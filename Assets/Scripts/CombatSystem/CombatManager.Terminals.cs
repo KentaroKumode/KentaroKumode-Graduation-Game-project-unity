@@ -221,8 +221,23 @@ namespace CombatSystem
                 foreach (var id in _deck.LastKept) if (usedNames.Remove(id)) usedKept++;
                 BossDownDiag.NoteKeptUse(_deck.LastKept.Count, usedKept);
             }
+            CueTerminals(b, o);                      // 合図 (#319・場の添字で読む ── FinishTurn が手札を書き換える前に)
             RemoveUsedFromRunDeck(o);                // (FinishTurn が手札を書き換える前に ── 場の添字で読む)
             _termRetain = _deck.FinishTurn(o);
+        }
+
+        /// <summary>このターンに発動した端子の合図 (#319): 発動・使い捨て・〈火葬の剣〉が外した端子。 知らせるだけ。</summary>
+        private static void CueTerminals(List<string> b, TerminalOutcome o)
+        {
+            foreach (int i in o.fired)
+            {
+                if (i < 0 || i >= b.Count) continue;
+                string id = b[i];
+                RaiseCue(CombatCue.TerminalFired, id);
+                var def = TerminalCards.Get(id);
+                if (def != null && def.disposable) RaiseCue(CombatCue.DisposableUsed, id);
+                if (id == TerminalIds.BurnOut && o.burnTarget >= 0 && o.burnTarget < b.Count) RaiseCue(CombatCue.BurnOut, b[o.burnTarget]);
+            }
         }
 
         /// <summary>ターン終了時の撃破を拾う (FinishTurnCommon が 2 か所で呼ぶ)。 <paramref name="enemyHpNow"/> ≤ 0 なら、 控えておいた撃破のボーナスを配る。

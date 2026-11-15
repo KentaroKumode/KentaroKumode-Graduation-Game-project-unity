@@ -53,7 +53,16 @@ namespace CombatSystem
         private int _diagHpTurnHead;
         private bool _diagChargeTurn;
 
+        /// <summary>ターンの頭のダウンの処理 (<see cref="BeginBossDownTurnCore"/>) と、 始まり・解けた時の合図 (#319)。</summary>
         private void BeginBossDownTurn(CombatContext ctx)
+        {
+            bool was = BossDown.ActiveNow;
+            BeginBossDownTurnCore(ctx);
+            if (!was && BossDown.ActiveNow) RaiseCue(CombatCue.BossDownStart);
+            else if (was && !BossDown.ActiveNow) RaiseCue(CombatCue.BossDownEnd);
+        }
+
+        private void BeginBossDownTurnCore(CombatContext ctx)
         {
             _diagHpTurnHead = playerHP; _diagChargeTurn = false;
             // 灰燼の王の〈業火〉の周期は HP 50% で 4 → 3 ターン (2026-11-14)。 このターンの周期の数え方に使う HP の割合をターンの頭に決める (取り消しの判定より前)

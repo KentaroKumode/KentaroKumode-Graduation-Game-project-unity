@@ -3714,6 +3714,35 @@ HP / 物資 / ターン / **充電ゲージ**（10 目盛り LED バー）/ **�
 
 ---
 
+### 18-6. 音（2026-11-15・#327）
+
+**方針**: 画面の中（液晶の中: 地図・戦闘の演出・地図の上の出来事）= **8bit 音源**（`Tools/sfx_gba.py`・`Tools/sfx_chip.py`）。画面の外（筐体の部品: GOLD の入れ物・パネルのボタン・数字ドラム・レーダー・GUI の出し入れ・窓・ダイス）= **実物の音の作り**（`Tools/sfx_analog.py`・採用した録音や生成は `Tools/sfx_real_apply.py`）。作る順は sfx_gba → sfx_chip → sfx_analog → sfx_real_apply（同名を上書きする）。音は `Assets/Resources/Game2DSfx/<名前>.wav`（git の管理外・#325）、鳴らすのは `Game2DSfx.Play("名前")`（同じ音は 30 ms 以内に重ねない）。**名前を組み立てて鳴らす音**（`dice_`・`radar_`・`wx_`・`coin_few_`）の頭の表は `Game2DSfx.ComposedPrefixes` の 1 か所で、sfx_real_apply.py がそれを読んで「コードに名前が無い wav を消す」掃除から外す（#326）。今は鳴らさないが消さない音（`crumble`・`sink`）は sfx_real_apply.py の `KEEP_UNUSED`。
+
+**音を鳴らす所の決まり**: 操作の音は**操作の関数か本体の出来事の側**で鳴らし、ボタンでもキーでも同じに鳴るようにする（#321）。成否のある操作は**できた時だけ**鳴らす（#323）。**できない操作**は `Game2DModal.ShowError`（失敗の音 `Game2DSfx.Error` = `ui_error`・無ければ `ui_click` を低く）で、選ぶ音と分ける（#324）。同じ出来事を 2 つの経路で鳴らさない（#322）。BOT がランを動かしている間（`GameHooks.BotDriving`）は、新しく足した合図の音（航行の HP・戦闘の合図）を鳴らさない。
+
+| 場面 | 出来事 | 音 | 鳴らす所 |
+|---|---|---|---|
+| 窓（筐体） | 開く / 閉じる / ボタン / 確定 / 行・タブ / ホバー | `ui_open` / `ui_close` / `ui_click` / `ui_confirm` / `ui_tab` / `ui_hover` | `Game2DModal` |
+| 窓（筐体） | できない操作（買えない・足りない・使えない） | `ui_error` | `Game2DModal.ShowError` |
+| 筐体 | GUI の出し入れ / 航行のボタン / 数字ドラム / GOLD の入れ物の開閉 | `gui_in`・`gui_out` / `nav_press` / `count_tick` / `pot_open`・`pot_close` | `Game2DHud`・`Game2DNavPanel`・`Game2DCounter`・`Game2DGoldPot` |
+| 筐体 | GOLD が増えた（報酬・売却など全部） | `coin_few_1/2`・`coin_pour_1〜3`（増えた量で段階） | `Game2DGoldPot.Payout` だけ |
+| 筐体 | レーダーの気配 | `radar_1〜3` | `Game2DRadar` |
+| 航行 | 歩いた（着いた点が雪の中なら低く・#331） | `step` | `Game2DSfxHost`（`FreeMapEvent.Arrived`・`WeatherAt(Me, Snow)`） |
+| 航行 | 偵察 / 照明 / 囮罠を置けた / 待つ | `recon` / `flare_launch` → `flare_burst` / `lure_set` / `ui_click` | `GameManager.OnNavFx`（`ReconTurn`・`UseFlare`・`TryPlaceLure`・`WaitTurn`） |
+| 航行 | 追跡者に見つかった / 警戒 / 見失った / 捕まった / 使い魔 / 囮罠を踏んだ | `chase_riser`→`chase_hit` / `alert` / `lost` / `caught` / `familiar` / `lure_hit` | `Game2DSfxHost`（`FreeMapEvent`） |
+| 航行 | HP を払った（物資切れの歩行・嵐・雹・#318） | `hurt` | `GameManager.OnNavHpPaid`（財布 `MapManager.RunWallet.PayHp`） |
+| 航行 | 嵐の段が進んだ（#317）・旧い前線の層では前線が進んだ | その嵐の天候の `wx_fog`・`wx_sand`・`wx_snow`・`wx_hail`（同じ音は 4 秒に 1 回） | `Game2DSfxHost.Weather` |
+| 航行 | 煙を使った | `flare_launch`（低く） | `FreeMapEvent.SmokeUsed` |
+| 航行 | 点を踏んだ / 層を降りた / 倒れた | `ui_open` / `floor_up` / `defeat` | `OnTileActivated`・`OnFloorAdvanced`・`FreeMapEvent.Died` |
+| 地図 | 点のホバー | `node_hover` | `Game2DMapView.Input` |
+| 戦闘 | 始まり / 敵の出現 / 決める / 配線 / ダイス | `battle_start` / `enemy_appear` / `decide` / `wire` / `dice_1〜3` | `Game2DBattleFx`・`Game2DBattleSim` |
+| 戦闘 | 振り・命中（武器の家系と会心）/ 被弾 / 防いだ / 盾のチャージ | `slash_swing` / `hit_slash`・`hit_crit`・`hit_axe`・`crit_axe`・`hit_shield`・`crit_shield` / `hit_enemy` / `block` / `charge_shield(_crit)` | `Game2DBattleFx`・`Game2DSfx.Hit` |
+| 戦闘 | 勝った / 負けた | `victory` / `defeat` | `Game2DBattleSim` |
+| 戦闘 | 激化の段が上がった（#319） | `alert`（低く） | `CombatManager.OnCue`（`EscalationUp`） |
+| 戦闘 | ボスのダウンの始まり・解けた / 役 / 端子の発動 / 使い捨て / 〈火葬の剣〉で外した / ヴェスカの段（#319） | まだ無い（合図だけ） | `CombatManager.OnCue` |
+
+**曲**（#313・#314・#315）: タイトルは `TitleBgm`（昼夜 2 曲・タイトル以外のフェーズでは 1 秒で消えて一時停止し、タイトルへ戻ると続きから）。タイトル以外は `Game2DBgm` が場面で選ぶ（ロード画面 `bgm_loading`・航行 `bgm_nav` / 嵐が来てから `bgm_nav_storm`・戦闘は敵の種類で `bgm_battle` / `bgm_elite` / `bgm_boss` / `bgm_boss_ash` / `bgm_boss_vesca` / `bgm_pursuer`・店 `bgm_shop`・休憩 `bgm_rest`・イベント `bgm_event`・〈門〉と裂け目の一択 `bgm_gate`・層を抜けた `bgm_floor_clear`・力尽きた `bgm_gameover`。名前は issue #293〜#312）。曲は `Resources/Game2DBgm/<名前>` に置き、**無ければ何も鳴らさない**（今は 1 曲も無い）。クロスフェード 0.8 秒。音量は設定の BGM の音量（`GameSettings.Bgm01`）だけで効く（TitleBgm の独自の消音は 2026-11-15 に廃止・§24）。ループの環境音の口は `Game2DSfx.Loop` / `StopLoop`（#316・使う所はまだ無い）。
+
 ## 19. 世界観（lore）
 
 **物語・世界観の確定稿。** ゲーム内テキストの出所をここに集約する。
@@ -5319,6 +5348,8 @@ BOT の払い方（`AutoRunner.Terminals` の `ChooseGoldPunch`）は実装済�
 
 | 対象 | 時期 | 理由 |
 |---|---|---|
+| **タイトルの曲の独自の消音（`TitleBgm` の `isMuted`・PlayerPrefs `TitleBgm.Muted`・ホットキー）** | 2026-11-15 | #315。設定の BGM の音量（`GameSettings.Bgm01`）と 2 系統で効いていた（シーンの既定が消音のままだと、設定を上げても鳴らない）。消したい時は設定の BGM の音量を下げる |
+| **〈崩れる地平〉〈沈み続ける湖面〉の音の呼び出し（`crumble`・`sink`）** | 2026-11-15 | #330。現象は廃止済み（§5-12・`Storm` が None に読み替える）で、嵐の層では鳴る契機が無かった。wav は git の管理外で戻せないので消さない（`Tools/sfx_real_apply.py` の `KEEP_UNUSED`・消すかどうかは #333 / #335） |
 | **端子 54 種の旧い名前（電気部品の名前）** | 2026-11-15 | ユーザーの決定で、戦闘の動きが分かる名前へ改名した（基本の 攻撃・防御・充電 と 剥ぎ取り・貫通弾・応急箱 は据え置き）。対応表（旧→新）: 定電圧→牽制斬り・検波器→片刃斬り・放電管→雷撃・決死→諸刃の剣・継電器→連係斬り・増圧→号令の剣・発振器→反復突き・二連→二刀流・ヒューズ→小盾・接地→受け流し・絶縁体→二重障壁・受け太刀→後の先・遮断器→大結界・整流器→倍加の雷・蓄電池→雷溜め・治癒→包帯・充填→力溜め・避雷器→防御陣・変圧器→剛腕・配電盤→先読み・主幹→千刃・増幅器→激昂・真空管→致命の一撃・共振器→共鳴・鋳造口→打ち直し・冷却材→鎮静香・計数器→柔軟な戦略・予熱器→無形の構え・双発→十字斬り・収穫機→魂狩り・研ぎ澄まし→処刑の刃・戦利品箱→賞金狩り・倍電圧→残響・呼び戻し→有効活用・停止信号→石化の瞳・二股→攻防一体・照星→一閃・急所読み→弱点看破・返し針→鉤爪・血抜き栓→血の渇き・霧吹き口→毒霧・毒見の秤→腐食の刃・焚き口→火種・余熱板→爆炎斬り・漏電口→招雷・大放電→裁きの雷・当て板→装甲板・盾押し口→重装突撃・起爆筒→火薬樽・非常弁→身代わり札・満充電→大導電・冷却弾→氷結瓶・写し取り→影写し・焼き切り→火葬の剣。id = 表示名なので、参照ごと 1 コミットで書き換えた（`TerminalIds`）。発売前なので旧名の読み替えの表は作らない（古い中断セーブの旧名は `TerminalCards.DropUnknownIds` で山札から外れる） |
 | **ヴェスカ 1・2 段目の大技（周期 5・大技 ×3.0・小技 ×0.8）と、ヴェスカの大技の絵としての「時が止まり凍った画面が砕ける / 画面が乱れ信号が切れる」** | 2026-11-15 | 作者の決定「天与、1・2・3・4 共通の大技に」→「1・2 では撃たなくてもいいかも」→ ok。ヴェスカの大技は 3・4 段目の天与（剣 / 盾 / 指輪の抽選・§13-4）にした。1・2 段目は遺物だけ（`heavyPeriod 0`・小技の倍率 ×0.8 も外れて ×1.0・未測定）。止まって砕ける / 乱れて切れる絵は、形態移行の演出（ダメージ無し）として残す |
 | **プレイヤーの攻撃で武器の絵を振る動き（剣・斧・短剣・盾。`BattleMotion.MakePlan` の溜め・振り抜き・保持、武器の絵、振りの光の軌跡、手描きの斬撃痕）** | 2026-11-15 | 作者の決定「そもそも最早武器のモーションは不要、パーティクルだけでいい」。武器の演出の絵（`weapon-家系-normal / crit`）を流す時に、振りの後の当たりを待つ作りだったので、剣の会心は振り抜いてから 1 秒なにも見えず、1.53 秒から絵が始まっていた。今は攻撃の頭から絵を流し、当たりの時刻は絵の側の表 `BattleMotion.WeaponSheetHits` で決める（§23-5）。振る動きのコードは、竜閃・素手・絵が読めない時のために残している |

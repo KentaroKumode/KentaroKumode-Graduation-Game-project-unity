@@ -164,9 +164,9 @@ namespace UI.Game2D
                     case "inc":
                         if (kind == null) break;
                         if (mpm.TryAssignRank(kind.Value)) Game2DSfx.Play("ui_confirm");
-                        else _modal.ShowToast(st.GetRank(kind.Value) >= kind.Value.MaxRank() ? "これ以上は上げられない" : "未配分のポイントが足りない");
+                        else _modal.ShowError(st.GetRank(kind.Value) >= kind.Value.MaxRank() ? "これ以上は上げられない" : "未配分のポイントが足りない");
                         break;
-                    case "dec": if (kind != null && !mpm.TryRefundRank(kind.Value)) _modal.ShowToast("これ以上は下げられない"); break;
+                    case "dec": if (kind != null && !mpm.TryRefundRank(kind.Value)) _modal.ShowError("これ以上は下げられない"); break;
                     case "slide":
                     {
                         if (kind == null) break;
@@ -174,13 +174,13 @@ namespace UI.Game2D
                         while (st.GetRank(kind.Value) > goal && guard++ < 16) if (!mpm.TryRefundRank(kind.Value)) break;
                         bool short_ = false;
                         while (st.GetRank(kind.Value) < goal && guard++ < 32) if (!mpm.TryAssignRank(kind.Value)) { short_ = true; break; }
-                        if (short_) _modal.ShowToast("未配分の pt が足りない (「pt を買う」で増やす)");
+                        if (short_) _modal.ShowError("未配分の pt が足りない (「pt を買う」で増やす)");
                         else Game2DSfx.Play("ui_click");
                         break;
                     }
                     case "buy":
                         if (mpm.TryPurchasePoint()) Game2DSfx.Play("ui_confirm");
-                        else _modal.ShowToast(mpm.IsPointCapReached ? "ポイントは上限" : "トークンが足りない (次 " + cost + ")");
+                        else _modal.ShowError(mpm.IsPointCapReached ? "ポイントは上限" : "トークンが足りない (次 " + cost + ")");
                         break;
                     case "page": _page = 1 - _page; break;
                     case "respec": mpm.RespecAllRanks(); _modal.ShowToast("全部の段を戻した"); break;

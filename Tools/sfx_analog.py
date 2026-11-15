@@ -72,6 +72,8 @@ x = np.zeros(int(0.3 * SR)); put(x, click(0.8, 1.1, 0.09), 0); put(x, click(1.0,
 x = np.zeros(int(0.2 * SR)); put(x, click(0.8, 1.0, 0.09), 0); put(x, bp(RNG.standard_normal(int(0.1 * SR)), 900, 3500) * np.sin(np.linspace(0, np.pi, int(0.1 * SR))) ** 2 * 0.25, 0.02); add('ui_open', x, -10)
 x = np.zeros(int(0.2 * SR)); put(x, bp(RNG.standard_normal(int(0.1 * SR)), 900, 3500) * np.sin(np.linspace(0, np.pi, int(0.1 * SR))) ** 2 * 0.25, 0); put(x, click(0.8, 0.9, 0.09), 0.09); add('ui_close', x, -10)
 x = np.zeros(int(0.12 * SR)); put(x, click(0.55, 1.5, 0.06), 0); put(x, click(0.45, 1.7, 0.06), 0.035); add('ui_tab', x, -12)
+# 失敗 (できない操作・#324・2026-11-15): 鈍いスイッチの「カッ・カッ」を 2 回 (確定より低く・暗く) + 筐体の低い唸り。 Game2DSfx.Error が鳴らす
+x = np.zeros(int(0.28 * SR)); put(x, click(0.9, 0.55, 0.09), 0); put(x, click(0.8, 0.5, 0.09), 0.1); put(x, ring(150, 0.06, 0.22, 0.22), 0.0); put(x, ring(147, 0.06, 0.18, 0.18), 0.1); add('ui_error', x, -10)
 x = np.zeros(int(0.2 * SR)); put(x, click(1.1, 0.9, 0.1), 0); put(x, click(1.0, 0.8, 0.1), 0.045); put(x, ring(520, 0.03, 0.15, 0.35), 0.05); add('decide', x, -9)
 add('wire', click(0.7, 1.5, 0.06), -11)
 add('count_tick', burst(1500, 6000, 0.001, 0.02, 0.8) + ring(2400, 0.004, 0.02, 0.4), -24, tail=0.2)

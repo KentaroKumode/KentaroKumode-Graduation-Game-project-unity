@@ -57,7 +57,7 @@ namespace UI.Game2D
                 _embers.Clear();
                 for (int i = 0; i < Embers; i++) _embers.Add(new Ember { at = 0.05f + Rnd() * 0.95f, vx = (Rnd() - 0.5f) * 16, life = 0.5f + Rnd() * 0.5f, dx = (Rnd() - 0.5f) * 8 });
             }
-            else { _reconActive = true; _reconT0 = Time.unscaledTime; _reconAnchor = anchor; }
+            else if (fx == GameManager.NavFx.Recon) { _reconActive = true; _reconT0 = Time.unscaledTime; _reconAnchor = anchor; }      // 囮罠・待つ (2026-11-15 に足した合図) は絵を出さない
         }
 
         // =====================================================================

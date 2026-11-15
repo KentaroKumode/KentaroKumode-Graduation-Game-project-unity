@@ -13,6 +13,10 @@ namespace UI.Game2D
     {
         /// <summary>全体の音量 (0〜1)。</summary>
         public static float Volume = 0.8f;
+
+        /// <summary>名前を組み立てて鳴らす音の頭 (dice_1〜3・radar_1〜3・wx_霧など・coin_few_1/2)。 <b>音の名前を文字列で書かない呼び方を足したら、 ここに頭を足す</b>。
+        /// Tools/sfx_real_apply.py はコードに "名前" が無い wav を消すが、 この表の頭で始まる音は残す (表はこの 1 か所・道具がこの行を読む・#326)。</summary>
+        public static readonly string[] ComposedPrefixes = { "dice_", "radar_", "wx_", "coin_few_" };
         private static readonly Dictionary<string, AudioClip> Clips = new Dictionary<string, AudioClip>();
         private static readonly Dictionary<string, float> Last = new Dictionary<string, float>();
         private static Game2DSfxHost _host;
@@ -47,6 +51,29 @@ namespace UI.Game2D
             var c = Get(name); if (c == null) return;
             _host.Shot(c, vol * Volume, pitch);
         }
+
+        /// <summary>できない操作の音 (#324・2026-11-15)。 押せない・足りない・使えない、 の時に 1 つの音で知らせる (選ぶ音 ui_click と分ける)。
+        /// 音 (ui_error・筐体の部品なので Tools/sfx_analog.py の実物寄りの音) がまだ無ければ、 ui_click を低く鳴らす。</summary>
+        public static void Error()
+        {
+            if (Get("ui_error") != null) Play("ui_error");
+            else Play("ui_click", 0.9f, 0.7f);
+        }
+
+        // ── ループの音 (#316・2026-11-15): 嵐の中にいる間などの環境音。 名前ごとに 1 本。 まだ使う所は無い ──
+        /// <summary>name をループで鳴らす (鳴っていれば音量だけ合わせる)。 fade 秒で立ち上がる。 音が無ければ何もしない。</summary>
+        public static void Loop(string name, float vol = 1f, float fade = 0.5f)
+        {
+            if (!Ensure()) return;
+            var c = Get(name); if (c == null) return;
+            _host.LoopOn(name, c, vol, fade);
+        }
+
+        /// <summary>ループを fade 秒で止める (鳴っていなければ何もしない)。</summary>
+        public static void StopLoop(string name, float fade = 0.5f) { if (_host != null) _host.LoopOff(name, fade); }
+
+        /// <summary>全部のループを止める (場面が変わった時など)。</summary>
+        public static void StopAllLoops(float fade = 0.5f) { if (_host != null) _host.LoopOffAll(fade); }
 
         /// <summary>sec 秒あとに鳴らす。</summary>
         public static void PlayDelayed(string name, float sec, float vol = 1f, float pitch = 1f)

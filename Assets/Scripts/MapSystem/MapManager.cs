@@ -273,6 +273,7 @@ namespace MapSystem
                 run.playerHP = Mathf.Max(0, run.playerHP - amount);
                 MetaProgression.Achievements.AchievementService.NoteExternalHpDamage(before - run.playerHP);
                 GameLoop.HpOutsideDiag.Add(Instance?.Sim?.HpPayReason ?? "移動", before - run.playerHP);   // [計装 2026-11-05]
+                GameLoop.GameManager.Instance?.NoteNavHpPaid(before - run.playerHP, Instance?.Sim?.HpPayReason ?? "移動");   // 合図 (#318・音の係が hurt を鳴らす)
                 return run.playerHP <= 0;
             }
         }

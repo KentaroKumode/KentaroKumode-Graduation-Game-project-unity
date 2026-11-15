@@ -132,7 +132,7 @@ namespace UI.Game2D
                     {
                         var gm = GameManager.Instance;
                         if (gm == null) return;
-                        if (!gm.SuspendAndReturnToTitle(out var why)) { modal.ShowToast(why ?? "保存できない"); return; }
+                        if (!gm.SuspendAndReturnToTitle(out var why)) { modal.ShowError(why ?? "保存できない"); return; }
                         Close();
                         return;
                     }
