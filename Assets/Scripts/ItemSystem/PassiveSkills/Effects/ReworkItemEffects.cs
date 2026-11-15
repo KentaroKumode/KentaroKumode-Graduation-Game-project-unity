@@ -129,9 +129,11 @@ namespace ItemSystem.PassiveSkills.Effects
 
     /// <summary>恒温の竈: 戦闘開始時、 前の戦闘の終わりに残っていた臨界の半分から始まる
     /// (RunState.pendingRinkaiCarryover を CombatManager が戦闘開始時に足す)。</summary>
-    public class MorningOven : IPassiveSkillEffect
+    public class MorningOven : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "恒温の竈";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Rw.Run?.pendingRinkaiCarryover ?? 0);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnBattleEnd };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -144,9 +146,11 @@ namespace ItemSystem.PassiveSkills.Effects
 
     /// <summary>溢れ取りの鋳型: 爆発のとき、 閾値を超えて溜まっていた臨界 1 につき、 次の攻撃の与ダメージ +2% (攻撃したら使い切る)。
     /// 2026-11-10: 旧「超えた臨界 1 につき爆発の追加ダメージ +2」から主攻撃へ返す形に変えた (5 層ボス戦で爆発が主攻撃を押しのけていた)。</summary>
-    public class OverflowMold : IPassiveSkillEffect
+    public class OverflowMold : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "溢れ取りの鋳型";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Pct(ctx.GetAccumulated(PctKey));
         public const float PctPerExcess = 0.02f;
         /// <summary>[persistent・戦闘開始で 0・攻撃したら 0] 溜まっている与ダメージの率。</summary>
         public const string PctKey = "rw.moldPct";
@@ -167,9 +171,11 @@ namespace ItemSystem.PassiveSkills.Effects
 
     /// <summary>二度目の打金: 爆発した次のターン、 与ダメージ +30%。
     /// 2026-11-10: 旧「爆発した次のターンも、 追加ダメージの半分が乗る」(爆発の残響 = 固定ダメ枠) から主攻撃へ返す形に変えた。</summary>
-    public class SecondStrike : IPassiveSkillEffect
+    public class SecondStrike : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "二度目の打金";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(Rw.Count(ctx, Kw.BurstAppliedTurnKey) > 0 && (Rw.Count(ctx, Kw.BurstAppliedTurnKey) == ctx.currentTurn || Rw.Count(ctx, Kw.BurstAppliedTurnKey) == ctx.currentTurn - 1));
         public const float Pct = 0.30f;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnPostRoll };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
@@ -233,9 +239,11 @@ namespace ItemSystem.PassiveSkills.Effects
 
     /// <summary>荒砥: 爆発した攻撃が通ると敵に出血 +4。 爆発 1 回につき、 この戦闘中の与ダメージ +5% (積もる・上限なし)。
     /// 2026-11-10: 「攻撃が通るたび臨界 +3」を与ダメージへ差し替えた (爆発が主攻撃へ返る口)。</summary>
-    public class RoughWhetstone : IPassiveSkillEffect
+    public class RoughWhetstone : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "荒砥";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Pct(ctx.GetAccumulated(PctKey));
         public const float PctPerBurst = 0.05f;
         /// <summary>[persistent・戦闘開始で 0] 積もった与ダメージの率。</summary>
         public const string PctKey = "rw.aratoPct";
@@ -253,9 +261,11 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>無害灯: 臨界が 10 以上の間、 受けるダメージ −2。</summary>
-    public class HarmlessLamp : IPassiveSkillEffect
+    public class HarmlessLamp : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "無害灯";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.rinkaiMeter >= 10);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnTurnStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -265,9 +275,11 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>工廠の材料箱: 爆発のたび、 この戦闘中の自分の防御 +2。</summary>
-    public class ArsenalCrate : IPassiveSkillEffect
+    public class ArsenalCrate : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "工廠の材料箱";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Rw.Count(ctx, Key));
         private const string Key = "rw.arsenal";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnRinkaiBurst, PassiveSkillTrigger.OnTurnStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
@@ -280,9 +292,11 @@ namespace ItemSystem.PassiveSkills.Effects
 
     /// <summary>継ぎ革の旅靴: マップを 1 歩進むごとに、 次の戦闘の開始時の臨界 +2。
     /// 2026-11-06: 旧 +3 は配線を払わない燃料で、 クリアしたランの 94% が持っていた。</summary>
-    public class PatchedBoots : IPassiveSkillEffect
+    public class PatchedBoots : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "継ぎ革の旅靴";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Rw.Steps);
         public const int PerStep = 2;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
@@ -338,9 +352,11 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 2026-11-10: 「溢れた充電 2 につき出目 +5%」から変更 (出目 +% の掛け先が小さすぎた)。
     /// 2026-11-07: 旧「溢れた充電 1 につき次の攻撃 +2」は、 満タンのあと充電端子に挿した出目 1 が攻撃 +2 になり
     /// (攻撃端子は +1)、 余った資源で強さを買える穴だった。</summary>
-    public class OldGauge : IPassiveSkillEffect
+    public class OldGauge : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "十五年目の計測器";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Rw.Count(ctx, Key));
         private const string Key = "rw.gauge";
         public const float PctPer1 = 0.03f;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnOvercharge, PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnWired };
@@ -397,9 +413,11 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>雷鯰の棘: 充電 7 以上の間、 攻撃が通るたび敵に毒 +1。</summary>
-    public class CatfishSpine : IPassiveSkillEffect
+    public class CatfishSpine : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "雷鯰の棘";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.GetCharge() >= 7);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -471,17 +489,21 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>聖路の白靴: マップを 1 歩進むごとに、 次の戦闘の開始時のシールド +2。</summary>
-    public class HolyRoadShoes : IPassiveSkillEffect
+    public class HolyRoadShoes : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "聖路の白靴";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Rw.Steps);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => Rw.Shield(ctx, Rw.Steps * 2, SkillId);
     }
 
     /// <summary>相棒の魂: シールドが割られて 0 になったとき、 割られる前の量の半分で張り直す (1 戦闘 1 回)。</summary>
-    public class CompanionSoul : IPassiveSkillEffect
+    public class CompanionSoul : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "相棒の魂";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Once(Rw.Count(ctx, "rw.companion") > 0, true);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnShieldBreak };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -494,9 +516,11 @@ namespace ItemSystem.PassiveSkills.Effects
 
     /// <summary>二拍目の心臓: HP が 50% を下回った瞬間にシールド (最大 HP の 50%) (1 戦闘 1 回)。
     /// 旧〈命脈〉から戦闘開始時の回復を外した。</summary>
-    public class SecondBeatHeart : IPassiveSkillEffect
+    public class SecondBeatHeart : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "二拍目の心臓";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Once(Rw.Count(ctx, "rw.secondBeat") > 0, true);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostReceiveDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -510,9 +534,11 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>重装兵の隠し刃: 敵の HP が 30% 以下になったターン、 シールドを最大 <see cref="MaxSpend"/> 使い、 使った量 × 2 を攻撃に加える (1 戦闘 1 回)。</summary>
-    public class KnightsTrump : IPassiveSkillEffect
+    public class KnightsTrump : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "重装兵の隠し刃";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Once(Rw.Count(ctx, "rw.trump") > 0, ctx.enemyMaxHP > 0 && ctx.enemyCurrentHP * 100 <= ctx.enemyMaxHP * 30 && ctx.consShield > 0);
         /// <summary>1 回に使うシールドの上限 (2026-11-04・仮置き)。 全部使う形だと平均 40 使って攻撃 +80 になり、
         /// 攻撃の加算全体の 15% をこの 1 品が占めていた。 使わなかった分のシールドは残る。</summary>
         public const int MaxSpend = 20;
@@ -531,9 +557,11 @@ namespace ItemSystem.PassiveSkills.Effects
     /// <summary>敗残兵の部隊章: シールドを 5 失うたび (吸収・半減とも) 刻み +1。 攻撃の端子を挿したターン、
     /// 刻み 1 つにつき攻撃の端子を挿した出目 +10% (使い切る)。
     /// 2026-11-06: 旧「この戦闘中の攻撃 +1」は戦闘が長いほど積み上がり、 攻撃+N の 16% を占めた。</summary>
-    public class VeteranPatch : IPassiveSkillEffect
+    public class VeteranPatch : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "敗残兵の部隊章";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Rw.Count(ctx, Stk));
         private const string Stk = "rw.veteranAtk";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnShieldAbsorb, PassiveSkillTrigger.OnShieldDecay, PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnWired };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
@@ -592,9 +620,11 @@ namespace ItemSystem.PassiveSkills.Effects
 
     /// <summary>力みの小手: シールドを合計 10 得るたび 刻み +1。 攻撃の端子を挿したターン、
     /// 刻み 1 つにつき攻撃の端子を挿した出目 +10% (使い切る)。 2026-11-06: 旧「この戦闘中の攻撃 +1」。</summary>
-    public class StrainGauntlet : IPassiveSkillEffect
+    public class StrainGauntlet : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "力みの小手";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Rw.Count(ctx, Stk));
         private const string Stk = "rw.gauntletAtk";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnShieldGain, PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnWired };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
@@ -613,9 +643,11 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 2026-11-10: 旧「攻撃が通るたび、 敵に毒 +2」から、 溜めた毒を主攻撃へ返す形に変えた (毒 1 スタックを 0.05% に下げた代わり)。
     /// 毒 +2 は毒を最も深く積んだ時だけ残す。
     /// 2026-11-06: 旧「戦闘開始時 毒 +2」は配線を払わない燃料で、 クリアしたランの 94% が持っていた。</summary>
-    public class GreenKnife : IPassiveSkillEffect
+    public class GreenKnife : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "緑染みの小刀";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.EnemyPoison / PerStacks > 0);
         public const int PerStacks = 5;
         public const float Pct = 0.05f;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnPostDealDamage };
@@ -632,9 +664,11 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>毒塗りの楔: ブロック端子に 2 個以上挿したターン、 敵が攻撃してきたら毒 +4 (2026-11-07: 旧 +2)。</summary>
-    public class PoisonWedge : IPassiveSkillEffect
+    public class PoisonWedge : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "毒塗りの楔";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(env.Block(ctx) >= 2);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -644,9 +678,11 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>毒草摘みの杖: マップを 1 歩進むごとに、 次の戦闘の開始時の毒 +1 (2026-11-07: 旧 2 歩につき +1)。</summary>
-    public class HerbStaff : IPassiveSkillEffect
+    public class HerbStaff : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "毒草摘みの杖";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Rw.Steps);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => Rw.Poison(ctx, Rw.Steps);
     }
@@ -709,9 +745,11 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 2026-11-10: 旧「その量の半分の臨界」から作り直した (毒が爆発へ流れる口を閉じ、 主攻撃へ返す)。 以下は旧効果の経緯。
     /// 2026-11-06: 旧「その量の臨界」は最大 HP の割合で入る毒をそのまま固定 50 の爆発にも換え、 毒を二重に数えていた
     /// (7 層ボスで爆発のダメージ/T が香炉あり 35.4・なし 6.6、 クリアしたランの所持率 97%)。</summary>
-    public class LongCenser : IPassiveSkillEffect
+    public class LongCenser : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "主より長い香炉";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Pct(ctx.GetAccumulated(PctKey));
         public const float PctPerTick = 0.05f;
         /// <summary>[persistent・戦闘開始で 0] 積もった与ダメージの率。</summary>
         public const string PctKey = "rw.censerPct";
@@ -727,9 +765,11 @@ namespace ItemSystem.PassiveSkills.Effects
     /// <summary>加重の拳套: 攻撃が通るたび (1 ターンに 1 回) 刻み +1。 刻み 1 つにつき与ダメージ +3%。 戦闘が終わると刻みは 0 に戻る。
     /// 2026-11-11 (#100): 毒の品から作り直した ── 拳套なのに毒で、 名前・フレーバー (「留め紐は一撃ごとに長くなる。 外すと元へ戻る」) と
     /// 効果が合っていなかった。 軸なし。 数値は仮置き (未測定)。 旧効果は「敵の毒が 5 増えるたび刻み +1・攻撃に挿したターンに使い切る」。</summary>
-    public class WeightingGauntlet : IPassiveSkillEffect
+    public class WeightingGauntlet : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "加重の拳套";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Rw.Count(ctx, Stk));
         public const float PctPerStack = 0.03f;
         /// <summary>[persistent・戦闘開始で 0] 刻みの数。</summary>
         private const string Stk = "rw.weightStacks";
@@ -818,9 +858,11 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>激情の刃: HP が 50% 以下の間、 攻撃が通るたび敵に出血 +2。</summary>
-    public class FuryBlade : IPassiveSkillEffect
+    public class FuryBlade : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "激情の刃";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.playerMaxHP > 0 && ctx.playerCurrentHP * 2 <= ctx.playerMaxHP);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -847,9 +889,11 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>天工開物: 武器を強化するたび、 以後の戦闘の開始時の臨界 +5 (累積)。 強化の回数は RunState が数える。</summary>
-    public class TenkouKaibutsu : IPassiveSkillEffect
+    public class TenkouKaibutsu : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "天工開物";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Rw.Run?.heavenlyCraftUpgrades ?? 0);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -902,9 +946,11 @@ namespace ItemSystem.PassiveSkills.Effects
     // ============================================================
 
     /// <summary>測量師の片眼鏡: マップを 1 歩進むごとに、 次の戦闘の会心率 +1% (その戦闘の間)。</summary>
-    public class SurveyorMonocle : IPassiveSkillEffect
+    public class SurveyorMonocle : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "測量師の片眼鏡";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Rw.Count(ctx, Key));
         private const string Key = "rw.surveyor";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnWired };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
@@ -915,9 +961,11 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>烈刃: 臨界 2 につき会心率 +1%。</summary>
-    public class FierceBlade : IPassiveSkillEffect
+    public class FierceBlade : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "烈刃";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.rinkaiMeter / 2 > 0);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnWired };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -927,9 +975,11 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>遅効の毒刃: 敵の毒が増えた次のターン、 増えた毒 5 につき会心率 +5% (2026-11-07: 旧 毒 1 につき)。</summary>
-    public class SlowPoisonBlade : IPassiveSkillEffect
+    public class SlowPoisonBlade : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "遅効の毒刃";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Rw.Count(ctx, Last) / 5);
         private const string Cur = "rw.slowPoison.cur", Last = "rw.slowPoison.last";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPoisonGain, PassiveSkillTrigger.OnTurnStart, PassiveSkillTrigger.OnWired };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
