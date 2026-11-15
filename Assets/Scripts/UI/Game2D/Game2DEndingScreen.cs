@@ -25,10 +25,16 @@ namespace UI.Game2D
         public const float LineReveal = 0.12f;
         private const float FadeSec = 0.35f;
         // 配置 (dot): 液晶の湾曲で端が切れるので、 左右 40・上 30・下 26 の内側
-        private const int Left = 40, TextW = 400, TitleY = 30, BodyY = 56, FootY = 232, LinesPerPage = 13;
+        //   題は 2 倍のドット字で中央 (2026-11-15 撮影: 小さく左上に寄りすぎていた)
+        private const int Left = 40, TextW = 400, TitleY = 26, TitleScale = 2, BodyY = 64, FootY = 232, LinesPerPage = 12;
 
-        private static readonly Color32 Bg = new Color32(0x07, 0x10, 0x15, 255), Ink = new Color32(0xd8, 0xec, 0xf2, 255),
-            Dim = new Color32(0x4d, 0x6a, 0x76, 255), Amber = new Color32(0xf0, 0xb0, 0x50, 255);
+        // 読みやすさ (2026-11-15 撮影: 液晶のにじみで本文が読みにくかった): 液晶の効果全体は弱めず、 字の側で抑える ──
+        //   ① 字の色を明るさ 8 割ほどに落とす (白に近い字ほどにじみが広がる)  ② 字の周り 1 dot (8 方向) に地より暗い縁取りを打ち、 にじみが字の間を埋めないようにする
+        private static readonly Color32 Bg = new Color32(0x07, 0x10, 0x15, 255), Ink = new Color32(0xb4, 0xc8, 0xce, 255),
+            Dim = new Color32(0x4d, 0x6a, 0x76, 255), Amber = new Color32(0xd8, 0x9c, 0x48, 255), Rim = new Color32(0x02, 0x05, 0x07, 255);
+
+        /// <summary>読み終わって閉じた回数 (場面の窓 Game2DPhaseScreens が見て、 閉じた後に「踏破」の窓を必ず作り直す)。</summary>
+        public static int ClosedSerial { get; private set; }
 
         /// <summary>出している間 (と、 閉じたフレーム) は true。 GUI・場面の窓・キー入力がこれを見る。</summary>
         public static bool Blocking => _active || _endFrame == Time.frameCount;
@@ -164,9 +170,13 @@ namespace UI.Game2D
             if (_pix == null || _pages.Count == 0) return;
             var p = _pix; p.Rect(0, 0, W, H, Bg);
             var pg = _pages[_page];
-            if (!string.IsNullOrEmpty(pg.title)) Game2DJpFont.Draw(p, pg.title, Left, TitleY, Amber);
+            if (!string.IsNullOrEmpty(pg.title))
+            {
+                int tw = Game2DJpFont.Width(pg.title) * TitleScale;
+                Text(p, pg.title, (W - tw) / 2, TitleY, Amber, TitleScale);
+            }
             int shown = Mathf.Min(pg.lines.Count, Mathf.FloorToInt(_t / LineReveal) + 1);
-            for (int i = 0; i < shown; i++) Game2DJpFont.Draw(p, pg.lines[i], Left, BodyY + i * Game2DJpFont.LineH, Ink);
+            for (int i = 0; i < shown; i++) Text(p, pg.lines[i], Left, BodyY + i * Game2DJpFont.LineH, Ink, 1);
             bool done = shown >= pg.lines.Count;
             string foot = (_page + 1) + " / " + _pages.Count;
             Game2DJpFont.Draw(p, foot, Left + TextW - Game2DJpFont.Width(foot), FootY, Dim);
@@ -174,9 +184,22 @@ namespace UI.Game2D
             _tex.SetPixels32(p.px); _tex.Apply(false);
         }
 
+        /// <summary>字を打つ: 先に周り 1 dot (8 方向) を暗い縁取り、 その上に字。 scale = 1 dot を scale×scale で打つ (整数倍・補間しない)。</summary>
+        private static void Text(KitPix p, string s, int x, int y, Color32 c, int scale)
+        {
+            var dots = new List<Vector2Int>();
+            Game2DJpFont.Draw((px, py) => dots.Add(new Vector2Int(px, py)), s, x, y);
+            foreach (var d in dots)
+            {
+                int bx = x + (d.x - x) * scale, by = y + (d.y - y) * scale;
+                p.Rect(bx - 1, by - 1, scale + 2, scale + 2, Rim);
+            }
+            foreach (var d in dots) p.Rect(x + (d.x - x) * scale, y + (d.y - y) * scale, scale, scale, c);
+        }
+
         private void Stop()
         {
-            _active = false; _endFrame = Time.frameCount; _closing = false; Track = null;
+            _active = false; _endFrame = Time.frameCount; _closing = false; Track = null; ClosedSerial++;
             GameManager.InputBlockedByScreen = false;
             if (_quad != null) _quad.enabled = false;
         }
