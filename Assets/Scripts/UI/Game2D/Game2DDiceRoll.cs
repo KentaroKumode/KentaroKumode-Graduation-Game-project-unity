@@ -38,31 +38,32 @@ namespace UI.Game2D
         public static float DurOf(int i) => Dur + Stagger * Mathf.Clamp(i, 0, 3);
 
         // ── 面の絵 ──
+        // 板の絵: 見本 (Captures の die_faces_style) と同じ取り方。 '.' = 透明 (上の 1 行と左の 1 列は空き・右と下に影の縁)
         private static readonly Color32[] Pal =
         {
-            new Color32(211, 202, 176, 255), new Color32(38, 40, 39, 255), new Color32(38, 43, 39, 255), new Color32(43, 44, 40, 255), new Color32(198, 187, 159, 255),
-            new Color32(108, 111, 109, 255), new Color32(130, 135, 131, 255), new Color32(90, 97, 95, 255), new Color32(109, 116, 112, 255), new Color32(209, 202, 179, 255),
+            new Color32(38, 40, 39, 255), new Color32(211, 202, 176, 255), new Color32(198, 187, 159, 255), new Color32(43, 44, 40, 255), new Color32(108, 111, 109, 255),
+            new Color32(38, 43, 39, 255), new Color32(130, 135, 131, 255), new Color32(209, 202, 179, 255), new Color32(109, 116, 112, 255),
         };
         private static readonly string[] Plate =
         {
-            "bbbcbbbccbbdbbbbbb",
-            "baaeeaaaaaaaaaaafb",
-            "baaaaaaaaaagaaaafb",
-            "baaaaaaaaaaaaaaafb",
-            "baaaaaaaaaaaaaaafb",
-            "baaaaaaaaaaaaaaafb",
-            "baaaaaaaaaaaaaagcb",
-            "baaaaaaaaaaaaaaahb",
-            "baaaaaaaaaaaaaaafb",
-            "baaaaaaaaaaaaaaafb",
-            "bagaaaaaaaaaaaaafb",
-            "baeaaaaaaaaaaaaaib",
-            "baaaaaaaaaaaaaaafb",
-            "baaaaaaaaaaaaaaafb",
-            "baaaaaaaaaagaaaafb",
-            "baajaaaaaaaaaaaafb",
-            "bfhfchhhhfffiffhbb",
-            "bbbbbbbbbbbbbbbbbb",
+            "..................",
+            ".abbcbbbbbcdabeeea",
+            ".bbbbbbbbbbbbbbbba",
+            ".bbbbbbbbbbbbbbbbf",
+            ".bbbbbbbbbbbbbbbba",
+            ".bbbbbbbbbbbbbbbba",
+            ".bbbbbbbbbbbbbbbbf",
+            ".ebbbbbbbbbbbbbbgf",
+            ".hbbbbbbbbbbbbbbba",
+            ".bbbbbbbbbbbbbbbba",
+            ".cbbbbbbbbbbbbbbba",
+            ".hbbbbbbbbbbbbbbbf",
+            ".egbbbbbbbbbbbbbba",
+            ".ibbbbbbbbbbbbbbba",
+            ".ibbbbbbbbbbbbbbbf",
+            ".ebhbbbbbbbbbbbbba",
+            ".ebhhbbbbbbbcbbbba",
+            ".afffdfaaaaadaaaab",
         };
         private static readonly int[][] Pips =
         {
@@ -70,7 +71,7 @@ namespace UI.Game2D
             new[] { 0, 2, 3, 5, 6, 8 }, new[] { 0, 2, 3, 4, 5, 6, 8 }, new[] { 0, 1, 2, 3, 5, 6, 7, 8 }, new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8 },
         };
         private static readonly int[] PipAt = { 2, 7, 12 };
-        private static readonly Color32 PipCol = new Color32(38, 40, 39, 255);
+        private static readonly Color32 PipCol = new Color32(38, 40, 39, 255), PipHi = new Color32(121, 126, 122, 255);
         private static readonly Dictionary<int, Color32[]> _faces = new Dictionary<int, Color32[]>();
 
         /// <summary>出目 v (1〜9) の面の絵 (18×18・上の行から)。 enemy = 敵の出目 (赤みへ寄せる)。 範囲の外の v は点の無い板。</summary>
@@ -82,6 +83,7 @@ namespace UI.Game2D
             for (int y = 0; y < Face; y++)
                 for (int x = 0; x < Face; x++)
                 {
+                    if (Plate[y][x] == '.') { a[y * Face + x] = new Color32(0, 0, 0, 0); continue; }
                     var c = Pal[Plate[y][x] - 'a'];
                     if (enemy) c = new Color32((byte)(c.r * 0.95f), (byte)(c.g * 0.84f), (byte)(c.b * 0.9f), 255);
                     a[y * Face + x] = c;
@@ -92,7 +94,7 @@ namespace UI.Game2D
                         for (int x = 0; x < 4; x++)
                         {
                             if ((x == 0 || x == 3) && (y == 0 || y == 3)) continue;      // 角を落として丸く
-                            a[(PipAt[k / 3] + y) * Face + PipAt[k % 3] + x] = PipCol;
+                            a[(PipAt[k / 3] + y) * Face + PipAt[k % 3] + x] = x == 2 && y == 2 ? PipHi : PipCol;      // 右下に 1 dot の照り
                         }
             _faces[key] = a; return a;
         }
@@ -101,7 +103,7 @@ namespace UI.Game2D
         public static void DrawFace(KitPix p, int x, int y, int v, bool enemy = false)
         {
             var a = FaceImg(v, enemy);
-            for (int j = 0; j < Face; j++) for (int i = 0; i < Face; i++) p.Set(x + i, y + j, a[j * Face + i]);
+            for (int j = 0; j < Face; j++) for (int i = 0; i < Face; i++) if (a[j * Face + i].a > 0) p.Set(x + i, y + j, a[j * Face + i]);
         }
 
         // ── 振る動き ──
@@ -153,7 +155,7 @@ namespace UI.Game2D
                         float x = (px + 0.5f) / K, y = (py + 0.5f) / K;
                         int u = Mathf.FloorToInt(x * c - y * sn + h), w = Mathf.FloorToInt(x * sn + y * c + h);
                         if (u < 0 || w < 0 || u >= Face || w >= Face) continue;
-                        var col = f[w * Face + u]; int i = (py + r) * n + (px + r);
+                        var col = f[w * Face + u]; if (col.a == 0) continue; int i = (py + r) * n + (px + r);
                         _acc[i * 3] += col.r; _acc[i * 3 + 1] += col.g; _acc[i * 3 + 2] += col.b; _cov[i]++;
                     }
             }
