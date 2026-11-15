@@ -8,7 +8,7 @@ namespace UI.Game2D
     /// <para><b>面の絵</b>: 欠けのある象牙色の板 (元は gui2d/battle_ui/die.png を 18×18 に取った物) に、 丸い点で目を打つ。 1〜9 まで。</para>
     ///
     /// <para><b>振る動き</b>: 立体にしない。 板が平面の上で回り、 <b>90 度回るたびに、 持っている面のどれかへ目が替わる</b>。
-    /// だんだん遅くなり、 最後の 90 度で止まる目になる。 回っている間は、 少し前の姿をディザの残像で後ろに置く (<see cref="Render"/>)。
+    /// だんだん遅くなり、 最後の 90 度で止まる目になる。 回っている間は、 角の後ろに円弧の筋を引いて回る向きの流れを出す (<see cref="Render"/>)。
     /// 回す絵は <b>ドットの格子に乗せ直さない</b> (作者の決定・1 ドット = <see cref="K"/> 画素の板を、 画素の細かさで回す) ので、
     /// 板の絵 (KitPix) ではなく、 細かい絵 (<see cref="TexSize"/> 四方) を別に重ねて出す。 止まったら、 いつもの 18×18 の絵に戻る。</para></summary>
     public static class Game2DDiceRoll
@@ -30,7 +30,7 @@ namespace UI.Game2D
         /// <summary>減速の強さ。</summary>
         public const float Ease = 2.2f;
         public const int Fps = 12;
-        /// <summary>残像が遡る長さ (コマ)。 いちばん古い残像が、 この分だけ前の姿。</summary>
+        /// <summary>流れの筋の長さを決める時間 (コマ)。 この間に回った角度が筋の長さ。</summary>
         public const float Blur = 0.6f;
         public static float DurOf(int i) => Dur + Stagger * Mathf.Clamp(i, 0, 3);
 
@@ -132,39 +132,47 @@ namespace UI.Game2D
             v = seq[Mathf.Min(q, seq.Length - 1)];
         }
 
-        // 4×4 の並べ方 (ベイヤー)。 ドットの格子 (1 ドット = K 画素) ごとに 1 つの値
-        private static readonly int[] Bayer = { 0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5 };
-        /// <summary>残像の濃さ (新しい順・ドットを打つ割合)。 枚数 = 長さ。</summary>
-        private static readonly float[] GhostDensity = { 0.7f, 0.5f, 0.3f, 0.15f };
-        private static readonly int[] _pv = new int[8]; private static readonly float[] _pc = new float[8], _ps = new float[8];
+        /// <summary>true = 回る板と筋を、 ドットの格子に乗せて描く (ピクセルパーフェクト)。 false = 画素の細かさで回す。 見比べ用 (戦闘中に F8 で切り替え)。</summary>
+        public static bool PixelPerfect;
+        // 流れの筋: (半径 dot・長さの倍率・角からの空き rad)。 角が通る円の上と、 その内側に 1 本
+        private static readonly float[][] Arcs = { new[] { 12.3f, 1.0f, 0.10f }, new[] { 10.6f, 0.6f, 0.30f } };
+        /// <summary>筋の長さの上限 (度)。</summary>
+        public const float MaxSpanDeg = 60f;
+        private static readonly Color32 ArcHead = new Color32(211, 202, 176, 255), ArcTail = new Color32(130, 135, 131, 255);
+
+        private static float Turned(float tt, float dur) { float k = Mathf.Clamp01(tt / dur); return Quarters * Mathf.PI * 0.5f * (1f - Mathf.Pow(1f - k, Ease)); }
 
         /// <summary>振っている 1 コマを dst (<see cref="TexSize"/> 四方・Texture2D の並び = 下の行から) へ描く。 t = 振り始めからの秒 (コマに丸めた値)、 dur = このダイスが止まるまでの秒。
         ///
-        /// <para><b>残像</b> (作風・2026-11-15 作者「溶けて見える・残像感が無い」を受けて): 今の姿は欠けなくそのまま描く。 その後ろに、 少し前の姿を <see cref="GhostDensity"/> の枚数だけ、
-        /// 古いほどまばらなディザ (ドットの格子のベイヤー) で置く。 色は混ぜない・半透明なし・出る色は板の絵の色だけ。
-        /// 速い所ほど残像が今の姿から離れて角の後ろに尾を引き、 止まると重なって消える。</para></summary>
+        /// <para><b>回る向きの流れ</b> (2026-11-15 作者「溶けて見える」「残像感が無い」「回転方向へのフローが足りない」を受けて):
+        /// 今の姿は欠けなくそのまま描く。 板の外に、 4 つの角の後ろへ 1 ドット幅の円弧の筋を引く (角が通った円の上)。
+        /// 筋の長さは速さに比例 (1 コマの <see cref="Blur"/> 倍の間に回った角度・上限 <see cref="MaxSpanDeg"/>)。 頭は象牙色・途中から灰・尻尾は 1 つ飛ばし。
+        /// 色は混ぜない・半透明なし。 止まると筋は消える。</para></summary>
         public static void Render(Color32[] dst, int[] seq, float t, float dur, bool ccw)
         {
-            int n = TexSize; float h = Face * 0.5f; int r = Reach * K, g = GhostDensity.Length;
-            for (int s = 0; s <= g; s++)
-            {
-                float tt = t - (Blur / Fps) * (s / (float)g);
-                Pose(seq, tt, dur, out _pv[s], out float ang); if (ccw) ang = -ang;
-                _pc[s] = Mathf.Cos(-ang); _ps[s] = Mathf.Sin(-ang);
-            }
-            for (int py = -r; py < r; py++)
-                for (int px = -r; px < r; px++)
+            int n = TexSize; float h = Face * 0.5f; int r = Reach * K; int cell = PixelPerfect ? K : 1;
+            Pose(seq, t, dur, out int v, out float ang);
+            float span = Mathf.Min(Turned(t, dur) - Turned(t - Blur / Fps, dur), MaxSpanDeg * Mathf.Deg2Rad);
+            float c0 = Mathf.Cos(-ang), s0 = Mathf.Sin(-ang); var f = FaceImg(v); const float half = Mathf.PI * 0.5f;
+            for (int py = 0; py < n; py++)
+                for (int px = 0; px < n; px++)
                 {
-                    float x = (px + 0.5f) / K, y = (py + 0.5f) / K; int o = (n - 1 - (py + r)) * n + (px + r);
-                    float th = (Bayer[(((py + r) / K) & 3) * 4 + (((px + r) / K) & 3)] + 0.5f) / 16f;
-                    var outc = new Color32(0, 0, 0, 0);
-                    for (int s = 0; s <= g; s++)
+                    // ピクセルパーフェクトの時は、 ドットのます (K×K) の中心で 1 回だけ決める
+                    float x = ((px / cell) * cell + cell * 0.5f - r) / K, y = ((py / cell) * cell + cell * 0.5f - r) / K;
+                    if (ccw) x = -x;
+                    int o = (n - 1 - py) * n + px; var outc = new Color32(0, 0, 0, 0);
+                    int u = Mathf.FloorToInt(x * c0 - y * s0 + h), w = Mathf.FloorToInt(x * s0 + y * c0 + h);
+                    if (u >= 0 && w >= 0 && u < Face && w < Face && f[w * Face + u].a > 0) { dst[o] = f[w * Face + u]; continue; }
+                    float rho = Mathf.Sqrt(x * x + y * y), phi = Mathf.Atan2(y, x);
+                    for (int a = 0; a < Arcs.Length; a++)
                     {
-                        if (s > 0 && GhostDensity[s - 1] <= th) continue;      // この残像は、 このドットには打たない
-                        int u = Mathf.FloorToInt(x * _pc[s] - y * _ps[s] + h), w = Mathf.FloorToInt(x * _ps[s] + y * _pc[s] + h);
-                        if (u < 0 || w < 0 || u >= Face || w >= Face) continue;
-                        var c = FaceImg(_pv[s])[w * Face + u]; if (c.a == 0) continue;
-                        outc = c; break;
+                        float R = Arcs[a][0], len = span * Arcs[a][1], gap = Arcs[a][2];
+                        if (Mathf.Abs(rho - R) >= 0.5f || len < 0.06f) continue;
+                        float d = Mathf.Repeat(ang + Mathf.PI * 0.25f - 0.02f - phi, half);      // 前の角までの角度 (回る向きに測る)
+                        if (d < gap || d > gap + len) continue;
+                        float q = (d - gap) / len;
+                        if (q < 0.45f) outc = ArcHead;
+                        else if (q < 0.8f || ((int)(d * R) & 1) == 0) outc = ArcTail;
                     }
                     dst[o] = outc;
                 }
