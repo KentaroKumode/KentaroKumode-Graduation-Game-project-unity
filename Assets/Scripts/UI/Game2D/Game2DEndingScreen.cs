@@ -57,10 +57,16 @@ namespace UI.Game2D
         private readonly List<Page> _pages = new List<Page>();
         private int _page; private float _t, _fadeT; private bool _closing;
         private RunState _doneRun;
+        // 出した時のフェーズとラン (#328): どちらかが変わったら、 閉じる動きの途中でもすぐ片付ける
+        private GameManager.GamePhase _playPhase; private RunState _playRun;
+        private GameManager _subscribed;
         private MeshRenderer _quad; private Texture2D _tex; private KitPix _pix; private MaterialPropertyBlock _mpb;
+
+        private void OnDisable() { Unsubscribe(); if (_active) Stop(); }      // 載っている物ごと止まった時も重ね絵と入力の遮断を残さない
 
         private void OnDestroy()
         {
+            Unsubscribe();
             if (_tex != null) Destroy(_tex);
             if (_quad != null) { if (_quad.sharedMaterial != null && _quad.sharedMaterial.name == "Game2DEndingBlend") Destroy(_quad.sharedMaterial); Destroy(_quad.gameObject); }
             if (_active) { _active = false; GameManager.InputBlockedByScreen = false; }
@@ -72,6 +78,37 @@ namespace UI.Game2D
         {
             var mv = FindObjectOfType<Game2DMapView>();
             if (mv != null && mv.plotQuad != null) PhaseDirector.AlsoShowFor(mv.plotQuad.transform, GameManager.GamePhase.RunClear, GameManager.GamePhase.RiftChoice);
+            Subscribe();
+        }
+
+        private void Subscribe()
+        {
+            var gm = GameManager.Instance;
+            if (gm == null || _subscribed == gm) return;
+            Unsubscribe();
+            gm.OnPhaseChanged += OnPhaseChanged; _subscribed = gm;
+        }
+
+        private void Unsubscribe() { if (_subscribed != null) _subscribed.OnPhaseChanged -= OnPhaseChanged; _subscribed = null; }
+
+        /// <summary>フェーズが変わった<b>その瞬間</b>に見る (#328・2026-11-16)。 次のフレームの Update で拾うと、 場面の窓 (Game2DPhaseScreens) の Update が
+        /// 先に回ったフレームでは <see cref="Blocking"/> がまだ false で、 「踏破」の窓が 1 コマ描かれていた (Update 同士の順は決まっていない)。
+        /// 出している間にフェーズかランが変わったら (タイトルへ・新しいラン)、 閉じる動きの途中でもここで片付ける。</summary>
+        private void OnPhaseChanged(GameManager.GamePhase _) => CheckPhase();
+
+        private void CheckPhase()
+        {
+            var gm = GameManager.Instance;
+            if (gm == null) return;
+            if (GameHooks.BotDriving || Application.isBatchMode) { if (_active) Stop(); return; }
+            if (_active && (gm.CurrentPhase != _playPhase || gm.Run != _playRun)) Stop();
+            if (gm.CurrentPhase == GameManager.GamePhase.Title) _doneRun = null;
+            // 踏破の瞬間を拾う (ラン 1 つに 1 回)
+            if (!_active && gm.CurrentPhase == GameManager.GamePhase.RunClear && gm.Run != null && gm.Run != _doneRun)
+            {
+                _doneRun = gm.Run;
+                Play(Endings.Resolve(gm.Run));
+            }
         }
 
         private bool EnsureQuad()
@@ -93,15 +130,9 @@ namespace UI.Game2D
 
         private void Update()
         {
-            var gm = GameManager.Instance;
             if (GameHooks.BotDriving || Application.isBatchMode) { if (_active) Stop(); return; }
-            // 踏破の瞬間を拾う (ラン 1 つに 1 回)
-            if (!_active && gm != null && gm.CurrentPhase == GameManager.GamePhase.RunClear && gm.Run != null && gm.Run != _doneRun)
-            {
-                _doneRun = gm.Run;
-                Play(Endings.Resolve(gm.Run));
-            }
-            if (gm != null && gm.CurrentPhase == GameManager.GamePhase.Title) _doneRun = null;
+            Subscribe();
+            CheckPhase();                                                     // 取りこぼし用 (購読より前に変わっていた時)
             if (!_active) return;
 
             float dt = Mathf.Min(0.05f, Time.unscaledDeltaTime);
@@ -130,6 +161,7 @@ namespace UI.Game2D
             if (e.id == Endings.EndTrueId) AddPages(Endings.Epilogue, Game2DBgm.Epilogue);      // 額縁が閉じる: 後日談 (棚の隅)
             if (_pages.Count == 0) return;
             _page = 0; _t = 0f; _fadeT = 0f; _closing = false; _active = true; Track = _pages[0].track;
+            var gm = GameManager.Instance; _playPhase = gm != null ? gm.CurrentPhase : GameManager.GamePhase.Title; _playRun = gm != null ? gm.Run : null;
             GameManager.InputBlockedByScreen = true;
             if (_tex == null) { _tex = new Texture2D(W, H, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp, name = "Game2DEnding" }; _pix = new KitPix(W, H); }
             if (_mpb == null) _mpb = new MaterialPropertyBlock();
@@ -215,7 +247,7 @@ namespace UI.Game2D
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         /// <summary>[実機の確認用・2026-11-15] エンディングの画面を直接出す (フェーズもランも変えない・セーブを止める)。
         /// id = end1 / end2 / end3 / end_true (後日談つき) / end_good / epilogue (後日談だけ)。 例: <c>UI.Game2D.Game2DEndingScreen.QaShow("end_true")</c>。
-        /// 読み終わって閉じると元の画面に戻る (踏破の窓は出ない)。 無い id なら false。</summary>
+        /// 読み終わって閉じると元の画面に戻る (踏破の窓は出ない)。 出している間にフェーズかランが変わるとすぐ片付く。 無い id なら false。</summary>
         public static bool QaShow(string id)
         {
             SaveGuard.Suppressed = true;
