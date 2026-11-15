@@ -8,7 +8,7 @@ namespace UI.Game2D
     /// <para><b>面の絵</b>: 欠けのある象牙色の板 (元は gui2d/battle_ui/die.png を 18×18 に取った物) に、 丸い点で目を打つ。 1〜9 まで。</para>
     ///
     /// <para><b>振る動き</b>: 立体にしない。 板が平面の上で回り、 <b>90 度回るたびに、 持っている面のどれかへ目が替わる</b>。
-    /// だんだん遅くなり、 最後の 90 度で止まる目になる。 回っている間はモーションブラー (1 コマの間の姿を重ねて平均) をかける。
+    /// だんだん遅くなり、 最後の 90 度で止まる目になる。 回っている間のブラーは、 色を混ぜずにディザで出す (<see cref="Render"/>)。
     /// 回す絵は <b>ドットの格子に乗せ直さない</b> (作者の決定・1 ドット = <see cref="K"/> 画素の板を、 画素の細かさで回す) ので、
     /// 板の絵 (KitPix) ではなく、 細かい絵 (<see cref="TexSize"/> 四方) を別に重ねて出す。 止まったら、 いつもの 18×18 の絵に戻る。</para></summary>
     public static class Game2DDiceRoll
@@ -33,7 +33,7 @@ namespace UI.Game2D
         /// <summary>ブラーの長さ (コマ)。</summary>
         public const float Blur = 0.6f;
         /// <summary>ブラーの重ね数。</summary>
-        public const int Samples = 12;
+        public const int Samples = 16;
 
         public static float DurOf(int i) => Dur + Stagger * Mathf.Clamp(i, 0, 3);
 
@@ -135,36 +135,32 @@ namespace UI.Game2D
             v = seq[Mathf.Min(q, seq.Length - 1)];
         }
 
-        private static float[] _acc; private static int[] _cov;
+        // 4×4 の並べ方 (ベイヤー)。 ドットの格子 (1 ドット = K 画素) ごとに 1 つの値
+        private static readonly int[] Bayer = { 0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5 };
+        private static readonly int[] _pv = new int[Samples]; private static readonly float[] _pc = new float[Samples], _ps = new float[Samples];
 
         /// <summary>振っている 1 コマを dst (<see cref="TexSize"/> 四方・Texture2D の並び = 下の行から) へ描く。 t = 振り始めからの秒 (コマに丸めた値)、 dur = このダイスが止まるまでの秒。
-        /// 板が無い所は透明、 ブラーの縁は半透明。</summary>
+        ///
+        /// <para><b>ブラーは色を混ぜない</b> (作風・2026-11-15 作者): 1 コマの間の姿を <see cref="Samples"/> 個用意し、 ドットごとに「そのうちのどれを見せるか」をベイヤーの並びで決める。
+        /// 出る色は板の絵の色だけ・半透明なし。 速い所ほど姿がばらけてディザの流れに見え、 止まると 1 枚の絵に揃う。</para></summary>
         public static void Render(Color32[] dst, int[] seq, float t, float dur, bool ccw)
         {
-            int n = TexSize; if (_acc == null) { _acc = new float[n * n * 3]; _cov = new int[n * n]; }
-            System.Array.Clear(_acc, 0, _acc.Length); System.Array.Clear(_cov, 0, _cov.Length);
-            float h = Face * 0.5f; int r = Reach * K;
+            int n = TexSize; float h = Face * 0.5f; int r = Reach * K;
             for (int s = 0; s < Samples; s++)
             {
                 float tt = t - (Blur / Fps) * (s / (float)(Samples - 1));
-                Pose(seq, tt, dur, out int v, out float ang); if (ccw) ang = -ang;
-                var f = FaceImg(v); float c = Mathf.Cos(-ang), sn = Mathf.Sin(-ang);
-                for (int py = -r; py < r; py++)
-                    for (int px = -r; px < r; px++)
-                    {
-                        float x = (px + 0.5f) / K, y = (py + 0.5f) / K;
-                        int u = Mathf.FloorToInt(x * c - y * sn + h), w = Mathf.FloorToInt(x * sn + y * c + h);
-                        if (u < 0 || w < 0 || u >= Face || w >= Face) continue;
-                        var col = f[w * Face + u]; if (col.a == 0) continue; int i = (py + r) * n + (px + r);
-                        _acc[i * 3] += col.r; _acc[i * 3 + 1] += col.g; _acc[i * 3 + 2] += col.b; _cov[i]++;
-                    }
+                Pose(seq, tt, dur, out _pv[s], out float ang); if (ccw) ang = -ang;
+                _pc[s] = Mathf.Cos(-ang); _ps[s] = Mathf.Sin(-ang);
             }
-            for (int y = 0; y < n; y++)
-                for (int x = 0; x < n; x++)
+            for (int py = -r; py < r; py++)
+                for (int px = -r; px < r; px++)
                 {
-                    int i = y * n + x, cv = _cov[i], o = (n - 1 - y) * n + x;
-                    if (cv == 0) { dst[o] = new Color32(0, 0, 0, 0); continue; }
-                    dst[o] = new Color32((byte)(_acc[i * 3] / cv), (byte)(_acc[i * 3 + 1] / cv), (byte)(_acc[i * 3 + 2] / cv), (byte)(255 * cv / Samples));
+                    int dx = (px + r) / K, dy = (py + r) / K; int s = Bayer[(dy & 3) * 4 + (dx & 3)] * Samples / 16;
+                    float x = (px + 0.5f) / K, y = (py + 0.5f) / K;
+                    int u = Mathf.FloorToInt(x * _pc[s] - y * _ps[s] + h), w = Mathf.FloorToInt(x * _ps[s] + y * _pc[s] + h);
+                    int o = (n - 1 - (py + r)) * n + (px + r);
+                    if (u < 0 || w < 0 || u >= Face || w >= Face) { dst[o] = new Color32(0, 0, 0, 0); continue; }
+                    dst[o] = FaceImg(_pv[s])[w * Face + u];
                 }
         }
     }
