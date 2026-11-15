@@ -8,14 +8,13 @@ namespace UI.Game2D
     /// <para><b>面の絵</b>: 欠けのある象牙色の板 (元は gui2d/battle_ui/die.png を 18×18 に取った物) に、 丸い点で目を打つ。 1〜9 まで。</para>
     ///
     /// <para><b>振る動き</b>: 立体にしない。 板が平面の上で回り、 <b>90 度回るたびに、 持っている面のどれかへ目が替わる</b>。
-    /// だんだん遅くなり、 最後の 90 度で止まる目になる。 回っている間は、 角の後ろに円弧の筋を引いて回る向きの流れを出す (<see cref="Render"/>)。
-    /// 回す絵は <b>ドットの格子に乗せ直さない</b> (作者の決定・1 ドット = <see cref="K"/> 画素の板を、 画素の細かさで回す) ので、
-    /// 板の絵 (KitPix) ではなく、 細かい絵 (<see cref="TexSize"/> 四方) を別に重ねて出す。 止まったら、 いつもの 18×18 の絵に戻る。</para></summary>
+    /// だんだん遅くなり、 最後の 90 度で止まる目になる。 回っている間は、 角から尾を引いて回る向きを見せる (<see cref="Render"/>)。
+    /// 回る板は Ports の板の上に 1 個ずつ重ねて出す (<see cref="TexSize"/> 四方・ドットの格子に乗せる)。 止まったら、 いつもの 18×18 の絵に戻る。</para></summary>
     public static class Game2DDiceRoll
     {
         public const int Face = 18;
-        /// <summary>回す絵の、 1 ドットあたりの画素。</summary>
-        public const int K = 4;
+        /// <summary>回す絵の、 1 ドットあたりの画素 (1 = ドットの格子に乗せる)。</summary>
+        public const int K = 1;
         /// <summary>回っている板が届く範囲 (中心から・dot)。 18 の対角の半分 12.7 より大きく。</summary>
         public const int Reach = 14;
         public const int TexSize = Reach * 2 * K;
@@ -30,7 +29,7 @@ namespace UI.Game2D
         /// <summary>減速の強さ。</summary>
         public const float Ease = 2.2f;
         public const int Fps = 12;
-        /// <summary>流れの筋の長さを決める時間 (コマ)。 この間に回った角度が筋の長さ。</summary>
+        /// <summary>尾の長さを決める時間 (コマ)。 この間に回った角度が尾の長さ。</summary>
         public const float Blur = 0.6f;
         public static float DurOf(int i) => Dur + Stagger * Mathf.Clamp(i, 0, 3);
 
@@ -132,49 +131,54 @@ namespace UI.Game2D
             v = seq[Mathf.Min(q, seq.Length - 1)];
         }
 
-        /// <summary>true = 回る板と筋を、 ドットの格子に乗せて描く (ピクセルパーフェクト)。 false = 画素の細かさで回す。 見比べ用 (戦闘中に F8 で切り替え)。</summary>
-        public static bool PixelPerfect;
-        // 流れの筋: (半径 dot・長さの倍率・角からの空き rad)。 角が通る円の上と、 その内側に 1 本
-        private static readonly float[][] Arcs = { new[] { 12.3f, 1.0f, 0.10f }, new[] { 10.6f, 0.6f, 0.30f } };
-        /// <summary>筋の長さの上限 (度)。</summary>
-        public const float MaxSpanDeg = 60f;
-        private static readonly Color32 ArcHead = new Color32(211, 202, 176, 255), ArcTail = new Color32(130, 135, 131, 255);
+        // 4×4 の並べ方 (ベイヤー)
+        private static readonly int[] Bayer = { 0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5 };
+        /// <summary>尾の長さの上限 (度)。</summary>
+        public const float MaxSpanDeg = 80f;
+        /// <summary>尾の、 角の所の太さ (dot) と、 細くなり方 (小さいほど根元の太さが長く続く)。</summary>
+        public const float TailWidth = 4.5f, TailTaper = 0.7f;
+        /// <summary>回っている板の半分 (dot)。 板の絵は 18×18 の中の 17×17 (上の 1 行と左の 1 列は空き) なので 8.5。</summary>
+        private const float PlateHalf = 8.5f;
+        private static readonly Color32 TailHead = new Color32(211, 202, 176, 255), TailBody = new Color32(130, 135, 131, 255);
 
         private static float Turned(float tt, float dur) { float k = Mathf.Clamp01(tt / dur); return Quarters * Mathf.PI * 0.5f * (1f - Mathf.Pow(1f - k, Ease)); }
 
         /// <summary>振っている 1 コマを dst (<see cref="TexSize"/> 四方・Texture2D の並び = 下の行から) へ描く。 t = 振り始めからの秒 (コマに丸めた値)、 dur = このダイスが止まるまでの秒。
+        /// 見本は Captures/dice_roll/sheet_pixel5 のいちばん下の段 (作者が選んだ・2026-11-15)。
         ///
-        /// <para><b>回る向きの流れ</b> (2026-11-15 作者「溶けて見える」「残像感が無い」「回転方向へのフローが足りない」を受けて):
-        /// 今の姿は欠けなくそのまま描く。 板の外に、 4 つの角の後ろへ 1 ドット幅の円弧の筋を引く (角が通った円の上)。
-        /// 筋の長さは速さに比例 (1 コマの <see cref="Blur"/> 倍の間に回った角度・上限 <see cref="MaxSpanDeg"/>)。 頭は象牙色・途中から灰・尻尾は 1 つ飛ばし。
-        /// 色は混ぜない・半透明なし。 止まると筋は消える。</para></summary>
+        /// <para><b>板</b>: 回した正方形を式で切り出す (辺がまっすぐ・中心は板の絵の真ん中)。 中は板の絵 (点と欠け) を取る。 時計回り。</para>
+        /// <para><b>尾</b> (回る向きの流れ): 4 つの角それぞれから、 回ってきた側へ、 角が通った円に沿って伸びる。 角の所でいちばん太く (<see cref="TailWidth"/>)・角に直接つながり、
+        /// 離れるほど細くなって消える。 長さは速さに比例 (1 コマの <see cref="Blur"/> 倍の間に回った角度・上限 <see cref="MaxSpanDeg"/>)。
+        /// 色は 象牙 → 灰 → 無し の 3 段で、 <b>段の境目だけディザ</b> (ベイヤー)。 混色・半透明なし。 止まると消える。</para></summary>
         public static void Render(Color32[] dst, int[] seq, float t, float dur, bool ccw)
         {
-            int n = TexSize; float h = Face * 0.5f; int r = Reach * K; int cell = PixelPerfect ? K : 1;
+            int n = TexSize, r = Reach;
             Pose(seq, t, dur, out int v, out float ang);
             float span = Mathf.Min(Turned(t, dur) - Turned(t - Blur / Fps, dur), MaxSpanDeg * Mathf.Deg2Rad);
-            float c0 = Mathf.Cos(-ang), s0 = Mathf.Sin(-ang); var f = FaceImg(v); const float half = Mathf.PI * 0.5f;
-            for (int py = 0; py < n; py++)
-                for (int px = 0; px < n; px++)
+            float c0 = Mathf.Cos(-ang), s0 = Mathf.Sin(-ang); var f = FaceImg(v); const float quarter = Mathf.PI * 0.5f;
+            float rc = PlateHalf * 1.41421356f + 0.3f;      // 角までの距離 (少し外まで)
+            for (int py = -r; py < r; py++)
+                for (int px = -r; px < r; px++)
                 {
-                    // ピクセルパーフェクトの時は、 ドットのます (K×K) の中心で 1 回だけ決める
-                    float x = ((px / cell) * cell + cell * 0.5f - r) / K, y = ((py / cell) * cell + cell * 0.5f - r) / K;
-                    if (ccw) x = -x;
-                    int o = (n - 1 - py) * n + px; var outc = new Color32(0, 0, 0, 0);
-                    int u = Mathf.FloorToInt(x * c0 - y * s0 + h), w = Mathf.FloorToInt(x * s0 + y * c0 + h);
-                    if (u >= 0 && w >= 0 && u < Face && w < Face && f[w * Face + u].a > 0) { dst[o] = f[w * Face + u]; continue; }
-                    float rho = Mathf.Sqrt(x * x + y * y), phi = Mathf.Atan2(y, x);
-                    for (int a = 0; a < Arcs.Length; a++)
+                    float X = ccw ? -px : px, Y = py; int o = (n - 1 - (py + r)) * n + (px + r);
+                    float lx = X * c0 - Y * s0, ly = X * s0 + Y * c0;
+                    if (Mathf.Max(Mathf.Abs(lx), Mathf.Abs(ly)) <= PlateHalf)
                     {
-                        float R = Arcs[a][0], len = span * Arcs[a][1], gap = Arcs[a][2];
-                        if (Mathf.Abs(rho - R) >= 0.5f || len < 0.06f) continue;
-                        float d = Mathf.Repeat(ang + Mathf.PI * 0.25f - 0.02f - phi, half);      // 前の角までの角度 (回る向きに測る)
-                        if (d < gap || d > gap + len) continue;
-                        float q = (d - gap) / len;
-                        if (q < 0.45f) outc = ArcHead;
-                        else if (q < 0.8f || ((int)(d * R) & 1) == 0) outc = ArcTail;
+                        int u = Mathf.Clamp(Mathf.FloorToInt(lx + 9.5f), 1, Face - 1), w = Mathf.Clamp(Mathf.FloorToInt(ly + 9.5f), 1, Face - 1);
+                        var c = f[w * Face + u]; dst[o] = c.a > 0 ? c : TailHead; continue;
                     }
-                    dst[o] = outc;
+                    dst[o] = new Color32(0, 0, 0, 0);
+                    if (span < 0.05f) continue;
+                    float rho = Mathf.Sqrt(X * X + Y * Y), phi = Mathf.Atan2(Y, X);
+                    float d = Mathf.Repeat(ang + Mathf.PI * 0.25f - phi, quarter);      // 回る向きの先にある角からの遅れ
+                    if (d > span) continue;
+                    float q = d / span, wd = TailWidth * Mathf.Pow(1f - q, TailTaper);
+                    if (rho > rc || rho < rc - wd) continue;
+                    float th = (Bayer[((py + r) & 3) * 4 + ((px + r) & 3)] + 0.5f) / 16f;
+                    if (q < 0.22f) dst[o] = TailHead;
+                    else if (q < 0.45f) dst[o] = (0.45f - q) / 0.23f > th ? TailHead : TailBody;
+                    else if (q < 0.68f) dst[o] = TailBody;
+                    else if ((1f - q) / 0.32f > th) dst[o] = TailBody;
                 }
         }
     }

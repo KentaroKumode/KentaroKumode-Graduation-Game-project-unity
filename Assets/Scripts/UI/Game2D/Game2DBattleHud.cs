@@ -192,7 +192,6 @@ namespace UI.Game2D
 
         private void Update()
         {
-            if (Input.GetKeyDown(KeyCode.F8)) { Game2DDiceRoll.PixelPerfect = !Game2DDiceRoll.PixelPerfect; Debug.Log("[出目の振り] ピクセルパーフェクト = " + Game2DDiceRoll.PixelPerfect); }      // 見比べ用 (仮・決まったら消す)
             if (_right == null || sim == null || !Game2DBattleSim.Active) { CancelDrag(); return; }
             // 配線を決める間だけ読み直す (その後は本判定に取り込まれて二重に数えるので、 最後の値を出し続ける)
             if (sim.CanOperate && CombatSystem.CombatManager.Instance != null)
