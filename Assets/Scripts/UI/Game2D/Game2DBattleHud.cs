@@ -1019,25 +1019,20 @@ namespace UI.Game2D
         //   持っている秘宝 (武器を除くランの持ち物) のアイコン (Resources/Icons/Items/<id>.png・16×16 をそのまま打つ・拡大縮小しない) を取った順に 1 列。
         //   入りきらない分は最後の枠を「+N」にまとめる。 見え方は本体 (ItemSystem.PassiveSkills.RelicLookup) が品ごとに返す (画面は品と数のキーを持たない):
         //     状態 (数を貯める・状態の間だけ効く・挿し方で決まる・待機して 1 回): 光っている間は縁を光らせ、 絵を少し明るく。 数があれば右下に 3×5 の数字。 使い終わった 1 戦闘 1 回の品は暗く。
-        //     出来事に反応するだけの品: 効果で値が変わった瞬間に 0.5 秒 (1 秒 8 コマの 4 コマ) 縁が光る (同じ品は 1 ターンに 1 回まで)。 音は ui_tab を小さく高く (BOT の間は鳴らさない)。
+        //     出来事に反応するだけの品: 効果で値が変わった瞬間に 0.5 秒 (1 秒 8 コマの 4 コマ) 縁が光る (起きるたびに始め直す)。 音は ui_tab を小さく高く (BOT の間は鳴らさない)。
         //     【規則】の品: 光らせない。
         //   光は加算 (縁の暖色)・絵は塗りつぶさない・原色にしない・大きさは変えない。 マウスを乗せると説明の帯に名前と効果。
         private readonly List<string> _relics = new List<string>();
         private readonly Dictionary<string, float> _relicFlashAt = new Dictionary<string, float>();
-        private readonly Dictionary<string, int> _relicPulseTurn = new Dictionary<string, int>();
         private int _hoverRelic = -1, _relicCountSig = -1, _relicStateSig; private bool _relicHooked;
         private const float RelicFlashSec = 0.5f;
         private static readonly Color32 RelicEdge = new Color32(0xf0, 0xb4, 0x5a, 255), RelicNum = new Color32(0xff, 0xe8, 0xb8, 255);
-
-        private static int RelicTurn => ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context?.currentTurn ?? 0;
 
         private void OnRelicFired(string id)
         {
             if (string.IsNullOrEmpty(id) || !Game2DBattleSim.Active || !_relics.Contains(id)) return;
             if (ItemSystem.PassiveSkills.RelicLookup.ModeOf(id, Env(), out _) != ItemSystem.PassiveSkills.RelicMode.Pulse) return;      // 状態で光る品・【規則】の品は一瞬光らせない
-            int turn = RelicTurn;
-            if (_relicPulseTurn.TryGetValue(id, out var last) && last == turn) return;      // 同じ品は 1 ターンに 1 回まで
-            _relicPulseTurn[id] = turn; _relicFlashAt[id] = Time.unscaledTime;
+            _relicFlashAt[id] = Time.unscaledTime;      // 起きるたびに 0.5 秒の光を始め直す (2026-11-15 作者の指示で「1 ターンに 1 回まで」を外した)
             if (!GameHooks.BotDriving) Game2DSfx.Play("ui_tab", 0.5f, 1.3f);
         }
 

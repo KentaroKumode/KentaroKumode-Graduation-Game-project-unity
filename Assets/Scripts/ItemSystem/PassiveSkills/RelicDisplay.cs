@@ -48,7 +48,7 @@ namespace ItemSystem.PassiveSkills
         State,
         /// <summary>【規則】の品: 光らせない。</summary>
         Quiet,
-        /// <summary>出来事に反応するだけの品: 効果で値が変わった瞬間だけ短く光る (<see cref="RelicFireProbe"/>・同じ品は 1 ターンに 1 回まで)。</summary>
+        /// <summary>出来事に反応するだけの品: 効果で値が変わった瞬間だけ短く光る (<see cref="RelicFireProbe"/>・起きるたびに光り直す)。</summary>
         Pulse,
     }
 
