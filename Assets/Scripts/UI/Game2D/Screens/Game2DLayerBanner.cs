@@ -21,6 +21,9 @@ namespace UI.Game2D
         private RawImage _img; private RectTransform _rt; private Texture2D _tex;
         private string _title, _sub;
         private bool _pending, _playing; private float _t;
+        /// <summary>デバッグで出した帯 (場面を問わず出す・ロード画面と窓も待たない)。</summary>
+        private bool _debug;
+        private static Game2DLayerBanner _inst;
 
         private const float InDur = 1.4f, Hold = 2.6f, OutDur = 1.8f;
         /// <summary>帯の高さ (dot)。 中央の <see cref="CoreH"/> は一様に暗く、 その上下はなめらかに透明へ。</summary>
@@ -53,15 +56,30 @@ namespace UI.Game2D
             _img = gameObject.AddComponent<RawImage>(); _img.raycastTarget = false; _img.enabled = false;
         }
 
-        private void OnEnable() => LayerTitles.OnShow += HandleShow;
-        private void OnDisable() => LayerTitles.OnShow -= HandleShow;
+        private void OnEnable() { LayerTitles.OnShow += HandleShow; _inst = this; }
+        private void OnDisable() { LayerTitles.OnShow -= HandleShow; if (_inst == this) _inst = null; }
         private void OnDestroy() { if (_tex != null) Destroy(_tex); Busy = false; }
 
         /// <summary>帯を待っている・流している間 true (手引きの板は帯が済んでから出す・issue #86)。</summary>
         public static bool Busy { get; private set; }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetStatics() { Busy = false; }
+        private static void ResetStatics() { Busy = false; _inst = null; }
+
+        // ── デバッグ (2026-11-16・作者の頼み「バナー演出を見たい」) ──
+        /// <summary>デバッグで出せる層 (深さ)。 序層・第一〜第五層・最終段。</summary>
+        public static readonly int[] DebugFloors = { 0, 1, 3, 5, 6, 7, 8 };
+
+        /// <summary>深さ floor の帯を、 今の場面を問わずその場で流す (タイトル・戦闘中でも)。 Play 中だけ。
+        /// エディタのメニュー Tools/DICE BOUND/層の帯 と、 Ctrl + 0〜6 (エディタ・開発ビルド) から呼ぶ。</summary>
+        public static bool DebugShow(int floor)
+        {
+            if (_inst == null) return false;
+            var e = LayerTitles.ForFloor(floor);
+            _inst._title = e.title ?? ""; _inst._sub = e.subtitle ?? "";
+            _inst._debug = true; _inst._pending = true; _inst._playing = false; _inst._img.enabled = false;
+            return true;
+        }
 
         private void HandleShow(string title, string subtitle)
         {
@@ -70,17 +88,24 @@ namespace UI.Game2D
             _pending = true; _playing = false; _img.enabled = false;
         }
 
-        private void Update() { Step(); Busy = _pending || _playing; }
+        private void Update()
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl))
+                for (int i = 0; i < DebugFloors.Length; i++) if (Input.GetKeyDown(KeyCode.Alpha0 + i)) DebugShow(DebugFloors[i]);
+#endif
+            Step(); Busy = _pending || _playing;
+        }
 
         private void Step()
         {
             var gm = GameManager.Instance;
             bool battle = gm != null && gm.CurrentPhase == GameManager.GamePhase.Combat;
             bool gone = gm == null || gm.CurrentPhase == GameManager.GamePhase.Title || gm.CurrentPhase == GameManager.GamePhase.GameOver;
-            if (gone || battle || GameHooks.BotDriving) { _pending = false; _playing = false; _img.enabled = false; return; }
+            if (!_debug && (gone || battle || GameHooks.BotDriving)) { _pending = false; _playing = false; _img.enabled = false; return; }
             if (_pending)
             {
-                if (Game2DLoadingScreen.Blocking || Game2DModal.Active) return;      // ロード画面・窓が消えてから出す
+                if (!_debug && (Game2DLoadingScreen.Blocking || Game2DModal.Active)) return;      // ロード画面・窓が消えてから出す
                 _pending = false; _playing = true; _t = 0f;
                 Build();
                 _img.color = new Color(1f, 1f, 1f, 0f); _img.enabled = true;
@@ -89,7 +114,7 @@ namespace UI.Game2D
             if (!_playing) return;
             _t += Mathf.Min(0.05f, Time.unscaledDeltaTime);
             float total = InDur + Hold + OutDur;
-            if (_t >= total) { _playing = false; _img.enabled = false; return; }
+            if (_t >= total) { _playing = false; _debug = false; _img.enabled = false; return; }
             float a = _t < InDur ? _t / InDur : _t > InDur + Hold ? (total - _t) / OutDur : 1f;
             _img.color = new Color(1f, 1f, 1f, Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(a)));
         }
