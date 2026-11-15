@@ -84,7 +84,7 @@ namespace UI.Game2D
             var gm = GameManager.Instance;
             if (gm == null) return;
             var phase = gm.CurrentPhase;
-            bool loading = Game2DLoadingScreen.Blocking;
+            bool loading = Game2DLoadingScreen.Blocking || Game2DEndingScreen.Blocking;      // エンディングの画面 (#328) も液晶の全面を使う
             bool show = phase != GameManager.GamePhase.Title && phase != GameManager.GamePhase.GameOver && !loading;      // ロード画面は液晶の全面を使う
             if (root != null && root.activeSelf != show) root.SetActive(show);
             // ロード画面が抜けた直後: 計器盤を引っ込めた位置から、 戦闘から戻る時と同じばねで滑り込ませる (ぱっと出さない)

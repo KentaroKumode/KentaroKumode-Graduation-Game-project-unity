@@ -25,7 +25,7 @@ namespace GameLoop
     ///   EndTrue 到達で Epilogue が unlock され、「刊行史 + 焼け残った あとがき」がプレイヤーに開示される。
     ///   **EndGood では本が書かれない**ので額縁は閉じない ── 接続しないことが GOOD END の代償にあたる。
     ///
-    /// 表示は当面ログのみ（GameManager の RunClear 地点で出力）。
+    /// 表示: GameManager の RunClear 地点でログに出し、 画面は UI.Game2D.Game2DEndingScreen が液晶の中に頁送りで出す (2026-11-15・#328・EndTrue の後は Epilogue も)。
     /// </summary>
     public static class Endings
     {

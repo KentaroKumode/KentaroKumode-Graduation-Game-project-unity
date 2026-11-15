@@ -82,6 +82,8 @@ namespace UI.Game2D
             if (coins != _lastCoins || hp != _lastHp) { _lastCoins = coins; _lastHp = hp; if (_open) _dirty = true; }
             int pend = gm.PendingStartingPassiveChoices.Count + gm.PendingEventPassiveOffers.Count * 100000000 + gm.PendingChallengeTiers.Count * 100 + (gm.Run != null ? gm.Run.pendingWeaponIds.Count * 10000 + gm.Run.pendingTerminalOffer.Count * 1000000 : 0);
             if (pend != _lastPending) { _lastPending = pend; _dirty = true; }
+            // エンディングの画面 (#328) の間は窓を出さない。 同じフレームで先に開いていたら閉じて、 読み終わってから作り直す
+            if (Game2DEndingScreen.Blocking) { if (_open) { CloseIfOpen(); _dirty = true; } return; }
             if (!_dirty) return;
             // ロード画面の間は出さない (終わってから出す・_dirty は残す)。 開いている窓も閉じる ──
             //   「層を抜けた」の窓は押した直後にロード画面が始まるので、 閉じないとロード画面の上に残り続けていた (2026-11-11)

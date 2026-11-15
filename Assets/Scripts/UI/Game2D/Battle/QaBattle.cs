@@ -175,6 +175,10 @@ namespace UI.Game2D.Battle
         /// <c>Start</c> / <c>Restart</c> で自動に戻る。 例: <c>UI.Game2D.Battle.QaBattle.ForceStow(1)</c></summary>
         public static void ForceStow(int mode) => Game2DBattleFx.QaStow = mode < 0 ? -1 : mode > 0 ? 1 : 0;
 
+        /// <summary>エンディングの画面を直接出す (#328・<see cref="Game2DEndingScreen.QaShow"/>・セーブを止める・フェーズは変えない)。
+        /// id = end1 / end2 / end3 / end_true (後日談つき) / end_good / epilogue。 例: <c>UI.Game2D.Battle.QaBattle.ShowEnding("end_true")</c></summary>
+        public static bool ShowEnding(string id) => Game2DEndingScreen.QaShow(id);
+
         /// <summary>今の状態を 1 行で (フェーズ・敵・ターン・予告・演出が空いているか・Go の進み)。</summary>
         public static string Status()
         {
