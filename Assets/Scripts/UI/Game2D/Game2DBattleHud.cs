@@ -998,7 +998,7 @@ namespace UI.Game2D
             var p = Frame(Right);
             bool live = sim != null && Game2DBattleSim.Active; bool known = live && sim.phase != Game2DBattleSim.P.ERoll;
             int en = live ? sim.enemyDiceCount : 3;
-            for (int i = 0; i < en; i++) DrawDie(p, new RectInt(14 + i * 20, 16, 17, 17), live ? sim.ed[i] : i + 3, true);
+            for (int i = 0; i < en; i++) DrawDie(p, new RectInt(14 + i * 20, 16, 18, 18), live ? sim.ed[i] : i + 3, true);
             if (known && sim.down) p.Text(sim.downWeak ? "ダウン(ひび):攻撃なし" : "ダウン:攻撃なし", 14, 36, MarkHeavyHud);      // ボスのダウン (2026-11-13): 止まるのは攻撃だけ (パッシブは動く)・ひびで割れた弱いダウンは (ひび) (2026-11-14)
             else if (known && sim.charging) p.Text(sim.tenyo > 0 ? "チャージ:" + CombatSystem.TenyoHeavy.NameOf((CombatSystem.TenyoHeavy.Gift)sim.tenyo) : "チャージ:攻撃なし", 14, 36, MarkHeavyHud);      // ヴェスカの天与 (2026-11-15): どれが来るか
             else if (known && sim.heavyIn == 0 && sim.tenyo > 0 && sim.eatk == 0) p.Text(CombatSystem.TenyoHeavy.NameOf((CombatSystem.TenyoHeavy.Gift)sim.tenyo) + ":攻撃なし", 14, 36, MarkHeavyHud);      // 天与の盾・指輪は攻撃しない   // 大技のチャージ (2026-11-14): 攻撃しない (次のターンが大技・下の「次: 大技」)
