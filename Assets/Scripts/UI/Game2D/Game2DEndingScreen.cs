@@ -64,9 +64,10 @@ namespace UI.Game2D
         }
 
         /// <summary>エンディングの id → 結びの絵の名前 (<see cref="ArtDir"/> の下のファイル名・拡張子 .png.bytes を除く)。 絵の無いエンディングは null (最後の頁で閉じる)。
-        /// 英雄の帰還 (end1) は作者がまだ決めていない (絵を決めたらここに 1 行足す)。 後日談は EndTrue の続きなので、 EndTrue の絵が後日談の後に出る。</summary>
+        /// 英雄の帰還 (end1) はタイトル画面の昼の絵 (day)。 後日談は EndTrue の続きなので、 EndTrue の絵が後日談の後に出る。</summary>
         public static string ArtNameFor(string endingId)
         {
+            if (endingId == Endings.End1.id) return "day";            // 英雄の帰還: タイトル画面の昼の大穴 (作者の決定・2026-11-16)
             if (endingId == Endings.End2.id) return "night";          // 無明の剣: 夜の大穴を見下ろしつつ、 ひっそりと別れを告げる後ろ姿
             if (endingId == Endings.End3.id) return "ash";            // 空の玉座: 灰と炎
             if (endingId == Endings.EndGoodId) return "dark";         // 見送り: 長い年月の後、 宇宙が全て呑み込まれて極点の光だけになった姿
@@ -324,7 +325,7 @@ namespace UI.Game2D
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         /// <summary>[実機の確認用・2026-11-15] エンディングの画面を直接出す (フェーズもランも変えない・セーブを止める)。
         /// id = end1 / end2 / end3 / end_true (後日談つき) / end_good / epilogue (後日談だけ)。 例: <c>UI.Game2D.Game2DEndingScreen.QaShow("end_true")</c>。
-        /// 読み終わると結びの絵 (<see cref="ArtNameFor"/>・end1 / epilogue は無し) を見せて閉じ、 元の画面に戻る (踏破の窓は出ない)。 出している間にフェーズかランが変わるとすぐ片付く。 無い id なら false。</summary>
+        /// 読み終わると結びの絵 (<see cref="ArtNameFor"/>・epilogue は無し) を見せて閉じ、 元の画面に戻る (踏破の窓は出ない)。 出している間にフェーズかランが変わるとすぐ片付く。 無い id なら false。</summary>
         public static bool QaShow(string id)
         {
             SaveGuard.Suppressed = true;
