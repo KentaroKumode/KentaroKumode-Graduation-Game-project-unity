@@ -304,7 +304,7 @@ namespace UI.Game2D
         /// <summary>戦闘の画面から開いた (2026-11-13): 見るだけ。 消耗品の [使う] は出さない (戦闘中に使うのは [道具] の窓・二重の入口にしない)。</summary>
         private bool _invBattle;
 
-        /// <summary>戦闘の画面 (<see cref="Game2DBattleHud"/> の [持ち物]・キー I) から持ち物の画面を開く。 開いたら true。
+        /// <summary>戦闘の画面 (<see cref="Game2DBattleLcd"/> の [持ち物]・キー I) から持ち物の画面を開く。 開いたら true。
         /// 戦闘の進行・乱数・判断待ちには触らない ── 窓が出ている間は戦闘の画面と <see cref="Battle.Game2DBattleSim"/> が窓を見て止まり、
         /// GameManager のキーは <see cref="SyncInventoryInput"/> が止める (地図と同じ作り)。 BOT が動かしている間は開かない。</summary>
         public static bool OpenInventoryInBattle(GameManager gm)

@@ -7,7 +7,7 @@ namespace UI.Game2D
 {
     /// <summary>
     /// 端子の山札 (ADR-0014) の見せ方。 種類の色・種類の呼び名・条件の短い表記・印 (レア・使い捨て・常設・軸) を、
-    /// 戦闘画面 (<see cref="Game2DBattleHud"/>) と報酬の画面 (<see cref="Game2DPhaseScreens"/>) で同じにする。
+    /// 戦闘画面 (<see cref="Game2DBattleLcd"/>) と報酬の画面 (<see cref="Game2DPhaseScreens"/>) で同じにする。
     /// 端子の名前・条件・効果の文は定義 (<see cref="TerminalCards"/>) から読む ── ここに端子ごとの文を持たない。
     /// </summary>
     public static class Game2DTerminalLook

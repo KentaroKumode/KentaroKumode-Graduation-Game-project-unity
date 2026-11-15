@@ -21,7 +21,7 @@ namespace UI.Game2D.Battle
         private static Game2DBattleSim Sim => Object.FindObjectOfType<Game2DBattleSim>(true);
         private static Game2DBattleFx Fx => Object.FindObjectOfType<Game2DBattleFx>(true);
         /// <summary>戦闘の GUI の格納のばねの値 (0.00 = 出ている / 1.00 = 画面の外)。</summary>
-        private static string StowNow() { var h = Object.FindObjectOfType<Game2DBattleHud>(true); return h != null ? h.StowValue(1000f).ToString("0.00") : "-"; }
+        private static string StowNow() { var h = Game2DBattleLcd.Instance; return h != null ? h.StowValue.ToString("0.00") : "-"; }
 
         /// <summary>確認で使う HP の既定 (最大 HP・今の HP)。 ボス相手に負けないよう大きくしてある。</summary>
         public const int DefaultHp = 9999;

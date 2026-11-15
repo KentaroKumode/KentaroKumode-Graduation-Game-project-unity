@@ -146,13 +146,9 @@ public static class Game2DBuilder
 
         var navOnly = Node("NavOnly", hudRoot, 0, 0, Game2DLayout.Width, Game2DLayout.Height);
         navOnly.anchorMin = Vector2.zero; navOnly.anchorMax = Vector2.one; navOnly.offsetMin = navOnly.offsetMax = Vector2.zero;
-        var battleOnly = Node("BattleOnly", hudRoot, 0, 0, Game2DLayout.Width, Game2DLayout.Height);
-        battleOnly.anchorMin = Vector2.zero; battleOnly.anchorMax = Vector2.one; battleOnly.offsetMin = battleOnly.offsetMax = Vector2.zero;
 
         var battleSim = cgo.AddComponent<UI.Game2D.Battle.Game2DBattleSim>(); battleSim.fx = battleFx;
-        var battleHud = battleOnly.gameObject.AddComponent<Game2DBattleHud>(); battleHud.sim = battleSim; battleHud.fx = battleFx;
-        battleHud.btnGoTex = BattleUiTex("btn_go");      // 端子のボタンの絵 (攻撃・防御・充電) は旧い配線の画面と一緒に削除 (2026-11-11)
-        battleHud.Build();      // 戦闘の GUI (仮置きの長方形 + 字)
+        // 戦闘の画面は液晶の中 (Game2DBattleLcd・戦闘の流れが実行時に同じ GameObject に付ける・2026-11-16〜)。 旧い戦闘の HUD (BattleOnly のパネル群) は削除
 
         // --- 操作パネル (map-prototype.html の BTNP): 枠の上端が、 閉じた GOLD の入れ物の下端 (54) に接する (枠は PNG の 3 行目から) → y = 51。
         //     下 = 3 つのボタン (押した絵は同じ場所に重ねて出し入れ)、 上 = 枠、 その上に残数ランプ、 いちばん上に影 ---
@@ -246,7 +242,7 @@ public static class Game2DBuilder
         // Hud は常に生きている Grid に付ける (hudRoot は Hud 自身が出し入れするので、 そこに付けると一度消えたら戻れない)
         var hud = gridRt.gameObject.AddComponent<Game2DHud>();
         hud.gold = goldPot; hud.radar = radar; hud.resBar = resBar; hud.panel = navPanel;
-        hud.navOnly = navOnly.gameObject; hud.battleOnly = battleOnly.gameObject; hud.battleHud = battleHud; hud.battleSim = battleSim; hud.extras = extras; hud.root = hudRoot.gameObject;
+        hud.navOnly = navOnly.gameObject; hud.battleSim = battleSim; hud.extras = extras; hud.root = hudRoot.gameObject;
 
         // --- 液晶の Quad: 走査線・湾曲・色収差・ブルーム・ノイズ + 点灯の瞬間の残像 (Game2D/LcdScreen)。 ビネットは外枠まで覆う Game2D/LcdFx ---
         if (quadGo != null)
@@ -265,7 +261,7 @@ public static class Game2DBuilder
         var cam = GameObject.Find("Main Camera").GetComponent<Camera>();
         var quad = GameObject.Find("Quad").transform;
         var screen = cgo.AddComponent<Game2DScreen>();
-        screen.screenCamera = cam; screen.lcdQuad = quad; screen.canvas = canvas; screen.gridRoot = presentGrid; mapView.screen = screen; navPanel.screen = screen; battleHud.screen = screen; modal.screen = screen; extras.screen = screen;
+        screen.screenCamera = cam; screen.lcdQuad = quad; screen.canvas = canvas; screen.gridRoot = presentGrid; mapView.screen = screen; navPanel.screen = screen; modal.screen = screen; extras.screen = screen;
         screen.Apply();
 
         // 開発用のデバッグ表示 (左上の文字) は、 液晶の作図と重なるので切る (キー操作は GameManager 側)

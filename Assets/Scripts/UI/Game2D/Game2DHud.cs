@@ -21,9 +21,7 @@ namespace UI.Game2D
         public Game2DNavPanel panel;
 
         [Header("戦闘だけ")]
-        public GameObject battleOnly;
         [Tooltip("航行の計器の足りない分 (天気・層・警告・待つ・職業・状態異常・アイテム枠・脱出)。 戦闘中は引っ込む")] public Game2DNavExtras extras;
-        [Tooltip("戦闘の GUI (仮置き)。 航行用の GUI と入れ替わりに入ってくる")] public Game2DBattleHud battleHud;
         [Tooltip("戦闘の流れ (試作)。 動いている間は HP とシールドの表示をこちらの値にする")] public Battle.Game2DBattleSim battleSim;
 
         [Header("全体")]
@@ -31,6 +29,10 @@ namespace UI.Game2D
 
         private Game2DMapView _view;
         private bool _battle;
+        /// <summary>新しい戦闘の画面の間に資源バーとレーダーを下へ隠すばね (0 = 出ている / 1 = 画面の外) と、 隠す距離。
+        /// 距離は絵の実際の上端から決める: 土台 bar_layer1.png の不透明な範囲は y 205〜 (丸い窓の台・x 97〜370)・レーダーは y 213〜。
+        /// 270 − 205 = 65 に、 会心の衝撃の GUI の揺れ (Game2DHud.ShakeDots・数 dot) の分を足して 72 (2026-11-16・62 では窓の台の上の 3 dot が残った)。</summary>
+        private Game2DSpring _spBottom; private const float BattleBottomHide = 72f;
         private Game2DSpring _spNav, _spGold;      // 航行用の GUI の引っ込み具合 (0 = 出ている / 1 = 画面の外)
         private Vector2 _goldBase, _resBase, _radarBase; private bool _radarInit;
         /// <summary>会心の衝撃で GUI 全体を揺らす量 (dot)。 戦闘演出 (Game2DBattleFx) が毎フレーム入れる。</summary>
@@ -188,10 +190,12 @@ namespace UI.Game2D
             }
             if (gold != null) ((RectTransform)gold.transform).anchoredPosition = _goldBase + new Vector2(0, Mathf.Round(_spGold.Value(110f) * 110f));      // GOLD の入れ物は戦闘中は出さない (上へ引っ込む)
             if (extras != null) extras.Drive(_spNav.Value(100f));
-            if (battleHud != null) { battleHud.Drive(_battle, dt); if (battleOnly != null) battleOnly.SetActive(battleHud.Visible); }      // 戦闘の GUI は、 入ってくる間・出ていく間も生かす
-            // 大技の発動の間の格納 (2026-11-15): 下の資源バー (戦闘中は HP とシールドの帯) を、 戦闘の GUI と同じばねで下へ。
+            // 戦闘の画面は液晶の中 (Game2DBattleLcd・2026-11-16〜)。 作者の決定「戦闘中は筐体の下の HP 帯とレーダーを別の部品として出さない」:
+            //   HP とシールドは液晶の中の左下へ移したので、 戦闘の入りで資源バーとレーダーを下へ滑らせて隠し、 出で戻す (航行の GUI の出し入れと同じばね)。
+            //   レーダー (魔石) は航行の地図の追跡者の歩数と方角 (FreeMapSim.Stone) で、 戦闘の中では変わらず戦闘の判断にも使わないので、 液晶の中へは移さない。
             //   レーダーは資源バーの右の窓に載っている部品なので一緒に下げる (分けると窓の無い所に浮く)
-            float down = battleHud != null ? Mathf.Round(battleHud.StowValue(Game2DBattleHud.StowBottom) * Game2DBattleHud.StowBottom) : 0f;
+            _spBottom.Go(_battle ? 1f : 0f, _battle ? 0.06f : 0.1f); _spBottom.Step(dt);
+            float down = Mathf.Round(_spBottom.Value(BattleBottomHide) * BattleBottomHide);
             if (resBar != null) ((RectTransform)resBar.transform).anchoredPosition = _resBase - new Vector2(0, down);
             if (radar != null) ((RectTransform)radar.transform).anchoredPosition = _radarBase - new Vector2(0, down);
             if (root != null)

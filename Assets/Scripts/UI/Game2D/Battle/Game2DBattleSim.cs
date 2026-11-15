@@ -7,7 +7,7 @@ namespace UI.Game2D.Battle
 {
     /// <summary>
     /// 戦闘の流れ (<b>仮置き</b>・2026-10-31 に実戦闘へ接続)。 <see cref="CombatManager"/> の「人が操作するターン」
-    /// (<see cref="CombatManager.BeginInteractiveTurn"/>) を進め、 <see cref="Game2DBattleFx"/> の演出と <see cref="Game2DBattleHud"/> の GUI をつなぐ。
+    /// (<see cref="CombatManager.BeginInteractiveTurn"/>) を進め、 <see cref="Game2DBattleFx"/> の演出と <see cref="Game2DBattleLcd"/> (液晶の中の戦闘の画面) をつなぐ。
     /// 1 ターン: 敵の攻撃が予告される → 自分のダイスが出る → (充電を払って振り直す) → 配線 → [GO!] → 自分の攻撃 → 敵の攻撃 → 次のターン。
     /// HP・出目・配線・ダメージはすべて本物で、 この部品は値を作らない (見せる順番と間だけを持つ)。
     /// 操作: [GO! / NEXT] ボタンか Space / 出目のクリックか 1〜9 / [REROLL] ボタンか E / Q = おまかせ。
@@ -91,6 +91,9 @@ namespace UI.Game2D.Battle
         }
 
         private void Touch() { version++; }
+
+        /// <summary>液晶の中に描く新しい戦闘の画面 (<see cref="Game2DBattleLcd"/>・2026-11-16) を同じ GameObject に付ける (シーンには保存しない)。</summary>
+        private void Awake() { if (GetComponent<Game2DBattleLcd>() == null) gameObject.AddComponent<Game2DBattleLcd>(); }
 
         private void OnEnable()
         {
@@ -614,6 +617,32 @@ namespace UI.Game2D.Battle
             return true;
         }
 
+        /// <summary>新しい戦闘の画面 (<see cref="Game2DBattleLcd"/>・出目をつかんで札へ運ぶ): 出目 die を札 s へ挿せるか。
+        /// s がもう埋まっていれば、 先に挿さっていた出目 (〈猫の手〉の出目は除く・後ろから) を 1 個床へ戻せば挿せるかを見て、 その出目を bumped に返す (入れ替え)。</summary>
+        public bool CanPlugDie(int die, int s, out int bumped)
+        {
+            bumped = -1;
+            if (!CanOperate || !IsDie(die) || IsCatLocked(die) || s < 0 || s >= board.Count || slot[die] == s) return false;
+            if (CanPlug(die, s)) return true;
+            for (int j = slot.Length - 1; j >= 0; j--)
+            {
+                if (j == die || slot[j] != s || IsCatLocked(j)) continue;
+                slot[j] = -1; bool ok = CanPlug(die, s); slot[j] = s;
+                if (ok) { bumped = j; return true; }
+            }
+            return false;
+        }
+
+        /// <summary>出目 die を札 s へ挿す (<see cref="CanPlugDie"/> の入れ替えを含む・前の挿し先からは外れる)。 挿せなければ false (何も変えない)。</summary>
+        public bool PlugDie(int die, int s)
+        {
+            if (!CanPlugDie(die, s, out int b)) return false;
+            if (b >= 0) slot[b] = -1;
+            if (Plug(die, s)) return true;
+            if (b >= 0) slot[b] = s;
+            return false;
+        }
+
         /// <summary>出目 die から端子を外す (手札へ戻す)。</summary>
         public void Unplug(int die)
         {
@@ -661,7 +690,10 @@ namespace UI.Game2D.Battle
             var w = TerminalWiring.Auto(board, dice, env, st, catDie, catSlot);      // 猫の 1 組は外さない
             for (int i = 0; i < slot.Length; i++) slot[i] = w != null && i < w.Length ? w[i] : -1;
             focusSlot = -1;
-            if (sound) { Game2DSfx.Play("wire", 1f, 1.1f); RecomputePreview(); Touch(); }
+            // 見込みは音の有無にかかわらず取り直す (2026-11-16: 音なしで呼ぶ口 ── ターンの頭・QaBattle ── の後に、 挿し方と見込みが食い違って
+            // 画面が発動する札を「不発」と出した。 ターンの頭は SyncDecision がこの後にもう一度取り直すが、 同じ値なので害は無い)
+            RecomputePreview(); Touch();
+            if (sound) Game2DSfx.Play("wire", 1f, 1.1f);
         }
 
         /// <summary>説明を出す端子を選ぶ (画面が端子の行を押した時)。</summary>
@@ -707,7 +739,7 @@ namespace UI.Game2D.Battle
         }
 
         // ── 〈有効活用〉(手札の持ち越しの規則): 捨て札から 1 枚を選ぶ ──
-        //   対象は場ではなく捨て札 (場に見えていない) なので、 画面は窓で選ぶ (Game2DBattleHud.OpenRecall)。 値は target[その端子の場の位置] = 捨て札の添字。
+        //   対象は場ではなく捨て札 (場に見えていない) なので、 画面は窓で選ぶ (BattleWindows.OpenRecall)。 値は target[その端子の場の位置] = 捨て札の添字。
         //   選ばなければ本体の既定 (最後に捨てた 1 枚・TerminalDeckState.RecallPick)。 選んだ値も既定も、 本体と同じ関数で読む。
 
         // ── 手札の規則 Pick: 残す印 ──

@@ -20,7 +20,7 @@ namespace ItemSystem.PassiveSkills
     /// </summary>
     public static class RelicFireProbe
     {
-        /// <summary>秘宝が発動した (引数 = 品の id・<see cref="PassiveSkillManager.OwnerItemOf"/>)。 画面 (Game2DBattleHud) が購読する。</summary>
+        /// <summary>秘宝が発動した (引数 = 品の id・<see cref="PassiveSkillManager.OwnerItemOf"/>)。 画面 (UI.Game2D.Game2DBattleLcd) が購読する。</summary>
         public static event Action<string> OnRelicFired;
 
         /// <summary>見張るか: 購読があり、 BOT がランを動かしていない。</summary>

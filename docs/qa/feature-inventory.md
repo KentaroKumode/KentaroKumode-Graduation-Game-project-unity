@@ -110,7 +110,7 @@ base: origin/main 6ea741d
 | F-D-03 | 振り直し | 全部振り直す・費用は充電で 個数×回目・回目は戦闘中に戻らない | `CombatManager.RerollPhase` | ― | 両 | 仕（§6-3・DCR §1⓪） | 固 |
 | F-D-04 | 端子の山札 | 開始 5 枚（攻撃 2・防御 2・充電 1）・手札 5 枚・切り直し | `CombatSystem/TerminalCards.cs`・`TerminalDeckState` | 端子 60 種（攻撃 24・防御 9・充電 5・補助 21・レア 14）[^term] | 両 | 仕（§6-4・ADR-0014） | 動（25回） |
 | F-D-05 | 手札の残す印 | 挿さなかった端子に印を付けると次も残る（Pick） | `TerminalDeckState.SplitHand/KeepFromMarks` | 規則 3 形（Off/All/Pick） | 両 | 仕（§6-4） | 動（11-13） |
-| F-D-06 | 〈有効活用〉 | 捨て札の 1 枚を次の手札へ | `TerminalDeckState.RecallPick/ApplyRecall`・`Game2DBattleHud.OpenRecall` | 1 | 両 | 仕（§6-4） | 動（11-13） |
+| F-D-06 | 〈有効活用〉 | 捨て札の 1 枚を次の手札へ | `TerminalDeckState.RecallPick/ApplyRecall`・`BattleWindows.OpenRecall` | 1 | 両 | 仕（§6-4） | 動（11-13） |
 | F-D-07 | 挿す条件 | 3 以下・5 以上・6 以上・偶数・奇数・同じ目・同じ目 2 個 | `TerminalCond` | 7＋なし[^cond] | 両 | コ | 動 |
 | F-D-08 | 使い捨て・常設 | 使い捨ては戦闘から外れる (次の戦闘ではまた山札に入る・〈応急箱〉も同じ・2026-11-14〜)・〈千刃〉は場に残る | `TerminalDef.disposable`・`TerminalDeckState.FinishTurn` | ― | ロ | 仕（§6-4） | 動 |
 | F-D-09 | 撃破のボーナスの端子 | 撃破の経路を問わず入る | `TerminalCards.Resolve` | 4 種 | ロ | 仕（§6-4） | 動（#117） |
@@ -250,7 +250,7 @@ base: origin/main 6ea741d
 | F-L-03 | 画面に出る文字列 | 品・敵・イベント・端子・カード・手引き・結末・図鑑・UI の文 | items.json・enemies.json・event_list・各 .cs | 概算 約 1,500 本[^str] | 両 | ― | 動 |
 | F-L-04 | 手引き | 契機で 1 度だけ出す・見出しが印の鍵 | `docs/handbook.md`・`Game2DTutorial.cs`・`Game2DTutorialText.cs` | 節 32・表に載る 31[^tut] | 画 | 食（G-21・G-22） | 動（21回） |
 | F-L-05 | 層題のバナー | 第一〜第五層・終層 | `GameLoop/LayerTitles.cs`・`Game2DLayerBanner` | 8 | 画 | 仕（§5-6） | 仮 |
-| F-L-06 | 戦闘の画面 | 予告・HP の棒の目盛り・手札・残す印・猫の印・敵の詳細の窓・DEF | `Game2DBattleHud.cs`・`Game2DEnemyPanel.cs` | 未確認 | 画 | 仕（§6-4・§6-15） | 動 |
+| F-L-06 | 戦闘の画面 | 予告・HP の棒の目盛り・手札・残す印・猫の印・敵の詳細の窓・DEF | `Game2DBattleLcd.cs`・`Game2DEnemyPanel.cs` | 未確認 | 画 | 仕（§6-4・§6-15） | 動 |
 | F-L-07 | 地図の画面 | 点・道・縄張りの赤・宝の印・状態の帯・近道 N 回・ETA | `Game2DMapView*.cs`・`Game2DNavExtras.cs` | 未確認 | 画 | 仕（§5-9・§17） | 動 |
 | F-L-08 | 場面の画面 | 店・休憩・イベント・宝・交換・門・結果・一択 | `Game2DPhaseScreens.cs` | 未確認 | 画 | 仕（仮置き） | 動 |
 | F-L-09 | 液晶の効果 | 走査線・湾曲・色収差・ビネット・ノイズ | `UI/Lcd/`・`Game2DSettingsApply.cs` | 5 | 画 | 仕（memory 11-02） | 固 |
