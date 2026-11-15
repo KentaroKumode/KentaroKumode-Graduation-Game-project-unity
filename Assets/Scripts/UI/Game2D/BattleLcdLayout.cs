@@ -38,8 +38,10 @@ namespace UI.Game2D
         public const int Arc = 2;
         /// <summary>解決の間に手札を引っ込める距離 (下へ・画面の外まで)。</summary>
         public const int HandHide = 66;
-        /// <summary>札の上の印 (「残す」「停止」など) の字の上端 (カードの上端からのずれ)。</summary>
-        public const int LabelDy = -13;
+        /// <summary>札の印 (「残す」「停止」「不発」など) の字の右端と上端 (カードの左上から・絵の窓の右上の角)。
+        /// 2026-11-16: 札の上 (上端 − 13) に置いていたが、 敵の HP の棒を足もとの上 (y 197〜) へ上げたので、 持ち上げた札の上の字が棒と棒の右の数と同じ行に並んで重なった。
+        /// 窓の右上は端子のマーク (窓の中央 17×17) の右で空いている (字 2 つ = 16 dot まで)。</summary>
+        public const int LabelRight = ArtX + ArtW - 1, LabelY = ArtY + 1;
 
         // ── 床の出目 ──
         /// <summary>1 個目の出目の左上と送り。 3 個で 1 段・4 個目からは上の段へ (仮)。 右端は敵の左下の「構え」の字 (x 170〜・Game2DBattleFx.DrawMarks) にかからない所まで。</summary>

@@ -342,16 +342,25 @@ namespace UI.Game2D
         private BattleCanvas _c; private float _dark = 1f;
 
         private Col C(Color32 c) => _dark >= 0.999f ? new Col(c.r, c.g, c.b) : new Col(c.r * _dark, c.g * _dark, c.b * _dark);
-        private void Px(int x, int y, Color32 c) => _c.Put(x, y, C(c));
-        private void Rect(int x, int y, int w, int h, Color32 c) { if (w > 0 && h > 0) _c.Rect(x, y, w, h, C(c)); }
+        /// <summary>網点で残す割合 (1 = 全部打つ・0 = 何も打たない)。 敵の棒を、 撃破の演出で敵が網点で抜けるのと一緒に抜く (<see cref="DrawFoot"/>)。</summary>
+        private float _keep = 1f;
+        private bool Kept(int x, int y) => _keep >= 1f || BattleCanvas.Bayer[(y & 3) * 4 + (x & 3)] / 16f < _keep;
+        private void Put(int x, int y, Col c) { if (Kept(x, y)) _c.Put(x, y, c); }
+        private void Px(int x, int y, Color32 c) => Put(x, y, C(c));
+        private void Rect(int x, int y, int w, int h, Color32 c)
+        {
+            if (w <= 0 || h <= 0) return;
+            if (_keep >= 1f) { _c.Rect(x, y, w, h, C(c)); return; }
+            var cc = C(c); for (int j = 0; j < h; j++) for (int i = 0; i < w; i++) Put(x + i, y + j, cc);
+        }
         private void Box(int x, int y, int w, int h, Color32 fill, Color32 edge) { Rect(x, y, w, h, edge); Rect(x + 1, y + 1, w - 2, h - 2, fill); }
 
         /// <summary>ドット字 (既定のフォント・Game2DJpFont)。 edge = 周り 8 方向に暗い縁取り (背景の上で読めるように)。</summary>
         private void Txt(string s, int x, int y, Color32 col, bool edge = true)
         {
             if (string.IsNullOrEmpty(s)) return;
-            if (edge) { var e = C(Edge); Game2DJpFont.Draw((px, py) => { for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++) _c.Put(px + dx, py + dy, e); }, s, x, y); }
-            var cc = C(col); Game2DJpFont.Draw((px, py) => _c.Put(px, py, cc), s, x, y);
+            if (edge) { var e = C(Edge); Game2DJpFont.Draw((px, py) => { for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++) Put(px + dx, py + dy, e); }, s, x, y); }
+            var cc = C(col); Game2DJpFont.Draw((px, py) => Put(px, py, cc), s, x, y);
         }
         private void TxtC(string s, int cx, int y, Color32 col, bool edge = true) => Txt(s, cx - Game2DJpFont.Width(s) / 2, y, col, edge);
         private void TxtR(string s, int right, int y, Color32 col, bool edge = true) => Txt(s, right - Game2DJpFont.Width(s), y, col, edge);
@@ -382,7 +391,7 @@ namespace UI.Game2D
         public void DrawHead(BattleCanvas c, int cx, int feet)
         {
             if (!Drawing || _sim == null || _fx == null) return;
-            _c = c; _dark = _fx.LcdDark; var s = _sim; var m = _fx.marks;
+            _c = c; _dark = _fx.LcdDark; _keep = 1f; var s = _sim; var m = _fx.marks;
             int yI = feet + BattleLcdLayout.HeadIntentDy, yN = feet + BattleLcdLayout.HeadNextDy, xr;
             if (m.intent > 0)
             {
@@ -425,10 +434,13 @@ namespace UI.Game2D
 
         /// <summary>敵の HP の棒 (旧 Game2DBattleFx.DrawEnemyHp の置き換え・新しい画面の間だけ): 棒・ダウンの目盛り・この手で削れる分 (金)・右に今の HP と −削れる分。
         /// 体の揺れでは動かない (EX・FloorY に固定)。 大技の暗幕に合わせて暗くする。</summary>
-        public void DrawFoot(BattleCanvas c)
+        /// <param name="keep">網点で残す割合 (撃破の演出で敵の足もとが抜けるのと同じ値・Game2DBattleFx が渡す・ふだんは 1)。
+        /// 2026-11-16: 敵が崩れて消えるのと一緒に、 敵の棒も網点で抜ける (勝った後は敵の棒を残さない ── 棒は敵の足もとに付いた敵の一部なので、 敵が居ない床に空の棒を残さない)。</param>
+        public void DrawFoot(BattleCanvas c, float keep = 1f)
         {
             if (_sim == null || _fx == null) return;
-            _c = c; _dark = _fx.LcdDark; if (_dark <= 0.02f) return;
+            _c = c; _dark = _fx.LcdDark; _keep = Mathf.Clamp01(keep);
+            if (_dark <= 0.02f || _keep <= 0f) { _keep = 1f; return; }
             int ehp = _fx.EnemyHp, emax = Mathf.Max(1, _fx.EnemyMax);
             int x = BattleMotion.EX + BattleLcdLayout.EBarDx, y = BattleMotion.FloorY + BattleLcdLayout.EBarDy, w = BattleLcdLayout.EBarW, h = BattleLcdLayout.EBarH;
             int inner = w - 2;
@@ -463,7 +475,7 @@ namespace UI.Game2D
         public void DrawUi(BattleCanvas c)
         {
             if (!Drawing || _sim == null || _fx == null || _fx.IsIntro) return;
-            _c = c; _dark = _fx.LcdDark; if (_dark <= 0.02f) return;
+            _c = c; _dark = _fx.LcdDark; _keep = 1f; if (_dark <= 0.02f) return;
             var s = _sim;
             DrawPlayer();
             // 引っ込んだ部品は、 ずれで液晶の外へ出る。 1 コマの動きは MaxStepPerFrame まで (残像が 2 段に見えないように)
@@ -661,7 +673,7 @@ namespace UI.Game2D
             // 札の上の印 (仮の字): 停止 / 対象・候補 / 不発 / 残す / 残り (2 個挿せる札)
             bool kept = sim.CanOperate && sim.IsKept(s);
             string label = stopped ? "停止" : cand ? (chosen ? "対象" : "候補") : plugged && !fires ? "不発" : kept ? "残す" : cap >= 2 && sim.Remaining(s) > 0 && plugged ? "残" + sim.Remaining(s) : null;
-            if (label != null) TxtC(label, r.x + r.width / 2, r.y + BattleLcdLayout.LabelDy, stopped ? StopMark : kept ? Gold2 : cand && chosen ? Bone : label == "不発" ? DimC : KeepMark);
+            if (label != null) TxtR(label, r.x + BattleLcdLayout.LabelRight, r.y + BattleLcdLayout.LabelY, stopped ? StopMark : kept ? Gold2 : cand && chosen ? Bone : label == "不発" ? DimC : KeepMark);      // 絵の窓の右上 (札の中)
         }
 
         // ── 床の出目 ──

@@ -690,7 +690,10 @@ namespace UI.Game2D.Battle
             var w = TerminalWiring.Auto(board, dice, env, st, catDie, catSlot);      // 猫の 1 組は外さない
             for (int i = 0; i < slot.Length; i++) slot[i] = w != null && i < w.Length ? w[i] : -1;
             focusSlot = -1;
-            if (sound) { Game2DSfx.Play("wire", 1f, 1.1f); RecomputePreview(); Touch(); }
+            // 見込みは音の有無にかかわらず取り直す (2026-11-16: 音なしで呼ぶ口 ── ターンの頭・QaBattle ── の後に、 挿し方と見込みが食い違って
+            // 画面が発動する札を「不発」と出した。 ターンの頭は SyncDecision がこの後にもう一度取り直すが、 同じ値なので害は無い)
+            RecomputePreview(); Touch();
+            if (sound) Game2DSfx.Play("wire", 1f, 1.1f);
         }
 
         /// <summary>説明を出す端子を選ぶ (画面が端子の行を押した時)。</summary>

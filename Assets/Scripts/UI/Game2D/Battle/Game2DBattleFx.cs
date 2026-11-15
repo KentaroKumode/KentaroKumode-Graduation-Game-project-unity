@@ -792,7 +792,7 @@ namespace UI.Game2D.Battle
             // 戦闘の画面 (Game2DBattleLcd・2026-11-16〜): 頭上の前触れ・足もとの棒・手札と操作を、 この作図面へ直接描く (戦闘の流れが動いていない時は null)
             var lcd = Game2DBattleLcd.Drawing ? Game2DBattleLcd.Instance : null;
             if (SimDriven && (_phase == Phase.Idle || _phase == Phase.Dot) && !_boss.Busy) { DrawMarks(EX + ep.dx, FLOOR + bob + ep.y); if (lcd != null) lcd.DrawHead(_c, EX + ep.dx, FLOOR + bob + ep.y); }
-            if (SimDriven && _phase != Phase.Intro && _phase != Phase.Won) { if (lcd != null) lcd.DrawFoot(_c); }      // 演出の絵 (大技のコマ) より手前・ダメージの数字より奥
+            if (SimDriven && _phase != Phase.Intro && _phase != Phase.Won) { if (lcd != null) lcd.DrawFoot(_c, _phase == Phase.Dying ? Cl(1 - (_dissolve - 0.55f) / 0.45f, 0, 1) : 1f); }      // 撃破: 体のいちばん下の帯 (gate 0.55) と同じ割合で棒も抜く      // 演出の絵 (大技のコマ) より手前・ダメージの数字より奥
             if (SimDriven && lcd != null) lcd.DrawUi(_c);      // 手札・出目・左下・右下 (ダメージの数字より奥)
             foreach (var d in _dmgs)
             {
