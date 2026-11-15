@@ -17,6 +17,12 @@ namespace UI.Game2D
     ///
     /// <para><b>曲</b>: 出している間は <see cref="Game2DBgm"/> が <see cref="Track"/> を読む (EndTrue = bgm_end_true / EndGood = bgm_end_good / ほか = bgm_end_other / 後日談 = bgm_epilogue・曲はまだ無いので無音)。
     /// 描き方はロード画面 (<see cref="Game2DLoadingScreen"/>) と同じ: 地図の板の複製を少し手前に置き、 Game2D/LoadingBlend の網目で出入りする。 BOT がランを動かしている間は出さない。</para>
+    ///
+    /// <para><b>結びの絵</b> (2026-11-16・作者の決定): 最後の頁 (EndTrue は後日談の最後の頁) を読み終えたら、 字の無い絵を 1 枚、 最後の頁から網目で浮かべ、
+    /// <see cref="ArtHold"/> 秒見せてから網目で閉じる (見せている間のクリック・Space・Enter で閉じる)。 絵は作者が描いた物を加工せずに
+    /// Resources/<see cref="ArtDir"/>*.png.bytes に置き (戦闘の背景・Game2DIcons と同じく、 取り込みの設定に左右されないようテキストの資産として読む)、
+    /// <see cref="ArtNameFor"/> で引く。 見せ方はタイトル画面の背景 (TitleDayNight の BG・幅 256 の絵を PPU 8 で置き、 液晶の高さ 16.875 単位 = 270 dot に写す
+    /// = 絵の 1 画素が 2×2 dot) に揃え、 <b>整数倍で液晶を覆う最小の倍率</b> (幅 256 なら 2 倍) で最近傍に拡大して中央に置き、 はみ出した端は切る (余りが出れば黒)。</para>
     /// </summary>
     public class Game2DEndingScreen : MonoBehaviour
     {
@@ -24,6 +30,10 @@ namespace UI.Game2D
         /// <summary>1 行が浮かぶ間 (秒)。</summary>
         public const float LineReveal = 0.12f;
         private const float FadeSec = 0.35f;
+        /// <summary>結びの絵を見せる長さ (秒・浮かびきってから・仮置き)。 この間のクリックで閉じる。</summary>
+        public const float ArtHold = 4f;
+        /// <summary>結びの絵の置き場 (Resources の下・*.png.bytes)。</summary>
+        public const string ArtDir = "Game2DEndingArt/";
         // 配置 (dot): 液晶の湾曲で端が切れるので、 左右 40・上 30・下 26 の内側
         //   題は 2 倍のドット字で中央 (2026-11-15 撮影: 小さく左上に寄りすぎていた)
         private const int Left = 40, TextW = 400, TitleY = 26, TitleScale = 2, BodyY = 64, FootY = 232, LinesPerPage = 12;
@@ -53,6 +63,17 @@ namespace UI.Game2D
             mv.gameObject.AddComponent<Game2DEndingScreen>();
         }
 
+        /// <summary>エンディングの id → 結びの絵の名前 (<see cref="ArtDir"/> の下のファイル名・拡張子 .png.bytes を除く)。 絵の無いエンディングは null (最後の頁で閉じる)。
+        /// 英雄の帰還 (end1) は作者がまだ決めていない (絵を決めたらここに 1 行足す)。 後日談は EndTrue の続きなので、 EndTrue の絵が後日談の後に出る。</summary>
+        public static string ArtNameFor(string endingId)
+        {
+            if (endingId == Endings.End2.id) return "night";          // 無明の剣: 夜の大穴を見下ろしつつ、 ひっそりと別れを告げる後ろ姿
+            if (endingId == Endings.End3.id) return "ash";            // 空の玉座: 灰と炎
+            if (endingId == Endings.EndGoodId) return "dark";         // 見送り: 長い年月の後、 宇宙が全て呑み込まれて極点の光だけになった姿
+            if (endingId == Endings.EndTrueId) return "true_end";     // 帳尻 (+ 棚の隅): 物語を物語として閉じる挿絵
+            return null;
+        }
+
         private struct Page { public string title; public List<string> lines; public string track; }
         private readonly List<Page> _pages = new List<Page>();
         private int _page; private float _t, _fadeT; private bool _closing;
@@ -61,6 +82,8 @@ namespace UI.Game2D
         private GameManager.GamePhase _playPhase; private RunState _playRun;
         private GameManager _subscribed;
         private MeshRenderer _quad; private Texture2D _tex; private KitPix _pix; private MaterialPropertyBlock _mpb;
+        // 結びの絵: _artReady = このエンディングに絵がある (Play で読んで _artTex に描いておく)・_inArt = 見せている所
+        private Texture2D _artTex; private bool _artReady, _inArt;
 
         private void OnDisable() { Unsubscribe(); if (_active) Stop(); }      // 載っている物ごと止まった時も重ね絵と入力の遮断を残さない
 
@@ -68,6 +91,7 @@ namespace UI.Game2D
         {
             Unsubscribe();
             if (_tex != null) Destroy(_tex);
+            if (_artTex != null) Destroy(_artTex);
             if (_quad != null) { if (_quad.sharedMaterial != null && _quad.sharedMaterial.name == "Game2DEndingBlend") Destroy(_quad.sharedMaterial); Destroy(_quad.gameObject); }
             if (_active) { _active = false; GameManager.InputBlockedByScreen = false; }
         }
@@ -139,12 +163,24 @@ namespace UI.Game2D
             _t += dt; _fadeT += dt;
             bool press = Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return);
             if (_closing) { if (_fadeT >= FadeSec) { Stop(); return; } }
+            else if (_inArt)
+            {
+                // 結びの絵: 浮かびきってから ArtHold 秒、 またはクリックで閉じる (閉じる時は網目で後ろの画面へ)
+                if (_fadeT >= FadeSec + ArtHold || (press && _fadeT >= FadeSec))
+                {
+                    if (press) GameManager.ScreenUsedSpaceFrame = Time.frameCount;      // 押した入力を後ろへ流さない
+                    _closing = true; _fadeT = 0f; SetBlend(_artTex, false);
+                }
+                ApplyFade();
+                return;                                                       // 絵の上には何も描かない
+            }
             else if (press && _fadeT >= FadeSec)
             {
                 GameManager.ScreenUsedSpaceFrame = Time.frameCount;      // 押した入力を後ろへ流さない
                 var pg = _pages[_page];
                 if (_t < pg.lines.Count * LineReveal) _t = 999f;          // 浮かびきる前: 全部を出す
                 else if (_page + 1 < _pages.Count) { _page++; _t = 0f; Track = _pages[_page].track; Game2DSfx.Play("ui_tab", 0.6f); }
+                else if (_artReady) { _inArt = true; _fadeT = 0f; SetBlend(_artTex, true); Game2DSfx.Play("ui_confirm"); }      // 最後の頁の上へ絵を網目で浮かべる
                 else { _closing = true; _fadeT = 0f; Game2DSfx.Play("ui_confirm"); }
             }
             Draw();
@@ -160,14 +196,12 @@ namespace UI.Game2D
             AddPages(e, track);
             if (e.id == Endings.EndTrueId) AddPages(Endings.Epilogue, Game2DBgm.Epilogue);      // 額縁が閉じる: 後日談 (棚の隅)
             if (_pages.Count == 0) return;
-            _page = 0; _t = 0f; _fadeT = 0f; _closing = false; _active = true; Track = _pages[0].track;
+            _page = 0; _t = 0f; _fadeT = 0f; _closing = false; _inArt = false; _active = true; Track = _pages[0].track;
             var gm = GameManager.Instance; _playPhase = gm != null ? gm.CurrentPhase : GameManager.GamePhase.Title; _playRun = gm != null ? gm.Run : null;
             GameManager.InputBlockedByScreen = true;
             if (_tex == null) { _tex = new Texture2D(W, H, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp, name = "Game2DEnding" }; _pix = new KitPix(W, H); }
-            if (_mpb == null) _mpb = new MaterialPropertyBlock();
-            _quad.GetPropertyBlock(_mpb);
-            _mpb.SetTexture("_MainTex", _tex); _mpb.SetVector("_Dots", new Vector4(W, H, 0, 0)); _mpb.SetFloat("_UsePrev", 0f);
-            _quad.SetPropertyBlock(_mpb);
+            _artReady = LoadArt(ArtNameFor(e.id));
+            SetBlend(_tex, false);
             _quad.enabled = true;
             Draw(); ApplyFade();
             Game2DSfx.Play("gui_out");
@@ -197,10 +231,53 @@ namespace UI.Game2D
             FlushPara(); FlushPage();
         }
 
+        /// <summary>網目の板に見せる物を渡す。 main = 浮かべる絵・overPrev = 見せないドットに今の頁 (_tex) を出す (頁 → 絵の入り) / false = 捨てて後ろを見せる。</summary>
+        private void SetBlend(Texture2D main, bool overPrev)
+        {
+            if (_quad == null) return;
+            if (_mpb == null) _mpb = new MaterialPropertyBlock();
+            _quad.GetPropertyBlock(_mpb);
+            _mpb.SetTexture("_MainTex", main); _mpb.SetVector("_Dots", new Vector4(W, H, 0, 0)); _mpb.SetFloat("_UsePrev", overPrev ? 1f : 0f);
+            if (overPrev) _mpb.SetTexture("_PrevTex", _tex);
+            _quad.SetPropertyBlock(_mpb);
+        }
+
+        /// <summary>結びの絵を読み、 液晶の大きさ (W×H) に写して _artTex に置く。 絵の画素は変えない: 整数倍で液晶を覆う最小の倍率で最近傍に拡大し、 中央に置いて端を切る
+        /// (タイトル画面の背景と同じ見せ方・幅 256 なら 2 倍)。 余りが出れば黒。 name が null・読めない時は false (絵なしで閉じる)。</summary>
+        private bool LoadArt(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return false;
+            var a = Resources.Load<TextAsset>(ArtDir + name + ".png");
+            if (a == null) { Debug.LogWarning("[Game2DEndingScreen] Resources/" + ArtDir + name + ".png.bytes が無い"); return false; }
+            var t = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+            bool ok = t.LoadImage(a.bytes) && t.width > 0 && t.height > 0;
+            Resources.UnloadAsset(a);
+            if (!ok) { Debug.LogWarning("[Game2DEndingScreen] " + name + " を読めない"); Destroy(t); return false; }
+            int sw = t.width, sh = t.height; var src = t.GetPixels32();                      // 下の行から
+            Destroy(t);
+            int s = Mathf.Max(1, Mathf.Max(Mathf.CeilToInt((float)W / sw), Mathf.CeilToInt((float)H / sh)));
+            int ox = (W - sw * s) / 2, oy = (H - sh * s) / 2;                                  // 左上からの位置 (負 = はみ出して切る)
+            var dst = new Color32[W * H]; var black = new Color32(0, 0, 0, 255);
+            for (int y = 0; y < H; y++)
+            {
+                int ry = y - oy;                                                               // 絵の上からの行 (拡大後)
+                for (int x = 0; x < W; x++)
+                {
+                    int rx = x - ox;
+                    Color32 c = black;
+                    if (rx >= 0 && ry >= 0 && rx < sw * s && ry < sh * s) { c = src[(sh - 1 - ry / s) * sw + rx / s]; c.a = 255; }
+                    dst[(H - 1 - y) * W + x] = c;                                              // Texture2D は下の行から
+                }
+            }
+            if (_artTex == null) _artTex = new Texture2D(W, H, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp, name = "Game2DEndingArt" };
+            _artTex.SetPixels32(dst); _artTex.Apply(false);
+            return true;
+        }
+
         private void ApplyFade()
         {
             if (_quad == null) return;
-            float f = Mathf.Clamp01(_fadeT / FadeSec); float fade = _closing ? 1f - f : f;
+            float f = Mathf.Clamp01(_fadeT / FadeSec); float fade = _closing ? 1f - f : f;      // 結びの絵の入り (_inArt) も 0 → 1 (見せないドットは最後の頁)
             if (_mpb == null) _mpb = new MaterialPropertyBlock();
             _quad.GetPropertyBlock(_mpb); _mpb.SetFloat("_Fade", fade); _quad.SetPropertyBlock(_mpb);
         }
@@ -239,7 +316,7 @@ namespace UI.Game2D
 
         private void Stop()
         {
-            _active = false; _endFrame = Time.frameCount; _closing = false; Track = null; ClosedSerial++;
+            _active = false; _endFrame = Time.frameCount; _closing = false; _inArt = false; Track = null; ClosedSerial++;
             GameManager.InputBlockedByScreen = false;
             if (_quad != null) _quad.enabled = false;
         }
@@ -247,7 +324,7 @@ namespace UI.Game2D
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         /// <summary>[実機の確認用・2026-11-15] エンディングの画面を直接出す (フェーズもランも変えない・セーブを止める)。
         /// id = end1 / end2 / end3 / end_true (後日談つき) / end_good / epilogue (後日談だけ)。 例: <c>UI.Game2D.Game2DEndingScreen.QaShow("end_true")</c>。
-        /// 読み終わって閉じると元の画面に戻る (踏破の窓は出ない)。 出している間にフェーズかランが変わるとすぐ片付く。 無い id なら false。</summary>
+        /// 読み終わると結びの絵 (<see cref="ArtNameFor"/>・end1 / epilogue は無し) を見せて閉じ、 元の画面に戻る (踏破の窓は出ない)。 出している間にフェーズかランが変わるとすぐ片付く。 無い id なら false。</summary>
         public static bool QaShow(string id)
         {
             SaveGuard.Suppressed = true;
