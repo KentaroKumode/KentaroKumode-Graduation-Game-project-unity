@@ -492,9 +492,11 @@ namespace ItemSystem.PassiveSkills.Effects
 
     /// <summary>絞り出し (Wringing) — ターン終了時、敵出血スタック×2 の追加固定ダメ (軽減無視)。
     /// 通常の出血DoT (BattleModifierManager) と二段構えで削る。</summary>
-    public class Wringing : IPassiveSkillEffect
+    public class Wringing : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "逆綴じの止血帯";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.enemyBleedStacks > 0);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -508,9 +510,11 @@ namespace ItemSystem.PassiveSkills.Effects
 
     /// <summary>血の一撃 (BloodStrike) — 攻撃時、敵出血1消費で 与ダメ+スタック値×3 (消費前スタック数×3)。
     /// 積んだ出血を火力に変換するバースト。スタック多いほど爆発力大。</summary>
-    public class BloodStrike : IPassiveSkillEffect
+    public class BloodStrike : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "血桜";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.enemyBleedStacks > 0);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -596,9 +600,11 @@ namespace ItemSystem.PassiveSkills.Effects
 
     /// <summary>不朽の熱 (UnyieldingHeat) — 臨界メーター≥40 の間に致命ダメを受けた時、
     /// HP=1 で踏みとどまり meter を全消費 (Burn Immortalflame の遺伝子継承)。 1戦闘1回。</summary>
-    public class UnyieldingHeat : IPassiveSkillEffect
+    public class UnyieldingHeat : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "八日目の灰燼";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Once(ctx.rinkaiUnyieldingUsed, ctx.rinkaiMeter >= 40);
         public PassiveSkillTrigger[] Triggers => new[] {
             PassiveSkillTrigger.OnBattleStart,
             PassiveSkillTrigger.OnPreReceiveDamage };
@@ -626,9 +632,11 @@ namespace ItemSystem.PassiveSkills.Effects
     /// <summary>無銘の剣舞譜 (特殊・4枚集約の変化先): 戦闘突入ごとに[剣先]スタック+1（最大99・ラン中持続）。
     /// ダイス合計に剣先スタック分を加算。与ダメージ時に剣先スタック分HP回復、被ダメージ時に剣先スタック分の
     /// 軽減不可ダメージを相手へ。スタックはランを跨がず IRunResettable でリセット。</summary>
-    public class BladeDance : IPassiveSkillEffect, IRunResettable, IRunStatePersistent
+    public class BladeDance : IPassiveSkillEffect, IRelicDisplay, IRunResettable, IRunStatePersistent
     {
         public string SkillId => "無銘の剣舞譜";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(kensaki);
         private int kensaki = 0; // 剣先スタック（ラン中持続）
 
         public void ResetRunState() { kensaki = 0; }
@@ -642,8 +650,8 @@ namespace ItemSystem.PassiveSkills.Effects
             return true;
         }
 
-        /// <summary>4枚集約による BD 取得時の初期スタック付与 (現在層 × 3)。
-        /// 取得が後半層に偏る構造のため、 集約成功への報酬として「現時点の層数 × 3」 をプリロードする。
+        /// <summary>4枚集約による BD 取得時の初期スタック付与 (現在層 × 5・2026-11-15 にコードに合わせてコメントを直した)。
+        /// 取得が後半層に偏る構造のため、 集約成功への報酬として「現時点の層数 × 5」 をプリロードする。
         /// 既に kensaki > seed の場合は上書きしない (後から再取得→上書きで減少を防ぐ)。</summary>
         public void SeedOnAcquire(int floor)
         {

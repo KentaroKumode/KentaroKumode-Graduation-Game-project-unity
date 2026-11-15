@@ -64,6 +64,8 @@ namespace ItemSystem.PassiveSkills.Effects
         private readonly int[] _provisionMin;     // 物資段階の下限・上限 (-1 = 使わない)。 生成時に名前から引く
         private readonly int[] _provisionBelow;
         private readonly IPassiveSkillEffect _inner;
+        /// <summary>包んでいる品の効果 (秘宝の列 #320 が見え方を読む)。</summary>
+        public IPassiveSkillEffect Inner => _inner;
         private readonly PassiveSkillTrigger[] _triggers;
         private readonly bool _tracksHit;
         private readonly bool _tracksStreak;

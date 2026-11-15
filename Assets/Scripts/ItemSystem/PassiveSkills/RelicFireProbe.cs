@@ -6,7 +6,8 @@ using System.Reflection;
 namespace ItemSystem.PassiveSkills
 {
     /// <summary>
-    /// 秘宝の発動を画面に出すための見張り (#320・2026-11-15)。 秘宝の効果 (<see cref="IPassiveSkillEffect.Execute"/>) を動かす前後で、
+    /// 秘宝の発動を画面に出すための見張り (#320・2026-11-15)。 <b>作り直しの後は「出来事に反応するだけの品」(<see cref="RelicMode.Pulse"/>) だけ</b>を見張る ──
+    /// 数を貯める品・状態の間だけ効く品などは、 効果のクラスが見え方を返す (<see cref="IRelicDisplay"/>)。 秘宝の効果 (<see cref="IPassiveSkillEffect.Execute"/>) を動かす前後で、
     /// 戦闘の状態 (<see cref="CombatContext"/> の数の欄・辞書・リストの長さ・ランの HP / 最大 HP / ゴールド) の指紋を比べ、
     /// <b>変わった時だけ</b>「その秘宝が発動した」と知らせる (<see cref="OnRelicFired"/>・引数 = 品の id)。
     ///
@@ -68,6 +69,9 @@ namespace ItemSystem.PassiveSkills
             if (run != null) { h = Mix(h, (ulong)(uint)run.playerHP); h = Mix(h, (ulong)(uint)run.playerMaxHP); h = Mix(h, (ulong)(uint)run.coins); }
             return h;
         }
+
+        /// <summary>見張る効果か: 見え方 (<see cref="IRelicDisplay"/>) を持つ効果は、 状態を読んで光るので見張らない (出来事に反応するだけの品だけ・#320 の作り直し)。</summary>
+        public static bool Wants(IPassiveSkillEffect e) => RelicLookup.DisplayOf(e) == null;
 
         /// <summary>効果を動かした後: 指紋が変わっていれば、 その効果の持ち主の品を知らせる (持ち主が分からない効果は知らせない)。</summary>
         public static void After(string skillId, ulong before, CombatContext ctx)

@@ -50,9 +50,11 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>余韻の鈴 (旧〈余韻の鍔〉): 会心が出た次のターン、 会心率 +20% (2026-11-07: 旧 +10%)。</summary>
-    public class LingeringBell : IPassiveSkillEffect
+    public class LingeringBell : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "余韻の鈴";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(Ax2.Count(ctx, Key) > 0 && (Ax2.Count(ctx, Key) == ctx.currentTurn || Ax2.LastTurn(ctx, Key)));
         private const string Key = "ax2.lingering";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalDamage, PassiveSkillTrigger.OnWired };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
@@ -84,9 +86,11 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>負け越しの賽: 会心が出なかった攻撃のたび会心率 +15% (会心が出ると 0 に戻る・2026-11-07: 旧 +10%)。</summary>
-    public class LosingStreakDie : IPassiveSkillEffect
+    public class LosingStreakDie : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "負け越しの賽";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Ax2.Count(ctx, Key));
         private const string Key = "ax2.streak";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage, PassiveSkillTrigger.OnWired };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
@@ -121,9 +125,11 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>抜き打ちの作法: 戦闘の最初の 2 回の攻撃は必ず会心 (2026-11-07: 旧 1 回)。</summary>
-    public class QuickDrawArt : IPassiveSkillEffect
+    public class QuickDrawArt : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "抜き打ちの作法";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => new RelicView { known = true, lit = Times - Ax2.Count(ctx, Key) > 0, count = System.Math.Max(0, Times - Ax2.Count(ctx, Key)), spent = Times - Ax2.Count(ctx, Key) <= 0 };
         public const int Times = 2;
         private const string Key = "ax2.quickDraw";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
@@ -196,9 +202,11 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>絶縁の外套: 過充電の間、 ターンの始めにシールド +4 (2026-11-10・#40: 旧「受けるダメージ −3」。 充電軸に被ダメ −N が寄りすぎていた)。</summary>
-    public class InsulatedCloak : IPassiveSkillEffect
+    public class InsulatedCloak : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "絶縁の外套";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.IsOvercharged());
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -220,9 +228,11 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>雷鳴の太鼓: 電流 1 につき充電の上限 +3 (2026-11-07: 旧 +2)。</summary>
-    public class ThunderDrum : IPassiveSkillEffect
+    public class ThunderDrum : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "雷鳴の太鼓";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.AxisDepth(AxisRules.Charge) > 0);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
             => ctx.chargeCapBonus = System.Math.Max(ctx.chargeCapBonus, 3 * ctx.AxisDepth(AxisRules.Charge));
@@ -268,9 +278,11 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>血の滴る刃先: 敵の出血が 10 以上の間、 与ダメージ +10% (2026-11-10: 旧 出目 +10%)。</summary>
-    public class DrippingEdge : IPassiveSkillEffect
+    public class DrippingEdge : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "血の滴る刃先";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.enemyBleedStacks >= 10);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -359,9 +371,11 @@ namespace ItemSystem.PassiveSkills.Effects
     // 〈麻痺の吹き矢〉(敵の毒 5 につき貫通 +1・OnWired) は 2026-11-11 に items.json の stats へ移した (段 3・per=enemyPoison・perEvery 5)。
 
     /// <summary>瘴気の外套: 敵の毒が 10 以上の間、 受けるダメージ − 瘴気 (2026-11-07: 旧 毒 20 以上・瘴気の半分)。</summary>
-    public class MiasmaMantle : IPassiveSkillEffect
+    public class MiasmaMantle : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "瘴気の外套";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.EnemyPoison >= 10);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -370,9 +384,11 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>毒溜まりの主: 毒が 30 以上の敵の攻撃 −25% (ctx.enemyAtkCutPct・予告の前に掛かる・2026-11-07: 旧 50 以上・−20%)。</summary>
-    public class PoolKeeper : IPassiveSkillEffect
+    public class PoolKeeper : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "毒溜まりの主";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.EnemyPoison >= 30);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -404,9 +420,11 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>重ね札の盾: シールドが 8 以上の間、 受けるダメージ −5 (2026-11-07: 旧 10 以上・−2 → −3 → −5)。</summary>
-    public class LayeredTagShield : IPassiveSkillEffect
+    public class LayeredTagShield : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "重ね札の盾";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.consShield >= 8);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {

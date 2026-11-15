@@ -402,7 +402,7 @@ namespace ItemSystem.PassiveSkills
                     int hlFixed = context.fixedDamageToEnemy;                                              // [計装 2026-11-05]
                     int hlPend = (int)context.GetAccumulated(Keywords.Kw.PendingEnemyDamageKey);
                     int ledHp = context.enemyCurrentHP;   // [計装 2026-11-10] ctx を通した削りの品別
-                    bool probe = RelicFireProbe.Active; ulong fp = probe ? RelicFireProbe.Take(context) : 0;      // 秘宝の発動の表示 (#320・画面が見ている時だけ)
+                    bool probe = RelicFireProbe.Active && RelicFireProbe.Wants(skills[i]); ulong fp = probe ? RelicFireProbe.Take(context) : 0;      // 秘宝の発動の表示 (#320・画面が見ている時だけ・見え方を持つ品は見張らない)
                     skills[i].Execute(trigger, context);
                     if (probe) RelicFireProbe.After(skills[i].SkillId, fp, context);
                     CombatSystem.EnemyHpLedger.NoteCtxSource(skills[i].SkillId, ledHp, context.enemyCurrentHP);
@@ -447,7 +447,7 @@ namespace ItemSystem.PassiveSkills
                     try
                     {
                         CombatContext.CurrentSkillId = s.SkillId;
-                        bool probe = RelicFireProbe.Active; ulong fp = probe ? RelicFireProbe.Take(context) : 0;      // 秘宝の発動の表示 (#320)
+                        bool probe = RelicFireProbe.Active && RelicFireProbe.Wants(s); ulong fp = probe ? RelicFireProbe.Take(context) : 0;      // 秘宝の発動の表示 (#320)
                         s.Execute(trigger, context);
                         if (probe) RelicFireProbe.After(s.SkillId, fp, context);
                         CombatContext.CurrentSkillId = "";

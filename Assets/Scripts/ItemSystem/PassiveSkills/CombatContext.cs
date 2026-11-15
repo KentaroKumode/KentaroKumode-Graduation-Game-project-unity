@@ -1147,7 +1147,7 @@ namespace ItemSystem.PassiveSkills
                 if (enemyBleedStacks == 0) Keywords.Kw.Raise(this, PassiveSkillTrigger.OnBleedZero, 1);
             }
             if (enemyPassivesDisabledTurns > 0) enemyPassivesDisabledTurns--; // 敵パッシブ無効化 残ターン
-            burstStackBonus -= burstStackBonus / 4;   // 〈二度詰めの雷管〉の上乗せは毎ターン 1/4 を失う (ヴェスカ 4 段で積み上がらない)
+            burstStackBonus -= (burstStackBonus + 3) / 4;   // 〈二度詰めの雷管〉の上乗せは毎ターン 1/4 を失う (ヴェスカ 4 段で積み上がらない・端数は切り上げて減らす = 3 からも 0 へ減る・2026-11-15 #320)
             // プレイヤーのシールドは毎ターン半減 (切り捨て。 1 → 0 で確実に消える)。 ヴェスカのシールド規約と同じ (GAME.md §13-4)。
             // T1 は戦闘開始時の付与 (開幕シールド等) をそのまま使うので半減しない。 そのターンの付与は OnTurnStart 以降なので「半減 → 付与」の順になる。
             // 〈脈なしの鋼心臓〉で止まる。 失った分を〈半減で失った〉出来事として配る (2026-10-31)。

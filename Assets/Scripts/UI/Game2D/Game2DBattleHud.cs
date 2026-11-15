@@ -1015,30 +1015,47 @@ namespace UI.Game2D
             p.Apply(t);
         }
 
-        // ── 秘宝の列 (#320・2026-11-15・作者「出す。 スレスパ式で左上に表示でもいいかも」) ──
-        //   持っている秘宝 (武器・消耗品を除くランの持ち物) のアイコン (Resources/Icons/Items/<id>.png・16×16 をそのまま打つ・拡大縮小しない) を取った順に 1 列。
-        //   入りきらない分は最後の枠を「+N」にまとめる。 発動した秘宝 (ItemSystem.PassiveSkills.RelicFireProbe: 効果で値が変わった時だけ) は
-        //   0.5 秒 (1 秒 8 コマの 4 コマ) 光る: アイコンの画素に暖色の光を足す (加算・強さ 1 → 3/4 → 1/2 → 1/4)。 大きさは変えない。
-        //   マウスを乗せると説明の帯 (端子と同じ帯) に名前と効果。 音は軽い ui_tab を高く小さく (BOT の間は鳴らさない)。
+        // ── 秘宝の列 (#320・2026-11-15・作者「出す。 スレスパ式で左上に表示でもいいかも」・同日に作り直し「条件を満たしている状態なら光り続ける」) ──
+        //   持っている秘宝 (武器を除くランの持ち物) のアイコン (Resources/Icons/Items/<id>.png・16×16 をそのまま打つ・拡大縮小しない) を取った順に 1 列。
+        //   入りきらない分は最後の枠を「+N」にまとめる。 見え方は本体 (ItemSystem.PassiveSkills.RelicLookup) が品ごとに返す (画面は品と数のキーを持たない):
+        //     状態 (数を貯める・状態の間だけ効く・挿し方で決まる・待機して 1 回): 光っている間は縁を光らせ、 絵を少し明るく。 数があれば右下に 3×5 の数字。 使い終わった 1 戦闘 1 回の品は暗く。
+        //     出来事に反応するだけの品: 効果で値が変わった瞬間に 0.5 秒 (1 秒 8 コマの 4 コマ) 縁が光る (同じ品は 1 ターンに 1 回まで)。 音は ui_tab を小さく高く (BOT の間は鳴らさない)。
+        //     【規則】の品: 光らせない。
+        //   光は加算 (縁の暖色)・絵は塗りつぶさない・原色にしない・大きさは変えない。 マウスを乗せると説明の帯に名前と効果。
         private readonly List<string> _relics = new List<string>();
         private readonly Dictionary<string, float> _relicFlashAt = new Dictionary<string, float>();
-        private int _hoverRelic = -1, _relicCountSig = -1; private bool _relicHooked;
+        private readonly Dictionary<string, int> _relicPulseTurn = new Dictionary<string, int>();
+        private int _hoverRelic = -1, _relicCountSig = -1, _relicStateSig; private bool _relicHooked;
         private const float RelicFlashSec = 0.5f;
-        private static readonly Color32 RelicGlow = new Color32(0xff, 0xc8, 0x78, 255);
+        private static readonly Color32 RelicEdge = new Color32(0xf0, 0xb4, 0x5a, 255), RelicNum = new Color32(0xff, 0xe8, 0xb8, 255);
+
+        private static int RelicTurn => ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context?.currentTurn ?? 0;
 
         private void OnRelicFired(string id)
         {
-            if (string.IsNullOrEmpty(id) || !Game2DBattleSim.Active) return;
-            _relicFlashAt[id] = Time.unscaledTime;
+            if (string.IsNullOrEmpty(id) || !Game2DBattleSim.Active || !_relics.Contains(id)) return;
+            if (ItemSystem.PassiveSkills.RelicLookup.ModeOf(id, Env(), out _) != ItemSystem.PassiveSkills.RelicMode.Pulse) return;      // 状態で光る品・【規則】の品は一瞬光らせない
+            int turn = RelicTurn;
+            if (_relicPulseTurn.TryGetValue(id, out var last) && last == turn) return;      // 同じ品は 1 ターンに 1 回まで
+            _relicPulseTurn[id] = turn; _relicFlashAt[id] = Time.unscaledTime;
             if (!GameHooks.BotDriving) Game2DSfx.Play("ui_tab", 0.5f, 1.3f);
         }
 
-        /// <summary>持っている秘宝の一覧を作り直す (持ち物の数が変わった時だけ)。</summary>
+        /// <summary>今の挿し方の見込み (配線を決める前は画面の見込み・決めた後は戦闘の記録)。 挿し方で決まる品 (当て布の籠手など) が読む。</summary>
+        private ItemSystem.PassiveSkills.RelicEnv Env()
+        {
+            var o = sim != null ? sim.preview : null;
+            if (o != null && sim.CanOperate) return new ItemSystem.PassiveSkills.RelicEnv { atkDice = o.attackDice, blockDice = o.blockDice };
+            return ItemSystem.PassiveSkills.RelicEnv.Unknown;
+        }
+
+        /// <summary>持っている秘宝の一覧を作り直す (持ち物が変わった時・戦闘の途中で足した品も入る)。</summary>
         private void RefreshRelics()
         {
             if (!_relicHooked) { ItemSystem.PassiveSkills.RelicFireProbe.OnRelicFired += OnRelicFired; _relicHooked = true; }
             var own = GameManager.Instance?.Run?.ownedPassiveItems;
-            int sig = own == null ? 0 : own.Count * 7919 + (own.Count > 0 ? (own[own.Count - 1] ?? "").GetHashCode() : 0);
+            int sig = 17;
+            if (own != null) unchecked { foreach (var id in own) sig = sig * 31 + (id ?? "").GetHashCode(); sig = sig * 31 + own.Count; }
             if (sig == _relicCountSig) return;
             _relicCountSig = sig; _relics.Clear();
             if (own == null) return;
@@ -1051,14 +1068,22 @@ namespace UI.Game2D
             }
         }
 
-        /// <summary>描き直しの版: 一覧が変わった時・乗っている枠が変わった時と、 光っている間は 1 秒 8 コマごと。</summary>
+        /// <summary>描き直しの版: 一覧・乗っている枠・品の見え方 (光る / 数 / 使用済み) が変わった時と、 出来事で光っている間は 1 秒 8 コマごと。</summary>
         private int RelicVersion()
         {
             RefreshRelics();
-            int v = _relicCountSig * 3 + _hoverRelic * 17;
+            var env = Env(); int st = 0;
+            unchecked
+            {
+                foreach (var id in _relics)
+                    if (ItemSystem.PassiveSkills.RelicLookup.ModeOf(id, env, out var v) == ItemSystem.PassiveSkills.RelicMode.State)
+                        st = st * 31 + (v.lit ? 1 : 0) + (v.spent ? 2 : 0) + (v.count + 1) * 4;
+            }
+            _relicStateSig = st;
+            int ver = _relicCountSig * 3 + _hoverRelic * 17 + st * 7;
             float now = Time.unscaledTime;
-            foreach (var kv in _relicFlashAt) if (now - kv.Value < RelicFlashSec + 0.05f) { v += (int)(now * 8f) * 31; break; }
-            return v;
+            foreach (var kv in _relicFlashAt) if (now - kv.Value < RelicFlashSec + 0.05f) { ver += (int)(now * 8f) * 31; break; }
+            return ver;
         }
 
         /// <summary>1 列に出す枠の数と、 「+N」の数 (0 = まとめない)。</summary>
@@ -1070,10 +1095,11 @@ namespace UI.Game2D
 
         private static RectInt RelicSlotR(int i) => new RectInt(BattleHudLayout.RelicPad - 1 + i * BattleHudLayout.RelicPitch, 0, BattleHudLayout.RelicPitch, BattleHudLayout.RelicBar.h);
 
+        /// <summary>出来事で光っている強さ (0〜1・1 秒 8 コマで 1 → 3/4 → 1/2 → 1/4)。</summary>
         private float RelicFlash(string id)
         {
             if (!_relicFlashAt.TryGetValue(id, out var t0)) return 0f;
-            int step = (int)((Time.unscaledTime - t0) * 8f);      // 1 秒 8 コマ
+            int step = (int)((Time.unscaledTime - t0) * 8f);
             return step < 0 || step >= 4 ? 0f : (4 - step) / 4f;
         }
 
@@ -1085,38 +1111,76 @@ namespace UI.Game2D
             int used = Mathf.Min(RelicR.width, (shown + (more > 0 ? 1 : 0)) * BattleHudLayout.RelicPitch + 2 * BattleHudLayout.RelicPad - 2);
             var p = new KitPix(RelicR.width, RelicR.height);      // 使わない右の部分は透明のまま
             if (Game2DKit.Tab != null) p.NineSlice(Game2DKit.Tab, 5, Well, 0, 0, used, RelicR.height); else p.Box(0, 0, used, RelicR.height, Well, Dark);
-            int y = (RelicR.height - BattleHudLayout.RelicIcon) / 2;
-            for (int i = 0; i < shown; i++)
+            int y = (RelicR.height - BattleHudLayout.RelicIcon) / 2, sz = BattleHudLayout.RelicIcon;
+            var env = Env();
+            bool anyHidden = false;
+            for (int i = 0; i < _relics.Count; i++)
             {
                 var id = _relics[i];
+                var mode = ItemSystem.PassiveSkills.RelicLookup.ModeOf(id, env, out var v);
+                float edge = mode == ItemSystem.PassiveSkills.RelicMode.State ? (v.lit ? 0.75f : 0f) : mode == ItemSystem.PassiveSkills.RelicMode.Pulse ? RelicFlash(id) : 0f;
+                if (i >= shown) { if (edge > 0f) anyHidden = true; continue; }
                 int x = BattleHudLayout.RelicPad + i * BattleHudLayout.RelicPitch;
                 var icon = Game2DKit.ItemIcon(id);
-                if (icon != null) p.Sprite(icon, x, y, BattleHudLayout.RelicIcon, BattleHudLayout.RelicIcon);
+                if (icon != null) p.Sprite(icon, x, y, sz, sz);
                 else { string nm = ItemSystem.ItemDatabase.DisplayNameOf(id) ?? id; p.Text(nm.Length > 0 ? nm.Substring(0, 1) : "?", x + 2, y + 2, Ink); }      // 絵の無い品は名前の 1 字
-                float k = RelicFlash(id);
-                if (k > 0f) Glow(p, x, y, BattleHudLayout.RelicIcon, BattleHudLayout.RelicIcon, k);
-                if (_hoverRelic == i) p.Rect(x, y + BattleHudLayout.RelicIcon, BattleHudLayout.RelicIcon, 1, Ink);      // 乗っている枠の下に 1 dot の線
+                if (mode == ItemSystem.PassiveSkills.RelicMode.State && v.spent) Tone(p, x, y, sz, sz, 0.45f);      // 使い終わった (1 戦闘 1 回) = 暗く
+                else if (edge > 0f) { Tone(p, x, y, sz, sz, 1f + 0.15f * edge); Edge(p, x - 1, y - 1, sz + 2, sz + 2, edge); }      // 光る = 絵を少し明るく + 縁に暖色の光
+                if (mode == ItemSystem.PassiveSkills.RelicMode.State && v.count >= 0) Digits(p, v.count + (v.percent ? "%" : ""), x + sz, y + sz);      // 右下に今の数
+                if (_hoverRelic == i) p.Rect(x, y + sz, sz, 1, Ink);      // 乗っている枠の下に 1 dot の線
             }
             if (more > 0)
             {
                 int x = BattleHudLayout.RelicPad + shown * BattleHudLayout.RelicPitch;
-                bool any = false; for (int i = shown; i < _relics.Count; i++) if (RelicFlash(_relics[i]) > 0f) { any = true; break; }
-                p.Text("+" + more, x, (RelicR.height - Game2DJpFont.Cell) / 2 + 1, any ? Chg : Dim);      // まとめた中の秘宝が発動したら、 字の色で知らせる
+                p.Text("+" + more, x, (RelicR.height - Game2DJpFont.Cell) / 2 + 1, anyHidden ? Chg : Dim);      // まとめた中の秘宝が光っていたら、 字の色で知らせる
             }
             p.Apply(t);
             return true;
         }
 
-        /// <summary>光を足す (加算・不透明な画素だけ)。 k = 強さ (0〜1)。</summary>
-        private static void Glow(KitPix p, int x, int y, int w, int h, float k)
+        /// <summary>絵の画素の明るさを k 倍 (不透明な画素だけ・255 で止める)。 色相は変えない。</summary>
+        private static void Tone(KitPix p, int x, int y, int w, int h, float k)
         {
             for (int j = 0; j < h; j++)
                 for (int i = 0; i < w; i++)
                 {
                     int px = x + i, py = y + j; if (px < 0 || py < 0 || px >= p.w || py >= p.h) continue;
                     int idx = (p.h - 1 - py) * p.w + px; var c = p.px[idx]; if (c.a < 128) continue;
-                    p.px[idx] = new Color32((byte)Mathf.Min(255, c.r + RelicGlow.r * k), (byte)Mathf.Min(255, c.g + RelicGlow.g * k), (byte)Mathf.Min(255, c.b + RelicGlow.b * k), 255);
+                    p.px[idx] = new Color32((byte)Mathf.Min(255, c.r * k), (byte)Mathf.Min(255, c.g * k), (byte)Mathf.Min(255, c.b * k), 255);
                 }
+        }
+
+        /// <summary>枠の 1 dot の縁に暖色の光を足す (加算・強さ k)。 絵の上には描かない。</summary>
+        private static void Edge(KitPix p, int x, int y, int w, int h, float k)
+        {
+            void Add(int px, int py)
+            {
+                if (px < 0 || py < 0 || px >= p.w || py >= p.h) return;
+                int idx = (p.h - 1 - py) * p.w + px; var c = p.px[idx];
+                p.px[idx] = new Color32((byte)Mathf.Min(255, c.r + RelicEdge.r * k), (byte)Mathf.Min(255, c.g + RelicEdge.g * k), (byte)Mathf.Min(255, c.b + RelicEdge.b * k), 255);
+            }
+            for (int i = 1; i < w - 1; i++) { Add(x + i, y); Add(x + i, y + h - 1); }
+            for (int j = 1; j < h - 1; j++) { Add(x, y + j); Add(x + w - 1, y + j); }
+        }
+
+        // 右下の数: 3×5 のドットの数字と % (影 1 dot)。 右端を (right, bottom) にそろえる
+        private static readonly Dictionary<char, string> D35 = new Dictionary<char, string>
+        {
+            {'0',"111101101101111"},{'1',"010110010010111"},{'2',"110001010100111"},{'3',"110001010001110"},{'4',"101101111001001"},{'5',"111100110001110"},{'6',"011100111101111"},
+            {'7',"111001010010010"},{'8',"111101111101111"},{'9',"111101111001110"},{'%',"101001010100101"},
+        };
+        private static void Digits(KitPix p, string s, int right, int bottom)
+        {
+            int w = s.Length * 4 - 1, x0 = right - w, y0 = bottom - 5;
+            for (int pass = 0; pass < 2; pass++)
+            {
+                var col = pass == 0 ? Game2DKit.Dark : RelicNum; int o = pass == 0 ? 1 : 0;
+                for (int k = 0; k < s.Length; k++)
+                {
+                    if (!D35.TryGetValue(s[k], out var g)) continue;
+                    for (int r = 0; r < 5; r++) for (int c = 0; c < 3; c++) if (g[r * 3 + c] == '1') p.Set(x0 + k * 4 + c + o, y0 + r + o, col);
+                }
+            }
         }
 
         /// <summary>マウスが乗っている秘宝の枠 (−1 = 無し・「+N」の枠も −1)。</summary>
