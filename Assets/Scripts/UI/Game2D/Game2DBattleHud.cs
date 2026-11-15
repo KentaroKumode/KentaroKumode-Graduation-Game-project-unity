@@ -1126,7 +1126,7 @@ namespace UI.Game2D
                 else { string nm = ItemSystem.ItemDatabase.DisplayNameOf(id) ?? id; p.Text(nm.Length > 0 ? nm.Substring(0, 1) : "?", x + 2, y + 2, Ink); }      // 絵の無い品は名前の 1 字
                 if (mode == ItemSystem.PassiveSkills.RelicMode.State && v.spent) Tone(p, x, y, sz, sz, 0.45f);      // 使い終わった (1 戦闘 1 回) = 暗く
                 else if (edge > 0f) { Tone(p, x, y, sz, sz, 1f + 0.15f * edge); Edge(p, x - 1, y - 1, sz + 2, sz + 2, edge); }      // 光る = 絵を少し明るく + 縁に暖色の光
-                if (mode == ItemSystem.PassiveSkills.RelicMode.State && v.count >= 0) Digits(p, v.count + (v.percent ? "%" : ""), x + sz, y + sz);      // 右下に今の数
+                if (mode == ItemSystem.PassiveSkills.RelicMode.State && v.count >= 0) Digits(p, v.count + (v.percent ? "%" : ""), x + sz - 1, y + sz - 1);      // 右下に今の数
                 if (_hoverRelic == i) p.Rect(x, y + sz, sz, 1, Ink);      // 乗っている枠の下に 1 dot の線
             }
             if (more > 0)
@@ -1163,22 +1163,29 @@ namespace UI.Game2D
             for (int j = 1; j < h - 1; j++) { Add(x, y + j); Add(x + w - 1, y + j); }
         }
 
-        // 右下の数: 3×5 のドットの数字と % (影 1 dot)。 右端を (right, bottom) にそろえる
+        // 右下の数: 3×5 のドットの数字と % (暗い縁取り 1 dot)。 右端を (right, bottom) にそろえる
         private static readonly Dictionary<char, string> D35 = new Dictionary<char, string>
         {
             {'0',"111101101101111"},{'1',"010110010010111"},{'2',"110001010100111"},{'3',"110001010001110"},{'4',"101101111001001"},{'5',"111100110001110"},{'6',"011100111101111"},
             {'7',"111001010010010"},{'8',"111101111101111"},{'9',"111101111001110"},{'%',"101001010100101"},
         };
+        /// <summary>右下の数 (3×5)。 絵に溶けないよう、 先に字の周り 1 dot (8 方向) を暗い色 (Game2DKit.Dark) で縁取ってから字を打つ (#320・撮影で拳套の縄に溶けた)。</summary>
         private static void Digits(KitPix p, string s, int right, int bottom)
         {
             int w = s.Length * 4 - 1, x0 = right - w, y0 = bottom - 5;
             for (int pass = 0; pass < 2; pass++)
             {
-                var col = pass == 0 ? Game2DKit.Dark : RelicNum; int o = pass == 0 ? 1 : 0;
                 for (int k = 0; k < s.Length; k++)
                 {
                     if (!D35.TryGetValue(s[k], out var g)) continue;
-                    for (int r = 0; r < 5; r++) for (int c = 0; c < 3; c++) if (g[r * 3 + c] == '1') p.Set(x0 + k * 4 + c + o, y0 + r + o, col);
+                    for (int r = 0; r < 5; r++)
+                        for (int c = 0; c < 3; c++)
+                        {
+                            if (g[r * 3 + c] != '1') continue;
+                            int px = x0 + k * 4 + c, py = y0 + r;
+                            if (pass == 0) { for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++) p.Set(px + dx, py + dy, Game2DKit.Dark); }
+                            else p.Set(px, py, RelicNum);
+                        }
                 }
             }
         }
