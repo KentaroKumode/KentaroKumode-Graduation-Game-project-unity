@@ -66,6 +66,14 @@ namespace UI.Game2D
             if (_active) { _active = false; GameManager.InputBlockedByScreen = false; }
         }
 
+        /// <summary>液晶の中身のカメラを、 踏破 (RunClear) と裂け目の一択 (RiftChoice) の間も生かす (シーンの PhaseDirector がこの 2 つのフェーズで止めていて、
+        /// エンディングの字が写らず、 一択の窓が出るまで液晶が真っ暗だった・2026-11-15)。</summary>
+        private void Start()
+        {
+            var mv = FindObjectOfType<Game2DMapView>();
+            if (mv != null && mv.plotQuad != null) PhaseDirector.AlsoShowFor(mv.plotQuad.transform, GameManager.GamePhase.RunClear, GameManager.GamePhase.RiftChoice);
+        }
+
         private bool EnsureQuad()
         {
             if (_quad != null) return true;

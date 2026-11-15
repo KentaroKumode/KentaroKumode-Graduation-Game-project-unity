@@ -44,6 +44,8 @@ namespace GameLoop
             //   End4 は定義だけ残してあるが、 どこからも参照していない (下の doc 参照)。
 
             string b = run?.lastBossId ?? "";
+            // ヴェスカの連戦 (4 段) は、 どの段の id が入っていても一択で分岐する (2026-11-15 #328: 本物のランは 1 段目の id だが、 4 段目から始めた戦闘では 4 段目の id が入り end1 になっていた)
+            if (BossIds.VescaStageOf(b) > 0) return run != null && run.riftLeftOpen ? EndGood : EndTrue;
             switch (b)
             {
                 // ヴェスカ撃破後の一択で分岐する。 これが唯一のエンディング分岐。

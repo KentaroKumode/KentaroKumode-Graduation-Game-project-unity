@@ -333,6 +333,15 @@ namespace GameLoop
         }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
+        /// <summary>[実機の確認用・2026-11-15 #328] 今のランのまま、 最後に倒したボス (<paramref name="lastBossId"/>) と裂け目の選択を入れて、 踏破 (RunClear) のフェーズへ入る。
+        /// エンディングの画面が本物と同じ経路 (フェーズの変化) で出る。 ランの記録・実績・解放は通さない (EndRun も呼ばない)。 呼ぶのは <c>UI.Game2D.Battle.QaBattle.ShowEndingInRunClear</c> だけ (セーブを止めた後)。</summary>
+        public void QaEnterRunClear(string lastBossId, bool riftLeftOpen)
+        {
+            if (Run == null) return;
+            Run.lastBossId = lastBossId ?? ""; Run.riftLeftOpen = riftLeftOpen;
+            SetPhase(GamePhase.RunClear);
+        }
+
         /// <summary>[実機の確認用・2026-11-14] 今のランのまま、 指定した敵との戦闘をボス戦と同じ手順で始める (マスを踏まない・報酬や集計の前処理はしない)。
         /// 呼ぶのは <c>UI.Game2D.Battle.QaBattle.Start</c> だけ (セーブを止めた後)。 敵が無ければ false。</summary>
         public bool QaStartCombat(string enemyId)
