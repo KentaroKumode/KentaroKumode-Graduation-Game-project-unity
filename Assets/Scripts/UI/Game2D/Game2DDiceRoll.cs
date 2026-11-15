@@ -3,103 +3,166 @@ using UnityEngine;
 
 namespace UI.Game2D
 {
-    /// <summary>出目が立体で転がる絵 (2026-11-15)。 立方体を 1 コマずつドットへ直接描く (画素ごとに光線を当てる・縮小も補間もしない)。
+    /// <summary>出目の面の絵と、 振る動き (2026-11-15・作者の案)。
     ///
-    /// <para><b>面は実行時に貼る</b>: 面の絵 (正面の出目の絵と同じ <see cref="Face"/>×<see cref="Face"/>) を、 そのダイスの面の一覧から取る。
-    /// 面の数は 6 とは限らない (出目パーツは 2〜9 面・<see cref="GameLoop.DiceFaceParts"/>) ので、 <b>形はいつも立方体</b>にして、
-    /// 裏へ回った面の絵を一覧の次の面へ差し替える。 同時に見える面は多くて 3 つなので、 面が何枚でも同じ作りで回り、 回っている間に持っている面が順に出る。
-    /// 最後のコマは、 止まった面が正面を向いた向き (呼ぶ側はそこからいつもの出目の絵を描く)。</para>
+    /// <para><b>面の絵</b>: 欠けのある象牙色の板 (元は gui2d/battle_ui/die.png を 18×18 に取った物) に、 丸い点で目を打つ。 1〜9 まで。</para>
     ///
-    /// <para>1 秒 8 コマ (<see cref="Fps"/>)。 大きさは変えない (回転で見える幅が変わるだけ)。 明るさは面ごとに 3 段。</para></summary>
+    /// <para><b>振る動き</b>: 立体にしない。 板が平面の上で回り、 <b>90 度回るたびに、 持っている面のどれかへ目が替わる</b>。
+    /// だんだん遅くなり、 最後の 90 度で止まる目になる。 回っている間はモーションブラー (1 コマの間の姿を重ねて平均) をかける。
+    /// 回す絵は <b>ドットの格子に乗せ直さない</b> (作者の決定・1 ドット = <see cref="K"/> 画素の板を、 画素の細かさで回す) ので、
+    /// 板の絵 (KitPix) ではなく、 細かい絵 (<see cref="TexSize"/> 四方) を別に重ねて出す。 止まったら、 いつもの 18×18 の絵に戻る。</para></summary>
     public static class Game2DDiceRoll
     {
-        public const int Fps = 8;
-        /// <summary>面の絵の 1 辺 (正面の出目の絵と同じ)。</summary>
         public const int Face = 18;
-        /// <summary>回っている間に絵が届く範囲の半分 (中心から)。</summary>
-        public const int Reach = 16;
+        /// <summary>回す絵の、 1 ドットあたりの画素。</summary>
+        public const int K = 4;
+        /// <summary>回っている板が届く範囲 (中心から・dot)。 18 の対角の半分 12.7 より大きく。</summary>
+        public const int Reach = 14;
+        public const int TexSize = Reach * 2 * K;
 
-        // 回す軸 (ダイスごとに変える) と、 回る量 (周)
-        private static readonly Vector3[] Axes = { new Vector3(1f, 0.55f, 0.25f), new Vector3(-0.6f, 1f, 0.3f), new Vector3(1f, -0.45f, -0.3f), new Vector3(0.5f, 1f, -0.25f) };
-        // 立方体の面: 0 = +z (正面で止まる面)・1 = -z・2 = +x・3 = -x・4 = +y・5 = -y
-        private static readonly Vector3[] Normals = { new Vector3(0, 0, 1), new Vector3(0, 0, -1), new Vector3(1, 0, 0), new Vector3(-1, 0, 0), new Vector3(0, 1, 0), new Vector3(0, -1, 0) };
+        // 動きの値 (見本 Captures/dice_roll/v4/index.html の初めの値)
+        /// <summary>90 度の回数。</summary>
+        public const int Quarters = 7;
+        /// <summary>最初のダイスが止まるまで (秒)。</summary>
+        public const float Dur = 0.8f;
+        /// <summary>後のダイスほど遅く止まる (秒・4 個目からは同じ)。</summary>
+        public const float Stagger = 0.125f;
+        /// <summary>減速の強さ。</summary>
+        public const float Ease = 2.2f;
+        public const int Fps = 12;
+        /// <summary>ブラーの長さ (コマ)。</summary>
+        public const float Blur = 0.6f;
+        /// <summary>ブラーの重ね数。</summary>
+        public const int Samples = 12;
 
-        private static Quaternion Pose(int frame, int frames, int seed, out int hop)
+        public static float DurOf(int i) => Dur + Stagger * Mathf.Clamp(i, 0, 3);
+
+        // ── 面の絵 ──
+        private static readonly Color32[] Pal =
         {
-            float t = frames <= 1 ? 1f : Mathf.Clamp01(frame / (float)(frames - 1));
-            float e = 1f - Mathf.Pow(1f - t, 2.2f);
-            float turns = 1.3f + 0.15f * (seed % 3);
-            hop = -Mathf.RoundToInt(3f * Mathf.Abs(Mathf.Sin(t * Mathf.PI * 2f)) * (1f - t));
-            return Quaternion.AngleAxis((1f - e) * turns * 360f, Axes[((seed % Axes.Length) + Axes.Length) % Axes.Length].normalized);
-        }
-
-        /// <summary>そのコマで、 立方体の 6 面がそれぞれ一覧の何番目の面を見せるか。 面は裏へ回るたびに次の面へ替わり、 最後のコマで正面の面が landed になる。</summary>
-        private static void Contents(int frame, int frames, int seed, int faceCount, int landed, int[] into)
+            new Color32(211, 202, 176, 255), new Color32(38, 40, 39, 255), new Color32(38, 43, 39, 255), new Color32(43, 44, 40, 255), new Color32(198, 187, 159, 255),
+            new Color32(108, 111, 109, 255), new Color32(130, 135, 131, 255), new Color32(90, 97, 95, 255), new Color32(109, 116, 112, 255), new Color32(209, 202, 179, 255),
+        };
+        private static readonly string[] Plate =
         {
-            // 視点は +z 側。 面が見える = 回した後の法線の z が正
-            var passAt = new int[6]; var total = new int[6]; var vis = new bool[6];
-            for (int f = 0; f < frames; f++)
-            {
-                var q = Pose(f, frames, seed, out _);
-                for (int s = 0; s < 6; s++)
+            "bbbcbbbccbbdbbbbbb",
+            "baaeeaaaaaaaaaaafb",
+            "baaaaaaaaaagaaaafb",
+            "baaaaaaaaaaaaaaafb",
+            "baaaaaaaaaaaaaaafb",
+            "baaaaaaaaaaaaaaafb",
+            "baaaaaaaaaaaaaagcb",
+            "baaaaaaaaaaaaaaahb",
+            "baaaaaaaaaaaaaaafb",
+            "baaaaaaaaaaaaaaafb",
+            "bagaaaaaaaaaaaaafb",
+            "baeaaaaaaaaaaaaaib",
+            "baaaaaaaaaaaaaaafb",
+            "baaaaaaaaaaaaaaafb",
+            "baaaaaaaaaagaaaafb",
+            "baajaaaaaaaaaaaafb",
+            "bfhfchhhhfffiffhbb",
+            "bbbbbbbbbbbbbbbbbb",
+        };
+        private static readonly int[][] Pips =
+        {
+            new int[0], new[] { 4 }, new[] { 0, 8 }, new[] { 0, 4, 8 }, new[] { 0, 2, 6, 8 }, new[] { 0, 2, 4, 6, 8 },
+            new[] { 0, 2, 3, 5, 6, 8 }, new[] { 0, 2, 3, 4, 5, 6, 8 }, new[] { 0, 1, 2, 3, 5, 6, 7, 8 }, new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8 },
+        };
+        private static readonly int[] PipAt = { 2, 7, 12 };
+        private static readonly Color32 PipCol = new Color32(38, 40, 39, 255);
+        private static readonly Dictionary<int, Color32[]> _faces = new Dictionary<int, Color32[]>();
+
+        /// <summary>出目 v (1〜9) の面の絵 (18×18・上の行から)。 enemy = 敵の出目 (赤みへ寄せる)。 範囲の外の v は点の無い板。</summary>
+        public static Color32[] FaceImg(int v, bool enemy = false)
+        {
+            int key = v * 2 + (enemy ? 1 : 0);
+            if (_faces.TryGetValue(key, out var a)) return a;
+            a = new Color32[Face * Face];
+            for (int y = 0; y < Face; y++)
+                for (int x = 0; x < Face; x++)
                 {
-                    bool v = (q * Normals[s]).z > 0.02f;
-                    if (f > 0 && vis[s] && !v) total[s]++;      // 見えていた面が裏へ回った
-                    vis[s] = v;
-                    if (f == frame) passAt[s] = total[s];
+                    var c = Pal[Plate[y][x] - 'a'];
+                    if (enemy) c = new Color32((byte)(c.r * 0.95f), (byte)(c.g * 0.84f), (byte)(c.b * 0.9f), 255);
+                    a[y * Face + x] = c;
                 }
-            }
-            for (int s = 0; s < 6; s++)
-            {
-                int end = s == 0 ? landed : landed + s;      // 最後のコマで見せる面 (正面 = 止まった面・ほかは一覧の続き)
-                into[s] = (((end - (total[s] - passAt[s])) % faceCount) + faceCount) % faceCount;
-            }
+            if (v >= 1 && v < Pips.Length)
+                foreach (int k in Pips[v])
+                    for (int y = 0; y < 4; y++)
+                        for (int x = 0; x < 4; x++)
+                        {
+                            if ((x == 0 || x == 3) && (y == 0 || y == 3)) continue;      // 角を落として丸く
+                            a[(PipAt[k / 3] + y) * Face + PipAt[k % 3] + x] = PipCol;
+                        }
+            _faces[key] = a; return a;
         }
 
-        /// <summary>転がる 1 コマを描く。 faces = 面の絵 (<see cref="Face"/>×<see cref="Face"/>・上の行から・透明は縁の色で埋める) の一覧、
-        /// landed = 止まる面の添字、 frame / frames = 今のコマ / 全コマ (最後のコマは正面)、 seed = ダイスの番号 (軸と回る量を変える)。</summary>
-        public static void Draw(KitPix p, int cx, int cy, IList<Color32[]> faces, int landed, int frame, int frames, int seed)
+        /// <summary>止まっている出目を板の絵へ描く (左上 x, y・18×18)。</summary>
+        public static void DrawFace(KitPix p, int x, int y, int v, bool enemy = false)
         {
-            if (p == null || faces == null || faces.Count == 0) return;
-            var slot = new int[6]; Contents(frame, frames, seed, faces.Count, landed, slot);
-            var q = Pose(frame, frames, seed, out int hop); var qi = Quaternion.Inverse(q);
-            var d = qi * new Vector3(0, 0, -1); float h = Face * 0.5f; var light = new Vector3(-0.35f, 0.55f, 0.76f);      // 光は左上の手前 (y は上が正)
-            int n = Reach * 2; var hit = new Color32[n * n]; var on = new bool[n * n];
-            for (int py = 0; py < n; py++)
-                for (int px = 0; px < n; px++)
+            var a = FaceImg(v, enemy);
+            for (int j = 0; j < Face; j++) for (int i = 0; i < Face; i++) p.Set(x + i, y + j, a[j * Face + i]);
+        }
+
+        // ── 振る動き ──
+
+        /// <summary>90 度の区切りごとの目の列を作る (長さ <see cref="Quarters"/> + 1)。 最後が止まる目 final、 その前は faces からランダム (同じ目を続けない)。
+        /// 見た目だけの乱数なので UnityEngine.Random を使う (GameRng は引かない)。</summary>
+        public static int[] MakeSeq(int[] faces, int final)
+        {
+            var seq = new int[Quarters + 1]; seq[Quarters] = final; int next = final;
+            for (int k = Quarters - 1; k >= 0; k--)
+            {
+                int v = next;
+                for (int tries = 0; tries < 8; tries++)
                 {
-                    // 画面は y が下向き・立体は y が上向き
-                    var o = qi * new Vector3(px + 0.5f - Reach, -(py + 0.5f - Reach - hop), 100f);
-                    float t0 = -1e9f, t1 = 1e9f; int ax = -1, sg = 0; bool miss = false;
-                    for (int k = 0; k < 3; k++)
+                    v = faces != null && faces.Length > 0 ? faces[Random.Range(0, faces.Length)] : Random.Range(1, 7);
+                    if (v != next || (faces != null && faces.Length == 1)) break;
+                }
+                seq[k] = v; next = v;
+            }
+            return seq;
+        }
+
+        private static void Pose(int[] seq, float tt, float dur, out int v, out float ang)
+        {
+            float k = Mathf.Clamp01(tt / dur); float total = Quarters * Mathf.PI * 0.5f;
+            float turned = total * (1f - Mathf.Pow(1f - k, Ease));
+            int q = Mathf.Min(Quarters, Mathf.FloorToInt(turned / (Mathf.PI * 0.5f) + 1e-5f));
+            ang = k >= 1f ? 0f : turned - q * Mathf.PI * 0.5f;
+            v = seq[Mathf.Min(q, seq.Length - 1)];
+        }
+
+        private static float[] _acc; private static int[] _cov;
+
+        /// <summary>振っている 1 コマを dst (<see cref="TexSize"/> 四方・Texture2D の並び = 下の行から) へ描く。 t = 振り始めからの秒 (コマに丸めた値)、 dur = このダイスが止まるまでの秒。
+        /// 板が無い所は透明、 ブラーの縁は半透明。</summary>
+        public static void Render(Color32[] dst, int[] seq, float t, float dur, bool ccw)
+        {
+            int n = TexSize; if (_acc == null) { _acc = new float[n * n * 3]; _cov = new int[n * n]; }
+            System.Array.Clear(_acc, 0, _acc.Length); System.Array.Clear(_cov, 0, _cov.Length);
+            float h = Face * 0.5f; int r = Reach * K;
+            for (int s = 0; s < Samples; s++)
+            {
+                float tt = t - (Blur / Fps) * (s / (float)(Samples - 1));
+                Pose(seq, tt, dur, out int v, out float ang); if (ccw) ang = -ang;
+                var f = FaceImg(v); float c = Mathf.Cos(-ang), sn = Mathf.Sin(-ang);
+                for (int py = -r; py < r; py++)
+                    for (int px = -r; px < r; px++)
                     {
-                        float dk = d[k], ok = o[k];
-                        if (Mathf.Abs(dk) < 1e-6f) { if (Mathf.Abs(ok) > h) { miss = true; break; } continue; }
-                        float a = (-h - ok) / dk, b = (h - ok) / dk; int s = a < b ? -1 : 1;
-                        if (a > b) { float w = a; a = b; b = w; }
-                        if (a > t0) { t0 = a; ax = k; sg = s; }
-                        if (b < t1) t1 = b;
+                        float x = (px + 0.5f) / K, y = (py + 0.5f) / K;
+                        int u = Mathf.FloorToInt(x * c - y * sn + h), w = Mathf.FloorToInt(x * sn + y * c + h);
+                        if (u < 0 || w < 0 || u >= Face || w >= Face) continue;
+                        var col = f[w * Face + u]; int i = (py + r) * n + (px + r);
+                        _acc[i * 3] += col.r; _acc[i * 3 + 1] += col.g; _acc[i * 3 + 2] += col.b; _cov[i]++;
                     }
-                    if (miss || ax < 0 || t0 > t1) continue;
-                    var pt = o + d * t0; int fi = ax == 2 ? (sg > 0 ? 0 : 1) : ax == 0 ? (sg > 0 ? 2 : 3) : (sg > 0 ? 4 : 5);
-                    // 面の中の位置 (0..Face-1)。 正面の面は u = x・v = 上から
-                    float u, v;
-                    if (ax == 2) { u = sg > 0 ? pt.x : -pt.x; v = -pt.y; }
-                    else if (ax == 0) { u = sg > 0 ? -pt.z : pt.z; v = -pt.y; }
-                    else { u = pt.x; v = sg > 0 ? pt.z : -pt.z; }
-                    int iu = Mathf.Clamp(Mathf.FloorToInt(u + h), 0, Face - 1), iv = Mathf.Clamp(Mathf.FloorToInt(v + h), 0, Face - 1);
-                    var img = faces[slot[fi]]; var c = img != null && img.Length >= Face * Face ? img[iv * Face + iu] : Game2DKit.Ivory;
-                    if (c.a < 128) c = Game2DKit.Dark;
-                    float lum = Vector3.Dot(q * Normals[fi], light); float m = lum > 0.62f ? 1f : lum > 0.3f ? 0.72f : 0.5f;
-                    hit[py * n + px] = new Color32((byte)(c.r * m), (byte)(c.g * m), (byte)(c.b * m), 255); on[py * n + px] = true;
-                }
-            for (int py = 0; py < n; py++)
-                for (int px = 0; px < n; px++)
+            }
+            for (int y = 0; y < n; y++)
+                for (int x = 0; x < n; x++)
                 {
-                    int i = py * n + px;
-                    if (on[i]) { p.Set(cx - Reach + px, cy - Reach + py, hit[i]); continue; }
-                    bool edge = (px > 0 && on[i - 1]) || (px < n - 1 && on[i + 1]) || (py > 0 && on[i - n]) || (py < n - 1 && on[i + n]);
-                    if (edge) p.Set(cx - Reach + px, cy - Reach + py, Game2DKit.Dark);
+                    int i = y * n + x, cv = _cov[i], o = (n - 1 - y) * n + x;
+                    if (cv == 0) { dst[o] = new Color32(0, 0, 0, 0); continue; }
+                    dst[o] = new Color32((byte)(_acc[i * 3] / cv), (byte)(_acc[i * 3 + 1] / cv), (byte)(_acc[i * 3 + 2] / cv), (byte)(255 * cv / Samples));
                 }
         }
     }

@@ -128,6 +128,7 @@ namespace UI.Game2D
         private void OnDestroy()
         {
             foreach (var t in new[] { _tr, _ts, _tp, _tc, _th, _tt2, _td, _trl, _tinv, _tg, _trb }) if (t != null) Destroy(t);
+            foreach (var t in _rollTex) if (t != null) Destroy(t);
             if (_relicHooked) { ItemSystem.PassiveSkills.RelicFireProbe.OnRelicFired -= OnRelicFired; _relicHooked = false; }
             _busyDrag = false;
         }
@@ -238,50 +239,45 @@ namespace UI.Game2D
         private KitPix Frame(int w, int h) { var p = new KitPix(w, h); p.NineSlice(Game2DKit.Frame, FrameB, Well); return p; }
         private KitPix Frame(RectInt r) => Frame(r.width, r.height);
 
-        /// <summary>ダイス 1 個: 面の絵 (点の数が出目)。 絵が無い時は無地の板 + 数字。</summary>
+        /// <summary>ダイス 1 個: 面の絵 (欠けのある象牙色の板 + 点の数が出目・<see cref="Game2DDiceRoll.FaceImg"/>)。 まだ分からない出目は無地の板 + ?。</summary>
         private void DrawDie(KitPix p, RectInt r, int v, bool enemy, bool question = false)
         {
-            var face = Game2DKit.DieFace(v);
-            if (question || face == null)
+            if (question || v < 1 || v > 9)
             {
                 p.Box(r.x, r.y, r.width, r.height, enemy ? new Color32(0xd8, 0xbc, 0xb4, 255) : Game2DKit.Ivory, Dark);
                 p.Text(question ? "?" : v.ToString(), r.x + (r.width - 6) / 2, r.y + (r.height - 10) / 2 + 1, Dark, 2);
             }
-            else p.Sprite(face, r.x, r.y, r.width, r.height);
+            else Game2DDiceRoll.DrawFace(p, r.x, r.y, v, enemy);
         }
 
-        // ── 転がる出目 (Game2DDiceRoll) ──
-        private readonly Dictionary<int, Color32[]> _faceImg = new Dictionary<int, Color32[]>();
-        private readonly List<Color32[]> _rollFaces = new List<Color32[]>();
-        /// <summary>出目 v の面の絵 (正面の出目の絵と同じ 18×18・上の行から)。 1 回描いて持つ。</summary>
-        private Color32[] FaceImg(int v)
+        // ── 振っている出目 (Game2DDiceRoll): 回る板は細かい絵なので、 Ports の上に 1 個ずつ重ねる ──
+        private readonly List<RawImage> _rollImg = new List<RawImage>(); private readonly List<Texture2D> _rollTex = new List<Texture2D>();
+        private readonly List<float> _rollAt = new List<float>(); private Color32[] _rollBuf;
+        private void UpdateRolling(int n)
         {
-            if (_faceImg.TryGetValue(v, out var a)) return a;
-            int n = Game2DDiceRoll.Face; var k = new KitPix(n, n); DrawDie(k, new RectInt(0, 0, n, n), v, false);
-            a = new Color32[n * n];
-            for (int y = 0; y < n; y++) System.Array.Copy(k.px, (n - 1 - y) * n, a, y * n, n);
-            _faceImg[v] = a; return a;
-        }
-        /// <summary>転がっているダイスを、 ほかの絵の上に立方体で描く (配線・口の上に少しかかる)。</summary>
-        private void DrawRolling(KitPix p, int n)
-        {
-            for (int i = 0; i < n; i++)
+            for (int i = 0; i < Mathf.Max(n, _rollImg.Count); i++)
             {
-                int f = sim.RollFrame(i); if (f < 0) continue;
-                var vals = sim.faceVals; _rollFaces.Clear(); int landed = -1;
-                if (vals != null && vals.Length > 0)
+                bool on = i < n && sim.Rolling(i);
+                if (!on) { if (i < _rollImg.Count && _rollImg[i].enabled) { _rollImg[i].enabled = false; _rollAt[i] = -1f; } continue; }
+                while (_rollImg.Count <= i)
                 {
-                    for (int k = 0; k < vals.Length; k++) _rollFaces.Add(FaceImg(vals[k]));
-                    landed = i < sim.landedFace.Length ? sim.landedFace[i] : -1;
-                    if (landed < 0 || landed >= vals.Length) landed = System.Array.IndexOf(vals, sim.pd[i]);
+                    var go = new GameObject("roll" + _rollImg.Count, typeof(RectTransform)); go.layer = 5;
+                    var rt = (RectTransform)go.transform; rt.SetParent(_ports, false);
+                    rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0, 1); rt.sizeDelta = new Vector2(Game2DDiceRoll.Reach * 2, Game2DDiceRoll.Reach * 2);
+                    var ri = go.AddComponent<RawImage>(); ri.raycastTarget = false; ri.enabled = false;
+                    var tx = new Texture2D(Game2DDiceRoll.TexSize, Game2DDiceRoll.TexSize, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp, hideFlags = HideFlags.HideAndDontSave };
+                    ri.texture = tx; _rollImg.Add(ri); _rollTex.Add(tx); _rollAt.Add(-1f);
                 }
-                if (landed < 0)      // 面の一覧が分からない・出目が一覧に無い (効果で変わった目): 1〜6 と今の出目で回す
+                var r = PDieR(i); var img = _rollImg[i];
+                img.rectTransform.anchoredPosition = new Vector2(r.x + r.width / 2 - Game2DDiceRoll.Reach, -(r.y + r.height / 2 - Game2DDiceRoll.Reach));
+                float t = sim.RollTime;
+                if (!img.enabled || !Mathf.Approximately(_rollAt[i], t))
                 {
-                    _rollFaces.Clear(); for (int k = 1; k <= 6; k++) _rollFaces.Add(FaceImg(k));
-                    if (sim.pd[i] >= 1 && sim.pd[i] <= 6) landed = sim.pd[i] - 1; else { _rollFaces.Add(FaceImg(sim.pd[i])); landed = 6; }
+                    if (_rollBuf == null) _rollBuf = new Color32[Game2DDiceRoll.TexSize * Game2DDiceRoll.TexSize];
+                    Game2DDiceRoll.Render(_rollBuf, sim.rollSeq[i], t, Game2DDiceRoll.DurOf(i), false);
+                    _rollTex[i].SetPixels32(_rollBuf); _rollTex[i].Apply(false); _rollAt[i] = t;
                 }
-                var r = PDieR(i);
-                Game2DDiceRoll.Draw(p, r.x + r.width / 2, r.y + r.height / 2, _rollFaces, landed, f, Game2DBattleSim.RollFramesOf(i), i);
+                img.enabled = true;
             }
         }
 
@@ -628,7 +624,7 @@ namespace UI.Game2D
             for (int i = 0; i < n; i++)
             {
                 int x0 = PortX(i), y0 = PortY(i);
-                if (sim.RollFrame(i) < 0) DrawDie(p, PDieR(i), sim.pd[i], false, !sim.rolled && sim.phase != Game2DBattleSim.P.PRoll);      // 転がっている間は後で立方体を描く
+                if (!sim.Rolling(i)) DrawDie(p, PDieR(i), sim.pd[i], false, !sim.rolled && sim.phase != Game2DBattleSim.P.PRoll);      // 回っている間は、 回る板を上に重ねる (UpdateRolling)
                 if (sim.IsRoleDie(i)) DrawRoleMark(p, i);
                 if (sim.IsCatLocked(i)) DrawCatMark(p, i);
                 int s = dieSlot != null && i < dieSlot.Length ? dieSlot[i] : -1;
@@ -663,7 +659,7 @@ namespace UI.Game2D
                 int lx = x0 + 68, ly = y0 + 9;
                 p.Box(lx, ly, 5, 5, fires && used ? kc : Off, fires && used ? Game2DTerminalLook.Mix(kc, Game2DKit.Ivory, 0.3f) : Game2DKit.Faint);
             }
-            DrawRolling(p, n);
+            UpdateRolling(n);
             p.Apply(t);
         }
 

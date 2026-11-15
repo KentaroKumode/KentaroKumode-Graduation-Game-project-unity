@@ -162,12 +162,12 @@ namespace UI.Game2D.Battle
                     break;
                 case P.PRoll:
                 {
-                    // 出目は立体で転がる (Game2DDiceRoll・2026-11-15)。 値は最初から本当の出目を持ち、 転がっている間は画面が立方体を描く
+                    // 出目は平面で回り、 90 度ごとに目が替わる (Game2DDiceRoll・2026-11-15)。 値は最初から本当の出目を持ち、 回っている間は画面が回る板を重ねて描く
                     var real = cm.PendingDecision?.playerDice;
                     if (real != null) EnsureDice(real.Length);
                     for (int i = 0; i < pd.Length; i++) pd[i] = real != null && i < real.Length ? real[i] : 0;
-                    SyncFaces(cm);
-                    if (t * Game2DDiceRoll.Fps >= RollFramesOf(pd.Length - 1)) { SyncDecision(cm, false); phase = P.Wire; rolled = true; t = 0; TutorialOnWire(); }
+                    SyncRoll();
+                    if (t >= Game2DDiceRoll.DurOf(pd.Length - 1)) { SyncDecision(cm, false); phase = P.Wire; rolled = true; t = 0; TutorialOnWire(); }
                     Touch(); break;
                 }
                 case P.PAttack:
@@ -220,26 +220,19 @@ namespace UI.Game2D.Battle
         }
 
         /// <summary>出目の個数を n に合わせる (挿し先は持ち越せる分だけ持ち越す)。 個数の上限は置かない。</summary>
-        // ── 出目が転がる絵 (Game2DDiceRoll) ──
-        /// <summary>転がるコマの数: 最初のダイスは 5 コマ (1 秒 8 コマ)、 後のダイスほど 1 コマずつ遅く止まる (4 個目からは同じ)。</summary>
-        public static int RollFramesOf(int i) => 5 + Mathf.Clamp(i, 0, 3);
-        /// <summary>ダイス i が今転がっているなら、 そのコマ (0〜)。 止まっていれば -1。</summary>
-        public int RollFrame(int i)
+        // ── 出目を振る動き (Game2DDiceRoll) ──
+        /// <summary>振り始めからの秒 (コマに丸めた値)。 振っていなければ -1。</summary>
+        public float RollTime => phase == P.PRoll ? Mathf.Floor(t * Game2DDiceRoll.Fps) / Game2DDiceRoll.Fps : -1f;
+        /// <summary>ダイス i が今回っているか。</summary>
+        public bool Rolling(int i) => phase == P.PRoll && rollSeq != null && i < rollSeq.Length && RollTime < Game2DDiceRoll.DurOf(i);
+        /// <summary>ダイスごとの、 90 度の区切りごとの目の列 (最後が止まる目)。 振り始めに作る。</summary>
+        public int[][] rollSeq;
+        private void SyncRoll()
         {
-            if (phase != P.PRoll) return -1;
-            int f = (int)(t * Game2DDiceRoll.Fps);
-            return f >= RollFramesOf(i) - 1 ? -1 : f;      // 最後のコマ = 正面 = いつもの出目の絵
-        }
-        /// <summary>このダイスの面の一覧 (出目の値・面の数は 6 とは限らない)。 分からなければ null (画面は 1〜6 で回す)。</summary>
-        public int[] faceVals;
-        /// <summary>ダイスごとの、 止まった面の添字 (<see cref="faceVals"/> の中)。 分からなければ -1。</summary>
-        public int[] landedFace = new int[0];
-        private void SyncFaces(CombatManager cm)
-        {
-            faceVals = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context?.equippedDiceFaces;
-            var fi = cm.PendingDecision?.playerFaceIdx;
-            if (landedFace.Length != pd.Length) landedFace = new int[pd.Length];
-            for (int i = 0; i < pd.Length; i++) landedFace[i] = fi != null && i < fi.Length ? fi[i] : -1;
+            if (rollSeq != null && rollSeq.Length == pd.Length) return;
+            var faces = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context?.equippedDiceFaces;
+            rollSeq = new int[pd.Length][];
+            for (int i = 0; i < pd.Length; i++) rollSeq[i] = Game2DDiceRoll.MakeSeq(faces, pd[i]);
         }
 
         private void EnsureDice(int n)
@@ -270,7 +263,7 @@ namespace UI.Game2D.Battle
             SyncDecision(cm, true);
             TurnStartFx(cm, regen);
             Game2DSfx.DiceRoll(4, 0.45f, 0.55f);
-            phase = P.PRoll; t = 0; Touch();
+            phase = P.PRoll; t = 0; rollSeq = null; Touch();
         }
 
         /// <summary>止まっている判断の中身を表示へ写す。 turnStart = ターンの頭 (挿し方を空から始める。 振り直しでは手元の挿し方を残す)。</summary>
@@ -375,7 +368,7 @@ namespace UI.Game2D.Battle
             Game2DSfx.Play("decide"); Game2DSfx.DiceRoll();
             cm.AnswerReroll(true);
             if (!cm.IsAwaitingDecision) { Resolve(cm); return; }
-            phase = P.PRoll; t = 0; rolled = false; SyncDecision(cm, false); Touch();
+            phase = P.PRoll; t = 0; rolled = false; rollSeq = null; SyncDecision(cm, false); Touch();
         }
 
         // ── 役 (ADR-0011) の表示 ──
