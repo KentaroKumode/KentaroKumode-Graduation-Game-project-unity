@@ -128,6 +128,7 @@ namespace UI.Game2D
         private void OnDestroy()
         {
             foreach (var t in new[] { _tr, _ts, _tp, _tc, _th, _tt2, _td, _trl, _tinv, _tg, _trb }) if (t != null) Destroy(t);
+            foreach (var t in _rollTex) if (t != null) Destroy(t);
             if (_relicHooked) { ItemSystem.PassiveSkills.RelicFireProbe.OnRelicFired -= OnRelicFired; _relicHooked = false; }
             _busyDrag = false;
         }
@@ -238,16 +239,46 @@ namespace UI.Game2D
         private KitPix Frame(int w, int h) { var p = new KitPix(w, h); p.NineSlice(Game2DKit.Frame, FrameB, Well); return p; }
         private KitPix Frame(RectInt r) => Frame(r.width, r.height);
 
-        /// <summary>ダイス 1 個: 面の絵 (点の数が出目)。 絵が無い時は無地の板 + 数字。</summary>
+        /// <summary>ダイス 1 個: 面の絵 (欠けのある象牙色の板 + 点の数が出目・<see cref="Game2DDiceRoll.FaceImg"/>)。 まだ分からない出目は無地の板 + ?。</summary>
         private void DrawDie(KitPix p, RectInt r, int v, bool enemy, bool question = false)
         {
-            var face = Game2DKit.DieFace(v);
-            if (question || face == null)
+            if (question || v < 1 || v > 9)
             {
                 p.Box(r.x, r.y, r.width, r.height, enemy ? new Color32(0xd8, 0xbc, 0xb4, 255) : Game2DKit.Ivory, Dark);
                 p.Text(question ? "?" : v.ToString(), r.x + (r.width - 6) / 2, r.y + (r.height - 10) / 2 + 1, Dark, 2);
             }
-            else p.Sprite(face, r.x, r.y, r.width, r.height);
+            else Game2DDiceRoll.DrawFace(p, r.x, r.y, v, enemy);
+        }
+
+        // ── 振っている出目 (Game2DDiceRoll): 回る板は細かい絵なので、 Ports の上に 1 個ずつ重ねる ──
+        private readonly List<RawImage> _rollImg = new List<RawImage>(); private readonly List<Texture2D> _rollTex = new List<Texture2D>();
+        private readonly List<float> _rollAt = new List<float>(); private Color32[] _rollBuf;
+        private void UpdateRolling(int n)
+        {
+            for (int i = 0; i < Mathf.Max(n, _rollImg.Count); i++)
+            {
+                bool on = i < n && sim.Rolling(i);
+                if (!on) { if (i < _rollImg.Count && _rollImg[i].enabled) { _rollImg[i].enabled = false; _rollAt[i] = -1f; } continue; }
+                while (_rollImg.Count <= i)
+                {
+                    var go = new GameObject("roll" + _rollImg.Count, typeof(RectTransform)); go.layer = 5;
+                    var rt = (RectTransform)go.transform; rt.SetParent(_ports, false);
+                    rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0, 1); rt.sizeDelta = new Vector2(Game2DDiceRoll.Reach * 2, Game2DDiceRoll.Reach * 2);
+                    var ri = go.AddComponent<RawImage>(); ri.raycastTarget = false; ri.enabled = false;
+                    var tx = new Texture2D(Game2DDiceRoll.TexSize, Game2DDiceRoll.TexSize, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp, hideFlags = HideFlags.HideAndDontSave };
+                    ri.texture = tx; _rollImg.Add(ri); _rollTex.Add(tx); _rollAt.Add(-1f);
+                }
+                var r = PDieR(i); var img = _rollImg[i];
+                img.rectTransform.anchoredPosition = new Vector2(r.x + r.width / 2 - Game2DDiceRoll.Reach, -(r.y + r.height / 2 - Game2DDiceRoll.Reach));
+                float t = sim.RollTime;
+                if (!img.enabled || !Mathf.Approximately(_rollAt[i], t))
+                {
+                    if (_rollBuf == null) _rollBuf = new Color32[Game2DDiceRoll.TexSize * Game2DDiceRoll.TexSize];
+                    Game2DDiceRoll.Render(_rollBuf, sim.rollSeq[i], t, Game2DDiceRoll.DurOf(i), false);
+                    _rollTex[i].SetPixels32(_rollBuf); _rollTex[i].Apply(false); _rollAt[i] = t;
+                }
+                img.enabled = true;
+            }
         }
 
         private void Redraw()
@@ -593,7 +624,7 @@ namespace UI.Game2D
             for (int i = 0; i < n; i++)
             {
                 int x0 = PortX(i), y0 = PortY(i);
-                DrawDie(p, PDieR(i), sim.pd[i], false, !sim.rolled && sim.phase != Game2DBattleSim.P.PRoll);
+                if (!sim.Rolling(i)) DrawDie(p, PDieR(i), sim.pd[i], false, !sim.rolled && sim.phase != Game2DBattleSim.P.PRoll);      // 回っている間は、 回る板を上に重ねる (UpdateRolling)
                 if (sim.IsRoleDie(i)) DrawRoleMark(p, i);
                 if (sim.IsCatLocked(i)) DrawCatMark(p, i);
                 int s = dieSlot != null && i < dieSlot.Length ? dieSlot[i] : -1;
@@ -628,6 +659,7 @@ namespace UI.Game2D
                 int lx = x0 + 68, ly = y0 + 9;
                 p.Box(lx, ly, 5, 5, fires && used ? kc : Off, fires && used ? Game2DTerminalLook.Mix(kc, Game2DKit.Ivory, 0.3f) : Game2DKit.Faint);
             }
+            UpdateRolling(n);
             p.Apply(t);
         }
 
@@ -966,7 +998,7 @@ namespace UI.Game2D
             var p = Frame(Right);
             bool live = sim != null && Game2DBattleSim.Active; bool known = live && sim.phase != Game2DBattleSim.P.ERoll;
             int en = live ? sim.enemyDiceCount : 3;
-            for (int i = 0; i < en; i++) DrawDie(p, new RectInt(14 + i * 20, 16, 17, 17), live ? sim.ed[i] : i + 3, true);
+            for (int i = 0; i < en; i++) DrawDie(p, new RectInt(14 + i * 20, 16, 18, 18), live ? sim.ed[i] : i + 3, true);
             if (known && sim.down) p.Text(sim.downWeak ? "ダウン(ひび):攻撃なし" : "ダウン:攻撃なし", 14, 36, MarkHeavyHud);      // ボスのダウン (2026-11-13): 止まるのは攻撃だけ (パッシブは動く)・ひびで割れた弱いダウンは (ひび) (2026-11-14)
             else if (known && sim.charging) p.Text(sim.tenyo > 0 ? "チャージ:" + CombatSystem.TenyoHeavy.NameOf((CombatSystem.TenyoHeavy.Gift)sim.tenyo) : "チャージ:攻撃なし", 14, 36, MarkHeavyHud);      // ヴェスカの天与 (2026-11-15): どれが来るか
             else if (known && sim.heavyIn == 0 && sim.tenyo > 0 && sim.eatk == 0) p.Text(CombatSystem.TenyoHeavy.NameOf((CombatSystem.TenyoHeavy.Gift)sim.tenyo) + ":攻撃なし", 14, 36, MarkHeavyHud);      // 天与の盾・指輪は攻撃しない   // 大技のチャージ (2026-11-14): 攻撃しない (次のターンが大技・下の「次: 大技」)
