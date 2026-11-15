@@ -31,8 +31,8 @@ namespace UI.Game2D
         public const int LabelDy = -13;
 
         // ── 床の出目 ──
-        /// <summary>1 個目の出目の左上と送り。 3 個で 1 段・4 個目からは上の段へ (仮)。</summary>
-        public const int FloorX = 106, FloorY = 162, FloorStepX = 24, FloorZig = 6, FloorRowStep = 26, FloorPerRow = 3;
+        /// <summary>1 個目の出目の左上と送り。 3 個で 1 段・4 個目からは上の段へ (仮)。 右端は敵の左下の「構え」の字 (x 170〜・Game2DBattleFx.DrawMarks) にかからない所まで。</summary>
+        public const int FloorX = 96, FloorY = 162, FloorStepX = 24, FloorZig = 6, FloorRowStep = 26, FloorPerRow = 3;
 
         // ── 敵の棒 (足もと) ──
         /// <summary>棒 (枠 1 dot + 中身 5 dot) の左端と上端 (敵の体の中心・足もとからのずれ) と幅。</summary>

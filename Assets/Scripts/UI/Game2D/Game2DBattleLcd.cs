@@ -109,6 +109,7 @@ namespace UI.Game2D
             // 持ち物の画面 (見るだけ): キー I。 窓が出ている間・つかんでいる間は開かない (旧画面と同じ条件)
             if (ready && !PointerBusy && !Game2DTutorial.Blocking && Input.GetKeyDown(KeyCode.I)) OpenInventory();
             if (!_hasMouse) { _hoverCard = _hoverRelic = -1; _hoverZone = Zone.None; if (!ready) CancelAll(); return; }
+            if ((_pressDie >= 0 || _pressCard >= 0) && !Input.GetMouseButton(0) && !Input.GetMouseButtonUp(0)) { CancelAll(); return; }      // 画面の外で離した
             Pointer(_mouse);
         }
 
@@ -653,7 +654,6 @@ namespace UI.Game2D
         private void DrawFloor()
         {
             var s = _sim; int n = s.DiceCount; if (n == 0) return;
-            bool any = false;
             for (int i = 0; i < n; i++)
             {
                 if (i == _dragDie || (i < s.slot.Length && s.slot[i] >= 0)) continue;
@@ -666,7 +666,6 @@ namespace UI.Game2D
                 if (s.IsRoleDie(i)) Frame1(x - 1, y - 1, 20, 20, Game2DKit.Gold);
                 if (s.IsCatLocked(i)) Frame1(x - 1, y - 1, 20, 20, Amber);
                 if (_hoverCard < 0 && _hasMouse && In(_mouse, new RectInt(x, y, 18, 18)) && s.CanOperate) Frame1(x - 1, y - 1, 20, 20, Bone);
-                any = true;
             }
             // 役 (仮): 床の出目の上に名前 (出目は金の縁)
             if (s.rolled && s.roles.Count > 0)
@@ -676,7 +675,6 @@ namespace UI.Game2D
                 BattleLcdLayout.FloorPos(Mathf.Max(0, n - 1), out _, out int ty);
                 Txt(t, BattleLcdLayout.FloorX, Mathf.Min(BattleLcdLayout.FloorY, ty) - 15, Gold);
             }
-            _ = any;
         }
 
         private void DrawDragGhost()
