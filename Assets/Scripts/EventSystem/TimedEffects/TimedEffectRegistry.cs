@@ -23,11 +23,17 @@ namespace EventSystem.TimedEffects
                 { "中毒", 2 },   // 次の2戦闘
                 { BattleBoonRule.ToilName,      BattleBoonRule.ToilCharges },        // 通常の戦闘の勝ち 3 回 (2026-11-13)
                 { BattleBoonRule.InsightName, BattleBoonRule.InsightCharges },   // 同上
+                // イベントの「悪い行い」の罰 (2026-11-16・作者の決定): 次の N 戦闘 (逃げた・負けた・イベントの戦闘でも 1 つ減る)
+                { TimedDebuffRule.SentimentName, TimedDebuffRule.SentimentCharges },   // 次の3戦闘 (旧: 既定の 1)
+                { TimedDebuffRule.GuiltName,     TimedDebuffRule.GuiltCharges },       // 次の2戦闘
+                { TimedDebuffRule.HelplessName,  TimedDebuffRule.HelplessCharges },    // 次の2戦闘
             };
 
-        /// <summary>画面に出す説明 (名前・残りと並べる)。 説明を持つ時限効果だけ (2026-11-13・〈徒労〉〈開眼〉)。 無ければ null。</summary>
+        /// <summary>画面に出す説明 (名前・残りと並べる)。 説明を持つ時限効果だけ (2026-11-13・〈徒労〉〈開眼〉/ 2026-11-16・〈感傷〉〈罪悪感〉〈無力感〉)。 無ければ null。</summary>
         public static string DescriptionOf(string id)
         {
+            string d = TimedDebuffRule.DescriptionOf(id);
+            if (d != null) return d;
             // 〈徒労〉の別の形 (LayerLong・2026-11-14) は層の間の説明。 戦闘のデバフ (GameHooks.ToilDamageDownPct > 0) は「与えるダメージ −N%。」を後ろに付ける
             return BattleBoonRule.DescriptionOf(id, GameLoop.GameHooks.ToilMode, GameLoop.GameHooks.ToilDamageDownPct);
         }
@@ -74,6 +80,8 @@ namespace EventSystem.TimedEffects
             Register(new Effects.StarBlessingEffect());
             Register(new Effects.RevelationEffect());
             Register(new Effects.SentimentEffect());
+            Register(new Effects.GuiltEffect());
+            Register(new Effects.HelplessEffect());
             Register(new Effects.TimeGazeEffect());
 
             // ===== ターン終了時系 =====

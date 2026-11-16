@@ -117,6 +117,8 @@ namespace CombatSystem
             {
                 hp = playerHP, maxHp = playerMaxHP, enemyAttack = enemyAttack,
                 whetBonus = run != null ? run.terminalWhetBonus : 0,
+                // 時限デバフ〈罪悪感〉(2026-11-16): 防御に挿した出目 −2 (下限 0)。 Resolve が引く (本体・画面・BOT の同じ口)
+                blockDieCut = EventSystem.TimedEffects.TimedDebuffRule.BlockDieCut(run?.timedDebuffs),
             };
             if (ctx == null) return e;
             e.charge = ctx.GetCharge(); e.chargeCap = ctx.ChargeCap; e.shield = ctx.consShield;

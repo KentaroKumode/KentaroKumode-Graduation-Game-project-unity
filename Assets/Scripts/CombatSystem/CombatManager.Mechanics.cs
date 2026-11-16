@@ -155,6 +155,13 @@ namespace CombatSystem
             else foreach (int i in rerolled) playerDice[i] = v;
         }
 
+        /// <summary>振り直し 1 回の費用 (充電) の 1 か所 (2026-11-16)。 = 振る個数 × この戦闘で何回目か + 時限デバフ〈無力感〉の上乗せ (+1)。
+        /// 無料の振り直し (〈特別・対〉) は 0 で、 上乗せも足さない。 本体の支払い・画面の費用の表示 (<see cref="TurnPause.rerollCost"/>)・
+        /// BOT の振り直しの方策 (AutoRunner.MutualRerollPolicy) がここを読む。 式の正本は <see cref="EventSystem.TimedEffects.TimedDebuffRule.RerollCost"/>。</summary>
+        public static int RerollCostNow(int diceCount, int nth, bool free)
+            => EventSystem.TimedEffects.TimedDebuffRule.RerollCost(diceCount, nth, free,
+                EventSystem.TimedEffects.TimedDebuffRule.RerollSurcharge(GameLoop.GameManager.Instance?.Run?.timedDebuffs));
+
         private IEnumerator<TurnPause> RerollPhase(CombatContext ctx, int[] playerDice, int[] enemyDice, int playerDiceMax,
                                                    int[] playerFaceIdx = null)
         {
@@ -194,6 +201,7 @@ namespace CombatSystem
             //   1〜2 個を刻んで追えたので、 充電さえあれば役がほぼ任意に作れた (〈極〉が設計 0.077%/T → 充電 12 で約 10%)。
             //   いまは (1) 方策の pick は「振るかどうか」だけを表し、 中身は読まない ── 振り直せない面以外を全部振る
             //   (2) 費用 = 振り直す個数 × (この戦闘で払った回数 + 1)。 ターンでは戻らない。 docs/GAME.md §6-3。
+            //   (3) 時限デバフ〈無力感〉(2026-11-16) を持っていれば毎回 +1 (無料の振り直しには足さない)。 式は RerollCostNow の 1 か所。
             int attempt = 1;   // このターンの何回目か (乱数の添字にだけ使う)
             int guard = 16;    // 方策が空でない配列を返し続けても止まるようにする
             var rerollIdx = new List<int>(playerDice.Length);
@@ -204,7 +212,7 @@ namespace CombatSystem
                 if (_interactiveTurn)
                 {
                     _pause.Set(TurnPauseKind.Reroll, playerDice, playerFaceIdx, tele);
-                    _pause.rerollCost = freeRerolls > 0 ? 0 : playerDice.Length * nth;
+                    _pause.rerollCost = RerollCostNow(playerDice.Length, nth, freeRerolls > 0);
                     // 振り直すかを決める時も手札と場を見せる (手札は振り直しで変わらない)。 敵の攻撃は予告の近似で組む
                     if (_deck != null) { _pause.board = _deck.board; _pause.terminalEnv = TerminalEnvNow(ctx, tele.enemyAttackValue); _pause.terminalState = _deck.state; }
                     yield return _pause;
@@ -217,9 +225,9 @@ namespace CombatSystem
                 rerollIdx.Clear();
                 for (int i = 0; i < playerDice.Length; i++) rerollIdx.Add(i);
 
-                int cost = rerollIdx.Count * nth;
-                bool usedFree = false;
-                if (freeRerolls > 0) { cost = 0; freeRerolls--; usedFree = true; }
+                bool usedFree = freeRerolls > 0;
+                int cost = RerollCostNow(rerollIdx.Count, nth, usedFree);   // 〈無力感〉の +1 もここ (無料の時は足さない)
+                if (usedFree) freeRerolls--;
                 if (!ctx.ConsumeCharge(cost)) break;   // 払えなければそこで打ち切り
 
                 for (int k = 0; k < rerollIdx.Count; k++)

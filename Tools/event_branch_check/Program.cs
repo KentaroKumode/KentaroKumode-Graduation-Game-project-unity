@@ -248,6 +248,53 @@ static class Program
         Check(allDark == 0, $"選べるか: 全部の選択肢が同時に暗くなり得るイベント {allDark} 件 (安全弁 EventEncounter.IsChoiceSelectable は残す)");
     }
 
+    /// <summary>イベントの悪選択の罰の作り替え (2026-11-16・作者の決定・docs/GAME.md §17): 8 つの選択肢の効果の並び・物資を払わない・
+    /// 時限デバフの名前が本体の定数 (TimedDebuffRule) と一致・登録と持つ数 (感傷 3・罪悪感 2・無力感 2)。</summary>
+    static void EvilChoices(string dir)
+    {
+        var all = new List<EventDefinition>();
+        foreach (var f in Directory.GetFiles(dir, "*.txt")) all.AddRange(EventSystem.EventParser.ParseAll(File.ReadAllText(f)));
+        string Fx(EventChoice c) => string.Join(",", c.effects.ConvertAll(e => e.type + (string.IsNullOrEmpty(e.param) ? "" : "[" + e.param + "]") + (e.amount != 0 ? e.amount.ToString("+0;-0") : "")));
+        const string guilt = "TimedDebuff[" + EventSystem.TimedEffects.TimedDebuffRule.GuiltName + "]";
+        const string helpless = "TimedDebuff[" + EventSystem.TimedEffects.TimedDebuffRule.HelplessName + "]";
+        var want = new (string ev, string ch, string fx)[]
+        {
+            ("迷子の子供", "見捨てる", helpless + ",GoldDelta+10"),
+            ("裏切り者の墓", "唾を吐く", "GoldDelta+15"),
+            ("腐敗した旅団", "刃を抜き斬り捨てる", "GoldDelta+10,EnterCombat"),
+            ("迷い込んだ商隊", "嘘の道を教える", guilt + ",GainPassiveItem"),
+            ("苗木", "踏み潰す", "TurnsPass+1,MaterialDelta+1,GainConsumableItem"),
+            ("老婆の商店", "老婆を殺し、品を奪う", guilt + ",GainPassiveItem"),
+            ("復興の旗", "押し入って荷を奪う", guilt + ",GainPassiveItem"),
+            ("切り伏せる男", "男の代わりに戦う", "EnterCombat"),
+        };
+        int ok = 0; var bad = new List<string>();
+        foreach (var w in want)
+        {
+            var ev = all.Find(e => e.name == w.ev);
+            var c = ev?.choices.Find(x => x.text == w.ch);
+            string got = c != null ? Fx(c) : "(無い)";
+            if (got == w.fx && !c.Has(EventEffectType.ProvisionDelta)) ok++; else bad.Add($"〈{w.ev}〉「{w.ch}」= {got} (期待 {w.fx})");
+        }
+        foreach (var l in bad) Console.WriteLine("    " + l);
+        Check(ok == want.Length, $"悪選択の罰 (2026-11-16): 8 つの選択肢の効果が作者の表どおり・物資を払わない ({ok}/{want.Length})");
+        // 時限デバフの名前が登録されているか (イベントで受ける時限デバフ・バフの名前は全部 TimedEffectRegistry に登録が要る ── 灯台の光の〈導きの光〉の二の舞を防ぐ)
+        string root = Path.GetFullPath(Path.Combine(dir, "../../.."));
+        string reg = File.ReadAllText(Path.Combine(root, "Assets/Scripts/EventSystem/TimedEffects/TimedEffectRegistry.cs"));
+        string roll = File.ReadAllText(Path.Combine(root, "Assets/Scripts/EventSystem/TimedEffects/Effects/RollEffects.cs"));
+        Check(reg.Contains("new Effects.SentimentEffect()") && reg.Contains("new Effects.GuiltEffect()") && reg.Contains("new Effects.HelplessEffect()")
+              && reg.Contains("TimedDebuffRule.SentimentCharges") && reg.Contains("TimedDebuffRule.GuiltCharges") && reg.Contains("TimedDebuffRule.HelplessCharges")
+              && roll.Contains("Id => TimedDebuffRule.GuiltName") && roll.Contains("Id => TimedDebuffRule.HelplessName") && roll.Contains("Id => TimedDebuffRule.SentimentName")
+              && System.Text.RegularExpressions.Regex.Matches(roll, @"TimedEffectTrigger\.OnRoll").Count >= 6,
+              "悪選択の罰: 〈感傷〉〈罪悪感〉〈無力感〉が時限効果として登録・持つ数は定数・どれも OnRoll (戦闘の終わりに 1 つ減る)");
+        var named = new List<string>();
+        foreach (var ev in all) foreach (var c in ev.choices) foreach (var e in c.effects)
+            if (e != null && e.type == EventEffectType.TimedDebuff && !named.Contains(e.param)) named.Add(e.param);
+        string[] fixedNames = { EventSystem.TimedEffects.TimedDebuffRule.SentimentName, EventSystem.TimedEffects.TimedDebuffRule.GuiltName, EventSystem.TimedEffects.TimedDebuffRule.HelplessName };
+        int seen = 0; foreach (var n in fixedNames) if (named.Contains(n)) seen++;
+        Check(seen == 3, $"悪選択の罰: event_list.txt の時限デバフ[…] に 3 つの名前がそのまま出る ({string.Join("・", named)})");
+    }
+
     /// <summary>〈灰に埋もれた基地〉2 本 (2026-11-13・docs/GAME.md §4-2 / §17): 召喚専用・一度のみ・深さ 6・選択肢の数 (はじめて 1・再訪 2) と効果・
     /// 時限効果の名前が本体の定数 (BattleBoonRule) と一致・版の選び方 (AshBaseEvent は本物をコンパイル)・〈真理〉は効果「真理を得る」で立つ。</summary>
     static void AshBase(string dir)
@@ -959,6 +1006,7 @@ static class Program
         Selectability(dir);
         Observatory(dir);
         AshBase(dir);
+        EvilChoices(dir);
         ToilInsight(Path.GetFullPath(Path.Combine(dir, "../../..")));
         Layers(dir);
         ClockRelic(Path.GetFullPath(Path.Combine(dir, "../../..")));   // dir = <root>/Assets/Resources/Events

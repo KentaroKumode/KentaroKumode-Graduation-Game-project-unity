@@ -789,6 +789,39 @@ static class T
             Check(tr == "2|2|3|3" && burstSum == 10, $"業火で烈炎 × 5 が入り 0 に戻る (2 × 5 = {burstSum})・その業火の主攻撃をシールドで受けた分は次へ積もる・取り消された業火は持ち越す → {tr}");
         }
 
+        // ---- 時限デバフ〈感傷〉〈罪悪感〉〈無力感〉(2026-11-16・EventSystem.TimedEffects.TimedDebuffRule) ----
+        {
+            var deb = new Dictionary<string, int> { { EventSystem.TimedEffects.TimedDebuffRule.GuiltName, 2 } };
+            int cut = EventSystem.TimedEffects.TimedDebuffRule.BlockDieCut(deb);
+            var env = new TerminalEnv { blockDieCut = cut };
+            var b = new List<string> { TerminalIds.Attack, TerminalIds.Block, TerminalIds.Block };
+            // 出目 5 → 攻撃・出目 3 → 防御・出目 1 → 防御: 攻撃 5 のまま・防御 (3−2) + max(0, 1−2) = 1
+            var o = TerminalCards.Resolve(b, new[] { 0, 1, 2 }, new[] { 5, 3, 1 }, env, new TerminalBattleState());
+            var o0 = TerminalCards.Resolve(b, new[] { 0, 1, 2 }, new[] { 5, 3, 1 }, new TerminalEnv(), new TerminalBattleState());
+            Check(cut == 2 && o.attackAdd == 5 && o.blockAdd == 1 && o0.blockAdd == 4 && o.blockDice == 2,
+                  $"罪悪感: 防御に挿した出目だけ −2・下限 0 (防御 3+1 → {o.blockAdd}・攻撃 5 → {o.attackAdd}・無しなら防御 {o0.blockAdd})");
+            // 防御の種類の他の端子: 〈絶縁〉(偶数・シールド +出目 +4) は 4 → 2 で +6。 〈導火〉(3 以下・ブロック +8) は 5 を挿しても条件は挿した目で見る (5 → 3 にはならない = 不発)
+            var bi = new List<string> { TerminalIds.Insulator, TerminalIds.Fuse };
+            var oi = TerminalCards.Resolve(bi, new[] { 0, 1 }, new[] { 4, 5 }, env, new TerminalBattleState());
+            Check(oi.shield == 2 + TerminalCards.InsulatorBonus && oi.blockAdd == 0,
+                  $"罪悪感: 〈絶縁〉のシールドも引いた目で (+{oi.shield})・条件は挿した目で見る (〈導火〉に 5 は不発・防御 {oi.blockAdd})");
+            Check(EventSystem.TimedEffects.TimedDebuffRule.BlockDieCut(new Dictionary<string, int>()) == 0
+                  && EventSystem.TimedEffects.TimedDebuffRule.BlockDieCut(new Dictionary<string, int> { { EventSystem.TimedEffects.TimedDebuffRule.GuiltName, 0 } }) == 0
+                  && EventSystem.TimedEffects.TimedDebuffRule.BlockDieCut(null) == 0,
+                  "罪悪感: 持っていない (残り 0・表が null) なら引かない");
+            // 振り直しの費用: 3 個 × 何回目か (+1)
+            int s = EventSystem.TimedEffects.TimedDebuffRule.RerollSurcharge(new Dictionary<string, int> { { EventSystem.TimedEffects.TimedDebuffRule.HelplessName, 1 } });
+            var withH = new[] { 1, 2, 3 }.Select(n => EventSystem.TimedEffects.TimedDebuffRule.RerollCost(3, n, false, s)).ToArray();
+            var noH = new[] { 1, 2, 3 }.Select(n => EventSystem.TimedEffects.TimedDebuffRule.RerollCost(3, n, false, 0)).ToArray();
+            Check(withH.SequenceEqual(new[] { 4, 7, 10 }) && noH.SequenceEqual(new[] { 3, 6, 9 }) && EventSystem.TimedEffects.TimedDebuffRule.RerollCost(3, 2, true, s) == 0,
+                  $"無力感: 振り直しの費用 +1 ({string.Join("/", withH)}・無しなら {string.Join("/", noH)})・無料の振り直しは 0 のまま");
+            Check(EventSystem.TimedEffects.TimedDebuffRule.SentimentCharges == 3 && EventSystem.TimedEffects.TimedDebuffRule.GuiltCharges == 2
+                  && EventSystem.TimedEffects.TimedDebuffRule.HelplessCharges == 2,
+                  "続く戦闘の数: 感傷 3・罪悪感 2・無力感 2");
+            Check(EventSystem.TimedEffects.TimedDebuffRule.SentimentDie(1) == 1 && EventSystem.TimedEffects.TimedDebuffRule.SentimentDie(4) == 3,
+                  "感傷: 出目 −1・下限 1");
+        }
+
         Console.WriteLine(fails == 0 ? "ALL OK" : fails + " FAILED");
         return fails == 0 ? 0 : 1;
     }

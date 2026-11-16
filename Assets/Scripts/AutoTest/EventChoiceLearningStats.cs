@@ -25,8 +25,9 @@ namespace AutoTest
         /// 同じ添字の新しい選択肢に乗る。 旧い版の行はファイルに残るが読まれない。
         /// c2 = 2026-11-11 のイベント再編 (issue #17: 物資の単位・ターンを使う選択肢)。
         /// c3 = 同日の値段表に照らした再調整 (ゴールドを今の大きさへ・立ち去りの物資+1 を外す)。
-        /// c4 = 2026-11-12 の報酬の多様化 (航行・選べる品・取り替え・鍛える・後で効く・素材を払う選択肢と、 航行が主役のイベント)。</summary>
-        public const string ChoiceRevision = "c4";
+        /// c4 = 2026-11-12 の報酬の多様化 (航行・選べる品・取り替え・鍛える・後で効く・素材を払う選択肢と、 航行が主役のイベント)。
+        /// c5 = 2026-11-16 の悪い行いの罰の作り替え (物資の減りをやめ、 時限デバフ〈罪悪感〉〈無力感〉・ターン・金の減りへ。 〈感傷〉は 3 戦闘)。</summary>
+        public const string ChoiceRevision = "c5";
 
         /// <summary>学習のキーに使う eventId (版つき)。 記録 (AutoRunner) と参照 (<see cref="GetLearnedLift"/>) の両方がここを通る。</summary>
         public static string EventKey(string eventId) => (eventId ?? "") + "#" + ChoiceRevision;
