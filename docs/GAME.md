@@ -3851,7 +3851,7 @@ HP / 物資 / ターン / **充電ゲージ**（10 目盛り LED バー）/ **�
 ロゴの下に **ENTER THE HOLLOW**（ラン開始）・**SKILL TREE**（整備パネル）・**GALLERY**（図鑑）・**SETTINGS**（設定の窓・Esc と同じ窓）の 4 行。
 配置は作者が見本の案 r を選んだ（`Captures/title_options/variants_day.png`）: 絵の中心の dot の y でロゴ 71・ボタン 158 / 185 / 212 / 239（間隔 27・x は中央）。旧: ロゴ 79・ボタン 175 / 207 / 239（間隔 32・3 行）。
 **シーン（`Game2D.unity`）は触らず**、起動時に `TitleMenuLayout`（`TitleMenuBootstrap` が呼ぶ・値はここの定数 1 か所）が置き直し、GALLERY を複製して SETTINGS を作る。
-SETTINGS の絵は 3 つのボタンの絵の字を切り出して並べた物（`Resources/TitleMenu/settings_day / night.png.bytes`・作り方 `Captures/title_options/work/make_settings.py`・金の字と黒い縁だけ）で、実行時に PPU 32・点の補間の Sprite にする。
+4 行の字の絵は 2026-11-17〜 DenkiChip で作り直した「v2-c」（ロゴの陰影の規則 + 縁 2 重・1 dot = 2 px・全画素が不透明か透明・作り方 `Captures/title_menu_font/work/make_v2.py`・作者の決定）。ENTER / SKILL / GALLERY は `Assets/Materials/*_day / night.png`、SETTINGS は `Resources/TitleMenu/settings_day / night.png.bytes`（実行時に PPU 32・点の補間の Sprite にする）。絵が旧い絵より小さくなったので、ボタンの当たり（シーンの BoxCollider2D は旧い絵の大きさ）は `TitleMenuLayout.FitCollider` が起動時に絵の範囲へそろえる（両端の矢印も当たりの範囲に置く）。旧い絵の控えは `Captures/title_menu_font/work/orig_menu/`。
 昼夜の差し替え（`TitleDayNight.AddSlot`）と両端の矢印（`MenuHoverCursor.AddItem`）に足す。夜のロゴの絵（`title_night.png` 480×240 px）は昼（120×60 px）の 4 倍の画素で PPU が同じ 8 なので、`TitleDayNight` が昼の絵と同じ大きさになる PPU で作り直して出す。
 メニューの字の絵のにじみ（ブルーム）は 2026-11-16 に消した（作者の指示）。ロゴのにじみは未決（作者の返事待ち）。
 

@@ -11,8 +11,8 @@ namespace UI
     /// 液晶の真ん中 (y 135) が Content の y 0。 部品は Content/Menu の子なので、 Menu の中の位置 = (135 − dot) ÷ 16 − Menu の y (シーンでは −1.5)。
     /// x は今のまま (中央)。 今の値 (シーン): ロゴ 79・ENTER THE HOLLOW 175・SKILL TREE 207・GALLERY 239 (間隔 32)。</para>
     ///
-    /// <para><b>SETTINGS の絵</b>: 3 つのボタンの絵の字 (S・E・T・I・N・G) を切り出して並べた物 (作り方 Captures/title_options/work/make_settings.py・
-    /// 金の字と黒い縁だけ・にじみ無し)。 3 つの絵はシーンが参照する取り込み済みのテクスチャだが、 これはシーンに無いので、
+    /// <para><b>SETTINGS の絵</b>: 2026-11-17〜 4 行とも DenkiChip で作り直した字の絵「v2-c」(ロゴの陰影の規則 + 縁 2 重・作り方 Captures/title_menu_font/work/make_v2.py・
+    /// 1 dot = 2 px・全画素が不透明か透明・旧い絵の控えは Captures/title_menu_font/work/orig_menu/)。 旧: 3 つのボタンの絵の字を切り出して並べた物 (Captures/title_options/work/make_settings.py)。 3 つの絵はシーンが参照する取り込み済みのテクスチャだが、 これはシーンに無いので、
     /// Resources/TitleMenu/settings_day / night.png.bytes をテキストの資産として読み、 <see cref="Texture2D.LoadImage(byte[])"/> で戻して Sprite を作る
     /// (PPU 32・点の補間・圧縮なし ── 3 つの絵と同じ扱い。 .meta が git 管理外でも取り込みの設定に左右されない・戦闘の背景と同じ読み方)。</para>
     ///
@@ -49,7 +49,21 @@ namespace UI
             if (skill != null) Place(skill.transform, SkillY, menuY);
             if (gallery == null) { Debug.LogWarning("[TitleMenuLayout] GalleryButton が無い (SETTINGS を作れない)"); return; }
             Place(gallery.transform, GalleryY, menuY);
+            // 当たりを今の絵の大きさに合わせる (2026-11-17: 字の絵を DenkiChip の作り直し v2-c に差し替えて小さくなった・シーンの BoxCollider2D は旧い絵の固定の大きさ)
+            FitCollider(play); FitCollider(skill); FitCollider(gallery);
             MakeSettings(gallery, menu, menuY);
+        }
+
+        /// <summary>ボタンの当たり (BoxCollider2D) を、 今の絵 (SpriteRenderer の sprite) の範囲にそろえる。 両端の矢印 (<see cref="MenuHoverCursor"/>) も当たりの範囲に置くので一緒にそろう。
+        /// 字の絵は透明の余白を持たない (v2-c・全画素が字か縁か透明で、 絵の外接の箱 = 絵の大きさ) ので、 絵の範囲そのまま。 昼と夜の絵は同じ大きさ。</summary>
+        private static void FitCollider(SpriteButton b)
+        {
+            if (b == null) return;
+            var sr = b.targetRenderer != null ? b.targetRenderer : b.GetComponent<SpriteRenderer>();
+            var col = b.GetComponent<BoxCollider2D>();
+            if (sr == null || sr.sprite == null || col == null) return;
+            var bd = sr.sprite.bounds;      // 絵の中の座標 (基準点から・拡大縮小は 1)
+            col.size = new Vector2(bd.size.x, bd.size.y); col.offset = new Vector2(bd.center.x, bd.center.y);
         }
 
         /// <summary>dot の y を Menu の中の位置にして置く (x と z は今のまま)。</summary>
@@ -72,13 +86,7 @@ namespace UI
             var dn = Object.FindObjectOfType<TitleDayNight>();
             bool isNight = dn != null && dn.mode == TitleDayNight.Mode.Night;
             if (sr != null) sr.sprite = isNight && night != null ? night : day;
-            // 当たり: GALLERY の当たりと絵の幅の差 (左右の余白) をそのままに、 SETTINGS の絵の幅へ合わせる
-            var gcol = gallery.GetComponent<BoxCollider2D>(); var col = go.GetComponent<BoxCollider2D>(); var gsr = gallery.GetComponent<SpriteRenderer>();
-            if (col != null && gcol != null && gsr != null && gsr.sprite != null)
-            {
-                float margin = gsr.sprite.bounds.size.x - gcol.size.x;
-                col.size = new Vector2(day.bounds.size.x - margin, gcol.size.y);
-            }
+            FitCollider(btn);      // 当たりを SETTINGS の絵の範囲に
             if (btn != null) btn.Clicked += OnSettingsClicked;
             // 昼夜の差し替えと両端の矢印に足す
             if (dn != null && sr != null) dn.AddSlot(sr, day, night != null ? night : day);
