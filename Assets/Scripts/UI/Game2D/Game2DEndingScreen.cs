@@ -34,7 +34,7 @@ namespace UI.Game2D
     /// (板の網目は使わない・係数 0 なら暗い地から絵が明るくなる)。 明るくなりきってから <see cref="NameDelay"/> 秒置いて、 絵の上の<b>画面の中央の上寄り</b>にエンディング名が浮かぶ
     /// (2026-11-16・作者の決定): 上に通し番号 (<see cref="NumberFor"/>・「ENDING:5」など・名前の半分の倍率)、 下に名前 (<see cref="Endings"/> の題・<see cref="NameScale"/> 倍)。
     /// 色は名前も番号も同じ白 (#F0F4F5・番号を暗くしない)。 2 段を合わせた塊の中心を y = <see cref="NameCenterY"/> (液晶の高さ 270 の上から 1/4 あたり・左右は中央) に置く
-    /// (見送りの絵は中央に小さな光が 1 つあるだけで、 名前が中央にあると絵の大部分が隠れるため)。 本文の行と同じく 1 段 <see cref="LineReveal"/> 秒で上から浮かぶ。
+    /// (帰路の絵は中央に小さな光が 1 つあるだけで、 名前が中央にあると絵の大部分が隠れるため)。 本文の行と同じく 1 段 <see cref="LineReveal"/> 秒で上から浮かぶ。
     /// 縁取りは既定で無し (<see cref="NameRim"/> = 0)・帯や板は敷かない。
     /// 名前が浮かびきってから <see cref="ArtHold"/> 秒見せ、 網目で閉じる。 クリック・Space・Enter は、 明るくなる途中 → 明るくなりきった所へ / 名前が出きる前 → 名前を出す / 名前が出た後 → 閉じる。
     /// 絵の無い結末 (絵が読めなかった時も) は、 最後の頁の後に暗い地 (Bg) のまま名前だけを出してから閉じる。</para>
@@ -117,8 +117,8 @@ namespace UI.Game2D
             if (endingId == Endings.End1.id) return "day";            // 英雄の帰還: タイトル画面の昼の大穴 (作者の決定・2026-11-16)
             if (endingId == Endings.End2.id) return "night";          // 無明の剣: 夜の大穴を見下ろしつつ、 ひっそりと別れを告げる後ろ姿
             if (endingId == Endings.End3.id) return "ash";            // 灰の玉座: 灰と炎
-            if (endingId == Endings.EndGoodId) return "dark";         // 見送り: 長い年月の後、 宇宙が全て呑み込まれて極点の光だけになった姿
-            if (endingId == Endings.EndTrueId) return "true_end";     // 帳尻 (+ 棚の隅): 物語を物語として閉じる挿絵
+            if (endingId == Endings.EndGoodId) return "dark";         // 帰路: 長い年月の後、 宇宙が全て呑み込まれて極点の光だけになった姿
+            if (endingId == Endings.EndTrueId) return "true_end";     // 終始 (+ 棚の隅): 物語を物語として閉じる挿絵
             return null;
         }
 
@@ -128,8 +128,8 @@ namespace UI.Game2D
             if (endingId == Endings.End1.id) return "ENDING:1";      // 英雄の帰還
             if (endingId == Endings.End2.id) return "ENDING:2";      // 無明の剣
             if (endingId == Endings.End3.id) return "ENDING:3";      // 灰の玉座
-            if (endingId == Endings.EndGoodId) return "ENDING:4";    // 見送り
-            if (endingId == Endings.EndTrueId) return "ENDING:5";    // 帳尻
+            if (endingId == Endings.EndGoodId) return "ENDING:4";    // 帰路
+            if (endingId == Endings.EndTrueId) return "ENDING:5";    // 終始
             return null;
         }
 
