@@ -166,11 +166,10 @@ namespace GameLoop
         ///
         /// <para><paramref name="leaveOpen"/> = false → <b>裂け目を閉じる</b> (TRUE END〈帳尻〉)。
         /// 自分と遺物の山とヴェスカを対価に帳尻を合わせる。 遺物経済は破綻し、
-        /// 主人公は行方不明になる。 数年後に七層の調査で見つかる手記から、
-        /// この盤上遊戯の原作『大穴』が書かれる ── <b>額縁が閉じるのはこちら側だけ</b>。</para>
+        /// 主人公は帰らず、 大穴の広がりは数年かけて止まる。</para>
         ///
         /// <para><paramref name="leaveOpen"/> = true → <b>閉じない</b> (GOOD END〈見送り〉)。
-        /// 世界は残るが本は書かれない。 額縁に接続しないことがこのエンドの代償にあたる。</para>
+        /// 主人公は秘宝を持って登り、 家族のもとへ帰る。 穴は残り、 誰も何も書かない。</para>
         ///
         /// <para>正本: <see cref="Endings"/> / docs/GAME.md §20。</para></summary>
         public void ChooseRiftFate(bool leaveOpen)

@@ -176,7 +176,7 @@ namespace UI.Game2D.Battle
         public static void ForceStow(int mode) => Game2DBattleFx.QaStow = mode < 0 ? -1 : mode > 0 ? 1 : 0;
 
         /// <summary>エンディングの画面を直接出す (#328・<see cref="Game2DEndingScreen.QaShow"/>・セーブを止める・フェーズは変えない)。
-        /// id = end1 / end2 / end3 / end_true (後日談つき) / end_good / epilogue。 例: <c>UI.Game2D.Battle.QaBattle.ShowEnding("end_true")</c></summary>
+        /// id = end1 / end2 / end3 / end_true / end_good。 例: <c>UI.Game2D.Battle.QaBattle.ShowEnding("end_true")</c></summary>
         public static bool ShowEnding(string id) => Game2DEndingScreen.QaShow(id);
 
         /// <summary>本物と同じ経路でエンディングを出す (#328): セーブを止め、 ランが無ければ始め、 最後に倒したボスと裂け目の選択を id に合わせて入れて踏破 (RunClear) のフェーズへ入る。

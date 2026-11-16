@@ -10,7 +10,7 @@ namespace UI.Game2D
     /// <para><b>選び方</b> (<see cref="Want"/>・毎フレーム): ロード画面 = bgm_loading / 戦闘 = 敵の種類 (灰燼の王 = bgm_boss_ash・ヴェスカ = bgm_boss_vesca・ほかの層のボス = bgm_boss・
     /// 追跡者と使い魔 = bgm_pursuer・エリート = bgm_elite・それ以外 = bgm_battle) / 店 = bgm_shop・休憩 = bgm_rest・イベント = bgm_event・〈門〉と裂け目の一択 = bgm_gate /
     /// 層を抜けた = bgm_floor_clear (1 回)・力尽きた = bgm_gameover (1 回) / 報酬の画面 = 前の曲のまま / 航行 = 嵐が来ていれば (嵐の段 1 以上) bgm_nav_storm、 それ以外は bgm_nav /
-    /// エンディングの画面 (<see cref="Game2DEndingScreen"/>) = bgm_end_true / bgm_end_good / bgm_end_other・後日談の頁は bgm_epilogue。
+    /// エンディングの画面 (<see cref="Game2DEndingScreen"/>) = bgm_end_true / bgm_end_good / bgm_end_other。
     /// 名前は issue #293〜#312 の曲の名前。 曲は Resources/Game2DBgm/&lt;名前&gt; に置く。 <b>無ければ何も鳴らさない</b> (今は 1 曲も無い)。</para>
     ///
     /// <para><b>鳴らし方</b>: 2 本の AudioSource のクロスフェード (<see cref="Crossfade"/> 秒)。 音量 = <see cref="BaseVolume"/> × 設定の BGM の音量 (<see cref="GameSettings.Bgm01"/>)。
@@ -21,7 +21,7 @@ namespace UI.Game2D
         // ── 曲の名前 (issue #293〜#312) ──
         public const string Nav = "bgm_nav", NavStorm = "bgm_nav_storm", Battle = "bgm_battle", Elite = "bgm_elite", Boss = "bgm_boss", BossAsh = "bgm_boss_ash",
             BossVesca = "bgm_boss_vesca", Pursuer = "bgm_pursuer", Shop = "bgm_shop", Rest = "bgm_rest", Event = "bgm_event", ClassSelect = "bgm_class_select",
-            Gate = "bgm_gate", EndTrue = "bgm_end_true", EndGood = "bgm_end_good", EndOther = "bgm_end_other", Epilogue = "bgm_epilogue",
+            Gate = "bgm_gate", EndTrue = "bgm_end_true", EndGood = "bgm_end_good", EndOther = "bgm_end_other",
             GameOver = "bgm_gameover", FloorClear = "bgm_floor_clear", Loading = "bgm_loading";
         /// <summary>曲の置き場所 (Resources の下)。</summary>
         public const string Folder = "Game2DBgm/";
@@ -79,7 +79,7 @@ namespace UI.Game2D
             var gm = GameManager.Instance;
             if (gm == null || gm.CurrentPhase == GameManager.GamePhase.Title) return null;      // タイトルは TitleBgm
             if (Game2DLoadingScreen.Blocking) return Loading;
-            if (Game2DEndingScreen.Blocking) return Game2DEndingScreen.Track;      // エンディングの画面 (#328): bgm_end_true / _good / _other・後日談は bgm_epilogue
+            if (Game2DEndingScreen.Blocking) return Game2DEndingScreen.Track;      // エンディングの画面 (#328): bgm_end_true / _good / _other
             switch (gm.CurrentPhase)
             {
                 case GameManager.GamePhase.Combat:

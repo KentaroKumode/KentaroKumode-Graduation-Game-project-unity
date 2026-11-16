@@ -607,8 +607,7 @@ namespace AutoTest
                 case GameManager.GamePhase.RiftChoice:
                     // ヴェスカ撃破後の一択 (2026-08-17)。 **必ず答えること** ── 放置すると
                     //   RunClear へ進まずバッチが止まる。
-                    //   BOT は常に「閉じる」= TRUE END。 勝敗の計測値は分岐で変わらないので、
-                    //   額縁 (Epilogue) が開く側に寄せておく。
+                    //   BOT は常に「閉じる」= TRUE END。 勝敗の計測値は分岐で変わらないので、 どちらでもよい。
                     gm.ChooseRiftFate(false);
                     return false;
 

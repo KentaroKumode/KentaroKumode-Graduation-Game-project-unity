@@ -6,8 +6,7 @@ namespace UI.Game2D
 {
     /// <summary>
     /// エンディングの画面 (#328・2026-11-15・<b>仮置き</b>)。 ランを踏破した時 (フェーズ RunClear) に、 <see cref="Endings.Resolve"/> の結果の題と本文を、
-    /// <b>液晶の中に</b>ドット字 (<see cref="Game2DJpFont"/>・字の指定は GameFont.cs) で頁送りで見せる。 EndTrue の後は、 続けて後日談 (<see cref="Endings.Epilogue"/>) の頁も見せる
-    /// (額縁が閉じるのは TRUE だけ・EndGood では本が書かれないので後日談は無い)。 読み終わると、 今までの「踏破」の窓 (到達の数字・入手した遺物 → タイトルへ) に続く。
+    /// <b>液晶の中に</b>ドット字 (<see cref="Game2DJpFont"/>・字の指定は GameFont.cs) で頁送りで見せる。 読み終わると、 今までの「踏破」の窓 (到達の数字・入手した遺物 → タイトルへ) に続く。
     ///
     /// <para><b>額縁の決まり</b>: エンディングの文は物語なので液晶の中に描く (筐体の窓 = Game2DModal には出さない)。 出している間は計器盤 (GUI) を隠す
     /// (<see cref="Game2DHud"/> がロード画面と同じく <see cref="Blocking"/> を見る)。</para>
@@ -15,7 +14,7 @@ namespace UI.Game2D
     /// <para><b>送り方</b>: 頁ごとに行が上から順に浮かぶ (1 行 <see cref="LineReveal"/> 秒)。 クリック・Space・Enter で、 浮かびきる前なら全部を出し、 浮かびきっていれば次の頁へ。
     /// 本文の「———」の行は頁の区切りに使う (描かない)。 頁に入りきらない段落は次の頁へ送る。</para>
     ///
-    /// <para><b>曲</b>: 出している間は <see cref="Game2DBgm"/> が <see cref="Track"/> を読む (EndTrue = bgm_end_true / EndGood = bgm_end_good / ほか = bgm_end_other / 後日談 = bgm_epilogue・曲はまだ無いので無音)。
+    /// <para><b>曲</b>: 出している間は <see cref="Game2DBgm"/> が <see cref="Track"/> を読む (EndTrue = bgm_end_true / EndGood = bgm_end_good / ほか = bgm_end_other・曲はまだ無いので無音)。
     /// 描き方はロード画面 (<see cref="Game2DLoadingScreen"/>) と同じ: 地図の板の複製を少し手前に置き、 Game2D/LoadingBlend の網目で出入りする。 BOT がランを動かしている間は出さない。</para>
     /// </summary>
     public class Game2DEndingScreen : MonoBehaviour
@@ -151,14 +150,13 @@ namespace UI.Game2D
             ApplyFade();
         }
 
-        /// <summary>エンディング e の頁を作って出す。 EndTrue なら後日談を続ける。</summary>
+        /// <summary>エンディング e の頁を作って出す。</summary>
         private void Play(Endings.Ending e)
         {
             if (string.IsNullOrEmpty(e.body) || !EnsureQuad()) return;
             _pages.Clear();
-            string track = e.id == Endings.EndTrueId ? Game2DBgm.EndTrue : e.id == Endings.EndGoodId ? Game2DBgm.EndGood : e.id == Endings.Epilogue.id ? Game2DBgm.Epilogue : Game2DBgm.EndOther;
+            string track = e.id == Endings.EndTrueId ? Game2DBgm.EndTrue : e.id == Endings.EndGoodId ? Game2DBgm.EndGood : Game2DBgm.EndOther;
             AddPages(e, track);
-            if (e.id == Endings.EndTrueId) AddPages(Endings.Epilogue, Game2DBgm.Epilogue);      // 額縁が閉じる: 後日談 (棚の隅)
             if (_pages.Count == 0) return;
             _page = 0; _t = 0f; _fadeT = 0f; _closing = false; _active = true; Track = _pages[0].track;
             var gm = GameManager.Instance; _playPhase = gm != null ? gm.CurrentPhase : GameManager.GamePhase.Title; _playRun = gm != null ? gm.Run : null;
@@ -246,7 +244,7 @@ namespace UI.Game2D
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         /// <summary>[実機の確認用・2026-11-15] エンディングの画面を直接出す (フェーズもランも変えない・セーブを止める)。
-        /// id = end1 / end2 / end3 / end_true (後日談つき) / end_good / epilogue (後日談だけ)。 例: <c>UI.Game2D.Game2DEndingScreen.QaShow("end_true")</c>。
+        /// id = end1 / end2 / end3 / end_true / end_good。 例: <c>UI.Game2D.Game2DEndingScreen.QaShow("end_true")</c>。
         /// 読み終わって閉じると元の画面に戻る (踏破の窓は出ない)。 出している間にフェーズかランが変わるとすぐ片付く。 無い id なら false。</summary>
         public static bool QaShow(string id)
         {
@@ -260,7 +258,6 @@ namespace UI.Game2D
                 case "end3": e = Endings.End3; break;
                 case Endings.EndTrueId: e = Endings.EndTrue; break;
                 case Endings.EndGoodId: e = Endings.EndGood; break;
-                case "epilogue": e = Endings.Epilogue; break;
                 default: return false;
             }
             if (_active) s.Stop();
