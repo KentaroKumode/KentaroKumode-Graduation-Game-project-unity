@@ -11,11 +11,11 @@ public static class EndingMenu
 
     [MenuItem(Root + "英雄の帰還 (end1)", priority = 320)] private static void E1() => Show("end1");
     [MenuItem(Root + "無明の剣 (end2)", priority = 321)] private static void E2() => Show("end2");
-    [MenuItem(Root + "空の玉座 (end3)", priority = 322)] private static void E3() => Show("end3");
+    [MenuItem(Root + "灰の玉座 (end3)", priority = 322)] private static void E3() => Show("end3");
     [MenuItem(Root + "GOOD END (end_good)", priority = 323)] private static void EG() => Show(GameLoop.Endings.EndGoodId);
     [MenuItem(Root + "TRUE END (end_true)", priority = 324)] private static void ET() => Show(GameLoop.Endings.EndTrueId);
 
-    [MenuItem(Root + "英雄の帰還 (end1)", true)] [MenuItem(Root + "無明の剣 (end2)", true)] [MenuItem(Root + "空の玉座 (end3)", true)]
+    [MenuItem(Root + "英雄の帰還 (end1)", true)] [MenuItem(Root + "無明の剣 (end2)", true)] [MenuItem(Root + "灰の玉座 (end3)", true)]
     [MenuItem(Root + "GOOD END (end_good)", true)] [MenuItem(Root + "TRUE END (end_true)", true)]
     private static bool Valid() => Application.isPlaying;
 }

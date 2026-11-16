@@ -365,8 +365,7 @@ namespace GameLoop
         /// <para>エンディングはこの 1 択だけで決まる。 false なら TRUE END〈裂け目を閉じる〉、
         /// true なら GOOD END〈閉じない〉。 撃破時に一度だけ set し、 以後は動かさない。</para>
         ///
-        /// <para><b>既定は false (閉じる)</b> ── 額縁 (『大穴』の卓上遊戯翻案) が成立するのは
-        /// こちらの分岐だけなので、 未選択のまま終わった場合も物語の筋が通る側へ倒す。</para></summary>
+        /// <para><b>既定は false (閉じる)</b> ── 未選択のまま終わった場合は TRUE END 側へ倒す。</para></summary>
         public bool riftLeftOpen;
 
         /// <summary>行動台帳（<see cref="RunChronicle"/>）。 1 行 = 1 つの出来事を

@@ -157,7 +157,7 @@ namespace Codex
             // オールクリアとして扱う。 7 層ヴェスカ 4 段連戦の踏破を要求するため、 これ単独で
             // 全制覇相当のゲートとなる。
             // 2026-08-17: 旧 "end5" (勝利で無条件に出ていたエンド) を EndTrue/EndGood に割った際、
-            //   ここも "end_true" へ移した。 **EndGood は数えない** ── 閉じなかった側は額縁に繋がらない。
+            //   ここも "end_true" へ移した。 **EndGood は数えない**。
             // ※ AllEndingsMaxDifficulty 階層を使う vignette は現時点で無い (将来の専用 codex 用)。
             if (meta.endingMaxDiffCleared == null) return false;
             return meta.endingMaxDiffCleared.Contains(GameLoop.Endings.EndTrueId);
