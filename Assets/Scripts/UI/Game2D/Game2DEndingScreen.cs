@@ -79,7 +79,7 @@ namespace UI.Game2D
         private const int Left = 40, TextW = 400, BodyY = 26, FootY = 232;
         private static int LinesPerPage => Mathf.Max(1, (FootY - BodyY - 1) / Game2DJpFont.LineH);
         // 液晶の安全域 (エンディング名を収める枠・dot)
-        public const int SafeL = 16, SafeR = 464, SafeT = 9, SafeB = 259;
+        public const int SafeL = LcdSafeArea.L, SafeR = LcdSafeArea.R, SafeT = LcdSafeArea.T, SafeB = LcdSafeArea.B;      // 値は LcdSafeArea (イベントの画面と共通)
         // エンディング名の段: 番号と名前の間 (dot)。 縁取りの太さは NameRim
         private const int NameGap = 8;
 

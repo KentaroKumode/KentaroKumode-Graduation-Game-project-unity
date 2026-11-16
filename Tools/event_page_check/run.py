@@ -24,7 +24,7 @@ RUNTIME = 'C:/Program Files/dotnet/shared/Microsoft.NETCore.App'
 EV = 'Assets/Scripts/EventSystem/'
 SOURCES = [EV + n + '.cs' for n in ('EventBranchText', 'EventEffectType', 'EventEffect', 'EventEffectRoles', 'EventChoice',
                                      'EventDefinition', 'EventCondition', 'EventParser')] + [
-    'Assets/Scripts/UI/Game2D/JpTextLayout.cs', 'Assets/Scripts/UI/Game2D/Screens/EventLayout.cs', 'Assets/Scripts/UI/Game2D/Screens/EventPaging.cs']
+    'Assets/Scripts/UI/Game2D/JpTextLayout.cs', 'Assets/Scripts/UI/Game2D/LcdSafeArea.cs', 'Assets/Scripts/UI/Game2D/Screens/EventLayout.cs', 'Assets/Scripts/UI/Game2D/Screens/EventPaging.cs']
 
 
 def fwd(p):

@@ -15,11 +15,15 @@ namespace UI.Game2D
     public static class EventLayout
     {
         public const int ScreenW = 480, ScreenH = 270;
-        /// <summary>画面の端から空ける幅 (選択肢の列が上下にはみ出さない範囲)。</summary>
-        public const int Margin = 4;
+        /// <summary>板・列・字を収める範囲 = 液晶の安全域 (<see cref="LcdSafeArea"/>・結末の画面と同じ左右 16・上下 9)。 背景の絵だけは画面いっぱい。
+        /// 2026-11-16 の実機で、 見本の配置 (端から 4 dot) は液晶の湾曲で左の字・右の札・下の縁が欠けた。</summary>
+        public const int SafeL = LcdSafeArea.L, SafeR = LcdSafeArea.R, SafeT = LcdSafeArea.T, SafeB = LcdSafeArea.B;
 
-        // ── 本文の板 (左下) ──
-        public const int PlateX = 4, PlateY = 108, PlateW = 294, PlateH = 158;
+        // ── 本文の板 (左下・安全域の左下の角に付ける) ──
+        public const int PlateW = 276, PlateH = 158;
+        public const int PlateX = SafeL, PlateY = SafeB - PlateH;
+        /// <summary>本文の板と選択肢の列の間。</summary>
+        public const int PlateColGap = 4;
         /// <summary>板の内側の左右の余白。</summary>
         public const int Pad = 8;
         /// <summary>板の上端から: 題の字の上端・区切り線・本文の 1 行目の上端。</summary>
@@ -29,25 +33,28 @@ namespace UI.Game2D
         /// <summary>操作の行のボタンの左右の余白と、 ボタンの間。</summary>
         public const int BtnPad = 6, BtnGap = 4;
 
-        /// <summary>本文の折り返しの幅 (278 dot)。</summary>
+        /// <summary>本文の折り返しの幅。</summary>
         public const int BodyW = PlateW - 2 * Pad;
         public static int OpY => PlateY + PlateH - OpBottom - OpH;
 
         // ── 選択肢の列 (右) ──
-        public const int ColX = 304, ColW = 172;
+        /// <summary>列は本文の板の右から安全域の右端まで。</summary>
+        public const int ColX = PlateX + PlateW + PlateColGap, ColW = SafeR - ColX;
         /// <summary>箱の高さと箱の間。</summary>
         public const int BoxH = 21, BoxGap = 4;
         /// <summary>箱の左端から番号・名前の字の左端。 札は箱の右端から ChipR 内側で右寄せ。</summary>
-        public const int NumDx = 6, NameDx = 18, ChipR = 6;
+        public const int NumDx = 5, NameDx = 15, ChipR = 5;
         /// <summary>札と札の間・名前と札の間。</summary>
-        public const int ChipGap = 7, NameChipGap = 5;
+        public const int ChipGap = 5, NameChipGap = 4;
         /// <summary>砂時計の絵の幅と、 絵と数の間。</summary>
         public const int HourglassW = 7, HourglassGap = 2;
         /// <summary>列の真ん中を置く高さ (本文の板の上端あたり)。</summary>
         public const int ColCenterY = PlateY + 20;
-        /// <summary>説明の板: 行数の上限・内側の余白。</summary>
-        public const int NoteLines = 2, NotePadY = 3;
-        public const int NoteW = ColW - 2 * Pad;
+        /// <summary>説明の板: 行数の上限・内側の余白 (上下・左右)。</summary>
+        public const int NoteLines = 2, NotePadY = 3, NotePadX = 6;
+        public const int NoteW = ColW - 2 * NotePadX;
+        /// <summary>選んでいる箱の左端の帯の幅 (液晶のにじみで細い縁が弱く見えても、 どれを選んでいるか分かる印)。</summary>
+        public const int SelBarW = 2;
 
         /// <summary>字を高さ h の箱の上下の真ん中に置く下げ幅 (cell = 字の高さ)。</summary>
         public static int TextDy(int h, int cell) => (h - cell + 1) / 2;
@@ -61,19 +68,19 @@ namespace UI.Game2D
         /// <summary>列の高さ (箱 n 個 + 説明の板 noteH)。</summary>
         public static int ColumnH(int n, int noteH) => n <= 0 ? 0 : n * BoxH + (n - 1) * BoxGap + (noteH > 0 ? BoxGap + noteH : 0);
 
-        /// <summary>列の上端。 列の真ん中を <see cref="ColCenterY"/> に置き、 画面の上下 (<see cref="Margin"/>) にはみ出さないよう寄せる。
+        /// <summary>列の上端。 列の真ん中を <see cref="ColCenterY"/> に置き、 安全域の上下 (<see cref="SafeT"/>・<see cref="SafeB"/>) にはみ出さないよう寄せる。
         /// maxNoteH = どの箱を選んでも足りるよう取る説明の板の高さ (選びかえで列の上端が動かないように)。</summary>
         public static int ColumnTop(int n, int maxNoteH)
         {
             int h = ColumnH(n, maxNoteH);
             int y = ColCenterY - h / 2;
-            if (y + h > ScreenH - Margin) y = ScreenH - Margin - h;
-            if (y < Margin) y = Margin;
+            if (y + h > SafeB) y = SafeB - h;
+            if (y < SafeT) y = SafeT;
             return y;
         }
 
         /// <summary>列が画面に収まるか (上端を寄せても下にはみ出さない)。</summary>
-        public static bool ColumnFits(int n, int maxNoteH) => ColumnTop(n, maxNoteH) + ColumnH(n, maxNoteH) <= ScreenH - Margin;
+        public static bool ColumnFits(int n, int maxNoteH) => ColumnTop(n, maxNoteH) >= SafeT && ColumnTop(n, maxNoteH) + ColumnH(n, maxNoteH) <= SafeB;
 
         /// <summary>札 1 枚の幅。</summary>
         public static int ChipW(EventChoice.CostChip c, Func<char, int> adv) => (c.turns ? HourglassW + HourglassGap : 0) + Width(c.text, adv);

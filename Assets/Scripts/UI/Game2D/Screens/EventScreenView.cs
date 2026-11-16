@@ -20,7 +20,7 @@ namespace UI.Game2D
         //   ① 字の色を明るさ 8 割ほどに落とす (見本の白 240,244,245 → 結末の本文と同じ b4c8ce・白に近い字ほどにじみが広がる)
         //   ② 字の周り 1 dot (8 方向) に地より暗い縁取り (Rim) を打ち、 にじみが字の間を埋めないようにする (<see cref="Text"/>)
         private static readonly Color32 Ink = new Color32(0xb4, 0xc8, 0xce, 255), Rim = new Color32(0x02, 0x05, 0x07, 255), Dim = new Color32(140, 156, 164, 255), Edge = new Color32(70, 84, 96, 255),
-            PlateFill = new Color32(10, 14, 20, 255), SelFill = new Color32(36, 48, 62, 255), ChipCol = new Color32(196, 206, 150, 255),
+            PlateFill = new Color32(10, 14, 20, 255), SelFill = new Color32(52, 70, 90, 255), SelBar = new Color32(216, 228, 232, 255), ChipCol = new Color32(196, 206, 150, 255),
             Warn = new Color32(236, 170, 90, 255), Bad = new Color32(214, 96, 86, 255), Off = new Color32(84, 94, 102, 255), NoBackdrop = new Color32(16, 20, 26, 255);
 
         /// <summary><b>板と箱の濃さ</b> (0〜255・地の色 <see cref="PlateFill"/> を背景の絵へ重ねる割合)。 背景が明るくても字が読める濃さにする
@@ -121,9 +121,12 @@ namespace UI.Game2D
             {
                 var c = choices[i]; bool on = i == sel, hv = i == _hoverBox;
                 var r = new RectInt(x, y, w, EventLayout.BoxH); _boxR.Add(r);
+                // 選んでいる箱 (2026-11-16 の実機: 液晶のにじみで細い明るい縁が弱く見えた): 縁に加えて、 地を一段明るく (SelFill) し、 左端に明るい帯 (SelBarW dot) を付ける。
+                //   払えない箱を選んだ時も見分けられるよう、 番号は明るい字・名前は暗い字より一段明るい字 (Dim) にする
                 Shade(p, r.x, r.y, r.width, r.height, on ? SelFill : PlateFill, on ? Ink : hv ? Dim : Edge);
+                if (on) p.Rect(r.x + 1, r.y + 1, EventLayout.SelBarW, r.height - 2, SelBar);
                 int ty = y + EventLayout.TextDy(EventLayout.BoxH, cell);
-                Text(p, (i + 1).ToString(), x + EventLayout.NumDx, ty, Dim);
+                Text(p, (i + 1).ToString(), x + EventLayout.NumDx, ty, on ? Ink : Dim);
                 // 札 (右寄せ・効果の並びの順)
                 int cx = x + w - EventLayout.ChipR;
                 if (c.chips != null)
@@ -138,7 +141,7 @@ namespace UI.Game2D
                         cx -= EventLayout.ChipGap;
                     }
                 int room = EventLayout.NameRoom(EventLayout.ChipsW(c.chips, Game2DJpFont.Advance));
-                Text(p, Game2DJpFont.Clip(c.name ?? "", room), x + EventLayout.NameDx, ty, c.disabled ? Off : Ink);
+                Text(p, Game2DJpFont.Clip(c.name ?? "", room), x + EventLayout.NameDx, ty, c.disabled ? (on ? Dim : Off) : Ink);
                 y += EventLayout.BoxH + EventLayout.BoxGap;
                 // 選んでいる箱の下の説明 (補足中の見込み・選べない理由)
                 if (on)
@@ -148,7 +151,7 @@ namespace UI.Game2D
                     {
                         int nh = EventLayout.NoteH(nl.Count, LH);
                         Shade(p, x, y, w, nh, PlateFill, Edge);
-                        for (int k = 0; k < nl.Count; k++) Text(p, nl[k], x + EventLayout.Pad, y + EventLayout.NotePadY + k * LH, c.disabled ? Bad : Warn);
+                        for (int k = 0; k < nl.Count; k++) Text(p, nl[k], x + EventLayout.NotePadX, y + EventLayout.NotePadY + k * LH, c.disabled ? Bad : Warn);
                         y += nh + EventLayout.BoxGap;
                     }
                 }
