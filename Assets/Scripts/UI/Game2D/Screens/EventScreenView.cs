@@ -23,10 +23,11 @@ namespace UI.Game2D
             PlateFill = new Color32(10, 14, 20, 255), SelFill = new Color32(52, 70, 90, 255), SelBar = new Color32(216, 228, 232, 255), ChipCol = new Color32(196, 206, 150, 255),
             Warn = new Color32(236, 170, 90, 255), Bad = new Color32(214, 96, 86, 255), Off = new Color32(84, 94, 102, 255), NoBackdrop = new Color32(16, 20, 26, 255);
 
-        /// <summary><b>板と箱の濃さ</b> (0〜255・地の色 <see cref="PlateFill"/> を背景の絵へ重ねる割合)。 背景が明るくても字が読める濃さにする
-        /// (見本は 220 で、 明るい層の絵の上で字が沈む所があった)。 液晶のブルームと自動露出で見え方が変わるので、 実機を見て調整する ── ここ 1 か所で決める。
+        /// <summary><b>板と箱の濃さ</b> (0〜255・地の色 <see cref="PlateFill"/> を背景の絵へ重ねる割合)。 ここ 1 か所で決める。
+        /// <b>140</b> (2026-11-16 作者の決定): 実機で 60 / 100 / 140 / 180 / 236 を撮り比べ、 板越しに背景の絵の形が分かり、 板の輪郭と箱の区切りも残る値を選んだ。
+        /// 字は 1 dot の暗い縁取り (<see cref="Rim"/>) があるので、 明るい背景の上でも 60 まで読めた (旧 236 = ほぼ不透明で、 背景の絵を隠していた)。
         /// 確認中は <see cref="QaPlateAlpha"/> で上書きできる (エディタと開発ビルドだけ)。</summary>
-        public const byte PlateAlpha = 236;
+        public const byte PlateAlpha = 140;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         /// <summary>[確認用] 0 以上なら <see cref="PlateAlpha"/> の代わりに使う (<c>UI.Game2D.Battle.QaBattle.EventPlateAlpha</c> が立てる)。</summary>
         public static int QaPlateAlpha = -1;
