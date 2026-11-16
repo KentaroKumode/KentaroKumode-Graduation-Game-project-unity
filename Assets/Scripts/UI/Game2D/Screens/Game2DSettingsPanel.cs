@@ -64,6 +64,16 @@ namespace UI.Game2D
 
         private GameSettings.Key[] Keys => _page == 0 ? ScreenKeys : SoundKeys;
 
+        /// <summary>ホーム画面の「SETTINGS」から開く (2026-11-16・<see cref="TitleMenuLayout"/>)。 Esc と同じ窓・同じ条件 (<see cref="CanOpenNow"/>・ほかの窓が出ていない)。 開いたら true。</summary>
+        public static bool OpenFromMenu()
+        {
+            var s = _inst;
+            if (s == null || s.modal == null || s.IsShown) return s != null && s.IsShown;
+            if (s.modal.IsOpen || Game2DModal.Active || !CanOpenNow()) return false;
+            s.Open();
+            return true;
+        }
+
         private void Open()
         {
             _page = 0;

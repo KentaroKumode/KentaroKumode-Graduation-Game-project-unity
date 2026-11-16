@@ -3846,6 +3846,15 @@ HP / 物資 / ターン / **充電ゲージ**（10 目盛り LED バー）/ **�
 
 ---
 
+### 18-5b. ホーム画面（タイトルのメニュー・2026-11-16）
+
+ロゴの下に **ENTER THE HOLLOW**（ラン開始）・**SKILL TREE**（整備パネル）・**GALLERY**（図鑑）・**SETTINGS**（設定の窓・Esc と同じ窓）の 4 行。
+配置は作者が見本の案 r を選んだ（`Captures/title_options/variants_day.png`）: 絵の中心の dot の y でロゴ 71・ボタン 158 / 185 / 212 / 239（間隔 27・x は中央）。旧: ロゴ 79・ボタン 175 / 207 / 239（間隔 32・3 行）。
+**シーン（`Game2D.unity`）は触らず**、起動時に `TitleMenuLayout`（`TitleMenuBootstrap` が呼ぶ・値はここの定数 1 か所）が置き直し、GALLERY を複製して SETTINGS を作る。
+SETTINGS の絵は 3 つのボタンの絵の字を切り出して並べた物（`Resources/TitleMenu/settings_day / night.png.bytes`・作り方 `Captures/title_options/work/make_settings.py`・金の字と黒い縁だけ）で、実行時に PPU 32・点の補間の Sprite にする。
+昼夜の差し替え（`TitleDayNight.AddSlot`）と両端の矢印（`MenuHoverCursor.AddItem`）に足す。夜のロゴの絵（`title_night.png` 480×240 px）は昼（120×60 px）の 4 倍の画素で PPU が同じ 8 なので、`TitleDayNight` が昼の絵と同じ大きさになる PPU で作り直して出す。
+メニューの字の絵のにじみ（ブルーム）は 2026-11-16 に消した（作者の指示）。ロゴのにじみは未決（作者の返事待ち）。
+
 ### 18-6. 音（2026-11-15・#327）
 
 **方針**: 画面の中（液晶の中: 地図・戦闘の演出・地図の上の出来事）= **8bit 音源**（`Tools/sfx_gba.py`・`Tools/sfx_chip.py`）。画面の外（筐体の部品: GOLD の入れ物・パネルのボタン・数字ドラム・レーダー・GUI の出し入れ・窓・ダイス）= **実物の音の作り**（`Tools/sfx_analog.py`・採用した録音や生成は `Tools/sfx_real_apply.py`）。作る順は sfx_gba → sfx_chip → sfx_analog → sfx_real_apply（同名を上書きする）。音は `Assets/Resources/Game2DSfx/<名前>.wav`（git の管理外・#325）、鳴らすのは `Game2DSfx.Play("名前")`（同じ音は 30 ms 以内に重ねない）。**名前を組み立てて鳴らす音**（`dice_`・`radar_`・`wx_`・`coin_few_`）の頭の表は `Game2DSfx.ComposedPrefixes` の 1 か所で、sfx_real_apply.py がそれを読んで「コードに名前が無い wav を消す」掃除から外す（#326）。今は鳴らさないが消さない音（`crumble`・`sink`）は sfx_real_apply.py の `KEEP_UNUSED`。

@@ -66,6 +66,16 @@ namespace UI
             SetVisible(false);
         }
 
+        /// <summary>実行時に作った項目を足す (ホーム画面の SETTINGS・<see cref="TitleMenuLayout"/>・2026-11-16)。 有効な間に足したらすぐ購読する。</summary>
+        public void AddItem(SpriteButton b)
+        {
+            if (b == null) return;
+            var list = new System.Collections.Generic.List<SpriteButton>(items ?? new SpriteButton[0]);
+            if (list.Contains(b)) return;
+            list.Add(b); items = list.ToArray();
+            if (isActiveAndEnabled) { b.PointerOverChanged -= OnHover; b.PointerOverChanged += OnHover; }
+        }
+
         private void OnHover(SpriteButton b, bool over)
         {
             if (over)
