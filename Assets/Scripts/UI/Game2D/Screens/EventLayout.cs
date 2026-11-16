@@ -24,10 +24,13 @@ namespace UI.Game2D
         public const int EdgeX = 8;
         public const int SafeL = EdgeX, SafeR = ScreenW - EdgeX, SafeT = LcdSafeArea.T, SafeB = LcdSafeArea.B;
 
-        // ── 本文の板 (左の余白 EdgeX の内側・画面の上下の中央) ──
-        //   2026-11-16 作者の決定: 左下の角に付けると、 液晶の湾曲 (角ほど強い) で板の左の縁が斜めに倒れて見えた。 上下の中央なら縁は上下対称の弓なりで倒れない
+        // ── 本文の板 (左下: 左の余白 EdgeX と下の余白 SafeB に付ける) ──
+        //   経緯 (どれも 2026-11-16): 見本どおり左下 → 作者の決定で上下の中央 (液晶の湾曲 (角ほど強い・旧い合わせ方 f = 0) で板の左の縁が斜めに倒れて見えたため)
+        //   → 作者の決定で左下へ戻した: 背景の絵 22 枚は「主役を上半分に置く」構図で作ってあり、 上下の中央の板が主役の大半を隠した (Captures/event_bg/ingame_sheet.png)。
+        //   液晶の外形を湾曲に合わせた今 (f = 1) は縁の倒れが弱まっている見込みなので、 絵を優先する。
+        //   四隅の楔 (f = 1 で画面の角が背景色になる所) との間: 板の左下の角 (8, 259) は画面の (17.3, 254.0) に見え、 楔の縁 (絵の外形) まで横 7・縦 9.6 dot 空く (k = 0.07)
         public const int PlateW = 278, PlateH = 158;
-        public const int PlateX = SafeL, PlateY = (ScreenH - PlateH) / 2;
+        public const int PlateX = SafeL, PlateY = SafeB - PlateH;
         /// <summary>本文の板と選択肢の列の間。</summary>
         public const int PlateColGap = 4;
         /// <summary>板の内側の左右の余白。</summary>
@@ -54,8 +57,8 @@ namespace UI.Game2D
         public const int ChipGap = 5, NameChipGap = 4;
         /// <summary>砂時計の絵の幅と、 絵と数の間。</summary>
         public const int HourglassW = 7, HourglassGap = 2;
-        /// <summary>列の真ん中を置く高さ (画面の上下の中央・本文の板と同じ理由)。</summary>
-        public const int ColCenterY = ScreenH / 2;
+        /// <summary>列の真ん中を置く高さ (本文の板の上端あたり・板を左下に置いた時と同じ考え方)。</summary>
+        public const int ColCenterY = PlateY + 20;
         /// <summary>説明の板: 行数の上限・内側の余白 (上下・左右)。</summary>
         public const int NoteLines = 2, NotePadY = 3, NotePadX = 6;
         public const int NoteW = ColW - 2 * NotePadX;
