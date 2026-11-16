@@ -73,33 +73,48 @@ namespace UI.Game2D
             Subscribe();
             var ph = gm.CurrentPhase;
             // イベントの画面が出ている間は、 キーも画面が受ける (頁送り・2026-11-13)
-            bool evKeys = ph == GameManager.GamePhase.EventEncounter && _open && _evDef != null && modal.IsOpen && modal.Current == _evDef;
+            bool evKeys = ph == GameManager.GamePhase.EventEncounter && _evPlan != null && Game2DEventScreen.Showing && !modal.IsOpen;
             GameManager.EventKeysByScreen = evKeys;
             if (evKeys && !Game2DLoadingScreen.Blocking) EventKeys(gm);
             if (ph != _shown) { _shown = ph; _dirty = true; _shopSell = false; _shopSupply = false; _robArmed = false; _sellPage = 0; _restFaces = false; _shopTerm = false; _termPick = TermPick.None; _termDeckPage = 0; if (ph != GameManager.GamePhase.EventEncounter) _eventResult = null; if (ph == GameManager.GamePhase.GateRitual) System.Array.Clear(_gateOffer, 0, 3); }
             // 画面の外で所持金・HP が変わった時も描き直す (買える品の明暗・副題の数字)
             int coins = gm.Run != null ? gm.Run.coins : 0, hp = gm.Run != null ? gm.Run.playerHP : 0;
-            if (coins != _lastCoins || hp != _lastHp) { _lastCoins = coins; _lastHp = hp; if (_open) _dirty = true; }
+            if (coins != _lastCoins || hp != _lastHp) { _lastCoins = coins; _lastHp = hp; if (_open || Game2DEventScreen.Showing) _dirty = true; }
             int pend = gm.PendingStartingPassiveChoices.Count + gm.PendingEventPassiveOffers.Count * 100000000 + gm.PendingChallengeTiers.Count * 100 + (gm.Run != null ? gm.Run.pendingWeaponIds.Count * 10000 + gm.Run.pendingTerminalOffer.Count * 1000000 : 0);
             if (pend != _lastPending) { _lastPending = pend; _dirty = true; }
             // イベントが替わった (同じフェーズのまま・QA の口 QaBattle.ShowEvent で続けて出した時など) も描き直す
             var evNow = ph == GameManager.GamePhase.EventEncounter && EventEncounter.Instance != null ? EventEncounter.Instance.Current : null;
             if (evNow != _evSeen || (evNow != null && gm.EventChoiceResolved != _evSeenResolved)) { _evSeen = evNow; _evSeenResolved = gm.EventChoiceResolved; _dirty = true; }
+            // 作り直しの依頼 (RequestRebuild・QA の口が同じイベント・同じフェーズのまま層や所持金を替えて出し直した時): 最初の頁から作り直す
+            if (_rebuildSeen != _rebuildSerial) { _rebuildSeen = _rebuildSerial; _evKey = null; _evSelFor = null; _dirty = true; }
             // エンディングの画面 (#328) の間は窓を出さない。 同じフレームで先に開いていたら閉じて、 読み終わってから作り直す
-            if (Game2DEndingScreen.Blocking) { if (_open) { CloseIfOpen(); _dirty = true; } return; }
+            if (Game2DEndingScreen.Blocking) { if (_open || Game2DEventScreen.Showing) { CloseIfOpen(); _dirty = true; } return; }
             if (_endingSerial != Game2DEndingScreen.ClosedSerial) { _endingSerial = Game2DEndingScreen.ClosedSerial; _dirty = true; }      // 読み終わった: 今のフェーズの窓 (踏破) を必ず作り直す
             if (!_dirty) return;
             // ロード画面の間は出さない (終わってから出す・_dirty は残す)。 開いている窓も閉じる ──
             //   「層を抜けた」の窓は押した直後にロード画面が始まるので、 閉じないとロード画面の上に残り続けていた (2026-11-11)
             if (Game2DLoadingScreen.Blocking) { CloseIfOpen(); return; }
             _dirty = false;
+            _evBuilt = false;
             var def = Build(gm, ph);
+            // イベントの画面は液晶の中身として描く (Game2DEventScreen・2026-11-16): 窓は閉じて、 液晶の板に出す
+            if (_evBuilt)
+            {
+                if (_open) { modal.Close(); _open = false; }
+                if (!Game2DEventScreen.Show(_evView)) Debug.LogWarning("[Game2DPhaseScreens] イベントの画面を液晶に出せない (地図の板が無い)");
+                return;
+            }
+            Game2DEventScreen.Hide();
             if (def == null) { CloseIfOpen(); return; }
             if (_open) modal.Replace(def); else modal.Open(def);
             _open = true;
         }
 
-        private void CloseIfOpen() { if (_open) { modal.Close(); _open = false; } }
+        private void CloseIfOpen() { if (_open) { modal.Close(); _open = false; } Game2DEventScreen.Hide(); }
+
+        /// <summary>今の場面の画面を、 最初の頁から作り直させる (同じフェーズ・同じイベントのまま中身を替えた時・QA の口 QaBattle.ShowEvent が呼ぶ)。</summary>
+        public static void RequestRebuild() => _rebuildSerial++;
+        private static int _rebuildSerial; private int _rebuildSeen;
         private int _endingSerial;
 
         /// <summary>操作の後に作り直す (フェーズが変わらない操作 ── 買った・振り直した など)。</summary>
@@ -697,28 +712,27 @@ namespace UI.Game2D
         //   頁の位置は画面だけが持つ (進行・セーブには入れない)。 導入 / 結果 / 別のイベントに替わったら最初の頁へ戻る。
         //   _evEpoch は選んだ回数 (OnEventResolved) ── ランダムイベントの振り直しで同じイベントに戻っても最初の頁から出す。
         // 2026-11-16: 窓 1 枚から全画面の配置 (背景の絵・左下に本文の板・右に選択肢の列) へ (EventScreenView・EventLayout・作者が見本で承認)。
+        //   絵は窓 (GUI の層) でなく液晶の中身として写す (Game2DEventScreen・液晶の効果を戦闘・結末とそろえる)。 Event() は窓の中身を返さず (null)、 _evBuilt を立てる。
         //   選択肢の箱を押すと選ぶだけ・確定は操作の行の [選ぶ] か数字のキー (今までの「行を選んでから [選ぶ]」と同じ・誤って即決しない)。
-        private int _evPage, _evEpoch; private string _evKey; private EventPaging.Plan _evPlan; private bool _evResolved; private ScreenDef _evDef;
+        private int _evPage, _evEpoch; private string _evKey; private EventPaging.Plan _evPlan; private bool _evResolved; private bool _evBuilt;
         private readonly EventScreenView _evView = new EventScreenView(); private string _evSelFor; private EventDefinition _evSeen; private bool _evSeenResolved;
 
         private ScreenDef Event(GameManager gm)
         {
             var ev = EventEncounter.Instance != null ? EventEncounter.Instance.Current : null;
             var run = gm.Run;
-            var d = New(ev != null ? ev.name : "イベント", null, Game2DLayout.Width);
-            d.full = true; d.canvas = _evView;
             bool resolved = gm.EventChoiceResolved;
             string text = resolved ? (string.IsNullOrEmpty(_eventResult) ? "……" : _eventResult) : ev?.flavor;
             var plan = resolved ? EventPaging.Result(text, Game2DJpFont.Advance) : EventPaging.Intro(text, Game2DJpFont.Advance);
             string key = (resolved ? "r:" : "i:") + _evEpoch + ":" + (ev != null ? ev.name : "") + ":" + text;
             bool fresh = key != _evKey;
             if (fresh) { _evKey = key; _evPage = 0; }
-            _evPage = plan.Clamp(_evPage); _evPlan = plan; _evResolved = resolved; _evDef = d;
+            _evPage = plan.Clamp(_evPage); _evPlan = plan; _evResolved = resolved; _evBuilt = true;
             bool last = plan.IsLast(_evPage);
 
             var v = _evView;
             v.backdrop = EventScreenView.BackdropName(ev);
-            v.title = d.title; v.pageMark = plan.Mark(_evPage); v.lines = plan.Lines(_evPage);
+            v.title = ev != null ? ev.name : "イベント"; v.pageMark = plan.Mark(_evPage); v.lines = plan.Lines(_evPage);
             v.buttons.Clear(); v.choices = null;
             if (_evPage > 0) v.buttons.Add(new EventScreenView.Btn { label = "前へ", action = "prev" });
             if (!last) { v.buttons.Add(new EventScreenView.Btn { label = "次へ", action = "page", primary = true }); v.hint = "Space 次へ"; }
@@ -756,7 +770,7 @@ namespace UI.Game2D
                 }
                 Refresh();
             };
-            return d;
+            return null;      // 窓は使わない (Update が _evBuilt を見て液晶の板に出す)
         }
 
         /// <summary>頁を 1 つ送る・戻す (画面の中だけ)。</summary>

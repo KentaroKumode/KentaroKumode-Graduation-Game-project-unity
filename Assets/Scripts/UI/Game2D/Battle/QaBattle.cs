@@ -328,8 +328,17 @@ namespace UI.Game2D.Battle
             EventSystem.EventEncounter.QaCatchEta = eta;
             bool ok = gm.QaStartEvent(eventName);
             Game2DLoadingScreen.QaDismiss();
+            UI.Game2D.Game2DPhaseScreens.RequestRebuild();      // 同じフェーズ・同じイベントのまま層や所持金を替えて出し直した時も、 最初の頁から描き直す
             Debug.Log($"[QaBattle] イベント {eventName} / 層 {run.currentFloor} (背景 {UI.Game2D.EventScreenView.BackdropName(null)}) / 所持金 {run.coins} / 見込み {eta} → {(ok ? "開始" : "失敗")}");
             return ok;
+        }
+
+        /// <summary>イベントの画面の板と箱の濃さを試しに替える (0〜255・-1 で定数 EventScreenView.PlateAlpha に戻す)。 液晶のブルーム・自動露出の上での見え方を見る用。
+        /// 決めた値は EventScreenView.PlateAlpha に書く。 例: <c>UI.Game2D.Battle.QaBattle.EventPlateAlpha(245)</c></summary>
+        public static void EventPlateAlpha(int a)
+        {
+            UI.Game2D.EventScreenView.QaPlateAlpha = a;
+            UI.Game2D.Game2DPhaseScreens.RequestRebuild();
         }
 
         /// <summary>イベントの名前の一覧 (定義ファイルの順・「、」区切り)。 例: <c>UI.Game2D.Battle.QaBattle.EventNames()</c></summary>

@@ -82,9 +82,6 @@ namespace UI.Game2D
         public int segW = 34;
         /// <summary>中身を自分で描く部品 (jp・2026-11-13)。 置くと行 (Items) の代わりにこれが描く。 h は呼ぶ側が決める (自動の高さは行を数えるので)。</summary>
         public IModalCanvas canvas;
-        /// <summary>全画面の中身 (2026-11-16・イベントの画面 <see cref="EventScreenView"/>)。 true だと窓の枠・題・行・ボタン・足元を描かず、
-        /// <see cref="canvas"/> が 480×270 の格子をまるごと描く (左上 0,0・下から入る動きは無い・閉じたらすぐ消える)。 ボタンは canvas が持つ。</summary>
-        public bool full;
     }
 
     /// <summary>
@@ -118,7 +115,8 @@ namespace UI.Game2D
 #endif
 
         /// <summary>窓が出ている (閉じる途中も含む) か、 手引きの板 (<see cref="Game2DTutorial"/>) が出ている間 true。 後ろの画面 (地図・戦闘・帯) はこれを見て手を止める。</summary>
-        public static bool Active { get => _active || Game2DTutorial.Blocking; private set => _active = value; }
+        /// <remarks>イベントの画面 (<see cref="Game2DEventScreen"/>・2026-11-16〜 液晶の中身として描く) を出している間も true (窓で出していた時と同じく後ろを止める)。</remarks>
+        public static bool Active { get => _active || Game2DTutorial.Blocking || Game2DEventScreen.Showing; private set => _active = value; }
         private static bool _active;
         /// <summary>窓だけが出ているか (手引きの板を数えない・手引きが「窓が出ていない時」を見分けるのに使う)。</summary>
         public static bool WindowActive => _active;
@@ -153,25 +151,23 @@ namespace UI.Game2D
         public void Open(ScreenDef def)
         {
             if (def == null || _rt == null) return;
-            if (def.full) { def.w = Game2DLayout.Width; def.h = Game2DLayout.Height; }
             if (def.h <= 0) def.h = AutoHeight(def);
             _def = def; _sel = Mathf.Clamp(def.sel0, 0, Mathf.Max(0, def.Items.Count - 1)); _hoverRow = _hoverTab = _hoverBtn = -1; _toast = ""; _open = true; Active = true; _dirty = true;
             if (_img == null) _img = _rt.GetComponent<RawImage>();
             _tex = Resize(_tex, def.w, def.h); _img.texture = _tex; _img.enabled = true; _rt.sizeDelta = new Vector2(def.w, def.h);
             _px = (Game2DLayout.Width - def.w) / 2; _py = (Game2DLayout.Height - def.h) / 2;
-            if (def.full) _sp.Set(1f); else { _sp.Set(0); _sp.Go(1f, 0f); }
+            _sp.Set(0); _sp.Go(1f, 0f);
             Game2DSfx.Play("ui_open");
         }
 
-        public void Close() { if (_open) Game2DSfx.Play("ui_close"); _open = false; if (_def != null && _def.full) _sp.Set(0f); else _sp.Go(0f, 0f); }
+        public void Close() { if (_open) Game2DSfx.Play("ui_close"); _open = false; _sp.Go(0f, 0f); }
 
         public void Open(string id) => Open(Game2DScreens.Make(id));
 
         /// <summary>開いている窓の中身だけを差し替える (入りの動きをやり直さない・選んでいる行は範囲内なら残す)。 開いていなければ開く。</summary>
         public void Replace(ScreenDef def)
         {
-            if (def != null && def.full) { def.w = Game2DLayout.Width; def.h = Game2DLayout.Height; }
-            if (!_open || _def == null || def == null || def.w != _def.w || def.full != _def.full) { Open(def); return; }
+            if (!_open || _def == null || def == null || def.w != _def.w) { Open(def); return; }
             if (def.h <= 0) def.h = AutoHeight(def);
             int keepSel = _sel; string keepToast = _toast; float keepT = _toastT;
             _def = def; _tex = Resize(_tex, def.w, def.h); _img.texture = _tex; _rt.sizeDelta = new Vector2(def.w, def.h);
@@ -548,13 +544,6 @@ namespace UI.Game2D
             _glintOn = false;   // 描くたびに数え直す (伝説の枠を描いたら立つ)
             var d = _def; var p = new KitPix(d.w, d.h); _lastPix = p;
             _rowR.Clear(); _tabR.Clear(); _btnR.Clear(); _barR.Clear(); _segR.Clear();
-            if (d.full)          // 全画面の中身 (イベントの画面): 枠・題・行・ボタンは描かず、 canvas に全部を任せる
-            {
-                if (d.canvas != null && d.canvas.Draw(p, new RectInt(0, 0, d.w, d.h), _glintTick)) _glintOn = true;
-                d.canvas?.DrawOverlay(p);
-                p.Apply(_tex);
-                return;
-            }
             p.NineSlice(Game2DKit.Frame, FrameB, Game2DKit.Well);
             int x0 = Inset, y = Inset - 4, iw = d.w - 2 * Inset, LH = Game2DJpFont.LineH, RH = RowHOf(d), RG = GapOf(d);
             // 題 (と、 その右に小さく副題)

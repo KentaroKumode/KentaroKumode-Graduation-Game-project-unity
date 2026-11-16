@@ -164,5 +164,19 @@ namespace UI.Game2D
             dot = new Vector2((mp.x - Screen.width / 2f) / ppd + Game2DLayout.Width / 2f, Game2DLayout.Height / 2f - (mp.y - Screen.height / 2f) / ppd);
             return dot.x >= 0 && dot.y >= 0 && dot.x <= Game2DLayout.Width && dot.y <= Game2DLayout.Height;
         }
+
+        /// <summary>GUI の格子の dot → 液晶の絵 (480×270) の dot (2026-11-16・イベントの画面)。 液晶は樽型に湾曲している (Game2D/LcdScreen の _Curve) ので、
+        /// 見えている点が絵のどこを映しているかをシェーダと同じ式「元 = 中心 × (1 + k·r²) / (1 + 2k)」で求める
+        /// (Game2DMapView.ScreenToMapDot・Game2DBattleLcd.LcdDot と同じ式)。 lcdQuad = 液晶の Quad (<see cref="Game2DScreen.lcdQuad"/>)。</summary>
+        public static Vector2 LcdDot(Transform lcdQuad, Vector2 d)
+        {
+            float k = 0f;
+            if (lcdQuad != null) { var mr = lcdQuad.GetComponent<MeshRenderer>(); if (mr != null && mr.sharedMaterial != null && mr.sharedMaterial.HasProperty("_Curve")) k = mr.sharedMaterial.GetFloat("_Curve"); }
+            if (k <= 0f) return d;
+            const float W = Game2DLayout.Width, H = Game2DLayout.Height;
+            float cx = d.x / W * 2f - 1f, cy = (1f - d.y / H) * 2f - 1f;
+            float f = (1f + k * (cx * cx + cy * cy)) / (1f + 2f * k);
+            return new Vector2((cx * f * 0.5f + 0.5f) * W, (1f - (cy * f * 0.5f + 0.5f)) * H);
+        }
     }
 }
