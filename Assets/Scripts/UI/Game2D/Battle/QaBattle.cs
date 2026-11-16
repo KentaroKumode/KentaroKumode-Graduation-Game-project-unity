@@ -391,13 +391,14 @@ namespace UI.Game2D.Battle
         }
 
         /// <summary>走査線の試しの形 (2026-11-16・作者「走査線で文章が読みづらい」の改善案の見比べ用・保存しない)。 液晶のシェーダのグローバル <c>_Game2DScanMode</c>。
-        /// 0 = 今のまま (既定) / 1 = 縞を dot の行の半分の細かさに (どの dot の行も同じ明るさ) / 2 = 明るい所 (字) ほど走査線を弱める / 3 = GUI の覆っている所だけ弱める。
-        /// 走査線の濃さそのものは設定の「走査線」(0 で切)。 例: <c>UI.Game2D.Battle.QaBattle.ScanMode(1)</c></summary>
+        /// <b>ビットの組 (0〜7・2026-11-17・重ねて見比べる)</b>: 1 = 縞を dot の行の半分の細かさに (どの dot の行も同じ明るさ) / 2 = 明るい所 (字) ほど走査線を弱める /
+        /// 4 = GUI の覆っている所だけ弱める。 2 と 4 を重ねると弱め方は掛け合わせ。 0 = 今のまま (既定)。
+        /// 例: 3 = 1+2・6 = 2+4・7 = 1+2+4。 走査線の濃さそのものは設定の「走査線」(0 で切)。 例: <c>UI.Game2D.Battle.QaBattle.ScanMode(3)</c></summary>
         public static string ScanMode(int mode)
         {
-            mode = Mathf.Clamp(mode, 0, 3);
+            mode = Mathf.Clamp(mode, 0, 7);
             Shader.SetGlobalFloat("_Game2DScanMode", mode);
-            return "scanMode=" + mode;
+            return "scanMode=" + mode + " (" + (mode == 0 ? "今のまま" : ((mode & 1) != 0 ? "1 半ドットの縞 " : "") + ((mode & 2) != 0 ? "2 明るい所を弱める " : "") + ((mode & 4) != 0 ? "4 GUI の所を弱める" : "")).TrimEnd() + ")";
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]

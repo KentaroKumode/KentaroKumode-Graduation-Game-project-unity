@@ -3802,7 +3802,7 @@ OfferPassives / TradePassive / ForgeWeapon / NextShopDiscount / NextRestBonus /
 「行間」（0〜3 dot）・「字間」（0〜2 dot）を足した（`GameSettings.Key.LineGap` / `CharGap`・PlayerPrefs に保存）。液晶のドット字の行送り（`Game2DJpFont.LineH`）と字の送り（`Advance`・`Draw`）に足すので、
 幅と行数を `Game2DJpFont` から数える所（折り返し・イベントの頁割り・窓の高さ・結末の頁・持ち物の升目・手引き・読み込みの一言）は全部一緒に割り直す。
 検算（`Tools/event_page_check`・`Tools/inventory_check`）は標準と最大（行間 +3・字間 +2）の 2 回回す。湾曲 0 でも式は破綻しない（分母 1・外形は画面の縁そのもの）。
-**走査線の改善案の見比べ**: `QaBattle.ScanMode(0〜3)`（0 = 今・1 = 縞を dot の行の半分の細かさに・2 = 明るい所ほど弱める・3 = GUI の覆う所だけ弱める）。入れるかは作者が選ぶ。
+**走査線の改善案の見比べ**: `QaBattle.ScanMode(0〜7)`（ビットの組・2026-11-17〜 重ねられる: 0 = 今・1 = 縞を dot の行の半分の細かさに・2 = 明るい所ほど弱める・4 = GUI の覆う所だけ弱める。例 3 = 1+2・6 = 2+4・7 = 1+2+4。2 と 4 の弱め方は掛け合わせ）。入れるかは作者が選ぶ。
 
 **GUI も液晶の中身として合成する**（2026-11-16・作者の決定「外の部品はもう無い」）: GUI（計器盤・帯・窓・手引き）は専用のカメラで 960×540 の RT（中身の RT と同じ格子・1 dot = 2 画素）へ描き、
 `Game2DGuiRt` がグローバル `_Game2DGuiTex` で `Game2D/LcdScreen` に渡す。液晶のシェーダが**湾曲した後の同じ座標**で中身に重ね（`GuiOver`）、そのあと色収差・残像・横線ノイズ・走査線・ブルーム・露出・粒を全部掛ける。

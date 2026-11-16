@@ -60,9 +60,9 @@ Shader "Game2D/LcdScreen"
             // GUI (2026-11-16・Game2DGuiRt がグローバルで入れる)
             sampler2D _Game2DGuiTex;
             float _Game2DGuiOn, _Game2DGuiFxOn, _Game2DGuiFxDark, _Game2DGuiFxRed;
-            // 走査線の試しの形 (2026-11-16・作者「走査線で文章が読みづらい」・QaBattle.ScanMode が入れるグローバル)。 0 = 今のまま (既定)
+            // 走査線の試しの形 (2026-11-16・作者「走査線で文章が読みづらい」・QaBattle.ScanMode が入れるグローバル)。 <b>ビットの組</b> (2026-11-17・重ねて見比べるため)。 0 = 今のまま (既定)
             //   1 = 縞を dot の行の半分の細かさにして、 どの dot の行も同じ明るさ (下半分が暗い) にする / 2 = 明るい所 (字・明るい線) ほど走査線を弱める /
-            //   3 = GUI (計器盤・帯・窓・手引き) の覆っている所だけ走査線を弱める
+            //   4 = GUI (計器盤・帯・窓・手引き) の覆っている所だけ走査線を弱める。 例 3 = 1+2・6 = 2+4・7 = 1+2+4
             float _Game2DScanMode;
             float4 _Game2DGuiFxWhite, _Game2DGuiFxShake;
 
@@ -154,15 +154,21 @@ Shader "Game2D/LcdScreen"
 
                 // ── 走査線 (横): 絵の 1 ドット行ごとに 明・暗 を交互に並べる (暗線の太さ = 絵の 1 ドット)。 湾曲した後の座標で数えるので、 絵の行と一緒に曲がる。
                 //   行の境目だけ、 画面の 1 画素の幅でなめらかにする (ドットが画面の 1 画素に近い小さい窓では、 そこから先は線を弱めてちらつきを防ぐ)
-                int scanMode = (int)round(_Game2DScanMode);
-                float v = panelUv.y * _ScanRows * (scanMode == 1 ? 2.0 : 1.0);      // 絵のドット行の番号 (小数)。 形 1 は 1 dot の行を明・暗の 2 本に割る
+                // 形のビット (整数の演算を使わず float で取り出す ── どの描き方でも同じに読めるように)
+                float scanBits = round(_Game2DScanMode);
+                float scanHalf = fmod(scanBits, 2.0);                               // 1: 半ドットの縞
+                float scanBright = fmod(floor(scanBits / 2.0), 2.0);                // 2: 明るい所ほど弱める
+                float scanGui = fmod(floor(scanBits / 4.0), 2.0);                   // 4: GUI の覆う所だけ弱める
+                float v = panelUv.y * _ScanRows * (scanHalf > 0.5 ? 2.0 : 1.0);      // 絵のドット行の番号 (小数)。 形 1 は 1 dot の行を明・暗の 2 本に割る
                 float fw = max(fwidth(v), 1e-5);
                 float rowDark = fmod(floor(v), 2.0);                               // この行が暗 (1) か 明 (0) か
                 float e = min(frac(v), 1.0 - frac(v));                              // 行の境目までの距離
                 float dark = lerp(rowDark, 1.0 - rowDark, 0.5 * saturate(1.0 - e / (0.5 * fw)));
                 float scan = _Scan * saturate((1.0 - fw) / 0.5);
-                if (scanMode == 2) scan *= 1.0 - 0.75 * smoothstep(0.30, 0.80, dot(col, float3(0.299, 0.587, 0.114)));      // 明るい所ほど弱める (字の画が縞で切れない)
-                if (scanMode == 3 && _Game2DGuiOn > 0.5) scan *= 1.0 - 0.85 * sqrt(saturate(tex2D(_Game2DGuiTex, panelUv).a));      // GUI の覆っている所だけ弱める
+                //   2 と 4 は掛け合わせる (両方の条件で弱まる)。 足し合わせ (弱め方の大きい方を取る) にしなかったのは、 GUI の暗い板 (明るさでは弱まらない) と
+                //   液晶の中の明るい字 (GUI ではない) を、 それぞれ片方の条件だけでも弱められるようにするため。 両方当たる所 (GUI の明るい字) は最も弱くなる
+                if (scanBright > 0.5) scan *= 1.0 - 0.75 * smoothstep(0.30, 0.80, dot(col, float3(0.299, 0.587, 0.114)));      // 明るい所ほど弱める (字の画が縞で切れない)
+                if (scanGui > 0.5 && _Game2DGuiOn > 0.5) scan *= 1.0 - 0.85 * sqrt(saturate(tex2D(_Game2DGuiTex, panelUv).a));      // GUI の覆っている所だけ弱める
                 col *= (1.0 - scan * dark) / (1.0 - scan * 0.5);                    // 暗い行は半分 = 平均の暗さ (濃さ / 2) を割って、 画面全体の明るさは変えない
 
                 // ── 発光のにじみ (ブルーム): 明るい画素のまわりへ光が漏れる。 走査線の暗い帯にも回り込む = 画素が自ら光っている見え方なので、 走査線の後に足す。
