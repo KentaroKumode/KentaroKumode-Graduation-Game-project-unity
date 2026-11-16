@@ -50,6 +50,13 @@ namespace UI.Game2D
         /// シェーダの既定も 1 だが、 アセットの材質 (git 管理外) が試作の頃の 0 を持っていても既定になるよう、 実行時の複製へここで入れる。 置き場はこの 1 か所。
         /// 見比べは QA の口 <c>QaBattle.LcdCurveFit(0)</c> (設定を変えるとここの値へ戻る)。</summary>
         public const float CurveFit = 1f;
+
+        /// <summary>走査線の形 (Game2D/LcdScreen のグローバル <c>_Game2DScanMode</c>・ビットの組: 1 = 半ドットの縞 / 2 = 明るい所ほど弱める / 4 = GUI の所を弱める)。
+        /// <b>既定 3 = 1+2</b> (2026-11-17・作者の決定: Full HD の実機で、 字の行ごとの明るさのばらつきが 15.9 → 7.4 に減った)。 4 は GUI の窓の場面で後で見比べる。
+        /// 置き場はこの 1 か所。 見比べは QA の口 <c>QaBattle.ScanMode(n)</c> (設定を変えるとここの値へ戻る)。 縞の濃さは設定の「走査線」(0 なら形に関係なく縞は出ない)。
+        /// 描くだけの値なので、 バッチ (画面なし)・BOT の測定には関わらない (この部品はバッチでは作らない)。</summary>
+        public const int ScanMode = 3;
+        private static readonly int ScanModeId = Shader.PropertyToID("_Game2DScanMode");
         private static readonly int CurveFitId = Shader.PropertyToID("_CurveFit");
 
         private static readonly int ScanId = Shader.PropertyToID("_Scan"), CurveId = Shader.PropertyToID("_Curve"), ChromaId = Shader.PropertyToID("_Chroma"),
@@ -122,6 +129,7 @@ namespace UI.Game2D
 
         private void Apply()
         {
+            Shader.SetGlobalFloat(ScanModeId, ScanMode);      // 走査線の形の既定 (グローバル・液晶の材質が見つかる前から効く)
             AudioListener.volume = GameSettings.Master01;
             Game2DSfx.Volume = GameSettings.Se01;
             if (_lcdMat != null)

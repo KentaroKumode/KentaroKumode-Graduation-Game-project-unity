@@ -392,7 +392,8 @@ namespace UI.Game2D.Battle
 
         /// <summary>走査線の試しの形 (2026-11-16・作者「走査線で文章が読みづらい」の改善案の見比べ用・保存しない)。 液晶のシェーダのグローバル <c>_Game2DScanMode</c>。
         /// <b>ビットの組 (0〜7・2026-11-17・重ねて見比べる)</b>: 1 = 縞を dot の行の半分の細かさに (どの dot の行も同じ明るさ) / 2 = 明るい所 (字) ほど走査線を弱める /
-        /// 4 = GUI の覆っている所だけ弱める。 2 と 4 を重ねると弱め方は掛け合わせ。 0 = 今のまま (既定)。
+        /// 4 = GUI の覆っている所だけ弱める。 2 と 4 を重ねると弱め方は掛け合わせ。 0 = 旧い縞 (形なし)。
+        /// 既定は 3 = 1+2 (2026-11-17・作者の決定・本体の <see cref="Game2DSettingsApply.ScanMode"/> が起動時と設定の変更時に入れる)。 ここで替えた値は設定を変えると既定へ戻る。
         /// 例: 3 = 1+2・6 = 2+4・7 = 1+2+4。 走査線の濃さそのものは設定の「走査線」(0 で切)。 例: <c>UI.Game2D.Battle.QaBattle.ScanMode(3)</c></summary>
         public static string ScanMode(int mode)
         {
@@ -400,9 +401,6 @@ namespace UI.Game2D.Battle
             Shader.SetGlobalFloat("_Game2DScanMode", mode);
             return "scanMode=" + mode + " (" + (mode == 0 ? "今のまま" : ((mode & 1) != 0 ? "1 半ドットの縞 " : "") + ((mode & 2) != 0 ? "2 明るい所を弱める " : "") + ((mode & 4) != 0 ? "4 GUI の所を弱める" : "")).TrimEnd() + ")";
         }
-
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetScanMode() => Shader.SetGlobalFloat("_Game2DScanMode", 0f);
 
         /// <summary>今の湾曲 (「curve=0.070 fit=0.00」)。</summary>
         public static string LcdCurveNow() { var m = LcdMat(); return m == null ? "(液晶の材質が無い)" : $"curve={m.GetFloat("_Curve"):0.000} fit={m.GetFloat("_CurveFit"):0.00}"; }

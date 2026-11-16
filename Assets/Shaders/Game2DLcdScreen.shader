@@ -60,7 +60,8 @@ Shader "Game2D/LcdScreen"
             // GUI (2026-11-16・Game2DGuiRt がグローバルで入れる)
             sampler2D _Game2DGuiTex;
             float _Game2DGuiOn, _Game2DGuiFxOn, _Game2DGuiFxDark, _Game2DGuiFxRed;
-            // 走査線の試しの形 (2026-11-16・作者「走査線で文章が読みづらい」・QaBattle.ScanMode が入れるグローバル)。 <b>ビットの組</b> (2026-11-17・重ねて見比べるため)。 0 = 今のまま (既定)
+            // 走査線の形 (2026-11-16・作者「走査線で文章が読みづらい」・グローバル)。 <b>ビットの組</b> (2026-11-17・重ねて見比べるため)。 0 = 旧い縞 (形なし)。
+            //   既定は 3 = 1+2 (2026-11-17・作者の決定・Full HD の実機で字の行ごとの明るさのばらつき 15.9 → 7.4)。 入れるのは Game2DSettingsApply.ScanMode (見比べは QaBattle.ScanMode)
             //   1 = 縞を dot の行の半分の細かさにして、 どの dot の行も同じ明るさ (下半分が暗い) にする / 2 = 明るい所 (字・明るい線) ほど走査線を弱める /
             //   4 = GUI (計器盤・帯・窓・手引き) の覆っている所だけ走査線を弱める。 例 3 = 1+2・6 = 2+4・7 = 1+2+4
             float _Game2DScanMode;
