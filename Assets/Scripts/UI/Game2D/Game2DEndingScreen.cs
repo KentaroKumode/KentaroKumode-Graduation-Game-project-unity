@@ -32,7 +32,7 @@ namespace UI.Game2D
     ///
     /// <para><b>最後</b>: 最後の頁を読み終えたら、 字だけが消えて、 同じ絵が係数 <see cref="BackdropDim"/> から 1.0 まで <see cref="ArtRise"/> 秒で明るくなる
     /// (板の網目は使わない・係数 0 なら暗い地から絵が明るくなる)。 明るくなりきってから <see cref="NameDelay"/> 秒置いて、 絵の上の<b>画面の中央</b>にエンディング名が浮かぶ
-    /// (2026-11-16・作者の指示): 上に通し番号 (<see cref="NumberFor"/>・「END 5」など・名前の半分の倍率)、 下に名前 (<see cref="Endings"/> の題・<see cref="NameScale"/> 倍・金色)。
+    /// (2026-11-16・作者の指示): 上に通し番号 (<see cref="NumberFor"/>・「END 5」など・名前の半分の倍率)、 下に名前 (<see cref="Endings"/> の題・<see cref="NameScale"/> 倍・色は <see cref="NameColorMode"/>・既定は白)。
     /// 2 段を合わせて上下の中央に置き、 本文の行と同じく 1 段 <see cref="LineReveal"/> 秒で上から浮かぶ。 縁取りは本文と同じ暗い色 (名前は 2 dot・番号は 1 dot)・帯や板は敷かない。
     /// 名前が浮かびきってから <see cref="ArtHold"/> 秒見せ、 網目で閉じる。 クリック・Space・Enter は、 明るくなる途中 → 明るくなりきった所へ / 名前が出きる前 → 名前を出す / 名前が出た後 → 閉じる。
     /// 絵の無い結末 (絵が読めなかった時も) は、 最後の頁の後に暗い地 (Bg) のまま名前だけを出してから閉じる。</para>
@@ -66,9 +66,11 @@ namespace UI.Game2D
         /// 安全域に収める計算 (<see cref="FitNameScale"/>) もこれに従う。</summary>
         public static int NameRim = DefaultNameRim;
         /// <summary>エンディング名の色の決め方 (2026-11-16・作者の指摘「名前の色が微妙」で切り替えられるように):
-        /// 0 = 金色 (既定) / 1 = 本文の字と同じ色 / 2 = その結末の結びの絵でいちばん明るい色 (輝度が最大の画素の色・絵が無ければ 1 と同じ)。
+        /// 0 = 金色 / 1 = 白 (既定・作者の決定・本文の字より一段明るい白 #F0F4F5) / 2 = その結末の結びの絵でいちばん明るい色 (輝度が最大の画素の色・絵が無ければ 1 と同じ)。
         /// 番号 (「END n」) の色は、 0 なら今まで (頁数と同じ色)、 1・2 なら名前の色を 7 割に落とした色。 縁取りの色は 2 (絵がある時) なら絵でいちばん暗い色、 それ以外は本文と同じ暗い色。</summary>
-        public static int NameColorMode;
+        public static int NameColorMode = DefaultNameColorMode;
+        /// <summary><see cref="NameColorMode"/> の初期値 (1 = 白)。</summary>
+        public const int DefaultNameColorMode = 1;
         // 配置 (dot): 液晶の湾曲で端が切れるので、 本文は左右 40・上 26・下 26 の内側
         //   本文の頁に題は出さない (2026-11-16・作者の指示: 「上のエンディング名は、 本文を読んでいる時は要らない」)。 題の場所 (y 26〜63) まで本文を上げ、
         //   1 頁の行数は「本文の上端から頁数の行 (FootY) の手前まで」で決める (前と同じ規則: 64 から 12 行 → 26 から 15 行・どの頁も同じ行数)
@@ -83,6 +85,8 @@ namespace UI.Game2D
         //   ① 字の色を明るさ 8 割ほどに落とす (白に近い字ほどにじみが広がる)  ② 字の周り 1 dot (8 方向) に地より暗い縁取りを打ち、 にじみが字の間を埋めないようにする
         private static readonly Color32 Bg = new Color32(0x07, 0x10, 0x15, 255), Ink = new Color32(0xb4, 0xc8, 0xce, 255),
             Dim = new Color32(0x4d, 0x6a, 0x76, 255), Amber = new Color32(0xd8, 0x9c, 0x48, 255), Rim = new Color32(0x02, 0x05, 0x07, 255);
+        // エンディング名の白 (NameColorMode = 1): 本文の字 (Ink) より一段明るい白。 純白は液晶のにじみで飛ぶのでごく僅かに落とし、 本文の字と同じく僅かに青みへ寄せる
+        private static readonly Color32 NameWhite = new Color32(0xf0, 0xf4, 0xf5, 255);
 
         /// <summary>読み終わって閉じた回数 (場面の窓 Game2DPhaseScreens が見て、 閉じた後に「踏破」の窓を必ず作り直す)。</summary>
         public static int ClosedSerial { get; private set; }
@@ -94,7 +98,7 @@ namespace UI.Game2D
         public static string Track { get; private set; }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetStatics() { _active = false; _endFrame = -1; Track = null; BackdropDim = DefaultBackdropDim; NameScale = DefaultNameScale; NameRim = DefaultNameRim; NameColorMode = 0; }
+        private static void ResetStatics() { _active = false; _endFrame = -1; Track = null; BackdropDim = DefaultBackdropDim; NameScale = DefaultNameScale; NameRim = DefaultNameRim; NameColorMode = DefaultNameColorMode; }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Attach()
@@ -439,7 +443,7 @@ namespace UI.Game2D
         /// <summary>番号の倍率 (名前の半分・最小 1)。</summary>
         private static int NumberScale(int nameScale) => Mathf.Max(1, nameScale / 2);
 
-        /// <summary>エンディング名を画面の中央に描く: 上に通し番号 (名前の半分の倍率・本文の頁数と同じ色)、 下に名前 (<see cref="NameScale"/>・金色)。
+        /// <summary>エンディング名を画面の中央に描く: 上に通し番号 (名前の半分の倍率)、 下に名前 (<see cref="NameScale"/>・色は <see cref="NameColorMode"/>)。
         /// 2 段を合わせて上下の中央に置き、 安全域に収める。 rows = 出す段の数 (本文の行と同じく上から順に浮かぶ・番号が無ければ名前だけの 1 段)。
         /// 縁取り: 名前は <see cref="NameRim"/> dot・番号は 1 dot (NameRim = 0 なら 0)。 色は <see cref="NameColorMode"/> で決める (<see cref="NameColors"/>)。 帯や板は敷かない。</summary>
         private void DrawName(KitPix p, int rows)
@@ -462,7 +466,7 @@ namespace UI.Game2D
             rim = Rim;
             if (m == 0) { name = Amber; no = Dim; return; }
             if (m == 2 && _artPal) { name = _artHi; rim = _artLo; }
-            else name = Ink;                                                                   // 1 (と、 絵の無い結末の 2)
+            else name = NameWhite;                                                             // 1 = 白 (と、 絵の無い結末の 2)
             no = new Color32((byte)(name.r * 7 / 10), (byte)(name.g * 7 / 10), (byte)(name.b * 7 / 10), 255);
         }
 
@@ -572,7 +576,7 @@ namespace UI.Game2D
             if (s != null && _active) s.Draw();
         }
 
-        /// <summary>[確認用・2026-11-16] エンディング名の色の決め方 (<see cref="NameColorMode"/>・0〜2 に丸める: 0 金色 / 1 本文の字の色 / 2 結びの絵でいちばん明るい色) を替え、
+        /// <summary>[確認用・2026-11-16] エンディング名の色の決め方 (<see cref="NameColorMode"/>・0〜2 に丸める: 0 金色 / 1 白 (既定) / 2 結びの絵でいちばん明るい色) を替え、
         /// 出ている所をすぐ描き直す。 例: <c>UI.Game2D.Game2DEndingScreen.QaSetNameColorMode(2)</c>。</summary>
         public static void QaSetNameColorMode(int mode)
         {
@@ -603,9 +607,9 @@ namespace UI.Game2D
             switch (Mathf.Clamp(NameColorMode, 0, 2))
             {
                 case 0: return "金色";
-                case 1: return "本文の字の色";
+                case 1: return "白 #" + ColorUtility.ToHtmlStringRGB(NameWhite);
                 default:
-                    if (!s._artPal) return "絵の明るい色・絵が無いので本文の字の色";
+                    if (!s._artPal) return "絵の明るい色・絵が無いので白";
                     return "絵の明るい色 #" + ColorUtility.ToHtmlStringRGB(s._artHi) + "・縁取り #" + ColorUtility.ToHtmlStringRGB(s._artLo);
             }
         }
