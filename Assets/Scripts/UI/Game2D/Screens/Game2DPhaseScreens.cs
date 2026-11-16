@@ -723,8 +723,8 @@ namespace UI.Game2D
             var run = gm.Run;
             bool resolved = gm.EventChoiceResolved;
             string text = resolved ? (string.IsNullOrEmpty(_eventResult) ? "……" : _eventResult) : ev?.flavor;
-            var plan = resolved ? EventPaging.Result(text, Game2DJpFont.Advance) : EventPaging.Intro(text, Game2DJpFont.Advance);
-            string key = (resolved ? "r:" : "i:") + _evEpoch + ":" + (ev != null ? ev.name : "") + ":" + text;
+            var plan = resolved ? EventPaging.Result(text, Game2DJpFont.Advance, Game2DJpFont.LineH) : EventPaging.Intro(text, Game2DJpFont.Advance, Game2DJpFont.LineH);      // 行間・字間の設定は実行時に読む
+            string key = (resolved ? "r:" : "i:") + Game2DJpFont.LineH + ":" + Game2DJpFont.CharGap + ":" + _evEpoch + ":" + (ev != null ? ev.name : "") + ":" + text;
             bool fresh = key != _evKey;
             if (fresh) { _evKey = key; _evPage = 0; }
             _evPage = plan.Clamp(_evPage); _evPlan = plan; _evResolved = resolved; _evBuilt = true;

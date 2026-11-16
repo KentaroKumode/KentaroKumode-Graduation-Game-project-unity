@@ -58,10 +58,16 @@ def main():
         sys.exit(1)
     with open(os.path.join(out, 'check.runtimeconfig.json'), 'w', encoding='utf-8') as f:
         f.write('{ "runtimeOptions": { "tfm": "netcoreapp3.1", "framework": { "name": "Microsoft.NETCore.App", "version": "3.1.0" } } }\n')
-    r = subprocess.run(['dotnet', os.path.join(out, 'check.dll'), '.'] + sys.argv[1:2], capture_output=True)
-    sys.stdout.buffer.write(r.stdout)
-    sys.stdout.buffer.flush()
-    sys.exit(r.returncode)
+    # 引数 (導入の頁数の一覧の書き出し先) は標準の設定の回だけに渡す。
+    # 設定の行間・字間 (2026-11-16): 標準 (0,0) と最大 (GameSettings.MaxLineGap, MaxCharGap = 3,2) の 2 回回す。 どちらも ALL OK で通る
+    code = 0
+    for gaps, extra in (('0,0', sys.argv[1:2]), ('3,2', [])):
+        env = dict(os.environ, EVPC_GAPS=gaps)
+        r = subprocess.run(['dotnet', os.path.join(out, 'check.dll'), '.'] + extra, capture_output=True, env=env)
+        sys.stdout.buffer.write(r.stdout)
+        sys.stdout.buffer.flush()
+        code = code or r.returncode
+    sys.exit(code)
 
 
 if __name__ == '__main__':

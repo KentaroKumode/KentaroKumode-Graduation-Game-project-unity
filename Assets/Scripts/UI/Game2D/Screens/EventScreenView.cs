@@ -127,7 +127,7 @@ namespace UI.Game2D
             Text(p, Game2DJpFont.Clip(title ?? "", EventLayout.BodyW - (markW > 0 ? markW + 8 : 0)), x0, py + EventLayout.TitleDy, Ink);
             p.Rect(x0, py + EventLayout.RuleDy, EventLayout.BodyW, 1, Edge);
             if (lines != null)
-                for (int i = 0; i < lines.Count && i < EventPaging.TextLines; i++) Text(p, lines[i], x0, py + EventLayout.BodyDy + i * LH, Ink);
+                for (int i = 0; i < lines.Count && i < EventPaging.LinesPerPage(LH); i++) Text(p, lines[i], x0, py + EventLayout.BodyDy + i * LH, Ink);
             // 操作の行: 左に案内・右にボタン
             int oy = EventLayout.OpY, ty = oy + EventLayout.TextDy(EventLayout.OpH, cell);
             _btnR.Clear();

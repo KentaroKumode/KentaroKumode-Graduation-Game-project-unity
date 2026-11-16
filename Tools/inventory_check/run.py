@@ -55,10 +55,14 @@ def main():
         sys.exit(1)
     with open(os.path.join(out, 'check.runtimeconfig.json'), 'w', encoding='utf-8') as f:
         f.write('{ "runtimeOptions": { "tfm": "netcoreapp3.1", "framework": { "name": "Microsoft.NETCore.App", "version": "3.1.0" } } }\n')
-    r = subprocess.run(['dotnet', os.path.join(out, 'check.dll'), '.'], capture_output=True)
-    sys.stdout.buffer.write(r.stdout)
-    sys.stdout.buffer.flush()
-    sys.exit(r.returncode)
+    # 設定の行間・字間 (2026-11-16): 標準 (0,0) と最大 (3,2) の 2 回回す
+    code = 0
+    for gaps in ('0,0', '3,2'):
+        r = subprocess.run(['dotnet', os.path.join(out, 'check.dll'), '.'], capture_output=True, env=dict(os.environ, EVPC_GAPS=gaps))
+        sys.stdout.buffer.write(r.stdout)
+        sys.stdout.buffer.flush()
+        code = code or r.returncode
+    sys.exit(code)
 
 
 if __name__ == '__main__':

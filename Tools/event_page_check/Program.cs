@@ -37,8 +37,13 @@ static class Program
         var map = new Dictionary<int, int>();
         for (int i = 0; i < n && o + 5 + 2 * cell <= b.Length; i++) { map[(int)BitConverter.ToUInt32(b, o)] = b[o + 4]; o += 5 + 2 * cell; }
         Glyphs = map;
-        Adv = ch => map.TryGetValue(ch, out var a) ? a : cell / 2;      // Game2DJpFont.Advance と同じ (無い字は字の高さの半分)
-        LineH = cell + 1;                                                // Game2DJpFont.LineH
+        // 設定の行間・字間 (2026-11-16・GameSettings.LineGap / CharGap): 環境変数 EVPC_GAPS="行間,字間" で与える (run.py が 0,0 と最大の 2 回回す)
+        int lineGap = 0, charGap = 0;
+        var gaps = Environment.GetEnvironmentVariable("EVPC_GAPS");
+        if (!string.IsNullOrEmpty(gaps)) { var sp = gaps.Split(','); lineGap = int.Parse(sp[0]); charGap = int.Parse(sp[1]); }
+        Adv = ch => (map.TryGetValue(ch, out var a) ? a : cell / 2) + charGap;      // Game2DJpFont.Advance と同じ (無い字は字の高さの半分・字間を足す)
+        LineH = cell + 1 + lineGap;                                                  // Game2DJpFont.LineH (行間を足す)
+        Console.WriteLine($"[設定] 行間 +{lineGap}・字間 +{charGap}");
         Console.WriteLine($"ドット字: 字の高さ {cell}・行送り {LineH}・{map.Count} 字・本文の幅 {EventLayout.BodyW} dot (本文の板 {EventLayout.PlateW}×{EventLayout.PlateH})・選択肢の列の幅 {EventLayout.ColW}");
     }
 
@@ -132,7 +137,7 @@ static class Program
         Rules();
 
         // ===== 2. 画面の配置 =====
-        Check(EventLayout.BodyLinesFit(LineH) >= EventPaging.TextLines, $"本文 {EventPaging.TextLines} 行が本文の板に収まる (入る行数 {EventLayout.BodyLinesFit(LineH)})");
+        Check(EventLayout.BodyLinesFit(LineH) >= EventPaging.LinesPerPage(LineH), $"1 頁の本文 {EventPaging.LinesPerPage(LineH)} 行が本文の板に収まる (入る行数 {EventLayout.BodyLinesFit(LineH)}・標準は {EventPaging.TextLines} 行)");
         Check(EventLayout.PlateX >= EventLayout.SafeL && EventLayout.PlateY >= LcdSafeArea.T && EventLayout.PlateY + EventLayout.PlateH <= LcdSafeArea.B
               && EventLayout.PlateX + EventLayout.PlateW <= EventLayout.ColX,
               $"本文の板がイベントの余白 (x {EventLayout.SafeL}〜{EventLayout.SafeR}・y {LcdSafeArea.T}〜{LcdSafeArea.B}・左右は液晶の安全域 {LcdSafeArea.L} より狭いイベントだけの値) に収まり、 選択肢の列と重ならない (板 x {EventLayout.PlateX} y {EventLayout.PlateY} {EventLayout.PlateW}×{EventLayout.PlateH})");
@@ -190,12 +195,12 @@ static class Program
         foreach (var ev in evs)
         {
             var d = ev.def; int k = d.choices.Count;
-            var plan = EventPaging.Intro(d.flavor, Adv);
+            var plan = EventPaging.Intro(d.flavor, Adv, LineH);
             texts++;
             pageCounts.Add(d.name + "\t" + plan.Count);
             if (plan.Count > 1) multi++;
             if (!plan.pages.SelectMany(x => x).SequenceEqual(AllLines(d.flavor))) { cut++; Console.WriteLine($"  NG 切り捨て: 〈{d.name}〉 導入"); }
-            foreach (var pg in plan.pages) if (pg.Count > EventPaging.TextLines) { cut++; Console.WriteLine($"  NG 頁の行数: 〈{d.name}〉 {pg.Count} 行"); }
+            foreach (var pg in plan.pages) if (pg.Count > EventPaging.LinesPerPage(LineH)) { cut++; Console.WriteLine($"  NG 頁の行数: 〈{d.name}〉 {pg.Count} 行"); }
             if (plan.Count > pagesMax) { pagesMax = plan.Count; pagesMaxWhat = $"〈{d.name}〉 導入"; }
             // 題 (頁の位置「9/9」の分を空けて)。 切れても「…」で出る
             int titleRoom = EventLayout.BodyW - (plan.Count > 1 ? EventLayout.Width(plan.Count + "/" + plan.Count, Adv) + 8 : 0);
@@ -226,10 +231,10 @@ static class Program
                 for (int b = 0; b < Math.Max(1, nb); b++)
                 {
                     string text = ResultText(c, nb > 0 ? b : -1);
-                    var rp = EventPaging.Result(text, Adv);
+                    var rp = EventPaging.Result(text, Adv, LineH);
                     texts++;
                     if (!rp.pages.SelectMany(x => x).SequenceEqual(AllLines(text))) { cut++; Console.WriteLine($"  NG 切り捨て: 〈{d.name}〉「{c.text}」 結果"); }
-                    foreach (var pgl in rp.pages) if (pgl.Count > EventPaging.TextLines) { cut++; Console.WriteLine($"  NG 頁の行数: 〈{d.name}〉「{c.text}」 結果"); }
+                    foreach (var pgl in rp.pages) if (pgl.Count > EventPaging.LinesPerPage(LineH)) { cut++; Console.WriteLine($"  NG 頁の行数: 〈{d.name}〉「{c.text}」 結果"); }
                     if (rp.Count > pagesMax) { pagesMax = rp.Count; pagesMaxWhat = $"〈{d.name}〉「{c.text}」 結果"; }
                 }
             }
@@ -238,7 +243,7 @@ static class Program
         Console.WriteLine($"文 {texts} 本 (導入・結果は分岐ごと)・頁の最大 {pagesMax} ({pagesMaxWhat})・導入が 2 頁以上のイベント {multi}");
         foreach (var ev in evs.Where(e => e.def.name.StartsWith("さびれた観測所")))
         {
-            var plan = EventPaging.Intro(ev.def.flavor, Adv);
+            var plan = EventPaging.Intro(ev.def.flavor, Adv, LineH);
             Console.WriteLine($"  〈{ev.def.name}〉 導入 {ev.def.flavor.Length} 字 → {plan.Count} 頁 (行数 {string.Join("・", plan.pages.Select(x => x.Count))})・選択肢 {ev.def.choices.Count}");
         }
         int kMax = evs.Max(e => e.def.choices.Count), noteHMax = EventLayout.NoteH(EventLayout.NoteLines, LineH);
@@ -275,7 +280,7 @@ static class Program
             Check(ghost.Count == 0, $"背景の対応表にあるのに存在しないイベント名 {ghost.Count} 件");
             Check(artBad.Count == 0, $"背景の対応表の絵が無い・480×270 の PNG でない {artBad.Count} 件");
         }
-        Check(cut == 0, $"切り捨てられる文 {cut} 件 (全部の行がどこかの頁に出る・1 頁 {EventPaging.TextLines} 行まで)");
+        Check(cut == 0, $"切り捨てられる文 {cut} 件 (全部の行がどこかの頁に出る・1 頁 {EventPaging.LinesPerPage(LineH)} 行まで)");
         Check(colOver == 0 && EventLayout.ColumnFits(kMax, noteHMax), $"選択肢の列 (箱 + 説明の板) が画面に収まらないもの {colOver} 件");
         Check(noteOver == 0, $"{EventLayout.NoteLines} 行に収まらない説明 (選べない理由・補足中の見込み) {noteOver} 件");
         Console.WriteLine(fails == 0 ? "ALL OK" : $"{fails} 件 NG");

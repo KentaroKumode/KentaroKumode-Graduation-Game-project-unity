@@ -18,8 +18,12 @@ namespace UI.Game2D
     /// </summary>
     public static class EventPaging
     {
-        /// <summary>1 頁の本文の行数。 本文の板に入る行数 (<see cref="EventLayout.BodyLinesFit"/>) 以下であること (検算が見る)。</summary>
+        /// <summary>1 頁の本文の行数の上限 (標準の行送りで本文の板に入る 8 行)。 行間の設定で行送りが伸びた時は、 板に入る行数 (<see cref="EventLayout.BodyLinesFit"/>) まで減らす
+        /// (<see cref="LinesPerPage"/>・2026-11-16)。 文は切り捨てず、 頁が増える。</summary>
         public const int TextLines = 8;
+
+        /// <summary>行送り lineH の時の 1 頁の本文の行数 (<see cref="TextLines"/> と板に入る行数の小さい方・最低 1)。</summary>
+        public static int LinesPerPage(int lineH) => Math.Max(1, Math.Min(TextLines, EventLayout.BodyLinesFit(lineH)));
 
         public sealed class Plan
         {
@@ -34,13 +38,16 @@ namespace UI.Game2D
             public int Clamp(int page) => page < 0 ? 0 : page >= pages.Count ? pages.Count - 1 : page;
         }
 
-        /// <summary>導入の頁割り。</summary>
-        public static Plan Intro(string flavor, Func<char, int> advance) => Split(flavor, advance);
+        /// <summary>導入の頁割り (lineH = 行送り・<see cref="Game2DJpFont.LineH"/>)。</summary>
+        public static Plan Intro(string flavor, Func<char, int> advance, int lineH) => Split(flavor, advance, lineH);
 
         /// <summary>結果 (結果の行と選んだ後の文) の頁割り。</summary>
-        public static Plan Result(string text, Func<char, int> advance) => Split(text, advance);
+        public static Plan Result(string text, Func<char, int> advance, int lineH) => Split(text, advance, lineH);
 
-        private static Plan Split(string text, Func<char, int> advance)
-            => new Plan { pages = JpTextLayout.Pages(text, EventLayout.BodyW, TextLines, TextLines, advance) };
+        private static Plan Split(string text, Func<char, int> advance, int lineH)
+        {
+            int n = LinesPerPage(lineH);
+            return new Plan { pages = JpTextLayout.Pages(text, EventLayout.BodyW, n, n, advance) };
+        }
     }
 }

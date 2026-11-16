@@ -390,6 +390,19 @@ namespace UI.Game2D.Battle
             return "guiInLcd=" + Game2DGuiRt.InLcd;
         }
 
+        /// <summary>走査線の試しの形 (2026-11-16・作者「走査線で文章が読みづらい」の改善案の見比べ用・保存しない)。 液晶のシェーダのグローバル <c>_Game2DScanMode</c>。
+        /// 0 = 今のまま (既定) / 1 = 縞を dot の行の半分の細かさに (どの dot の行も同じ明るさ) / 2 = 明るい所 (字) ほど走査線を弱める / 3 = GUI の覆っている所だけ弱める。
+        /// 走査線の濃さそのものは設定の「走査線」(0 で切)。 例: <c>UI.Game2D.Battle.QaBattle.ScanMode(1)</c></summary>
+        public static string ScanMode(int mode)
+        {
+            mode = Mathf.Clamp(mode, 0, 3);
+            Shader.SetGlobalFloat("_Game2DScanMode", mode);
+            return "scanMode=" + mode;
+        }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetScanMode() => Shader.SetGlobalFloat("_Game2DScanMode", 0f);
+
         /// <summary>今の湾曲 (「curve=0.070 fit=0.00」)。</summary>
         public static string LcdCurveNow() { var m = LcdMat(); return m == null ? "(液晶の材質が無い)" : $"curve={m.GetFloat("_Curve"):0.000} fit={m.GetFloat("_CurveFit"):0.00}"; }
 

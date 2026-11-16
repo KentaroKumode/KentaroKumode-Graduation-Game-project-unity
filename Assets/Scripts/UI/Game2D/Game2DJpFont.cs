@@ -13,8 +13,13 @@ namespace UI.Game2D
     {
         /// <summary>字の高さ (ドット)。 焼いたファイルから読む (読めない時は <see cref="GameFont.DotPx"/>)。</summary>
         public static int Cell { get { var _ = Map; return _cell; } }
-        /// <summary>行送り (字の高さ + 行間 1)。</summary>
-        public static int LineH => Cell + 1;
+        /// <summary>行送り (字の高さ + 行間 1 + 設定の「行間」<see cref="LineGap"/>)。</summary>
+        public static int LineH => Cell + 1 + LineGap;
+        /// <summary>設定の「行間」(dot・0〜<see cref="GameSettings.MaxLineGap"/>・2026-11-16)。 行送りに足す。</summary>
+        public static int LineGap => GameSettings.Get(GameSettings.Key.LineGap);
+        /// <summary>設定の「字間」(dot・0〜<see cref="GameSettings.MaxCharGap"/>・2026-11-16)。 字の送り幅 (<see cref="Advance"/>・<see cref="Draw(System.Action{int, int}, string, int, int)"/>) に足す。
+        /// 幅を数える所 (折り返し <see cref="JpTextLayout"/>・頁割り・窓の寸法) は <see cref="Advance"/> を通すので、 一緒に変わる。</summary>
+        public static int CharGap => GameSettings.Get(GameSettings.Key.CharGap);
 
         private struct Glyph { public byte adv; public ushort[] rows; }
         private static Dictionary<int, Glyph> _map;
@@ -46,7 +51,7 @@ namespace UI.Game2D
             }
         }
 
-        public static int Advance(char ch) => Map.TryGetValue(ch, out var g) ? g.adv : _cell / 2;
+        public static int Advance(char ch) => (Map.TryGetValue(ch, out var g) ? g.adv : _cell / 2) + CharGap;
 
         public static int Width(string s)
         {
@@ -72,9 +77,9 @@ namespace UI.Game2D
                         int bits = g.rows[r]; if (bits == 0) continue;
                         for (int i = 0; i < 16; i++) if ((bits >> (15 - i) & 1) != 0) put(cx + i, y + r);
                     }
-                    cx += g.adv;
+                    cx += g.adv + CharGap;
                 }
-                else cx += _cell / 2;
+                else cx += _cell / 2 + CharGap;
             }
             return cx - x;
         }

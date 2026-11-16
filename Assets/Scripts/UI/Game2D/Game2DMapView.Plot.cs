@@ -193,12 +193,12 @@ namespace UI.Game2D
                 // 嵐の中の点への移動の見積もり (2026-11-13): 払う HP を点の下に出す
                 int stormHp = ok ? sim.StormHpFor(_hover) : 0;
                 float ly = q.y + 8 * Pxs;
-                if (stormHp > 0) { Text("HP-" + stormHp, q.x, ly, _lc.red); ly += Game2DJpFont.Cell + 1; }
+                if (stormHp > 0) { Text("HP-" + stormHp, q.x, ly, _lc.red); ly += Game2DJpFont.LineH; }
                 // 不安定化の見積もり (2026-11-13 二版): その点を踏む / 開けると何ポイント溜まるか。 境目を越えるなら「崩れ始める」「フェーズ k へ」
                 if (ok && sim.InstabilityMode)
                 {
                     string est = InstabilityEstimate(sim, _hover, out string cross);
-                    if (est != null) { Text(est, q.x, ly, _lc.warn); ly += Game2DJpFont.Cell + 1; }
+                    if (est != null) { Text(est, q.x, ly, _lc.warn); ly += Game2DJpFont.LineH; }
                     if (cross != null) Text(cross, q.x, ly, StormHot);
                 }
             }
