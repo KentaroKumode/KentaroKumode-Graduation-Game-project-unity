@@ -167,7 +167,7 @@ namespace EventSystem
         /// 見せない支払いは <see cref="HiddenPaymentMayFallShort"/> が true なら選べて、 ある分だけ失う。</summary>
         public static bool BlocksWhenShort(EventEffect e) => !HiddenPaymentMayFallShort || IsShownCost(e);
 
-        /// <summary>見せる代償の短い文 (選択肢の下の説明に並べる)。 ターンは補足中の見込みを呼び手が後ろに付ける。 文を持たない効果は null。</summary>
+        /// <summary>見せる代償の短い文 (選択肢の下の説明に並べる)。 ターンは捕捉中の見込みを呼び手が後ろに付ける。 文を持たない効果は null。</summary>
         public static string ShownCostText(EventEffect e)
         {
             if (e == null) return null;

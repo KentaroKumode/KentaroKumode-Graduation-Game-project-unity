@@ -740,7 +740,7 @@ namespace UI.Game2D
             else if (resolved || ev == null || ev.choices.Count == 0) { v.buttons.Add(new EventScreenView.Btn { label = "次へ", action = "next", primary = true }); v.hint = "Space 次へ"; }
             else
             {
-                // 選択肢 (最後の頁だけ): 名前・見せる代償の札・選べないか・補足中の見込み・箱の下の説明
+                // 選択肢 (最後の頁だけ): 名前・見せる代償の札・選べないか・捕捉中の見込み・箱の下の説明
                 v.choices = new List<EventScreenView.Choice>();
                 int first = -1;
                 for (int i = 0; i < ev.choices.Count; i++)
@@ -774,9 +774,9 @@ namespace UI.Game2D
             return null;      // 窓は使わない (Update が _evBuilt を見て液晶の板に出す)
         }
 
-        /// <summary>イベントの画面の上の帯の値 (2026-11-16): HP・物資・ゴールド・素材・ターン・補足中 (地図の帯 Game2DNavExtras と同じ所から読む)。
-        /// 航行マップの無い層では、 ターンと補足中を出さない (詰めて並べる)。 結果の頁では選んだ効果の後の値: HP・物資・ゴールド・素材は選んだ時に適用済み、
-        /// ターンは地図へ戻る時に進むので、 まだ進めていない分 (EventEncounter.PendingTurns) を足して見せる。 補足中の見込みは今の値 (ターンが進む前)。</summary>
+        /// <summary>イベントの画面の上の帯の値 (2026-11-16): HP・物資・ゴールド・素材・ターン・捕捉中 (地図の帯 Game2DNavExtras と同じ所から読む)。
+        /// 航行マップの無い層では、 ターンと捕捉中を出さない (詰めて並べる)。 結果の頁では選んだ効果の後の値: HP・物資・ゴールド・素材は選んだ時に適用済み、
+        /// ターンは地図へ戻る時に進むので、 まだ進めていない分 (EventEncounter.PendingTurns) を足して見せる。 捕捉中の見込みは今の値 (ターンが進む前)。</summary>
         private static List<EventLayout.BarItem> EventBar(GameManager gm)
         {
             var run = gm.Run; var list = new List<EventLayout.BarItem>();
@@ -792,8 +792,8 @@ namespace UI.Game2D
                 list.Add(new EventLayout.BarItem { label = "ターン", value = (sim.Turn + pending).ToString() });
             }
             var eta = EventEncounter.CatchEtaNow();
-            if (eta.Valid) list.Add(new EventLayout.BarItem { label = "補足中", value = "あと" + eta.turns, warn = true });
-            else if (sim != null && sim.FoeAlive && sim.FoeMode == MapSystem.FreeMove.FoeMode.Chase) list.Add(new EventLayout.BarItem { value = "補足中", warn = true });
+            if (eta.Valid) list.Add(new EventLayout.BarItem { label = "捕捉中", value = "あと" + eta.turns, warn = true });
+            else if (sim != null && sim.FoeAlive && sim.FoeMode == MapSystem.FreeMove.FoeMode.Chase) list.Add(new EventLayout.BarItem { value = "捕捉中", warn = true });
             return list;
         }
 

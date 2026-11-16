@@ -553,7 +553,7 @@ namespace AutoTest
                     if (hpR >= 0.95f && TryRestRemoveLowFace(gm)) return false;
                     //   山札から抜く (ADR-0014): 同じく HP が満ちている時だけ。 基本の端子が多ければ 1 枚 (AutoRunner.Terminals)
                     if (hpR >= 0.95f && TryRestRemoveTerminal(gm)) return false;
-                    //   多めに休む: HP が 6 割を切っていて、 追跡者に補足されていない時 (1 ターン進むので、 追われている時は使わない)
+                    //   多めに休む: HP が 6 割を切っていて、 追跡者に捕捉されていない時 (1 ターン進むので、 追われている時は使わない)
                     var sim = gm.FreeMap;
                     bool hunted = sim != null && sim.FoeAlive && sim.FoeMode == MapSystem.FreeMove.FoeMode.Chase;
                     if (hpR < 0.6f && sim != null && !hunted) { gm.RestHealMore(); return false; }

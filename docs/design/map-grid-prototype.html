@@ -252,7 +252,7 @@ function foeNextStep() {
 function foeTurn() {
   const pf = PROFILES[S.prof], dMe = bfs(M.nbr, S.me);
   const detectR = S.flare > 0 ? P.flareR : P.detectR;
-  if (dMe[S.foe] <= detectR) { if (S.foeMode !== "追跡") log(`〈${pf.name}〉に補足された`); S.foeMode = "追跡"; S.lastSeen = S.me; S.lose = 0; }
+  if (dMe[S.foe] <= detectR) { if (S.foeMode !== "追跡") log(`〈${pf.name}〉に捕捉された`); S.foeMode = "追跡"; S.lastSeen = S.me; S.lose = 0; }
   else if (S.foeMode === "追跡" && ++S.lose > P.quietLose) { S.foeMode = "巡回"; log(`〈${pf.name}〉は見失った`); }
   else if (S.foeMode === "巡回" && hasTrace(S.foe)) { S.foeMode = "警戒"; log(`〈${pf.name}〉が痕跡を見つけた`); }
   for (let k = 0; k < pf.foeSteps; k++) { S.foe = foeNextStep(); if (S.foe === S.me) break; }
@@ -335,7 +335,7 @@ function moveTo(i) {
 // ============================================================
 //  表示
 // ============================================================
-function etaToCatch() {   // 補足されている時: 最短で何手で捕まるか (こちらがその場に留まった場合)
+function etaToCatch() {   // 捕捉されている時: 最短で何手で捕まるか (こちらがその場に留まった場合)
   const pf = PROFILES[S.prof], d = bfs(M.nbr, S.me); let best = Infinity, who = "";
   if (S.foeMode === "追跡" && pf.foeSteps > 0) { const t = Math.ceil(d[S.foe] / pf.foeSteps); if (t < best) { best = t; who = "本体"; } }
   for (const f of S.fams) { if (!pf.famSteps) continue; const chasing = f.hound ? S.foeMode === "追跡" : f.target != null;
@@ -356,7 +356,7 @@ function refresh() {
   let w = "";
   if (S.foe === S.me) w = `捕まった ── 〈${pf.name}〉との戦闘（${pf.fight}）`;
   else if (S.lastContact === S.turn) w = "使い魔と接触した（戦闘）";
-  else if (isFinite(eta.best)) w = `補足されている ── 最短 ${eta.best} 手で捕まる（${eta.who}）`;
+  else if (isFinite(eta.best)) w = `捕捉されている ── 最短 ${eta.best} 手で捕まる（${eta.who}）`;
   else if (S.foeMode === "警戒") w = "警告: 痕跡をたどられている";
   $("warn").textContent = w;
   $("turn").textContent = S.turn; $("sup").textContent = `${S.sup}（1 手 −${P.supMove}）`; $("hp").textContent = `${S.hp} / ${P.hpMax}`;

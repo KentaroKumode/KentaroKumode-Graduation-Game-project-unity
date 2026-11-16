@@ -11,7 +11,7 @@ namespace AutoTest
     /// <list type="bullet">
     /// <item><b>Naive</b>: 行き先だけを決めて最短の道を歩く。 追跡者を避けない。</item>
     /// <item><b>Optimal / Super / Exact / Ultra</b>: 同じ行き先に加えて、 <b>見えている / 魔石に出ている追跡者を避ける</b>
-    ///       ── 次の 1 歩を、 追跡者に近づかない隣へ振る・補足されたら囮罠を使う。</item>
+    ///       ── 次の 1 歩を、 追跡者に近づかない隣へ振る・捕捉されたら囮罠を使う。</item>
     /// </list>
     /// どの方策も乱数を使わない。 追跡者の性質 (<see cref="FoeProfile"/>) は読まない (プレイヤーには明かされない)。
     ///
@@ -416,7 +416,7 @@ namespace AutoTest
             bool cantFightBlind = hpRatio < dangerTarget;
             int nCount = L.Count;
 
-            // ── 補足されている: 囮罠を使う (回避あり) ──
+            // ── 捕捉されている: 囮罠を使う (回避あり) ──
             if (avoid)
             {
                 var eta = sim.Eta();
@@ -429,7 +429,7 @@ namespace AutoTest
             }
 
             // ── 〈補給線〉(〈兵站〉r10・2026-11-09): 追われていたら、 追跡者から今より 3 歩以上遠い中継点へ跳ぶ ──
-            //   補足は解けない (追跡者は跳んだ先へ向かう) ので、 稼げるのは距離だけ。 ターンを使わないので同じ判断をもう一度する。
+            //   捕捉は解けない (追跡者は跳んだ先へ向かう) ので、 稼げるのは距離だけ。 ターンを使わないので同じ判断をもう一度する。
             //   「今より遠い」でしか跳ばないので、 跳び返して往復することはない。
             if (sim.FoeAlive && sim.FoeMode == MapSystem.FreeMove.FoeMode.Chase && GameManager.SupplyLineUnlocked
                 && run.provision >= FreeMapParams.RelaySupply)

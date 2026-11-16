@@ -49,11 +49,11 @@ namespace AutoTest
         static float ConsumablePrice(RunState run) => PRICE_CONSUMABLE * Prog(run);
 
         // ===== ターンを使う選択肢 (2026-11-11・issue #17) =====
-        /// <summary>補足されていない時の 1 ターンの値段。 巡回中の追跡者がいる層は、 その場に留まると通りかかられる見込みがある。</summary>
+        /// <summary>捕捉されていない時の 1 ターンの値段。 巡回中の追跡者がいる層は、 その場に留まると通りかかられる見込みがある。</summary>
         const float V_TURN_FOE_PATROL = -1.0f;
         /// <summary>追跡者のいない層 (または倒した後) の 1 ターン。 天候の前線が進むだけ。</summary>
         const float V_TURN_NO_FOE     = -0.3f;
-        /// <summary>補足されているが、 使うターンの間には捕まらない時の 1 ターン (距離が詰まる)。</summary>
+        /// <summary>捕捉されているが、 使うターンの間には捕まらない時の 1 ターン (距離が詰まる)。</summary>
         const float V_TURN_CHASED     = -3.0f;
         /// <summary>使うターンの間に捕まる: 追跡者 (本体・猟犬) との戦闘。 勝てば物資 +6 とアイテムが入るので、 エリートの戦闘より少し軽く見る。</summary>
         const float V_CAUGHT_BODY     = -18.0f;
@@ -425,10 +425,10 @@ namespace AutoTest
         const float V_SCOUT_POINT = 0.05f;
         /// <summary>補給の場所が分かる: まだ分かっていない店・休憩 1 つ = 1 歩 (物資 1)。</summary>
         const float V_SUPPLY_POINT = 1.0f;
-        /// <summary>追跡者を撒く (補足中): 捕まる見込みの 6 割を消す。 補足されていなくても近い時は少し。</summary>
+        /// <summary>追跡者を撒く (捕捉中): 捕まる見込みの 6 割を消す。 捕捉されていなくても近い時は少し。</summary>
         const float V_SHAKE_CHASED = 0.6f;
         const float V_SHAKE_NEAR = 2.0f;
-        /// <summary>追跡者を遠ざける: 補足中は 1 歩 = 補足中の 1 ターンぶん (V_TURN_CHASED)、 巡回中は 1 歩 0.3。</summary>
+        /// <summary>追跡者を遠ざける: 捕捉中は 1 歩 = 捕捉中の 1 ターンぶん (V_TURN_CHASED)、 巡回中は 1 歩 0.3。</summary>
         const float V_PUSH_PATROL = 0.3f;
         /// <summary>前線 1 段 (= 5 ターンぶんの前線の進み) = 物資 0.5。 今いる所に前線が届いていれば倍。</summary>
         const float V_FRONT_STEP = 0.5f;
@@ -480,7 +480,7 @@ namespace AutoTest
                 float hpPct = run != null ? (float)run.playerHP / UnityEngine.Mathf.Max(1, run.playerMaxHP) : 1f;
                 return -V_CAUGHT_BODY * V_SHAKE_CHASED * (hpPct < 0.65f ? 1.8f : 1f);
             }
-            // 補足は縄張りの中でしか起きない (2026-11-13・縄張りの番人): 縄張りの外に居れば「近い」は撒く理由にならない
+            // 捕捉は縄張りの中でしか起きない (2026-11-13・縄張りの番人): 縄張りの外に居れば「近い」は撒く理由にならない
             return sim.Stone().level >= 1 && !sim.OutsideFoeReach ? V_SHAKE_NEAR : 0f;
         }
 
@@ -500,13 +500,13 @@ namespace AutoTest
             if (sim.Eta().Valid) return V_TURN_CHASED * steps;
             int d = sim.HopsFrom(sim.Me)[sim.FoeNode];
             int after = d == int.MaxValue ? int.MaxValue : UnityEngine.Mathf.Max(1, d - steps);
-            // 補足される距離まで来るなら、 捕まる見込みの半分 (補足されても逃げ切れることがある)
+            // 捕捉される距離まで来るなら、 捕まる見込みの半分 (捕捉されても逃げ切れることがある)
             if (after <= sim.DetectHops) return 0.5f * V_CAUGHT_BODY;
             return V_TURN_FOE_PATROL * steps;
         }
 
         /// <summary>近道+N (2026-11-12 に作り替え): この後の移動 N 回ぶん、 物資を使わずターンも進まない。
-        /// 1 回 = 物資 1 の値段 + 1 ターンぶんの値段 (ターンを使う時の値段の符号を返したもの: 補足中 3・巡回中 1・追跡者なし 0.3。
+        /// 1 回 = 物資 1 の値段 + 1 ターンぶんの値段 (ターンを使う時の値段の符号を返したもの: 捕捉中 3・巡回中 1・追跡者なし 0.3。
         /// 縄張りを出ない番人で自分が縄張りの外なら、 追跡者なしと同じ 0.3)。
         /// 層を出たら残りは消えるので、 数えるのは終点までの歩数まで。</summary>
         private static float ScoreShortcut(int steps, RunState run)
@@ -538,7 +538,7 @@ namespace AutoTest
         }
 
         /// <summary>その場で N ターンを使う値段 (2026-11-11・issue #17)。 本体と同じ見込み (<see cref="EventEncounter.CatchEtaNow"/>・
-        /// 補足中に「留まったら何ターンで捕まるか」) を読む。 **捕まるなら戦闘 1 回ぶん**、 捕まらないなら 1 ターンごとの小さな値段。</summary>
+        /// 捕捉中に「留まったら何ターンで捕まるか」) を読む。 **捕まるなら戦闘 1 回ぶん**、 捕まらないなら 1 ターンごとの小さな値段。</summary>
         private static float ScoreTurns(int turns)
         {
             if (turns <= 0) return 0f;

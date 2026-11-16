@@ -72,16 +72,16 @@ namespace MapSystem.FreeMove
         public const int StoneFar = 4;
 
         // ── 追跡者 ─────────────────────────────────────────────
-        /// <summary>補足 (察知) の歩数。 照明中は <see cref="FlareRange"/>。</summary>
+        /// <summary>捕捉 (察知) の歩数。 照明中は <see cref="FlareRange"/>。</summary>
         public const int DetectRange = 2;
-        /// <summary>このターン数だけ補足できなければ見失う。</summary>
+        /// <summary>このターン数だけ捕捉できなければ見失う。</summary>
         public const int QuietLose = 3;
-        /// <summary>召喚者 (動かない) の補足の歩数 (2026-11-04)。 動けない代わりに遠くから気づく。</summary>
+        /// <summary>召喚者 (動かない) の捕捉の歩数 (2026-11-04)。 動けない代わりに遠くから気づく。</summary>
         public const int SummonerDetectRange = 5;
         /// <summary>追跡の上限 (2026-11-04)。 このターン数だけ追い続けたら諦めて巡回へ戻る。
         /// 同じ速さの追跡者は、 下がり続けるプレイヤーと永遠に距離が保たれてしまうため。</summary>
         public const int ChaseGiveUp = 8;
-        /// <summary>諦めた後、 このターン数のあいだは補足しない (すぐ補足し直して上限が意味を失わないように)。</summary>
+        /// <summary>諦めた後、 このターン数のあいだは捕捉しない (すぐ捕捉し直して上限が意味を失わないように)。</summary>
         public const int ChaseRest = 4;
         /// <summary>使い魔がプレイヤーを見つける歩数。</summary>
         public const int FamiliarSee = 1;

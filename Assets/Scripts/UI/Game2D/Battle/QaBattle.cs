@@ -310,7 +310,7 @@ namespace UI.Game2D.Battle
 
         /// <summary>名前を指定したイベントの画面を出す (セーブを止める・ランが無ければ新しいランを始める・戦闘中なら打ち切る)。
         /// floor = 見せる層の番号 (背景の絵が替わる・-1 = 今のまま)・coins = 所持金 (-1 = 今のまま・0 で「ゴールドが足りない」の箱を見る)・
-        /// eta = 補足されていて N ターンで捕まる見込みにする (-1 = 本物の見込み・1 でターンの札の警告と箱の下の説明を見る)。
+        /// eta = 捕捉されていて N ターンで捕まる見込みにする (-1 = 本物の見込み・1 でターンの札の警告と箱の下の説明を見る)。
         /// 例: <c>UI.Game2D.Battle.QaBattle.ShowEvent("老婆の商店", 2, 0, 1)</c>・<c>UI.Game2D.Battle.QaBattle.ShowEvent("さびれた観測所・再訪・写し", 4)</c></summary>
         public static bool ShowEvent(string eventName, int floor = -1, int coins = -1, int eta = -1)
         {

@@ -489,7 +489,7 @@ namespace AutoTest
                        && guardPack++ < ShopManager.ProvisionPackStock
                        && sm.TryBuyProvisionPack(gm.Run)) { }
 
-                // 囮罠 (2026-11-04): 追跡者の居る層では 2 個まで持っておく。 補足された時に航行の BOT が使う (AutoRunner.FreeMap)。
+                // 囮罠 (2026-11-04): 追跡者の居る層では 2 個まで持っておく。 捕捉された時に航行の BOT が使う (AutoRunner.FreeMap)。
                 //   棚の品より先に買うが、 所持金が 20G を切る時は買わない (8G の道具で棚を買えなくしない)
                 if (MapSystem.FreeMove.FloorPlan.HasWanderer(gm.Run.Depth))
                 {

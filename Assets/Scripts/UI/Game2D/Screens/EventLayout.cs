@@ -74,7 +74,7 @@ namespace UI.Game2D
         public const int BarY = 0, BarH = 16, BarPadX = 8, BarItemGap = 12, BarLabelGap = 4;
         public const int BarX = SafeL, BarW = SafeR - SafeL;
 
-        /// <summary>帯に並べる値 1 つ。 label = 暗い字 (null なら値だけ・ゴールド「36G」)・value = 明るい字・warn = 全部を警告の色 (補足中)。</summary>
+        /// <summary>帯に並べる値 1 つ。 label = 暗い字 (null なら値だけ・ゴールド「36G」)・value = 明るい字・warn = 全部を警告の色 (捕捉中)。</summary>
         public struct BarItem { public string label, value; public bool warn; }
 
         /// <summary>値 1 つの幅。</summary>

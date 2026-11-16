@@ -74,7 +74,7 @@ namespace GameLoop
         /// <summary>〈補給線〉が使えるか (整備パネル〈兵站〉r10)。</summary>
         public static bool SupplyLineUnlocked => MetaProgression.MetaBuffApplicator.IsSupplyLineUnlocked();
 
-        /// <summary>〈補給線〉: この層で一度着いた前哨基地・店へ跳ぶ (物資 1・ターンを使わない・補足は解けない)。</summary>
+        /// <summary>〈補給線〉: この層で一度着いた前哨基地・店へ跳ぶ (物資 1・ターンを使わない・捕捉は解けない)。</summary>
         public bool RelayStep(string nodeId)
         {
             var sim = FreeMapForAction();
@@ -185,7 +185,7 @@ namespace GameLoop
             if (ev == FreeMapEvent.None) return;
             var pf = sim.Profile;
             if ((ev & FreeMapEvent.SmokeUsed) != 0) Log($"〈{ItemIds.NavSmokeBall}〉が弾けた ── 追跡者は見失い、 最後に見た所を探している（この層ではもう使えない）");
-            if ((ev & FreeMapEvent.Detected) != 0) Log($"〈{pf.displayName}〉に補足された");
+            if ((ev & FreeMapEvent.Detected) != 0) Log($"〈{pf.displayName}〉に捕捉された");
             if ((ev & FreeMapEvent.FoeLost) != 0) Log($"〈{pf.displayName}〉は見失った");
             if ((ev & FreeMapEvent.FoeAlerted) != 0) Log("（追跡者が何かに気づいた）");
             if ((ev & FreeMapEvent.FamiliarLaunched) != 0) Log("使い魔が放たれた");

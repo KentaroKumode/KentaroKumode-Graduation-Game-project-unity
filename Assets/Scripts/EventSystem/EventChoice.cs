@@ -47,7 +47,7 @@ namespace EventSystem
 
         /// <summary>選択肢の下に出す説明の文 (2026-11-16 に作り直し・作者の決定「自分から差し出す物は見せる・ハプニングは見せない」)。 何も無ければ null。
         /// 並びは 選べない理由 → 見せる代償 (効果の並びの順・<see cref="EventEffectRoles.IsShownCost"/>・文は <see cref="EventEffectRoles.ShownCostText"/>)。
-        /// ターンの後ろには補足中の捕まるまでを付ける (etaTurns = 補足されている時の捕まるまでのターン・-1 = 補足されていない)。
+        /// ターンの後ろには捕捉中の捕まるまでを付ける (etaTurns = 捕捉されている時の捕まるまでのターン・-1 = 捕捉されていない)。
         /// 選べない時 (why あり) は、 理由とターンだけを出す ── 足りない支払いは理由の文が言うので、 ほかの支払いを並べて 2 行を越えないようにする。
         /// 組み立ては <c>EventEncounter.DescribeCost</c> から呼ぶ (検算 Tools/event_page_check が最も長い形で窓の 2 行に収まるかを見る)。 得る物は書かない。</summary>
         public string CostText(string why, int etaTurns)
@@ -68,8 +68,8 @@ namespace EventSystem
                     {
                         etaDone = true;
                         int turns = TurnCost;
-                        sb.Append(etaTurns <= turns ? $"（補足されている: {etaTurns} ターンで捕まる）"
-                                                    : $"（補足されている: 最短 {etaTurns} ターンで捕まる）");
+                        sb.Append(etaTurns <= turns ? $"（捕捉されている: {etaTurns} ターンで捕まる）"
+                                                    : $"（捕捉されている: 最短 {etaTurns} ターンで捕まる）");
                     }
                 }
             return sb.Length > 0 ? sb.ToString() : null;
@@ -94,15 +94,15 @@ namespace EventSystem
         }
 
         /// <summary>選んでいる箱の下に出す説明 (2026-11-16・イベントの画面・行は改行で分ける)。 何も無ければ null。
-        /// why = 選べない理由 (選べる箱は null を渡す)・etaTurns = 補足されている時の捕まるまでのターン (-1 = 補足されていない)。
-        /// 補足中の見込みはターンを使う選択肢だけに付ける。 札が言う代償 (ターン・ゴールド …) はここに繰り返さない。
+        /// why = 選べない理由 (選べる箱は null を渡す)・etaTurns = 捕捉されている時の捕まるまでのターン (-1 = 捕捉されていない)。
+        /// 捕捉中の見込みはターンを使う選択肢だけに付ける。 札が言う代償 (ターン・ゴールド …) はここに繰り返さない。
         /// 箱の下の 2 行に収まるかは検算 Tools/event_page_check が見る。</summary>
         public string NoteText(string why, int etaTurns)
         {
             string eta = null;
             int turns = TurnCost;
             if (turns > 0 && etaTurns >= 0)
-                eta = etaTurns <= turns ? $"補足されている。{etaTurns} ターンで捕まる" : $"補足中。最短 {etaTurns} ターンで捕まる";      // 「補足されている。最短 99 ターン…」は箱の下の 1 行 (156 dot) に入らない
+                eta = etaTurns <= turns ? $"捕捉されている。{etaTurns} ターンで捕まる" : $"捕捉中。最短 {etaTurns} ターンで捕まる";      // 「捕捉されている。最短 99 ターン…」は箱の下の 1 行 (156 dot) に入らない
             if (why == null) return eta;
             return eta == null ? why : why + "\n" + eta;
         }

@@ -3,7 +3,7 @@
 //   1. 頁割りの規則 (段落ごとに 1 頁・長い段落は行で割る・最後の頁は選択肢に場所を空ける・行を捨てない)
 //   2. 画面の配置 (2026-11-16・EventLayout): 本文 8 行が本文の板に収まる・板と列が画面に収まる・画面が使う字がドット字にある
 //   3. 全イベント: 導入・結果の文が全部どこかの頁に出る (切り捨て 0・1 頁 8 行まで)・選択肢の列 (箱 + 説明の板) が画面に収まる・
-//      箱の下の説明 (選べない理由・補足中の見込み) が 2 行に収まる。 名前が札と当たって「…」で切れる選択肢の数と一覧を出す
+//      箱の下の説明 (選べない理由・捕捉中の見込み) が 2 行に収まる。 名前が札と当たって「…」で切れる選択肢の数と一覧を出す
 //   4. 背景の絵の対応表 (Resources/Game2DBackdrops/event_backdrops.txt): 全イベントに対応がある・表の名前が全部実在する・表の絵が全部ある (480×270 の PNG)
 using System;
 using System.Collections.Generic;
@@ -148,15 +148,15 @@ static class Program
             {
                 new EventLayout.BarItem { label = "HP", value = "999/999" }, new EventLayout.BarItem { label = "物資", value = "10" },
                 new EventLayout.BarItem { value = "999G" }, new EventLayout.BarItem { label = "素材", value = "99" },
-                new EventLayout.BarItem { label = "ターン", value = "999" }, new EventLayout.BarItem { label = "補足中", value = "あと99", warn = true },
+                new EventLayout.BarItem { label = "ターン", value = "999" }, new EventLayout.BarItem { label = "捕捉中", value = "あと99", warn = true },
             };
             int bw = EventLayout.BarContentW(longest, Adv);
-            Check(bw <= EventLayout.BarW, $"上の帯に最も長い値 (HP 999/999・物資 10・999G・素材 99・ターン 999・補足中 あと99) が収まる ({bw} ≦ {EventLayout.BarW} dot・帯 x {EventLayout.BarX}〜{EventLayout.BarX + EventLayout.BarW} y {EventLayout.BarY}〜{EventLayout.BarY + EventLayout.BarH})");
+            Check(bw <= EventLayout.BarW, $"上の帯に最も長い値 (HP 999/999・物資 10・999G・素材 99・ターン 999・捕捉中 あと99) が収まる ({bw} ≦ {EventLayout.BarW} dot・帯 x {EventLayout.BarX}〜{EventLayout.BarX + EventLayout.BarW} y {EventLayout.BarY}〜{EventLayout.BarY + EventLayout.BarH})");
             int colTop = EventLayout.ColumnTop(5, EventLayout.NoteH(EventLayout.NoteLines, LineH));
             Check(colTop >= EventLayout.BarY + EventLayout.BarH, $"選択肢の列 (5 つ + 説明 2 行・上端 {colTop}) が上の帯 (下端 {EventLayout.BarY + EventLayout.BarH}) と重ならない");
             Check(EventLayout.PlateY >= EventLayout.BarY + EventLayout.BarH, "本文の板が上の帯と重ならない");
         }
-        string need = "…〜0123456789G素材物資手放す次へ前選ぶ補足されている。最短ターンで捕まる中HP/あと";
+        string need = "…〜0123456789G素材物資手放す次へ前選ぶ捕捉されている。最短ターンで捕まる中HP/あと";
         var missing = need.Where(ch => !Glyphs.ContainsKey(ch)).Distinct().ToList();
         Check(missing.Count == 0, "画面が使う字がドット字にある" + (missing.Count > 0 ? " (無い字: " + string.Join("", missing) + ")" : ""));
 
@@ -170,7 +170,7 @@ static class Program
                 var ev = new Ev { file = Path.GetFileName(path), def = def };
                 foreach (var c in def.choices)
                 {
-                    // 箱の下の説明の全部の形: 選べない理由 (無し・どれか) × 補足中の見込み (無し・N ターンで捕まる・最短 99 ターン)
+                    // 箱の下の説明の全部の形: 選べない理由 (無し・どれか) × 捕捉中の見込み (無し・N ターンで捕まる・最短 99 ターン)
                     var reasons = new SortedSet<string>(StringComparer.Ordinal);
                     foreach (var sc in scenes) { sc(gm); var r = c.UnavailableReason(gm.Run); if (r != null) reasons.Add(r); }
                     var whys = new List<string> { null }; whys.AddRange(reasons);
@@ -282,7 +282,7 @@ static class Program
         }
         Check(cut == 0, $"切り捨てられる文 {cut} 件 (全部の行がどこかの頁に出る・1 頁 {EventPaging.LinesPerPage(LineH)} 行まで)");
         Check(colOver == 0 && EventLayout.ColumnFits(kMax, noteHMax), $"選択肢の列 (箱 + 説明の板) が画面に収まらないもの {colOver} 件");
-        Check(noteOver == 0, $"{EventLayout.NoteLines} 行に収まらない説明 (選べない理由・補足中の見込み) {noteOver} 件");
+        Check(noteOver == 0, $"{EventLayout.NoteLines} 行に収まらない説明 (選べない理由・捕捉中の見込み) {noteOver} 件");
         Console.WriteLine(fails == 0 ? "ALL OK" : $"{fails} 件 NG");
         return fails == 0 ? 0 : 1;
     }

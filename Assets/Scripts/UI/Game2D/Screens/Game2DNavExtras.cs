@@ -12,7 +12,7 @@ namespace UI.Game2D
     /// 上の帯 = 天気 (今)・層 (今の層 / 最終層)・警告ランプ (追跡者が警戒・追跡中で点灯)・待つボタン / 左下 = 職業・状態異常・消耗品・パッシブ / 右 = 航行アイテムの枠 3 つ・脱出ボタン。
     /// 層・追跡者・天気・所持品 (左下の 10 枠は品のアイコン・2026-11-12) は実際の値、 予報は見本。 戦闘中は 3 方向へ引っ込む (<see cref="Drive"/>)。
     /// <para>操作 (2026-11-04): 上の帯の [WAIT] = 待つ (その場で 1 ターン・Space と同じ) / 左下の ITEMS の欄 = 持ち物の画面 (2026-11-13 に升目の画面へ・品の詳細を読む・消耗品を使う)。</para>
-    /// <para>2026-11-11: 上の帯の右隣に「経過ターン・補足中の警告 (ETA)・照明の残り」の帯、 右の列に航行アイテムの 3 枠 (V / B / N・〈前哨の旗〉を立てる)、
+    /// <para>2026-11-11: 上の帯の右隣に「経過ターン・捕捉中の警告 (ETA)・照明の残り」の帯、 右の列に航行アイテムの 3 枠 (V / B / N・〈前哨の旗〉を立てる)、
     /// 終点 (ボス・〈門〉) へ踏み出す前の確認の窓 (<see cref="ConfirmExit"/>) を足した。</para>
     /// </summary>
     public class Game2DNavExtras : MonoBehaviour
@@ -20,7 +20,7 @@ namespace UI.Game2D
         public Game2DScreen screen;
         public Game2DModal modal;
         [SerializeField] private RectTransform _top, _left, _right;      // _right = 航行アイテムの 3 枠 (2026-11-11 に戻した。 旧版のシーンに残っていたものは大きさ・位置を直して使う)
-        /// <summary>経過ターン・補足中の警告 (ETA)・照明の残り・羅針の方角の帯 (2026-11-11・issue #69 / #72)。 シーンに無ければ実行時に作る。</summary>
+        /// <summary>経過ターン・捕捉中の警告 (ETA)・照明の残り・羅針の方角の帯 (2026-11-11・issue #69 / #72)。 シーンに無ければ実行時に作る。</summary>
         [SerializeField] private RectTransform _status;
         private Texture2D _tt, _tl, _tr, _ts;
         private static readonly RectInt TopR = new RectInt(96, 0, 124, 30), LeftR = new RectInt(0, 219, 100, 51);      // 2026-11-11: 字を既定のフォント (高さ 12) にして広げた
@@ -120,7 +120,7 @@ namespace UI.Game2D
             }
             bool jump = Time.unscaledTime < _jumpUntil;
             bool chase = sim != null && sim.FoeAlive && sim.FoeMode == FoeMode.Chase;
-            int blink = chase ? Mathf.FloorToInt(Time.unscaledTime * 2.5f) & 1 : 0;      // 補足中の警告は 2.5 回/秒で明滅
+            int blink = chase ? Mathf.FloorToInt(Time.unscaledTime * 2.5f) & 1 : 0;      // 捕捉中の警告は 2.5 回/秒で明滅
             int h = floor * 7 + passives * 31 + cons * 131 + (run != null ? run.playerHP * 389 : 0) + weather * 17 + (foe + 2) * 1009 + (sim != null ? sim.Version * 7919 : 0) + blink * 104729 + (_hoverSlot + 2) * 15485863 + (jump ? 31 : 0);
             if (h == _hash && Time.unscaledTime < _next) return;
             _hash = h; _next = Time.unscaledTime + 0.5f;
@@ -129,8 +129,8 @@ namespace UI.Game2D
             RedrawSlots(gm, sim, run);
         }
 
-        // ── 経過ターン・補足中の警告 (issue #69 / #72) ──
-        //   1 行目 = 経過ターン (「ターン」とは書かない) と照明の残り・近道の残り (イベント「近道+N」・ただで動ける回数)。 2 行目 = 優先順に 「枠の説明 (乗せている時)」→「補足中の ETA」→「羅針の方角」。
+        // ── 経過ターン・捕捉中の警告 (issue #69 / #72) ──
+        //   1 行目 = 経過ターン (「ターン」とは書かない) と照明の残り・近道の残り (イベント「近道+N」・ただで動ける回数)。 2 行目 = 優先順に 「枠の説明 (乗せている時)」→「捕捉中の ETA」→「羅針の方角」。
         //   補給 (店) で動けない待ち時間は、 今の規則 (店は 0 ターン) では起きない。 まとめて進んだ分 (イベント・多めに休む) はターン数の横の「+N」(gui-needed.md #21)。
 
         private void RedrawStatus(GameManager gm, FreeMapSim sim, RunState run, bool blinkOn)
@@ -156,9 +156,9 @@ namespace UI.Game2D
             if (_hoverSlot >= 0) { line = SlotHint(gm, sim, run, _hoverSlot); col = Game2DKit.Ink; }
             else if (sim.FoeAlive && sim.FoeMode == FoeMode.Chase)
             {
-                // 補足中: こちらが動かなかった場合に最短で何ターンで捕まるか (§5-9・FreeMapSim.Eta)。 誰が来るかは出さない (性質は明かさない)
+                // 捕捉中: こちらが動かなかった場合に最短で何ターンで捕まるか (§5-9・FreeMapSim.Eta)。 誰が来るかは出さない (性質は明かさない)
                 var eta = sim.Eta();
-                line = eta.Valid ? "補足中 あと" + eta.turns + "ターンで捕まる" : "補足中";
+                line = eta.Valid ? "捕捉中 あと" + eta.turns + "ターンで捕まる" : "捕捉中";
                 col = blinkOn ? Game2DKit.Red : Game2DKit.Off;
             }
             else if (NavItems.FineBearing(run))
@@ -196,7 +196,7 @@ namespace UI.Game2D
         }
 
         // ── 航行アイテムの 3 枠 (issue #10・gui-needed.md #20) ──
-        //   枠に入るのは「使う」か「回数のある」航行アイテムだけ: 〈前哨の旗〉(押すと立てる)・〈煙玉〉(補足された時に自動で弾ける・押しても何もしない)。
+        //   枠に入るのは「使う」か「回数のある」航行アイテムだけ: 〈前哨の旗〉(押すと立てる)・〈煙玉〉(捕捉された時に自動で弾ける・押しても何もしない)。
         //   ほかの 11 品は持っているだけで効くので、 持ち物の画面 (秘宝) で読む。 絵は無いので、 名前の頭の 1 字で出す。
 
         private int _hoverSlot = -1;
@@ -228,7 +228,7 @@ namespace UI.Game2D
             if (i >= items.Count) return "空き (" + SlotKeyNames[i] + ")";
             string id = items[i]; bool ready = SlotReady(gm, sim, id);
             if (id == ItemIds.NavOutpostFlag) return ready ? id + " 押すとここに立てる" : id + " この層は立て済み";
-            if (id == ItemIds.NavSmokeBall) return ready ? id + " 補足された時に自動" : id + " この層は使用済み";
+            if (id == ItemIds.NavSmokeBall) return ready ? id + " 捕捉された時に自動" : id + " この層は使用済み";
             return id;
         }
 

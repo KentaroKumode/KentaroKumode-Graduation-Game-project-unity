@@ -50,7 +50,7 @@ namespace EventSystem
         RevealEncounters,
         /// <summary>補給の場所が分かる: この層の店と休憩の点を完全公開する。</summary>
         RevealSupplies,
-        /// <summary>追跡者を撒く: 補足を外す (巡回へ戻り、 しばらく補足しない・使い魔は消える)。</summary>
+        /// <summary>追跡者を撒く: 捕捉を外す (巡回へ戻り、 しばらく捕捉しない・使い魔は消える)。</summary>
         ShakeOffPursuer,
         /// <summary>追跡者を遠ざける+N: 追跡者の本体を道で N 歩遠ざける。</summary>
         PushPursuer,

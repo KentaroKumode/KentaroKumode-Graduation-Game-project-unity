@@ -87,7 +87,7 @@ namespace UI.Game2D
             public List<EventChoice.CostChip> chips;
             /// <summary>選べない (名前を暗く・札を赤く)。</summary>
             public bool disabled;
-            /// <summary>ターンの札を警告の色に (補足されていて、 使うターンのうちに捕まる見込み)。</summary>
+            /// <summary>ターンの札を警告の色に (捕捉されていて、 使うターンのうちに捕まる見込み)。</summary>
             public bool warnTurns;
             /// <summary>選んでいる時に箱の下に出す説明 (改行で行を分ける・null = 板を出さない)。</summary>
             public string note;
@@ -98,7 +98,7 @@ namespace UI.Game2D
         // ── 中身 (Game2DPhaseScreens が詰める) ──
         public string backdrop, title, pageMark, hint;
         public List<string> lines = new List<string>();
-        /// <summary>上の帯の値 (航行の数値・左から HP・物資・ゴールド・素材・ターン・補足中)。 null か空なら帯を出さない。</summary>
+        /// <summary>上の帯の値 (航行の数値・左から HP・物資・ゴールド・素材・ターン・捕捉中)。 null か空なら帯を出さない。</summary>
         public List<EventLayout.BarItem> bar;
         /// <summary>選択肢 (null か空 = 右の列を出さず背景を見せる)。</summary>
         public List<Choice> choices;
@@ -152,7 +152,7 @@ namespace UI.Game2D
         }
 
         /// <summary>上の帯 (2026-11-16): 画面の上辺に付けた 1 本。 板・箱と同じ作り (地を濃さ <see cref="PlateAlpha"/> で重ね・1 dot の縁)。
-        /// 値は間隔だけで左から並べる (ラベルは暗い字・値は明るい字・補足中は警告の色)。 幅に収まらない値は描かない (検算が最も長い値で収まりを見ている)。</summary>
+        /// 値は間隔だけで左から並べる (ラベルは暗い字・値は明るい字・捕捉中は警告の色)。 幅に収まらない値は描かない (検算が最も長い値で収まりを見ている)。</summary>
         private void TopBar(KitPix p, int cell)
         {
             if (bar == null || bar.Count == 0) return;
@@ -201,7 +201,7 @@ namespace UI.Game2D
                 int room = EventLayout.NameRoom(EventLayout.ChipsW(c.chips, Game2DJpFont.Advance));
                 Text(p, Game2DJpFont.Clip(c.name ?? "", room), x + EventLayout.NameDx, ty, c.disabled ? (on ? Dim : Off) : Ink);
                 y += EventLayout.BoxH + EventLayout.BoxGap;
-                // 選んでいる箱の下の説明 (補足中の見込み・選べない理由)
+                // 選んでいる箱の下の説明 (捕捉中の見込み・選べない理由)
                 if (on)
                 {
                     var nl = NoteLinesOf(c);

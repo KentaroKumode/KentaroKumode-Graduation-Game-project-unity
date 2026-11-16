@@ -196,8 +196,8 @@ namespace EventSystem
             return true;
         }
 
-        /// <summary>いま追跡者・猟犬・使い魔に補足されているなら「最短で何ターンで捕まるか」(こちらが留まった場合)。
-        /// 補足されていない・航行マップの外なら <see cref="MapSystem.FreeMove.CatchEta.None"/>。
+        /// <summary>いま追跡者・猟犬・使い魔に捕捉されているなら「最短で何ターンで捕まるか」(こちらが留まった場合)。
+        /// 捕捉されていない・航行マップの外なら <see cref="MapSystem.FreeMove.CatchEta.None"/>。
         /// 表示 (#72) と BOT が同じ値を読む。</summary>
         public static MapSystem.FreeMove.CatchEta CatchEtaNow()
         {
@@ -209,7 +209,7 @@ namespace EventSystem
         }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-        /// <summary>[実機の確認用・2026-11-16] 0 以上だと、 補足されていて N ターンで捕まる見込みとみなす (イベントの画面の警告の色と説明の確認・
+        /// <summary>[実機の確認用・2026-11-16] 0 以上だと、 捕捉されていて N ターンで捕まる見込みとみなす (イベントの画面の警告の色と説明の確認・
         /// <c>UI.Game2D.Battle.QaBattle.ShowEvent</c> が立てる)。 -1 = 本物の見込み。 BOT も同じ値を読むので、 確認の外では立てない。</summary>
         public static int QaCatchEta = -1;
 
@@ -217,7 +217,7 @@ namespace EventSystem
         private static void QaReset() => QaCatchEta = -1;
 #endif
 
-        /// <summary>N ターンをその場で使うと捕まるか (今の補足の見込みで判定。 巡回中の追跡者が偶然通りかかる分は含まない)。</summary>
+        /// <summary>N ターンをその場で使うと捕まるか (今の捕捉の見込みで判定。 巡回中の追跡者が偶然通りかかる分は含まない)。</summary>
         public static bool WouldBeCaught(int turns)
         {
             if (turns <= 0) return false;
@@ -240,7 +240,7 @@ namespace EventSystem
             return choice.CostText(why, etaTurns);
         }
 
-        /// <summary>イベントの画面で、 選んでいる箱の下に出す説明 (2026-11-16)。 選べない理由 (暗くした箱だけ) と補足中の見込み (ターンを使う選択肢だけ)。
+        /// <summary>イベントの画面で、 選んでいる箱の下に出す説明 (2026-11-16)。 選べない理由 (暗くした箱だけ) と捕捉中の見込み (ターンを使う選択肢だけ)。
         /// 何も無ければ null (画面は説明の板ごと出さない)。 文は <see cref="EventChoice.NoteText"/>。</summary>
         public static string DescribeNote(EventDefinition ev, int index, RunState run)
         {
