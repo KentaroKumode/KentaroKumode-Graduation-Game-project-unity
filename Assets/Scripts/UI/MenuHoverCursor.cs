@@ -35,6 +35,10 @@ namespace UI
         [Header("配置")]
         [Tooltip("項目の端からの隙間(world)")]
         public float gap = 0.2f;
+        [Tooltip("矢印の不透明な所と項目の端の間 (液晶の dot)。 0 以下なら旧い置き方 (矢印の中心を端から gap だけ離す)")]
+        public float textGapDots = 3f;
+        [Tooltip("液晶の 1 unit の dot 数 (矢印の位置を dot の格子にそろえる)。 0 ならそろえない")]
+        public float dotsPerUnit = 16f;
         [Tooltip("位置の微調整(world)")]
         public Vector2 nudge = Vector2.zero;
         [Tooltip("描画順（メニュー文字より前に）")]
@@ -107,8 +111,71 @@ namespace UI
             else { var sr = b.GetComponent<SpriteRenderer>(); if (sr == null) return; bd = sr.bounds; }
 
             float y = bd.center.y + nudge.y;
-            _left.transform.position = new Vector3(bd.min.x - gap + nudge.x, y, b.transform.position.z);
-            _right.transform.position = new Vector3(bd.max.x + gap + nudge.x, y, b.transform.position.z);
+            float lx = bd.min.x - gap + nudge.x, rx = bd.max.x + gap + nudge.x;
+            // 2026-11-17: 矢印の不透明な所と項目の端 (当たり = 字の外縁・TitleMenuLayout.FitCollider) の間をちょうど textGapDots にする。
+            //   矢印の絵は左右で中身の位置が違う (左は先端が中心から 8 dot・右は左端が中心から 7 dot) ので、 絵の不透明な範囲を実行時に測って求める (絵を替えても崩れない)。
+            //   旧い置き方 (中心を端から gap) は、 字の絵の当たりが字の外縁になってから (ed7af5c8) 矢印が字に 4.8 / 3.8 dot 食い込んでいた
+            if (textGapDots > 0f && TryOpaqueX(_left, out _, out float lMax) && TryOpaqueX(_right, out float rMin, out _))
+            {
+                float g = textGapDots / Mathf.Max(1f, dotsPerUnit);
+                lx = bd.min.x - g - lMax + nudge.x;      // 左の矢印の不透明な右端 = 項目の左端 − 間
+                rx = bd.max.x + g - rMin + nudge.x;      // 右の矢印の不透明な左端 = 項目の右端 + 間
+            }
+            // 液晶の dot の格子にそろえる (半端な 0.5 dot に置かない)。 左右は字から離れる向きへ丸め (間が textGapDots より狭くならない)・上下は近い方へ
+            if (dotsPerUnit > 0f)
+            {
+                lx = Mathf.Floor(lx * dotsPerUnit + 1e-4f) / dotsPerUnit;
+                rx = Mathf.Ceil(rx * dotsPerUnit - 1e-4f) / dotsPerUnit;
+                y = Mathf.Round(y * dotsPerUnit) / dotsPerUnit;
+            }
+            _left.transform.position = new Vector3(lx, y, b.transform.position.z);
+            _right.transform.position = new Vector3(rx, y, b.transform.position.z);
+        }
+
+        // 矢印の絵の不透明な範囲 (基準点からの横の位置・unit)。 絵ごとに 1 度だけ測る。 取り込みの設定で読めない (isReadable = 0) 絵でも測れるよう、 GPU で写して読む
+        private static readonly System.Collections.Generic.Dictionary<Sprite, Vector2> _opaque = new System.Collections.Generic.Dictionary<Sprite, Vector2>();
+
+        /// <summary>矢印 sr の絵の不透明 (alpha ≥ 250) な所の左端・右端 (矢印の中心からの横の距離・unit・左右反転を含む)。 測れなければ false。</summary>
+        private static bool TryOpaqueX(SpriteRenderer sr, out float min, out float max)
+        {
+            min = max = 0f;
+            var sp = sr != null ? sr.sprite : null;
+            if (sp == null || sp.texture == null) return false;
+            if (!_opaque.TryGetValue(sp, out var r))
+            {
+                r = MeasureOpaque(sp);
+                _opaque[sp] = r;
+            }
+            if (r.x > r.y) return false;
+            min = r.x; max = r.y;
+            if (sr.flipX) { float a = -max, b = -min; min = a; max = b; }
+            return true;
+        }
+
+        private static Vector2 MeasureOpaque(Sprite sp)
+        {
+            var bad = new Vector2(1f, 0f);
+            var tex = sp.texture; var rect = sp.textureRect;
+            int w = Mathf.RoundToInt(rect.width), h = Mathf.RoundToInt(rect.height);
+            if (w <= 0 || h <= 0) return bad;
+            var rt = RenderTexture.GetTemporary(tex.width, tex.height, 0, RenderTextureFormat.ARGB32);
+            var prev = RenderTexture.active;
+            try
+            {
+                Graphics.Blit(tex, rt);
+                RenderTexture.active = rt;
+                var t = new Texture2D(w, h, TextureFormat.RGBA32, false);
+                t.ReadPixels(new Rect(rect.x, rect.y, w, h), 0, 0); t.Apply(false);
+                var px = t.GetPixels32(); Object.Destroy(t);
+                int x0 = int.MaxValue, x1 = -1;
+                for (int y = 0; y < h; y++)
+                    for (int x = 0; x < w; x++)
+                        if (px[y * w + x].a >= 250) { if (x < x0) x0 = x; if (x > x1) x1 = x; }
+                if (x1 < 0) return bad;
+                float ppu = sp.pixelsPerUnit, piv = sp.pivot.x;      // pivot は絵の左下からの px
+                return new Vector2((x0 - piv) / ppu, (x1 + 1 - piv) / ppu);
+            }
+            finally { RenderTexture.active = prev; RenderTexture.ReleaseTemporary(rt); }
         }
 
         /// <summary>left/rightSprite を変更した後、 生成済みカーソルへ反映する（昼夜切替など）。</summary>
