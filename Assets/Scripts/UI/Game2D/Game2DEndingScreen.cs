@@ -5,14 +5,16 @@ using UnityEngine;
 namespace UI.Game2D
 {
     /// <summary>
-    /// エンディングの画面 (#328・2026-11-15・<b>仮置き</b>)。 ランを踏破した時 (フェーズ RunClear) に、 <see cref="Endings.Resolve"/> の結果の題と本文を、
-    /// <b>液晶の中に</b>ドット字 (<see cref="Game2DJpFont"/>・字の指定は GameFont.cs) で頁送りで見せる。 読み終わると、 今までの「踏破」の窓 (到達の数字・入手した遺物 → タイトルへ) に続く。
+    /// エンディングの画面 (#328・2026-11-15・<b>仮置き</b>)。 ランを踏破した時 (フェーズ RunClear) に、 <see cref="Endings.Resolve"/> の結果の本文を、
+    /// <b>液晶の中に</b>ドット字 (<see cref="Game2DJpFont"/>・字の指定は GameFont.cs) で頁送りで見せ、 最後に結びの絵の上でエンディング名を見せる。
+    /// 読み終わると、 今までの「踏破」の窓 (到達の数字・入手した遺物 → タイトルへ) に続く。
     ///
     /// <para><b>額縁の決まり</b>: エンディングの文は物語なので液晶の中に描く (筐体の窓 = Game2DModal には出さない)。 出している間は計器盤 (GUI) を隠す
     /// (<see cref="Game2DHud"/> がロード画面と同じく <see cref="Blocking"/> を見る)。</para>
     ///
     /// <para><b>送り方</b>: 頁ごとに行が上から順に浮かぶ (1 行 <see cref="LineReveal"/> 秒)。 クリック・Space・Enter で、 浮かびきる前なら全部を出し、 浮かびきっていれば次の頁へ。
-    /// 本文の「———」の行は頁の区切りに使う (描かない)。 頁に入りきらない段落は次の頁へ送る。</para>
+    /// 本文の「———」の行は頁の区切りに使う (描かない)。 頁に入りきらない段落は次の頁へ送る。 本文の頁に題 (エンディング名) は出さない (2026-11-16・作者の指示)
+    /// ── どの頁も同じ組み方で、 1 頁 <see cref="LinesPerPage"/> 行 (y 26 から頁数の行の手前まで・15 行)。 右下の頁数と左下の「クリックで進む」にも本文と同じ暗い縁取り。</para>
     ///
     /// <para><b>曲</b>: 出している間は <see cref="Game2DBgm"/> が <see cref="Track"/> を読む (EndTrue = bgm_end_true / EndGood = bgm_end_good / ほか = bgm_end_other・曲はまだ無いので無音)。
     /// 描き方はロード画面 (<see cref="Game2DLoadingScreen"/>) と同じ: 地図の板の複製を少し手前に置き、 Game2D/LoadingBlend の網目で出入りする。 BOT がランを動かしている間は出さない。</para>
@@ -23,14 +25,17 @@ namespace UI.Game2D
     /// = 絵の 1 画素が 2×2 dot) に揃え、 <b>整数倍で液晶を覆う最小の倍率</b> (幅 256 なら 2 倍) で最近傍に拡大して中央に置き、 はみ出した端は切る (余りが出れば黒)。
     /// 写した絵は 1 度だけ作り (<see cref="LoadArt"/> → _artPx)、 本文の後ろも最後も同じ配列から色を作るので、 明るくなった時に 1 画素もずれない。</para>
     ///
-    /// <para><b>本文の後ろの絵</b> (2026-11-16・作者の依頼): 本文を読んでいる間 (題の頁・最初の頁への入りも)、 その結末の結びの絵を
+    /// <para><b>本文の後ろの絵</b> (2026-11-16・作者の依頼): 本文を読んでいる間 (最初の頁への入りも)、 その結末の結びの絵を
     /// 「元の色 × <see cref="BackdropDim"/>」に暗くして字の後ろに敷く (黒へ寄せるだけ・全面のディザや市松は使わない)。 字と同じ 1 枚の画像 (_tex) に、
     /// 毎コマ地として先に写してから字を打つ。 暗い絵は係数ごとに 1 度だけ作り (_backPx)、 頁をめくっても同じ配列を写すので背景は変わらない。
     /// 係数 0・絵の無い結末・読めなかった時は今までどおりの暗い地 (Bg)。</para>
     ///
     /// <para><b>最後</b>: 最後の頁を読み終えたら、 字だけが消えて、 同じ絵が係数 <see cref="BackdropDim"/> から 1.0 まで <see cref="ArtRise"/> 秒で明るくなる
-    /// (板の網目は使わない・係数 0 なら暗い地から絵が明るくなる)。 明るくなりきってから <see cref="ArtHold"/> 秒見せ、 網目で閉じる
-    /// (見せている間のクリック・Space・Enter で閉じる・明るくなる途中で押すと明るくなりきった所へ飛ぶ)。 絵の無い結末は最後の頁から網目で閉じる。</para>
+    /// (板の網目は使わない・係数 0 なら暗い地から絵が明るくなる)。 明るくなりきってから <see cref="NameDelay"/> 秒置いて、 絵の上の<b>画面の中央</b>にエンディング名が浮かぶ
+    /// (2026-11-16・作者の指示): 上に通し番号 (<see cref="NumberFor"/>・「END 5」など・名前の半分の倍率)、 下に名前 (<see cref="Endings"/> の題・<see cref="NameScale"/> 倍・金色)。
+    /// 2 段を合わせて上下の中央に置き、 本文の行と同じく 1 段 <see cref="LineReveal"/> 秒で上から浮かぶ。 縁取りは本文と同じ暗い色 (名前は 2 dot・番号は 1 dot)・帯や板は敷かない。
+    /// 名前が浮かびきってから <see cref="ArtHold"/> 秒見せ、 網目で閉じる。 クリック・Space・Enter は、 明るくなる途中 → 明るくなりきった所へ / 名前が出きる前 → 名前を出す / 名前が出た後 → 閉じる。
+    /// 絵の無い結末 (絵が読めなかった時も) は、 最後の頁の後に暗い地 (Bg) のまま名前だけを出してから閉じる。</para>
     /// </summary>
     public class Game2DEndingScreen : MonoBehaviour
     {
@@ -48,9 +53,22 @@ namespace UI.Game2D
         public static float BackdropDim = DefaultBackdropDim;
         /// <summary>結びの絵の置き場 (Resources の下・*.png.bytes)。</summary>
         public const string ArtDir = "Game2DEndingArt/";
-        // 配置 (dot): 液晶の湾曲で端が切れるので、 左右 40・上 30・下 26 の内側
-        //   題は 2 倍のドット字で中央 (2026-11-15 撮影: 小さく左上に寄りすぎていた)
-        private const int Left = 40, TextW = 400, TitleY = 26, TitleScale = 2, BodyY = 64, FootY = 232, LinesPerPage = 12;
+        /// <summary>結びの絵が明るくなりきってから、 エンディング名が浮かび始めるまでの間 (秒・仮置き)。 絵の無い結末は最後の頁を送ってからの間。</summary>
+        public const float NameDelay = 0.6f;
+        /// <summary><see cref="NameScale"/> の初期値。</summary>
+        public const int DefaultNameScale = 4;
+        /// <summary>エンディング名の倍率 (元のドット字の 1 dot を NameScale×NameScale で打つ・最近傍の整数倍・ぼかさない)。 通し番号はこの半分 (最小 1)。
+        /// 安全域の幅 (x <see cref="SafeL"/>〜<see cref="SafeR"/>) に縁取りごと収まらない倍率は、 描く時に収まる最大へ丸める。</summary>
+        public static int NameScale = DefaultNameScale;
+        // 配置 (dot): 液晶の湾曲で端が切れるので、 本文は左右 40・上 26・下 26 の内側
+        //   本文の頁に題は出さない (2026-11-16・作者の指示: 「上のエンディング名は、 本文を読んでいる時は要らない」)。 題の場所 (y 26〜63) まで本文を上げ、
+        //   1 頁の行数は「本文の上端から頁数の行 (FootY) の手前まで」で決める (前と同じ規則: 64 から 12 行 → 26 から 15 行・どの頁も同じ行数)
+        private const int Left = 40, TextW = 400, BodyY = 26, FootY = 232;
+        private static int LinesPerPage => Mathf.Max(1, (FootY - BodyY - 1) / Game2DJpFont.LineH);
+        // 液晶の安全域 (エンディング名を収める枠・dot)
+        public const int SafeL = 16, SafeR = 464, SafeT = 9, SafeB = 259;
+        // エンディング名の段: 番号と名前の間 (dot)・名前の縁取りの太さ (dot)。 番号の縁取りは本文と同じ 1 dot
+        private const int NameGap = 8, NameRim = 2;
 
         // 読みやすさ (2026-11-15 撮影: 液晶のにじみで本文が読みにくかった): 液晶の効果全体は弱めず、 字の側で抑える ──
         //   ① 字の色を明るさ 8 割ほどに落とす (白に近い字ほどにじみが広がる)  ② 字の周り 1 dot (8 方向) に地より暗い縁取りを打ち、 にじみが字の間を埋めないようにする
@@ -67,7 +85,7 @@ namespace UI.Game2D
         public static string Track { get; private set; }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetStatics() { _active = false; _endFrame = -1; Track = null; BackdropDim = DefaultBackdropDim; }
+        private static void ResetStatics() { _active = false; _endFrame = -1; Track = null; BackdropDim = DefaultBackdropDim; NameScale = DefaultNameScale; }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Attach()
@@ -77,7 +95,7 @@ namespace UI.Game2D
             mv.gameObject.AddComponent<Game2DEndingScreen>();
         }
 
-        /// <summary>エンディングの id → 結びの絵の名前 (<see cref="ArtDir"/> の下のファイル名・拡張子 .png.bytes を除く)。 絵の無いエンディングは null (最後の頁で閉じる)。
+        /// <summary>エンディングの id → 結びの絵の名前 (<see cref="ArtDir"/> の下のファイル名・拡張子 .png.bytes を除く)。 絵の無いエンディングは null (最後の頁の後、 暗い地のまま名前だけを出して閉じる)。
         /// 英雄の帰還 (end1) はタイトル画面の昼の絵 (day)。</summary>
         public static string ArtNameFor(string endingId)
         {
@@ -89,7 +107,18 @@ namespace UI.Game2D
             return null;
         }
 
-        private struct Page { public string title; public List<string> lines; public string track; }
+        /// <summary>エンディングの通し番号 (結びの絵の上で、 エンディング名の上に小さく出す)。 表はこの 1 か所。 名前は <see cref="Endings"/> の題をそのまま使う (ここには持たない)。</summary>
+        public static string NumberFor(string endingId)
+        {
+            if (endingId == Endings.End1.id) return "END 1";      // 英雄の帰還
+            if (endingId == Endings.End2.id) return "END 2";      // 無明の剣
+            if (endingId == Endings.End3.id) return "END 3";      // 灰の玉座
+            if (endingId == Endings.EndGoodId) return "END 4";    // 見送り
+            if (endingId == Endings.EndTrueId) return "END 5";    // 帳尻
+            return null;
+        }
+
+        private struct Page { public List<string> lines; public string track; }
         private readonly List<Page> _pages = new List<Page>();
         private int _page; private float _t, _fadeT; private bool _closing;
         private RunState _doneRun;
@@ -103,6 +132,8 @@ namespace UI.Game2D
         private Color32[] _artPx, _backPx; private string _artName; private float _backK = -1f;
         private bool _inArt; private float _artT, _qaRise = -1f;
         private bool ArtReady => _artPx != null;
+        // エンディング名: _name = 題 (Endings の title)・_nameNo = 通し番号 (NumberFor・無ければ番号の段なし)
+        private string _name, _nameNo;
 
         private void OnDisable() { Unsubscribe(); if (_active) Stop(); }      // 載っている物ごと止まった時も重ね絵と入力の遮断を残さない
 
@@ -183,15 +214,17 @@ namespace UI.Game2D
             if (_closing) { if (_fadeT >= FadeSec) { Stop(); return; } }
             else if (_inArt)
             {
-                // 結びの絵: ArtRise 秒で明るくなり、 明るくなりきってから ArtHold 秒、 またはクリックで閉じる (閉じる時は網目で後ろの画面へ)
+                // 結びの絵: ArtRise 秒で明るくなり、 NameDelay 秒置いてエンディング名が浮かび、 名前が出てから ArtHold 秒、 またはクリックで閉じる (閉じる時は網目で後ろの画面へ)
+                //   絵の無い結末は明るくなる間が 0 (暗い地のまま名前だけ)
                 if (_qaRise < 0f) _artT += dt;
                 if (press)
                 {
                     GameManager.ScreenUsedSpaceFrame = Time.frameCount;      // 押した入力を後ろへ流さない
-                    if (ArtRise01() < 1f) _artT = ArtRise;                  // 明るくなる途中: 明るくなりきった所へ
+                    if (ArtRise01() < 1f) _artT = RiseSec;                  // 明るくなる途中: 明るくなりきった所へ
+                    else if (_artT < NameFullAt) _artT = NameFullAt;        // 名前が出きる前: 名前を出す
                     else { _closing = true; _fadeT = 0f; }
                 }
-                else if (_qaRise < 0f && _artT >= ArtRise + ArtHold) { _closing = true; _fadeT = 0f; }
+                else if (_qaRise < 0f && _artT >= NameFullAt + ArtHold) { _closing = true; _fadeT = 0f; }
             }
             else if (press && _fadeT >= FadeSec)
             {
@@ -199,8 +232,7 @@ namespace UI.Game2D
                 var pg = _pages[_page];
                 if (_t < pg.lines.Count * LineReveal) _t = 999f;          // 浮かびきる前: 全部を出す
                 else if (_page + 1 < _pages.Count) { _page++; _t = 0f; Track = _pages[_page].track; Game2DSfx.Play("ui_tab", 0.6f); }
-                else if (ArtReady) { _inArt = true; _artT = 0f; Game2DSfx.Play("ui_confirm"); }      // 字を消して、 後ろの絵を明るくする (同じ板・同じ絵・網目なし)
-                else { _closing = true; _fadeT = 0f; Game2DSfx.Play("ui_confirm"); }
+                else { _inArt = true; _artT = 0f; Game2DSfx.Play("ui_confirm"); }      // 字を消して後ろの絵を明るくし (同じ板・同じ絵・網目なし)、 名前を出す (絵が無ければ暗い地に名前だけ)
             }
             Draw();
             ApplyFade();
@@ -214,6 +246,7 @@ namespace UI.Game2D
             string track = e.id == Endings.EndTrueId ? Game2DBgm.EndTrue : e.id == Endings.EndGoodId ? Game2DBgm.EndGood : Game2DBgm.EndOther;
             AddPages(e, track);
             if (_pages.Count == 0) return;
+            _name = e.title; _nameNo = NumberFor(e.id);
             _page = 0; _t = 0f; _fadeT = 0f; _closing = false; _inArt = false; _artT = 0f; _qaRise = -1f; _active = true; Track = _pages[0].track;
             var gm = GameManager.Instance; _playPhase = gm != null ? gm.CurrentPhase : GameManager.GamePhase.Title; _playRun = gm != null ? gm.Run : null;
             GameManager.InputBlockedByScreen = true;
@@ -225,18 +258,18 @@ namespace UI.Game2D
             Game2DSfx.Play("gui_out");
         }
 
-        /// <summary>本文を頁に割る: 「———」の行で区切り、 段落 (空行まで) が頁に入りきらなければ次の頁へ送る。 1 頁目に題。</summary>
+        /// <summary>本文を頁に割る: 「———」の行で区切り、 段落 (空行まで) が頁に入りきらなければ次の頁へ送る。 どの頁も同じ組み方 (題は出さない・1 頁 <see cref="LinesPerPage"/> 行)。</summary>
         private void AddPages(Endings.Ending e, string track)
         {
-            var cur = new List<string>(); bool first = true;
+            var cur = new List<string>(); int per = LinesPerPage;
             var para = new List<string>();
-            void FlushPage() { if (cur.Count > 0) { while (cur.Count > 0 && cur[cur.Count - 1].Length == 0) cur.RemoveAt(cur.Count - 1); if (cur.Count > 0) _pages.Add(new Page { title = first ? e.title : null, lines = cur, track = track }); first = false; } cur = new List<string>(); }
+            void FlushPage() { if (cur.Count > 0) { while (cur.Count > 0 && cur[cur.Count - 1].Length == 0) cur.RemoveAt(cur.Count - 1); if (cur.Count > 0) _pages.Add(new Page { lines = cur, track = track }); } cur = new List<string>(); }
             void FlushPara()
             {
                 if (para.Count == 0) return;
-                if (cur.Count > 0 && cur.Count + 1 + para.Count > LinesPerPage) FlushPage();
+                if (cur.Count > 0 && cur.Count + 1 + para.Count > per) FlushPage();
                 if (cur.Count > 0) cur.Add("");
-                foreach (var l in para) { if (cur.Count >= LinesPerPage) FlushPage(); cur.Add(l); }
+                foreach (var l in para) { if (cur.Count >= per) FlushPage(); cur.Add(l); }
                 para.Clear();
             }
             foreach (var raw in e.body.Split('\n'))
@@ -292,12 +325,24 @@ namespace UI.Game2D
             return true;
         }
 
-        /// <summary>結びの絵の明るくなる進み (0..1)。 確認用に止めていればその値。</summary>
+        /// <summary>結びの絵の明るくなる進み (0..1)。 確認用に止めていればその値。 絵の無い結末はいつも 1。</summary>
         private float ArtRise01()
         {
+            if (!ArtReady) return 1f;
             float r = _qaRise >= 0f ? _qaRise : ArtRise <= 0f ? 1f : _artT / ArtRise;
             return Mathf.Clamp01(r);
         }
+
+        /// <summary>結びの絵の段で、 明るくなる長さ (秒)。 絵の無い結末は 0。</summary>
+        private float RiseSec => ArtReady ? Mathf.Max(0f, ArtRise) : 0f;
+        /// <summary>エンディング名の段の数 (番号 + 名前・番号が無ければ名前だけ)。</summary>
+        private int NameRows => string.IsNullOrEmpty(_nameNo) ? 1 : 2;
+        /// <summary>結びの絵の段で、 名前が浮かび始める時刻 (_artT・秒)。</summary>
+        private float NameAt => RiseSec + NameDelay;
+        /// <summary>結びの絵の段で、 名前が浮かびきる時刻 (本文の行と同じく 1 段 <see cref="LineReveal"/> 秒)。 ArtHold はここから数える。</summary>
+        private float NameFullAt => NameAt + NameRows * LineReveal;
+        /// <summary>今出ている名前の段の数 (0 = まだ・本文の行と同じ数え方: 浮かび始めに 1 段目)。</summary>
+        private int NameShown => _artT < NameAt ? 0 : Mathf.Min(NameRows, Mathf.FloorToInt((_artT - NameAt) / LineReveal) + 1);
 
         /// <summary>本文の地を dst に写す: 結びの絵があり係数が 0 より大きければ「絵 × 係数」(係数が変わった時だけ作り直す)、 なければ Bg。
         /// 頁をめくっても同じ _backPx を写すだけなので、 背景は頁をまたいで変わらない。</summary>
@@ -344,32 +389,60 @@ namespace UI.Game2D
         {
             if (_pix == null || _pages.Count == 0) return;
             var p = _pix;
-            if (_inArt && _artPx != null) { FillArt(p.px, ArtRise01()); _tex.SetPixels32(p.px); _tex.Apply(false); return; }      // 結びの絵の段: 字は描かない
+            if (_inArt)
+            {
+                // 結びの絵の段: 本文は描かず、 絵 (無ければ暗い地 Bg) の上にエンディング名だけ
+                if (_artPx != null) FillArt(p.px, ArtRise01()); else for (int i = 0; i < p.px.Length; i++) p.px[i] = Bg;
+                DrawName(p, NameShown);
+                _tex.SetPixels32(p.px); _tex.Apply(false); return;
+            }
             FillBackdrop(p.px);                                                                // 本文の地 (頁をまたいで同じ配列)
             var pg = _pages[_page];
-            if (!string.IsNullOrEmpty(pg.title))
-            {
-                int tw = Game2DJpFont.Width(pg.title) * TitleScale;
-                Text(p, pg.title, (W - tw) / 2, TitleY, Amber, TitleScale);
-            }
             int shown = Mathf.Min(pg.lines.Count, Mathf.FloorToInt(_t / LineReveal) + 1);
             for (int i = 0; i < shown; i++) Text(p, pg.lines[i], Left, BodyY + i * Game2DJpFont.LineH, Ink, 1);
             bool done = shown >= pg.lines.Count;
             string foot = (_page + 1) + " / " + _pages.Count;
-            Game2DJpFont.Draw(p, foot, Left + TextW - Game2DJpFont.Width(foot), FootY, Dim);
-            if (done && (int)(Time.unscaledTime * 2.5f) % 2 == 0) Game2DJpFont.Draw(p, "クリックで進む", Left, FootY, Dim);      // 浮かびきったら明滅
+            Text(p, foot, Left + TextW - Game2DJpFont.Width(foot), FootY, Dim, 1);              // 頁数と「クリックで進む」も本文と同じ縁取り (絵の明るい所に重なっても読めるよう)
+            if (done && (int)(Time.unscaledTime * 2.5f) % 2 == 0) Text(p, "クリックで進む", Left, FootY, Dim, 1);      // 浮かびきったら明滅
             _tex.SetPixels32(p.px); _tex.Apply(false);
         }
 
-        /// <summary>字を打つ: 先に周り 1 dot (8 方向) を暗い縁取り、 その上に字。 scale = 1 dot を scale×scale で打つ (整数倍・補間しない)。</summary>
-        private static void Text(KitPix p, string s, int x, int y, Color32 c, int scale)
+        /// <summary>名前の実際の倍率: <see cref="NameScale"/> (1 以上) を、 名前が縁取りごと安全域の幅 (x <see cref="SafeL"/>〜<see cref="SafeR"/>) に収まる最大へ丸めた値。</summary>
+        public static int FitNameScale(string name)
+        {
+            int k = Mathf.Max(1, NameScale), w = Game2DJpFont.Width(name);
+            while (k > 1 && w * k + NameRim * 2 > SafeR - SafeL) k--;
+            return k;
+        }
+
+        /// <summary>番号の倍率 (名前の半分・最小 1)。</summary>
+        private static int NumberScale(int nameScale) => Mathf.Max(1, nameScale / 2);
+
+        /// <summary>エンディング名を画面の中央に描く: 上に通し番号 (名前の半分の倍率・本文の頁数と同じ色)、 下に名前 (<see cref="NameScale"/>・金色)。
+        /// 2 段を合わせて上下の中央に置き、 安全域に収める。 rows = 出す段の数 (本文の行と同じく上から順に浮かぶ・番号が無ければ名前だけの 1 段)。
+        /// 縁取りは本文と同じ暗い色: 名前は <see cref="NameRim"/> dot・番号は 1 dot。 帯や板は敷かない。</summary>
+        private void DrawName(KitPix p, int rows)
+        {
+            if (rows <= 0 || string.IsNullOrEmpty(_name)) return;
+            int ks = FitNameScale(_name), kn = NumberScale(ks), cell = Game2DJpFont.Cell;
+            bool hasNo = !string.IsNullOrEmpty(_nameNo);
+            int hNo = hasNo ? cell * kn + NameGap : 0, hAll = hNo + cell * ks;
+            int top = Mathf.Clamp((H - hAll) / 2, SafeT, Mathf.Max(SafeT, SafeB - hAll));
+            if (hasNo) Text(p, _nameNo, CenterX(_nameNo, kn), top, Dim, kn, 1);
+            if (rows > (hasNo ? 1 : 0)) Text(p, _name, CenterX(_name, ks), top + hNo, Amber, ks, NameRim);
+        }
+
+        private static int CenterX(string s, int k) => Mathf.Max(SafeL, (W - Game2DJpFont.Width(s) * k) / 2);
+
+        /// <summary>字を打つ: 先に周り rim dot (8 方向) を暗い縁取り、 その上に字。 scale = 1 dot を scale×scale で打つ (整数倍・補間しない)。</summary>
+        private static void Text(KitPix p, string s, int x, int y, Color32 c, int scale, int rim = 1)
         {
             var dots = new List<Vector2Int>();
             Game2DJpFont.Draw((px, py) => dots.Add(new Vector2Int(px, py)), s, x, y);
             foreach (var d in dots)
             {
                 int bx = x + (d.x - x) * scale, by = y + (d.y - y) * scale;
-                p.Rect(bx - 1, by - 1, scale + 2, scale + 2, Rim);
+                p.Rect(bx - rim, by - rim, scale + rim * 2, scale + rim * 2, Rim);
             }
             foreach (var d in dots) p.Rect(x + (d.x - x) * scale, y + (d.y - y) * scale, scale, scale, c);
         }
@@ -384,7 +457,7 @@ namespace UI.Game2D
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         /// <summary>[実機の確認用・2026-11-15] エンディングの画面を直接出す (フェーズもランも変えない・セーブを止める)。
         /// id = end1 / end2 / end3 / end_true / end_good。 例: <c>UI.Game2D.Game2DEndingScreen.QaShow("end_true")</c>。
-        /// 読み終わると結びの絵 (<see cref="ArtNameFor"/>) を見せて閉じ、 元の画面に戻る (踏破の窓は出ない)。 出している間にフェーズかランが変わるとすぐ片付く。 無い id なら false。</summary>
+        /// 読み終わると結びの絵 (<see cref="ArtNameFor"/>) とエンディング名を見せて閉じ、 元の画面に戻る (踏破の窓は出ない)。 出している間にフェーズかランが変わるとすぐ片付く。 無い id なら false。</summary>
         public static bool QaShow(string id)
         {
             SaveGuard.Suppressed = true;
@@ -424,26 +497,48 @@ namespace UI.Game2D
             return true;
         }
 
-        /// <summary>[確認用・2026-11-16] 結びの絵の段へ入り、 明るさの進みを rise01 (0..1 に丸める・1 = 明るくなりきった状態) で止めて見せる (自動では閉じない・クリックでは閉じる)。
+        /// <summary>[確認用・2026-11-16] 結びの絵の段へ入り、 明るさの進みを rise01 (0..1 に丸める・1 = 明るくなりきった状態) で止めて見せる (名前は出さない・自動では閉じない・クリックでは進む)。
         /// 先に <see cref="QaShow"/> で出しておく。 出ていない・絵の無い結末なら false。 例: <c>UI.Game2D.Game2DEndingScreen.QaGotoArt(0.5f)</c>。</summary>
-        public static bool QaGotoArt(float rise01)
+        public static bool QaGotoArt(float rise01) => QaGotoArt(rise01, false);
+
+        /// <summary>[確認用・2026-11-16] 結びの絵の段へ入り、 止めて見せる。 showName = true なら、 絵を明るくなりきった状態 (rise01 は無視) にしてエンディング名を出しきった所で止める
+        /// (絵の無い結末でも、 暗い地に名前だけの状態を見せられる)。 false なら <see cref="QaGotoArt(float)"/> と同じ (名前なし・絵の無い結末は false)。
+        /// 自動では閉じない (クリックでは進む)。 例: <c>UI.Game2D.Game2DEndingScreen.QaGotoArt(1f, true)</c>。</summary>
+        public static bool QaGotoArt(float rise01, bool showName)
         {
-            var s = FindObjectOfType<Game2DEndingScreen>(); if (s == null || !_active || !s.ArtReady) return false;
+            var s = FindObjectOfType<Game2DEndingScreen>(); if (s == null || !_active) return false;
+            if (!showName && !s.ArtReady) return false;
             s._page = s._pages.Count - 1; s._t = 999f; s._fadeT = FadeSec; s._closing = false;
-            s._inArt = true; s._qaRise = Mathf.Clamp01(rise01); s._artT = s._qaRise * ArtRise;
+            s._inArt = true;
+            if (showName) { s._qaRise = 1f; s._artT = s.NameFullAt; }
+            else { s._qaRise = Mathf.Clamp01(rise01); s._artT = s._qaRise * ArtRise; }
             s.Draw(); s.ApplyFade();
             return true;
         }
 
-        /// <summary>[確認用・2026-11-16] 今の様子を 1 行で返す (頁/全頁数・絵の名前・係数・段)。 例: <c>UI.Game2D.Game2DEndingScreen.QaStatus()</c>。</summary>
+        /// <summary>[確認用・2026-11-16] エンディング名の倍率 (<see cref="NameScale"/>・1 以上に丸める) を替え、 出ている所をすぐ描き直す。 戻り値 = 今の結末の名前に実際に使う倍率
+        /// (安全域に収まらなければ収まる最大へ丸めた値・出ていなければ「英雄の帰還」で数えた値)。 例: <c>UI.Game2D.Game2DEndingScreen.QaSetNameScale(5)</c>。</summary>
+        public static int QaSetNameScale(int k)
+        {
+            NameScale = Mathf.Max(1, k);
+            var s = FindObjectOfType<Game2DEndingScreen>();
+            if (s != null && _active) s.Draw();
+            return FitNameScale(s != null && _active && !string.IsNullOrEmpty(s._name) ? s._name : Endings.End1.title);
+        }
+
+        /// <summary>[確認用・2026-11-16] 今の様子を 1 行で返す (頁/全頁数・絵の名前・係数・段・名前の段と倍率)。 例: <c>UI.Game2D.Game2DEndingScreen.QaStatus()</c>。</summary>
         public static string QaStatus()
         {
             var s = FindObjectOfType<Game2DEndingScreen>(); if (s == null) return "画面の部品が無い";
             if (!_active) return "出していない";
             string stage = s._closing ? "閉じる途中" : s._inArt ? (s.ArtRise01() < 1f ? "結びの絵 (明るくなる途中)" : "結びの絵 (見せている)") : "本文";
-            return "頁 " + (s._page + 1) + "/" + s._pages.Count + " ・絵 " + (s._artName ?? "なし") + (s.ArtReady ? "" : " (読めていない)")
+            string name = !s._inArt ? "未" : s.NameShown <= 0 ? "出る前" : s.NameShown < s.NameRows ? "浮かぶ途中" : "出ている";
+            int ks = FitNameScale(s._name ?? "");
+            return "頁 " + (s._page + 1) + "/" + s._pages.Count + " (1 頁 " + LinesPerPage + " 行) ・絵 " + (s._artName ?? "なし") + (s.ArtReady ? "" : " (読めていない)")
                 + " ・係数 " + BackdropDim.ToString("0.###") + " ・段 " + stage
-                + (s._inArt ? " ・明るさの進み " + s.ArtRise01().ToString("0.###") + (s._qaRise >= 0f ? " (固定)" : "") : "");
+                + (s._inArt ? " ・明るさの進み " + s.ArtRise01().ToString("0.###") + (s._qaRise >= 0f ? " (固定)" : "") : "")
+                + " ・名前 " + name + " 「" + (s._nameNo ?? "") + " / " + (s._name ?? "") + "」 位置 中央 ・倍率 " + ks + (ks != NameScale ? " (指定 " + NameScale + " を丸めた)" : "")
+                + " ・番号の倍率 " + NumberScale(ks);
         }
 #endif
     }
