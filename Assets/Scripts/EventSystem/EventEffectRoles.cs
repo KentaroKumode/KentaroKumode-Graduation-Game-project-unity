@@ -175,10 +175,10 @@ namespace EventSystem
             switch (e.type)
             {
                 case EventEffectType.TurnsPass:          return n + " ターンを使う";
-                case EventEffectType.GoldDelta:          return e.amount < 0 ? "ゴールド " + n + " を払う" : null;
-                case EventEffectType.MaterialDelta:      return e.amount < 0 ? "素材 " + n + " を渡す" : null;
+                case EventEffectType.GoldDelta:          return e.amount < 0 ? n + "ゴールドを払う" : null;
+                case EventEffectType.MaterialDelta:      return e.amount < 0 ? "素材を" + n + "個渡す" : null;
                 case EventEffectType.ProvisionDelta:
-                case EventEffectType.HungerDelta:        return e.amount < 0 ? "物資 " + n + " を渡す" : null;
+                case EventEffectType.HungerDelta:        return e.amount < 0 ? "物資を" + n + "個渡す" : null;
                 case EventEffectType.DiscardPassiveItem: return string.IsNullOrEmpty(e.param) ? "秘宝を 1 つ手放す" : "〈" + e.param + "〉を手放す";
                 case EventEffectType.TradePassive:       return "秘宝を 1 つ差し出す";
                 case EventEffectType.HpDelta:            return e.amount < 0 ? "HP " + n + " を失う" : null;

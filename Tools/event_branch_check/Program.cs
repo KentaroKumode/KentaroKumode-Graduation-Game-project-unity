@@ -344,8 +344,8 @@ static class Program
               $"代償を見せるか: 伏せた支払いは足りなくても選べる (砂時計 {h1}・身ぐるみ {h2})・見せる支払いは選べず理由を出す (「{r1}」「{r2}」)");
         string d1 = food?.CostText(null, -1), d2 = fix?.CostText(null, 2), d3 = Find("切り伏せる男", "小さな灯火を渡す")?.CostText(null, -1);
         Console.WriteLine($"    説明の例: 「{d1}」「{d2}」「{d3}」「{strip?.CostText(null, -1) ?? "(なし)"}」");
-        Check(d1 == "物資 3 を渡す" && d2 != null && d2.StartsWith("2 ターンを使う（補足されている: 2 ターンで捕まる）・素材 3 を渡す") && strip?.CostText(null, -1) == null,
-              "代償を見せるか: 説明の文 (物資 3 を渡す / N ターンを使う + 補足中・素材 N を渡す / 見せない代償だけなら説明なし)");
+        Check(d1 == "物資を3個渡す" && d2 != null && d2.StartsWith("2 ターンを使う（補足されている: 2 ターンで捕まる）・素材を3個渡す") && strip?.CostText(null, -1) == null,
+              "代償を見せるか: 説明の文 (物資を3個渡す / N ターンを使う + 補足中・素材をN個渡す / 見せない代償だけなら説明なし)");
     }
 
     /// <summary>イベントの悪選択の罰の作り替え (2026-11-16・作者の決定・docs/GAME.md §17): 8 つの選択肢の効果の並び・物資を払わない・
