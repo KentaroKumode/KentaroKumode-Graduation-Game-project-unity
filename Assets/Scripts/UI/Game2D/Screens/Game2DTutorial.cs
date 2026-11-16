@@ -415,6 +415,23 @@ namespace UI.Game2D
 
         private const int FocusPad = 2;
 
+        /// <summary>液晶の絵の上の範囲 (戦闘の部品・液晶の dot) を、 画面に見えている範囲 (GUI の格子の dot) へ写す (2026-11-16)。 幕と枠は GUI の層 (湾曲しない) に描くので、
+        /// 液晶の湾曲の分だけずれていた。 角と辺の中点の 8 点を写した外接の矩形 (湾曲で辺が弓なりになる分も入れる)。 式は <see cref="Game2DPointer.ScreenDotOfLcd"/>。</summary>
+        private static RectInt LcdRectOnScreen(RectInt q)
+        {
+            var sc = FindObjectOfType<Game2DScreen>(); var lq = sc != null ? sc.lcdQuad : null;
+            float x0 = float.MaxValue, y0 = float.MaxValue, x1 = float.MinValue, y1 = float.MinValue;
+            for (int i = 0; i <= 2; i++)
+                for (int j = 0; j <= 2; j++)
+                {
+                    if (i == 1 && j == 1) continue;
+                    var s = Game2DPointer.ScreenDotOfLcd(lq, new Vector2(q.x + q.width * i * 0.5f, q.y + q.height * j * 0.5f));
+                    x0 = Mathf.Min(x0, s.x); x1 = Mathf.Max(x1, s.x); y0 = Mathf.Min(y0, s.y); y1 = Mathf.Max(y1, s.y);
+                }
+            int ix0 = Mathf.FloorToInt(x0), iy0 = Mathf.FloorToInt(y0);
+            return new RectInt(ix0, iy0, Mathf.CeilToInt(x1) - ix0, Mathf.CeilToInt(y1) - iy0);
+        }
+
         /// <summary>部品の範囲 (格子の dot・左上が原点・余白 <see cref="FocusPad"/> 込み・画面の内側に切る)。 部品が無い・隠れている・ほとんど画面の外なら null。</summary>
         private RectInt? FocusRect(string title)
         {
@@ -435,7 +452,7 @@ namespace UI.Game2D
                 {
                     var r = Game2DBattleLcd.Instance.FocusRect(part.Value, title == TutorialTopics.Long);      // 「戦闘の長期化」= 激化 (敵の頭上)
                     if (!r.HasValue) return null;
-                    var q = r.Value; int lx0 = Mathf.Max(0, q.x - FocusPad), ly0 = Mathf.Max(0, q.y - FocusPad);
+                    var q = LcdRectOnScreen(r.Value); int lx0 = Mathf.Max(0, q.x - FocusPad), ly0 = Mathf.Max(0, q.y - FocusPad);
                     int lx1 = Mathf.Min(Game2DLayout.Width, q.xMax + FocusPad), ly1 = Mathf.Min(Game2DLayout.Height, q.yMax + FocusPad);
                     return new RectInt(lx0, ly0, lx1 - lx0, ly1 - ly0);
                 }

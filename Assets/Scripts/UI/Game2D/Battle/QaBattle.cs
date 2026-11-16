@@ -341,7 +341,7 @@ namespace UI.Game2D.Battle
             UI.Game2D.Game2DPhaseScreens.RequestRebuild();
         }
 
-        // ── 液晶の湾曲 (2026-11-16・試作の見比べ用) ──
+        // ── 液晶の湾曲 (2026-11-16・見比べ用。 既定は外形を湾曲に合わせる f = 1) ──
 
         /// <summary>液晶の板の材質 (Game2D/LcdScreen・設定が作った複製)。 無ければ null。</summary>
         private static Material LcdMat()
@@ -362,7 +362,7 @@ namespace UI.Game2D.Battle
             Debug.LogWarning("[QaBattle] マウスの当たりが読む材質と液晶の板の材質が別だった (値を写した)");
         }
 
-        /// <summary>湾曲の外形の合わせ方 <c>_CurveFit</c> を実行中に替える (0 = 四隅を絵の端に合わせる・今まで / 1 = 縁の中央を合わせる・絵の外形が樽型・間は線形)。
+        /// <summary>湾曲の外形の合わせ方 <c>_CurveFit</c> を実行中に替える (1 = 縁の中央を合わせる・絵の外形が樽型・既定 / 0 = 旧い合わせ方: 四隅を絵の端に合わせる・間は線形)。 設定を変えると既定 (Game2DSettingsApply.CurveFit) へ戻る。
         /// マウスの当たり (Game2DPointer.LcdDot) も同じ材質から読むので一緒に変わる。 保存はしない (Play を抜けると戻る)。 戻り値 = 今の値の説明。
         /// 例: <c>UI.Game2D.Battle.QaBattle.LcdCurveFit(1)</c></summary>
         public static string LcdCurveFit(float fit)

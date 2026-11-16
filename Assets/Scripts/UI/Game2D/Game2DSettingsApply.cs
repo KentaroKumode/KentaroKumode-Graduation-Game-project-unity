@@ -46,6 +46,12 @@ namespace UI.Game2D
         // 外枠の仕上げ
         private Graphic _fx; private Material _fxMat; private float _vig0;
 
+        /// <summary>液晶の湾曲の外形の合わせ方 (Game2D/LcdScreen の <c>_CurveFit</c>)。 1 = 縁の中央を絵の端に合わせる (絵の外形が樽型・2026-11-16 作者の決定)。
+        /// シェーダの既定も 1 だが、 アセットの材質 (git 管理外) が試作の頃の 0 を持っていても既定になるよう、 実行時の複製へここで入れる。 置き場はこの 1 か所。
+        /// 見比べは QA の口 <c>QaBattle.LcdCurveFit(0)</c> (設定を変えるとここの値へ戻る)。</summary>
+        public const float CurveFit = 1f;
+        private static readonly int CurveFitId = Shader.PropertyToID("_CurveFit");
+
         private static readonly int ScanId = Shader.PropertyToID("_Scan"), CurveId = Shader.PropertyToID("_Curve"), ChromaId = Shader.PropertyToID("_Chroma"),
             GrainId = Shader.PropertyToID("_Grain"), VigId = Shader.PropertyToID("_Vignette"), BrightId = Shader.PropertyToID("_Bright");
 
@@ -103,6 +109,17 @@ namespace UI.Game2D
             return found;
         }
 
+        /// <summary>マウスの当たり (Game2DPointer.LcdDot) が読む材質 (Game2DScreen.lcdQuad の材質) が、 描く材質 (_lcdMat) と別物なら同じ湾曲を写す
+        /// (ふつうは同じ Quad なので何もしない)。 見た目と当たりがずれないように。</summary>
+        private void SyncPointerMaterial()
+        {
+            var sc = FindObjectOfType<Game2DScreen>();
+            var mr = sc != null && sc.lcdQuad != null ? sc.lcdQuad.GetComponent<MeshRenderer>() : null;
+            var pm = mr != null ? mr.sharedMaterial : null;
+            if (pm == null || pm == _lcdMat || !pm.HasProperty(CurveFitId)) return;
+            pm.SetFloat(CurveId, _lcdMat.GetFloat(CurveId)); pm.SetFloat(CurveFitId, _lcdMat.GetFloat(CurveFitId));
+        }
+
         private void Apply()
         {
             AudioListener.volume = GameSettings.Master01;
@@ -111,6 +128,8 @@ namespace UI.Game2D
             {
                 _lcdMat.SetFloat(ScanId, Mathf.Clamp01(_scan0 * GameSettings.FxScale(GameSettings.Key.Scan)));
                 _lcdMat.SetFloat(CurveId, Mathf.Clamp(_curve0 * GameSettings.FxScale(GameSettings.Key.Curve), 0f, 0.2f));
+                if (_lcdMat.HasProperty(CurveFitId)) _lcdMat.SetFloat(CurveFitId, CurveFit);
+                SyncPointerMaterial();
                 _lcdMat.SetFloat(ChromaId, Mathf.Clamp(_chroma0 * GameSettings.FxScale(GameSettings.Key.Chroma), 0f, 0.02f));
                 _lcdMat.SetFloat(GrainId, Mathf.Clamp(_grain0 * GameSettings.FxScale(GameSettings.Key.Noise), 0f, 0.3f));
             }

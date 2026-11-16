@@ -16,7 +16,8 @@ namespace UI.Game2D
     {
         public const int ScreenW = 480, ScreenH = 270;
         /// <summary>板・列・字を収める範囲 = 液晶の安全域 (<see cref="LcdSafeArea"/>・結末の画面と同じ左右 16・上下 9)。 背景の絵だけは画面いっぱい。
-        /// 2026-11-16 の実機で、 見本の配置 (端から 4 dot) は液晶の湾曲で左の字・右の札・下の縁が欠けた。</summary>
+        /// 2026-11-16 の実機で、 見本の配置 (端から 4 dot) は液晶の湾曲 (旧い合わせ方 f = 0) で左の字・右の札・下の縁が欠けた。 外形を湾曲に合わせる今の既定 (f = 1) では欠けない
+        /// (広げる余地は左右それぞれ 16 dot まで・上下は板が中央なので関係ない ── 広げるかは作者が決める)。</summary>
         public const int SafeL = LcdSafeArea.L, SafeR = LcdSafeArea.R, SafeT = LcdSafeArea.T, SafeB = LcdSafeArea.B;
 
         // ── 本文の板 (安全域の左端・画面の上下の中央) ──

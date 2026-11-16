@@ -181,6 +181,25 @@ namespace UI.Game2D
             return LcdDot(d, k, fit);
         }
 
+        /// <summary>逆向き: 液晶の絵 (480×270) の dot → GUI の格子の dot (その絵の点が画面のどこに見えるか)。 GUI の層 (湾曲しない) で、 液晶の中の部品を囲む・指す時に使う
+        /// (手引きの強調の枠など)。 式は <see cref="LcdDot(Vector2, float, float)"/> の逆を不動点の繰り返しで解く (k ≤ 0.2 なら 12 回で 0.01 dot 以下に収まる)。</summary>
+        public static Vector2 ScreenDotOfLcd(Transform lcdQuad, Vector2 p)
+        {
+            float k = 0f, fit = 0f;
+            if (lcdQuad != null)
+            {
+                var mr = lcdQuad.GetComponent<MeshRenderer>(); var m = mr != null ? mr.sharedMaterial : null;
+                if (m != null && m.HasProperty("_Curve")) k = m.GetFloat("_Curve");
+                if (m != null && m.HasProperty("_CurveFit")) fit = m.GetFloat("_CurveFit");
+            }
+            if (k <= 0f) return p;
+            const float W = Game2DLayout.Width, H = Game2DLayout.Height;
+            float sx = p.x / W * 2f - 1f, sy = (1f - p.y / H) * 2f - 1f, D = 1f + k * (2f - Mathf.Clamp01(fit));
+            float cx = sx, cy = sy;
+            for (int i = 0; i < 12; i++) { float r2 = cx * cx + cy * cy; cx = sx * D / (1f + k * r2); cy = sy * D / (1f + k * r2); }
+            return new Vector2((cx * 0.5f + 0.5f) * W, (1f - (cy * 0.5f + 0.5f)) * H);
+        }
+
         /// <summary>湾曲の式 (シェーダ Game2D/LcdScreen の frag の頭と同じ): 元 = 中心 × (1 + k·r²) / (1 + k·(2 − fit))。 c・r² は縦横とも −1〜1 に正規化した座標。
         /// fit = 0: 四隅を絵の端に合わせる (見える範囲は長方形・既定) / 1: 縁の中央を絵の端に合わせる (絵の外形が樽型・試作)。</summary>
         public static Vector2 LcdDot(Vector2 d, float k, float fit)
