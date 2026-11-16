@@ -76,7 +76,8 @@ namespace UI.Game2D
             if (wheel != 0f && inside && Time.unscaledTime - _wheelAt >= 0.14f) { _wheelAt = Time.unscaledTime; ZoomTo(_zoom + (wheel > 0 ? 1 : -1)); }
 
             bool consumes = inside && ((panel != null && panel.Consumes(d.x, d.y)) || Game2DNavExtras.Consumes(d));      // ボタン・計器の上のクリックは地図へ渡さない
-            var dm = ScreenToMapDot(d);                                  // 地図の点の判定は、 湾曲を戻した位置で行う
+            // 地図の点の判定は、 湾曲を戻した位置で行う。 GUI を液晶の中身として合成している間 (既定) は TryDot が戻し済み (2026-11-16)・旧い提示の板の時だけここで戻す
+            var dm = Game2DGuiRt.InLcd ? d : ScreenToMapDot(d);
 
             // ドラッグ (拡大中・ボタンの上でないところから)
             var mp = (Vector2)Input.mousePosition;

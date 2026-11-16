@@ -2,7 +2,9 @@
 // 2026-11-02 に効果を絞って作り直した: 走査線 (横) / 画面の湾曲 / 色収差 / 発光のにじみ (ブルーム) + 自動露出 / ノイズ (横線ノイズ + フィルムの粒)。 もう 1 つのビネットは外枠まで覆うので Game2D/LcdFx 側。
 //   (画素の格子・サブピクセル・ドットの芯・バックライトのにじみ・ちらつきは、 この作り直しで外した。 git の履歴に残る。 ブルームと自動露出は同日に戻した)
 //   湾曲 → 色収差 → 残像 (起動の瞬間用) → 横線ノイズ → 走査線 → ブルーム → 露出 → 粒。 走査線と横線ノイズは湾曲した後の座標で引くので、 画面と一緒に曲がる。
-// 地図 (この Quad) にだけ掛かる。 外枠の GUI (Canvas) には掛けない。
+// 2026-11-16 (作者の決定「外の部品はもう無い」): GUI (計器盤・帯・窓・手引き) の RT (Game2DGuiRt・960×540・中身の RT と同じ格子) も、 ここで湾曲した後の同じ座標で読んで
+//   中身に重ね、 そのあと効果 (色収差・残像・横線ノイズ・走査線・ブルーム・露出・粒) を全部掛ける。 GUI はグローバルの _Game2DGuiTex (_Game2DGuiOn = 1 の時だけ)。
+//   残像・ブルーム・自動露出の元の絵 (_PrevTex など・Game2DLcdGhost) にも GUI を重ねてある。 ボスの大技の揺れ・暗転・赤・白も GUI へここで掛ける (旧: 提示の板 Game2D/GuiPresent)。
 Shader "Game2D/LcdScreen"
 {
     Properties
@@ -55,6 +57,29 @@ Shader "Game2D/LcdScreen"
             float _Chroma, _Distort, _Power, _Ghost, _Curve, _CurveFit, _Scan, _ScanRows, _Grain, _GrainFps, _Bloom, _BloomThr, _Halo, _BloomTintAmt, _BloomFar, _Exposure;
             fixed4 _Back, _Ink, _BloomTint;
             float4 _GrainCells;
+            // GUI (2026-11-16・Game2DGuiRt がグローバルで入れる)
+            sampler2D _Game2DGuiTex;
+            float _Game2DGuiOn, _Game2DGuiFxOn, _Game2DGuiFxDark, _Game2DGuiFxRed;
+            float4 _Game2DGuiFxWhite, _Game2DGuiFxShake;
+
+            // 中身の色 lcd の上に、 GUI の RT の uv の所を重ねる。 GUI の RT は UI の通常の合成 (SrcAlpha, OneMinusSrcAlpha) で透明な地へ書かれているので、
+            // かぶり率 = sqrt(alpha)・色はかぶり率を掛けた色 (旧 Game2D/GuiPresent と同じ読み方)。 ボスの大技は GUI 全体に同じ強さで掛ける (中身と同じに)。
+            float3 GuiOver(float3 lcd, float2 uv)
+            {
+                if (_Game2DGuiOn < 0.5) return lcd;
+                if (_Game2DGuiFxOn > 0.5) uv += float2(-_Game2DGuiFxShake.x / 480.0, _Game2DGuiFxShake.y / 270.0);      // 揺れ (dot)。 中身の揺れは絵を (dx, dy) ずらす = ここでは (−dx, +dy) から読む
+                float4 g = tex2D(_Game2DGuiTex, uv);
+                float cov = sqrt(saturate(g.a));
+                float3 rgb = g.rgb;
+                if (_Game2DGuiFxOn > 0.5)
+                {
+                    // 暗幕 → 赤 (王) → 白 (発光は赤の上)。 暗幕の倍率が負 (シュヴァリエの真っ黒の一拍) は 0 = 黒
+                    rgb *= max(_Game2DGuiFxDark, 0.0);
+                    rgb = float3(min(cov, rgb.r + 26.0 / 255.0 * _Game2DGuiFxRed * cov), rgb.g * (1.0 - 0.45 * _Game2DGuiFxRed), rgb.b * (1.0 - 0.6 * _Game2DGuiFxRed));
+                    rgb = lerp(rgb, _Game2DGuiFxWhite.rgb * cov, saturate(_Game2DGuiFxWhite.a));
+                }
+                return lcd * (1.0 - cov) + rgb;
+            }
 
             v2f vert (appdata v) { v2f o; o.pos = UnityObjectToClipPos(v.vertex); o.uv = v.uv; return o; }
 
@@ -113,7 +138,8 @@ Shader "Game2D/LcdScreen"
 
                 // ── 色収差: 中心から外向きに、 赤は外へ・青は内へずれる (レンズの色ずれ)。 中心にも少し残し、 縁へ行くほど強くなる。 緑は動かさない
                 float2 ca = c * _Chroma * (0.25 + 0.75 * r2);
-                fixed3 cur = fixed3(tex2D(_MainTex, suv + ca).r, tex2D(_MainTex, suv).g, tex2D(_MainTex, suv - ca).b);
+                //   GUI も同じ座標で重ねてから色をずらす (計器や窓の字も中身と同じに色がずれる)
+                fixed3 cur = fixed3(GuiOver(tex2D(_MainTex, suv + ca).rgb, suv + ca).r, GuiOver(tex2D(_MainTex, suv).rgb, suv).g, GuiOver(tex2D(_MainTex, suv - ca).rgb, suv - ca).b);
 
                 // 残像 (点灯の瞬間の液晶の応答の遅れ): 前のフレームを lighten で薄く重ねる
                 fixed3 prev = tex2Dlod(_PrevTex, float4(suv, 0, 0)).rgb;

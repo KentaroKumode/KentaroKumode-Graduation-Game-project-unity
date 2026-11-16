@@ -415,7 +415,8 @@ namespace UI.Game2D
 
         private const int FocusPad = 2;
 
-        /// <summary>液晶の絵の上の範囲 (戦闘の部品・液晶の dot) を、 画面に見えている範囲 (GUI の格子の dot) へ写す (2026-11-16)。 幕と枠は GUI の層 (湾曲しない) に描くので、
+        /// <summary>液晶の絵の上の範囲 (戦闘の部品・液晶の dot) を、 画面に見えている範囲 (GUI の格子の dot) へ写す (2026-11-16)。 <b>旧い提示の板 (Game2DGuiRt.InLcd = false) の時だけ使う</b> ──
+        /// 既定 (GUI も液晶の中身として同じに曲がる) では、 部品の範囲をそのまま使えば合う (写すと二重になる)。 旧い形では幕と枠を湾曲しない層に描くので、
         /// 液晶の湾曲の分だけずれていた。 角と辺の中点の 8 点を写した外接の矩形 (湾曲で辺が弓なりになる分も入れる)。 式は <see cref="Game2DPointer.ScreenDotOfLcd"/>。</summary>
         private static RectInt LcdRectOnScreen(RectInt q)
         {
@@ -452,7 +453,7 @@ namespace UI.Game2D
                 {
                     var r = Game2DBattleLcd.Instance.FocusRect(part.Value, title == TutorialTopics.Long);      // 「戦闘の長期化」= 激化 (敵の頭上)
                     if (!r.HasValue) return null;
-                    var q = LcdRectOnScreen(r.Value); int lx0 = Mathf.Max(0, q.x - FocusPad), ly0 = Mathf.Max(0, q.y - FocusPad);
+                    var q = Game2DGuiRt.InLcd ? r.Value : LcdRectOnScreen(r.Value); int lx0 = Mathf.Max(0, q.x - FocusPad), ly0 = Mathf.Max(0, q.y - FocusPad);
                     int lx1 = Mathf.Min(Game2DLayout.Width, q.xMax + FocusPad), ly1 = Mathf.Min(Game2DLayout.Height, q.yMax + FocusPad);
                     return new RectInt(lx0, ly0, lx1 - lx0, ly1 - ly0);
                 }

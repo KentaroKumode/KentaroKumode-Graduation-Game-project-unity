@@ -381,6 +381,15 @@ namespace UI.Game2D.Battle
             return LcdCurveNow();
         }
 
+        /// <summary>GUI (計器盤・帯・窓・手引き) の合成の形を替える (2026-11-16・見比べ用・保存しない)。 true = 液晶の中身として合成 (既定・湾曲と液晶の効果が全部掛かる) /
+        /// false = 旧い提示の板 (湾曲しない層で液晶の上に重ね、 影と上下の色調を付ける)。 押す所の変換 (Game2DPointer.TryDot) も一緒に切り替わる。
+        /// 例: <c>UI.Game2D.Battle.QaBattle.GuiInLcd(false)</c></summary>
+        public static string GuiInLcd(bool on)
+        {
+            Game2DGuiRt.InLcd = on;
+            return "guiInLcd=" + Game2DGuiRt.InLcd;
+        }
+
         /// <summary>今の湾曲 (「curve=0.070 fit=0.00」)。</summary>
         public static string LcdCurveNow() { var m = LcdMat(); return m == null ? "(液晶の材質が無い)" : $"curve={m.GetFloat("_Curve"):0.000} fit={m.GetFloat("_CurveFit"):0.00}"; }
 

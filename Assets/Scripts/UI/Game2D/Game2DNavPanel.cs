@@ -151,10 +151,29 @@ namespace UI.Game2D
         }
     }
 
-    /// <summary>マウスの位置 → GUI の dot (480×270・左上が原点・y 下向き)。</summary>
+    /// <summary>マウスの位置 → 480×270 の格子の dot (左上が原点・y 下向き)。 <b>押す所は全部ここを通る</b> (2026-11-16)。</summary>
     public static class Game2DPointer
     {
+        /// <summary>マウスの位置 → GUI の部品 (計器盤・帯・窓・手引き) の dot。 GUI を液晶の中身として合成している間 (<see cref="Game2DGuiRt.InLcd"/>・既定) は、
+        /// GUI も液晶と同じに湾曲して見えるので、 湾曲を戻した dot (<see cref="LcdDot(Transform, Vector2)"/>) を返す。 旧い提示の板の時は画面の位置そのまま。
+        /// 絵の外 (四隅の楔) を指している時は false。</summary>
         public static bool TryDot(Game2DScreen screen, out Vector2 dot)
+        {
+            if (!TryScreenDot(screen, out dot)) return false;
+            if (Game2DGuiRt.InLcd) dot = LcdDot(screen.lcdQuad, dot);
+            return InGrid(dot);
+        }
+
+        /// <summary>マウスの位置 → 液晶の中身 (地図・戦闘・イベントの画面) の dot。 いつも湾曲を戻す (GUI の合成の形に関係なく、 中身は湾曲している)。 絵の外なら false。</summary>
+        public static bool TryLcdDot(Game2DScreen screen, out Vector2 dot)
+        {
+            if (!TryScreenDot(screen, out dot)) return false;
+            dot = LcdDot(screen.lcdQuad, dot);
+            return InGrid(dot);
+        }
+
+        /// <summary>マウスの位置 → 画面の上の格子の dot (湾曲を戻さない)。</summary>
+        private static bool TryScreenDot(Game2DScreen screen, out Vector2 dot)
         {
             dot = default;
             if (screen == null) return false;
@@ -162,8 +181,10 @@ namespace UI.Game2D
             if (mp.x < 0 || mp.y < 0 || mp.x > Screen.width || mp.y > Screen.height) return false;
             float ppd = screen.PixelsPerGuiDot;
             dot = new Vector2((mp.x - Screen.width / 2f) / ppd + Game2DLayout.Width / 2f, Game2DLayout.Height / 2f - (mp.y - Screen.height / 2f) / ppd);
-            return dot.x >= 0 && dot.y >= 0 && dot.x <= Game2DLayout.Width && dot.y <= Game2DLayout.Height;
+            return InGrid(dot);
         }
+
+        private static bool InGrid(Vector2 d) => d.x >= 0 && d.y >= 0 && d.x <= Game2DLayout.Width && d.y <= Game2DLayout.Height;
 
         /// <summary>GUI の格子の dot → 液晶の絵 (480×270) の dot。 液晶は樽型に湾曲している (Game2D/LcdScreen の _Curve・_CurveFit) ので、
         /// 見えている点が絵のどこを映しているかをシェーダと同じ式で求める。 <b>式の置き場はここ 1 か所</b> (2026-11-16 にまとめた:

@@ -111,8 +111,7 @@ namespace UI.Game2D
             RefreshRelics();
 
             bool ready = !Stowed && !Game2DModal.Active && _screen != null;
-            _hasMouse = ready && Game2DPointer.TryDot(_screen, out _mouse);
-            if (_hasMouse) _mouse = LcdDot(_mouse);
+            _hasMouse = ready && Game2DPointer.TryLcdDot(_screen, out _mouse);      // 湾曲を戻した液晶の dot (2026-11-16〜 変換は TryLcdDot の中・後掛けはしない)
             // 持ち物の画面 (見るだけ): キー I。 窓が出ている間・つかんでいる間は開かない (旧画面と同じ条件)
             if (ready && !PointerBusy && !Game2DTutorial.Blocking && Input.GetKeyDown(KeyCode.I)) OpenInventory();
             if (!_hasMouse) { _hoverCard = _hoverRelic = -1; _hoverZone = Zone.None; if (!ready) CancelAll(); return; }
@@ -128,9 +127,6 @@ namespace UI.Game2D
         private bool ExtrasUp => _leftOff == 0 && _rightOff == 0 && _topOff == 0;
         private static int StepTo(int cur, int target) => cur + Mathf.Clamp(target - cur, -BattleLcdLayout.MaxStepPerFrame, BattleLcdLayout.MaxStepPerFrame);
 
-        /// <summary>画面の位置 (GUI の格子の dot) → 液晶の絵 (480×270) の dot。 液晶は樽型に湾曲している (Game2D/LcdScreen の _Curve) ので、
-        /// 見えている点が絵のどこを映しているかをシェーダと同じ式で求める (Game2DMapView.ScreenToMapDot と同じ)。 当たり判定を見た目に合わせる。</summary>
-        private Vector2 LcdDot(Vector2 d) => Game2DPointer.LcdDot(_screen != null ? _screen.lcdQuad : null, d);      // 式は Game2DPointer.LcdDot の 1 か所 (_CurveFit も読む)
 
         private void CancelAll()
         {

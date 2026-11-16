@@ -15,7 +15,7 @@ namespace UI.Game2D
     /// <para>出している間は <see cref="Game2DModal.Active"/> が true を返す (地図・戦闘・帯などの後ろの画面は今までどおり手を止める) ── 窓で出していた時と同じ働き。
     /// 計器盤 (GUI) は読み込み・結末と同じく隠す (<see cref="Game2DHud"/>・液晶の全面を使う)。 BOT がランを動かしている間は出さない。</para>
     ///
-    /// <para><b>マウス</b>: 液晶は樽型に湾曲しているので、 GUI の格子の dot (<see cref="Game2DPointer.TryDot"/>) を <see cref="Game2DPointer.LcdDot"/> で液晶の絵の dot に戻してから当てる
+    /// <para><b>マウス</b>: 液晶は樽型に湾曲しているので、 湾曲を戻した液晶の dot (<see cref="Game2DPointer.TryLcdDot"/>) で当てる
     /// (地図・戦闘の液晶と同じ式)。</para>
     /// </summary>
     public class Game2DEventScreen : MonoBehaviour
@@ -108,9 +108,8 @@ namespace UI.Game2D
             if (_fadeT < FadeSec) { _fadeT += Mathf.Min(0.05f, Time.unscaledDeltaTime); ApplyFade(); }
             if (_view != null && !Game2DTutorial.Blocking && !Game2DModal.WindowActive)      // 手引きの板・窓が上にある間は押させない
             {
-                var d = default(Vector2);
-                bool inside = _mv != null && Game2DPointer.TryDot(_mv.screen, out d);
-                var local = inside ? Game2DPointer.LcdDot(_mv.lcdQuad, d) : default;
+                var local = default(Vector2);
+                bool inside = _mv != null && Game2DPointer.TryLcdDot(_mv.screen, out local);      // 湾曲を戻した液晶の dot (変換は TryLcdDot の中)
                 bool click = inside && _fadeT >= FadeSec && Input.GetMouseButtonDown(0);
                 if (_view.Pointer(local, inside, click)) _dirty = true;
             }

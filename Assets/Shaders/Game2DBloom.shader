@@ -1,6 +1,6 @@
 // 液晶のブルーム用の下処理 (Game2DLcdGhost が毎フレーム呼ぶ)。 Quad のシェーダ (Game2D/LcdScreen) が、 できた小さな絵をなめらかに引き伸ばして重ねる。
 //   Pass 0: しきい値を超えた明るさだけを取り出し、 4×4 の塊ごとに「平均 (面の光)」と「最大 (細い線・点の光)」にまとめて縮小する
-//   Pass 1: 横のガウスぼかし   Pass 2: 縦のガウスぼかし   Pass 3: 2×2 を平均して半分に縮小
+//   Pass 1: 横のガウスぼかし   Pass 2: 縦のガウスぼかし   Pass 3: 2×2 を平均して半分に縮小   Pass 4: GUI の RT を重ねる (2026-11-16)
 // 元の絵は 1 画素ずつの点なので、 点を直接サンプルして足すと、 にじみの輪郭が階段状にカクカクする。 縮小してぼかした絵を、 双一次補間で拡大して使えば、 輪郭が丸くなめらかになる。
 Shader "Hidden/Game2DBloom"
 {
@@ -86,6 +86,17 @@ Shader "Hidden/Game2DBloom"
             #pragma vertex vert
             #pragma fragment frag
             fixed4 frag (v2f i) : SV_Target { return tex2D(_MainTex, i.uv); }
+            ENDCG
+        }
+        // Pass 4 (2026-11-16): GUI の RT を、 残像・ブルーム・自動露出の元の絵 (中身の写し) の上に重ねる (Game2DLcdGhost)。
+        //   GUI の RT はかぶり率 = sqrt(alpha)・色はかぶり率を掛けた色 (Game2D/LcdScreen の GuiOver と同じ読み方)
+        Pass
+        {
+            Blend One OneMinusSrcAlpha
+            CGPROGRAM
+            #pragma vertex vert
+            #pragma fragment frag
+            fixed4 frag (v2f i) : SV_Target { float4 g = tex2D(_MainTex, i.uv); return float4(g.rgb, sqrt(saturate(g.a))); }
             ENDCG
         }
     }

@@ -100,6 +100,14 @@ namespace UI.Game2D
                 _prev.Create();
             }
             Graphics.Blit(src, _prev);
+            // GUI を液晶の中身として合成する時 (2026-11-16・Game2DGuiRt.InLcd): 残像・ブルーム・自動露出の元の絵にも GUI を重ねる (計器も液晶の明るさの一部)。
+            //   ここは前のフレームの中身なので、 GUI の RT も前のフレームの物 (同じフレームどうし)。 重ね方は液晶のシェーダの GuiOver と同じ (Hidden/Game2DBloom の Pass 4)
+            var gui = Game2DGuiRt.InLcd && Game2DGuiRt.Current != null ? Game2DGuiRt.Current.Texture : null;
+            if (gui != null && bloomShader != null)
+            {
+                if (_bloomMat == null) _bloomMat = new Material(bloomShader) { hideFlags = HideFlags.HideAndDontSave };
+                Graphics.Blit(gui, _prev, _bloomMat, 4);
+            }
             BuildBloom();
             if (autoExposure) Meter(); else { MeasuredLuma = -1f; Exposure = Mathf.MoveTowards(Exposure, 1f, Time.unscaledDeltaTime * 2f); }
             if (_mpb == null) _mpb = new MaterialPropertyBlock();
