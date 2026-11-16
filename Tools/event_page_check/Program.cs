@@ -1,9 +1,9 @@
 // イベントの窓の頁割り (EventPaging・JpTextLayout・ModalJpMetrics) の検算。 Tools/event_page_check/run.py が Unity なしでコンパイルして回す。
 //   画面と同じ関数 (Assets/Scripts/UI/Game2D/JpTextLayout.cs ほか) を、 焼いたドット字 (GameFont.DotPath の .bytes) の送り幅で回す。
 //   1. 頁割りの規則 (段落ごとに 1 頁・長い段落は行で割る・最後の頁は選択肢に場所を空ける・行を捨てない)
-//   2. 直す前 (2026-11-13 まで) の窓: 導入は 5 行・結果は 8 行で切り捨て、 選択肢は窓の高さ 266 に入る分だけ描いていた ── 溢れていた文と選択肢の一覧
-//   3. 直した後の窓: 全イベントの導入・結果の文が全部どこかの頁に出る (切り捨て 0)・どの頁も窓が 266 (格子 270) に収まる・
-//      選択肢が全部描ける (説明の 2 行が付いた時も)・選択肢の名前と説明 (選べない理由・見せる代償・使うターン) が切れない
+//   2. 画面の配置 (2026-11-16・EventLayout): 本文 8 行が本文の板に収まる・板と列が画面に収まる・画面が使う字がドット字にある
+//   3. 全イベント: 導入・結果の文が全部どこかの頁に出る (切り捨て 0・1 頁 8 行まで)・選択肢の列 (箱 + 説明の板) が画面に収まる・
+//      箱の下の説明 (選べない理由・補足中の見込み) が 2 行に収まる。 名前が札と当たって「…」で切れる選択肢の数と一覧を出す
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -17,6 +17,7 @@ static class Program
     static int fails;
     static Func<char, int> Adv;
     static int LineH;
+    static Dictionary<int, int> Glyphs;
 
     static void Check(bool ok, string what)
     {
@@ -34,9 +35,10 @@ static class Program
         int cell = b[4], n = BitConverter.ToInt32(b, 5), o = 9;
         var map = new Dictionary<int, int>();
         for (int i = 0; i < n && o + 5 + 2 * cell <= b.Length; i++) { map[(int)BitConverter.ToUInt32(b, o)] = b[o + 4]; o += 5 + 2 * cell; }
+        Glyphs = map;
         Adv = ch => map.TryGetValue(ch, out var a) ? a : cell / 2;      // Game2DJpFont.Advance と同じ (無い字は字の高さの半分)
         LineH = cell + 1;                                                // Game2DJpFont.LineH
-        Console.WriteLine($"ドット字: 字の高さ {cell}・行送り {LineH}・{map.Count} 字・本文の幅 {ModalJpMetrics.BodyW(EventPaging.Width)} dot (窓の幅 {EventPaging.Width})");
+        Console.WriteLine($"ドット字: 字の高さ {cell}・行送り {LineH}・{map.Count} 字・本文の幅 {EventLayout.BodyW} dot (本文の板 {EventLayout.PlateW}×{EventLayout.PlateH})・選択肢の列の幅 {EventLayout.ColW}");
     }
 
     // ===== 1. 規則 =====
@@ -117,7 +119,7 @@ static class Program
     static List<string> AllLines(string text)
     {
         var l = new List<string>();
-        foreach (var para in JpTextLayout.Paragraphs(text)) l.AddRange(JpTextLayout.Lines(para, ModalJpMetrics.BodyW(EventPaging.Width), Adv));
+        foreach (var para in JpTextLayout.Paragraphs(text)) l.AddRange(JpTextLayout.Lines(para, EventLayout.BodyW, Adv));
         return l;
     }
 
@@ -127,6 +129,15 @@ static class Program
         string root = args.Length > 0 ? args[0] : ".";
         LoadFont(root);
         Rules();
+
+        // ===== 2. 画面の配置 =====
+        Check(EventLayout.BodyLinesFit(LineH) >= EventPaging.TextLines, $"本文 {EventPaging.TextLines} 行が本文の板に収まる (入る行数 {EventLayout.BodyLinesFit(LineH)})");
+        Check(EventLayout.PlateX >= 0 && EventLayout.PlateY + EventLayout.PlateH <= EventLayout.ScreenH && EventLayout.PlateX + EventLayout.PlateW <= EventLayout.ColX,
+              "本文の板が画面に収まり、 選択肢の列と重ならない");
+        Check(EventLayout.ColX + EventLayout.ColW <= EventLayout.ScreenW - EventLayout.Margin, "選択肢の列が画面の右に収まる");
+        string need = "…〜0123456789G素材物資手放す次へ前選ぶ補足されている。最短ターンで捕まる中";
+        var missing = need.Where(ch => !Glyphs.ContainsKey(ch)).Distinct().ToList();
+        Check(missing.Count == 0, "画面が使う字がドット字にある" + (missing.Count > 0 ? " (無い字: " + string.Join("", missing) + ")" : ""));
 
         var gm = new GameLoop.GameManager { Run = new GameLoop.RunState() };
         GameLoop.GameManager.Instance = gm;
@@ -138,89 +149,60 @@ static class Program
                 var ev = new Ev { file = Path.GetFileName(path), def = def };
                 foreach (var c in def.choices)
                 {
-                    // 説明の文の最も長い形: 選べない理由のどれか + 使うターン + 補足中 (最短 99 ターン)
+                    // 箱の下の説明の全部の形: 選べない理由 (無し・どれか) × 補足中の見込み (無し・N ターンで捕まる・最短 99 ターン)
                     var reasons = new SortedSet<string>(StringComparer.Ordinal);
                     foreach (var sc in scenes) { sc(gm); var r = c.UnavailableReason(gm.Run); if (r != null) reasons.Add(r); }
-                    // 2026-11-16: 見せる代償 (ゴールド・素材・秘宝・印〔見せる〕の物資) も並ぶ (EventChoice.CostText)
-                    var cands = new List<string> { c.CostText(null, c.TurnCost > 0 ? 99 : -1) };
-                    foreach (var r in reasons) cands.Add(c.CostText(r, c.TurnCost > 0 ? 99 : -1));
-                    foreach (var d in cands) if (!string.IsNullOrEmpty(d)) { ev.descs.Add(d); ev.anyDesc = true; }
+                    var whys = new List<string> { null }; whys.AddRange(reasons);
+                    foreach (var why in whys)
+                        foreach (int eta in new[] { -1, 1, 99 })
+                        {
+                            var d = c.NoteText(why, eta);
+                            if (!string.IsNullOrEmpty(d)) { ev.descs.Add(d); ev.anyDesc = true; }
+                        }
                 }
                 evs.Add(ev);
             }
         GameLoop.GameManager.Instance = null;
-        int bw = ModalJpMetrics.BodyW(EventPaging.Width);
-        Console.WriteLine($"イベント {evs.Count}・選択肢 {evs.Sum(e => e.def.choices.Count)}・選択肢の最大 {evs.Max(e => e.def.choices.Count)}");
+        int choicesAll = evs.Sum(e => e.def.choices.Count);
+        Console.WriteLine($"イベント {evs.Count}・選択肢 {choicesAll}・選択肢の最大 {evs.Max(e => e.def.choices.Count)}");
 
-        // ===== 2. 直す前の窓 =====
-        //   導入: 本文 5 行で切る (ScreenDef.bodyLines の既定)・「／」はそのまま字として出ていた・高さは中身の高さを 266 で切る・行は入る分だけ描く
-        //   結果: 本文 8 行で切る
-        var before = new List<(int over, string what)>();
-        int oldCutRows = 0;
+        // ===== 3. 全イベント =====
+        int texts = 0, cut = 0, colOver = 0, noteOver = 0, nameCut = 0, titleCut = 0, pagesMax = 0, multi = 0;
+        string pagesMaxWhat = "";
+        var cutNames = new List<string>();
+        var pageCounts = new List<string>();
         foreach (var ev in evs)
         {
             var d = ev.def; int k = d.choices.Count;
-            int n = JpTextLayout.Lines(d.flavor, bw, Adv).Count;          // 「／」を字のまま折り返す
-            if (n > 5) before.Add((n - 5, $"{ev.file} 〈{d.name}〉 導入 {n} 行 → 5 行で切れる ({n - 5} 行が読めない・{d.flavor.Length} 字)"));
-            foreach (bool det in ev.anyDesc ? new[] { false, true } : new[] { false })
-            {
-                int shown = Math.Min(5, n);
-                int h = Math.Min(ModalJpMetrics.MaxH, ModalJpMetrics.HeightUncapped(LineH, n > 0, shown, k, 0, det));
-                int fit = ModalJpMetrics.RowsThatFit(h, LineH, n > 0, shown, 0, det);
-                if (fit < k)
-                {
-                    oldCutRows++;
-                    before.Add((100 + k - fit, $"{ev.file} 〈{d.name}〉 選択肢 {k} のうち {fit} しか描けない{(det ? " (説明の 2 行が出ている時)" : "")}: 「{string.Join("」「", d.choices.Skip(fit).Select(c => c.text))}」が出ない"));
-                    break;
-                }
-            }
-            for (int i = 0; i < k; i++)
-            {
-                var c = d.choices[i]; int nb = BranchCount(c);
-                for (int b = 0; b < Math.Max(1, nb); b++)
-                {
-                    int m = JpTextLayout.Lines(ResultText(c, nb > 0 ? b : -1), bw, Adv).Count;
-                    if (m > 8) before.Add((m - 8, $"{ev.file} 〈{d.name}〉「{c.text}」{(nb > 0 ? "分岐" + (b + 1) : "")} 結果 {m} 行 → 8 行で切れる"));
-                }
-            }
-        }
-        Console.WriteLine($"[直す前] 切り捨てられる文・描かれない選択肢 {before.Count} 件 (うち選択肢が描かれないイベント {oldCutRows})。 上位 10 件:");
-        foreach (var x in before.OrderByDescending(x => x.over).Take(10)) Console.WriteLine("  " + x.what);
-
-        // ===== 3. 直した後の窓 =====
-        int texts = 0, cut = 0, overH = 0, rowsCut = 0, nameCut = 0, descCut = 0, pagesMax = 0, hMax = 0, compact = 0;
-        string hMaxWhat = "", pagesMaxWhat = "";
-        foreach (var ev in evs)
-        {
-            var d = ev.def; int k = d.choices.Count;
-            foreach (bool det in ev.anyDesc ? new[] { false, true } : new[] { false })
-            {
-                var plan = EventPaging.Intro(d.flavor, k, det, LineH, Adv);
-                texts++;
-                var got = plan.pages.SelectMany(x => x).ToList(); var want = AllLines(d.flavor);
-                if (!got.SequenceEqual(want)) { cut++; Console.WriteLine($"  NG 切り捨て: 〈{d.name}〉 導入 {want.Count} 行のうち {got.Count} 行"); }
-                for (int pg = 0; pg < plan.Count; pg++)
-                {
-                    int cap = plan.IsLast(pg) ? plan.lastLines : EventPaging.TextLines;
-                    if (plan.Lines(pg) > cap) { cut++; Console.WriteLine($"  NG 頁の行数: 〈{d.name}〉 {pg + 1} 頁 {plan.Lines(pg)} 行 > {cap}"); }
-                    if (!EventPaging.RowsFit(plan, pg, k, det, LineH)) { rowsCut++; Console.WriteLine($"  NG 選択肢が描けない: 〈{d.name}〉{(det ? " (説明あり)" : "")}"); }
-                }
-                if (!plan.fits || plan.height > ModalJpMetrics.MaxH) { overH++; Console.WriteLine($"  NG 窓の高さ: 〈{d.name}〉 {plan.height}"); }
-                if (plan.rowH > 0) compact++;
-                if (plan.height > hMax) { hMax = plan.height; hMaxWhat = $"〈{d.name}〉 導入 (選択肢 {k}{(det ? "・説明あり" : "")})"; }
-                if (plan.Count > pagesMax) { pagesMax = plan.Count; pagesMaxWhat = $"〈{d.name}〉 導入"; }
-            }
-            // 選択肢の名前 (行の幅に Clip される: 行の幅 - 左右 6)・説明 (2 行まで)
-            int nameW = EventPaging.Width - 2 * ModalJpMetrics.Inset - 12;
-            foreach (var c in d.choices)
-            {
-                int w = c.text.Sum(ch => Adv(ch));
-                if (w > nameW) { nameCut++; Console.WriteLine($"  NG 選択肢の名前が切れる: 〈{d.name}〉「{c.text}」 {w} > {nameW} dot"); }
-            }
+            var plan = EventPaging.Intro(d.flavor, Adv);
+            texts++;
+            pageCounts.Add(d.name + "\t" + plan.Count);
+            if (plan.Count > 1) multi++;
+            if (!plan.pages.SelectMany(x => x).SequenceEqual(AllLines(d.flavor))) { cut++; Console.WriteLine($"  NG 切り捨て: 〈{d.name}〉 導入"); }
+            foreach (var pg in plan.pages) if (pg.Count > EventPaging.TextLines) { cut++; Console.WriteLine($"  NG 頁の行数: 〈{d.name}〉 {pg.Count} 行"); }
+            if (plan.Count > pagesMax) { pagesMax = plan.Count; pagesMaxWhat = $"〈{d.name}〉 導入"; }
+            // 題 (頁の位置「9/9」の分を空けて)。 切れても「…」で出る
+            int titleRoom = EventLayout.BodyW - (plan.Count > 1 ? EventLayout.Width(plan.Count + "/" + plan.Count, Adv) + 8 : 0);
+            if (EventLayout.Width(d.name, Adv) > titleRoom) { titleCut++; Console.WriteLine($"  題が切れる: 〈{d.name}〉 {EventLayout.Width(d.name, Adv)} > {titleRoom} dot"); }
+            // 選択肢の列 (箱 k 個 + 説明の板の最大)
+            int noteMax = 0;
             foreach (var s in ev.descs)
             {
-                int n = JpTextLayout.Lines(s, bw, Adv).Count;
-                if (n > ModalJpMetrics.JDetail) { descCut++; Console.WriteLine($"  NG 説明が 2 行に収まらない: 〈{d.name}〉「{s}」 {n} 行"); }
+                int n = JpTextLayout.Lines(s, EventLayout.NoteW, Adv).Count;
+                if (n > EventLayout.NoteLines) { noteOver++; Console.WriteLine($"  NG 説明が {EventLayout.NoteLines} 行に収まらない: 〈{d.name}〉「{s.Replace("\n", "／")}」 {n} 行"); }
+                noteMax = Math.Max(noteMax, Math.Min(n, EventLayout.NoteLines));
+            }
+            if (!EventLayout.ColumnFits(k, EventLayout.NoteH(noteMax, LineH))) { colOver++; Console.WriteLine($"  NG 選択肢の列が画面に収まらない: 〈{d.name}〉 選択肢 {k}・説明 {noteMax} 行"); }
+            // 名前が札と当たって切れるか
+            foreach (var c in d.choices)
+            {
+                var chips = c.CostChips();
+                int room = EventLayout.NameRoom(EventLayout.ChipsW(chips, Adv)), w = EventLayout.Width(c.text, Adv);
+                if (w > room)
+                {
+                    nameCut++;
+                    cutNames.Add($"〈{d.name}〉「{c.text}」 {w} > {room} dot (札: {(chips.Count == 0 ? "なし" : string.Join(" ", chips.Select(x => (x.turns ? "砂" : "") + x.text)))})");
+                }
             }
             for (int i = 0; i < k; i++)
             {
@@ -228,32 +210,29 @@ static class Program
                 for (int b = 0; b < Math.Max(1, nb); b++)
                 {
                     string text = ResultText(c, nb > 0 ? b : -1);
-                    var plan = EventPaging.Result(text, LineH, Adv);
+                    var rp = EventPaging.Result(text, Adv);
                     texts++;
-                    if (!plan.pages.SelectMany(x => x).SequenceEqual(AllLines(text))) { cut++; Console.WriteLine($"  NG 切り捨て: 〈{d.name}〉「{c.text}」 結果"); }
-                    foreach (var pgl in plan.pages) if (pgl.Count > EventPaging.TextLines) { cut++; Console.WriteLine($"  NG 頁の行数: 〈{d.name}〉「{c.text}」 結果"); }
-                    if (!plan.fits || plan.height > ModalJpMetrics.MaxH) { overH++; Console.WriteLine($"  NG 窓の高さ: 〈{d.name}〉「{c.text}」 結果 {plan.height}"); }
-                    if (plan.height > hMax) { hMax = plan.height; hMaxWhat = $"〈{d.name}〉「{c.text}」 結果"; }
-                    if (plan.Count > pagesMax) { pagesMax = plan.Count; pagesMaxWhat = $"〈{d.name}〉「{c.text}」 結果"; }
+                    if (!rp.pages.SelectMany(x => x).SequenceEqual(AllLines(text))) { cut++; Console.WriteLine($"  NG 切り捨て: 〈{d.name}〉「{c.text}」 結果"); }
+                    foreach (var pgl in rp.pages) if (pgl.Count > EventPaging.TextLines) { cut++; Console.WriteLine($"  NG 頁の行数: 〈{d.name}〉「{c.text}」 結果"); }
+                    if (rp.Count > pagesMax) { pagesMax = rp.Count; pagesMaxWhat = $"〈{d.name}〉「{c.text}」 結果"; }
                 }
             }
         }
-        // 選択肢の数の上限 (説明あり・行を詰めて・本文 0 行で 266 に入る数)
-        int maxK = 0;
-        for (int kk = 1; kk <= 12; kk++) if (EventPaging.Intro("", kk, true, LineH, Adv).fits) maxK = kk;
-        Console.WriteLine($"[直した後] 文 {texts} 本 (導入は説明の有無の両方・結果は分岐ごと)・頁の最大 {pagesMax} ({pagesMaxWhat})・窓の高さの最大 {hMax} ({hMaxWhat})・行を詰めた導入 {compact}");
-        Console.WriteLine($"[直した後] 今の窓に入る選択肢の数の上限 (説明の 2 行あり) = {maxK}");
+        if (args.Length > 1) File.WriteAllLines(args[1], pageCounts);      // 導入の頁数の一覧 (配置を変えた時の比べ用)
+        Console.WriteLine($"文 {texts} 本 (導入・結果は分岐ごと)・頁の最大 {pagesMax} ({pagesMaxWhat})・導入が 2 頁以上のイベント {multi}");
         foreach (var ev in evs.Where(e => e.def.name.StartsWith("さびれた観測所")))
         {
-            var plan = EventPaging.Intro(ev.def.flavor, ev.def.choices.Count, ev.anyDesc, LineH, Adv);
-            Console.WriteLine($"  〈{ev.def.name}〉 導入 {ev.def.flavor.Length} 字 → {plan.Count} 頁 (行数 {string.Join("・", plan.pages.Select(x => x.Count))})・最後の頁の本文 {plan.lastLines} 行まで・選択肢 {ev.def.choices.Count} (説明{(ev.anyDesc ? "あり" : "なし")})・行の高さ {(plan.rowH > 0 ? plan.rowH : ModalJpMetrics.JRowH)}・窓の高さ {plan.height}");
+            var plan = EventPaging.Intro(ev.def.flavor, Adv);
+            Console.WriteLine($"  〈{ev.def.name}〉 導入 {ev.def.flavor.Length} 字 → {plan.Count} 頁 (行数 {string.Join("・", plan.pages.Select(x => x.Count))})・選択肢 {ev.def.choices.Count}");
         }
-        Check(cut == 0, $"切り捨てられる文 {cut} 件 (全部の行がどこかの頁に出る・頁の行数が上限以下)");
-        Check(overH == 0 && hMax <= ModalJpMetrics.MaxH, $"窓の高さが {ModalJpMetrics.MaxH} (格子 270) を超えるもの {overH} 件 (最大 {hMax})");
-        Check(rowsCut == 0, $"描けない選択肢があるもの {rowsCut} 件 (説明の 2 行が出ている時も)");
-        Check(nameCut == 0, $"名前が切れる選択肢 {nameCut} 件");
-        Check(descCut == 0, $"2 行に収まらない説明 (選べない理由・使うターン・補足中) {descCut} 件");
-        Check(maxK >= evs.Max(e => e.def.choices.Count), $"選択肢の数の上限 {maxK} ≧ 今の最大 {evs.Max(e => e.def.choices.Count)}");
+        int kMax = evs.Max(e => e.def.choices.Count), noteHMax = EventLayout.NoteH(EventLayout.NoteLines, LineH);
+        Console.WriteLine($"選択肢の列: 最多 {kMax} つ + 説明 {EventLayout.NoteLines} 行 = 高さ {EventLayout.ColumnH(kMax, noteHMax)}・上端 {EventLayout.ColumnTop(kMax, noteHMax)}");
+        Console.WriteLine($"名前が「…」で切れる選択肢 {nameCut} / {choicesAll}:");
+        foreach (var x in cutNames) Console.WriteLine("  " + x);
+        Console.WriteLine($"題が切れるイベント {titleCut}");
+        Check(cut == 0, $"切り捨てられる文 {cut} 件 (全部の行がどこかの頁に出る・1 頁 {EventPaging.TextLines} 行まで)");
+        Check(colOver == 0 && EventLayout.ColumnFits(kMax, noteHMax), $"選択肢の列 (箱 + 説明の板) が画面に収まらないもの {colOver} 件");
+        Check(noteOver == 0, $"{EventLayout.NoteLines} 行に収まらない説明 (選べない理由・補足中の見込み) {noteOver} 件");
         Console.WriteLine(fails == 0 ? "ALL OK" : $"{fails} 件 NG");
         return fails == 0 ? 0 : 1;
     }

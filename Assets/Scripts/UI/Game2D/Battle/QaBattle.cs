@@ -306,6 +306,40 @@ namespace UI.Game2D.Battle
         /// <summary>1 コマ (1/8 秒) だけ進める (一時停止の間に使う)。</summary>
         public static void StepFrame() => Game2DBattleFx.QaStepSeconds += 0.125f;
 
+        // ── イベントの画面 (2026-11-16・EventScreenView) ──
+
+        /// <summary>名前を指定したイベントの画面を出す (セーブを止める・ランが無ければ新しいランを始める・戦闘中なら打ち切る)。
+        /// floor = 見せる層の番号 (背景の絵が替わる・-1 = 今のまま)・coins = 所持金 (-1 = 今のまま・0 で「ゴールドが足りない」の箱を見る)・
+        /// eta = 補足されていて N ターンで捕まる見込みにする (-1 = 本物の見込み・1 でターンの札の警告と箱の下の説明を見る)。
+        /// 例: <c>UI.Game2D.Battle.QaBattle.ShowEvent("老婆の商店", 2, 0, 1)</c>・<c>UI.Game2D.Battle.QaBattle.ShowEvent("さびれた観測所・再訪・写し", 4)</c></summary>
+        public static bool ShowEvent(string eventName, int floor = -1, int coins = -1, int eta = -1)
+        {
+            SaveGuard.Suppressed = true;
+            if (!Application.isPlaying) { Debug.LogWarning("[QaBattle] Play モードで呼ぶ"); return false; }
+            var gm = GameManager.Instance;
+            if (gm == null) { Debug.LogWarning("[QaBattle] GameManager が無い"); return false; }
+            MarkAllTutorialsSeen();
+            if (gm.Run == null || gm.CurrentPhase == GameManager.GamePhase.Title || gm.CurrentPhase == GameManager.GamePhase.GameOver)
+                gm.StartNewRun();
+            if (gm.CurrentPhase == GameManager.GamePhase.Combat) CombatManager.Instance?.QaAbortCombat();
+            var run = gm.Run;
+            if (floor >= 0) run.currentFloor = Mathf.Clamp(floor, MapSystem.FreeMove.FloorPlan.FarmFloor, MapSystem.FreeMove.FloorPlan.LastOrdinal);
+            if (coins >= 0) run.coins = coins;
+            EventSystem.EventEncounter.QaCatchEta = eta;
+            bool ok = gm.QaStartEvent(eventName);
+            Game2DLoadingScreen.QaDismiss();
+            Debug.Log($"[QaBattle] イベント {eventName} / 層 {run.currentFloor} (背景 {UI.Game2D.EventScreenView.BackdropName(null)}) / 所持金 {run.coins} / 見込み {eta} → {(ok ? "開始" : "失敗")}");
+            return ok;
+        }
+
+        /// <summary>イベントの名前の一覧 (定義ファイルの順・「、」区切り)。 例: <c>UI.Game2D.Battle.QaBattle.EventNames()</c></summary>
+        public static string EventNames()
+        {
+            var sb = new System.Text.StringBuilder();
+            foreach (var e in EventSystem.EventDatabase.All) sb.Append(sb.Length > 0 ? "、" : "").Append(e.name);
+            return sb.ToString();
+        }
+
         /// <summary>自分の攻撃 (キー Space)。 family = sword / axe / dagger / shield (絵を流す) か null (手描き)。</summary>
         public static void DemoAttack(string family, bool crit, int dealt = 20)
         {

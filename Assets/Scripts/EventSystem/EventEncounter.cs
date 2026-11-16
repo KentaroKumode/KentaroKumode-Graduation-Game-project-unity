@@ -201,9 +201,21 @@ namespace EventSystem
         /// 表示 (#72) と BOT が同じ値を読む。</summary>
         public static MapSystem.FreeMove.CatchEta CatchEtaNow()
         {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (QaCatchEta >= 0) return new MapSystem.FreeMove.CatchEta { turns = QaCatchEta, who = 0 };
+#endif
             var sim = GameManager.Instance != null ? GameManager.Instance.FreeMap : null;
             return sim != null ? sim.Eta() : MapSystem.FreeMove.CatchEta.None;
         }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        /// <summary>[実機の確認用・2026-11-16] 0 以上だと、 補足されていて N ターンで捕まる見込みとみなす (イベントの画面の警告の色と説明の確認・
+        /// <c>UI.Game2D.Battle.QaBattle.ShowEvent</c> が立てる)。 -1 = 本物の見込み。 BOT も同じ値を読むので、 確認の外では立てない。</summary>
+        public static int QaCatchEta = -1;
+
+        [UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void QaReset() => QaCatchEta = -1;
+#endif
 
         /// <summary>N ターンをその場で使うと捕まるか (今の補足の見込みで判定。 巡回中の追跡者が偶然通りかかる分は含まない)。</summary>
         public static bool WouldBeCaught(int turns)
@@ -216,6 +228,8 @@ namespace EventSystem
         /// <summary>選択肢の「代償」の短い説明 (イベントの画面の選択肢の下に出す)。 何も無ければ null。
         /// 得るものは書かない (見出しの文が語る)。 書くのは選べない理由 (必ず) と、 見せる代償 (2026-11-16・作者の決定「自分から差し出す物は見せる・
         /// ハプニングは見せない」・<see cref="EventEffectRoles.IsShownCost"/>)。 組み立ては <see cref="EventChoice.CostText"/>。</summary>
+        /// <remarks>2026-11-16〜 イベントの画面はこの文を使わない (札 <see cref="EventChoice.CostChips"/> と箱の下の説明 <see cref="DescribeNote"/>)。
+        /// 文の作り (<see cref="EventChoice.CostText"/>) は検算 Tools/event_branch_check が読む。</remarks>
         public static string DescribeCost(EventChoice choice, RunState run)
         {
             if (choice == null) return null;
@@ -224,6 +238,18 @@ namespace EventSystem
             int etaTurns = -1;
             if (t > 0) { var eta = CatchEtaNow(); if (eta.Valid) etaTurns = eta.turns; }
             return choice.CostText(why, etaTurns);
+        }
+
+        /// <summary>イベントの画面で、 選んでいる箱の下に出す説明 (2026-11-16)。 選べない理由 (暗くした箱だけ) と補足中の見込み (ターンを使う選択肢だけ)。
+        /// 何も無ければ null (画面は説明の板ごと出さない)。 文は <see cref="EventChoice.NoteText"/>。</summary>
+        public static string DescribeNote(EventDefinition ev, int index, RunState run)
+        {
+            if (ev?.choices == null || index < 0 || index >= ev.choices.Count || ev.choices[index] == null) return null;
+            var c = ev.choices[index];
+            string why = IsChoiceSelectable(ev, index, run) ? null : c.UnavailableReason(run);
+            int etaTurns = -1;
+            if (c.TurnCost > 0) { var eta = CatchEtaNow(); if (eta.Valid) etaTurns = eta.turns; }
+            return c.NoteText(why, etaTurns);
         }
     }
 }

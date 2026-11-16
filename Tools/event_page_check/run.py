@@ -1,15 +1,15 @@
-"""イベントの窓の頁割り (2026-11-13・docs/GAME.md §17「イベントの窓」) を Unity なしで検算する。
+"""イベントの画面の頁割りと配置 (2026-11-13・2026-11-16 に全画面の配置へ・docs/GAME.md §17「イベントの画面」) を Unity なしで検算する。
 
-画面と同じ関数 ── UnityEngine 非依存の JpTextLayout.cs (折り返し・頁割り)・ModalJpMetrics.cs (窓の寸法の式)・
+画面と同じ関数 ── UnityEngine 非依存の JpTextLayout.cs (折り返し・頁割り)・EventLayout.cs (画面の寸法の式)・
 EventPaging.cs (イベントの頁割り) ── と、 イベントの解析 (EventParser.cs ほか・Unity の型は
 Tools/event_branch_check/Stubs.cs の代役) を Unity 同梱の Roslyn (csc) でコンパイルし、 システムの .NET Core 3.1
 ランタイムで実行する (作りは Tools/event_branch_check/run.py と同じ)。 字の送り幅は焼いたドット字
 (GameFont.cs の DotPath の .bytes) を読む。 検算の中身は Program.cs:
-  直す前の窓で切り捨てられていた文・描かれていなかった選択肢の一覧 (上位 10 件) と、
-  直した後の窓で「切り捨て 0・窓の高さ 266 以下・選択肢が全部描ける・名前と説明が切れない」。
+  「切り捨て 0・本文が板に収まる・選択肢の列 (最多の箱 + 説明の板) が画面に収まる・説明が 2 行に収まる」と、
+  名前が札と当たって「…」で切れる選択肢の一覧。
 最後の行が `ALL OK` なら全部通っている。
 
-使い方 (リポジトリのルートで): python Tools/event_page_check/run.py
+使い方 (リポジトリのルートで): python Tools/event_page_check/run.py [導入の頁数の一覧の書き出し先]
 """
 import glob
 import os
@@ -24,7 +24,7 @@ RUNTIME = 'C:/Program Files/dotnet/shared/Microsoft.NETCore.App'
 EV = 'Assets/Scripts/EventSystem/'
 SOURCES = [EV + n + '.cs' for n in ('EventBranchText', 'EventEffectType', 'EventEffect', 'EventEffectRoles', 'EventChoice',
                                      'EventDefinition', 'EventCondition', 'EventParser')] + [
-    'Assets/Scripts/UI/Game2D/JpTextLayout.cs', 'Assets/Scripts/UI/Game2D/Screens/ModalJpMetrics.cs', 'Assets/Scripts/UI/Game2D/Screens/EventPaging.cs']
+    'Assets/Scripts/UI/Game2D/JpTextLayout.cs', 'Assets/Scripts/UI/Game2D/Screens/EventLayout.cs', 'Assets/Scripts/UI/Game2D/Screens/EventPaging.cs']
 
 
 def fwd(p):
@@ -58,7 +58,7 @@ def main():
         sys.exit(1)
     with open(os.path.join(out, 'check.runtimeconfig.json'), 'w', encoding='utf-8') as f:
         f.write('{ "runtimeOptions": { "tfm": "netcoreapp3.1", "framework": { "name": "Microsoft.NETCore.App", "version": "3.1.0" } } }\n')
-    r = subprocess.run(['dotnet', os.path.join(out, 'check.dll'), '.'], capture_output=True)
+    r = subprocess.run(['dotnet', os.path.join(out, 'check.dll'), '.'] + sys.argv[1:2], capture_output=True)
     sys.stdout.buffer.write(r.stdout)
     sys.stdout.buffer.flush()
     sys.exit(r.returncode)

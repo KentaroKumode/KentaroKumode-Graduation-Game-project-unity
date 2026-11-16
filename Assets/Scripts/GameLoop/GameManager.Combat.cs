@@ -342,6 +342,21 @@ namespace GameLoop
             SetPhase(GamePhase.RunClear);
         }
 
+        /// <summary>[実機の確認用・2026-11-16] 今のランのまま、 名前を指定したイベントを始める (マスを踏まない・抽選を通さない・乱数を使わない)。
+        /// 呼ぶのは <c>UI.Game2D.Battle.QaBattle.ShowEvent</c> だけ (セーブを止めた後)。 定義が無ければ false。</summary>
+        public bool QaStartEvent(string eventName)
+        {
+            var ee = EventSystem.EventEncounter.Instance;
+            if (Run == null || ee == null) return false;
+            var def = EventSystem.EventDatabase.GetByName(eventName);
+            if (def == null) { Debug.LogWarning($"[QaBattle] イベント '{eventName}' が無い"); return false; }
+            eventChoiceResolved = false; returnToMapAfterEventCombat = false; _bossAfterAshBase = false;
+            ee.TakePendingTurns(); ee.TakePendingNav();
+            if (!ee.BeginWith(Run, def) || ee.Current == null) return false;
+            SetPhase(GamePhase.EventEncounter);
+            return true;
+        }
+
         /// <summary>[実機の確認用・2026-11-14] 今のランのまま、 指定した敵との戦闘をボス戦と同じ手順で始める (マスを踏まない・報酬や集計の前処理はしない)。
         /// 呼ぶのは <c>UI.Game2D.Battle.QaBattle.Start</c> だけ (セーブを止めた後)。 敵が無ければ false。</summary>
         public bool QaStartCombat(string enemyId)

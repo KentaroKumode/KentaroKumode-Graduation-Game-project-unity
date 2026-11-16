@@ -195,6 +195,37 @@ namespace EventSystem
             }
         }
 
+        /// <summary>見せる代償の札の短い文 (2026-11-16・イベントの画面の選択肢の箱の右端・<see cref="ShownCostText"/> の札の版)。
+        /// ターンは数だけ (画面が砂時計の絵を前に付ける)・ゴールド「10G」・素材「素材3」・物資「物資3」・秘宝を手放す / 差し出す「手放す」。
+        /// 見せるかの判定はしない (呼び手が <see cref="IsShownCost"/> を通す)。 札の文を持たない効果は null。</summary>
+        public static string ShownCostChip(EventEffect e)
+        {
+            if (e == null) return null;
+            int n = System.Math.Abs(e.amount);
+            switch (e.type)
+            {
+                case EventEffectType.TurnsPass:          return e.amount > 0 ? n.ToString() : null;
+                case EventEffectType.GoldDelta:          return e.amount < 0 ? n + "G" : null;
+                case EventEffectType.MaterialDelta:      return e.amount < 0 ? "素材" + n : null;
+                case EventEffectType.ProvisionDelta:
+                case EventEffectType.HungerDelta:        return e.amount < 0 ? "物資" + n : null;
+                case EventEffectType.DiscardPassiveItem:
+                case EventEffectType.TradePassive:       return "手放す";
+                // 以下は既定で見せない物 (印〔見せる〕を付けた時だけ札になる・2026-11-16 の時点で付いた例は無い)
+                case EventEffectType.HpDelta:            return e.amount < 0 ? "HP" + n : null;
+                case EventEffectType.MaxHpDelta:         return e.amount < 0 ? "最大HP" + n : null;
+                case EventEffectType.HpHalve:            return "HP半分";
+                case EventEffectType.HpSetTo:            return "HP" + e.amount + "に";
+                case EventEffectType.EnterCombat:        return "戦闘";
+                case EventEffectType.EnterEliteCombat:   return "強敵";
+                case EventEffectType.TimedDebuff:
+                case EventEffectType.PermanentDebuff:    return "〈" + e.param + "〉";
+                case EventEffectType.PullPursuer:        return "追跡者";
+                case EventEffectType.ShiftFront:         return e.amount > 0 ? "前線" : null;
+                default:                                 return null;
+            }
+        }
+
         /// <summary>この効果が今の状況で起きない理由 (画面に出す短い文)。 起きるなら null。
         /// 得になる効果にも代償にも使う ── 選べるかの判定 (<see cref="NothingGainedReason"/>) と、 選んだ後の結果の行 (<c>EventEffectExecutor</c>) が同じ文を出す。</summary>
         public static string NotHappeningReason(EventEffect e, in EventEffectSituation s)

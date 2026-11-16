@@ -72,7 +72,7 @@ namespace UI.Game2D
             if (gm == null || GameHooks.BotDriving || Application.isBatchMode) { GameManager.EventKeysByScreen = false; CloseIfOpen(); return; }
             Subscribe();
             var ph = gm.CurrentPhase;
-            // イベントの窓が出ている間は、 キーも画面が受ける (頁送り・2026-11-13)
+            // イベントの画面が出ている間は、 キーも画面が受ける (頁送り・2026-11-13)
             bool evKeys = ph == GameManager.GamePhase.EventEncounter && _open && _evDef != null && modal.IsOpen && modal.Current == _evDef;
             GameManager.EventKeysByScreen = evKeys;
             if (evKeys && !Game2DLoadingScreen.Blocking) EventKeys(gm);
@@ -82,6 +82,9 @@ namespace UI.Game2D
             if (coins != _lastCoins || hp != _lastHp) { _lastCoins = coins; _lastHp = hp; if (_open) _dirty = true; }
             int pend = gm.PendingStartingPassiveChoices.Count + gm.PendingEventPassiveOffers.Count * 100000000 + gm.PendingChallengeTiers.Count * 100 + (gm.Run != null ? gm.Run.pendingWeaponIds.Count * 10000 + gm.Run.pendingTerminalOffer.Count * 1000000 : 0);
             if (pend != _lastPending) { _lastPending = pend; _dirty = true; }
+            // イベントが替わった (同じフェーズのまま・QA の口 QaBattle.ShowEvent で続けて出した時など) も描き直す
+            var evNow = ph == GameManager.GamePhase.EventEncounter && EventEncounter.Instance != null ? EventEncounter.Instance.Current : null;
+            if (evNow != _evSeen || (evNow != null && gm.EventChoiceResolved != _evSeenResolved)) { _evSeen = evNow; _evSeenResolved = gm.EventChoiceResolved; _dirty = true; }
             // エンディングの画面 (#328) の間は窓を出さない。 同じフレームで先に開いていたら閉じて、 読み終わってから作り直す
             if (Game2DEndingScreen.Blocking) { if (_open) { CloseIfOpen(); _dirty = true; } return; }
             if (_endingSerial != Game2DEndingScreen.ClosedSerial) { _endingSerial = Game2DEndingScreen.ClosedSerial; _dirty = true; }      // 読み終わった: 今のフェーズの窓 (踏破) を必ず作り直す
@@ -693,41 +696,60 @@ namespace UI.Game2D
         // 頁送り (2026-11-13・EventPaging): 導入は「／」の段落ごとに 1 頁、 長い段落と結果の文は行数で割る。 選択肢は最後の頁だけ。
         //   頁の位置は画面だけが持つ (進行・セーブには入れない)。 導入 / 結果 / 別のイベントに替わったら最初の頁へ戻る。
         //   _evEpoch は選んだ回数 (OnEventResolved) ── ランダムイベントの振り直しで同じイベントに戻っても最初の頁から出す。
+        // 2026-11-16: 窓 1 枚から全画面の配置 (背景の絵・左下に本文の板・右に選択肢の列) へ (EventScreenView・EventLayout・作者が見本で承認)。
+        //   選択肢の箱を押すと選ぶだけ・確定は操作の行の [選ぶ] か数字のキー (今までの「行を選んでから [選ぶ]」と同じ・誤って即決しない)。
         private int _evPage, _evEpoch; private string _evKey; private EventPaging.Plan _evPlan; private bool _evResolved; private ScreenDef _evDef;
+        private readonly EventScreenView _evView = new EventScreenView(); private string _evSelFor; private EventDefinition _evSeen; private bool _evSeenResolved;
 
         private ScreenDef Event(GameManager gm)
         {
             var ev = EventEncounter.Instance != null ? EventEncounter.Instance.Current : null;
-            var d = New(ev != null ? ev.name : "イベント", null, EventPaging.Width);
+            var run = gm.Run;
+            var d = New(ev != null ? ev.name : "イベント", null, Game2DLayout.Width);
+            d.full = true; d.canvas = _evView;
             bool resolved = gm.EventChoiceResolved;
             string text = resolved ? (string.IsNullOrEmpty(_eventResult) ? "……" : _eventResult) : ev?.flavor;
-            // 選択肢の下に代償 (使うターン・補足中の捕まるまで・足りないゴールド) を出す (2026-11-11・issue #17)
-            var items = new List<ModalItem>(); bool detail = false;
-            if (!resolved && ev != null)
+            var plan = resolved ? EventPaging.Result(text, Game2DJpFont.Advance) : EventPaging.Intro(text, Game2DJpFont.Advance);
+            string key = (resolved ? "r:" : "i:") + _evEpoch + ":" + (ev != null ? ev.name : "") + ":" + text;
+            bool fresh = key != _evKey;
+            if (fresh) { _evKey = key; _evPage = 0; }
+            _evPage = plan.Clamp(_evPage); _evPlan = plan; _evResolved = resolved; _evDef = d;
+            bool last = plan.IsLast(_evPage);
+
+            var v = _evView;
+            v.backdrop = EventScreenView.BackdropName(ev);
+            v.title = d.title; v.pageMark = plan.Mark(_evPage); v.lines = plan.Lines(_evPage);
+            v.buttons.Clear(); v.choices = null;
+            if (_evPage > 0) v.buttons.Add(new EventScreenView.Btn { label = "前へ", action = "prev" });
+            if (!last) { v.buttons.Add(new EventScreenView.Btn { label = "次へ", action = "page", primary = true }); v.hint = "Space 次へ"; }
+            else if (resolved || ev == null || ev.choices.Count == 0) { v.buttons.Add(new EventScreenView.Btn { label = "次へ", action = "next", primary = true }); v.hint = "Space 次へ"; }
+            else
+            {
+                // 選択肢 (最後の頁だけ): 名前・見せる代償の札・選べないか・補足中の見込み・箱の下の説明
+                v.choices = new List<EventScreenView.Choice>();
+                int first = -1;
                 for (int i = 0; i < ev.choices.Count; i++)
                 {
                     var c = ev.choices[i];
-                    var it = new ModalItem { name = c.text, desc = EventEncounter.DescribeCost(c, gm.Run), disabled = !EventEncounter.IsChoiceSelectable(ev, i, gm.Run) };
-                    if (!string.IsNullOrEmpty(it.desc)) detail = true;
-                    items.Add(it);
+                    bool ok = EventEncounter.IsChoiceSelectable(ev, i, run);
+                    if (ok && first < 0) first = i;
+                    v.choices.Add(new EventScreenView.Choice
+                    {
+                        name = c.text, chips = c.CostChips(), disabled = !ok,
+                        warnTurns = EventEncounter.WouldBeCaught(c.TurnCost),
+                        note = EventEncounter.DescribeNote(ev, i, run),
+                    });
                 }
-            var plan = resolved ? EventPaging.Result(text, Game2DJpFont.LineH, Game2DJpFont.Advance)
-                                : EventPaging.Intro(text, items.Count, detail, Game2DJpFont.LineH, Game2DJpFont.Advance);
-            string key = (resolved ? "r:" : "i:") + _evEpoch + ":" + (ev != null ? ev.name : "") + ":" + text;
-            if (key != _evKey) { _evKey = key; _evPage = 0; }
-            _evPage = plan.Clamp(_evPage); _evPlan = plan; _evResolved = resolved; _evDef = d;
-            bool last = plan.IsLast(_evPage);
-            d.h = plan.height; d.rowH = plan.rowH;
-            d.body = plan.Body(_evPage); d.bodyLines = Mathf.Max(1, plan.Lines(_evPage)); d.pageMark = plan.Mark(_evPage);
-            if (_evPage > 0) d.buttons.Add(B("前へ", "prev"));
-            if (!last) d.buttons.Add(B("次へ", "page", true));
-            else if (resolved) d.buttons.Add(B("次へ", "next", true));
-            else { d.Items.AddRange(items); d.buttons.Add(B("選ぶ", "pick", true)); }
-            d.onAction = (a, sel) =>
+                if (_evSelFor != key) { _evSelFor = key; v.ResetSelection(Mathf.Max(0, first)); }      // 選択肢が初めて出た時に、 最初の選べる箱を選んでおく
+                v.buttons.Add(new EventScreenView.Btn { label = "選ぶ", action = "pick", primary = true });
+                v.hint = ev.choices.Count > 1 ? "1〜" + Mathf.Min(9, ev.choices.Count) + " で選ぶ" : "1 で選ぶ";
+            }
+            if (fresh && v.choices == null) v.ResetSelection(0);
+            v.onAction = (a, sel) =>
             {
                 switch (a)
                 {
-                    case "prev": EventPageStep(-1, false); return;      // 押した音は窓が鳴らす
+                    case "prev": EventPageStep(-1, false); return;      // 押した音は画面 (EventScreenView) が鳴らす
                     case "page": EventPageStep(+1, false); return;
                     case "next": gm.ConfirmEventEncounter(); break;
                     case "pick": if (ev != null && sel >= 0 && sel < ev.choices.Count) gm.ResolveEventChoice(sel); break;
@@ -746,7 +768,7 @@ namespace UI.Game2D
             _evPage = p; if (sound) Game2DSfx.Play("ui_click"); Refresh();
         }
 
-        /// <summary>イベントの窓のキー (手引きの板と同じ操作): Space / Enter / → で次の頁 (結果の最後の頁では地図へ戻る)・← / Backspace で前の頁・
+        /// <summary>イベントの画面のキー (手引きの板と同じ操作): Space / Enter / → で次の頁 (結果の最後の頁では地図へ戻る)・← / Backspace で前の頁・
         /// 1〜9 は最後の頁 (選択肢が出ている頁) でだけ選ぶ。 この間 GameManager のイベントのキー (<see cref="GameManager.EventKeysByScreen"/>) は止める
         /// ── 止めないと Space が結果の頁を飛ばして地図へ戻し、 数字が見えていない選択肢を選んでいた。</summary>
         private void EventKeys(GameManager gm)

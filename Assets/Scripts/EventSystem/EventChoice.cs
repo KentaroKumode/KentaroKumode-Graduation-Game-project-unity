@@ -75,6 +75,38 @@ namespace EventSystem
             return sb.Length > 0 ? sb.ToString() : null;
         }
 
+        /// <summary>選択肢の箱の右端の札 1 枚 (2026-11-16・イベントの画面)。 turns = ターンの札 (画面が砂時計の絵を前に付け、 text は数だけ)。</summary>
+        public struct CostChip { public bool turns; public string text; }
+
+        /// <summary>選択肢の箱の右端に並べる「見せる代償」の札 (2026-11-16・効果の並びの順)。 どれを見せるかは <see cref="EventEffectRoles.IsShownCost"/>・
+        /// 札の文は <see cref="EventEffectRoles.ShownCostChip"/>。 得る物は出さない。 選べない時も全部並べる (画面が赤くする・理由は箱の下の説明が言う)。</summary>
+        public List<CostChip> CostChips()
+        {
+            var list = new List<CostChip>();
+            if (effects != null)
+                foreach (var e in effects)
+                {
+                    if (!EventEffectRoles.IsShownCost(e)) continue;
+                    string t = EventEffectRoles.ShownCostChip(e);
+                    if (t != null) list.Add(new CostChip { turns = e.type == EventEffectType.TurnsPass, text = t });
+                }
+            return list;
+        }
+
+        /// <summary>選んでいる箱の下に出す説明 (2026-11-16・イベントの画面・行は改行で分ける)。 何も無ければ null。
+        /// why = 選べない理由 (選べる箱は null を渡す)・etaTurns = 補足されている時の捕まるまでのターン (-1 = 補足されていない)。
+        /// 補足中の見込みはターンを使う選択肢だけに付ける。 札が言う代償 (ターン・ゴールド …) はここに繰り返さない。
+        /// 箱の下の 2 行に収まるかは検算 Tools/event_page_check が見る。</summary>
+        public string NoteText(string why, int etaTurns)
+        {
+            string eta = null;
+            int turns = TurnCost;
+            if (turns > 0 && etaTurns >= 0)
+                eta = etaTurns <= turns ? $"補足されている。{etaTurns} ターンで捕まる" : $"補足中。最短 {etaTurns} ターンで捕まる";      // 「補足されている。最短 99 ターン…」は箱の下の 1 行 (156 dot) に入らない
+            if (why == null) return eta;
+            return eta == null ? why : why + "\n" + eta;
+        }
+
         /// <summary>この選択肢が使うターン (効果「ターン+N」の合計・確率分岐の中は数えない)。 0 なら時間を使わない。</summary>
         public int TurnCost
         {
