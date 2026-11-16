@@ -105,7 +105,7 @@ namespace UI.Game2D
             int v = GameSettings.Get(k);
             if (k == GameSettings.Key.Master || k == GameSettings.Key.Bgm || k == GameSettings.Key.Se) return v >= 100 ? "最大" : "";
             if (k == GameSettings.Key.Bright) return v == 50 ? "標準" : "標準の ×" + GameSettings.Brightness.ToString("0.00");
-            if (k == GameSettings.Key.LineGap || k == GameSettings.Key.CharGap) return v == 0 ? "標準" : "+" + v + " dot";
+            if (k == GameSettings.Key.LineGap || k == GameSettings.Key.CharGap) return v == GameSettings.Defs[(int)k].def ? "標準" : "+" + v + " dot";      // 標準 = 既定の値 (行間は 1・2026-11-17)
             if (v == 0) return "切";
             return v == 50 ? "標準" : "標準の ×" + GameSettings.FxScale(k).ToString("0.00");
         }

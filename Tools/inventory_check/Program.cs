@@ -97,7 +97,7 @@ static class Program
         Check(inv.Inside(BattleHudLayout.Safe), $"戦闘の画面の入口 {inv} が液晶の安全に見える範囲 {BattleHudLayout.Safe} の中 (湾曲で縁が欠けない)");
         Check(hit.Count == 0, "戦闘の画面の入口が、 秘宝の列・山と捨て札・敵・手札・床の出目に重ならない" + (hit.Count > 0 ? ": " + string.Join(" ", hit) : ""));
         // 入口の箱 BattleHudLayout.Inv は旧い戦闘の HUD の寸法 (今の戦闘の画面 Game2DBattleLcd.InvRect は字の幅から箱を作る)。 行間・字間を足した設定では参考に出すだけ
-        if (lineGap > 0 || charGap > 0) Console.WriteLine($"参考 (旧い HUD の固定の箱・今は字の幅から箱を作る): 入口の字「{BattleHudLayout.InvLabel}」{Width(BattleHudLayout.InvLabel)} dot・入口 ({inv.w}×{inv.h})");
+        if (lineGap > 1 || charGap > 0) Console.WriteLine($"参考 (旧い HUD の固定の箱・今は字の幅から箱を作る): 入口の字「{BattleHudLayout.InvLabel}」{Width(BattleHudLayout.InvLabel)} dot・入口 ({inv.w}×{inv.h})");
         else Check(Width(BattleHudLayout.InvLabel) + 6 <= inv.w && LineH <= inv.h + 1, $"入口の字「{BattleHudLayout.InvLabel}」{Width(BattleHudLayout.InvLabel)} dot が入口 ({inv.w}×{inv.h}) に入る");
     }
 

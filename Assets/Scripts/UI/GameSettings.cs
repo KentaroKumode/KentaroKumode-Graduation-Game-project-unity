@@ -31,7 +31,8 @@ namespace UI
             new Def { pref = "Settings.vignette", name = "ビネット",   min = 0, max = 100, def = 50,  desc = "四隅の暗さ。 50 が標準・0 で切。" },
             new Def { pref = "Settings.noise",    name = "ノイズ",     min = 0, max = 100, def = 50,  desc = "横線のノイズとフィルムの粒。 50 が標準・0 で切。" },
             // 2026-11-16 (作者の依頼「走査線で文章が読みづらい」): 液晶のドット字の行送りと字の送りに足す dot (Game2DJpFont.LineH / Advance が読む・全部の画面の文に効く)
-            new Def { pref = "Settings.lineGap",  name = "行間",       min = 0, max = MaxLineGap, def = 0, desc = "文の行と行の間に足す。 0 が標準。" },
+            //   行間の既定は 1 (2026-11-17・作者の依頼)。 保存した値がある人はそれが優先 (V の PlayerPrefs.GetInt(pref, def))。 既定に戻すのは設定の窓の [既定に戻す]
+            new Def { pref = "Settings.lineGap",  name = "行間",       min = 0, max = MaxLineGap, def = 1, desc = "文の行と行の間に足す。 1 が標準。" },
             new Def { pref = "Settings.charGap",  name = "字間",       min = 0, max = MaxCharGap, def = 0, desc = "字と字の間に足す。 0 が標準。" },
         };
 
