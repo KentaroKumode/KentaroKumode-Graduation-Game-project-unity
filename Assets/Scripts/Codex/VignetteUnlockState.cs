@@ -153,7 +153,7 @@ namespace Codex
 
         private static bool AllEndingsMaxDifficultyCleared(MetaProgressState meta)
         {
-            // capstone「最後の一筆」廃止に伴い、 **EndTrue〈帳尻〉** を事実上の最高難度
+            // capstone「最後の一筆」廃止に伴い、 **EndTrue〈終始〉** を事実上の最高難度
             // オールクリアとして扱う。 7 層ヴェスカ 4 段連戦の踏破を要求するため、 これ単独で
             // 全制覇相当のゲートとなる。
             // 2026-08-17: 旧 "end5" (勝利で無条件に出ていたエンド) を EndTrue/EndGood に割った際、
