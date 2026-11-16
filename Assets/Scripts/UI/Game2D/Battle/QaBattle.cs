@@ -341,6 +341,49 @@ namespace UI.Game2D.Battle
             UI.Game2D.Game2DPhaseScreens.RequestRebuild();
         }
 
+        // ── 液晶の湾曲 (2026-11-16・試作の見比べ用) ──
+
+        /// <summary>液晶の板の材質 (Game2D/LcdScreen・設定が作った複製)。 無ければ null。</summary>
+        private static Material LcdMat()
+        {
+            var g = Object.FindObjectOfType<Game2DLcdGhost>();
+            var m = g != null && g.surface != null ? g.surface.sharedMaterial : null;
+            return m != null && m.HasProperty("_CurveFit") ? m : null;
+        }
+
+        /// <summary>マウスの当たりが読む材質 (Game2DScreen.lcdQuad の材質) が液晶の板の材質と別なら、 同じ値を写す (見た目と当たりがずれないように)。</summary>
+        private static void SyncPointerMat(Material m)
+        {
+            var sc = Object.FindObjectOfType<Game2DScreen>();
+            var mr = sc != null && sc.lcdQuad != null ? sc.lcdQuad.GetComponent<MeshRenderer>() : null;
+            var pm = mr != null ? mr.sharedMaterial : null;
+            if (pm == null || pm == m || !pm.HasProperty("_CurveFit")) return;
+            pm.SetFloat("_Curve", m.GetFloat("_Curve")); pm.SetFloat("_CurveFit", m.GetFloat("_CurveFit"));
+            Debug.LogWarning("[QaBattle] マウスの当たりが読む材質と液晶の板の材質が別だった (値を写した)");
+        }
+
+        /// <summary>湾曲の外形の合わせ方 <c>_CurveFit</c> を実行中に替える (0 = 四隅を絵の端に合わせる・今まで / 1 = 縁の中央を合わせる・絵の外形が樽型・間は線形)。
+        /// マウスの当たり (Game2DPointer.LcdDot) も同じ材質から読むので一緒に変わる。 保存はしない (Play を抜けると戻る)。 戻り値 = 今の値の説明。
+        /// 例: <c>UI.Game2D.Battle.QaBattle.LcdCurveFit(1)</c></summary>
+        public static string LcdCurveFit(float fit)
+        {
+            var m = LcdMat(); if (m == null) return "(液晶の材質が無い)";
+            m.SetFloat("_CurveFit", Mathf.Clamp01(fit)); SyncPointerMat(m);
+            return LcdCurveNow();
+        }
+
+        /// <summary>湾曲の強さ <c>_Curve</c> を実行中に替える (0〜0.2・材質の既定 0.07 × 設定の倍率)。 設定を変えると設定の値で上書きされる。 保存はしない。
+        /// 例: <c>UI.Game2D.Battle.QaBattle.LcdCurve(0.1f)</c></summary>
+        public static string LcdCurve(float k)
+        {
+            var m = LcdMat(); if (m == null) return "(液晶の材質が無い)";
+            m.SetFloat("_Curve", Mathf.Clamp(k, 0f, 0.2f)); SyncPointerMat(m);
+            return LcdCurveNow();
+        }
+
+        /// <summary>今の湾曲 (「curve=0.070 fit=0.00」)。</summary>
+        public static string LcdCurveNow() { var m = LcdMat(); return m == null ? "(液晶の材質が無い)" : $"curve={m.GetFloat("_Curve"):0.000} fit={m.GetFloat("_CurveFit"):0.00}"; }
+
         /// <summary>イベントの名前の一覧 (定義ファイルの順・「、」区切り)。 例: <c>UI.Game2D.Battle.QaBattle.EventNames()</c></summary>
         public static string EventNames()
         {

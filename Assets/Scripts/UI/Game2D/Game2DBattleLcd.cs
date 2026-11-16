@@ -130,17 +130,7 @@ namespace UI.Game2D
 
         /// <summary>画面の位置 (GUI の格子の dot) → 液晶の絵 (480×270) の dot。 液晶は樽型に湾曲している (Game2D/LcdScreen の _Curve) ので、
         /// 見えている点が絵のどこを映しているかをシェーダと同じ式で求める (Game2DMapView.ScreenToMapDot と同じ)。 当たり判定を見た目に合わせる。</summary>
-        private Vector2 LcdDot(Vector2 d)
-        {
-            float k = 0f;
-            var q = _screen != null ? _screen.lcdQuad : null;
-            if (q != null) { var mr = q.GetComponent<MeshRenderer>(); if (mr != null && mr.sharedMaterial != null && mr.sharedMaterial.HasProperty("_Curve")) k = mr.sharedMaterial.GetFloat("_Curve"); }
-            if (k <= 0f) return d;
-            const float W = Game2DLayout.Width, H = Game2DLayout.Height;
-            float cx = d.x / W * 2f - 1f, cy = (1f - d.y / H) * 2f - 1f;
-            float f = (1f + k * (cx * cx + cy * cy)) / (1f + 2f * k);
-            return new Vector2((cx * f * 0.5f + 0.5f) * W, (1f - (cy * f * 0.5f + 0.5f)) * H);
-        }
+        private Vector2 LcdDot(Vector2 d) => Game2DPointer.LcdDot(_screen != null ? _screen.lcdQuad : null, d);      // 式は Game2DPointer.LcdDot の 1 か所 (_CurveFit も読む)
 
         private void CancelAll()
         {

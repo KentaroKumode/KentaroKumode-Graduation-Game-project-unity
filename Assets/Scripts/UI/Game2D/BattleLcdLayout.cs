@@ -14,6 +14,7 @@ namespace UI.Game2D
         //   液晶のシェーダ (Assets/Shaders/Game2DLcdScreen.shader の frag の頭・樽型の湾曲 「元 = 中心 × (1 + k·r²) / (1 + 2k)」) は、 四隅をちょうど絵の端に合わせ、
         //   縁の中央ほど内側を見る (= 縁の中央の近くの絵は画面の外へ押し出される)。 k = _Curve は Assets/Settings/Game2DLcdScreen.mat で 0.07 (設定の「湾曲」で 0〜2 倍・上限 0.2)。
         //   k = 0.07 で見える範囲 (計算): 上下は x 240 で y 8〜261・x 96 で y 5〜264 / 左右は y 135 で x 15〜464・y 200 で x 11〜468。
+        //   (この数は _CurveFit = 0 (既定) の時。 試作の _CurveFit = 1 では分母が 1 + k になり、 縁の中央がちょうど絵の端に合って絵は画面の外へ出ない・四隅は絵の外 (2026-11-16・式は Game2DPointer.LcdDot))
         //   部品はこの矩形の内側に置く (隅に近い物ほど余裕がある)。 設定で湾曲を強めると (k 0.1 以上) 下の札の底がまた欠ける ── 設定の上限を下げるかは未決。
         /// <summary>安全に見える矩形 (左・上・右・下の端の dot・含む)。</summary>
         public const int SafeX0 = 16, SafeY0 = 9, SafeX1 = 464, SafeY1 = 259;

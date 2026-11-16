@@ -165,17 +165,30 @@ namespace UI.Game2D
             return dot.x >= 0 && dot.y >= 0 && dot.x <= Game2DLayout.Width && dot.y <= Game2DLayout.Height;
         }
 
-        /// <summary>GUI の格子の dot → 液晶の絵 (480×270) の dot (2026-11-16・イベントの画面)。 液晶は樽型に湾曲している (Game2D/LcdScreen の _Curve) ので、
-        /// 見えている点が絵のどこを映しているかをシェーダと同じ式「元 = 中心 × (1 + k·r²) / (1 + 2k)」で求める
-        /// (Game2DMapView.ScreenToMapDot・Game2DBattleLcd.LcdDot と同じ式)。 lcdQuad = 液晶の Quad (<see cref="Game2DScreen.lcdQuad"/>)。</summary>
+        /// <summary>GUI の格子の dot → 液晶の絵 (480×270) の dot。 液晶は樽型に湾曲している (Game2D/LcdScreen の _Curve・_CurveFit) ので、
+        /// 見えている点が絵のどこを映しているかをシェーダと同じ式で求める。 <b>式の置き場はここ 1 か所</b> (2026-11-16 にまとめた:
+        /// 地図 Game2DMapView.ScreenToMapDot・戦闘 Game2DBattleLcd.LcdDot・イベントの画面 Game2DEventScreen がここを呼ぶ)。
+        /// lcdQuad = 液晶の Quad (<see cref="Game2DScreen.lcdQuad"/>・湾曲の値をその材質から読む)。 絵の外 (f &gt; 0 の時の四隅) を指すと 0〜480 / 0〜270 の外の値が返る。</summary>
         public static Vector2 LcdDot(Transform lcdQuad, Vector2 d)
         {
-            float k = 0f;
-            if (lcdQuad != null) { var mr = lcdQuad.GetComponent<MeshRenderer>(); if (mr != null && mr.sharedMaterial != null && mr.sharedMaterial.HasProperty("_Curve")) k = mr.sharedMaterial.GetFloat("_Curve"); }
+            float k = 0f, fit = 0f;
+            if (lcdQuad != null)
+            {
+                var mr = lcdQuad.GetComponent<MeshRenderer>(); var m = mr != null ? mr.sharedMaterial : null;
+                if (m != null && m.HasProperty("_Curve")) k = m.GetFloat("_Curve");
+                if (m != null && m.HasProperty("_CurveFit")) fit = m.GetFloat("_CurveFit");
+            }
+            return LcdDot(d, k, fit);
+        }
+
+        /// <summary>湾曲の式 (シェーダ Game2D/LcdScreen の frag の頭と同じ): 元 = 中心 × (1 + k·r²) / (1 + k·(2 − fit))。 c・r² は縦横とも −1〜1 に正規化した座標。
+        /// fit = 0: 四隅を絵の端に合わせる (見える範囲は長方形・既定) / 1: 縁の中央を絵の端に合わせる (絵の外形が樽型・試作)。</summary>
+        public static Vector2 LcdDot(Vector2 d, float k, float fit)
+        {
             if (k <= 0f) return d;
             const float W = Game2DLayout.Width, H = Game2DLayout.Height;
             float cx = d.x / W * 2f - 1f, cy = (1f - d.y / H) * 2f - 1f;
-            float f = (1f + k * (cx * cx + cy * cy)) / (1f + 2f * k);
+            float f = (1f + k * (cx * cx + cy * cy)) / (1f + k * (2f - Mathf.Clamp01(fit)));
             return new Vector2((cx * f * 0.5f + 0.5f) * W, (1f - (cy * f * 0.5f + 0.5f)) * H);
         }
     }

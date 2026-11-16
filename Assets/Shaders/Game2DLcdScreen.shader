@@ -12,6 +12,7 @@ Shader "Game2D/LcdScreen"
         _Ghost ("残像の濃さ (液晶の応答の遅れ・点灯の瞬間は Game2DBoot が上げる)", Range(0, 1)) = 0.38
         _Curve ("湾曲 (0 = 平ら)", Range(0, 0.2)) = 0.03
         _Back ("画面の外の色", Color) = (0.027, 0.02, 0.008, 1)
+        _CurveFit ("湾曲の外形の合わせ方 (0 = 四隅を絵の端に合わせる・見える範囲は長方形 / 1 = 縁の中央を絵の端に合わせる・絵の外形が樽型・試作 2026-11-16)", Range(0, 1)) = 0
         _Power ("電源 (Game2DBoot が入れる・0 = 消灯 / 1 = 点灯済み)", Range(0, 1)) = 1
         _Distort ("画面の歪み (Game2DBoot が点灯の瞬間だけ入れる・0 = なし)", Range(0, 1)) = 0
         _Scan ("走査線の濃さ (横線の暗い帯の暗さ・0 = なし)", Range(0, 1)) = 0.4
@@ -51,7 +52,7 @@ Shader "Game2D/LcdScreen"
             struct v2f { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; };
 
             sampler2D _MainTex, _PrevTex, _NoiseTex, _BloomTex, _BloomTexB;
-            float _Chroma, _Distort, _Power, _Ghost, _Curve, _Scan, _ScanRows, _Grain, _GrainFps, _Bloom, _BloomThr, _Halo, _BloomTintAmt, _BloomFar, _Exposure;
+            float _Chroma, _Distort, _Power, _Ghost, _Curve, _CurveFit, _Scan, _ScanRows, _Grain, _GrainFps, _Bloom, _BloomThr, _Halo, _BloomTintAmt, _BloomFar, _Exposure;
             fixed4 _Back, _Ink, _BloomTint;
             float4 _GrainCells;
 
@@ -82,12 +83,19 @@ Shader "Game2D/LcdScreen"
 
             fixed4 frag (v2f i) : SV_Target
             {
-                // ── 画面の湾曲 (樽型): 元 = 中心 × (1 + k·r²) / (1 + 2k)。 四隅がちょうど絵の端に合う (縁の中央は少し内側を見る) = 外が見えず、 黒い角が出ない
+                // ── 画面の湾曲 (樽型): 元 = 中心 × (1 + k·r²) / (1 + k·(2 − f))。 c と r² は縦横とも −1〜1 に正規化した座標。
+                //   f = _CurveFit = 0 (既定): 分母 1 + 2k。 四隅 (r² = 2) がちょうど絵の端に合う (縁の中央は少し内側を見る) = 外が見えず、 黒い角が出ない。 見える範囲は長方形のまま
+                //   f = 1 (試作・2026-11-16): 分母 1 + k。 縁の中央 (左右は c = (±1, 0)・上下は c = (0, ±1)・どちらも r² = 1) がちょうど絵の端に合い、 四隅は絵の外 (_Back) を見る
+                //     = 絵の外形が樽型になり、 中身の曲がりとそろう。 絵は 1 画素も画面の外へ出ない。 式は縦横で同じ (r² が正規化した座標なので、 左右と上下の縁の中央が同時に合う)
+                //   マウスの当たり (画面の位置 → 液晶の dot) は同じ式を Game2DPointer.LcdDot が持つ
                 float2 c = i.uv * 2.0 - 1.0;
                 float r2 = dot(c, c);
-                float2 s = c * (1.0 + _Curve * r2) / (1.0 + 2.0 * _Curve);
+                float2 s = c * (1.0 + _Curve * r2) / (1.0 + _Curve * (2.0 - _CurveFit));
                 float2 suv = s * 0.5 + 0.5;
                 if (suv.x < 0 || suv.y < 0 || suv.x > 1 || suv.y > 1) return fixed4(_Back.rgb, 1);
+                // 絵の外形の縁 (f > 0 の時だけ): 画面の 1 画素ぶんで _Back へ寄せ、 樽型の縁が画面の画素でギザギザにならないようにする (f = 0 は今までどおり何もしない)
+                float edgeM = min(min(suv.x, 1.0 - suv.x), min(suv.y, 1.0 - suv.y));
+                float edgeA = _CurveFit > 0.001 ? saturate(edgeM / max(fwidth(edgeM), 1e-5)) : 1.0;
                 float2 panelUv = suv;      // 走査線は液晶の板そのもの。 点灯の瞬間の歪み (絵のずれ) には付いていかない
 
                 // 点灯の瞬間の歪み: 行ごとの横ずれ (走査のちぎれ)・ブロックごとの大きな横ずれ・縦の揺れ。 強さ _Distort は点灯直後に最大から急に減る
@@ -156,6 +164,7 @@ Shader "Game2D/LcdScreen"
                 #endif
 
                 col = PowerOn(col, _Power);                   // 起動演出 (電源オン)
+                col = lerp(_Back.rgb, col, edgeA);            // 絵の外形の縁 (f > 0 の時だけ・上の edgeA)
                 return fixed4(col, 1);
             }
             ENDCG

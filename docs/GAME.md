@@ -3748,6 +3748,9 @@ OfferPassives / TradePassive / ForgeWeapon / NextShopDiscount / NextRestBonus /
 
 **924 × 556 物理 px**。**4 物理 px = 1 dot** のため、内部は **231 × 139 dot**。
 
+**液晶の湾曲の外形（試作の切り替え・2026-11-16）**: `Game2D/LcdScreen` の `_CurveFit`（既定 0 = 今まで: 四隅を絵の端に合わせ、見える範囲は長方形・縁の中央の近くの絵は画面の外へ出る / 1 = 縁の中央を絵の端に合わせ、絵の外形が樽型・四隅は `_Back`）。式は「元 = 中心 × (1 + k·r²) / (1 + k·(2 − f))」で、マウスの当たりも同じ式（`Game2DPointer.LcdDot` の 1 か所）。
+作者が実機の A/B（`QaBattle.LcdCurveFit(0〜1)`・`QaBattle.LcdCurve(k)`）を見て決めるための試作。決まるまで既定は 0、安全域（`LcdSafeArea`）も変えない。
+
 ### 18-3. 実装フェーズ（W1〜W10）
 
 W1〜W3 が基盤、W4〜W6 で操作が成立、**W7〜W8 で戦闘接続**、W9〜W10 は演出。
