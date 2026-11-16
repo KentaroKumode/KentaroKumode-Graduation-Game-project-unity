@@ -7,7 +7,7 @@ namespace UI.Game2D
     /// 設定 (<see cref="GameSettings"/>) を実際に効かせる係 (#85・2026-11-11)。 実行時に 1 つ作り、 シーンを跨いで残る。
     /// <list type="bullet">
     /// <item>音: メイン = <c>AudioListener.volume</c>・SE = <see cref="Game2DSfx.Volume"/>・BGM = <see cref="TitleBgm"/> が自分で読む。</item>
-    /// <item>液晶の Quad (Game2D/LcdScreen): 走査線 <c>_Scan</c>・湾曲 <c>_Curve</c>・色収差 <c>_Chroma</c>・フィルムの粒 <c>_Grain</c>。
+    /// <item>液晶の Quad (Game2D/LcdScreen): 走査線 <c>_Scan</c>・湾曲 <c>_Curve</c>・色収差 <c>_Chroma</c>・フィルムの粒 <c>_Grain</c>・ブルーム <c>_Bloom</c> と <c>_Halo</c> (2026-11-17)。
     ///   アセットのマテリアルは書き換えず、 <b>実行時の複製</b>を Quad に付けて、 そこへ「元の値 × 倍率」を入れる。
     ///   MaterialPropertyBlock にしないのは、 地図の入力 (Game2DMapView.Input) が湾曲を sharedMaterial から読んでクリック位置を直すため ──
     ///   複製を sharedMaterial にすれば、 湾曲を変えてもクリックの位置がずれない。</item>
@@ -40,7 +40,7 @@ namespace UI.Game2D
 
         // 液晶の Quad
         private Renderer _lcd; private Material _lcdMat;
-        private float _scan0, _curve0, _chroma0, _grain0;
+        private float _scan0, _curve0, _chroma0, _grain0, _bloom0, _halo0;
         // 横線ノイズ
         private Game2DLcdNoise _noise; private float _gain0;
         // 外枠の仕上げ
@@ -60,7 +60,8 @@ namespace UI.Game2D
         private static readonly int CurveFitId = Shader.PropertyToID("_CurveFit");
 
         private static readonly int ScanId = Shader.PropertyToID("_Scan"), CurveId = Shader.PropertyToID("_Curve"), ChromaId = Shader.PropertyToID("_Chroma"),
-            GrainId = Shader.PropertyToID("_Grain"), VigId = Shader.PropertyToID("_Vignette"), BrightId = Shader.PropertyToID("_Bright");
+            GrainId = Shader.PropertyToID("_Grain"), VigId = Shader.PropertyToID("_Vignette"), BrightId = Shader.PropertyToID("_Bright"),
+            BloomId = Shader.PropertyToID("_Bloom"), HaloId = Shader.PropertyToID("_Halo");
 
         private void OnDestroy()
         {
@@ -91,6 +92,7 @@ namespace UI.Game2D
                     var src = r.sharedMaterial;
                     if (_lcdMat != null) Destroy(_lcdMat);
                     _scan0 = src.GetFloat(ScanId); _curve0 = src.GetFloat(CurveId); _chroma0 = src.GetFloat(ChromaId); _grain0 = src.GetFloat(GrainId);
+                    _bloom0 = src.GetFloat(BloomId); _halo0 = src.GetFloat(HaloId);
                     _lcdMat = new Material(src) { name = src.name + " (settings)" };
                     r.sharedMaterial = _lcdMat; _lcd = r; found = true;
                 }
@@ -140,6 +142,10 @@ namespace UI.Game2D
                 SyncPointerMaterial();
                 _lcdMat.SetFloat(ChromaId, Mathf.Clamp(_chroma0 * GameSettings.FxScale(GameSettings.Key.Chroma), 0f, 0.02f));
                 _lcdMat.SetFloat(GrainId, Mathf.Clamp(_grain0 * GameSettings.FxScale(GameSettings.Key.Noise), 0f, 0.3f));
+                // ブルーム (2026-11-17): 面の光 _Bloom と縁の光 _Halo に倍率を掛ける (50 → ×1 = 今の値そのまま・0 → 両方 0 = 光らない)。 周りの明るさでの抑え方 (Game2DLcdGhost の形・k・thr) は変えない
+                float bs = GameSettings.FxScale(GameSettings.Key.Bloom);
+                _lcdMat.SetFloat(BloomId, Mathf.Clamp01(_bloom0 * bs));
+                _lcdMat.SetFloat(HaloId, Mathf.Clamp01(_halo0 * bs));
             }
             if (_noise != null) _noise.gain = _gain0 * GameSettings.FxScale(GameSettings.Key.Noise);
             if (_fxMat != null)

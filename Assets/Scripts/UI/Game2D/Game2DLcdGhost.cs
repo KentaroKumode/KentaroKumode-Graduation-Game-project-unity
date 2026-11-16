@@ -160,7 +160,9 @@ namespace UI.Game2D
                 if (_bloomMat == null) _bloomMat = new Material(bloomShader) { hideFlags = HideFlags.HideAndDontSave };
                 Graphics.Blit(gui, _prev, _bloomMat, 4);
             }
-            BuildBloom();
+            // 設定の「ブルーム」が 0 (面の光 _Bloom も縁の光 _Halo も 0) の時は、 光の下処理 (取り出し・縮小・ぼかし) を止める (シェーダは 0 を掛けるので光らない)
+            var lm = surface.sharedMaterial;
+            if (lm == null || lm.GetFloat(BloomId) > 0f || lm.GetFloat(HaloId) > 0f) BuildBloom();
             if (!AutoExposureOn) { MeasuredLuma = -1f; Exposure = 1f; }      // 自動露出は止めた (2026-11-17・どの形でも 1 に固定・測らない)
 #pragma warning disable CS0162      // AutoExposureOn は定数 (戻す時のために残す)
             else if (autoExposure) Meter(); else { MeasuredLuma = -1f; Exposure = Mathf.MoveTowards(Exposure, 1f, Time.unscaledDeltaTime * 2f); }

@@ -5,7 +5,7 @@ namespace UI.Game2D
 {
     /// <summary>
     /// 設定の画面 (#85・<b>仮置き</b>・2026-11-11・docs/design/gui-needed.md #41)。 共通の板のモーダルに、 値ごとのスライダーを並べる。
-    /// 頁: 画面 (明るさ・走査線・湾曲・色収差・ビネット・ノイズ・行間・字間) / 音 (メイン・BGM・SE)。 値の置き場・範囲・既定は <see cref="GameSettings"/>、
+    /// 頁: 画面 (明るさ・走査線・湾曲・色収差・ビネット・ノイズ・ブルーム・行間・字間) / 音 (メイン・BGM・SE)。 値の置き場・範囲・既定は <see cref="GameSettings"/>、
     /// 効かせるのは <see cref="Game2DSettingsApply"/>。 動かすとその場で効き、 閉じる時に保存する (次の起動でも効く)。
     /// <para>開き方: Esc (タイトル・航行・戦闘で、 ほかの窓が出ていない時)。 もう一度 Esc か「閉じる」で閉じる。
     /// 操作: バーを押す・引く / 選んだ行を [−] [+] か ← → (Shift で 10 ずつ)。 タイトルにはまだ設定のボタンの絵が無いので Esc だけ。</para>
@@ -16,7 +16,7 @@ namespace UI.Game2D
         public Game2DModal modal;
 
         private static readonly GameSettings.Key[] ScreenKeys = { GameSettings.Key.Bright, GameSettings.Key.Scan, GameSettings.Key.Curve, GameSettings.Key.Chroma, GameSettings.Key.Vignette, GameSettings.Key.Noise,
-                                                                  GameSettings.Key.LineGap, GameSettings.Key.CharGap };      // 行間・字間 (2026-11-16)
+                                                                  GameSettings.Key.Bloom, GameSettings.Key.LineGap, GameSettings.Key.CharGap };      // ブルーム (2026-11-17)・行間・字間 (2026-11-16)
         private static readonly GameSettings.Key[] SoundKeys = { GameSettings.Key.Master, GameSettings.Key.Bgm, GameSettings.Key.Se };
 
         private static Game2DSettingsPanel _inst;
@@ -115,8 +115,9 @@ namespace UI.Game2D
             var keys = Keys;
             var d = new ScreenDef
             {
-                // rowH 14: 画面の頁は 8 行 (行間を最大にしても窓が 266 に収まる・2026-11-16)
-                id = "settings_panel", jp = true, w = 472, cols = 1, rowH = 14, sliders = true, sliderNoTicks = true, sliderNameW = 74,
+                // rowH 13: 画面の頁は 9 行 (2026-11-17・ブルームを足した)。 窓の高さ = 16 + 20 + 4 + 9 × (13 + 1) + (2 × 行送り + 6) + 4 + 行送り + 4 + 22 + 16
+                //   = 行間 0 (行送り 13) で 257・行間 3 (行送り 16) で 266 (上限 ModalJpMetrics.MaxH = 266 ちょうど)。 14 のままだと行間 1 で 269・行間 3 で 275 になり下の行が描かれなかった
+                id = "settings_panel", jp = true, w = 472, cols = 1, rowH = 13, sliders = true, sliderNoTicks = true, sliderNameW = 74,
                 title = _page == 0 ? "設定 ― 画面" : "設定 ― 音",
                 sub = "動かすとすぐ効く。 閉じると保存する",
             };
