@@ -404,8 +404,8 @@ namespace UI.Game2D.Battle
 
         // ── ブルームを周りの明るさで変える試し (2026-11-17・作者「周りが明るい所はブルームを抑えたい」・見比べ用・保存しない) ──
 
-        /// <summary>ブルームの形: 0 = 今のまま (絶対のしきい値 + 自動露出・既定) / 1 = 周りが明るい所ほど抑える / 2 = 周りより明るい分だけ光る。
-        /// 1・2 の間は自動露出を 1 に固定する。 例: <c>UI.Game2D.Battle.QaBattle.BloomMode(1)</c></summary>
+        /// <summary>ブルームの形: 0 = 旧い形 (絶対のしきい値) / 1 = 周りが明るい所ほど抑える / 2 = 周りより明るい分だけ光る (既定・2026-11-17〜・k 2.0・thr 0.08・広さ 1/16)。
+        /// 自動露出は形に関係なく止めてある (1 固定)。 既定は本体の Game2DLcdGhost.Default*。 例: <c>UI.Game2D.Battle.QaBattle.BloomMode(0)</c></summary>
         public static string BloomMode(int mode)
         {
             Game2DLcdGhost.BloomMode = Mathf.Clamp(mode, 0, 2);

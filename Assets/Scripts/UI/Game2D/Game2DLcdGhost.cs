@@ -27,7 +27,7 @@ namespace UI.Game2D
         [Range(0f, 4f), Tooltip("タイトル・職業選択での光のにじみの倍率 (マテリアルの _Bloom と _Halo に掛ける)。 航行は暗い地に明るい細い線なので、 にじみが強く出て光って見える。 タイトルは絵が中間の明るさなので、 同じ値だとほとんど光らない")]
         public float titleBloomScale = 2f;
 
-        [Header("自動露出")]
+        [Header("自動露出 (2026-11-17〜 止めた・AutoExposureOn = false の間は効かない)")]
         public bool autoExposure = true;
         [Range(0.05f, 0.9f), Tooltip("目標の平均の明るさ (効果を掛ける前の絵・0..1)。 これより明るいと下げる")] public float target = 0.38f;
         [Range(0f, 1.5f), Tooltip("効きの強さ (0 = 何もしない・1 = 目標との比そのまま)")] public float strength = 0.6f;
@@ -47,20 +47,27 @@ namespace UI.Game2D
 
         private RenderTexture _prev, _bloomA, _bloomTmpA, _bloomB, _bloomTmpB;
 
-        // ── ブルームを周りの明るさで変える試し (2026-11-17・作者「昼の画面は周りも明るいのにブルームが強い・周りが明るい所は抑えたい」) ──
-        //   見比べる口は QaBattle.BloomMode / BloomSuppress / BloomRelative。 既定 0 = 今のまま (作者が絵を見て選ぶまで変えない)。
-        /// <summary>0 = 今のまま (絶対のしきい値 + 自動露出) / 1 = 周りが明るい所ほどブルームを抑える (抑え率 = 1 − smoothstep(<see cref="SupLo"/>, <see cref="SupHi"/>, 周り)) /
-        /// 2 = 周りより明るい分だけ光る (しきい値 = <see cref="RelThr"/> + <see cref="RelK"/> × 周り)。 1・2 は自動露出を 1 に固定する (絵全体の明るさを変えない)。</summary>
-        public static int BloomMode = 0;
-        /// <summary>周りの明るさを測る広さ: 0 = 1/4 (細かい・約 4 dot の塊をぼかす) / 1 = 1/8 / 2 = 1/16 (広い・約 16 dot の塊をぼかす)。</summary>
-        public static int SurLevel = 2;
+        // ── ブルームの形 (2026-11-17・作者「昼の画面は周りも明るいのにブルームが強い・周りが明るい所は抑えたい」) ──
+        //   <b>既定 = 形 2 (周りより明るい分だけ光る)・k 2.0・thr 0.08・広さ 1/16</b> (2026-11-17・作者の決定: 実機の撮り比べで、 昼の砂地のにじみが減り、 暗い場面は今のまま)。
+        //   形 0・1 は見比べの口として残す (QaBattle.BloomMode / BloomSuppress / BloomRelative)。 既定の置き場はここの Default* (起動時もこの値に戻す)。
+        /// <summary>0 = 旧い形 (絶対のしきい値 _BloomThr) / 1 = 周りが明るい所ほどブルームを抑える (抑え率 = 1 − smoothstep(<see cref="SupLo"/>, <see cref="SupHi"/>, 周り)) /
+        /// 2 = 周りより明るい分だけ光る (しきい値 = <see cref="RelThr"/> + <see cref="RelK"/> × 周り・既定)。</summary>
+        public static int BloomMode = DefaultBloomMode;
+        /// <summary>周りの明るさを測る広さ: 0 = 1/4 (細かい・約 4 dot の塊をぼかす) / 1 = 1/8 / 2 = 1/16 (広い・約 16 dot の塊をぼかす・既定)。</summary>
+        public static int SurLevel = DefaultSurLevel;
         /// <summary>形 1 のしきい値 (周りの輝度・液晶の RT の値・リニア): ここから下げ始め、 <see cref="SupHi"/> で消える。</summary>
-        public static float SupLo = 0.10f, SupHi = 0.35f;
+        public static float SupLo = DefaultSupLo, SupHi = DefaultSupHi;
         /// <summary>形 2 の値: しきい値 = RelThr + RelK × 周り。</summary>
-        public static float RelK = 1.0f, RelThr = 0.08f;
+        public static float RelK = DefaultRelK, RelThr = DefaultRelThr;
+        public const int DefaultBloomMode = 2, DefaultSurLevel = 2;
+        public const float DefaultSupLo = 0.10f, DefaultSupHi = 0.35f, DefaultRelK = 2.0f, DefaultRelThr = 0.08f;
+
+        /// <summary>自動露出を効かせるか (2026-11-17〜 false・作者の決定: ブルームを周りとの比較で出すので、 絵全体の明るさは変えない)。 false の間は _Exposure = 1 に固定し、
+        /// 明るさを測る縮小 (GenerateMips) と読み戻し (AsyncGPUReadback) もしない。 仕組み (Meter) は戻せるように残す。 _Exposure を読むのは液晶のシェーダ (Game2D/LcdScreen) だけ。</summary>
+        public const bool AutoExposureOn = false;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetBloomTrial() { BloomMode = 0; SurLevel = 2; SupLo = 0.10f; SupHi = 0.35f; RelK = 1.0f; RelThr = 0.08f; }
+        private static void ResetBloomTrial() { BloomMode = DefaultBloomMode; SurLevel = DefaultSurLevel; SupLo = DefaultSupLo; SupHi = DefaultSupHi; RelK = DefaultRelK; RelThr = DefaultRelThr; }
 
         private RenderTexture _lumA, _lumTmpA, _lumB, _lumTmpB, _lumC, _lumTmpC;
         private static readonly int SurTexId = Shader.PropertyToID("_SurTex"), RelModeId = Shader.PropertyToID("_RelMode"), SupLoId = Shader.PropertyToID("_SupLo"),
@@ -154,8 +161,10 @@ namespace UI.Game2D
                 Graphics.Blit(gui, _prev, _bloomMat, 4);
             }
             BuildBloom();
-            if (BloomMode == 1 || BloomMode == 2) { MeasuredLuma = -1f; Exposure = 1f; }      // 周りの明るさの試し: 自動露出を 1 に固定 (絵全体の明るさを変えない)
+            if (!AutoExposureOn) { MeasuredLuma = -1f; Exposure = 1f; }      // 自動露出は止めた (2026-11-17・どの形でも 1 に固定・測らない)
+#pragma warning disable CS0162      // AutoExposureOn は定数 (戻す時のために残す)
             else if (autoExposure) Meter(); else { MeasuredLuma = -1f; Exposure = Mathf.MoveTowards(Exposure, 1f, Time.unscaledDeltaTime * 2f); }
+#pragma warning restore CS0162
             if (_mpb == null) _mpb = new MaterialPropertyBlock();
             surface.GetPropertyBlock(_mpb);
             _mpb.SetTexture(PrevId, _prev);

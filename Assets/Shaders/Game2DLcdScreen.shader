@@ -24,7 +24,7 @@ Shader "Game2D/LcdScreen"
         _BloomTexB ("ブルーム (1/8)", 2D) = "black" {}
         _Bloom ("発光のにじみ (明るい画素のまわりへ光が漏れる)", Range(0, 1)) = 0.35
         _BloomThr ("にじみ始める明るさ", Range(0, 1)) = 0.22
-        _Exposure ("自動露出 (Game2DLcdGhost が毎フレーム入れる・1 = 変えない)", Float) = 1
+        _Exposure ("自動露出 (Game2DLcdGhost が毎フレーム入れる・1 = 変えない・2026-11-17〜 止めて 1 固定)", Float) = 1
         _BloomFar ("広いにじみ (1/8) の混ぜ具合 (小さいほど光の届く範囲が狭い。 近くの強さは変えない)", Range(0, 1)) = 0.12
         _BloomSoft ("ぼかしの広がり (大きいほど柔らかく広い・Game2DLcdGhost が読む)", Range(0.5, 4)) = 1.1
         _BloomTint ("にじみの色味 (元の絵の色を、 この色へ寄せる)", Color) = (0.72, 0.88, 1.0, 1)
