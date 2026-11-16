@@ -164,11 +164,11 @@ namespace GameLoop
 
         /// <summary>ヴェスカ撃破後の一択を確定してランを閉じる。
         ///
-        /// <para><paramref name="leaveOpen"/> = false → <b>裂け目を閉じる</b> (TRUE END〈帳尻〉)。
+        /// <para><paramref name="leaveOpen"/> = false → <b>裂け目を閉じる</b> (TRUE END〈終始〉)。
         /// 自分と遺物の山とヴェスカを対価に帳尻を合わせる。 遺物経済は破綻し、
         /// 主人公は帰らず、 大穴の広がりは数年かけて止まる。</para>
         ///
-        /// <para><paramref name="leaveOpen"/> = true → <b>閉じない</b> (GOOD END〈見送り〉)。
+        /// <para><paramref name="leaveOpen"/> = true → <b>閉じない</b> (GOOD END〈帰路〉)。
         /// 主人公は秘宝を持って登り、 家族のもとへ帰る。 穴は残り、 誰も何も書かない。</para>
         ///
         /// <para>正本: <see cref="Endings"/> / docs/GAME.md §20。</para></summary>

@@ -19,7 +19,7 @@ namespace Codex
         {
             // 2026-11-11 (#24) 再編: **重大な内容ほど後で開く**段に並べ直した (段の定義と割り当て表は docs/GAME.md §20「codex の解禁」)。
             //   段 0 常時 / 段 1 ランの途中 (層に着く・敵に会う・品を得る ── 層・敵・品の項目は CodexRecord) / 段 2 結末を 1 つ見た /
-            //   段 3 結末ごとの初回 / 段 4 7 層の後 (見送り・帳尻) / 段 5 全部の結末を見た後。
+            //   段 3 結末ごとの初回 / 段 4 7 層の後 (帰路・終始) / 段 5 全部の結末を見た後。
             //   旧: 結末の初回 / 3 回の 2 段で、 全部が結末の後だった。 「3 回」は使わなくなった (enum は残す)。
             Prologue,          // ある朝            (段 0: 常時)
 
@@ -35,14 +35,14 @@ namespace Codex
             MumeiNoKeisho,     // 玉座の番          (段 3: end3 初回・§19-9 の段 3「codex で明示」)
             Tomuraikin,        // 弔い金            (段 1: Run.Depth 5〈審きの淵〉に着いた)
 
-            // 見送り (GOOD) ── 閉じなかった世界
+            // 帰路 (GOOD) ── 閉じなかった世界
             ChousaHoukoku,     // 調査報告（第三次）(段 4: end_good 初回)
 
             // E5 終幕 ── 塞ぐ
             TatamuJunban,      // 畳む順番          (段 4: end_true 初回)
 
             // 2026-11-16: 旧「一枚目」(Ichimaime) を削除し、 ここへ「おとぎ話」を置いた (docs/GAME.md §24)
-            FurukiHon,         // おとぎ話          (段 5: 帳尻を含む全部の結末を見た ── いちばん最後に開く)
+            FurukiHon,         // おとぎ話          (段 5: 終始を含む全部の結末を見た ── いちばん最後に開く)
         }
 
         public enum UnlockTier
@@ -60,7 +60,7 @@ namespace Codex
             ReachFloor,
             /// <summary>どれかの結末を 1 回見た (2026-11-11)。</summary>
             AnyEnding,
-            /// <summary>帳尻 (end_true) を含む、 今ある全部の結末 (end1・end2・end3・end_good・end_true) を見た (2026-11-11)。</summary>
+            /// <summary>終始 (end_true) を含む、 今ある全部の結末 (end1・end2・end3・end_good・end_true) を見た (2026-11-11)。</summary>
             AllEndings,
         }
 
@@ -514,7 +514,7 @@ namespace Codex
                     "\n" +
                     "それが幾らに相当するのかは、誰にも勘定できなかった。\n" +
                     "街の熱は冷めたが、人々は前を向いて、それぞれの人生を歩み始めた。",
-                // 街が十一年かけて死ぬ ＝ 遺物経済の破綻。 EndTrue〈帳尻〉の後日談。
+                // 街が十一年かけて死ぬ ＝ 遺物経済の破綻。 EndTrue〈終始〉の後日談。
                 condition = new UnlockCondition { endingId = GameLoop.Endings.EndTrueId, tier = UnlockTier.FirstClear },
             },
 

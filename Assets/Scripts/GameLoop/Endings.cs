@@ -20,7 +20,7 @@ namespace GameLoop
     ///   **主人公自身を収支に含める** EndTrue と、 **閉じないことを選ぶ** EndGood に割った。
     ///
     /// 2026-11-16 (作者の決定): **筐体の中の事は、 もう物語の外と接続しない。** 旧い額縁 (原作『大穴』→ 卓上遊戯 → 筐体の遊び手) を物語から外し、
-    ///   後日談「棚の隅」(旧 Epilogue) と codex「一枚目」を削除した。 帳尻の最後にあった「深い層の紙束が読み物になる」段も削除。
+    ///   後日談「棚の隅」(旧 Epilogue) と codex「一枚目」を削除した。 終始の最後にあった「深い層の紙束が読み物になる」段も削除。
     ///   本として残るのは主人公の手帳の 1 冊だけ: 縁の欠けた銅貨を挟んだ手帳が裂け目へ → 大昔の遺跡 → 写し → 戸棚の角の丸い本 (codex「おとぎ話」・結びがプロローグの 1 行目)。
     ///   本文では説明しない・決定論ではない (同じ手帳・同じ子供とは書かない)。 docs/GAME.md §24。
     ///
@@ -217,7 +217,7 @@ namespace GameLoop
 
         public static readonly Ending EndTrue = new Ending
         {
-            id = EndTrueId, title = "帳尻",
+            id = EndTrueId, title = "終始",
             body =
                 "まず、彼の蔵が向こう側へ落ちていった。\n" +
                 "彼の数えで、幾百年もの間ため込まれた遺物の山が、\n" +
@@ -272,7 +272,7 @@ namespace GameLoop
         /// <para>底の紙束も主人公の手帳も裂け目の向こうへ放り込み、 誰も何も書かない。</para></summary>
         public static readonly Ending EndGood = new Ending
         {
-            id = EndGoodId, title = "見送り",
+            id = EndGoodId, title = "帰路",
             body =
                 "彼だけを向こうへ返したあと、\n" +
                 "あなたは縁に座って、しばらく数えていた。\n" +
