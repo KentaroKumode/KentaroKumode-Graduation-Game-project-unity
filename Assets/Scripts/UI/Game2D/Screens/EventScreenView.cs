@@ -98,6 +98,8 @@ namespace UI.Game2D
         // ── 中身 (Game2DPhaseScreens が詰める) ──
         public string backdrop, title, pageMark, hint;
         public List<string> lines = new List<string>();
+        /// <summary>上の帯の値 (航行の数値・左から HP・物資・ゴールド・素材・ターン・補足中)。 null か空なら帯を出さない。</summary>
+        public List<EventLayout.BarItem> bar;
         /// <summary>選択肢 (null か空 = 右の列を出さず背景を見せる)。</summary>
         public List<Choice> choices;
         public readonly List<Btn> buttons = new List<Btn>();
@@ -116,6 +118,7 @@ namespace UI.Game2D
         {
             int LH = Game2DJpFont.LineH, cell = Game2DJpFont.Cell;
             Backdrop(p);
+            TopBar(p, cell);
             // 本文の板
             int px = EventLayout.PlateX, py = EventLayout.PlateY, x0 = px + EventLayout.Pad;
             Shade(p, px, py, EventLayout.PlateW, EventLayout.PlateH, PlateFill, Edge);
@@ -146,6 +149,24 @@ namespace UI.Game2D
             _boxR.Clear();
             if (choices != null && choices.Count > 0) Column(p, LH, cell);
             return false;
+        }
+
+        /// <summary>上の帯 (2026-11-16): 画面の上辺に付けた 1 本。 板・箱と同じ作り (地を濃さ <see cref="PlateAlpha"/> で重ね・1 dot の縁)。
+        /// 値は間隔だけで左から並べる (ラベルは暗い字・値は明るい字・補足中は警告の色)。 幅に収まらない値は描かない (検算が最も長い値で収まりを見ている)。</summary>
+        private void TopBar(KitPix p, int cell)
+        {
+            if (bar == null || bar.Count == 0) return;
+            Shade(p, EventLayout.BarX, EventLayout.BarY, EventLayout.BarW, EventLayout.BarH, PlateFill, Edge);
+            int x = EventLayout.BarX + EventLayout.BarPadX, ty = EventLayout.BarY + EventLayout.TextDy(EventLayout.BarH, cell), right = EventLayout.BarX + EventLayout.BarW - EventLayout.BarPadX;
+            foreach (var it in bar)
+            {
+                int w = EventLayout.BarItemW(it, Game2DJpFont.Advance);
+                if (x + w > right) break;
+                int tx = x;
+                if (!string.IsNullOrEmpty(it.label)) { Text(p, it.label, tx, ty, it.warn ? Warn : Dim); tx += Game2DJpFont.Width(it.label) + EventLayout.BarLabelGap; }
+                Text(p, it.value, tx, ty, it.warn ? Warn : Ink);
+                x += w + EventLayout.BarItemGap;
+            }
         }
 
         private void Column(KitPix p, int LH, int cell)

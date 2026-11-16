@@ -732,7 +732,8 @@ namespace UI.Game2D
 
             var v = _evView;
             v.backdrop = EventScreenView.BackdropName(ev);
-            v.title = ev != null ? ev.name : "イベント"; v.pageMark = plan.Mark(_evPage); v.lines = plan.Lines(_evPage);
+            v.title = ev != null ? ev.name : "イベント";
+            v.bar = EventBar(gm); v.pageMark = plan.Mark(_evPage); v.lines = plan.Lines(_evPage);
             v.buttons.Clear(); v.choices = null;
             if (_evPage > 0) v.buttons.Add(new EventScreenView.Btn { label = "前へ", action = "prev" });
             if (!last) { v.buttons.Add(new EventScreenView.Btn { label = "次へ", action = "page", primary = true }); v.hint = "Space 次へ"; }
@@ -771,6 +772,29 @@ namespace UI.Game2D
                 Refresh();
             };
             return null;      // 窓は使わない (Update が _evBuilt を見て液晶の板に出す)
+        }
+
+        /// <summary>イベントの画面の上の帯の値 (2026-11-16): HP・物資・ゴールド・素材・ターン・補足中 (地図の帯 Game2DNavExtras と同じ所から読む)。
+        /// 航行マップの無い層では、 ターンと補足中を出さない (詰めて並べる)。 結果の頁では選んだ効果の後の値: HP・物資・ゴールド・素材は選んだ時に適用済み、
+        /// ターンは地図へ戻る時に進むので、 まだ進めていない分 (EventEncounter.PendingTurns) を足して見せる。 補足中の見込みは今の値 (ターンが進む前)。</summary>
+        private static List<EventLayout.BarItem> EventBar(GameManager gm)
+        {
+            var run = gm.Run; var list = new List<EventLayout.BarItem>();
+            if (run == null) return list;
+            list.Add(new EventLayout.BarItem { label = "HP", value = run.playerHP + "/" + run.playerMaxHP });
+            list.Add(new EventLayout.BarItem { label = "物資", value = run.provision.ToString() });
+            list.Add(new EventLayout.BarItem { value = run.coins + "G" });
+            list.Add(new EventLayout.BarItem { label = "素材", value = run.weaponMaterials.ToString() });
+            var sim = gm.FreeMap;
+            if (sim != null)
+            {
+                int pending = EventEncounter.Instance != null ? EventEncounter.Instance.PendingTurns : 0;
+                list.Add(new EventLayout.BarItem { label = "ターン", value = (sim.Turn + pending).ToString() });
+            }
+            var eta = EventEncounter.CatchEtaNow();
+            if (eta.Valid) list.Add(new EventLayout.BarItem { label = "補足中", value = "あと" + eta.turns, warn = true });
+            else if (sim != null && sim.FoeAlive && sim.FoeMode == MapSystem.FreeMove.FoeMode.Chase) list.Add(new EventLayout.BarItem { value = "補足中", warn = true });
+            return list;
         }
 
         /// <summary>頁を 1 つ送る・戻す (画面の中だけ)。</summary>

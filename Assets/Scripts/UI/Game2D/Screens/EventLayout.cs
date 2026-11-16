@@ -65,6 +65,31 @@ namespace UI.Game2D
         /// <summary>選んでいる箱の左端の帯の幅 (液晶のにじみで細い縁が弱く見えても、 どれを選んでいるか分かる印)。</summary>
         public const int SelBarW = 2;
 
+        // ── 上の帯 (航行の数値・2026-11-16 作者の承認) ──
+        //   画面の上辺に付ける (y 0・作者の指示「もっと上辺ギチギチまで」)。 液晶の外形を湾曲に合わせた今 (f = 1) は絵が画面の外へ出ないので、 y 0 の行も欠けない
+        //   (上辺の中央では絵の y 0 が画面の y 0 にちょうど重なる)。 左右はイベントの余白 (x 8〜472)。
+        //   四隅の楔との関係 (k = 0.07): 帯の左上の角 (8, 0) は画面の (18.9, 6.4)、 右上 (472, 0) は (461.1, 6.4) に見え (絵の角 (0, 0) は (12.0, 6.8))、 どちらも絵の外形 (楔の縁) の上に乗る
+        //   ── 絵の上端 (y 0) の行は外形そのものなので、 帯の上の縁は全長で外形に沿って弓なりに見え、 楔の色には掛からない (角を落とす必要は無い)。
+        /// <summary>帯の上端・高さ・左右の内側の余白・値と値の間・ラベルと値の間。</summary>
+        public const int BarY = 0, BarH = 16, BarPadX = 8, BarItemGap = 12, BarLabelGap = 4;
+        public const int BarX = SafeL, BarW = SafeR - SafeL;
+
+        /// <summary>帯に並べる値 1 つ。 label = 暗い字 (null なら値だけ・ゴールド「36G」)・value = 明るい字・warn = 全部を警告の色 (補足中)。</summary>
+        public struct BarItem { public string label, value; public bool warn; }
+
+        /// <summary>値 1 つの幅。</summary>
+        public static int BarItemW(BarItem it, Func<char, int> adv)
+            => (string.IsNullOrEmpty(it.label) ? 0 : Width(it.label, adv) + BarLabelGap) + Width(it.value, adv);
+
+        /// <summary>帯の中身の幅 (左右の余白を含む)。 これが <see cref="BarW"/> 以下なら収まる。</summary>
+        public static int BarContentW(List<BarItem> items, Func<char, int> adv)
+        {
+            int w = 2 * BarPadX;
+            if (items == null) return w;
+            for (int i = 0; i < items.Count; i++) w += BarItemW(items[i], adv) + (i > 0 ? BarItemGap : 0);
+            return w;
+        }
+
         /// <summary>字を高さ h の箱の上下の真ん中に置く下げ幅 (cell = 字の高さ)。</summary>
         public static int TextDy(int h, int cell) => (h - cell + 1) / 2;
 

@@ -137,7 +137,21 @@ static class Program
               && EventLayout.PlateX + EventLayout.PlateW <= EventLayout.ColX,
               $"本文の板がイベントの余白 (x {EventLayout.SafeL}〜{EventLayout.SafeR}・y {LcdSafeArea.T}〜{LcdSafeArea.B}・左右は液晶の安全域 {LcdSafeArea.L} より狭いイベントだけの値) に収まり、 選択肢の列と重ならない (板 x {EventLayout.PlateX} y {EventLayout.PlateY} {EventLayout.PlateW}×{EventLayout.PlateH})");
         Check(EventLayout.ColX + EventLayout.ColW <= EventLayout.SafeR, $"選択肢の列がイベントの余白の右に収まる (列 x {EventLayout.ColX} 幅 {EventLayout.ColW})");
-        string need = "…〜0123456789G素材物資手放す次へ前選ぶ補足されている。最短ターンで捕まる中";
+        // 上の帯 (2026-11-16): 最も長い値で横に収まる・選択肢の列 (最多 5 つ + 説明 2 行) と重ならない・本文の板と重ならない
+        {
+            var longest = new List<EventLayout.BarItem>
+            {
+                new EventLayout.BarItem { label = "HP", value = "999/999" }, new EventLayout.BarItem { label = "物資", value = "10" },
+                new EventLayout.BarItem { value = "999G" }, new EventLayout.BarItem { label = "素材", value = "99" },
+                new EventLayout.BarItem { label = "ターン", value = "999" }, new EventLayout.BarItem { label = "補足中", value = "あと99", warn = true },
+            };
+            int bw = EventLayout.BarContentW(longest, Adv);
+            Check(bw <= EventLayout.BarW, $"上の帯に最も長い値 (HP 999/999・物資 10・999G・素材 99・ターン 999・補足中 あと99) が収まる ({bw} ≦ {EventLayout.BarW} dot・帯 x {EventLayout.BarX}〜{EventLayout.BarX + EventLayout.BarW} y {EventLayout.BarY}〜{EventLayout.BarY + EventLayout.BarH})");
+            int colTop = EventLayout.ColumnTop(5, EventLayout.NoteH(EventLayout.NoteLines, LineH));
+            Check(colTop >= EventLayout.BarY + EventLayout.BarH, $"選択肢の列 (5 つ + 説明 2 行・上端 {colTop}) が上の帯 (下端 {EventLayout.BarY + EventLayout.BarH}) と重ならない");
+            Check(EventLayout.PlateY >= EventLayout.BarY + EventLayout.BarH, "本文の板が上の帯と重ならない");
+        }
+        string need = "…〜0123456789G素材物資手放す次へ前選ぶ補足されている。最短ターンで捕まる中HP/あと";
         var missing = need.Where(ch => !Glyphs.ContainsKey(ch)).Distinct().ToList();
         Check(missing.Count == 0, "画面が使う字がドット字にある" + (missing.Count > 0 ? " (無い字: " + string.Join("", missing) + ")" : ""));
 
