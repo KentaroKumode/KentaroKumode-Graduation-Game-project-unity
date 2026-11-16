@@ -402,6 +402,40 @@ namespace UI.Game2D.Battle
             return "scanMode=" + mode + " (" + (mode == 0 ? "今のまま" : ((mode & 1) != 0 ? "1 半ドットの縞 " : "") + ((mode & 2) != 0 ? "2 明るい所を弱める " : "") + ((mode & 4) != 0 ? "4 GUI の所を弱める" : "")).TrimEnd() + ")";
         }
 
+        // ── ブルームを周りの明るさで変える試し (2026-11-17・作者「周りが明るい所はブルームを抑えたい」・見比べ用・保存しない) ──
+
+        /// <summary>ブルームの形: 0 = 今のまま (絶対のしきい値 + 自動露出・既定) / 1 = 周りが明るい所ほど抑える / 2 = 周りより明るい分だけ光る。
+        /// 1・2 の間は自動露出を 1 に固定する。 例: <c>UI.Game2D.Battle.QaBattle.BloomMode(1)</c></summary>
+        public static string BloomMode(int mode)
+        {
+            Game2DLcdGhost.BloomMode = Mathf.Clamp(mode, 0, 2);
+            return BloomNow();
+        }
+
+        /// <summary>形 1 (抑える) の値: lo = 周りの輝度がここから下げ始める・hi = ここで消える (液晶の RT の値・リニア・0〜1)・level = 周りを測る広さ
+        /// (0 = 1/4 細かい / 1 = 1/8 / 2 = 1/16 広い・-1 = 今のまま)。 例: <c>UI.Game2D.Battle.QaBattle.BloomSuppress(0.10f, 0.35f, 2)</c></summary>
+        public static string BloomSuppress(float lo, float hi, int level = -1)
+        {
+            Game2DLcdGhost.SupLo = Mathf.Clamp01(lo); Game2DLcdGhost.SupHi = Mathf.Clamp01(Mathf.Max(hi, lo));
+            if (level >= 0) Game2DLcdGhost.SurLevel = Mathf.Clamp(level, 0, 2);
+            return BloomNow();
+        }
+
+        /// <summary>形 2 (周りより明るい分だけ) の値: しきい値 = thr + k × 周り。 level は <see cref="BloomSuppress"/> と同じ。 例: <c>UI.Game2D.Battle.QaBattle.BloomRelative(1.0f, 0.08f)</c></summary>
+        public static string BloomRelative(float k, float thr, int level = -1)
+        {
+            Game2DLcdGhost.RelK = Mathf.Max(0f, k); Game2DLcdGhost.RelThr = Mathf.Clamp01(thr);
+            if (level >= 0) Game2DLcdGhost.SurLevel = Mathf.Clamp(level, 0, 2);
+            return BloomNow();
+        }
+
+        /// <summary>今のブルームの形と値・自動露出 (「bloom=1 lo=0.10 hi=0.35 level=2 k=1.00 thr=0.08 exposure=1.00」)。</summary>
+        public static string BloomNow()
+        {
+            var g = Object.FindObjectOfType<Game2DLcdGhost>();
+            return $"bloom={Game2DLcdGhost.BloomMode} lo={Game2DLcdGhost.SupLo:0.00} hi={Game2DLcdGhost.SupHi:0.00} level={Game2DLcdGhost.SurLevel} k={Game2DLcdGhost.RelK:0.00} thr={Game2DLcdGhost.RelThr:0.00} exposure={(g != null ? g.Exposure : 1f):0.00}";
+        }
+
         /// <summary>今の湾曲 (「curve=0.070 fit=0.00」)。</summary>
         public static string LcdCurveNow() { var m = LcdMat(); return m == null ? "(液晶の材質が無い)" : $"curve={m.GetFloat("_Curve"):0.000} fit={m.GetFloat("_CurveFit"):0.00}"; }
 

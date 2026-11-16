@@ -46,6 +46,25 @@ namespace UI.Game2D
         private int _frame;
 
         private RenderTexture _prev, _bloomA, _bloomTmpA, _bloomB, _bloomTmpB;
+
+        // ── ブルームを周りの明るさで変える試し (2026-11-17・作者「昼の画面は周りも明るいのにブルームが強い・周りが明るい所は抑えたい」) ──
+        //   見比べる口は QaBattle.BloomMode / BloomSuppress / BloomRelative。 既定 0 = 今のまま (作者が絵を見て選ぶまで変えない)。
+        /// <summary>0 = 今のまま (絶対のしきい値 + 自動露出) / 1 = 周りが明るい所ほどブルームを抑える (抑え率 = 1 − smoothstep(<see cref="SupLo"/>, <see cref="SupHi"/>, 周り)) /
+        /// 2 = 周りより明るい分だけ光る (しきい値 = <see cref="RelThr"/> + <see cref="RelK"/> × 周り)。 1・2 は自動露出を 1 に固定する (絵全体の明るさを変えない)。</summary>
+        public static int BloomMode = 0;
+        /// <summary>周りの明るさを測る広さ: 0 = 1/4 (細かい・約 4 dot の塊をぼかす) / 1 = 1/8 / 2 = 1/16 (広い・約 16 dot の塊をぼかす)。</summary>
+        public static int SurLevel = 2;
+        /// <summary>形 1 のしきい値 (周りの輝度・液晶の RT の値・リニア): ここから下げ始め、 <see cref="SupHi"/> で消える。</summary>
+        public static float SupLo = 0.10f, SupHi = 0.35f;
+        /// <summary>形 2 の値: しきい値 = RelThr + RelK × 周り。</summary>
+        public static float RelK = 1.0f, RelThr = 0.08f;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetBloomTrial() { BloomMode = 0; SurLevel = 2; SupLo = 0.10f; SupHi = 0.35f; RelK = 1.0f; RelThr = 0.08f; }
+
+        private RenderTexture _lumA, _lumTmpA, _lumB, _lumTmpB, _lumC, _lumTmpC;
+        private static readonly int SurTexId = Shader.PropertyToID("_SurTex"), RelModeId = Shader.PropertyToID("_RelMode"), SupLoId = Shader.PropertyToID("_SupLo"),
+            SupHiId = Shader.PropertyToID("_SupHi"), RelKId = Shader.PropertyToID("_RelK"), RelThrId = Shader.PropertyToID("_RelThr");
         private Material _bloomMat;
         private MaterialPropertyBlock _mpb;
         private static readonly int BloomTexId = Shader.PropertyToID("_BloomTex"), BloomTexBId = Shader.PropertyToID("_BloomTexB");
@@ -54,7 +73,7 @@ namespace UI.Game2D
 
         private void OnDestroy()
         {
-            foreach (var rt in new[] { _prev, _bloomA, _bloomTmpA, _bloomB, _bloomTmpB }) if (rt != null) { rt.Release(); Destroy(rt); }
+            foreach (var rt in new[] { _prev, _bloomA, _bloomTmpA, _bloomB, _bloomTmpB, _lumA, _lumTmpA, _lumB, _lumTmpB, _lumC, _lumTmpC }) if (rt != null) { rt.Release(); Destroy(rt); }
             if (_bloomMat != null) Destroy(_bloomMat);
         }
 
@@ -81,12 +100,38 @@ namespace UI.Game2D
             var mat = surface.sharedMaterial;
             float softness = mat.GetFloat("_BloomSoft");      // ぼかしの広がり (マテリアルで調整する)
             _bloomMat.SetFloat(ThrId, mat.GetFloat("_BloomThr")); _bloomMat.SetFloat(PowId, mat.GetFloat("_BloomPow"));
-            Graphics.Blit(_prev, _bloomA, _bloomMat, 0);                                   // 明るい所だけ・4×4 を 1 つに
+            if (BloomMode == 1 || BloomMode == 2)
+            {
+                // 周りの明るさ: 輝度の 4×4 平均 (1/4) → ぼかす → 1/8 → ぼかす → 1/16 → ぼかす。 使う段は SurLevel。 段を足した分だけ下処理が増える (小さい絵の Blit 9 回)
+                if (_lumA == null || _lumA.width != w || _lumA.height != h)
+                {
+                    foreach (var rt in new[] { _lumA, _lumTmpA, _lumB, _lumTmpB, _lumC, _lumTmpC }) if (rt != null) { rt.Release(); Destroy(rt); }
+                    _lumA = NewSmall(w, h, "Game2DLumA"); _lumTmpA = NewSmall(w, h, "Game2DLumTmpA");
+                    _lumB = NewSmall(Mathf.Max(1, w / 2), Mathf.Max(1, h / 2), "Game2DLumB"); _lumTmpB = NewSmall(Mathf.Max(1, w / 2), Mathf.Max(1, h / 2), "Game2DLumTmpB");
+                    _lumC = NewSmall(Mathf.Max(1, w / 4), Mathf.Max(1, h / 4), "Game2DLumC"); _lumTmpC = NewSmall(Mathf.Max(1, w / 4), Mathf.Max(1, h / 4), "Game2DLumTmpC");
+                }
+                Graphics.Blit(_prev, _lumA, _bloomMat, 5);
+                Blur(_lumA, _lumTmpA, softness);
+                RenderTexture sur = _lumA;
+                if (SurLevel >= 1) { Graphics.Blit(_lumA, _lumB, _bloomMat, 3); Blur(_lumB, _lumTmpB, softness); sur = _lumB; }
+                if (SurLevel >= 2) { Graphics.Blit(_lumB, _lumC, _bloomMat, 3); Blur(_lumC, _lumTmpC, softness); sur = _lumC; }
+                _bloomMat.SetTexture(SurTexId, sur); _bloomMat.SetFloat(RelModeId, BloomMode);
+                _bloomMat.SetFloat(SupLoId, SupLo); _bloomMat.SetFloat(SupHiId, SupHi); _bloomMat.SetFloat(RelKId, RelK); _bloomMat.SetFloat(RelThrId, RelThr);
+                Graphics.Blit(_prev, _bloomA, _bloomMat, 6);                               // 周りの明るさを効かせた取り出し・4×4 を 1 つに
+            }
+            else Graphics.Blit(_prev, _bloomA, _bloomMat, 0);                                   // 明るい所だけ・4×4 を 1 つに
             _bloomMat.SetVector(DirId, new Vector2(softness, 0)); Graphics.Blit(_bloomA, _bloomTmpA, _bloomMat, 1);
             _bloomMat.SetVector(DirId, new Vector2(0, softness)); Graphics.Blit(_bloomTmpA, _bloomA, _bloomMat, 1);
             Graphics.Blit(_bloomA, _bloomB, _bloomMat, 3);                                 // もう 1 段小さく (広いやわらかな光)
             _bloomMat.SetVector(DirId, new Vector2(softness, 0)); Graphics.Blit(_bloomB, _bloomTmpB, _bloomMat, 1);
             _bloomMat.SetVector(DirId, new Vector2(0, softness)); Graphics.Blit(_bloomTmpB, _bloomB, _bloomMat, 1);
+        }
+
+        /// <summary>横・縦のガウスぼかし (tmp を経て rt へ戻す)。</summary>
+        private void Blur(RenderTexture rt, RenderTexture tmp, float softness)
+        {
+            _bloomMat.SetVector(DirId, new Vector2(softness, 0)); Graphics.Blit(rt, tmp, _bloomMat, 1);
+            _bloomMat.SetVector(DirId, new Vector2(0, softness)); Graphics.Blit(tmp, rt, _bloomMat, 1);
         }
 
         private void Update()
@@ -109,7 +154,8 @@ namespace UI.Game2D
                 Graphics.Blit(gui, _prev, _bloomMat, 4);
             }
             BuildBloom();
-            if (autoExposure) Meter(); else { MeasuredLuma = -1f; Exposure = Mathf.MoveTowards(Exposure, 1f, Time.unscaledDeltaTime * 2f); }
+            if (BloomMode == 1 || BloomMode == 2) { MeasuredLuma = -1f; Exposure = 1f; }      // 周りの明るさの試し: 自動露出を 1 に固定 (絵全体の明るさを変えない)
+            else if (autoExposure) Meter(); else { MeasuredLuma = -1f; Exposure = Mathf.MoveTowards(Exposure, 1f, Time.unscaledDeltaTime * 2f); }
             if (_mpb == null) _mpb = new MaterialPropertyBlock();
             surface.GetPropertyBlock(_mpb);
             _mpb.SetTexture(PrevId, _prev);
