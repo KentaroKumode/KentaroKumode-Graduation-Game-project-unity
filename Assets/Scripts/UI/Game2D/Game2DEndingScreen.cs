@@ -56,10 +56,19 @@ namespace UI.Game2D
         /// <summary>結びの絵が明るくなりきってから、 エンディング名が浮かび始めるまでの間 (秒・仮置き)。 絵の無い結末は最後の頁を送ってからの間。</summary>
         public const float NameDelay = 0.6f;
         /// <summary><see cref="NameScale"/> の初期値。</summary>
-        public const int DefaultNameScale = 4;
+        public const int DefaultNameScale = 3;
         /// <summary>エンディング名の倍率 (元のドット字の 1 dot を NameScale×NameScale で打つ・最近傍の整数倍・ぼかさない)。 通し番号はこの半分 (最小 1)。
         /// 安全域の幅 (x <see cref="SafeL"/>〜<see cref="SafeR"/>) に縁取りごと収まらない倍率は、 描く時に収まる最大へ丸める。</summary>
         public static int NameScale = DefaultNameScale;
+        /// <summary><see cref="NameRim"/> の初期値。</summary>
+        public const int DefaultNameRim = 2;
+        /// <summary>エンディング名の縁取りの太さ (dot・0 = 縁取りなし / 1 / 2)。 番号 (「END n」) の縁取りは、 これが 0 なら 0・それ以外は本文と同じ 1 dot。
+        /// 安全域に収める計算 (<see cref="FitNameScale"/>) もこれに従う。</summary>
+        public static int NameRim = DefaultNameRim;
+        /// <summary>エンディング名の色の決め方 (2026-11-16・作者の指摘「名前の色が微妙」で切り替えられるように):
+        /// 0 = 金色 (既定) / 1 = 本文の字と同じ色 / 2 = その結末の結びの絵でいちばん明るい色 (輝度が最大の画素の色・絵が無ければ 1 と同じ)。
+        /// 番号 (「END n」) の色は、 0 なら今まで (頁数と同じ色)、 1・2 なら名前の色を 7 割に落とした色。 縁取りの色は 2 (絵がある時) なら絵でいちばん暗い色、 それ以外は本文と同じ暗い色。</summary>
+        public static int NameColorMode;
         // 配置 (dot): 液晶の湾曲で端が切れるので、 本文は左右 40・上 26・下 26 の内側
         //   本文の頁に題は出さない (2026-11-16・作者の指示: 「上のエンディング名は、 本文を読んでいる時は要らない」)。 題の場所 (y 26〜63) まで本文を上げ、
         //   1 頁の行数は「本文の上端から頁数の行 (FootY) の手前まで」で決める (前と同じ規則: 64 から 12 行 → 26 から 15 行・どの頁も同じ行数)
@@ -67,8 +76,8 @@ namespace UI.Game2D
         private static int LinesPerPage => Mathf.Max(1, (FootY - BodyY - 1) / Game2DJpFont.LineH);
         // 液晶の安全域 (エンディング名を収める枠・dot)
         public const int SafeL = 16, SafeR = 464, SafeT = 9, SafeB = 259;
-        // エンディング名の段: 番号と名前の間 (dot)・名前の縁取りの太さ (dot)。 番号の縁取りは本文と同じ 1 dot
-        private const int NameGap = 8, NameRim = 2;
+        // エンディング名の段: 番号と名前の間 (dot)。 縁取りの太さは NameRim
+        private const int NameGap = 8;
 
         // 読みやすさ (2026-11-15 撮影: 液晶のにじみで本文が読みにくかった): 液晶の効果全体は弱めず、 字の側で抑える ──
         //   ① 字の色を明るさ 8 割ほどに落とす (白に近い字ほどにじみが広がる)  ② 字の周り 1 dot (8 方向) に地より暗い縁取りを打ち、 にじみが字の間を埋めないようにする
@@ -85,7 +94,7 @@ namespace UI.Game2D
         public static string Track { get; private set; }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetStatics() { _active = false; _endFrame = -1; Track = null; BackdropDim = DefaultBackdropDim; NameScale = DefaultNameScale; }
+        private static void ResetStatics() { _active = false; _endFrame = -1; Track = null; BackdropDim = DefaultBackdropDim; NameScale = DefaultNameScale; NameRim = DefaultNameRim; NameColorMode = 0; }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Attach()
@@ -132,6 +141,8 @@ namespace UI.Game2D
         private Color32[] _artPx, _backPx; private string _artName; private float _backK = -1f;
         private bool _inArt; private float _artT, _qaRise = -1f;
         private bool ArtReady => _artPx != null;
+        // 結びの絵でいちばん明るい色・いちばん暗い色 (輝度で選ぶ・LoadArt で 1 回だけ拾う・絵が無ければ _artPal = false)。 NameColorMode = 2 で使う
+        private Color32 _artHi, _artLo; private bool _artPal;
         // エンディング名: _name = 題 (Endings の title)・_nameNo = 通し番号 (NumberFor・無ければ番号の段なし)
         private string _name, _nameNo;
 
@@ -297,7 +308,7 @@ namespace UI.Game2D
         /// name が null・読めない時は false (_artPx = null・本文の地は Bg・最後の頁から網目で閉じる)。</summary>
         private bool LoadArt(string name)
         {
-            _artPx = null; _backPx = null; _backK = -1f; _artName = name;
+            _artPx = null; _backPx = null; _backK = -1f; _artName = name; _artPal = false;
             if (string.IsNullOrEmpty(name)) return false;
             var a = Resources.Load<TextAsset>(ArtDir + name + ".png");
             if (a == null) { Debug.LogWarning("[Game2DEndingScreen] Resources/" + ArtDir + name + ".png.bytes が無い"); return false; }
@@ -307,6 +318,15 @@ namespace UI.Game2D
             if (!ok) { Debug.LogWarning("[Game2DEndingScreen] " + name + " を読めない"); Destroy(t); return false; }
             int sw = t.width, sh = t.height; var src = t.GetPixels32();                      // 下の行から
             Destroy(t);
+            int lHi = -1, lLo = int.MaxValue;                                                  // 名前の色 (NameColorMode = 2) 用: 輝度が最大・最小の画素の色 (透明な画素は除く)
+            foreach (var c0 in src)
+            {
+                if (c0.a == 0) continue;
+                int l = c0.r * 299 + c0.g * 587 + c0.b * 114;
+                if (l > lHi) { lHi = l; _artHi = c0; }
+                if (l < lLo) { lLo = l; _artLo = c0; }
+            }
+            _artPal = lHi >= 0; _artHi.a = 255; _artLo.a = 255;
             int s = Mathf.Max(1, Mathf.Max(Mathf.CeilToInt((float)W / sw), Mathf.CeilToInt((float)H / sh)));
             int ox = (W - sw * s) / 2, oy = (H - sh * s) / 2;                                  // 左上からの位置 (負 = はみ出して切る)
             var dst = new Color32[W * H]; var black = new Color32(0, 0, 0, 255);
@@ -411,7 +431,8 @@ namespace UI.Game2D
         public static int FitNameScale(string name)
         {
             int k = Mathf.Max(1, NameScale), w = Game2DJpFont.Width(name);
-            while (k > 1 && w * k + NameRim * 2 > SafeR - SafeL) k--;
+            int rim = Mathf.Clamp(NameRim, 0, 2);
+            while (k > 1 && w * k + rim * 2 > SafeR - SafeL) k--;
             return k;
         }
 
@@ -420,7 +441,7 @@ namespace UI.Game2D
 
         /// <summary>エンディング名を画面の中央に描く: 上に通し番号 (名前の半分の倍率・本文の頁数と同じ色)、 下に名前 (<see cref="NameScale"/>・金色)。
         /// 2 段を合わせて上下の中央に置き、 安全域に収める。 rows = 出す段の数 (本文の行と同じく上から順に浮かぶ・番号が無ければ名前だけの 1 段)。
-        /// 縁取りは本文と同じ暗い色: 名前は <see cref="NameRim"/> dot・番号は 1 dot。 帯や板は敷かない。</summary>
+        /// 縁取り: 名前は <see cref="NameRim"/> dot・番号は 1 dot (NameRim = 0 なら 0)。 色は <see cref="NameColorMode"/> で決める (<see cref="NameColors"/>)。 帯や板は敷かない。</summary>
         private void DrawName(KitPix p, int rows)
         {
             if (rows <= 0 || string.IsNullOrEmpty(_name)) return;
@@ -428,22 +449,38 @@ namespace UI.Game2D
             bool hasNo = !string.IsNullOrEmpty(_nameNo);
             int hNo = hasNo ? cell * kn + NameGap : 0, hAll = hNo + cell * ks;
             int top = Mathf.Clamp((H - hAll) / 2, SafeT, Mathf.Max(SafeT, SafeB - hAll));
-            if (hasNo) Text(p, _nameNo, CenterX(_nameNo, kn), top, Dim, kn, 1);
-            if (rows > (hasNo ? 1 : 0)) Text(p, _name, CenterX(_name, ks), top + hNo, Amber, ks, NameRim);
+            int rim = Mathf.Clamp(NameRim, 0, 2), rimNo = rim == 0 ? 0 : 1;
+            NameColors(out var cName, out var cNo, out var cRim);
+            if (hasNo) Text(p, _nameNo, CenterX(_nameNo, kn), top, cNo, kn, rimNo, cRim);
+            if (rows > (hasNo ? 1 : 0)) Text(p, _name, CenterX(_name, ks), top + hNo, cName, ks, rim, cRim);
+        }
+
+        /// <summary>エンディング名の色 (<see cref="NameColorMode"/> で決める): 名前・番号・縁取り。</summary>
+        private void NameColors(out Color32 name, out Color32 no, out Color32 rim)
+        {
+            int m = Mathf.Clamp(NameColorMode, 0, 2);
+            rim = Rim;
+            if (m == 0) { name = Amber; no = Dim; return; }
+            if (m == 2 && _artPal) { name = _artHi; rim = _artLo; }
+            else name = Ink;                                                                   // 1 (と、 絵の無い結末の 2)
+            no = new Color32((byte)(name.r * 7 / 10), (byte)(name.g * 7 / 10), (byte)(name.b * 7 / 10), 255);
         }
 
         private static int CenterX(string s, int k) => Mathf.Max(SafeL, (W - Game2DJpFont.Width(s) * k) / 2);
 
-        /// <summary>字を打つ: 先に周り rim dot (8 方向) を暗い縁取り、 その上に字。 scale = 1 dot を scale×scale で打つ (整数倍・補間しない)。</summary>
-        private static void Text(KitPix p, string s, int x, int y, Color32 c, int scale, int rim = 1)
+        /// <summary>字を打つ: 先に周り rim dot (8 方向) を暗い縁取り (rimColor・省略なら <see cref="Rim"/>・rim = 0 なら打たない)、 その上に字。 scale = 1 dot を scale×scale で打つ (整数倍・補間しない)。</summary>
+        private static void Text(KitPix p, string s, int x, int y, Color32 c, int scale, int rim = 1) => Text(p, s, x, y, c, scale, rim, Rim);
+
+        private static void Text(KitPix p, string s, int x, int y, Color32 c, int scale, int rim, Color32 rimColor)
         {
             var dots = new List<Vector2Int>();
             Game2DJpFont.Draw((px, py) => dots.Add(new Vector2Int(px, py)), s, x, y);
-            foreach (var d in dots)
-            {
-                int bx = x + (d.x - x) * scale, by = y + (d.y - y) * scale;
-                p.Rect(bx - rim, by - rim, scale + rim * 2, scale + rim * 2, Rim);
-            }
+            if (rim > 0)
+                foreach (var d in dots)
+                {
+                    int bx = x + (d.x - x) * scale, by = y + (d.y - y) * scale;
+                    p.Rect(bx - rim, by - rim, scale + rim * 2, scale + rim * 2, rimColor);
+                }
             foreach (var d in dots) p.Rect(x + (d.x - x) * scale, y + (d.y - y) * scale, scale, scale, c);
         }
 
@@ -526,6 +563,24 @@ namespace UI.Game2D
             return FitNameScale(s != null && _active && !string.IsNullOrEmpty(s._name) ? s._name : Endings.End1.title);
         }
 
+        /// <summary>[確認用・2026-11-16] エンディング名の縁取りの太さ (<see cref="NameRim"/>・0〜2 に丸める・0 = 縁取りなし) を替え、 出ている所をすぐ描き直す。
+        /// 例: <c>UI.Game2D.Game2DEndingScreen.QaSetNameRim(1)</c>。</summary>
+        public static void QaSetNameRim(int rim)
+        {
+            NameRim = Mathf.Clamp(rim, 0, 2);
+            var s = FindObjectOfType<Game2DEndingScreen>();
+            if (s != null && _active) s.Draw();
+        }
+
+        /// <summary>[確認用・2026-11-16] エンディング名の色の決め方 (<see cref="NameColorMode"/>・0〜2 に丸める: 0 金色 / 1 本文の字の色 / 2 結びの絵でいちばん明るい色) を替え、
+        /// 出ている所をすぐ描き直す。 例: <c>UI.Game2D.Game2DEndingScreen.QaSetNameColorMode(2)</c>。</summary>
+        public static void QaSetNameColorMode(int mode)
+        {
+            NameColorMode = Mathf.Clamp(mode, 0, 2);
+            var s = FindObjectOfType<Game2DEndingScreen>();
+            if (s != null && _active) s.Draw();
+        }
+
         /// <summary>[確認用・2026-11-16] 今の様子を 1 行で返す (頁/全頁数・絵の名前・係数・段・名前の段と倍率)。 例: <c>UI.Game2D.Game2DEndingScreen.QaStatus()</c>。</summary>
         public static string QaStatus()
         {
@@ -538,7 +593,21 @@ namespace UI.Game2D
                 + " ・係数 " + BackdropDim.ToString("0.###") + " ・段 " + stage
                 + (s._inArt ? " ・明るさの進み " + s.ArtRise01().ToString("0.###") + (s._qaRise >= 0f ? " (固定)" : "") : "")
                 + " ・名前 " + name + " 「" + (s._nameNo ?? "") + " / " + (s._name ?? "") + "」 位置 中央 ・倍率 " + ks + (ks != NameScale ? " (指定 " + NameScale + " を丸めた)" : "")
-                + " ・番号の倍率 " + NumberScale(ks);
+                + " ・番号の倍率 " + NumberScale(ks)
+                + " ・縁取り " + Mathf.Clamp(NameRim, 0, 2) + " dot (番号 " + (Mathf.Clamp(NameRim, 0, 2) == 0 ? 0 : 1) + " dot)"
+                + " ・色のモード " + Mathf.Clamp(NameColorMode, 0, 2) + " (" + ColorModeLabel(s) + ")";
+        }
+
+        private static string ColorModeLabel(Game2DEndingScreen s)
+        {
+            switch (Mathf.Clamp(NameColorMode, 0, 2))
+            {
+                case 0: return "金色";
+                case 1: return "本文の字の色";
+                default:
+                    if (!s._artPal) return "絵の明るい色・絵が無いので本文の字の色";
+                    return "絵の明るい色 #" + ColorUtility.ToHtmlStringRGB(s._artHi) + "・縁取り #" + ColorUtility.ToHtmlStringRGB(s._artLo);
+            }
         }
 #endif
     }
