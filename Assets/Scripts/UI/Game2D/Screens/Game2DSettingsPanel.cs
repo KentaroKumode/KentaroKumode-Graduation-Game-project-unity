@@ -105,7 +105,8 @@ namespace UI.Game2D
             var keys = Keys;
             var d = new ScreenDef
             {
-                id = "settings_panel", jp = true, w = 472, cols = 1, rowH = 14,      // 14: 画面の頁は 8 行 (行間を最大にしても窓が 266 に収まる) sliders = true, sliderNoTicks = true, sliderNameW = 74,
+                // rowH 14: 画面の頁は 8 行 (行間を最大にしても窓が 266 に収まる・2026-11-16)
+                id = "settings_panel", jp = true, w = 472, cols = 1, rowH = 14, sliders = true, sliderNoTicks = true, sliderNameW = 74,
                 title = _page == 0 ? "設定 ― 画面" : "設定 ― 音",
                 sub = "動かすとすぐ効く。 閉じると保存する",
             };
