@@ -329,7 +329,7 @@ namespace UI.Game2D.Battle
             bool ok = gm.QaStartEvent(eventName);
             Game2DLoadingScreen.QaDismiss();
             UI.Game2D.Game2DPhaseScreens.RequestRebuild();      // 同じフェーズ・同じイベントのまま層や所持金を替えて出し直した時も、 最初の頁から描き直す
-            Debug.Log($"[QaBattle] イベント {eventName} / 層 {run.currentFloor} (背景 {UI.Game2D.EventScreenView.BackdropName(null)}) / 所持金 {run.coins} / 見込み {eta} → {(ok ? "開始" : "失敗")}");
+            Debug.Log($"[QaBattle] イベント {eventName} / 層 {run.currentFloor} (背景 {UI.Game2D.EventScreenView.BackdropName(EventSystem.EventEncounter.Instance?.Current)}) / 所持金 {run.coins} / 見込み {eta} → {(ok ? "開始" : "失敗")}");
             return ok;
         }
 
@@ -383,6 +383,19 @@ namespace UI.Game2D.Battle
 
         /// <summary>今の湾曲 (「curve=0.070 fit=0.00」)。</summary>
         public static string LcdCurveNow() { var m = LcdMat(); return m == null ? "(液晶の材質が無い)" : $"curve={m.GetFloat("_Curve"):0.000} fit={m.GetFloat("_CurveFit"):0.00}"; }
+
+        /// <summary>イベントの画面の背景を、 どのイベントでも名指しの絵にする (Resources/Game2DBackdrops の名前・"ev_wave" など・null か "" で対応表どおりに戻す)。
+        /// 絵ごとに板と列に隠れる具合を撮る用。 先に <see cref="ShowEvent"/> で画面を出しておく。 戻り値 = 今出している絵の名前 (読めない名前なら層の絵になり、 警告が出る)。
+        /// 例: <c>UI.Game2D.Battle.QaBattle.EventBackdrop("ev_wave")</c></summary>
+        public static string EventBackdrop(string name)
+        {
+            UI.Game2D.EventScreenView.QaBackdrop = string.IsNullOrEmpty(name) ? null : name;
+            UI.Game2D.Game2DPhaseScreens.RequestRebuild();
+            var ev = EventSystem.EventEncounter.Instance != null ? EventSystem.EventEncounter.Instance.Current : null;
+            string bg = UI.Game2D.EventScreenView.BackdropName(ev);
+            if (BattleBackdrops.Load(bg) == null) Debug.LogWarning($"[QaBattle] 背景 {bg} を読めない");
+            return bg;
+        }
 
         /// <summary>イベントの名前の一覧 (定義ファイルの順・「、」区切り)。 例: <c>UI.Game2D.Battle.QaBattle.EventNames()</c></summary>
         public static string EventNames()

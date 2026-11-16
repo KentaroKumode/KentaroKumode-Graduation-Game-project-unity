@@ -4,6 +4,7 @@
 //   2. 画面の配置 (2026-11-16・EventLayout): 本文 8 行が本文の板に収まる・板と列が画面に収まる・画面が使う字がドット字にある
 //   3. 全イベント: 導入・結果の文が全部どこかの頁に出る (切り捨て 0・1 頁 8 行まで)・選択肢の列 (箱 + 説明の板) が画面に収まる・
 //      箱の下の説明 (選べない理由・補足中の見込み) が 2 行に収まる。 名前が札と当たって「…」で切れる選択肢の数と一覧を出す
+//   4. 背景の絵の対応表 (Resources/Game2DBackdrops/event_backdrops.txt): 全イベントに対応がある・表の名前が全部実在する・表の絵が全部ある (480×270 の PNG)
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -231,6 +232,35 @@ static class Program
         Console.WriteLine($"名前が「…」で切れる選択肢 {nameCut} / {choicesAll}:");
         foreach (var x in cutNames) Console.WriteLine("  " + x);
         Console.WriteLine($"題が切れるイベント {titleCut}");
+        // ===== 4. 背景の絵の対応表 (2026-11-16・EventBackdropTable) =====
+        //   全イベントに対応がある・表の名前が全部実在する (改名で黙って層の絵へ落ちない)・表の絵が全部ある (480×270 の PNG)
+        {
+            string dir = Path.Combine(root, "Assets/Resources/Game2DBackdrops");
+            var bad = new List<string>();
+            var table = EventBackdropTable.Parse(File.ReadAllText(Path.Combine(root, "Assets/Resources", EventBackdropTable.ResourcePath + ".txt")), bad);
+            var names = new HashSet<string>(evs.Select(e => e.def.name));
+            var noArt = evs.Where(e => !table.ContainsKey(e.def.name)).Select(e => e.def.name).Distinct().ToList();
+            var ghost = table.Keys.Where(k => !names.Contains(k)).ToList();
+            var artBad = new List<string>();
+            foreach (var art in table.Values.Distinct())
+            {
+                string f = Path.Combine(dir, art + ".png.bytes");
+                if (!File.Exists(f)) { artBad.Add(art + " (無い)"); continue; }
+                var b = File.ReadAllBytes(f);
+                bool png = b.Length > 24 && b[0] == 0x89 && b[1] == 'P' && b[2] == 'N' && b[3] == 'G';
+                int w = png ? (b[16] << 24 | b[17] << 16 | b[18] << 8 | b[19]) : 0, h = png ? (b[20] << 24 | b[21] << 16 | b[22] << 8 | b[23]) : 0;
+                if (!png || w != 480 || h != 270) artBad.Add($"{art} (PNG {png}・{w}×{h})");
+            }
+            Console.WriteLine($"背景の絵の対応表: {table.Count} 行・絵 {table.Values.Distinct().Count()} 種類");
+            foreach (var x in noArt) Console.WriteLine("  対応が無いイベント (層の絵になる): " + x);
+            foreach (var x in ghost) Console.WriteLine("  表にあるのに存在しないイベント名: " + x);
+            foreach (var x in artBad) Console.WriteLine("  絵が無い・大きさが違う: " + x);
+            foreach (var x in bad) Console.WriteLine("  読めない行: " + x);
+            Check(bad.Count == 0, $"背景の対応表の読めない行 {bad.Count} 件");
+            Check(noArt.Count == 0, $"背景の対応が無いイベント {noArt.Count} 件");
+            Check(ghost.Count == 0, $"背景の対応表にあるのに存在しないイベント名 {ghost.Count} 件");
+            Check(artBad.Count == 0, $"背景の対応表の絵が無い・480×270 の PNG でない {artBad.Count} 件");
+        }
         Check(cut == 0, $"切り捨てられる文 {cut} 件 (全部の行がどこかの頁に出る・1 頁 {EventPaging.TextLines} 行まで)");
         Check(colOver == 0 && EventLayout.ColumnFits(kMax, noteHMax), $"選択肢の列 (箱 + 説明の板) が画面に収まらないもの {colOver} 件");
         Check(noteOver == 0, $"{EventLayout.NoteLines} 行に収まらない説明 (選べない理由・補足中の見込み) {noteOver} 件");

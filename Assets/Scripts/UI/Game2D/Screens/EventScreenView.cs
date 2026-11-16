@@ -39,10 +39,46 @@ namespace UI.Game2D
         /// <see cref="DrawHourglass"/> の 1 か所を直す。</summary>
         private static readonly string[] Hourglass = { "#######", " ##### ", "  ###  ", "   #   ", "  # #  ", " # # # ", "#######" };
 
-        /// <summary><b>イベントの背景の絵の名前</b> (Resources/Game2DBackdrops の名前)。 イベントごとの絵へ差し替える時はここ 1 か所を直す。
-        /// 今は仮に、 今いる層の戦闘の背景 (<see cref="BattleBackdrops.ForFloor"/>・見せる層の番号 <c>RunState.currentFloor</c>)。</summary>
+        /// <summary><b>イベントの背景の絵の名前</b> (Resources/Game2DBackdrops の名前)。 決めるのはここ 1 か所。
+        /// 2026-11-16〜 イベントごとの絵 (対応表 Resources/<see cref="EventBackdropTable.ResourcePath"/>.txt・22 枚の ev_*)。 表に無いイベント (と ev が null) は、
+        /// 今いる層の戦闘の背景 (<see cref="BattleBackdrops.ForFloor"/>・見せる層の番号 <c>RunState.currentFloor</c>)。 確認中は <c>QaBackdrop</c> が先 (エディタと開発ビルドだけ)。</summary>
         public static string BackdropName(EventDefinition ev)
-            => BattleBackdrops.ForFloor(GameLoop.GameManager.Instance?.Run?.currentFloor ?? MapSystem.FreeMove.FloorPlan.FarmFloor);
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (!string.IsNullOrEmpty(QaBackdrop)) return QaBackdrop;
+#endif
+            if (ev != null && !string.IsNullOrEmpty(ev.name) && Table().TryGetValue(ev.name, out var art)) return art;
+            return BattleBackdrops.ForFloor(GameLoop.GameManager.Instance?.Run?.currentFloor ?? MapSystem.FreeMove.FloorPlan.FarmFloor);
+        }
+
+        // 対応表 (一度読んだら持っておく)
+        private static Dictionary<string, string> _table;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics()
+        {
+            _table = null;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            QaBackdrop = null; QaPlateAlpha = -1;
+#endif
+        }
+
+        private static Dictionary<string, string> Table()
+        {
+            if (_table != null) return _table;
+            var a = Resources.Load<TextAsset>(EventBackdropTable.ResourcePath);
+            if (a == null) { Debug.LogWarning("[EventScreenView] Resources/" + EventBackdropTable.ResourcePath + ".txt が無い (イベントの背景は層の絵になる)"); return _table = new Dictionary<string, string>(); }
+            var bad = new List<string>();
+            _table = EventBackdropTable.Parse(a.text, bad);
+            foreach (var l in bad) Debug.LogWarning("[EventScreenView] イベントの背景の対応表の読めない行: " + l);
+            Resources.UnloadAsset(a);
+            return _table;
+        }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        /// <summary>[確認用] 空でなければ、 どのイベントでもこの絵 (Game2DBackdrops の名前) を出す (<c>UI.Game2D.Battle.QaBattle.EventBackdrop</c> が立てる・null で元へ)。</summary>
+        public static string QaBackdrop;
+#endif
 
         public sealed class Choice
         {

@@ -6,7 +6,7 @@ Tools/event_branch_check/Stubs.cs の代役) を Unity 同梱の Roslyn (csc) �
 ランタイムで実行する (作りは Tools/event_branch_check/run.py と同じ)。 字の送り幅は焼いたドット字
 (GameFont.cs の DotPath の .bytes) を読む。 検算の中身は Program.cs:
   「切り捨て 0・本文が板に収まる・選択肢の列 (最多の箱 + 説明の板) が画面に収まる・説明が 2 行に収まる」と、
-  名前が札と当たって「…」で切れる選択肢の一覧。
+  名前が札と当たって「…」で切れる選択肢の一覧と、 背景の絵の対応表 (全イベントに対応がある・表の名前が実在する・絵が全部ある)。
 最後の行が `ALL OK` なら全部通っている。
 
 使い方 (リポジトリのルートで): python Tools/event_page_check/run.py [導入の頁数の一覧の書き出し先]
@@ -24,7 +24,7 @@ RUNTIME = 'C:/Program Files/dotnet/shared/Microsoft.NETCore.App'
 EV = 'Assets/Scripts/EventSystem/'
 SOURCES = [EV + n + '.cs' for n in ('EventBranchText', 'EventEffectType', 'EventEffect', 'EventEffectRoles', 'EventChoice',
                                      'EventDefinition', 'EventCondition', 'EventParser')] + [
-    'Assets/Scripts/UI/Game2D/JpTextLayout.cs', 'Assets/Scripts/UI/Game2D/LcdSafeArea.cs', 'Assets/Scripts/UI/Game2D/Screens/EventLayout.cs', 'Assets/Scripts/UI/Game2D/Screens/EventPaging.cs']
+    'Assets/Scripts/UI/Game2D/JpTextLayout.cs', 'Assets/Scripts/UI/Game2D/LcdSafeArea.cs', 'Assets/Scripts/UI/Game2D/Screens/EventLayout.cs', 'Assets/Scripts/UI/Game2D/Screens/EventBackdropTable.cs', 'Assets/Scripts/UI/Game2D/Screens/EventPaging.cs']
 
 
 def fwd(p):
