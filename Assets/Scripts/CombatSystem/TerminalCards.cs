@@ -146,6 +146,10 @@ namespace CombatSystem
         /// Kw.AddHeat・AddCharge・consShield・会心の判定) で止まる。 <see cref="TerminalCards.Resolve"/> は同じ物を結果から落とし、
         /// 見込み (画面・BOT) が本体と食い違わないようにする。</summary>
         public bool sealPoison, sealBleed, sealHeat, sealCharge, sealShield, sealCrit;
+        /// <summary>防御の種類の端子に挿した出目 1 つから引く量 (下限 0)。 時限デバフ〈罪悪感〉(2026-11-16・EventSystem.TimedEffects.TimedDebuffRule) が 2。 0 = なし。
+        /// <see cref="TerminalCards.Resolve"/> の「5. 効果」で、 端子へ入る出目の合計を作る所だけで引く (端子の条件は挿した目そのもので見る)。
+        /// 本体・画面の見込み・BOT の配線の評価はどれも CombatManager.TerminalEnvNow の盤面を Resolve に渡すので、 同じ値を読む。</summary>
+        public int blockDieCut;
     }
 
     /// <summary>1 ターンの端子の結果。 本体がこれを攻撃・防御・充電・戦闘の情報へ反映する。</summary>
@@ -522,7 +526,10 @@ namespace CombatSystem
                 if (defs[s] == null || !Plugged(o.slotOfDie, s)) continue;
                 var d = defs[s]; string id = board[s];
                 int sum = 0, num = 0;
-                for (int i = 0; i < n; i++) if (o.slotOfDie[i] == s) { sum += v[i]; num++; }
+                //   〈罪悪感〉(2026-11-16): 防御の種類の端子に挿した出目は 1 つずつ −blockDieCut (下限 0)。 〈号令の剣〉の +1 の後に引く。
+                //   条件 (「2. 条件」) は引く前の目で見る ── 引いた目で見ると〈導火〉(3 以下) などに挿せる目が増え、 罰が得になる。
+                int cutHere = d.kind == TerminalKind.Block ? env.blockDieCut : 0;
+                for (int i = 0; i < n; i++) if (o.slotOfDie[i] == s) { sum += EventSystem.TimedEffects.TimedDebuffRule.CutBlockDie(v[i], cutHere); num++; }
                 o.fired.Add(s);
                 if (!d.basic) o.firedNonBasic++;
                 switch (d.kind)

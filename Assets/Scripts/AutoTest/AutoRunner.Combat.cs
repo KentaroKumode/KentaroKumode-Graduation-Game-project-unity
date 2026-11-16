@@ -1704,7 +1704,8 @@ namespace AutoTest
         ///   ② 振る合計が、 面平均 × 個数 を下回る → 振る
         ///   ③ それ以外 → 振らない
         ///
-        /// 費用は `振り直す個数 × この戦闘で何回目か`（attempt が戦闘の通し番号）。 **充電を使い切らない** ──
+        /// 費用は `振り直す個数 × この戦闘で何回目か`（attempt が戦闘の通し番号）+ 時限デバフ〈無力感〉の +1。 本体と同じ
+        /// <see cref="CombatSystem.CombatManager.RerollCostNow"/> を読む (2026-11-16)。 **充電を使い切らない** ──
         /// 充電は端子へ挿さなかったダイスの対価なので、 全部リロールへ流すと配線の判断そのものが消える。</summary>
         private int[] MutualRerollPolicy(int[] dice, CombatSystem.MutualTurnTelegraph tele, int attempt)
         {
@@ -1739,7 +1740,7 @@ namespace AutoTest
             if (v3.rerollEv)
             {
                 int freeLeftE = ctx.currentBuffs.TryGetValue(CombatSystem.YachtRoleEffects.FreeRerollKey, out float ffE) ? (int)ffE : 0;
-                int costE = freeLeftE > 0 ? 0 : all.Count * System.Math.Max(1, attempt);
+                int costE = CombatSystem.CombatManager.RerollCostNow(all.Count, attempt, freeLeftE > 0);
                 if (ctx.GetCharge() - RerollChargeReserve < costE) return null;
                 var faceVals = (faces != null && faces.Length > 0) ? faces : new[] { 1, 2, 3, 4, 5, 6 };
                 float cur = BestUtilityOf(dice, tele);
@@ -1756,7 +1757,7 @@ namespace AutoTest
             if (heavyNow && rerollSum < tele.enemyAttackValue && rerollSum < meanFace * all.Count * 1.15f)
             {
                 int freeH = ctx.currentBuffs.TryGetValue(CombatSystem.YachtRoleEffects.FreeRerollKey, out float ffH) ? (int)ffH : 0;
-                int costH = freeH > 0 ? 0 : all.Count * System.Math.Max(1, attempt);
+                int costH = CombatSystem.CombatManager.RerollCostNow(all.Count, attempt, freeH > 0);
                 return ctx.GetCharge() >= costH ? all.ToArray() : null;
             }
 
@@ -1765,7 +1766,7 @@ namespace AutoTest
 
             int freeLeft = ctx.currentBuffs.TryGetValue(CombatSystem.YachtRoleEffects.FreeRerollKey, out float ff)
                 ? (int)ff : 0;
-            int cost = freeLeft > 0 ? 0 : all.Count * System.Math.Max(1, attempt);
+            int cost = CombatSystem.CombatManager.RerollCostNow(all.Count, attempt, freeLeft > 0);
             if (ctx.GetCharge() - RerollChargeReserve < cost) return null;
             return all.ToArray();
         }

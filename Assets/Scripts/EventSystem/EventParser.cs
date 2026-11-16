@@ -378,7 +378,19 @@ namespace EventSystem
         private static readonly Regex nextShop     = new Regex(@"^次の店の値段-(\d+)%$");
         private static readonly Regex nextRest     = new Regex(@"^次の休憩の回復\+(\d+)%$");
 
+        /// <summary>1 つの効果を読む。 頭の印 〔見せる〕/〔伏せる〕(2026-11-16・代償を見せるかの例外・EventEffectRoles.ShowMark) を外して
+        /// <see cref="EventEffect.costMark"/> に写す。 印は「勝利後」より前に書く。</summary>
         private static EventEffect ParseSingleEffect(string t)
+        {
+            int mark = 0;
+            if (t.StartsWith(EventEffectRoles.ShowMark, StringComparison.Ordinal)) { mark = 1; t = t.Substring(EventEffectRoles.ShowMark.Length).Trim(); }
+            else if (t.StartsWith(EventEffectRoles.HideMark, StringComparison.Ordinal)) { mark = -1; t = t.Substring(EventEffectRoles.HideMark.Length).Trim(); }
+            var e = ParseSingleEffectBody(t);
+            if (e != null) e.costMark = mark;
+            return e;
+        }
+
+        private static EventEffect ParseSingleEffectBody(string t)
         {
             bool postCombat = false;
             if (t.StartsWith("勝利後"))

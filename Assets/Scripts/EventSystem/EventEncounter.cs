@@ -214,7 +214,8 @@ namespace EventSystem
         }
 
         /// <summary>選択肢の「代償」の短い説明 (イベントの画面の選択肢の下に出す)。 何も無ければ null。
-        /// 得るものは書かない (見出しの文が語る) ── 書くのは時間と、 払えないゴールドだけ。</summary>
+        /// 得るものは書かない (見出しの文が語る)。 書くのは選べない理由 (必ず) と、 見せる代償 (2026-11-16・作者の決定「自分から差し出す物は見せる・
+        /// ハプニングは見せない」・<see cref="EventEffectRoles.IsShownCost"/>)。 組み立ては <see cref="EventChoice.CostText"/>。</summary>
         public static string DescribeCost(EventChoice choice, RunState run)
         {
             if (choice == null) return null;
@@ -222,7 +223,7 @@ namespace EventSystem
             int t = choice.TurnCost;
             int etaTurns = -1;
             if (t > 0) { var eta = CatchEtaNow(); if (eta.Valid) etaTurns = eta.turns; }
-            return EventChoice.CostText(why, t, etaTurns);
+            return choice.CostText(why, etaTurns);
         }
     }
 }

@@ -21,7 +21,9 @@ SOURCES = ['TerminalCards', 'BossDown', 'MutualAttack', 'HeavyCycle']
 # BOT の判断のうち純粋な部分 (#141・ダウンの狙いと残す印)。 UnityEngine に依存しない
 EXTRA = ['Assets/Scripts/AutoTest/DownKeepRules.cs',
          # 灰燼の王の〈業火〉の周期 (旧〈業火の予兆〉の数え方・2026-11-14)。 Escalation.HeavyCycleOffset だけ Stubs.cs の代用品を読む
-         'Assets/Scripts/ItemSystem/PassiveSkills/Effects/EmberOmenTiming.cs']
+         'Assets/Scripts/ItemSystem/PassiveSkills/Effects/EmberOmenTiming.cs',
+         # 時限デバフ〈感傷〉〈罪悪感〉〈無力感〉の規則 (2026-11-16)。 TerminalCards.Resolve が〈罪悪感〉の引き算を読む
+         'Assets/Scripts/EventSystem/TimedEffects/TimedDebuffRule.cs']
 
 
 def fwd(p):

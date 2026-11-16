@@ -39,19 +39,45 @@ namespace EventSystem.TimedEffects.Effects
     }
 
     /// <summary>
-    /// 感傷（時限デバフ）: 全てのプレイヤーダイス目を-1（最小1でクランプ）。
+    /// 感傷（時限デバフ）: 全てのプレイヤーダイス目を-1（最小1でクランプ）。 次の 3 戦闘 (2026-11-16 に 1 → 3)。 規則と数値の正本は <see cref="TimedDebuffRule"/>。
+    /// 振り直しの後・配線の前に掛かる (CombatManager.ExecuteTurn の OnRoll)。
     /// </summary>
     public class SentimentEffect : ITimedEffect
     {
-        public string Id => "感傷";
+        public string Id => TimedDebuffRule.SentimentName;
         public TimedEffectTrigger Trigger => TimedEffectTrigger.OnRoll;
 
         public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
         {
             if (ctx == null || ctx.playerDice == null) return;
             for (int i = 0; i < ctx.playerDice.Length; i++)
-                ctx.playerDice[i] = Mathf.Max(1, ctx.playerDice[i] - 1);
+                ctx.playerDice[i] = TimedDebuffRule.SentimentDie(ctx.playerDice[i]);
         }
+    }
+
+    /// <summary>
+    /// 罪悪感（時限デバフ・2026-11-16）: 防御の端子に挿した出目だけ −2 (下限 0)。 次の 2 戦闘。 規則と数値の正本は <see cref="TimedDebuffRule"/>。
+    /// <para>出目そのものは変えない (どこへ挿すかで効くかが決まるので、 振った時には決まらない)。 効果は端子の解決
+    /// (CombatSystem.TerminalCards.Resolve) が盤面 (CombatManager.TerminalEnvNow が <c>run.timedDebuffs</c> から載せる TerminalEnv.blockDieCut) を見て掛ける。
+    /// ここの <see cref="Apply"/> は何もしない ── OnRoll に置くのは、 戦闘の終わりに 1 つ減らす扱い (〈感傷〉と同じ) に乗るため。</para>
+    /// </summary>
+    public class GuiltEffect : ITimedEffect
+    {
+        public string Id => TimedDebuffRule.GuiltName;
+        public TimedEffectTrigger Trigger => TimedEffectTrigger.OnRoll;
+        public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat) { }
+    }
+
+    /// <summary>
+    /// 無力感（時限デバフ・2026-11-16）: 振り直しの費用に充電 +1 (毎回・無料の振り直しには足さない)。 次の 2 戦闘。 規則と数値の正本は <see cref="TimedDebuffRule"/>。
+    /// <para>効果は費用の 1 か所 (CombatManager.RerollCostNow → <see cref="TimedDebuffRule.RerollCost"/>) が <c>run.timedDebuffs</c> を見て掛ける。
+    /// ここの <see cref="Apply"/> は何もしない ── OnRoll に置くのは、 戦闘の終わりに 1 つ減らす扱い (〈感傷〉と同じ) に乗るため。</para>
+    /// </summary>
+    public class HelplessEffect : ITimedEffect
+    {
+        public string Id => TimedDebuffRule.HelplessName;
+        public TimedEffectTrigger Trigger => TimedEffectTrigger.OnRoll;
+        public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat) { }
     }
 
     /// <summary>

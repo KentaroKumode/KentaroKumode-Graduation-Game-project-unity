@@ -248,6 +248,153 @@ static class Program
         Check(allDark == 0, $"選べるか: 全部の選択肢が同時に暗くなり得るイベント {allDark} 件 (安全弁 EventEncounter.IsChoiceSelectable は残す)");
     }
 
+    /// <summary>効果の綴り (event_list.txt の書き方に戻す・表 cost_display.tsv と突き合わせる用)。</summary>
+    static string Spell(EventEffect e)
+    {
+        switch (e.type)
+        {
+            case EventEffectType.TurnsPass: return "ターン+" + e.amount;
+            case EventEffectType.GoldDelta: return "ゴールド" + e.amount.ToString("+0;-0");
+            case EventEffectType.MaterialDelta: return "武器強化素材" + e.amount.ToString("+0;-0");
+            case EventEffectType.ProvisionDelta: return "物資" + e.amount.ToString("+0;-0");
+            case EventEffectType.HpDelta: return "HP" + e.amount.ToString("+0;-0");
+            case EventEffectType.MaxHpDelta: return "最大HP" + e.amount.ToString("+0;-0");
+            case EventEffectType.HpHalve: return "現在HPの半分を支払う";
+            case EventEffectType.EnterCombat: return "戦闘に突入";
+            case EventEffectType.EnterEliteCombat: return "エリートとの戦闘に突入";
+            case EventEffectType.TimedDebuff: return "時限デバフ[" + e.param + "]";
+            case EventEffectType.PermanentDebuff: return "永続デバフ[" + e.param + "]";
+            case EventEffectType.DiscardPassiveItem: return "パッシブアイテム[" + e.param + "]を廃棄";
+            case EventEffectType.TradePassive: return "パッシブを差し出して替える";
+            case EventEffectType.PullPursuer: return "追跡者を呼ぶ+" + e.amount;
+            case EventEffectType.ShiftFront: return e.amount > 0 ? "前線を近づける+" + e.amount : "前線を遠ざける+" + (-e.amount);
+            default: return e.type.ToString();
+        }
+    }
+
+    /// <summary>代償を見せるか (2026-11-16・作者の決定「自分から差し出す物は見せる・ハプニングは見せない」・docs/GAME.md §17):
+    /// 本体の判定 (EventEffectRoles.IsShownCost・印〔見せる〕〔伏せる〕を含む) が作者の確認した表 (cost_display.tsv・96 選択肢) と一致・
+    /// 表に無い選択肢は何も見せない・印は確率分岐の中に無い・伏せた支払いは足りなくても選べる / 見せる支払いは選べない (理由を出す)。</summary>
+    static void CostDisplay(string dir)
+    {
+        var all = new List<EventDefinition>();
+        foreach (var f in Directory.GetFiles(dir, "*.txt")) all.AddRange(EventSystem.EventParser.ParseAll(File.ReadAllText(f)));
+        string here = Path.GetFullPath(Path.Combine(dir, "../../../Tools/event_branch_check/cost_display.tsv"));
+        var rows = new Dictionary<string, (string shown, string hidden)>();
+        foreach (var line in File.ReadAllLines(here))
+        {
+            if (line.Length == 0 || line.StartsWith("#")) continue;
+            var c = line.Split('	');
+            rows[c[0] + "｜" + c[1]] = (c[2], c.Length > 3 ? c[3] : "");
+        }
+        int match = 0, rowsSeen = 0, extra = 0, hiddenOk = 0, hiddenAll = 0, marksInBranch = 0, shownTotal = 0, hiddenTotal = 0;
+        var bad = new List<string>();
+        foreach (var ev in all)
+            foreach (var ch in ev.choices)
+            {
+                var shown = new List<string>();
+                foreach (var e in ch.effects)
+                {
+                    if (e == null) continue;
+                    if (EventEffectRoles.IsShownCost(e)) shown.Add(Spell(e));
+                    if (e.type == EventEffectType.Probability && e.branches != null)
+                        foreach (var br in e.branches) foreach (var c in br) if (c != null && c.costMark != 0) marksInBranch++;
+                }
+                string got = string.Join("|", shown);
+                string key = ev.name + "｜" + ch.text;
+                if (!rows.TryGetValue(key, out var want))
+                {
+                    if (shown.Count > 0) { extra++; bad.Add($"表に無いのに見せる: 〈{ev.name}〉「{ch.text}」= {got}"); }
+                    continue;
+                }
+                rowsSeen++; shownTotal += shown.Count;
+                if (got == want.shown) match++; else bad.Add($"〈{ev.name}〉「{ch.text}」 見せる = {(got == "" ? "(なし)" : got)} (表 {(want.shown == "" ? "(なし)" : want.shown)})");
+                // 見せない側: 表の各項目が、 見せない効果として選択肢にある (確率分岐の中は「確率:」付き)
+                if (want.hidden.Length > 0)
+                    foreach (var h in want.hidden.Split('|'))
+                    {
+                        hiddenAll++; hiddenTotal++;
+                        bool prob = h.StartsWith("確率:"); string t = prob ? h.Substring(3) : h; bool found = false;
+                        foreach (var e in ch.effects)
+                        {
+                            if (e == null) continue;
+                            if (!prob && Spell(e) == t && !EventEffectRoles.IsShownCost(e)) found = true;
+                            if (prob && e.type == EventEffectType.Probability && e.branches != null)
+                                foreach (var br in e.branches) foreach (var c in br) if (c != null && Spell(c) == t) found = true;
+                        }
+                        if (found) hiddenOk++; else bad.Add($"〈{ev.name}〉「{ch.text}」 見せない「{h}」が見つからない (見せている・綴りが違う)");
+                    }
+            }
+        foreach (var l in bad) Console.WriteLine("    " + l);
+        Check(rowsSeen == rows.Count && match == rows.Count && extra == 0,
+              $"代償を見せるか: 本体の判定が作者の表と一致 ({match}/{rows.Count} 選択肢・見せる {shownTotal} 件・表に無い選択肢で見せる物 {extra})");
+        Check(hiddenOk == hiddenAll, $"代償を見せるか: 表の「見せない」{hiddenAll} 件が全部、 見せない効果として選択肢にある ({hiddenOk}/{hiddenAll})");
+        Check(marksInBranch == 0, $"代償を見せるか: 印〔見せる〕〔伏せる〕は確率分岐の中に無い ({marksInBranch} 件)");
+
+        // 伏せた支払いは足りなくても選べる (ある分だけ失う)・見せる支払いは選べない
+        EventChoice Find(string ev, string ch) => all.Find(e => e.name == ev)?.choices.Find(c => c.text == ch);
+        var broke = new GameLoop.RunState { coins = 999, provision = 0, weaponMaterials = 0 };
+        var hourglass = Find("凍結した時計塔", "砂時計を持ち帰る");          // 〔伏せる〕武器強化素材-2
+        var strip = Find("ボロボロの盗賊", "身ぐるみを剥がす");            // 物資-2 (既定で見せない)
+        var food = Find("迷子の子供", "食料を分ける");                    // 〔見せる〕物資-3
+        var fix = Find("凍結した時計塔", "時計を直そうとする");            // 武器強化素材-3 (既定で見せる)
+        bool h1 = hourglass != null && hourglass.IsAvailable(broke), h2 = strip != null && strip.IsAvailable(broke);
+        string r1 = food?.UnavailableReason(broke), r2 = fix?.UnavailableReason(broke);
+        Check(EventEffectRoles.HiddenPaymentMayFallShort && h1 && h2 && r1 == "物資が足りない（3）" && r2 != null && r2.Contains("素材が足りない（3）"),
+              $"代償を見せるか: 伏せた支払いは足りなくても選べる (砂時計 {h1}・身ぐるみ {h2})・見せる支払いは選べず理由を出す (「{r1}」「{r2}」)");
+        string d1 = food?.CostText(null, -1), d2 = fix?.CostText(null, 2), d3 = Find("切り伏せる男", "小さな灯火を渡す")?.CostText(null, -1);
+        Console.WriteLine($"    説明の例: 「{d1}」「{d2}」「{d3}」「{strip?.CostText(null, -1) ?? "(なし)"}」");
+        Check(d1 == "物資を3個渡す" && d2 != null && d2.StartsWith("2 ターンを使う（補足されている: 2 ターンで捕まる）・素材を3個渡す") && strip?.CostText(null, -1) == null,
+              "代償を見せるか: 説明の文 (物資を3個渡す / N ターンを使う + 補足中・素材をN個渡す / 見せない代償だけなら説明なし)");
+    }
+
+    /// <summary>イベントの悪選択の罰の作り替え (2026-11-16・作者の決定・docs/GAME.md §17): 8 つの選択肢の効果の並び・物資を払わない・
+    /// 時限デバフの名前が本体の定数 (TimedDebuffRule) と一致・登録と持つ数 (感傷 3・罪悪感 2・無力感 2)。</summary>
+    static void EvilChoices(string dir)
+    {
+        var all = new List<EventDefinition>();
+        foreach (var f in Directory.GetFiles(dir, "*.txt")) all.AddRange(EventSystem.EventParser.ParseAll(File.ReadAllText(f)));
+        string Fx(EventChoice c) => string.Join(",", c.effects.ConvertAll(e => e.type + (string.IsNullOrEmpty(e.param) ? "" : "[" + e.param + "]") + (e.amount != 0 ? e.amount.ToString("+0;-0") : "")));
+        const string guilt = "TimedDebuff[" + EventSystem.TimedEffects.TimedDebuffRule.GuiltName + "]";
+        const string helpless = "TimedDebuff[" + EventSystem.TimedEffects.TimedDebuffRule.HelplessName + "]";
+        var want = new (string ev, string ch, string fx)[]
+        {
+            ("迷子の子供", "見捨てる", helpless + ",GoldDelta+10"),
+            ("裏切り者の墓", "唾を吐く", "GoldDelta+15"),
+            ("腐敗した旅団", "刃を抜き斬り捨てる", "GoldDelta+10,EnterCombat"),
+            ("迷い込んだ商隊", "嘘の道を教える", guilt + ",GainPassiveItem"),
+            ("苗木", "踏み潰す", "TurnsPass+1,MaterialDelta+1,GainConsumableItem"),
+            ("老婆の商店", "老婆を殺し、品を奪う", guilt + ",GainPassiveItem"),
+            ("復興の旗", "押し入って荷を奪う", guilt + ",GainPassiveItem"),
+            ("切り伏せる男", "男の代わりに戦う", "EnterCombat"),
+        };
+        int ok = 0; var bad = new List<string>();
+        foreach (var w in want)
+        {
+            var ev = all.Find(e => e.name == w.ev);
+            var c = ev?.choices.Find(x => x.text == w.ch);
+            string got = c != null ? Fx(c) : "(無い)";
+            if (got == w.fx && !c.Has(EventEffectType.ProvisionDelta)) ok++; else bad.Add($"〈{w.ev}〉「{w.ch}」= {got} (期待 {w.fx})");
+        }
+        foreach (var l in bad) Console.WriteLine("    " + l);
+        Check(ok == want.Length, $"悪選択の罰 (2026-11-16): 8 つの選択肢の効果が作者の表どおり・物資を払わない ({ok}/{want.Length})");
+        // 時限デバフの名前が登録されているか (イベントで受ける時限デバフ・バフの名前は全部 TimedEffectRegistry に登録が要る ── 灯台の光の〈導きの光〉の二の舞を防ぐ)
+        string root = Path.GetFullPath(Path.Combine(dir, "../../.."));
+        string reg = File.ReadAllText(Path.Combine(root, "Assets/Scripts/EventSystem/TimedEffects/TimedEffectRegistry.cs"));
+        string roll = File.ReadAllText(Path.Combine(root, "Assets/Scripts/EventSystem/TimedEffects/Effects/RollEffects.cs"));
+        Check(reg.Contains("new Effects.SentimentEffect()") && reg.Contains("new Effects.GuiltEffect()") && reg.Contains("new Effects.HelplessEffect()")
+              && reg.Contains("TimedDebuffRule.SentimentCharges") && reg.Contains("TimedDebuffRule.GuiltCharges") && reg.Contains("TimedDebuffRule.HelplessCharges")
+              && roll.Contains("Id => TimedDebuffRule.GuiltName") && roll.Contains("Id => TimedDebuffRule.HelplessName") && roll.Contains("Id => TimedDebuffRule.SentimentName")
+              && System.Text.RegularExpressions.Regex.Matches(roll, @"TimedEffectTrigger\.OnRoll").Count >= 6,
+              "悪選択の罰: 〈感傷〉〈罪悪感〉〈無力感〉が時限効果として登録・持つ数は定数・どれも OnRoll (戦闘の終わりに 1 つ減る)");
+        var named = new List<string>();
+        foreach (var ev in all) foreach (var c in ev.choices) foreach (var e in c.effects)
+            if (e != null && e.type == EventEffectType.TimedDebuff && !named.Contains(e.param)) named.Add(e.param);
+        string[] fixedNames = { EventSystem.TimedEffects.TimedDebuffRule.SentimentName, EventSystem.TimedEffects.TimedDebuffRule.GuiltName, EventSystem.TimedEffects.TimedDebuffRule.HelplessName };
+        int seen = 0; foreach (var n in fixedNames) if (named.Contains(n)) seen++;
+        Check(seen == 3, $"悪選択の罰: event_list.txt の時限デバフ[…] に 3 つの名前がそのまま出る ({string.Join("・", named)})");
+    }
+
     /// <summary>〈灰に埋もれた基地〉2 本 (2026-11-13・docs/GAME.md §4-2 / §17): 召喚専用・一度のみ・深さ 6・選択肢の数 (はじめて 1・再訪 2) と効果・
     /// 時限効果の名前が本体の定数 (BattleBoonRule) と一致・版の選び方 (AshBaseEvent は本物をコンパイル)・〈真理〉は効果「真理を得る」で立つ。</summary>
     static void AshBase(string dir)
@@ -959,6 +1106,8 @@ static class Program
         Selectability(dir);
         Observatory(dir);
         AshBase(dir);
+        EvilChoices(dir);
+        CostDisplay(dir);
         ToilInsight(Path.GetFullPath(Path.Combine(dir, "../../..")));
         Layers(dir);
         ClockRelic(Path.GetFullPath(Path.Combine(dir, "../../..")));   // dir = <root>/Assets/Resources/Events

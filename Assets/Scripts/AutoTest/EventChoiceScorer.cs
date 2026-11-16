@@ -61,6 +61,27 @@ namespace AutoTest
         const float V_CAUGHT_FAMILIAR = -8.0f;
         /// <summary>時限バフ / デバフ: 消耗品の半分 (多くは次の 1 戦闘だけ効く)。</summary>
         const float TIMED_VS_CONSUMABLE = 0.5f;
+
+        // ===== イベントの「悪い行い」の罰の時限デバフ (2026-11-16・作者の決定) =====
+        //  上の「消耗品の半分」は〈感傷〉が 1 戦闘だった頃の値 (= 1 戦闘・全部の出目 −1 を 1 とする)。 3 つは
+        //  重さ (1 戦闘あたり・〈感傷〉1 戦闘 = 1) × 続く戦闘の数 (TimedEffectRegistry の既定の数 = 本体と同じ) を掛ける。 ほかの時限デバフは 1 のまま。
+        /// <summary>〈感傷〉1 戦闘の重さ (基準)。 全部の出目 −1 (下限 1) = 1 ターン 3 個で出目の合計 −3 前後。</summary>
+        const float W_SENTIMENT_PER_FIGHT = 1.0f;
+        /// <summary>〈罪悪感〉1 戦闘の重さ。 防御に挿した出目だけ −2 (下限 0)。 防御に挿すのはおおむね 3 個のうち 1 個 (守りのターンで 2 個) なので
+        /// 1 ターン −2〜−4 で〈感傷〉と並ぶが、 攻撃・充電は削らず、 挿し先を攻撃へ寄せて避けられる。 〈感傷〉の 0.7。</summary>
+        const float W_GUILT_PER_FIGHT = 0.7f;
+        /// <summary>〈無力感〉1 戦闘の重さ。 振り直しの費用 +1 (充電)。 BOT の振り直しは 1 ターン高々 1 回で、 振らないターンには効かない
+        /// (1 戦闘で充電 2〜4 ほど・充電 1 の効用は配線評価の 1.2 = 出目 1 よりやや上)。 出目を直接削る〈感傷〉より軽く 0.3。</summary>
+        const float W_HELPLESS_PER_FIGHT = 0.3f;
+
+        /// <summary>時限デバフの重み (消耗品の半分を 1 とする)。 3 つは 1 戦闘の重さ × 続く戦闘の数・ほかは 1 (旧い値付けのまま)。</summary>
+        static float TimedDebuffWeight(string id)
+        {
+            float per = id == EventSystem.TimedEffects.TimedDebuffRule.SentimentName ? W_SENTIMENT_PER_FIGHT
+                      : id == EventSystem.TimedEffects.TimedDebuffRule.GuiltName     ? W_GUILT_PER_FIGHT
+                      : id == EventSystem.TimedEffects.TimedDebuffRule.HelplessName  ? W_HELPLESS_PER_FIGHT : -1f;
+            return per < 0f ? 1f : per * EventSystem.TimedEffects.TimedEffectRegistry.GetDefaultCharges(id);
+        }
         const float V_GAIN_FLAG  = +30.0f;
         const float V_DISC_FLAG  = -22.0f;
         const float V_ARMOR_DUR  = -3.5f;
@@ -291,7 +312,7 @@ namespace AutoTest
                     return V_ARMOR_DUR;
 
                 case EventEffectType.TimedBuff:    return  TIMED_VS_CONSUMABLE * ConsumablePrice(run);
-                case EventEffectType.TimedDebuff:  return -TIMED_VS_CONSUMABLE * ConsumablePrice(run);
+                case EventEffectType.TimedDebuff:  return -TIMED_VS_CONSUMABLE * ConsumablePrice(run) * TimedDebuffWeight(e.param);
                 case EventEffectType.PermanentDebuff: return -PassivePrice(run);
 
                 case EventEffectType.GainPassiveItem:
