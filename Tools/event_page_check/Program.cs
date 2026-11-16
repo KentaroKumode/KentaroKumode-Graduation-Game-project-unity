@@ -132,10 +132,10 @@ static class Program
 
         // ===== 2. 画面の配置 =====
         Check(EventLayout.BodyLinesFit(LineH) >= EventPaging.TextLines, $"本文 {EventPaging.TextLines} 行が本文の板に収まる (入る行数 {EventLayout.BodyLinesFit(LineH)})");
-        Check(EventLayout.PlateX >= LcdSafeArea.L && EventLayout.PlateY >= LcdSafeArea.T && EventLayout.PlateY + EventLayout.PlateH <= LcdSafeArea.B
+        Check(EventLayout.PlateX >= EventLayout.SafeL && EventLayout.PlateY >= LcdSafeArea.T && EventLayout.PlateY + EventLayout.PlateH <= LcdSafeArea.B
               && EventLayout.PlateX + EventLayout.PlateW <= EventLayout.ColX,
-              $"本文の板が液晶の安全域 (x {LcdSafeArea.L}〜{LcdSafeArea.R}・y {LcdSafeArea.T}〜{LcdSafeArea.B}) に収まり、 選択肢の列と重ならない (板 x {EventLayout.PlateX} y {EventLayout.PlateY} {EventLayout.PlateW}×{EventLayout.PlateH})");
-        Check(EventLayout.ColX + EventLayout.ColW <= LcdSafeArea.R, $"選択肢の列が安全域の右に収まる (列 x {EventLayout.ColX} 幅 {EventLayout.ColW})");
+              $"本文の板がイベントの余白 (x {EventLayout.SafeL}〜{EventLayout.SafeR}・y {LcdSafeArea.T}〜{LcdSafeArea.B}・左右は液晶の安全域 {LcdSafeArea.L} より狭いイベントだけの値) に収まり、 選択肢の列と重ならない (板 x {EventLayout.PlateX} y {EventLayout.PlateY} {EventLayout.PlateW}×{EventLayout.PlateH})");
+        Check(EventLayout.ColX + EventLayout.ColW <= EventLayout.SafeR, $"選択肢の列がイベントの余白の右に収まる (列 x {EventLayout.ColX} 幅 {EventLayout.ColW})");
         string need = "…〜0123456789G素材物資手放す次へ前選ぶ補足されている。最短ターンで捕まる中";
         var missing = need.Where(ch => !Glyphs.ContainsKey(ch)).Distinct().ToList();
         Check(missing.Count == 0, "画面が使う字がドット字にある" + (missing.Count > 0 ? " (無い字: " + string.Join("", missing) + ")" : ""));

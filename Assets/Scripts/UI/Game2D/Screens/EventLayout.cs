@@ -15,14 +15,18 @@ namespace UI.Game2D
     public static class EventLayout
     {
         public const int ScreenW = 480, ScreenH = 270;
-        /// <summary>板・列・字を収める範囲 = 液晶の安全域 (<see cref="LcdSafeArea"/>・結末の画面と同じ左右 16・上下 9)。 背景の絵だけは画面いっぱい。
-        /// 2026-11-16 の実機で、 見本の配置 (端から 4 dot) は液晶の湾曲 (旧い合わせ方 f = 0) で左の字・右の札・下の縁が欠けた。 外形を湾曲に合わせる今の既定 (f = 1) では欠けない
-        /// (広げる余地は左右それぞれ 16 dot まで・上下は板が中央なので関係ない ── 広げるかは作者が決める)。</summary>
-        public const int SafeL = LcdSafeArea.L, SafeR = LcdSafeArea.R, SafeT = LcdSafeArea.T, SafeB = LcdSafeArea.B;
+        /// <summary>イベントの画面の左右の余白 (dot・<b>イベントだけの値</b>)。 板・列・字はこの内側。 背景の絵だけは画面いっぱい。
+        /// <para>液晶の安全域 (<see cref="LcdSafeArea"/>・左右 16) より 8 dot 狭い (2026-11-16・作者の承認): 液晶の外形を湾曲に合わせる今の既定 (_CurveFit = 1) では
+        /// 絵が 1 dot も画面の外へ出ないので、 左右の欠けを避ける余白は要らなくなった。 広げた分は本文の折り返しの幅と選択肢の名前の幅に回した。
+        /// 安全域そのもの (結末の画面などが読む) は作者が承認した配置のために変えないので、 イベントだけがこの値を持つ。
+        /// 上下は安全域のまま (板と列は上下の中央なので端に寄らない)。</para>
+        /// <para>経緯: 見本の配置 (端から 4 dot) は旧い合わせ方 (f = 0) の湾曲で左の字・右の札・下の縁が欠け、 一度は安全域 (16) まで寄せた。</para></summary>
+        public const int EdgeX = 8;
+        public const int SafeL = EdgeX, SafeR = ScreenW - EdgeX, SafeT = LcdSafeArea.T, SafeB = LcdSafeArea.B;
 
-        // ── 本文の板 (安全域の左端・画面の上下の中央) ──
+        // ── 本文の板 (左の余白 EdgeX の内側・画面の上下の中央) ──
         //   2026-11-16 作者の決定: 左下の角に付けると、 液晶の湾曲 (角ほど強い) で板の左の縁が斜めに倒れて見えた。 上下の中央なら縁は上下対称の弓なりで倒れない
-        public const int PlateW = 276, PlateH = 158;
+        public const int PlateW = 278, PlateH = 158;
         public const int PlateX = SafeL, PlateY = (ScreenH - PlateH) / 2;
         /// <summary>本文の板と選択肢の列の間。</summary>
         public const int PlateColGap = 4;
@@ -40,7 +44,7 @@ namespace UI.Game2D
         public static int OpY => PlateY + PlateH - OpBottom - OpH;
 
         // ── 選択肢の列 (右) ──
-        /// <summary>列は本文の板の右から安全域の右端まで。</summary>
+        /// <summary>列は本文の板の右から右の余白 (<see cref="SafeR"/>) まで。</summary>
         public const int ColX = PlateX + PlateW + PlateColGap, ColW = SafeR - ColX;
         /// <summary>箱の高さと箱の間。</summary>
         public const int BoxH = 21, BoxGap = 4;
