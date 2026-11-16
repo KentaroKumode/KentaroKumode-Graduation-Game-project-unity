@@ -121,12 +121,13 @@ namespace UI
                 lx = bd.min.x - g - lMax + nudge.x;      // 左の矢印の不透明な右端 = 項目の左端 − 間
                 rx = bd.max.x + g - rMin + nudge.x;      // 右の矢印の不透明な左端 = 項目の右端 + 間
             }
-            // 液晶の dot の格子にそろえる (半端な 0.5 dot に置かない)。 左右は字から離れる向きへ丸め (間が textGapDots より狭くならない)・上下は近い方へ
+            // 液晶の dot の格子にそろえる (半端な 0.5 dot に置かない)。 左右は字から離れる向きへ丸め (間が textGapDots より狭くならない)。
+            //   上下は、 矢印の絵の高さが偶数 dot なので中心を整数の dot に置く。 項目の中心が x.5 の時はいつも上へ寄せる (Mathf.Round は偶数へ丸めるので行ごとに向きが割れる)
             if (dotsPerUnit > 0f)
             {
                 lx = Mathf.Floor(lx * dotsPerUnit + 1e-4f) / dotsPerUnit;
                 rx = Mathf.Ceil(rx * dotsPerUnit - 1e-4f) / dotsPerUnit;
-                y = Mathf.Round(y * dotsPerUnit) / dotsPerUnit;
+                y = Mathf.Floor(y * dotsPerUnit + 0.5f) / dotsPerUnit;
             }
             _left.transform.position = new Vector3(lx, y, b.transform.position.z);
             _right.transform.position = new Vector3(rx, y, b.transform.position.z);

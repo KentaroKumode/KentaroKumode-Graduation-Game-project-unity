@@ -45,13 +45,15 @@ namespace UI
             var skill = Find("SkillTreeButton"); var gallery = Find("GalleryButton");
             var logo = menu.Find("Title");
             float menuY = menu.localPosition.y;
+            if (gallery == null) { Debug.LogWarning("[TitleMenuLayout] GalleryButton が無い (SETTINGS を作れない)"); }
+            float galleryX = gallery != null ? gallery.transform.localPosition.x : 0f;      // SETTINGS は GALLERY の複製なので、 ずらす前の GALLERY の x を基にする
             Place(logo, LogoY, menuY); Place(play.transform, PlayY, menuY);
             if (skill != null) Place(skill.transform, SkillY, menuY);
-            if (gallery == null) { Debug.LogWarning("[TitleMenuLayout] GalleryButton が無い (SETTINGS を作れない)"); return; }
+            if (gallery == null) return;
             Place(gallery.transform, GalleryY, menuY);
             // 当たりを今の絵の大きさに合わせる (2026-11-17: 字の絵を DenkiChip の作り直し v2-c → v3-2 に差し替えて小さくなった・シーンの BoxCollider2D は旧い絵の固定の大きさ)
             FitCollider(play); FitCollider(skill); FitCollider(gallery);
-            MakeSettings(gallery, menu, menuY);
+            MakeSettings(gallery, menu, menuY, galleryX);
         }
 
         /// <summary>ボタンの当たり (BoxCollider2D) を、 今の絵 (SpriteRenderer の sprite) の範囲にそろえる。 両端の矢印 (<see cref="MenuHoverCursor"/>) も当たりの範囲に置くので一緒にそろう。
@@ -66,26 +68,42 @@ namespace UI
             col.size = new Vector2(bd.size.x, bd.size.y); col.offset = new Vector2(bd.center.x, bd.center.y);
         }
 
-        /// <summary>dot の y を Menu の中の位置にして置く (x と z は今のまま)。</summary>
-        private static void Place(Transform t, int dotY, float menuY)
+        /// <summary>dot の y を Menu の中の位置にして置く (z は今のまま)。 baseX = ずらす前の x (Menu の中・null なら今の x)。
+        /// <para><b>液晶の dot の格子にそろえる</b> (2026-11-17): 絵の中心を置くので、 絵の幅・高さ (dot) が奇数だと縁が半端な 0.5 dot に来る
+        /// (字の絵 v3-2 は高さ 23 dot・ENTER 189 dot・SETTINGS 93 dot)。 その時だけ中心を +0.5 dot ずらし、 縁を整数の dot に置く。
+        /// 縦は下へ (dot の y を増やす)、 横は右へ。 大きさは今の絵から求めるので、 字の絵を替えても効く。 当たり (<see cref="FitCollider"/>) と両端の矢印は
+        /// 絵の範囲から作るので、 ずらした位置に付いてくる。</para></summary>
+        private static void Place(Transform t, int dotY, float menuY, float? baseX = null)
         {
             if (t == null) return;
-            var p = t.localPosition; p.y = (CenterY - dotY) / DotsPerUnit - menuY; t.localPosition = p;
+            float dy = 0f, dx = 0f;
+            var sr = t.GetComponent<SpriteRenderer>();
+            if (sr != null && sr.sprite != null)
+            {
+                var size = sr.sprite.bounds.size * DotsPerUnit;      // 絵の大きさ (dot・拡大縮小は 1)
+                if (Mathf.RoundToInt(size.y) % 2 == 1) dy = 0.5f;
+                if (Mathf.RoundToInt(size.x) % 2 == 1) dx = 0.5f;
+            }
+            var p = t.localPosition;
+            float x0 = baseX ?? p.x;
+            p.y = (CenterY - (dotY + dy)) / DotsPerUnit - menuY;
+            p.x = Mathf.Round(x0 * DotsPerUnit) / DotsPerUnit + dx / DotsPerUnit;      // ずらす前の x を dot の格子に丸めてから右へ
+            t.localPosition = p;
         }
 
-        private static void MakeSettings(SpriteButton gallery, Transform menu, float menuY)
+        private static void MakeSettings(SpriteButton gallery, Transform menu, float menuY, float galleryX)
         {
             if (menu.Find(SettingsName) != null) return;
             var day = LoadSprite(ArtDay); var night = LoadSprite(ArtNight);
             if (day == null) { Debug.LogWarning("[TitleMenuLayout] Resources/" + ArtDay + ".bytes を読めない (SETTINGS を作らない)"); return; }
             var go = Object.Instantiate(gallery.gameObject, menu, false);       // 部品 (絵・当たり・SpriteButton・層) は GALLERY と同じ
             go.name = SettingsName;
-            Place(go.transform, SettingsY, menuY);
             var btn = go.GetComponent<SpriteButton>();
             var sr = btn != null && btn.targetRenderer != null ? btn.targetRenderer : go.GetComponent<SpriteRenderer>();
             var dn = Object.FindObjectOfType<TitleDayNight>();
             bool isNight = dn != null && dn.mode == TitleDayNight.Mode.Night;
             if (sr != null) sr.sprite = isNight && night != null ? night : day;
+            Place(go.transform, SettingsY, menuY, galleryX);      // 絵を替えてから置く (大きさで半端な 0.5 dot をそろえるため)
             FitCollider(btn);      // 当たりを SETTINGS の絵の範囲に
             if (btn != null) btn.Clicked += OnSettingsClicked;
             // 昼夜の差し替えと両端の矢印に足す
