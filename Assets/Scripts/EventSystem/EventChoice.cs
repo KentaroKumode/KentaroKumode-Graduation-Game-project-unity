@@ -45,21 +45,33 @@ namespace EventSystem
         /// <summary>記録の文を分岐ごとに分けて書いてあるか (分けてある時だけ、 引いた分岐を戦記に残す)。</summary>
         public bool DigestSplitByBranch => digestByBranch != null;
 
-        /// <summary>選択肢の下に出す説明の文 (選べない理由・使うターン・補足中の捕まるまで)。 何も無ければ null。
-        /// 組み立ては <c>EventEncounter.DescribeCost</c> から呼ぶ (検算 Tools/event_page_check が最も長い形で窓の 2 行に収まるかを見る)。
-        /// etaTurns = 補足されている時の捕まるまでのターン (-1 = 補足されていない)。</summary>
-        public static string CostText(string why, int turns, int etaTurns)
+        /// <summary>選択肢の下に出す説明の文 (2026-11-16 に作り直し・作者の決定「自分から差し出す物は見せる・ハプニングは見せない」)。 何も無ければ null。
+        /// 並びは 選べない理由 → 見せる代償 (効果の並びの順・<see cref="EventEffectRoles.IsShownCost"/>・文は <see cref="EventEffectRoles.ShownCostText"/>)。
+        /// ターンの後ろには補足中の捕まるまでを付ける (etaTurns = 補足されている時の捕まるまでのターン・-1 = 補足されていない)。
+        /// 選べない時 (why あり) は、 理由とターンだけを出す ── 足りない支払いは理由の文が言うので、 ほかの支払いを並べて 2 行を越えないようにする。
+        /// 組み立ては <c>EventEncounter.DescribeCost</c> から呼ぶ (検算 Tools/event_page_check が最も長い形で窓の 2 行に収まるかを見る)。 得る物は書かない。</summary>
+        public string CostText(string why, int etaTurns)
         {
             var sb = new System.Text.StringBuilder();
             if (why != null) sb.Append(why);
-            if (turns > 0)
-            {
-                if (sb.Length > 0) sb.Append("・");
-                sb.Append($"{turns} ターンを使う");
-                if (etaTurns >= 0)
-                    sb.Append(etaTurns <= turns ? $"（補足されている: {etaTurns} ターンで捕まる）"
-                                                : $"（補足されている: 最短 {etaTurns} ターンで捕まる）");
-            }
+            bool etaDone = false;
+            if (effects != null)
+                foreach (var e in effects)
+                {
+                    if (!EventEffectRoles.IsShownCost(e)) continue;
+                    if (why != null && e.type != EventEffectType.TurnsPass) continue;
+                    string t = EventEffectRoles.ShownCostText(e);
+                    if (t == null) continue;
+                    if (sb.Length > 0) sb.Append("・");
+                    sb.Append(t);
+                    if (e.type == EventEffectType.TurnsPass && etaTurns >= 0 && !etaDone)
+                    {
+                        etaDone = true;
+                        int turns = TurnCost;
+                        sb.Append(etaTurns <= turns ? $"（補足されている: {etaTurns} ターンで捕まる）"
+                                                    : $"（補足されている: 最短 {etaTurns} ターンで捕まる）");
+                    }
+                }
             return sb.Length > 0 ? sb.ToString() : null;
         }
 
@@ -103,7 +115,7 @@ namespace EventSystem
         }
 
         /// <summary>この選択肢で払う物資 (効果「物資-N」の合計・確率分岐の中と「勝利後」は数えない)。 2026-11-13。
-        /// 足りなければ選べない (<see cref="UnavailableReason"/>)。 確率分岐の中の物資-N は支払いでなく結果として失う物なので、 ここには入れない。</summary>
+        /// 確率分岐の中の物資-N は支払いでなく結果として失う物なので、 ここには入れない。 選べるかの判定は見せる支払いだけを数える (<see cref="BlockingPayment"/>・2026-11-16)。</summary>
         public int ProvisionCost
         {
             get
@@ -114,6 +126,19 @@ namespace EventSystem
                         if (e != null && !e.postCombat && (e.type == EventEffectType.ProvisionDelta || e.type == EventEffectType.HungerDelta) && e.amount < 0) n -= e.amount;
                 return n;
             }
+        }
+
+        /// <summary>足りなければ選べなくする支払いの合計 (2026-11-16)。 確率分岐の外・「勝利後」でない -N のうち、 <see cref="EventEffectRoles.BlocksWhenShort"/> の物だけ
+        /// (見せる支払い。 伏せた支払いは足りなくても選べて、 ある分だけ失う)。 <paramref name="provision"/> = 物資 (旧表記の空腹度も) を数える。</summary>
+        private int BlockingPayment(EventEffectType type, bool provision = false)
+        {
+            int n = 0;
+            if (effects != null)
+                foreach (var e in effects)
+                    if (e != null && !e.postCombat && e.amount < 0
+                        && (e.type == type || (provision && e.type == EventEffectType.HungerDelta))
+                        && EventEffectRoles.BlocksWhenShort(e)) n -= e.amount;
+            return n;
         }
 
         /// <summary>この選択肢が効果 type を (確率分岐の外に) 持つか。</summary>
@@ -135,15 +160,17 @@ namespace EventSystem
         public bool IsAvailable(GameLoop.RunState run) => UnavailableReason(run) == null;
 
         /// <summary>選べない理由 (画面に出す短い文)。 選べるなら null。
-        /// 判定の順は (a) ゴールド → 物資 → 素材 (鍛える素材を含む)、 (b) 得になる効果が何ひとつ起きない (最初に書かれた得の効果の理由)。</summary>
+        /// 判定の順は (a) ゴールド → 物資 → 素材 (鍛える素材を含む)、 (b) 得になる効果が何ひとつ起きない (最初に書かれた得の効果の理由)。
+        /// (a) に数えるのは見せる支払いだけ (2026-11-16・<see cref="EventEffectRoles.BlocksWhenShort"/>・切り替えは <see cref="EventEffectRoles.HiddenPaymentMayFallShort"/>)。</summary>
         public string UnavailableReason(GameLoop.RunState run)
         {
             if (run == null) return null;
-            int g = GoldCost;
+            // 支払いは見せる物だけ (2026-11-16・EventEffectRoles.BlocksWhenShort)。 伏せた支払いは足りなくても選べて、 ある分だけ失う
+            int g = BlockingPayment(EventEffectType.GoldDelta);
             if (run.coins < g) return $"ゴールドが足りない（{g}G）";
-            int p = ProvisionCost;
+            int p = BlockingPayment(EventEffectType.ProvisionDelta, provision: true);
             if (run.provision < p) return $"物資が足りない（{p}）";
-            int m = MaterialCost;
+            int m = BlockingPayment(EventEffectType.MaterialDelta);
             if (Has(EventEffectType.ForgeWeapon))
             {
                 int cost = GameLoop.GameManager.WeaponUpgradeCost(run);

@@ -3,7 +3,7 @@
 //   1. 頁割りの規則 (段落ごとに 1 頁・長い段落は行で割る・最後の頁は選択肢に場所を空ける・行を捨てない)
 //   2. 直す前 (2026-11-13 まで) の窓: 導入は 5 行・結果は 8 行で切り捨て、 選択肢は窓の高さ 266 に入る分だけ描いていた ── 溢れていた文と選択肢の一覧
 //   3. 直した後の窓: 全イベントの導入・結果の文が全部どこかの頁に出る (切り捨て 0)・どの頁も窓が 266 (格子 270) に収まる・
-//      選択肢が全部描ける (説明の 2 行が付いた時も)・選択肢の名前と説明 (選べない理由・使うターン) が切れない
+//      選択肢が全部描ける (説明の 2 行が付いた時も)・選択肢の名前と説明 (選べない理由・見せる代償・使うターン) が切れない
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -141,8 +141,9 @@ static class Program
                     // 説明の文の最も長い形: 選べない理由のどれか + 使うターン + 補足中 (最短 99 ターン)
                     var reasons = new SortedSet<string>(StringComparer.Ordinal);
                     foreach (var sc in scenes) { sc(gm); var r = c.UnavailableReason(gm.Run); if (r != null) reasons.Add(r); }
-                    var cands = new List<string> { EventChoice.CostText(null, c.TurnCost, c.TurnCost > 0 ? 99 : -1) };
-                    foreach (var r in reasons) cands.Add(EventChoice.CostText(r, c.TurnCost, c.TurnCost > 0 ? 99 : -1));
+                    // 2026-11-16: 見せる代償 (ゴールド・素材・秘宝・印〔見せる〕の物資) も並ぶ (EventChoice.CostText)
+                    var cands = new List<string> { c.CostText(null, c.TurnCost > 0 ? 99 : -1) };
+                    foreach (var r in reasons) cands.Add(c.CostText(r, c.TurnCost > 0 ? 99 : -1));
                     foreach (var d in cands) if (!string.IsNullOrEmpty(d)) { ev.descs.Add(d); ev.anyDesc = true; }
                 }
                 evs.Add(ev);
