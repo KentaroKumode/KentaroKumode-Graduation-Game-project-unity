@@ -10,6 +10,8 @@
   A_*      = Super のアブレーション
   P0 / P12 = Super のパネルの点数 0 / 12 (24 は S)
 
+測定の条件 (2026-11-18〜): 嵐あり + 嵐を読む BOT (T2) が AutoRunner の既定 (GAME.md §13-5)。 腕の実効は「腕と実効状態」の policySig (storm= / snav=) で読む。
+
 読むもの: 各腕の round_000/c*/learn_runs.json (ラン)・response.json (実効状態・学習の読み)・worker.log (Item not found)。
 書くもの (出力フォルダ):
   summary.md                 表 (条件・n・単位・信頼区間・検定)
@@ -76,6 +78,41 @@ def load_arm(d):
 
 def is_clear(r):
     return r.get('bandScore', -1) >= CLEAR_BAND
+
+
+# 画面の層ごとの死亡率 (2026-11-18): (画面の層, 死んだ帯, 着いた帯の下限, §13-5 の目標 (下限, 上限)・深さで読む, 名前)
+LAYERS = [
+    (1, (1,), 1, (0.0, 0.01), '第 1 層 (深さ 0・1)'),
+    (2, (2, 3), 2, (0.12, 0.15), '第 2 層 (深さ 3)'),
+    (3, (6, 7), 6, (0.20, 0.25), '第 3 層 (深さ 5)'),
+    (4, (9,), 9, (0.25, 0.30), '第 4 層 (深さ 6)'),
+    (5, (10,), 10, (0.45, 0.50), '第 5 層 (深さ 7・ヴェスカ)'),
+]
+
+
+def death_cause(r):
+    """死んだランの死因 (Captures/storm の段階 3-0 と同じ分け方)。"""
+    if r.get('deathInBossFight'):
+        return 'boss'
+    fs = r.get('fights', [])
+    if fs and not fs[-1].get('won'):
+        return 'road_in' if fs[-1].get('stormIn', -1) == 1 else 'road_out'
+    return 'walk'
+
+
+def _won_turns(rw, k):
+    return rw.get(k + '_won') == 1 and rw.get(k + '_turns', '') != ''
+
+
+def ore_a(rw):
+    """俺ツエーの候補 A: 第 3 層 (深さ 5) のボスを 5 ターン以内。"""
+    return _won_turns(rw, 'boss_d5') and rw['boss_d5_turns'] <= 5
+
+
+def ore_c(rw):
+    """俺ツエーの判定 (候補 C・作者 2026-11-18): 第 3 層のボス ≤5 ターン・第 4 層 (深さ 6) のボス ≤6 ターン・ヴェスカ 4 段の合計 ≤20 ターンのどれか。"""
+    return (ore_a(rw) or (_won_turns(rw, 'boss_d6') and rw['boss_d6_turns'] <= 6)
+            or (rw.get('vesca_won') == 1 and rw.get('vesca_turns', '') != '' and rw['vesca_turns'] <= 20))
 
 
 # ---------------------------------------------------------------- 統計
@@ -361,20 +398,61 @@ def main():
 
     common = None
     for lab, a in arms.items():
-        if lab.startswith('A_'):
-            continue   # アブレーションは 4,000 ランなので、 梯子の共通のシードを狭めない (対は腕ごとに取る)
+        if lab.startswith('A_') or re.match(r'^P\d', lab):
+            continue   # アブレーション・パネルはラン数が梯子と違うことがあるので、 梯子の共通のシードを狭めない (対は腕ごとに取る)
         s = set(a['runs'])
         common = s if common is None else common & s
     common = sorted(common or [])
     P(f'全腕に共通するシード: {len(common)} 本\n')
 
     # ---- クリア率
-    P('## クリア率 (全ラン・難易度 0・Wilson 95%)\n')
-    P('| 腕 | クリア率 |')
-    P('|---|---|')
+    P('## クリア率と俺ツエーの率 (全ラン・難易度 0・Wilson 95%)\n')
+    P('俺ツエーの判定は候補 C (作者 2026-11-18): 第 3 層 (深さ 5) のボスを 5 ターン以内・第 4 層 (深さ 6) のボスを 6 ターン以内・ヴェスカ 4 段を合計 20 ターン以内のどれか。 候補 A = 第 3 層のボスを 5 ターン以内だけ。 分母は全ラン。\n')
+    P('| 腕 | クリア率 | 俺ツエー (候補 C) | うちクリア | 候補 A |')
+    P('|---|---|---|---|---|')
     for lab, a in arms.items():
         rs = list(a['runs'].values())
-        P(f'| {lab} | {pct(sum(is_clear(r) for r in rs), len(rs))} |')
+        rows_ = [ore_candidates(r) for r in rs]
+        hc = [rw for rw in rows_ if ore_c(rw)]
+        ha = [rw for rw in rows_ if ore_a(rw)]
+        P(f'| {lab} | {pct(sum(is_clear(r) for r in rs), len(rs))} | {pct(len(hc), len(rs))} | {pct(sum(rw["clear"] for rw in hc), len(hc))} | {pct(len(ha), len(rs))} |')
+    P('')
+
+    # ---- 層ごとの死亡率 (到達者あたり・§13-5 の目標と並べる・2026-11-18)
+    P('## 層ごとの死亡率 (その層に着いたランのうち、 その層で終わった割合・§13-5)\n')
+    P('目標は §13-5「到達者のうちその層で死ぬ割合」を深さで読んだ値 (深さ 1 ≤1% / 3 12〜15% / 5 20〜25% / 6 25〜30% / 7 (ヴェスカ) 45〜50%・深さ 2・4 は 2026-09-28 に削除)。'
+      ' 帯 (bandScore) で数える: 第 1 層 = 帯 1・第 2 層 = 2〜3・第 3 層 = 6〜7・第 4 層 = 9・第 5 層 = 10。 帯 8 (第 3 層を倒して〈決意〉なしで終了) は死に数えず、 次の層へも着かない。\n')
+    P('| 腕 | ' + ' | '.join((f'{nm} ({lo * 100:.0f}〜{hi * 100:.0f}%)' if lo else f'{nm} (≤{hi * 100:.0f}%)') for _, _, _, (lo, hi), nm in LAYERS) + ' | 帯 8 |')
+    P('|---|' + '---|' * (len(LAYERS) + 1))
+    for lab, a in arms.items():
+        rs = [r for r in a['runs'].values() if r.get('bandScore', -1) >= 1]
+        cells = []
+        for _, dead_b, reach_b, (lo, hi), _ in LAYERS:
+            reach = sum(1 for r in rs if r['bandScore'] >= reach_b)
+            dead = sum(1 for r in rs if r['bandScore'] in dead_b)
+            if not reach:
+                cells.append('—')
+                continue
+            rate = dead / reach
+            mark = '' if lo <= rate <= hi else '*'
+            cells.append(f'{100 * rate:.1f}%{mark} ({dead}/{reach})')
+        P(f'| {lab} | ' + ' | '.join(cells) + f' | {sum(1 for r in rs if r["bandScore"] == 8)} |')
+    P('')
+    P('`*` = 目標の外。 深い層ほど着いた集団が選ばれている (§13-5 の「条件付きであることの注意」)。\n')
+    P('### 死んだランの死因 (層ごと・腕 S と参考の段)\n')
+    P('道中の戦闘は、 その戦闘が嵐の中で始まったか (敵に〈嵐〉) で分ける。 「歩いて尽きた」= 最後の戦闘に勝った後に、 嵐の HP か物資切れで HP が尽きた。\n')
+    P('| 腕 | 層 | 死 | ボス戦 | 道中の戦闘 (嵐の外) | 道中の戦闘 (嵐の中) | 歩いて尽きた |')
+    P('|---|---|---|---|---|---|---|')
+    for lab, a in arms.items():
+        if not (lab == 'S' or lab.startswith('R_')):
+            continue
+        rs = [r for r in a['runs'].values() if r.get('bandScore', -1) >= 1]
+        for _, dead_b, _, _, nm in LAYERS:
+            c = Counter(death_cause(r) for r in rs if r['bandScore'] in dead_b)
+            n = sum(c.values())
+            if not n:
+                continue
+            P(f'| {lab} | {nm} | {n} | ' + ' | '.join(f'{c[k]} ({100 * c[k] / n:.0f}%)' for k in ('boss', 'road_out', 'road_in', 'walk')) + ' |')
     P('')
 
     # ---- 俺ツエーの候補
