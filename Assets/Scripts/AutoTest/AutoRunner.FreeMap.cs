@@ -243,6 +243,7 @@ namespace AutoTest
                 revealed[i] = n.revealed;
                 if (n.revealed && n.EffectiveType == TileType.Boss) boss = i;
             }
+            if (navStormOracleBoss) boss = sim.Layout.goal;   // [測定 2026-11-18] 上限の見当: ボスの位置を知っているとして動く (既定 false)
             return new StormNavView(sim, revealed, boss);
         }
 

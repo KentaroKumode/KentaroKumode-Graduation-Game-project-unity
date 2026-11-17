@@ -129,7 +129,12 @@ namespace AutoTest
                     float stormWalk = 0f;
                     if (storm != null && !storm.Walk(from, c, candNode[i], ref ns, out stormWalk)) continue;
                     float gain = MacroGain(candNode[i], layer, run, ref ns) - steps * MacroStepCost - stormWalk;
-                    if (storm != null) storm.Arrive(candNode[i], ref ns);
+                    if (storm != null)
+                    {
+                        float pts0 = ns.pts;
+                        storm.Arrive(candNode[i], ref ns);
+                        gain -= navStormPointPrice * (ns.pts - pts0);   // [測定 2026-11-18] 1 点の値段 (既定 0 = 今までと同じ)
+                    }
                     if (fearHops != null) gain -= navFearMacro * FearCloseness(fearHops, c, fearR);
                     // 2026-11-09: 踏んだ後に「出口」か「まだ寄っていない補給できる店」まで歩けるか (店で買い足す前提の計画)
                     //   嵐の航行: 出口までの道で払う嵐の HP (見込み) を、 HP で歩ける分から先に引く
@@ -232,9 +237,10 @@ namespace AutoTest
             public bool Walk(int from, int c, MapNode n, ref MacroSim s, out float loss)
             {
                 int hp = _sv.WalkCost(from, c, P(s.pts), c == _sv.Boss, out int pEnd, out _);
-                s.pts += pEnd - P(s.pts);
+                int walkPts = pEnd - P(s.pts);
+                s.pts += walkPts;
                 MarkFight(c, n, ref s);
-                loss = 0f;
+                loss = _r.navStormPointPrice * walkPts;   // [測定 2026-11-18] 歩いて溜まる分の値段 (既定 0)
                 if (hp <= 0) return true;
                 float frac = hp / _maxHp;
                 if (_exitDeath) loss += (float)StormNavView.DeathProb(s.hp, frac, s.var) * MacroDeathCost;

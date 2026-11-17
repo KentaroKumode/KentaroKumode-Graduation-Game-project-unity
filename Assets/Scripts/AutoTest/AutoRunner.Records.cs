@@ -112,7 +112,11 @@ namespace AutoTest
              .Append(" danger=").Append(UseLearnedDanger ? 1 : 0)
              .Append(" abl=").Append(ablateShop ? "S" : "").Append(ablateShopScore ? "R" : "").Append(ablateEvent ? "E" : "")
              .Append(ablateFreeNav ? "N" : "").Append(combatNaive ? "C" : "")
-             .Append(" events=").Append(suppressEvents ? 0 : 1).Append(" storm=").Append(stormEnabled ? 1 : 0);
+             .Append(" events=").Append(suppressEvents ? 0 : 1).Append(" storm=").Append(stormEnabled ? 1 : 0)
+             .Append(" snav=").Append(navStormAware ? 1 : 0).Append(navStormExitDeath ? "D" : "").Append(navStormFightModel ? "M" : "").Append(navStormFightDeath ? "F" : "")
+             .Append(navStormOracleBoss ? "O" : "")
+             .Append(" shpw=").Append(navStormHpWeightMul.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture))
+             .Append(" sprice=").Append(navStormPointPrice.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture));
             return b.ToString();
         }
 
