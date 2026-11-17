@@ -68,6 +68,30 @@ namespace AutoTest.EditorTools
 
         private static State _st;
         private static string _root = "";
+
+        /// <summary>新しい並列の学習・測定を始める前に、 古い生成物を刈る (2026-11-18)。 規則 (残す日数など) は
+        /// <c>Tools/prune_outputs.py</c> の 1 か所に置き、 ここはそれを呼ぶだけ。 learn_parallel は 11-18 まで刈る対象に入っておらず、 117 GB たまっていた。
+        /// python が無い・失敗した時は警告だけ出して続ける (測定は止めない)。</summary>
+        private static void PruneOldOutputs()
+        {
+            try
+            {
+                string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+                var psi = new System.Diagnostics.ProcessStartInfo("python", "\"" + Path.Combine(projectRoot, "Tools", "prune_outputs.py") + "\"")
+                {
+                    WorkingDirectory = projectRoot, UseShellExecute = false, CreateNoWindow = true,
+                    RedirectStandardOutput = true, RedirectStandardError = true,
+                    StandardOutputEncoding = Encoding.UTF8,
+                };
+                using (var p = System.Diagnostics.Process.Start(psi))
+                {
+                    string output = p.StandardOutput.ReadToEnd();
+                    p.WaitForExit(120000);
+                    if (!string.IsNullOrWhiteSpace(output)) Debug.Log("[学習並列] 古い生成物を刈った:\n" + output.Trim());
+                }
+            }
+            catch (Exception e) { Debug.LogWarning("[学習並列] prune_outputs.py を呼べなかった (続ける): " + e.Message); }
+        }
         private static readonly List<Slot> _slots = new List<Slot>();
         private static readonly Queue<Slot> _pending = new Queue<Slot>();
         private static int _maxParallel;
@@ -302,6 +326,7 @@ namespace AutoTest.EditorTools
             var ks = new List<string>(cfg.Keys);
             var vs = new List<string>(); foreach (var k in ks) vs.Add(cfg[k]);
 
+            PruneOldOutputs();
             _root = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "AutoRunLogs",
                 "learn_parallel", DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture)));
             Directory.CreateDirectory(_root);
