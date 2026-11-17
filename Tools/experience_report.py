@@ -20,6 +20,7 @@
 """
 import csv
 import glob
+import gzip
 import io
 import json
 import math
@@ -45,11 +46,15 @@ def load_arm(d):
     eff, reads, notfound, fails = set(), set(), 0, 0
     for c in sorted(glob.glob(os.path.join(d, 'round_000', 'c*'))):
         p = os.path.join(c, 'learn_runs.json')
-        if not os.path.exists(p):
+        if os.path.exists(p):
+            with io.open(p, encoding='utf-8-sig') as f:
+                js = json.load(f)
+        elif os.path.exists(p + '.gz'):   # 空きを作るために圧縮した記録 (2026-11-17)
+            with gzip.open(p + '.gz', 'rt', encoding='utf-8-sig') as f:
+                js = json.load(f)
+        else:
             fails += 1
             continue
-        with io.open(p, encoding='utf-8-sig') as f:
-            js = json.load(f)
         for r in js.get('runs', []):
             runs[r['index']] = r
         rp = os.path.join(c, 'response.json')
@@ -453,7 +458,7 @@ def main():
             cells = []
             for k in range(3):
                 same = tot = 0
-                for i in common:
+                for i in [j for j in common if j in a["runs"]]:
                     sa, sb = ref[i].get('shelves', []), a['runs'][i].get('shelves', [])
                     if len(sa) > k and len(sb) > k:
                         tot += 1
@@ -463,11 +468,11 @@ def main():
         P('')
         sc_shelf, miss, seen = {}, 0, 0
         for i in common:
-            v, ns, m, s = shelf_luck(ref[i], itt)
+            v, ns, m, s = shelf_luck(ref[i], itt, nshelves=1, top=3)
             sc_shelf[i] = v
             miss += m
             seen += s
-        P(f'棚の版 L_棚 = 最初の 3 回の棚 (腕 {probe_lab} の棚) で、 棚ごとに ITT の値の上位 2 品の和 (負は 0) を足した値。 単位は ITT の Δクリア率 (百分率ポイント)。 ITT に無い品 {miss}/{seen} 枠は 0。\n')
+        P(f'棚の版 L_棚 = 最初の棚 (どの腕でも同じ = 判断に依らないのは 1 番目だけ・上の表) の ITT の値の上位 3 品の和 (負は 0) を足した値。 単位は ITT の Δクリア率 (百分率ポイント)。 ITT に無い品 {miss}/{seen} 枠は 0。\n')
         # 結果の版: 参考の段 (R_*) のバンドの平均
         probes = [l for l in arms if l.startswith('R_')]
         sc_out = {}
@@ -487,7 +492,7 @@ def main():
         P('| 腕 | ' + ' | '.join(luck) + ' |')
         P('|---|' + '---|' * len(luck))
         for lab, a in arms.items():
-            P(f'| {lab} | ' + ' | '.join(f'{auc(sc, a["runs"], common):.3f}' for sc in luck.values()) + ' |')
+            P(f'| {lab} | ' + ' | '.join(f'{auc(sc, a["runs"], [j for j in common if j in a["runs"]]):.3f}' for sc in luck.values()) + ' |')
         P('')
 
         # ---- 知識の関与
@@ -534,7 +539,8 @@ def main():
             P('')
             P('| 対 (A 対 B) | 下位 1/4 の A | 下位 1/4 の B | B ÷ A | 対 |')
             P('|---|---|---|---|---|')
-            pairs = [('K0', 'K6'), ('K0', 'S'), ('K6', 'S'), ('K0', 'K3'), ('K3', 'K6'), ('R_Naive', 'S'), ('R_Optimal', 'S'), ('K0', 'R_Optimal')]
+            pairs = [('K0', 'K6'), ('K0', 'S'), ('K6', 'S'), ('K0', 'K3'), ('K3', 'K6'), ('R_Naive', 'S'), ('R_Optimal', 'S'), ('K0', 'R_Optimal'),
+                     ('R_Naive', 'K3'), ('R_Naive', 'K6'), ('R_Naive', 'K7'), ('K6', 'K7'), ('K7', 'S')]
             for a_, b_ in pairs:
                 if a_ not in arms or b_ not in arms:
                     continue
