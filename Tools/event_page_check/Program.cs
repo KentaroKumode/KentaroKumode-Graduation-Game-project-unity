@@ -79,6 +79,8 @@ static class Program
         Check(!w8.Any(l => System.Text.RegularExpressions.Regex.IsMatch(l, "「.{0,3}$")), "開き括弧の後ろ 3 字以下で行を終えない → " + string.Join("／", w8));
         var w9 = JpTextLayout.Lines("ゆっくりとあなたはそれをひろいあげる", 90, a10);
         Check(w9.Take(w9.Count - 1).All(l => l.EndsWith("は") || l.EndsWith("を") || l.EndsWith("へ")), "ひらがな同士でも「を」「へ」「は」の後では折れる → " + string.Join("／", w9));
+        var w10 = JpTextLayout.Lines("一二三四五六七——八九十", 80, a10);
+        Check(!w10.Any(l => l.EndsWith("—") && !l.EndsWith("——")) && w10.Any(l => l.StartsWith("——")), "「——」は 2 字の間で割らず、 行頭に来てよい → " + string.Join("／", w10));
         var p9 = JpTextLayout.Pages("一二三四五六七八九", 10, 8, 8, a10);
         Check(p9.Count == 2 && p9[0].Count == 7 && p9[1].Count == 2, "段落が 1 行だけはみ出す時は前の頁から 1 行下ろす (8 + 1 → 7 + 2)");
         var w5 = JpTextLayout.Lines("あいうえおかきくけこさしすせそ", 50, a10);
@@ -118,7 +120,7 @@ static class Program
                         var prev = ls[k - 1];
                         if (prev.Length > 0 && JpTextLayout.NoEnd(prev[prev.Length - 1])) { auditKinsoku++; auditList.Add($"行末禁則: {label}「{prev}／{l}」"); }
                         bool afterSpace = at > 0 && (seg[at - 1] == ' ' || seg[at - 1] == '　');
-                        if (!afterSpace && at > 0 && !JpTextLayout.BreakAllowed(seg, at)) { auditMid++; auditList.Add($"語の途中: {label}「{ls[k - 1]}／{l}」"); }
+                        if (!afterSpace && at > 0 && !JpTextLayout.BreakAllowed(seg, at) && "」』）】〕〉》".IndexOf(seg[at - 1]) < 0 && !(JpTextLayout.NoSplit(seg[at]) && seg[at - 1] != seg[at])) { auditMid++; auditList.Add($"語の途中: {label}「{ls[k - 1]}／{l}」"); }
                     }
                     pos = at + l.Length;
                 }

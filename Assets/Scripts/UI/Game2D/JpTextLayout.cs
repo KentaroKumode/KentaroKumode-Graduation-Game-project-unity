@@ -22,7 +22,7 @@ namespace UI.Game2D
         ///   ただし BudouX の切れ目でも、 ひらがな同士・カタカナ同士・漢字同士の間は捨てる (<see cref="BreakAllowed"/>・2026-11-17: 「護衛な／し」「手の／ひら」「虚／空」「あなた／へ」のような誤判定がこの形だった)。
         ///   折るのは字の種類が変わる所 (ひらがな → 漢字など) と句読点・括弧の前後。 複合動詞の「拾い／上げ」は組版として許される切れ目なので残す。
         ///   ひらがな同士でも助詞「を」「へ」「は」の後は折ってよい。 割らない語 (「売り子」) と、 開き括弧の後ろ 3 字以下で行が終わる所 (「「私の／」) では折らない</item>
-        /// <item><b>禁則</b>: 行頭に句読点・閉じ括弧・小書きの仮名・長音・中黒などを置かない (<see cref="NoStart"/>)。 行末に開き括弧を置かない (<see cref="NoEnd"/>)。
+        /// <item><b>禁則</b>: 行頭に句読点・閉じ括弧・小書きの仮名・長音・中黒などを置かない (<see cref="NoStart"/>)。 「——」「……」は 2 字の間で割らない (<see cref="NoSplit"/>)。 行末に開き括弧を置かない (<see cref="NoEnd"/>)。
         ///   ぶら下げはしない (幅 maxW を超えないことを保つ) ── 収まらない時は前の字ごと次の行へ追い出す</item>
         /// <item>文節 1 つが 1 行より長い時だけ、 禁則を守って字の間で折る (それも無理なら字の間で折る)</item>
         /// <item><b>短すぎる最後の行を防ぐ</b>: 段落の最後の行が句読点を除いて <see cref="WidowChars"/> 字以下なら、 前の行の最後の文節を下ろす (下ろした行が幅に収まる時だけ)</item>
@@ -46,9 +46,13 @@ namespace UI.Game2D
         /// <summary>最後の行がこの字数以下 (句読点・閉じ括弧などの <see cref="NoStart"/> を数えない) なら、 短すぎる行として前の行から文節を下ろす。</summary>
         public const int WidowChars = 2;
 
-        /// <summary>行頭に置かない字 (句読点・閉じ括弧・小書きの仮名・長音・中黒・三点リーダー・ダッシュ・感嘆と疑問など)。</summary>
+        /// <summary>行頭に置かない字 (句読点・閉じ括弧・小書きの仮名・長音・中黒・感嘆と疑問・繰り返し記号・ハイフン類など・JIS X 4051 の行頭禁則)。 ダッシュと三点リーダーは入れない (<see cref="NoSplit"/>)。</summary>
         public static bool NoStart(char c) => NoStartChars.IndexOf(c) >= 0;
-        private const string NoStartChars = "、。，．,.:;：；!?！？)]}）］｝〕〉》」』】〙〗〟’”｠»ゝゞヽヾーァィゥェォッャュョヮヵヶぁぃぅぇぉっゃゅょゎゕゖㇰㇱㇲㇳㇴㇵㇶㇷㇸㇹㇺㇻㇼㇽㇾㇿ々〻‐゠–〜～・…‥―—ｰ％%";
+        private const string NoStartChars = "、。，．,.:;：；!?！？)]}）］｝〕〉》」』】〙〗〟’”｠»ゝゞヽヾーァィゥェォッャュョヮヵヶぁぃぅぇぉっゃゅょゎゕゖㇰㇱㇲㇳㇴㇵㇶㇷㇸㇹㇺㇻㇼㇽㇾㇿ々〻‐゠–〜～・ｰ％%";
+
+        /// <summary>分離禁止の字 (ダッシュ・三点リーダー)。 同じ字が 2 つ並んだ間 (「——」「……」) では折らない。 行頭に来るのはよい
+        /// (JIS X 4051 の分離禁止文字・行頭禁則ではない。 2026-11-17 まで行頭禁則に入れていて、 「——」でつながった長いまとまりが丸ごと次の行へ送られていた)。</summary>
+        public static bool NoSplit(char c) => c == '—' || c == '―' || c == '…' || c == '‥';
 
         /// <summary>行末に置かない字 (開き括弧)。</summary>
         public static bool NoEnd(char c) => NoEndChars.IndexOf(c) >= 0;
@@ -62,6 +66,7 @@ namespace UI.Game2D
         {
             char a = s[i - 1], b = s[i];
             if (NoStart(b) || NoEnd(a)) return false;
+            if (a == b && NoSplit(a)) return false;
             if (IsAlnum(a) && IsAlnum(b)) return false;
             return true;
         }
@@ -78,7 +83,9 @@ namespace UI.Game2D
             for (int i = 1; i < n; i++)
             {
                 charOk[i] = CharBreakOk(s, i);
-                bool boundary = IsSpace(s[i - 1]) || (!IsSpace(s[i]) && BreakAllowed(s, i));
+                // 空白の後・閉じ括弧の後・「——」「……」の前は、 BudouX の判定によらず切れ目にする (約物の前後は語の途中になり得ない)
+                bool punct = !IsSpace(s[i]) && (("」』）】〕〉》".IndexOf(s[i - 1]) >= 0) || (NoSplit(s[i]) && s[i - 1] != s[i]));
+                bool boundary = IsSpace(s[i - 1]) || punct || (!IsSpace(s[i]) && BreakAllowed(s, i));
                 phrase[i] = boundary && charOk[i];
             }
             var starts = new List<int>();
@@ -168,8 +175,8 @@ namespace UI.Game2D
         private static readonly string[] NoBreakWords = { "売り子", "ひと呼吸", "ふた呼吸" };
 
         /// <summary>ひらがな同士の間でも、 左の字がこれなら BudouX の切れ目で折ってよい (2026-11-17・作者の承認)。 ほぼ必ず助詞として使う字だけ
-        /// (「と」「の」「か」「が」は「礼と／して」「手の／ひら」「剥が／し」の誤判定があったので入れない)。</summary>
-        private const string HiraParticles = "をへは";
+        /// (「を」「へ」「は」「で」「に」「も」。 「と」「の」「か」「が」は「礼と／して」「手の／ひら」「剥が／し」の誤判定があったので入れない)。</summary>
+        private const string HiraParticles = "をへはでにも";
 
         /// <summary>開き括弧の後ろがこの字数以下で行が終わる折れ方はしない (「「私の／勘定には…」・2026-11-17・作者の承認)。</summary>
         public const int OpenQuoteMin = 3;
