@@ -16,6 +16,8 @@ My project — Unity 3D ローグライク（ボードゲーム調・ダイス�
 - [docs/design-rejects.md](docs/design-rejects.md) — **設計アイデアの棄却記録**（実装前に落とした案と理由）。
   §24 が「仕様として存在した決定」の記録なのに対し、こちらは**実装に至らなかった検討**。
   新しいアイデアを出す前に**両方**読む
+- **[docs/experience-goal.md](docs/experience-goal.md) — 体験の大目標**（2026-11-17・作者の宣言）。「俺ツエーの回」と「引きの悪さを知識で乗り切る回」の両方を持つ。
+  バランス・レベルデザインの調整案は、この 2 つのどちらをどう強めるかで説明する。指標と進め方もここ（GAME.md には置かない）
 - [docs/handbook.md](docs/handbook.md) — プレイヤー向けチュートリアル文面（攻略情報は書かない）
 - [docs/adr/](docs/adr/) — アーキテクチャ決定記録（原本）。要約は GAME.md §3
 - 2026-07-27 に `docs/specs/` / `plans/` / `open-questions/` は GAME.md へ統合・削除済み
