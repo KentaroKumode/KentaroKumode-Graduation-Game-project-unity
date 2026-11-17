@@ -87,6 +87,33 @@ namespace AutoTest
             public int heavyHits, heavyTaken, heavyMax;
             /// <summary>[計装 2026-11-14・嵐の航行] 戦闘が始まった時の嵐: -1 = 不安定化の時計の層でない / 0 = 嵐の外 / 1 = 嵐の中 (敵に〈嵐〉)・その時のフェーズ・不安定化の累計。</summary>
             public int stormIn = -1, stormPhase, stormInst;
+            /// <summary>[計装 2026-11-17・体験の物差し] この戦闘 (ヴェスカは段) で、 1 ターンに敵の HP を実際に減らした量の最大 (EnemyHpLedger の入った量 0〜6 の和・はみ出しは入らない) と、
+            /// 1 ターンに要求した量の最大 (主攻撃・毒・爆発・その他の固定・出血の要求 + 反射・ctx の直接・はみ出しの前)。 「1 ターンに最大 HP の何割」の候補。</summary>
+            public int maxTurnLanded, maxTurnRequested;
+            /// <summary>[計装 2026-11-17・体験の物差し] ボス戦の開始時 (連戦は最初の段) に持っていた品 (パッシブ・装備中の武器。 出目パーツは入らない)。 ボス戦の終わりの記録だけが持つ。</summary>
+            public string[] held;
+        }
+
+        /// <summary>[計装 2026-11-17・体験の物差し] ラン開始時に実際に効いていた方策の設定を 1 行にする。 Begin が技量から立てる物
+        /// (Super の v3 の各スイッチ・序列の段・価格の差し引き・ITT の版・ミスの率・戦闘名の危険度) とアブレーションの口を、 送った値ではなく入っていた値で読む。</summary>
+        public string PolicySignature()
+        {
+            var b = new System.Text.StringBuilder();
+            b.Append("skill=").Append(EffectiveWiringSkill).Append(" combat=").Append(CombatWiringSkill)
+             .Append(" tiers=").Append(LearnedPriorityProvider.BuyTierCount)
+             .Append(" priceK=").Append(LearnedPriorityProvider.IttPriceK.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture))
+             .Append(" itt=").Append(string.IsNullOrEmpty(GrantItt.Variant) ? "base" : GrantItt.Variant)
+             .Append(" mistake=").Append(wiringMistakeRate.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture))
+             .Append(" freeBlock=").Append(FreeBlockRule ? 1 : 0)
+             .Append(" def=").Append(v3.superDefense ? 1 : 0).Append(" cons=").Append(v3.superConsumables ? 1 : 0)
+             .Append(" nav=").Append(v3.superNav ? 1 : 0).Append(" plan=").Append(v3.macroPlan ? 1 : 0)
+             .Append(" p3=").Append(v3.phase3Ranked ? 1 : 0).Append(" commit=").Append(v3.axisCommitBuy ? 1 : 0)
+             .Append(" out=").Append(ReadOutgoingMultEffective ? 1 : 0).Append(" epas=").Append(ReadEnemyPassivesEffective ? 1 : 0)
+             .Append(" danger=").Append(UseLearnedDanger ? 1 : 0)
+             .Append(" abl=").Append(ablateShop ? "S" : "").Append(ablateShopScore ? "R" : "").Append(ablateEvent ? "E" : "")
+             .Append(ablateFreeNav ? "N" : "").Append(combatNaive ? "C" : "")
+             .Append(" events=").Append(suppressEvents ? 0 : 1).Append(" storm=").Append(stormEnabled ? 1 : 0);
+            return b.ToString();
         }
 
         /// <summary><see cref="RunRec.stormNav"/> の 1 層の列の数 (第 2 巡で 5 → 10)。</summary>
@@ -136,6 +163,10 @@ namespace AutoTest
             /// 8 切り上げた後に嵐で払った HP, 9 その層で嵐で払った HP)。 第 2 巡 (2026-11-14) で 5 → 10 列に・死んだ層も載せる。
             /// 不安定化の時計でない層は載らない。 口 navStormAware が切れていても、 判断の時点は同じ定義で記録する。</summary>
             public List<int> stormNav = new List<int>();
+            /// <summary>[計装 2026-11-17・引きの質] 入った店の棚 (入った順・最初の 8 回まで)。 1 行 = "深さ|種類:id;種類:id;…" (入った時の棚・買う前・リロールの前)。</summary>
+            public List<string> shelves = new List<string>();
+            /// <summary>[計装 2026-11-17] ラン開始時に実際に効いていた方策の設定 (Begin が技量から立てた物を含む・<see cref="PolicySignature"/>)。</summary>
+            public string policySig = "";
             /// <summary>[計装 2026-11-13] 深さ 6 (画面の第 4 層) の〈灰に埋もれた基地〉: 0 = 起きていない / 1 = 最初に踏んだイベントマスで起きた
             /// / 2 = イベントマスを踏まずに終点へ着き、 安全弁がボス戦の前に出した。 深さ 6 へ届かなかったランと、 イベントなしの測定は 0。</summary>
             public int ashBase;

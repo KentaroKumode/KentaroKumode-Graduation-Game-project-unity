@@ -516,6 +516,23 @@ namespace AutoTest
                         if (os != null && !string.IsNullOrEmpty(os.itemId))
                             _cur.offeredItemsEver.Add(os.itemId);
                     }
+                    // [計装 2026-11-17・引きの質] 入った時の棚を順に残す (最初の 8 回まで・同じ棚の続けての記録は 1 回)。 読むだけ。
+                    if (_cur.shelves.Count < 8)
+                    {
+                        var sb = new System.Text.StringBuilder();
+                        sb.Append(run != null ? run.Depth : 0).Append('|');
+                        bool first = true;
+                        for (int oi = 0; oi < inv.slots.Count; oi++)
+                        {
+                            var os = inv.slots[oi];
+                            if (os == null || string.IsNullOrEmpty(os.itemId)) continue;
+                            if (!first) sb.Append(';');
+                            sb.Append((int)os.kind).Append(':').Append(os.itemId).Append(':').Append(os.price);
+                            first = false;
+                        }
+                        string shelf = sb.ToString();
+                        if (_cur.shelves.Count == 0 || _cur.shelves[_cur.shelves.Count - 1] != shelf) _cur.shelves.Add(shelf);
+                    }
                 }
 
                 // 持っている誓約が封じた軸の品は買わない (2026-11-07)。 買っても働かず、 封じを知らない BOT は

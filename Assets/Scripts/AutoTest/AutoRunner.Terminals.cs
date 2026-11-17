@@ -209,7 +209,7 @@ namespace AutoTest
             int catDie = cm.CatPawDie, catSlot = cm.CatPawSlot;
 
             // 素朴版: 本体の既定 (素朴な点) と同じ。 旧い配線の素朴版 (出目降順の本数分割) に当たる「深く考えない」打ち方。
-            if (EffectiveWiringSkill == WiringSkill.Naive)
+            if (CombatWiringSkill == WiringSkill.Naive)   // [アブレーション 2026-11-17] combatNaive も素朴版の配線
             {
                 bestU = 0f;
                 return TerminalWiring.Auto(board, rolls, cm.TerminalEnvNow(ctx, tele.enemyAttackValue), deck.state, catDie, catSlot);

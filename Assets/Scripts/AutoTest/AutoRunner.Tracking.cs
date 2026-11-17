@@ -85,6 +85,7 @@ namespace AutoTest
             SettleMainCorr();   // [V3 mainCorr] 前の段の最後のターンの実際を締める (段の記録に入れる)
             bool isChainSwap = cm != null && cm.IsCombatActive
                 && !string.IsNullOrEmpty(_pendingEnemyId);
+            if (isChainSwap) NoteTurnDealt();   // [計装 2026-11-17] 段を倒したターンの途中までを前の段へ
             if (isChainSwap && _cur != null)
             {
                 // 戦闘中は Run.playerHP が更新されない（戦闘終了時のみ同期）。
@@ -118,6 +119,7 @@ namespace AutoTest
                     damageDealt = CombatSystem.EnemyDatabase.Get(_pendingEnemyId)?.maxHP ?? 0,
                     playerMaxHpEnd = (cm != null && cm.IsCombatActive)
                                    ? cm.PlayerMaxHP : (gm?.Run?.playerMaxHP ?? 0),
+                    maxTurnLanded = (int)System.Math.Round(_tdMaxLanded), maxTurnRequested = (int)System.Math.Round(_tdMaxReq),   // [計装 2026-11-17]
                 };
                 _cur.combats.Add(midRec);
                 // L1学習: チェーン途中で倒した形態も「撃破記録」に入れる
@@ -160,6 +162,8 @@ namespace AutoTest
             FlushPredTrace();
             if (_pendingEnemyIsBoss) SnapState(1, _pendingEnemyHpBefore);
             _cwWin = _cwDraw = _cwLoss = _cwLossAbs = 0; // 新戦闘のターン内訳リセット
+            BeginTurnDealtSegment();   // [計装 2026-11-17] 1 ターンの与ダメの最大を段ごとに数え直す
+            if (!isChainSwap) _pendingHeld = _pendingEnemyIsBoss ? HeldSnapshot(gm?.Run) : null;   // [計装 2026-11-17] ボス戦の開始時の持ち物
             ResetMainCorrForm();
         }
 
@@ -174,6 +178,57 @@ namespace AutoTest
         private long _downsAtStart;
         private long _heavyHitsAtStart, _heavyTakenAtStart;
         private int[] _pendingAxis;
+
+        // ── [計装 2026-11-17・体験の物差し] 1 ターンに敵の HP を減らした量の最大 (段ごと) ──
+        //   AutoRunner が ExecuteTurn を呼ぶ前後で EnemyHpLedger の累計の差を取る。 連戦で段を倒したターンは、 段の差し替えの時点までを前の段へ数える。
+        //   読むだけ (乱数も本体の状態も触らない)。
+        private double _tdBaseLanded, _tdBaseReq, _tdMaxLanded, _tdMaxReq;
+        private string[] _pendingHeld;
+
+        private static double LedgerLandedNow()
+        {
+            var c = CombatSystem.EnemyHpLedger.Cum;
+            double t = 0;
+            for (int i = CombatSystem.EnemyHpLedger.Main; i <= CombatSystem.EnemyHpLedger.CtxDirect; i++) t += c[i];
+            return t;
+        }
+
+        private static double LedgerRequestedNow()
+        {
+            var c = CombatSystem.EnemyHpLedger.Cum;
+            return c[CombatSystem.EnemyHpLedger.MainRequested] + c[CombatSystem.EnemyHpLedger.PoisonRequested]
+                 + c[CombatSystem.EnemyHpLedger.BurstRequested] + c[CombatSystem.EnemyHpLedger.OtherFixedRequested]
+                 + c[CombatSystem.EnemyHpLedger.BleedRequested] + c[CombatSystem.EnemyHpLedger.Reflect]
+                 + c[CombatSystem.EnemyHpLedger.CtxDirect];
+        }
+
+        /// <summary>ターンの頭 (ExecuteTurn の前) に呼ぶ: このターンの差の起点を今の累計にする。</summary>
+        private void BeginTurnDealt() { _tdBaseLanded = LedgerLandedNow(); _tdBaseReq = LedgerRequestedNow(); }
+
+        /// <summary>ターンの終わり (ExecuteTurn の後)・段の差し替えの時点に呼ぶ: 起点からの差で最大を更新し、 起点を今へ進める。</summary>
+        private void NoteTurnDealt()
+        {
+            double l = LedgerLandedNow(), r = LedgerRequestedNow();
+            if (l - _tdBaseLanded > _tdMaxLanded) _tdMaxLanded = l - _tdBaseLanded;
+            if (r - _tdBaseReq > _tdMaxReq) _tdMaxReq = r - _tdBaseReq;
+            _tdBaseLanded = l; _tdBaseReq = r;
+        }
+
+        private void BeginTurnDealtSegment()
+        {
+            _tdMaxLanded = _tdMaxReq = 0;
+            _tdBaseLanded = LedgerLandedNow(); _tdBaseReq = LedgerRequestedNow();
+        }
+
+        /// <summary>ボス戦の開始時の持ち物: パッシブ (武器を含む・出目パーツは入らない)。 装備中の武器は "装備:" を付けて別に足す。</summary>
+        private static string[] HeldSnapshot(GameLoop.RunState run)
+        {
+            if (run == null) return null;
+            var l = new List<string>();
+            if (run.ownedPassiveItems != null) l.AddRange(run.ownedPassiveItems);
+            if (!string.IsNullOrEmpty(run.equippedWeaponId)) l.Add("装備:" + run.equippedWeaponId);
+            return l.ToArray();
+        }
 
         private float[] LedgerSinceStart()
         {
@@ -250,6 +305,8 @@ namespace AutoTest
                 heavyTaken = (int)(CombatSystem.HeavyHitDiag.TotalHeavyTaken - _heavyTakenAtStart),
                 heavyMax = CombatSystem.HeavyHitDiag.SegmentHeavyMax,
                 stormIn = _pendingStormIn, stormPhase = _pendingStormPhase, stormInst = _pendingStormInst,   // [計装 2026-11-14・嵐の航行]
+                maxTurnLanded = (int)System.Math.Round(_tdMaxLanded), maxTurnRequested = (int)System.Math.Round(_tdMaxReq),   // [計装 2026-11-17]
+                held = _pendingEnemyIsBoss ? _pendingHeld : null,
             };
             _cur.combats.Add(rec);
             _cur.totalCombats++;

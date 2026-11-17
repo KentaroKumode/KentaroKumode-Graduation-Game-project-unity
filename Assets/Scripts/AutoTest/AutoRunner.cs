@@ -141,6 +141,12 @@ namespace AutoTest
         public WiringSkill EffectiveWiringSkill
             => wiringSkill == WiringSkill.Ultra ? WiringSkill.Super : wiringSkill;
 
+        /// <summary>[アブレーション 2026-11-17・体験の物差し] 戦闘の技量だけを潰す: true なら配線を素朴版 (本体の既定の挿し方)・リロールなしにする。
+        /// 航行・店・イベント・消耗品の判断は <see cref="wiringSkill"/> のまま。 既定 false (今の挙動と同じ)。 乱数は引かない。</summary>
+        public bool combatNaive = false;
+        /// <summary>戦闘の配線とリロールが使う技量 (<see cref="combatNaive"/> なら Naive・それ以外は <see cref="EffectiveWiringSkill"/>)。</summary>
+        public WiringSkill CombatWiringSkill => combatNaive ? WiringSkill.Naive : EffectiveWiringSkill;
+
         /// <summary>SuperV3 の実験スイッチ (Optimal + 改善案)。 全 OFF なら Optimal と同一。</summary>
         public V3Flags v3 = new V3Flags();
 

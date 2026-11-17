@@ -77,7 +77,7 @@ namespace AutoTest
             // ADR-0009/0010: 配線・リロール・役の 3 方策を注入 (パイプライン OFF 時は未使用)。
             //   素朴版は **リロールと役を一切使わない** ＝ ADR-0010 以前と同じ打ち方。
             //   最適版との差が「役システムが開けた技量帯の幅」そのものになる (Verification ①)。
-            WiringSkill effectiveSkill = EffectiveWiringSkill;
+            WiringSkill effectiveSkill = CombatWiringSkill;   // [アブレーション 2026-11-17] combatNaive なら配線・リロールだけ素朴版
             // 6 層・7 層のボス戦で Super を Optimal の方策へ切り替える分岐 (superLayer6/7OptimalCombatRoutine) と、
             //   旧い先読み方策 (ExactCombatAI・SuperCombatAI) の BeginCombat は 2026-11-12 に削除した。
             //   切り替えの先も元も、 下で必ず同じ山札の方策に上書きされていたので、 分岐の結果を読む所が無かった。
@@ -137,7 +137,9 @@ namespace AutoTest
                 // 逃げる (2026-09-28): 追跡者の戦闘は、 頭で HP が少なければ逃げる。
                 if (cm.CurrentCombatTurn <= 1 && ShouldFleePursuer(run, GameManager.Instance) && cm.RequestFlee())
                     FreeMapPursuerFlees++;
+                BeginTurnDealt();   // [計装 2026-11-17] 1 ターンの与ダメ
                 var tr = cm.ExecuteTurn();
+                NoteTurnDealt();
                 if (tr.isDraw) _cwDraw++;
                 else if (tr.playerWon) _cwWin++;
                 else { _cwLoss++; if (tr.totalDamage <= 0) _cwLossAbs++; }
