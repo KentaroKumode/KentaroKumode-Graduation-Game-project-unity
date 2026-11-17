@@ -116,7 +116,8 @@ namespace AutoTest
              .Append(" snav=").Append(navStormAware ? 1 : 0).Append(navStormExitDeath ? "D" : "").Append(navStormFightModel ? "M" : "").Append(navStormFightDeath ? "F" : "")
              .Append(navStormOracleBoss ? "O" : "")
              .Append(" shpw=").Append(navStormHpWeightMul.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture))
-             .Append(" sprice=").Append(navStormPointPrice.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture));
+             .Append(" sprice=").Append(navStormPointPrice.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture))
+             .Append(" sexit=").Append(navStormExitAtPts);
             return b.ToString();
         }
 

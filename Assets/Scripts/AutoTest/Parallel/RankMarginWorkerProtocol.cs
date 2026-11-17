@@ -549,7 +549,7 @@ namespace AutoTest.ParallelSweep
                 // 2026-11-14 (#140 の 2 第 2 巡): 嵐の航行の直し (道の死・嵐の中の戦闘の見積もり・戦闘の死・嵐の HP の重みの倍率)。 False / 1 = 第 1 巡と同じ
                 "navStormExitDeath", "navStormFightModel", "navStormFightDeath", "navStormHpWeightMul",
                 // 2026-11-18 (嵐の原因調査): 上限の見当の口 (ボスの位置を知る) と、 計画の 1 点の値段 (既定 false / 0 = 今までと同じ)
-                "navStormOracleBoss", "navStormPointPrice",
+                "navStormOracleBoss", "navStormPointPrice", "navStormExitAtPts",
                 // 2026-11-14: ボスの機構の値の差し替え (id:名前:値・灰燼の王の予兆 JudgmentDice / 憤怒 FuryAttack / 再生 RegrowthRate)。
                 //   灰燼の王の基礎の攻撃・最大 HP は上の enemyAttackSpec / enemyHpSpec (boss_layer6:N)。 足りなかった enemyHpMul も並べる
                 "bossParamSpec", "enemyHpMul",

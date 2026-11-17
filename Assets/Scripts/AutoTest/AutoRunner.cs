@@ -232,6 +232,9 @@ namespace AutoTest
         /// <summary>[測定 2026-11-18・嵐の原因調査] Super の計画 (嵐の航行) が、 不安定化ポイント 1 点ごとに引く値段 (クリアの対数オッズ・既定 0 = 今までと同じ)。
         /// 着いた点で溜まる分と歩いて溜まる分の両方に掛ける (嵐を「取れる量の予算」と見る影の値段)。 測定で振るつまみ。 乱数は引かない。</summary>
         public float navStormPointPrice = 0f;
+        /// <summary>[測定 2026-11-18・嵐の原因調査] 嵐の航行 (navStormAware) が、 不安定化の累計がこの値以上になったら出口へ向かう (人の「ここまで取ったら出る」の規則・0 = 使わない = 既定)。
+        /// 取る量と嵐の HP の引き換えの曲線を、 値で切り上げる規則と別に描くためのつまみ。 乱数は引かない。</summary>
+        public int navStormExitAtPts = 0;
         /// <summary>[測定 2026-11-13] 天候の作り。 本体の GameHooks.StormEnabled へ流す (ラン終了で true へ)。
         /// true (既定) = 嵐 (静かな時間のあとに輪が縮む・嵐の中の点への移動で HP・嵐の中の戦闘は敵に〈嵐〉・始点は最外周から・ボスの点は伏せる・GAME.md §5-12)。
         /// BOT は終点の位置を今までどおり知っていて、 フェーズ 3 で出口へ切り替え、 出口までの見積もりに嵐の HP を足す (最小の対応)。
@@ -887,7 +890,8 @@ namespace AutoTest
                  + $"・戦闘の死 {(navStormFightDeath ? "HP に合わせる" : "第 1 巡の式")} (navStormFightDeath={navStormFightDeath})"
                  + $"・嵐の HP の重み ×{navStormHpWeightMul:0.##} (navStormHpWeightMul={navStormHpWeightMul:0.##})"
                  + $"・ボスの位置 {(navStormOracleBoss ? "知っている (上限の見当・測定の口)" : "見えた時だけ")} (navStormOracleBoss={navStormOracleBoss})"
-                 + $"・1 点の値段 {navStormPointPrice:0.###} (navStormPointPrice={navStormPointPrice:0.###}) "
+                 + $"・1 点の値段 {navStormPointPrice:0.###} (navStormPointPrice={navStormPointPrice:0.###})"
+                 + $"・累計で出る {(navStormExitAtPts > 0 ? navStormExitAtPts + " 以上で出口へ" : "使わない")} (navStormExitAtPts={navStormExitAtPts}) "
                  + $"/ 端子の撃破のボーナス {(terminalKillNeedsAttack ? "攻撃したターンだけ (旧い条件)" : "経路を問わない")} "
                  + $"/ 手札 {(handCarry == CombatSystem.HandCarryMode.Pick ? "印を付けた端子だけ残す (Pick)" : handCarry == CombatSystem.HandCarryMode.All ? "挿さなかった端子は全部残る (All)" : "毎ターン捨てる (Off・旧い規則)")}"
                  + $"{(handCarry == CombatSystem.HandCarryMode.Pick ? " 残す方策 " + EffectiveHandKeepPolicy + " (handKeepPolicy=" + handKeepPolicy + ")" : "")} "

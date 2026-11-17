@@ -513,7 +513,8 @@ namespace AutoTest
             bool toExit = _freeMapActions > MaxFreeMapActionsPerFloor
                           || exitHopsAt == int.MaxValue
                           || (!exitOk && !refuelOk)
-                          || (sv == null && sim.StormMode && sim.StormPhase >= 3);   // 嵐 (2026-11-13・(a)): フェーズ 3 に入ったら出口へ (輪がボスの点へ縮み、 フェーズ 4 はボスの点のほか全部が嵐の中)。
+                          || (sv == null && sim.StormMode && sim.StormPhase >= 3)
+                          || (sv != null && navStormExitAtPts > 0 && sim.Instability >= navStormExitAtPts);   // [測定 2026-11-18] 累計で出る規則 (既定 0 = 使わない)   // 嵐 (2026-11-13・(a)): フェーズ 3 に入ったら出口へ (輪がボスの点へ縮み、 フェーズ 4 はボスの点のほか全部が嵐の中)。
                                                                                      //   嵐の見方 (口 navStormAware) では外す ── 切り上げは下の値の比較 (取る価値 − 嵐の代償 ≦ 0) で出る
             bool forcedExit = toExit, choosing = false;   // [アブレーション 2026-11-17] 行き先を選ぶ枝 (計画 / Rank) に入ったか
             if (!toExit && !exitOk && refuelOk) target = refuel;   // 先に補給
