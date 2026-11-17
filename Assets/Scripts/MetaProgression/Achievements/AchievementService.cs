@@ -5,12 +5,17 @@ using GameLoop;
 using ItemSystem.PassiveSkills;
 using MetaProgression.Relics;
 using UnityEngine;
+using Cat = MetaProgression.Achievements.AchievementCatalog;
 
 namespace MetaProgression.Achievements
 {
     /// <summary>
-    /// GUI-independent achievement tracker. Public Note* methods are the only gameplay hooks.
-    /// AutoRunner already raises SuppressRelicGrant, which also suppresses achievements.
+    /// 実績の判定と解除 (画面に依存しない)。 遊びの処理から呼ぶ口は Note* / BeginRun / CompleteRun だけで、 どれもゲームの値を<b>読むだけ</b> (戦闘・経済・乱数を変えない)。
+    /// 一覧の正本は <see cref="AchievementCatalog"/>・仕様は docs/GAME.md §15-6。
+    ///
+    /// <para><b>層</b>: 文は画面の層の番号、 判定は <see cref="RunState.Depth"/> (<see cref="Depth"/> = <see cref="MapSystem.FreeMove.FloorPlan.DepthOf"/>)。</para>
+    /// <para><b>保存</b>: ラン単位の数は <see cref="RunProgress"/> (中断セーブの写しは <see cref="RunProgressState"/>)。 <see cref="RunState"/> には足さない ── 中断セーブの指紋が変わる。
+    /// ランを跨ぐ数は <see cref="MetaProgressState"/> の achievement*。</para>
     /// </summary>
     public static class AchievementService
     {
@@ -25,16 +30,64 @@ namespace MetaProgression.Achievements
         }
 
         private static RunProgress run;
+        /// <summary>解除した時に鳴る (画面のお知らせ用)。 BOT が動かしている間は解除しないので鳴らない。</summary>
         public static event Action<AchievementDefinition> OnUnlocked;
         /// <summary>解除しない間: 遺物の付与を止めた測定 (<see cref="MetaBuffApplicator.SuppressRelicGrant"/>) と、 BOT がランを動かしている間 (<see cref="GameHooks.BotDriving"/>・2026-11-17)。
-        /// 記録 (codex・<c>CodexRecorder</c>) と同じく、 実績は人が遊んだ時だけ解除する。 2026-11-17 まではふつうのバッチでも解除し、 <see cref="OnUnlocked"/> も鳴っていた。</summary>
+        /// 記録 (codex・<c>CodexRecorder</c>) と同じく、 実績は人が遊んだ時だけ解除する。 2026-11-17 まではふつうのバッチでも解除し、 <see cref="OnUnlocked"/> も鳴っていた。
+        /// <b>Note* を足す時は必ず <see cref="Ready"/> か Suppressed を通す。</b></summary>
         private static bool Suppressed => MetaBuffApplicator.SuppressRelicGrant || GameHooks.BotDriving;
 
+        private static bool Ready => !Suppressed && run != null && run.active;
+
+        /// <summary>画面の層 n (0〜5) の深さ (判定は深さで行う)。</summary>
+        private static int Depth(int layer) => MapSystem.FreeMove.FloorPlan.DepthOf(layer);
+
+        private static MetaProgressState Meta => MetaProgressManager.Instance?.State;
+
+        // ============================================================
+        //  画面 (ギャラリー) が読む口
+        // ============================================================
+
+        /// <summary>解除済みか。</summary>
         public static bool IsUnlocked(string id)
         {
-            var s = MetaProgressManager.Instance?.State;
+            var s = Meta;
             return s?.unlockedAchievementIds != null && s.unlockedAchievementIds.Contains(id);
         }
+
+        /// <summary>解除した時刻 (UTC)。 解除していなければ null。</summary>
+        public static DateTime? UnlockedAtUtc(string id)
+        {
+            var s = Meta;
+            if (s?.unlockedAchievementIds == null || s.achievementUnlockUtcTicks == null) return null;
+            int i = s.unlockedAchievementIds.IndexOf(id);
+            if (i < 0 || i >= s.achievementUnlockUtcTicks.Count) return null;
+            return new DateTime(s.achievementUnlockUtcTicks[i], DateTimeKind.Utc);
+        }
+
+        /// <summary>画面で伏せる (「？？？」にする) か: 隠しで、 まだ取っていない。</summary>
+        public static bool IsMasked(AchievementDefinition def) => def != null && def.hidden && !IsUnlocked(def.id);
+
+        /// <summary>伏せ字。</summary>
+        public const string MaskText = "？？？";
+
+        /// <summary>画面に出す名前 (伏せる物は「？？？」)。</summary>
+        public static string ShownName(AchievementDefinition def) => def == null ? "" : IsMasked(def) ? MaskText : def.displayName;
+
+        /// <summary>画面に出す条件の文 (伏せる物は「？？？」)。</summary>
+        public static string ShownDescription(AchievementDefinition def) => def == null ? "" : IsMasked(def) ? MaskText : def.description;
+
+        /// <summary>解除済みの数 (一覧にある物だけ数える)。</summary>
+        public static int UnlockedCount()
+        {
+            int n = 0;
+            foreach (var d in AchievementCatalog.All) if (IsUnlocked(d.id)) n++;
+            return n;
+        }
+
+        // ============================================================
+        //  解除
+        // ============================================================
 
         public static bool Unlock(string id)
         {
@@ -55,31 +108,52 @@ namespace MetaProgression.Achievements
             return true;
         }
 
+        /// <summary>ランを跨ぐ一覧に足す (足したら保存)。 足したら true。</summary>
+        private static bool AddMeta(List<string> list, string v)
+        {
+            if (list == null || string.IsNullOrEmpty(v) || list.Contains(v)) return false;
+            list.Add(v);
+            MetaProgressManager.Instance?.Save();
+            return true;
+        }
+
+        // ============================================================
+        //  ラン
+        // ============================================================
+
         public static void BeginRun(RunState state)
         {
             if (Suppressed || state == null) { run = null; return; }
-            var meta = MetaProgressManager.Instance?.State;
-            var relics = meta != null ? meta.EquippedRelics() : null;
-            bool fullSet = false;
-            for (int s = 0; s < RelicCatalog.SetCount; s++) if (RelicApplicator.Has3((RelicSet)s)) fullSet = true;
             run = new RunProgress
             {
                 active = true,
                 startMaxHp = Math.Max(1, state.playerMaxHP),
-                relicEquipped = relics != null && relics.Count > 0,
-                cursedRelicEquipped = fullSet,   // 2026-11-10: 刻印の廃止に伴い「同じセットを 3 個持ち込んだ」に読み替え (id は据え置き)
                 difficulty = state.challengeDifficulty,
             };
-            Unlock(AchievementCatalog.FirstRun);
+            ReadRelicLoadout(out run.relicEquipped, out run.cursedRelicEquipped);
+            Unlock(Cat.FirstRun);
         }
 
-        public static void NoteFloorEntered(int floor)
+        /// <summary>今の持ち込みの遺物: 1 個でも持ち込んでいるか / 同じセットを 3 個持ち込んでいるか。</summary>
+        private static void ReadRelicLoadout(out bool any, out bool fullSet)
+        {
+            var meta = Meta;
+            var relics = meta != null ? meta.EquippedRelics() : null;
+            any = relics != null && relics.Count > 0;
+            fullSet = false;
+            for (int s = 0; s < RelicCatalog.SetCount; s++) if (RelicApplicator.Has3((RelicSet)s)) fullSet = true;
+        }
+
+        public static void NoteFloorEntered(int depth)
         {
             if (!Ready) return;
-            if (floor >= 3) Unlock(AchievementCatalog.Reach3);
-            if (floor >= 6) Unlock(AchievementCatalog.Reach6);
-            if (floor >= 7) Unlock(AchievementCatalog.Reach7);
+            if (depth >= Depth(4)) Unlock(Cat.Reach6);
+            if (depth >= Depth(5)) Unlock(Cat.Reach7);
         }
+
+        // ============================================================
+        //  戦闘
+        // ============================================================
 
         public static void NoteCombatStarted()
         {
@@ -92,6 +166,7 @@ namespace MetaProgression.Achievements
         {
             if (!Ready) return;
             run.hpOneStreak = turn.playerHPAfter == 1 ? run.hpOneStreak + 1 : 0;
+            if (turn.isCritical && turn.totalDamage >= Cat.CritGoal) Unlock(Cat.Crit100);
         }
 
         public static void NoteHealRequested(int amount)
@@ -117,17 +192,152 @@ namespace MetaProgression.Achievements
                 mgr.State.achievementRoleMask |= bit;
                 mgr.Save();
             }
-            Unlock(AchievementCatalog.FirstRole);
+            Unlock(Cat.FirstRole);
+            if (YachtRoles.IsTriple(role)) Unlock(Cat.RoleZoro);
             int allMask = 0;
-            foreach (RoleKind k in Enum.GetValues(typeof(RoleKind))) allMask |= 1 << (int)k;
-            if ((mgr.State.achievementRoleMask & allMask) == allMask) Unlock(AchievementCatalog.AllRoles);
+            foreach (RoleKind k in YachtRoles.All) allMask |= 1 << (int)k;
+            if ((mgr.State.achievementRoleMask & allMask) == allMask) Unlock(Cat.AllRoles);
         }
 
         public static void NoteConsumableUsed() { if (Ready) run.usedConsumable = true; }
         public static void NoteExternalHpDamage(int amount) { if (Ready && amount > 0) run.damageTaken += amount; }
-        public static void NoteRelicEquipped() { if (Ready) run.relicEquipped = true; }
         public static void NotePlayerFled() { if (Ready) run.playerFled = true; }
         public static void NoteEnemyEscaped(string enemyId) { if (Ready && !string.IsNullOrEmpty(enemyId)) run.escapedEnemyIds.Add(enemyId); }
+
+        public static void NoteCombatEnded(RunState state, CombatResult result, CombatContext context)
+        {
+            if (!Ready || state == null) return;
+            run.damageTaken += Math.Max(0, result.damageTaken);
+            if (!result.playerWon) return;
+
+            var mgr = MetaProgressManager.Instance;
+            if (mgr?.State != null)
+            {
+                mgr.State.achievementCombatWins++;
+                if (mgr.State.achievementCombatWins >= Cat.CombatWinsGoal) Unlock(Cat.CombatWins100);
+                else mgr.Save();
+            }
+
+            if (result.playerHPRemaining == 1) Unlock(Cat.WinAt1Hp);
+            if (run.hpOneStreak >= Cat.CalmDownTurns) Unlock(Cat.HiddenCalmDown);
+            if (run.combatRequestedHeal >= Math.Max(1, state.playerMaxHP) * Cat.PerpetualHealTimes)
+                Unlock(Cat.HiddenPerpetualMotion);
+            if (run.escapedEnemyIds.Contains(result.enemyId)) Unlock(Cat.HiddenReturningEnemy);
+            if (state.terminalDeck != null && state.terminalDeck.Count <= TerminalCards.MinDeckSize) Unlock(Cat.DeckMin);
+            CheckOverkill(result);
+            CheckThirteenthEnd(state, result);
+
+            if (!BossIds.IsBoss(result.enemyId)) return;
+            int depth = state.Depth;
+            if (result.enemyId == BossIds.FarmBoss)
+            {
+                if (result.totalTurns >= Cat.CrateSlowTurns) Unlock(Cat.CrateSlow);
+                return;   // 0 層の古い宝箱はほかのボスの実績に数えない
+            }
+            if (depth == Depth(1)) Unlock(Cat.Boss1);
+            if (depth == Depth(2))
+            {
+                Unlock(Cat.Boss3);
+                if (mgr?.State != null)
+                {
+                    if (mgr.State.achievementLayer2Bosses == null) mgr.State.achievementLayer2Bosses = new List<string>();
+                    AddMeta(mgr.State.achievementLayer2Bosses, result.enemyId);
+                    if (mgr.State.achievementLayer2Bosses.Contains(BossIds.Layer3Marsh)
+                        && mgr.State.achievementLayer2Bosses.Contains(BossIds.Layer3Goblin)
+                        && mgr.State.achievementLayer2Bosses.Contains(BossIds.Layer3Mirror))
+                        Unlock(Cat.Boss3All);
+                }
+            }
+            if (depth == Depth(3)) CheckLayer3Boss(state);
+            if (result.damageTaken == 0) Unlock(Cat.BossNoHpDamage);
+            if (depth >= Depth(2) && result.totalTurns <= 1) Unlock(Cat.BossOneTurn);
+            if (result.enemyId == BossIds.Layer6Ash)
+            {
+                float blaze = context != null ? context.GetAccumulated(ItemSystem.PassiveSkills.Effects.BlazeBrand.StackKey) : 0f;
+                if (blaze <= 0f) Unlock(Cat.HiddenNoBlazeBoss6);
+                if (run.difficulty >= ChallengeCards.MaxDifficulty) Unlock(Cat.ChallengeKingD10);
+            }
+            if (BossIds.VescaStageOf(result.enemyId) > 0)
+            {
+                Unlock(Cat.Clear7);
+                if (VescaClock.Held(state)) Unlock(Cat.VescaClock);
+                if (run.difficulty >= ChallengeCards.MaxDifficulty) Unlock(Cat.ChallengeVescaD10);
+            }
+            // あと一ターンだけ: 〈最後の審判〉の刻限の 1 ターン前 (ラン通算の戦闘ターン・0 層は数えない) にボスを倒す
+            int deadline = MetaDebuffApplicator.GetJudgmentTurnThreshold();
+            if (deadline > 0 && state.totalCombatTurns == deadline - 1) Unlock(Cat.HiddenTurn124);
+        }
+
+        /// <summary>3 層 (深さ 5) のボスを倒した: 挑戦の難易度・職業・縛り・揃いの至宝・七つの重荷。</summary>
+        private static void CheckLayer3Boss(RunState state)
+        {
+            int d = run.difficulty;
+            if (d >= Cat.DifficultyLow) Unlock(Cat.ChallengeD3);
+            if (d >= Cat.DifficultyMid) Unlock(Cat.ChallengeD6);
+            if (d >= ChallengeCards.MaxDifficulty) Unlock(Cat.ChallengeD10);
+
+            switch (state.playerClass)
+            {
+                case ClassType.Swordsman: Unlock(Cat.ClassSword); break;
+                case ClassType.Knight: Unlock(Cat.ClassKnight); break;
+                case ClassType.Berserker: Unlock(Cat.ClassBerserker); break;
+                case ClassType.Assassin: Unlock(Cat.ClassAssassin); break;
+            }
+
+            if (!run.usedConsumable) Unlock(Cat.NoConsumableBoss5);
+            if (!run.playerFled) Unlock(Cat.NoFleeBoss5);
+            if (!run.purchased) Unlock(Cat.NoPurchaseBoss6);
+            if (!run.rerolled) Unlock(Cat.NoRerollBoss6);
+            if (state.coins == 0) Unlock(Cat.ZeroGoldBoss6);
+            if (!run.relicEquipped && !run.usedConsumable) Unlock(Cat.NoRelicConsumableClear7);
+            if (run.cursedRelicEquipped) Unlock(Cat.CursedRelicClear7);
+
+            // 七つの重荷: 背負っている「大罪:○○」の種類を通算で数える。
+            //   注意: 大罪は IV の札で 5 層の入口でしか配られないので、 今の配り方ではここで背負っていない (docs/GAME.md §23-31・作者の判断待ち)
+            var meta = Meta;
+            if (meta != null && state.challengePicks != null)
+            {
+                if (meta.achievementSinsCarried == null) meta.achievementSinsCarried = new List<string>();
+                foreach (var p in state.challengePicks)
+                {
+                    ChallengeCards.Split(p, out var deb, out _);
+                    if (deb != null && ChallengeCards.IsSin(deb.kind)) AddMeta(meta.achievementSinsCarried, deb.kind);
+                }
+                bool all = true;
+                foreach (var kind in SinKinds()) if (!meta.achievementSinsCarried.Contains(kind)) { all = false; break; }
+                if (all) Unlock(Cat.SinsAll);
+            }
+        }
+
+        /// <summary>大罪の種類 (挑戦カードの一覧から引く・7 種)。</summary>
+        private static List<string> SinKinds()
+        {
+            var l = new List<string>();
+            foreach (var c in ChallengeCards.All)
+                if (!c.isBuff && !c.pending && ChallengeCards.IsSin(c.kind) && !l.Contains(c.kind)) l.Add(c.kind);
+            return l;
+        }
+
+        private static void CheckOverkill(CombatResult result)
+        {
+            if (result.turnLog == null || result.turnLog.Count == 0) return;
+            var t = result.turnLog[result.turnLog.Count - 1];
+            int dealt = Math.Max(0, t.totalDamage) + Math.Max(0, t.fixedDamage);
+            int hpBefore = t.enemyHPAfter + dealt;
+            if (t.enemyHPAfter <= 0 && hpBefore == 1 && dealt >= Cat.OverkillGoal) Unlock(Cat.HiddenOverkill);
+        }
+
+        private static void CheckThirteenthEnd(RunState state, CombatResult result)
+        {
+            if (state.totalCombatTurns != Cat.ThirteenTurn || result.turnLog == null || result.turnLog.Count == 0) return;
+            var t = result.turnLog[result.turnLog.Count - 1];
+            int dealt = Math.Max(0, t.totalDamage) + Math.Max(0, t.fixedDamage);
+            if (t.enemyHPAfter <= 0 && dealt == Cat.ThirteenDamage) Unlock(Cat.HiddenThirteenthEnd);
+        }
+
+        // ============================================================
+        //  店
+        // ============================================================
 
         public static void BeginShop()
         {
@@ -140,7 +350,7 @@ namespace MetaProgression.Achievements
             if (!Ready) return;
             run.purchased = true;
             run.shopPurchases++;
-            if (coinsAfter == 0) Unlock(AchievementCatalog.HiddenExactZeroPurchase);
+            if (coinsAfter == 0) Unlock(Cat.HiddenExactZeroPurchase);
             CheckStubbornShop();
         }
 
@@ -161,80 +371,20 @@ namespace MetaProgression.Achievements
 
         private static void CheckStubbornShop()
         {
-            if (run.shopPurchases >= 3 && run.shopSales >= 3 && run.shopRerolls >= 3)
-                Unlock(AchievementCatalog.HiddenShopStubborn);
+            int n = Cat.StubbornCount;
+            if (run.shopPurchases >= n && run.shopSales >= n && run.shopRerolls >= n)
+                Unlock(Cat.HiddenShopStubborn);
         }
 
-        public static void NoteCombatEnded(RunState state, CombatResult result, CombatContext context)
-        {
-            if (!Ready || state == null) return;
-            run.damageTaken += Math.Max(0, result.damageTaken);
-            if (!result.playerWon) return;
-
-            var mgr = MetaProgressManager.Instance;
-            if (mgr?.State != null)
-            {
-                mgr.State.achievementCombatWins++;
-                if (mgr.State.achievementCombatWins >= 100) Unlock(AchievementCatalog.CombatWins100);
-                else mgr.Save();
-            }
-
-            if (result.playerHPRemaining == 1) Unlock(AchievementCatalog.WinAt1Hp);
-            if (run.hpOneStreak >= 3) Unlock(AchievementCatalog.HiddenCalmDown);
-            if (run.combatRequestedHeal >= Math.Max(1, state.playerMaxHP) * 3)
-                Unlock(AchievementCatalog.HiddenPerpetualMotion);
-            if (run.escapedEnemyIds.Contains(result.enemyId)) Unlock(AchievementCatalog.HiddenReturningEnemy);
-            CheckOverkill(result);
-            CheckThirteenthEnd(state, result);
-
-            bool boss = GameLoop.BossIds.IsBoss(result.enemyId);
-            if (!boss) return;
-            int floor = state.Depth;
-            if (floor == 1) Unlock(AchievementCatalog.Boss1);
-            if (floor == 5)
-            {
-                Unlock(AchievementCatalog.Boss5);
-                if (!run.usedConsumable) Unlock(AchievementCatalog.NoConsumableBoss5);
-                if (!run.playerFled) Unlock(AchievementCatalog.NoFleeBoss5);
-            }
-            if (result.damageTaken == 0) Unlock(AchievementCatalog.BossNoHpDamage);
-            if (floor >= 3 && result.totalTurns <= 1) Unlock(AchievementCatalog.BossOneTurn);
-            if (floor == 5 && result.enemyId == GameLoop.BossIds.Layer5Hidden) Unlock(AchievementCatalog.HiddenSaintGeorges);
-            if (floor == 6)
-            {
-                if (!run.purchased) Unlock(AchievementCatalog.NoPurchaseBoss6);
-                if (!run.rerolled) Unlock(AchievementCatalog.NoRerollBoss6);
-                if (state.coins == 0) Unlock(AchievementCatalog.ZeroGoldBoss6);
-                float blaze = context != null ? context.GetAccumulated(ItemSystem.PassiveSkills.Effects.BlazeBrand.StackKey) : 0f;
-                if (blaze <= 0f) Unlock(AchievementCatalog.HiddenNoBlazeBoss6);
-            }
-            if (state.totalCombatTurns == 124) Unlock(AchievementCatalog.HiddenTurn124);
-        }
-
-        private static void CheckOverkill(CombatResult result)
-        {
-            if (result.turnLog == null || result.turnLog.Count == 0) return;
-            var t = result.turnLog[result.turnLog.Count - 1];
-            int dealt = Math.Max(0, t.totalDamage) + Math.Max(0, t.fixedDamage);
-            int hpBefore = t.enemyHPAfter + dealt;
-            if (t.enemyHPAfter <= 0 && hpBefore == 1 && dealt >= 100) Unlock(AchievementCatalog.HiddenOverkill);
-        }
-
-        private static void CheckThirteenthEnd(RunState state, CombatResult result)
-        {
-            if (state.totalCombatTurns != 13 || result.turnLog == null || result.turnLog.Count == 0) return;
-            var t = result.turnLog[result.turnLog.Count - 1];
-            int dealt = Math.Max(0, t.totalDamage) + Math.Max(0, t.fixedDamage);
-            if (t.enemyHPAfter <= 0 && dealt == 13) Unlock(AchievementCatalog.HiddenThirteenthEnd);
-        }
-
-        public static void NoteFinalPageOpened() { if (Ready) Unlock(AchievementCatalog.HiddenFinalPage); }
+        // ============================================================
+        //  遺物 (ランの外)
+        // ============================================================
 
         /// <summary>遺物を入手した・強化した時に呼ぶ (§15-5・2026-11-10)。 主ステ最大 = ★4 / サブ最大 = どれかのサブが 2 段 / 全部最大 = ★4・サブ 3 個がすべて 2 段。</summary>
         public static void NoteRelicAcquired(Relic relic)
         {
             if (Suppressed || relic == null || !relic.IsValid()) return;
-            Unlock(AchievementCatalog.FirstRelic);
+            Unlock(Cat.FirstRelic);
             bool mainMax = relic.stars >= RelicCatalog.MaxStars;
             bool subMax = false, allMax = mainMax && relic.SubCount >= RelicCatalog.MaxSubs;
             for (int i = 0; i < relic.SubCount; i++)
@@ -242,64 +392,34 @@ namespace MetaProgression.Achievements
                 if (relic.subSteps[i] >= RelicCatalog.SubStepMax) subMax = true;
                 else allMax = false;
             }
-            if (mainMax) Unlock(AchievementCatalog.RelicMainMax);
-            if (subMax) Unlock(AchievementCatalog.RelicSubMax);
-            if (allMax) Unlock(AchievementCatalog.RelicAllMax);
+            if (mainMax) Unlock(Cat.RelicMainMax);
+            if (subMax) Unlock(Cat.RelicSubMax);
+            if (allMax) Unlock(Cat.RelicAllMax);
+
+            // 六つの棚: 持っている遺物のセットが全部そろった
+            var owned = Meta?.ownedRelics;
+            if (owned != null)
+            {
+                int mask = 0;
+                foreach (var r in owned) if (r != null && r.IsValid() && r.set >= 0 && r.set < RelicCatalog.SetCount) mask |= 1 << r.set;
+                if (mask == (1 << RelicCatalog.SetCount) - 1) Unlock(Cat.RelicSetsAll);
+            }
         }
 
+        // ============================================================
+        //  ランの終わり
+        // ============================================================
+
+        /// <summary>ランをクリアした (結末を見る 3 か所・GameManager.Floor / Gate)。 結末の実績は結末の画面と同じ <see cref="Endings.Resolve"/> で決める。</summary>
         public static void CompleteRun(RunState state)
         {
             if (!Ready || state == null || state.playerHP <= 0) return;
-            if (run.damageTaken > run.startMaxHp * 10) Unlock(AchievementCatalog.HiddenTheseus);
-            if (state.Depth >= 7 && state.bossDefeatedThisFloor)
-            {
-                Unlock(AchievementCatalog.Clear7);
-                if (!run.relicEquipped && !run.usedConsumable) Unlock(AchievementCatalog.NoRelicConsumableClear7);
-                if (run.cursedRelicEquipped) Unlock(AchievementCatalog.CursedRelicClear7);
-                UnlockChallengeAchievements();
-                UnlockCategoryAchievements(state);
-            }
+            if (run.damageTaken > run.startMaxHp * Cat.TheseusTimes) Unlock(Cat.HiddenTheseus);
+            var def = AchievementCatalog.ForEnding(Endings.NumberOf(Endings.Resolve(state).id));
+            if (def != null) Unlock(def.id);
             run.active = false;
         }
 
-        /// <summary>挑戦の実績 (2026-11-10: 旧配点の点数 10〜50 から、 難易度 2・4・6・8・10 へ読み替え・id は据え置き)。</summary>
-        private static void UnlockChallengeAchievements()
-        {
-            int d = run.difficulty;
-            if (d >= 2) Unlock(AchievementCatalog.Challenge10);
-            if (d >= 4) Unlock(AchievementCatalog.Challenge20);
-            if (d >= 6) Unlock(AchievementCatalog.Challenge30);
-            if (d >= 8) Unlock(AchievementCatalog.Challenge40);
-            if (d >= ChallengeCards.MaxDifficulty) Unlock(AchievementCatalog.Challenge50);
-        }
-
-        /// <summary>系統の実績 (2026-11-10: 旧「カテゴリを最高 Tier で揃える」から、 受けたデバフの系統へ読み替え・id と名前は据え置き)。
-        /// A 耐久・B 攻撃・C 手を 3 枚以上 ／ D 経済を 2 枚 (経済の札は 2 種しかない) ／ E 七つの大罪を受けてクリア。</summary>
-        private static void UnlockCategoryAchievements(RunState state)
-        {
-            int dur = 0, atk = 0, hand = 0, eco = 0; bool sin = false;
-            if (state.challengePicks != null)
-                foreach (var p in state.challengePicks)
-                {
-                    ChallengeCards.Split(p, out var deb, out _);
-                    if (deb == null) continue;
-                    if (ChallengeCards.IsSin(deb.kind)) sin = true;
-                    switch (deb.family)
-                    {
-                        case ChallengeCards.Family.Durability: dur++; break;
-                        case ChallengeCards.Family.Attack: atk++; break;
-                        case ChallengeCards.Family.Hand: hand++; break;
-                        case ChallengeCards.Family.Economy: eco++; break;
-                    }
-                }
-            if (dur >= 3) Unlock(AchievementCatalog.CategoryAMax);
-            if (atk >= 3) Unlock(AchievementCatalog.CategoryBMax);
-            if (hand >= 3) Unlock(AchievementCatalog.CategoryCMax);
-            if (eco >= 2) Unlock(AchievementCatalog.CategoryDMax);
-            if (sin) Unlock(AchievementCatalog.CategoryEMax);
-        }
-
-        private static bool Ready => !Suppressed && run != null && run.active;
 
         // ============================================================
         //  中断セーブ (issue #84)

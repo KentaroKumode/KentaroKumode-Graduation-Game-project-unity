@@ -122,15 +122,11 @@ namespace UI.Game2D
             return null;
         }
 
-        /// <summary>エンディングの通し番号 (結びの絵の上で、 エンディング名の上に小さく出す)。 表はこの 1 か所。 名前は <see cref="Endings"/> の題をそのまま使う (ここには持たない)。</summary>
+        /// <summary>エンディングの通し番号 (結びの絵の上で、 エンディング名の上に小さく出す)。 番号の表は <see cref="Endings.NumberOf"/> の 1 か所 (実績の END1〜5 も同じ表を読む)。 名前は <see cref="Endings"/> の題をそのまま使う (ここには持たない)。</summary>
         public static string NumberFor(string endingId)
         {
-            if (endingId == Endings.End1.id) return "ENDING:1";      // 英雄の帰還
-            if (endingId == Endings.End2.id) return "ENDING:2";      // 無明の剣
-            if (endingId == Endings.End3.id) return "ENDING:3";      // 灰の玉座
-            if (endingId == Endings.EndGoodId) return "ENDING:4";    // 帰路
-            if (endingId == Endings.EndTrueId) return "ENDING:5";    // 終始
-            return null;
+            int n = Endings.NumberOf(endingId);
+            return n > 0 ? "ENDING:" + n : null;
         }
 
         private struct Page { public List<string> lines; public string track; }

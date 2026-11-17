@@ -43,6 +43,10 @@ namespace MetaProgression
         public List<long> achievementUnlockUtcTicks = new List<long>();
         public int achievementCombatWins;
         public int achievementRoleMask;
+        /// <summary>[実績] 倒したことのある 2 層 (深さ 3) のボスの id (三つの玉座・ランを跨いで数える)。 書くのは AchievementService だけ。</summary>
+        public List<string> achievementLayer2Bosses = new List<string>();
+        /// <summary>[実績] 背負って 3 層のボスを倒した「大罪:○○」の種類 (ChallengeCards の kind・七つの重荷)。</summary>
+        public List<string> achievementSinsCarried = new List<string>();
 
         // (旧: 挑戦デバフの配点 `challenge` (§15-2) は 2026-11-10 に撤去 (#9)。 JsonUtility は未知の欄を黙って捨てる)
 

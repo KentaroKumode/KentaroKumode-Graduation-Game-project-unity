@@ -36,6 +36,18 @@ namespace GameLoop
             public string Display => $"=== ENDING: {title} ===\n{body}";
         }
 
+        /// <summary>結末の通し番号 (1〜5・知らない id は 0)。 **表はこの 1 か所** ── 結びの絵の「ENDING:n」(Game2DEndingScreen.NumberFor) と実績の END1〜5 (AchievementDefinition.endingNo) が読む。
+        /// end1 = 1 英雄の帰還 / end2 = 2 無明の剣 / end3 = 3 灰の玉座 / end_good = 4 帰路 / end_true = 5 終始。</summary>
+        public static int NumberOf(string endingId)
+        {
+            if (endingId == End1.id) return 1;
+            if (endingId == End2.id) return 2;
+            if (endingId == End3.id) return 3;
+            if (endingId == EndGoodId) return 4;
+            if (endingId == EndTrueId) return 5;
+            return 0;
+        }
+
         public static Ending Resolve(RunState run)
         {
             // **敗北ではエンディングを出さない (2026-08-17)。**
