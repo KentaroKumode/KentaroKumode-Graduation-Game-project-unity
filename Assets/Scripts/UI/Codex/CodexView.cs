@@ -137,9 +137,16 @@ namespace UI.Codex
             _wired = false;
         }
 
-        /// <summary>タイトルの「GALLERY」。 Game2D の記録の窓 (<see cref="Game2D.Game2DCodexPanel"/>・未解禁は伏せ字) を開く (2026-11-11〜)。
-        /// 窓が開けない環境 (Game2D の GUI が無い) でだけ、 この旧い閲覧画面 (TMP・debugUnlockAll で全部読める) を開く。</summary>
-        private void HandleGalleryClick() { if (_mode != Mode.Closed) return; if (Game2D.Game2DCodexPanel.Open()) return; Open(); }
+        /// <summary>タイトルの「GALLERY」。 Game2D のギャラリーの画面 (<see cref="Game2D.Game2DGalleryScreen"/>・入口 → 品・本・実績・2026-11-17〜) を開く。
+        /// 開けない環境 (Game2D が無い) でだけ、 この旧い閲覧画面 (TMP・debugUnlockAll で全部読める) を開く。
+        /// ほかの窓が出ている・ギャラリーが既に出ている時は何もしない。</summary>
+        private void HandleGalleryClick()
+        {
+            if (_mode != Mode.Closed || Game2D.Game2DGalleryScreen.Showing || Game2D.Game2DModal.Active) return;
+            if (Game2D.Game2DGalleryScreen.Open()) return;
+            if (FindObjectOfType<Game2D.Game2DGalleryScreen>() != null) return;      // Game2D はあるが今は開けない (タイトルでない など)
+            Open();
+        }
 
         // ----------------------------------------------------------------
         //  Open / Close

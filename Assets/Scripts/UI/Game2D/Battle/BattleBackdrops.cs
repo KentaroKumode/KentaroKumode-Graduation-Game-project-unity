@@ -25,6 +25,9 @@ namespace UI.Game2D.Battle
         /// <summary>見せる層の番号 (0 = 序層・1〜5 = 第一〜第五層) → 背景。 ファイル名の数字は深さ (0/1/3/5/6/7) で、 作者の書き出しのまま。</summary>
         private static readonly string[] ByFloor = { "bg_floor0", "bg_floor1", "bg_floor3", "bg_floor5", "bg_floor6", "bg_floor7" };
         public const string Chevalier = "bg_chevalier", King = "bg_king", Vesca = "bg_vesca", VescaFinal = "bg_vesca_p4";
+        /// <summary>ギャラリーの背景 (書庫・2026-11-17 作者の決定): Assets/Materials/library.png を最近傍で 1/2 (2 dot = 絵の 1 画素) にして、
+        /// 左 20・右 12・上 4・下 4 を切った 480×270 (戦闘の背景ではないが、 同じ大きさ・同じ読み方なのでここに置く)。</summary>
+        public const string Library = "bg_library";
 
         /// <summary>見せる層の番号の背景 (範囲外は両端へ丸める)。</summary>
         public static string ForFloor(int floor) => ByFloor[Mathf.Clamp(floor, 0, FloorPlan.LastOrdinal)];

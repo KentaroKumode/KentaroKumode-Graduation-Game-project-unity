@@ -7,7 +7,7 @@ namespace Codex
 {
     /// <summary>
     /// 読み物（WorldVignettes）の解禁判定 + メタ永続状態への読み書き。
-    /// MonoBehaviour 非依存。 画面は UI.Game2D.Game2DCodexPanel (タイトルの GALLERY・2026-11-11)。
+    /// MonoBehaviour 非依存。 画面は UI.Game2D.GalleryView の「本」(タイトルの GALLERY・2026-11-17〜)。
     /// 段の定義と割り当て表は docs/GAME.md §20「codex の解禁」。
     ///
     /// 永続化は MetaProgressState に追加した並列リストフィールドを介して

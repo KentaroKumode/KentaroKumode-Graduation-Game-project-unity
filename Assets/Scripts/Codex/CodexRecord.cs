@@ -11,6 +11,9 @@ namespace Codex
     /// <para>保存は <see cref="MetaProgressState.codexEnemies"/> / <see cref="MetaProgressState.codexItems"/> / <see cref="MetaProgressState.codexFloors"/>。
     /// 数えるのは人が遊んでいる時だけ (BOT・バッチ実行では数えない ── AutoRunner はラン毎にメタ進行を作り直すので、 数えても残らないが無駄な保存になる)。</para>
     /// <para>ゲームの処理には触らない: <see cref="CodexRecorder"/> が毎フレーム、 今のラン・戦闘の状態を読むだけ。</para>
+    /// <para>画面 (2026-11-17〜 ギャラリー <c>UI.Game2D.GalleryView</c>) が出すのは品だけ。 敵と層の分類は画面から無くなった (作者の決定・Captures/gallery_layout/decisions.md) が、
+    /// 記録は残す: 層 (<see cref="FloorReached"/>・<see cref="DeepestFloor"/>) は読み物の解禁 (<see cref="VignetteUnlockState"/> の ReachFloor) が読み、
+    /// 敵 (<see cref="EnemyMet"/>) は今は誰も読まないが、 セーブに載っている記録なので消さない (いつか画面に戻す時に、 それまでの遊びの分が残る)。</para>
     /// </summary>
     public static class CodexRecord
     {

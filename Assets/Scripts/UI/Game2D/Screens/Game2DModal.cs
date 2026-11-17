@@ -115,8 +115,9 @@ namespace UI.Game2D
 #endif
 
         /// <summary>窓が出ている (閉じる途中も含む) か、 手引きの板 (<see cref="Game2DTutorial"/>) が出ている間 true。 後ろの画面 (地図・戦闘・帯) はこれを見て手を止める。</summary>
-        /// <remarks>イベントの画面 (<see cref="Game2DEventScreen"/>・2026-11-16〜 液晶の中身として描く) を出している間も true (窓で出していた時と同じく後ろを止める)。</remarks>
-        public static bool Active { get => _active || Game2DTutorial.Blocking || Game2DEventScreen.Showing; private set => _active = value; }
+        /// <remarks>イベントの画面 (<see cref="Game2DEventScreen"/>・2026-11-16〜 液晶の中身として描く) を出している間も true (窓で出していた時と同じく後ろを止める)。
+        /// ギャラリーの画面 (<see cref="Game2DGalleryScreen"/>・2026-11-17) を出している間と閉じたフレームも true (Esc で入口 → タイトルへ戻った同じ Esc で設定の窓を開かない)。</remarks>
+        public static bool Active { get => _active || Game2DTutorial.Blocking || Game2DEventScreen.Showing || Game2DGalleryScreen.Blocking; private set => _active = value; }
         private static bool _active;
         /// <summary>窓だけが出ているか (手引きの板を数えない・手引きが「窓が出ていない時」を見分けるのに使う)。</summary>
         public static bool WindowActive => _active;
