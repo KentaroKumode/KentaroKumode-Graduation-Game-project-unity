@@ -20,7 +20,7 @@ UNITY = 'C:/Program Files/Unity/Hub/Editor/2022.3.22f1/Editor/Data'
 DOTNET_UNITY = UNITY + '/NetCoreRuntime/dotnet.exe'
 CSC = UNITY + '/DotNetSdkRoslyn/csc.dll'
 RUNTIME = 'C:/Program Files/dotnet/shared/Microsoft.NETCore.App'
-SOURCES = ['Assets/Scripts/UI/Game2D/JpTextLayout.cs', 'Assets/Scripts/UI/Game2D/Screens/ModalJpMetrics.cs',
+SOURCES = ['Assets/Scripts/UI/Game2D/JpTextLayout.cs', 'Assets/Scripts/UI/Game2D/JpBreakModel.cs', 'Assets/Scripts/UI/Game2D/Screens/ModalJpMetrics.cs',
            'Assets/Scripts/UI/Game2D/Screens/InventoryLayout.cs', 'Assets/Scripts/UI/Game2D/Screens/ItemCardInfo.cs',
            'Assets/Scripts/UI/Game2D/BattleHudLayout.cs', 'Assets/Scripts/UI/Game2D/BattleLcdLayout.cs']
 
