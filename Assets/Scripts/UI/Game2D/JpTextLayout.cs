@@ -165,7 +165,7 @@ namespace UI.Game2D
         }
 
         /// <summary>割らない語 (2026-11-17・作者の承認)。 字の種類が変わる所で BudouX が切ってしまう名詞など (「売り／子」)。 見つかったら足す。</summary>
-        private static readonly string[] NoBreakWords = { "売り子" };
+        private static readonly string[] NoBreakWords = { "売り子", "ひと呼吸", "ふた呼吸" };
 
         /// <summary>ひらがな同士の間でも、 左の字がこれなら BudouX の切れ目で折ってよい (2026-11-17・作者の承認)。 ほぼ必ず助詞として使う字だけ
         /// (「と」「の」「か」「が」は「礼と／して」「手の／ひら」「剥が／し」の誤判定があったので入れない)。</summary>
