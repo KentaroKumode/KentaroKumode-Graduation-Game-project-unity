@@ -18,7 +18,9 @@ namespace UI.Game2D
         /// 幅 maxW に収まるよう折り返す (改行文字でも改行・2026-11-17 に 1 字ずつの簡易版から作り直し)。 <see cref="Game2DJpFont.Lines"/> の中身。
         /// 設定の「字間」で 1 行に入る字数が変わるので、 書き手の手の改行では守れない ── 折る位置は表示の側が決める。 決まり:
         /// <list type="number">
-        /// <item><b>文節で折る</b>: 折ってよいのは文節の切れ目 (BudouX の日本語モデル・<see cref="JpBreakModel"/>) と空白の後だけ。 「映ってい／る。」のような語の途中では折らない</item>
+        /// <item><b>文節で折る</b>: 折ってよいのは文節の切れ目 (BudouX の日本語モデル・<see cref="JpBreakModel"/>) と空白の後だけ。 「映ってい／る。」のような語の途中では折らない。
+        ///   ただし BudouX の切れ目でも、 ひらがな同士・カタカナ同士・漢字同士の間は捨てる (<see cref="BreakAllowed"/>・2026-11-17: 「護衛な／し」「手の／ひら」「虚／空」「あなた／へ」のような誤判定がこの形だった)。
+        ///   折るのは字の種類が変わる所 (ひらがな → 漢字など) と句読点・括弧の前後。 複合動詞の「拾い／上げ」は組版として許される切れ目なので残す</item>
         /// <item><b>禁則</b>: 行頭に句読点・閉じ括弧・小書きの仮名・長音・中黒などを置かない (<see cref="NoStart"/>)。 行末に開き括弧を置かない (<see cref="NoEnd"/>)。
         ///   ぶら下げはしない (幅 maxW を超えないことを保つ) ── 収まらない時は前の字ごと次の行へ追い出す</item>
         /// <item>文節 1 つが 1 行より長い時だけ、 禁則を守って字の間で折る (それも無理なら字の間で折る)</item>
@@ -75,7 +77,7 @@ namespace UI.Game2D
             for (int i = 1; i < n; i++)
             {
                 charOk[i] = CharBreakOk(s, i);
-                bool boundary = IsSpace(s[i - 1]) || (!IsSpace(s[i]) && PhraseBoundary(s, i));
+                bool boundary = IsSpace(s[i - 1]) || (!IsSpace(s[i]) && BreakAllowed(s, i));
                 phrase[i] = boundary && charOk[i];
             }
             var starts = new List<int>();
@@ -152,6 +154,24 @@ namespace UI.Game2D
         private static int B(int f, char a, char b) => _bw[f].TryGetValue(Key2(a, b), out var v) ? v : 0;
         private static int T(int f, char a, char b, char c) => _tw[f].TryGetValue(Key3(a, b, c), out var v) ? v : 0;
 
+        private enum Script { Other, Hira, Kata, Kanji }
+        private static Script ScriptOf(char c)
+        {
+            if (c >= 'ぁ' && c <= 'ゖ') return Script.Hira;
+            if ((c >= 'ァ' && c <= 'ヺ') || c == 'ー') return Script.Kata;
+            if ((c >= '一' && c <= '鿿') || (c >= '㐀' && c <= '䶿') || c == '々' || c == '〆' || (c >= '豈' && c <= '﫿')) return Script.Kanji;
+            return Script.Other;
+        }
+
+        /// <summary>s[i-1] と s[i] の間で文節として折ってよいか: BudouX の切れ目で、 かつ字の種類が同じ (ひらがな・カタカナ・漢字) 2 字の間でない (i ≧ 1)。
+        /// 禁則は見ない (<see cref="NoStart"/> / <see cref="NoEnd"/> は別に見る)。</summary>
+        public static bool BreakAllowed(string s, int i)
+        {
+            var a = ScriptOf(s[i - 1]);
+            if (a != Script.Other && a == ScriptOf(s[i])) return false;
+            return PhraseBoundary(s, i);
+        }
+
         /// <summary>BudouX で s[i-1] と s[i] の間が文節の切れ目か (i ≧ 1)。</summary>
         public static bool PhraseBoundary(string s, int i)
         {
@@ -202,8 +222,18 @@ namespace UI.Game2D
             foreach (var para in Paragraphs(text))
             {
                 var lines = Lines(para, maxW, advance);
+                int first = pages.Count;
                 for (int i = 0; i < lines.Count; i += perPage)
                     pages.Add(lines.GetRange(i, Math.Min(perPage, lines.Count - i)));
+                // 段落が次の頁へ 1 行だけはみ出す時は、 前の頁から 1 行下ろす (8 行 + 1 行 → 7 行 + 2 行・2026-11-17 作者の承認)。
+                // 1 行だけの頁は読み送りとして不自然。 前の頁が 3 行以上ある時だけ (下ろしても前の頁が 2 行以上残る)
+                int lp = pages.Count - 1;
+                if (lp > first && pages[lp].Count == 1 && pages[lp - 1].Count >= 3)
+                {
+                    var prev = pages[lp - 1];
+                    pages[lp].Insert(0, prev[prev.Count - 1]);
+                    prev.RemoveAt(prev.Count - 1);
+                }
             }
             if (pages.Count == 0) { pages.Add(new List<string>()); return pages; }
             var last = pages[pages.Count - 1];

@@ -71,15 +71,26 @@ static class Program
         Check(w3.All(l => l.Length == 0 || !JpTextLayout.NoEnd(l[l.Length - 1])), "行末に開き括弧を置かない → " + string.Join("／", w3));
         var w4 = JpTextLayout.Lines("あ\n\nい\n", 90, a10);
         Check(w4.Count == 3 && w4[1] == "" && w4[2] == "い", "改行文字の扱いは前と同じ (空行は残し、 末尾の改行は行にしない)");
+        var w6 = JpTextLayout.Lines("そっとあなたへ差し出す", 80, a10);
+        Check(w6.All(l => l.Length == 0 || l[0] != 'へ'), "ひらがな同士の間では折らない (行頭に「へ」を置かない) → " + string.Join("／", w6));
+        var p9 = JpTextLayout.Pages("一二三四五六七八九", 10, 8, 8, a10);
+        Check(p9.Count == 2 && p9[0].Count == 7 && p9[1].Count == 2, "段落が 1 行だけはみ出す時は前の頁から 1 行下ろす (8 + 1 → 7 + 2)");
         var w5 = JpTextLayout.Lines("あいうえおかきくけこさしすせそ", 50, a10);
         Check(string.Concat(w5) == "あいうえおかきくけこさしすせそ" && w5.All(l => l.Length <= 5), "文節が 1 行より長ければ字の間で折る (字を捨てない・幅を超えない)");
     }
 
     // ===== 折れ方の監査 (2026-11-17): 本文の板の幅で、 段 (改行文字で区切った 1 まとまり) ごとに折って、 悪い折れ方を数える =====
-    static int auditKinsoku, auditOver, auditWidow, auditMid, auditLines;
+    static int auditKinsoku, auditOver, auditWidow, auditMid, auditLines, auditLonePage;
     static readonly List<string> auditList = new List<string>();
     static void Audit(string label, string text, int maxW)
     {
+        // 段落が次の頁へ 1 行だけはみ出して、 1 行だけの頁になる (2026-11-17・前の頁から 1 行下ろす決まりで 0 になるはず)
+        int per = EventPaging.LinesPerPage(LineH);
+        foreach (var para in JpTextLayout.Paragraphs(text))
+        {
+            var pp = JpTextLayout.Pages(para, maxW, per, per, Adv);
+            if (pp.Count > 1 && pp[pp.Count - 1].Count == 1) { auditLonePage++; auditList.Add($"1 行だけの頁: {label}「{pp[pp.Count - 1][0]}」"); }
+        }
         foreach (var para in JpTextLayout.Paragraphs(text))
             foreach (var seg in para.Split('\n'))
             {
@@ -101,7 +112,7 @@ static class Program
                         var prev = ls[k - 1];
                         if (prev.Length > 0 && JpTextLayout.NoEnd(prev[prev.Length - 1])) { auditKinsoku++; auditList.Add($"行末禁則: {label}「{prev}／{l}」"); }
                         bool afterSpace = at > 0 && (seg[at - 1] == ' ' || seg[at - 1] == '　');
-                        if (!afterSpace && at > 0 && !JpTextLayout.PhraseBoundary(seg, at)) { auditMid++; auditList.Add($"語の途中: {label}「{ls[k - 1]}／{l}」"); }
+                        if (!afterSpace && at > 0 && !JpTextLayout.BreakAllowed(seg, at)) { auditMid++; auditList.Add($"語の途中: {label}「{ls[k - 1]}／{l}」"); }
                     }
                     pos = at + l.Length;
                 }
@@ -333,10 +344,11 @@ static class Program
             Check(ghost.Count == 0, $"背景の対応表にあるのに存在しないイベント名 {ghost.Count} 件");
             Check(artBad.Count == 0, $"背景の対応表の絵が無い・480×270 の PNG でない {artBad.Count} 件");
         }
-        Console.WriteLine($"折れ方の監査 (導入・選んだ後の文・{auditLines} 行): 禁則 {auditKinsoku}・幅超え {auditOver}・語の途中 {auditMid}・短い最後の行 {auditWidow}");
+        Console.WriteLine($"折れ方の監査 (導入・選んだ後の文・{auditLines} 行): 禁則 {auditKinsoku}・幅超え {auditOver}・語の途中 {auditMid}・短い最後の行 {auditWidow}・1 行だけの頁 {auditLonePage}");
         foreach (var x in auditList) Console.WriteLine("  " + x);
         Check(auditKinsoku == 0, $"禁則を破る折れ方 {auditKinsoku} 件");
         Check(auditOver == 0, $"本文の板の幅を超える行 {auditOver} 件");
+        Check(auditLonePage == 0, $"段落が 1 行だけはみ出した頁 {auditLonePage} 件");
         Check(cut == 0, $"切り捨てられる文 {cut} 件 (全部の行がどこかの頁に出る・1 頁 {EventPaging.LinesPerPage(LineH)} 行まで)");
         Check(colOver == 0 && EventLayout.ColumnFits(kMax, noteHMax), $"選択肢の列 (箱 + 説明の板) が画面に収まらないもの {colOver} 件");
         Check(noteOver == 0, $"{EventLayout.NoteLines} 行に収まらない説明 (選べない理由・捕捉中の見込み) {noteOver} 件");
