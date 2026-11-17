@@ -172,9 +172,10 @@ namespace UI.Game2D
             _mpb.SetTexture(PrevId, _prev);
             _mpb.SetFloat(ExposureId, Exposure);
             if (_bloomA != null) { _mpb.SetTexture(BloomTexId, _bloomA); _mpb.SetTexture(BloomTexBId, _bloomB); }
-            // タイトル・職業選択は絵が中間の明るさなので、 光のにじみを強める
+            // タイトル・職業選択は絵が中間の明るさなので、 光のにじみを強める。 ギャラリー (タイトルから入る別の画面・2026-11-17) は暗い板に字を並べる画面なので、
+            // イベントの画面と同じ強さに戻す (タイトルの倍率のままだと、 板の地までにじみで白っぽく浮いて字が読みにくかった)
             var gm = GameLoop.GameManager.Instance;
-            bool title = gm != null && gm.CurrentPhase == GameLoop.GameManager.GamePhase.Title;
+            bool title = gm != null && gm.CurrentPhase == GameLoop.GameManager.GamePhase.Title && !Game2DGalleryScreen.Showing;
             var lcdMat = surface.sharedMaterial;
             _mpb.SetFloat(BloomId, lcdMat.GetFloat(BloomId) * (title ? titleBloomScale : 1f));
             _mpb.SetFloat(HaloId, lcdMat.GetFloat(HaloId) * (title ? titleBloomScale : 1f));
