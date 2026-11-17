@@ -506,7 +506,7 @@ namespace MetaProgression.Achievements
         public static void NoteObservatoryMet() { if (Ready) Unlock(Cat.Observatory); }
 
         /// <summary>記録 (codex) の品と本の埋まり具合を見る (CodexRecorder が記録を足した時・結末の後)。 ランの外でも呼んでよい。
-        /// 品 = 記録の品の升目 (武器・秘宝・消耗品。 手に入れるまで枠を出さない預かり物は分母に入れない)、 本 = 読み物 (<see cref="Codex.WorldVignettes.All"/>)。</summary>
+        /// 品 = 記録の品の升目 (武器・秘宝・消耗品。 手に入れるまで影も出さない結末に関わる品 (ItemIds.EndingKeyItems) は分母に入れない)、 本 = 読み物 (<see cref="Codex.WorldVignettes.All"/>)。</summary>
         public static void CheckCodex()
         {
             if (Suppressed) return;
