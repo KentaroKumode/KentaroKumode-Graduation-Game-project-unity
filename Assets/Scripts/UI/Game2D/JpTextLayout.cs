@@ -235,6 +235,43 @@ namespace UI.Game2D
         }
 
         /// <summary>
+        /// 台詞の前後で改行する (2026-11-17・作者の決定「案 B」)。 対象は<b>文の頭で始まる台詞だけ</b> ── 段の頭か、 。！？」 の直後の「「」。
+        /// その「「」の前と、 対応する「」」の後で改行する (「」。」は「。」の後)。 「」と」「」って」(と言った) と、 閉じた後に句読点以外の行頭禁則の字が続く時は、 後ろでは改行しない。
+        /// 文の途中の「「」(書かれた字・名前・「…見て、「台詞」と言った」) には触らない。 区切って見せたい台詞は、 書き手が文の頭に置く。
+        /// 入れ子の「「」は外側だけを見る。 段の頭と末尾には改行を足さない。
+        /// </summary>
+        public static string DialogueBreaks(string t)
+        {
+            if (string.IsNullOrEmpty(t) || t.IndexOf('「') < 0) return t;
+            var sb = new System.Text.StringBuilder(t.Length + 8);
+            int depth = 0; bool speech = false;
+            for (int i = 0; i < t.Length; i++)
+            {
+                char c = t[i];
+                if (c == '「')
+                {
+                    if (depth == 0)
+                    {
+                        char pv = i > 0 ? t[i - 1] : '\n';
+                        speech = pv == '\n' || "。！？!?」".IndexOf(pv) >= 0;
+                        if (speech && sb.Length > 0 && sb[sb.Length - 1] != '\n') sb.Append('\n');
+                    }
+                    depth++; sb.Append(c); continue;
+                }
+                sb.Append(c);
+                if (c == '」' && depth > 0 && --depth == 0 && speech)
+                {
+                    if (i + 1 < t.Length && t[i + 1] == '。') { sb.Append('。'); i++; }
+                    if (i + 1 >= t.Length || t[i + 1] == '\n' || t[i + 1] == '「') continue;      // 次の台詞は「「」の側で改行する
+                    char nx = t[i + 1];
+                    if (nx == 'と' || nx == 'っ' || NoStart(nx)) continue;
+                    sb.Append('\n');
+                }
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>
         /// 頁に割る。 段落 (<see cref="PageBreak"/> の区切り) 1 つが 1 頁で、 1 頁 <paramref name="perPage"/> 行を超える段落は行の切れ目で次の頁へ送る
         /// (文の途中で切れてよいが、 行の途中では切らない)。 最後の頁は <paramref name="lastPage"/> 行まで (選択肢に場所を空ける):
         /// 最後の頁が超える時は、 その頁の終わりの <paramref name="lastPage"/> 行だけを最後の頁に残し、 前を 1 頁にする。
@@ -249,10 +286,25 @@ namespace UI.Game2D
             var pages = new List<List<string>>();
             foreach (var para in Paragraphs(text))
             {
-                var lines = Lines(para, maxW, advance);
+                // 台詞の前後で改行した段 (DialogueBreaks) を、 まとまりごとに折る。 end[k] = 行 k がまとまりの最後の行
+                var lines = new List<string>(); var end = new List<bool>();
+                var segs = DialogueBreaks(para).Split('\n');
+                for (int g = 0; g < segs.Length; g++)
+                {
+                    if (segs[g].Length == 0) { if (g < segs.Length - 1) { lines.Add(""); end.Add(true); } continue; }
+                    var sl = Lines(segs[g], maxW, advance);
+                    for (int k = 0; k < sl.Count; k++) { lines.Add(sl[k]); end.Add(k == sl.Count - 1); }
+                }
                 int first = pages.Count;
-                for (int i = 0; i < lines.Count; i += perPage)
-                    pages.Add(lines.GetRange(i, Math.Min(perPage, lines.Count - i)));
+                // 頁の切れ目は、 頁の後ろ半分にまとまりの境目があればそこを使う (台詞の途中で頁を変えない・2026-11-17 作者の承認)。 無ければ行の数で切る
+                for (int i = 0; i < lines.Count;)
+                {
+                    int take = Math.Min(perPage, lines.Count - i);
+                    if (i + take < lines.Count)
+                        for (int t = take; t >= (perPage + 1) / 2; t--) if (end[i + t - 1]) { take = t; break; }
+                    pages.Add(lines.GetRange(i, take));
+                    i += take;
+                }
                 // 段落が次の頁へ 1 行だけはみ出す時は、 前の頁から 1 行下ろす (8 行 + 1 行 → 7 行 + 2 行・2026-11-17 作者の承認)。
                 // 1 行だけの頁は読み送りとして不自然。 前の頁が 3 行以上ある時だけ (下ろしても前の頁が 2 行以上残る)
                 int lp = pages.Count - 1;

@@ -81,6 +81,12 @@ static class Program
         Check(w9.Take(w9.Count - 1).All(l => l.EndsWith("は") || l.EndsWith("を") || l.EndsWith("へ")), "ひらがな同士でも「を」「へ」「は」の後では折れる → " + string.Join("／", w9));
         var w10 = JpTextLayout.Lines("一二三四五六七——八九十", 80, a10);
         Check(!w10.Any(l => l.EndsWith("—") && !l.EndsWith("——")) && w10.Any(l => l.StartsWith("——")), "「——」は 2 字の間で割らず、 行頭に来てよい → " + string.Join("／", w10));
+        Check(JpTextLayout.DialogueBreaks("男は言った。「行け」。そして去った。") == "男は言った。\n「行け」。\nそして去った。", "文の頭の台詞の前後で改行する (「」。」は「。」の後)");
+        Check(JpTextLayout.DialogueBreaks("机には「誰も帰らなかった」とだけある。") == "机には「誰も帰らなかった」とだけある。", "文の途中の「」には触らない");
+        Check(JpTextLayout.DialogueBreaks("「行け」と男は言った。") == "「行け」と男は言った。", "「」と」の後では改行しない");
+        Check(JpTextLayout.DialogueBreaks("「一」「二」") == "「一」\n「二」", "続く台詞の間で改行する");
+        var pd = JpTextLayout.Pages("一二三。「四五六七八九」", 40, 2, 2, a10);
+        Check(pd.Count == 2 && pd[0].Count == 1 && pd[1][0].StartsWith("「"), "頁の後ろ半分に台詞の境目があればそこで頁を切る → " + string.Join(" | ", pd.Select(x => string.Join("／", x))));
         var p9 = JpTextLayout.Pages("一二三四五六七八九", 10, 8, 8, a10);
         Check(p9.Count == 2 && p9[0].Count == 7 && p9[1].Count == 2, "段落が 1 行だけはみ出す時は前の頁から 1 行下ろす (8 + 1 → 7 + 2)");
         var w5 = JpTextLayout.Lines("あいうえおかきくけこさしすせそ", 50, a10);
@@ -100,7 +106,7 @@ static class Program
             if (pp.Count > 1 && pp[pp.Count - 1].Count == 1) { auditLonePage++; auditList.Add($"1 行だけの頁: {label}「{pp[pp.Count - 1][0]}」"); }
         }
         foreach (var para in JpTextLayout.Paragraphs(text))
-            foreach (var seg in para.Split('\n'))
+            foreach (var seg in JpTextLayout.DialogueBreaks(para).Split('\n'))
             {
                 if (seg.Length == 0) continue;
                 var ls = JpTextLayout.Lines(seg, maxW, Adv);
@@ -191,10 +197,20 @@ static class Program
         return s.Length == 0 ? "……" : s;
     }
 
+    /// <summary>頁割りを目で見る時の書き出し (環境変数 EVPC_PAGES = 書き出し先・追記)。</summary>
+    static void DumpPages(string label, EventPaging.Plan plan)
+    {
+        var f = Environment.GetEnvironmentVariable("EVPC_PAGES");
+        if (string.IsNullOrEmpty(f)) return;
+        var sb = new System.Text.StringBuilder("■" + label + "\n");
+        for (int i = 0; i < plan.Count; i++) { foreach (var l in plan.pages[i]) sb.Append("    ").Append(l).Append('\n'); sb.Append("    ── ").Append(i + 1).Append('/').Append(plan.Count).Append('\n'); }
+        File.AppendAllText(f, sb.ToString());
+    }
+
     static List<string> AllLines(string text)
     {
         var l = new List<string>();
-        foreach (var para in JpTextLayout.Paragraphs(text)) l.AddRange(JpTextLayout.Lines(para, EventLayout.BodyW, Adv));
+        foreach (var para in JpTextLayout.Paragraphs(text)) l.AddRange(JpTextLayout.Lines(JpTextLayout.DialogueBreaks(para), EventLayout.BodyW, Adv));
         return l;
     }
 
@@ -266,6 +282,7 @@ static class Program
             var d = ev.def; int k = d.choices.Count;
             var plan = EventPaging.Intro(d.flavor, Adv, LineH);
             Audit($"〈{d.name}〉 導入", d.flavor, EventLayout.BodyW);
+            DumpPages($"〈{d.name}〉 導入", plan);
             texts++;
             pageCounts.Add(d.name + "\t" + plan.Count);
             if (plan.Count > 1) multi++;
@@ -302,6 +319,7 @@ static class Program
                 {
                     string text = ResultText(c, nb > 0 ? b : -1);
                     var rp = EventPaging.Result(text, Adv, LineH);
+                    DumpPages($"〈{d.name}〉「{c.text}」 結果{(nb > 0 ? " 分岐" + (b + 1) : "")}", rp);
                     var after = c.PostFlavorFor(nb > 0 ? b : -1);
                     if (!string.IsNullOrEmpty(after)) Audit($"〈{d.name}〉「{c.text}」 結果{(nb > 0 ? " 分岐" + (b + 1) : "")}", after, EventLayout.BodyW);
                     texts++;
