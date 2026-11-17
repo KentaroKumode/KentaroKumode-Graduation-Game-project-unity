@@ -26,7 +26,9 @@ namespace MetaProgression.Achievements
 
         private static RunProgress run;
         public static event Action<AchievementDefinition> OnUnlocked;
-        private static bool Suppressed => MetaBuffApplicator.SuppressRelicGrant;
+        /// <summary>解除しない間: 遺物の付与を止めた測定 (<see cref="MetaBuffApplicator.SuppressRelicGrant"/>) と、 BOT がランを動かしている間 (<see cref="GameHooks.BotDriving"/>・2026-11-17)。
+        /// 記録 (codex・<c>CodexRecorder</c>) と同じく、 実績は人が遊んだ時だけ解除する。 2026-11-17 まではふつうのバッチでも解除し、 <see cref="OnUnlocked"/> も鳴っていた。</summary>
+        private static bool Suppressed => MetaBuffApplicator.SuppressRelicGrant || GameHooks.BotDriving;
 
         public static bool IsUnlocked(string id)
         {
