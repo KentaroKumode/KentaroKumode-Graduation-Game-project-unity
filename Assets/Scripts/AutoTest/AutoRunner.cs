@@ -207,21 +207,27 @@ namespace AutoTest
         /// Rank の航行は避けたい点 (averse と同じ 90) にする。 行き先に選ばないだけで、 出口への道の上の点は踏む (禁止ではない)。
         /// false = 今までと完全に同じ動き。 乱数は引かない。 エリート・宝・店・休憩・イベントの値付けは変えない。</summary>
         public bool navToilAware = true;
-        /// <summary>[2026-11-14・#140 の 2] 航行が嵐 (不安定化の時計) を読むか。 false (既定) = 今までと完全に同じ動き (乱数の消費も同じ・終点の位置を知っている・フェーズ 3 で出口へ)。
+        /// <summary>[2026-11-14・#140 の 2] 航行が嵐 (不安定化の時計) を読むか。 false = 旧い動き (乱数の消費も同じ・終点の位置を知っている・フェーズ 3 で出口へ)。
+        /// <b>2026-11-18〜 既定 true</b> (測定の基準を「嵐あり + 嵐を読む BOT (T2 = この口と第 2 巡の 3 つ)」に切り替えた・GAME.md §13-5)。
+        /// 根拠: 嵐あり・Super・同じシード 4,000 ランで、 読まない 2.1% → T2 9.7% (53 対 356・p=3e-56)。 読まない BOT は嵐を値付けしないので、 嵐ありの測定がゲームでなく BOT の穴を測っていた。
+        /// 旧い基準の数字 (読まない・嵐なし) と比べる腕は false を明示する。 BOT の口なので、 ゲームの挙動は変わらない (猫の手の写しは配線しか使わない)。
         /// true = Optimal / Super (追跡者を避ける方策) が、 嵐の層で <see cref="StormNavView"/> の見方を使う ──
         /// 隠れたボスの点を読まない (候補から探す)・点を取る価値から「溜まるポイントで嵐が早まる代償」を引く・「まだ取る」と「出口へ」を値で比べる (フェーズ 3 の規則は外す)・
         /// 嵐の中の 1 歩の HP を道の費用に入れる。 Naive は読まない (嵐を読まない下限)。 手番の時計 (stormClock=Turns)・嵐の無い層では効かない。 乱数は引かない。</summary>
-        public bool navStormAware = false;
+        public bool navStormAware = true;
         /// <summary>[2026-11-14・#140 の 2 第 2 巡] 嵐の航行 (navStormAware) が、 出口までの道と計画の中の道で「歩いて HP が尽きる」確率を値付けするか。
         /// true = 確率 Φ((道の嵐の HP − 見込みの HP) ÷ 散らばり) × 死の損 (<c>MacroDeathCost</c>) を代償に足す。 散らばり = 計画の中の戦闘の損の分散 (学習の種類ごとの標準偏差) + ボスが隠れている時の候補の間の道の HP の分散。
-        /// false (既定) = 第 1 巡と同じ (道の死を数えない)。 根拠: 第 1 巡の測定で、 戦闘の後に歩いて死んだランが Super 665 / 3000 (読まない時 265・嵐なし 101)。</summary>
-        public bool navStormExitDeath = false;
+        /// false = 第 1 巡と同じ (道の死を数えない)。 根拠: 第 1 巡の測定で、 戦闘の後に歩いて死んだランが Super 665 / 3000 (読まない時 265・嵐なし 101)。
+        /// 2026-11-18〜 既定 true (T2 の一部・<see cref="navStormAware"/> の注釈)。</summary>
+        public bool navStormExitDeath = true;
         /// <summary>[2026-11-14・第 2 巡] 嵐の中の戦闘の敵の〈嵐〉の見積もりを、 攻撃の上乗せ (<c>FreeMapParams.StormEnemyAttack</c>) × その種類の戦闘のターン数 (このランで見た平均) に替えるか。
-        /// false (既定) = 第 1 巡の「被ダメ × (1 + 上乗せ ÷ 層の最大の 1 発)」。 このランでまだその種類と戦っていなければ第 1 巡の式のまま。</summary>
-        public bool navStormFightModel = false;
+        /// false = 第 1 巡の「被ダメ × (1 + 上乗せ ÷ 層の最大の 1 発)」。 このランでまだその種類と戦っていなければ第 1 巡の式のまま。
+        /// 2026-11-18〜 既定 true (T2 の一部・<see cref="navStormAware"/> の注釈)。</summary>
+        public bool navStormFightModel = true;
         /// <summary>[2026-11-14・第 2 巡] 嵐の航行の計画で、 戦闘の死の見込みを HP に合わせて読むか。 true = 死の確率 = max(学習の敗北率, Φ((戦闘の損の平均 − 今の HP) ÷ 標準偏差)) × 死の損。
-        /// false (既定) = 第 1 巡と同じ (敗北率 × 死の損 × HP の余裕の逆数・HP 20% で頭打ち)。 根拠: 第 1 巡の測定で、 負けた通常の戦闘に入った時の HP の割合が 6% 前後。</summary>
-        public bool navStormFightDeath = false;
+        /// false = 第 1 巡と同じ (敗北率 × 死の損 × HP の余裕の逆数・HP 20% で頭打ち)。 根拠: 第 1 巡の測定で、 負けた通常の戦闘に入った時の HP の割合が 6% 前後。
+        /// 2026-11-18〜 既定 true (T2 の一部・<see cref="navStormAware"/> の注釈)。</summary>
+        public bool navStormFightDeath = true;
         /// <summary>[2026-11-14・第 2 巡] 嵐の航行の代償のうち、 嵐の HP の損 (歩く間・出口まで) に掛ける HP の重み (Super の計画の層ごとの HP の重み) の倍率。 既定 1 = 第 1 巡と同じ。
         /// 測定で振るつまみ (隠し倍率ではない・実効状態の行に出る)。 死の確率の項 (navStormExitDeath) には掛からない。</summary>
         public float navStormHpWeightMul = 1f;
@@ -237,7 +243,8 @@ namespace AutoTest
         public int navStormExitAtPts = 0;
         /// <summary>[測定 2026-11-13] 天候の作り。 本体の GameHooks.StormEnabled へ流す (ラン終了で true へ)。
         /// true (既定) = 嵐 (静かな時間のあとに輪が縮む・嵐の中の点への移動で HP・嵐の中の戦闘は敵に〈嵐〉・始点は最外周から・ボスの点は伏せる・GAME.md §5-12)。
-        /// BOT は終点の位置を今までどおり知っていて、 フェーズ 3 で出口へ切り替え、 出口までの見積もりに嵐の HP を足す (最小の対応)。
+        /// BOT は既定 (2026-11-18〜) で嵐を読む (<see cref="navStormAware"/> と第 2 巡の 3 つ = T2)。 口を切ると、 終点の位置を知っていて、 フェーズ 3 で出口へ切り替え、 出口までの見積もりに嵐の HP を足すだけ (最小の対応)。
+        /// 測定の基準は嵐あり (2026-11-18〜・GAME.md §13-5)。 嵐なし (false) の数字は育てる時間を無制限に与えた条件で、 嵐ありの数字と直接比べない。
         /// false = 旧い作り (左から右へ進む前線・崩れる地平と沈み続ける湖面あり・始点は左端 = main と全件一致のはず)。</summary>
         public bool stormEnabled = true;
         /// <summary>[測定 2026-11-13 二版] 嵐の時計の種類。 本体の GameHooks.StormClock へ流す (ラン終了で Instability へ)。

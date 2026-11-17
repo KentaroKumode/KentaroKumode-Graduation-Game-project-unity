@@ -321,6 +321,9 @@ namespace AutoTest.EditorTools
             if (ab) cfg["measureNoExplore"] = "True";   // 学習に合流しない測定にランダムな買い物を混ぜない
             cfg["freeNavScout"] = scout ? "True" : "False";
             cfg["navLearnedDanger"] = learnedDanger ? "True" : "False";
+            // 嵐 (2026-11-18〜): ここでは決めない ── AutoRunner の既定 (嵐あり stormEnabled=True + 嵐を読む BOT T2 = navStormAware と第 2 巡の 3 つ) をそのまま渡す。
+            //   学習・ITT・A/B のどの経路も同じ既定で走る (分けない)。 理由: 品の値付けも測定も製品の条件 (嵐あり) で取る ── 嵐なしで値付けすると「取れる量が無制限」の前提の序列になる。
+            //   嵐なしの旧い基準 (Super 32.2%・2026-11-17) と比べる腕だけ、 v3_queue の腕に stormEnabled=False を明示する (GAME.md §13-5)。 実効値は summary の [実効状態] 行とランの記録の policySig (storm= / snav=) で確かめる。
             if (overrides != null) foreach (var kv in overrides) cfg[kv.Key] = kv.Value;
 
             var ks = new List<string>(cfg.Keys);

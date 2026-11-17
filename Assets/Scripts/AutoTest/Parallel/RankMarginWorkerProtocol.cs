@@ -544,9 +544,9 @@ namespace AutoTest.ParallelSweep
                 "toilDamageDownPct",
                 // 2026-11-14: 航行が〈徒労〉を読むか (True = 既定・持っている間 通常の戦闘の点は報酬なし・False = 旧い動き)
                 "navToilAware",
-                // 2026-11-14 (#140 の 2): 航行が嵐を読むか (False = 既定・旧い動き / True = 隠れたボスを探す・取る代償・値で切り上げ・嵐の HP を道の費用に)
+                // 2026-11-14 (#140 の 2): 航行が嵐を読むか (False = 旧い動き / True = 隠れたボスを探す・取る代償・値で切り上げ・嵐の HP を道の費用に)。 2026-11-18〜 既定 True (測定の基準 T2)
                 "navStormAware",
-                // 2026-11-14 (#140 の 2 第 2 巡): 嵐の航行の直し (道の死・嵐の中の戦闘の見積もり・戦闘の死・嵐の HP の重みの倍率)。 False / 1 = 第 1 巡と同じ
+                // 2026-11-14 (#140 の 2 第 2 巡): 嵐の航行の直し (道の死・嵐の中の戦闘の見積もり・戦闘の死・嵐の HP の重みの倍率)。 False / 1 = 第 1 巡と同じ。 2026-11-18〜 3 つとも既定 True (T2)
                 "navStormExitDeath", "navStormFightModel", "navStormFightDeath", "navStormHpWeightMul",
                 // 2026-11-18 (嵐の原因調査): 上限の見当の口 (ボスの位置を知る) と、 計画の 1 点の値段 (既定 false / 0 = 今までと同じ)
                 "navStormOracleBoss", "navStormPointPrice", "navStormExitAtPts",
