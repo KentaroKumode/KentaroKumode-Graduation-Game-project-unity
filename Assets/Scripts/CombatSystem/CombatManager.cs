@@ -814,7 +814,7 @@ namespace CombatSystem
                 ctx, GameLoop.GameManager.Instance?.Run, this);
 
             OnCombatStart?.Invoke(enemy.id);
-            MetaProgression.Achievements.AchievementService.NoteCombatStarted();
+            MetaProgression.Achievements.AchievementService.NoteCombatStarted(enemy.id);
 
             
             // 恒久デバフ「コルヴェンの憤怒」: ボス戦の戦闘開始時、現在HP半減（1T目のダイス最大化は OnRoll で処理）

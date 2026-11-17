@@ -549,6 +549,7 @@ namespace EventSystem
                 case GameLoop.ConvictionSystem.IdConviction:
                 {
                     GameLoop.ConvictionSystem.OnFirstAcquired(run);
+                    MetaProgression.Achievements.AchievementService.NoteConvictionChainDone();   // 実績〈根拠は要らない〉 (災厄の予兆で〈根拠のない確信〉を得た = 連鎖の 3 つ目)
                     result.log.Add("根拠のない確信が芽吹いた (確信段階1)。エリート撃破毎に成長する。");
                     break;
                 }

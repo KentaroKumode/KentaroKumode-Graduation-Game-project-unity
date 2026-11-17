@@ -51,6 +51,7 @@ namespace Codex
                 meta.endingMaxDiffCleared.Add(endingId);
 
             MetaProgressManager.Instance.Save();
+            MetaProgression.Achievements.AchievementService.CheckCodex();   // 実績: 結末で読み物が開いたか (BOT の間は CheckCodex が止める)
         }
 
         // ----------------------------------------------------------------

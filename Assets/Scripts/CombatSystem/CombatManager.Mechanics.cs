@@ -346,7 +346,7 @@ namespace CombatSystem
                 // [計装 2026-08-15] ダイス別の発動は戦闘単位で FinishCombat が積む
                 //   (役の発動地点から GameManager.Instance を引かないため)。
                 YachtRoleEffects.FiredThisCombat[(int)k]++;
-                MetaProgression.Achievements.AchievementService.NoteRoleFired(k);
+                MetaProgression.Achievements.AchievementService.NoteRoleFired(k, tier);
             }
 
             if (ctx.firedRolesThisTurn.Count > 0)

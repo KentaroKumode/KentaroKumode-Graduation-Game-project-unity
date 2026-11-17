@@ -191,6 +191,9 @@ namespace GameLoop
             if ((ev & FreeMapEvent.FamiliarLaunched) != 0) Log("使い魔が放たれた");
             if ((ev & FreeMapEvent.FamiliarVanished) != 0) Log("（使い魔は見失って消えた）");
             if ((ev & FreeMapEvent.LureTriggered) != 0) NavDiag.NoteLure(true);   // [計装]
+            if ((ev & FreeMapEvent.LureTriggered) != 0) MetaProgression.Achievements.AchievementService.NoteLureHit();   // 実績〈罠師〉
+            if ((ev & (FreeMapEvent.Detected | FreeMapEvent.Caught | FreeMapEvent.FamiliarContact)) != 0)
+                MetaProgression.Achievements.AchievementService.NoteFoundByPursuer();   // 実績〈忍び足〉 (この層で見つかった)
             if ((ev & FreeMapEvent.LureTriggered) != 0) Log($"（囮罠が作動した）追跡者が{FreeMapParams.LureHoldTurns}ターン足止めされた");
             if ((ev & FreeMapEvent.FrontAdvanced) != 0 && sim.Weather != WeatherKind.None)
                 Log($"前線が左から {System.Math.Min(sim.Front, FreeMapParams.Width):0.0} まで届いた（{sim.Weather.DisplayName()}）");
@@ -462,6 +465,7 @@ namespace GameLoop
         {
             _inPursuerFight = false;
             NavDiag.End(NavDiag.Won, Run);   // [計装]
+            MetaProgression.Achievements.AchievementService.NotePursuerWon();   // 実績〈狩る側〉
             FreeMap?.ResolveBodyWon();
             AddBattleWinInstability(elite: false, pursuer: true);   // 不安定化: 番人を倒した +2 (報酬の秘宝は GrantRewardItem で +3)
             int before = Run.provision;
@@ -542,6 +546,7 @@ namespace GameLoop
         private void HandleFamiliarFightWon()
         {
             ProvisionSystem.Supply(Run, FreeMapParams.RewardBattle);
+            MetaProgression.Achievements.AchievementService.NoteFamiliarWon();   // 実績〈猟犬払い〉
             Log("使い魔を退けた");
             AddBattleWinInstability(elite: false, pursuer: false);   // 不安定化: 通常の戦闘と同じ +1 (2026-11-13)
             EndFamiliarFight(fled: false);

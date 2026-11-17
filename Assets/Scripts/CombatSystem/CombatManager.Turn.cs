@@ -181,7 +181,7 @@ namespace CombatSystem
             turnLog.Add(result);
 
             OnTurnEnd?.Invoke(result);
-            MetaProgression.Achievements.AchievementService.NoteTurnEnded(result);
+            MetaProgression.Achievements.AchievementService.NoteTurnEnded(result, ctx);
 
             // ログ出力
             LogTurnResult(result);
@@ -527,6 +527,7 @@ namespace CombatSystem
             //   **回復の後・ダメージの前**に取る。 差分で採るのは、 通常ダメージ・固定ダメ・出血・
             //   反射・反撃固定ダメと**削る経路が 5 本ある**ため ── 個別に足すと必ずどれかを取り落とす。
             int primaryHpBeforeDamage = enemyHP;
+            int secondaryHpAtTurnStart = secondaryEnemy != null ? secondaryHP : 0;   // [読むための欄・実績〈一網打尽〉]
 
             int enemyExtraDice = (int)ctx.GetAccumulated("extraDice");
             ctx.accumulatedValues["extraDice"] = 0;
@@ -924,6 +925,11 @@ namespace CombatSystem
                 enemyDice = enemyDice,
                 playerDiceTotal = ctx.playerDiceTotal,
                 enemyDiceTotal = ctx.enemyDiceTotal,
+                // [読むための欄・実績] 戦闘の計算には使わない
+                escalationStage = Escalation.StageOf(escTurn),
+                secondaryHPAtStart = secondaryHpAtTurnStart,
+                wiredKinds = (attackDiceCount > 0 ? TurnResult.WiredAttack : 0) | (blockDiceCount > 0 ? TurnResult.WiredBlock : 0)
+                           | (chargeDiceCount > 0 ? TurnResult.WiredCharge : 0) | (specialCount > 0 ? TurnResult.WiredSupport : 0),
             };
 
             // --- 6. 解決: プレイヤー攻撃 → 敵攻撃 (自先制・撃破時は敵攻撃なし) ---
@@ -1064,6 +1070,9 @@ namespace CombatSystem
             //   逃げるターンは固定ダメの枠も捨てる (atkBase の確定後に足された臨界爆発・品が預けた分を含む)。
             //   役の追撃も攻撃に付くものなので、 攻撃しないターンには乗せない。
             if (skipAttack) { dealtDmg = 0; isCrit = false; }
+            // [読むための欄・実績〈鎧通し〉] 主攻撃が通り、 敵の防御を貫通で 0 にした (ProcessDamage の中の防御の計算と同じ式で読むだけ)
+            result.defensePiercedToZero = !skipAttack && dealtDmg > 0 && ctx.enemyDefense > 0
+                && DefenseFormula.Effective(ctx.enemyDefense, ctx.playerArmorPen + (isCrit ? ctx.critArmorPen : 0)) == 0;
             // 画面: 主攻撃の倍率 (会心・与ダメ%・敵の防御まで全部込みの 最終 ÷ 倍率の前の攻撃値) を着弾の数字の横に出す (2026-11-11)
             LastHitMultPct = !skipAttack && atkBase > 0 && dealtDmg > 0 ? Mathf.RoundToInt(dealtDmg * 100f / atkBase) : 0;
             EnemyHpLedger.CommitMainMitigation(!skipAttack);   // [計装] 主攻撃の防御・敵の軽減で削った量

@@ -125,6 +125,7 @@ namespace GameLoop
                     gold = GoldIncome.Gain(Run, gold, "値下げ交渉");
                     Run.playerHP = Mathf.Max(1, result.playerHPRemaining);
                     RunStats.RobberyWins++;
+                    MetaProgression.Achievements.AchievementService.NoteRobberyWon();   // 実績〈値切りの腕〉
                     RunStats.RobberyLootTotal += loot;
                     Log($"値下げ交渉勝利: 戦利品{loot}件 +{gold}G");
                     OnBattleEnded?.Invoke(result);

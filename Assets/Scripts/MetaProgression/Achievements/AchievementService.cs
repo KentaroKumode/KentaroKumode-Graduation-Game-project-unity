@@ -27,6 +27,16 @@ namespace MetaProgression.Achievements
             public int difficulty;
             public bool cursedRelicEquipped;
             public readonly HashSet<string> escapedEnemyIds = new HashSet<string>();
+            // ── 層ごと (層に入るたびに 0・素通り / 忍び足) ──
+            /// <summary>この層で、 ボスのほかに始めた戦闘の数 (追跡者・使い魔・イベント・値下げ交渉の戦闘も数える)。</summary>
+            public int floorFights;
+            /// <summary>この層で追跡者に見つかった (捕捉・捕まる・使い魔と接触)。</summary>
+            public bool floorFound;
+            // ── 戦闘ごと (戦闘を始めるたびに 0) ──
+            /// <summary>この戦闘で見た敵の攻撃の激化の一番高い段 (0〜4・長丁場)。</summary>
+            public int combatMaxEscStage;
+            /// <summary>この戦闘で〈狂暴化〉が発動した (根比べ)。</summary>
+            public bool combatBerserk;
         }
 
         private static RunProgress run;
@@ -147,27 +157,50 @@ namespace MetaProgression.Achievements
         public static void NoteFloorEntered(int depth)
         {
             if (!Ready) return;
+            run.floorFights = 0;
+            run.floorFound = false;
             if (depth >= Depth(4)) Unlock(Cat.Reach6);
             if (depth >= Depth(5)) Unlock(Cat.Reach7);
+            var gm = GameManager.Instance;
+            if (gm?.Run != null) { NoteCoins(gm.Run.coins); NoteTerminalDeck(gm.Run); }
         }
 
         // ============================================================
         //  戦闘
         // ============================================================
 
-        public static void NoteCombatStarted()
+        public static void NoteCombatStarted(string enemyId)
         {
             if (!Ready) return;
             run.combatRequestedHeal = 0;
             run.hpOneStreak = 0;
+            run.combatMaxEscStage = 0;
+            run.combatBerserk = false;
+            if (!BossIds.IsBoss(enemyId)) run.floorFights++;
         }
 
-        public static void NoteTurnEnded(TurnResult turn)
+        /// <summary>ターンの終わり (CombatManager.FinishTurnCommon・HP を同期した後)。 <paramref name="ctx"/> は読むだけ。</summary>
+        public static void NoteTurnEnded(TurnResult turn, CombatContext ctx)
         {
             if (!Ready) return;
             run.hpOneStreak = turn.playerHPAfter == 1 ? run.hpOneStreak + 1 : 0;
+            if (turn.escalationStage > run.combatMaxEscStage) run.combatMaxEscStage = turn.escalationStage;
             if (turn.isCritical && turn.totalDamage >= Cat.CritGoal) Unlock(Cat.Crit100);
+            if (turn.defensePiercedToZero) Unlock(Cat.PierceZero);
+            if ((turn.wiredKinds & TurnResult.WiredAll) == TurnResult.WiredAll) Unlock(Cat.Terminal5Types);
+            if (ctx == null) return;
+            if (ctx.healBlocked) run.combatBerserk = true;   // 回復を封じるのは〈狂暴化〉だけ (Berserk)
+            if (ctx.EnemyPoison >= Cat.PoisonGoal) Unlock(Cat.Poison99);
+            if (ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.BleedMaxKey) >= Cat.BleedGoal) Unlock(Cat.BleedBig);
+            if (ctx.GetCharge() >= Cat.ChargeGoal) Unlock(Cat.Charge30);
+            if (ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.BurstTotalKey) >= Cat.BurstGoal) Unlock(Cat.Burst5);
         }
+
+        /// <summary>ボスのダウンが大技 (チャージか大技のターン) に重なって取り消した (CombatManager.Down)。</summary>
+        public static void NoteBossDownCanceledHeavy() { if (Ready) Unlock(Cat.DownCancel); }
+
+        /// <summary>主攻撃 1 回で目盛りを <paramref name="broken"/> 個割った (CombatManager.Down)。</summary>
+        public static void NoteBossDownBroken(int broken) { if (Ready && broken >= 2) Unlock(Cat.DownDouble); }
 
         public static void NoteHealRequested(int amount)
         {
@@ -181,7 +214,8 @@ namespace MetaProgression.Achievements
             if (Ready) run.rerolled = true;
         }
 
-        public static void NoteRoleFired(RoleKind role)
+        /// <summary>役が発動した。 <paramref name="tier"/> = その目の出目パーツの段 (奥の手)。</summary>
+        public static void NoteRoleFired(RoleKind role, DiceFaceParts.Tier tier)
         {
             if (!Ready) return;
             var mgr = MetaProgressManager.Instance;
@@ -194,6 +228,7 @@ namespace MetaProgression.Achievements
             }
             Unlock(Cat.FirstRole);
             if (YachtRoles.IsTriple(role)) Unlock(Cat.RoleZoro);
+            if (tier >= Cat.TopFaceTier) Unlock(Cat.RoleTop);
             int allMask = 0;
             foreach (RoleKind k in YachtRoles.All) allMask |= 1 << (int)k;
             if ((mgr.State.achievementRoleMask & allMask) == allMask) Unlock(Cat.AllRoles);
@@ -225,6 +260,17 @@ namespace MetaProgression.Achievements
                 else mgr.Save();
             }
 
+            if (result.enemyElite && mgr?.State != null)
+            {
+                mgr.State.achievementEliteKills++;
+                if (mgr.State.achievementEliteKills >= Cat.EliteGoal) Unlock(Cat.Elite20);
+                else mgr.Save();
+            }
+            if (run.combatMaxEscStage >= Escalation.Thresholds.Length) Unlock(Cat.Escalation4);   // 段は 0〜4 (閾値の数が最大)
+            NoteCoins(state.coins);
+            if (result.turnLog != null && result.turnLog.Count > 0 && result.turnLog[result.turnLog.Count - 1].secondaryHPAtStart > 0)
+                Unlock(Cat.PairOneTurn);   // 最後のターンの頭に 2 体目が生きていた = 2 体とも最後のターンに倒した
+
             if (result.playerHPRemaining == 1) Unlock(Cat.WinAt1Hp);
             if (run.hpOneStreak >= Cat.CalmDownTurns) Unlock(Cat.HiddenCalmDown);
             if (run.combatRequestedHeal >= Math.Max(1, state.playerMaxHP) * Cat.PerpetualHealTimes)
@@ -241,6 +287,7 @@ namespace MetaProgression.Achievements
                 if (result.totalTurns >= Cat.CrateSlowTurns) Unlock(Cat.CrateSlow);
                 return;   // 0 層の古い宝箱はほかのボスの実績に数えない
             }
+            if (run.combatBerserk) Unlock(Cat.BerserkWin);
             if (depth == Depth(1)) Unlock(Cat.Boss1);
             if (depth == Depth(2))
             {
@@ -346,6 +393,155 @@ namespace MetaProgression.Achievements
         }
 
         // ============================================================
+        //  航行 (GameManager.FreeMap / Rewards)
+        // ============================================================
+
+        /// <summary>追跡者に見つかった (捕捉・捕まる・使い魔と接触)。</summary>
+        public static void NoteFoundByPursuer() { if (Ready) run.floorFound = true; }
+        public static void NotePursuerWon() { if (Ready) Unlock(Cat.PursuerWin); }
+        public static void NoteFamiliarWon() { if (Ready) Unlock(Cat.FamiliarWin); }
+        public static void NoteLureHit() { if (Ready) Unlock(Cat.LureHit); }
+
+        /// <summary>嵐の段の最後 (<see cref="MapSystem.FreeMove.Storm.PhaseOf(int)"/> の 4)。</summary>
+        private const int StormLastPhase = 4;
+
+        /// <summary>層の終点のボスを倒した (GameManager.Rewards のボスの枝・地図がまだ今の層の時)。 0 層の宝箱は数えない。
+        /// <paramref name="sim"/> = 今の層の航行の地図 (地図の無い層は null)。</summary>
+        public static void NoteBossNodeWon(RunState state, MapSystem.FreeMove.FreeMapSim sim)
+        {
+            if (!Ready || state == null) return;
+            int depth = state.Depth;
+            if (depth == Depth(0)) return;
+            if (sim != null && sim.StormMode && sim.StormPhase >= StormLastPhase) Unlock(Cat.StormBoss);
+            if (state.provision <= 0) Unlock(Cat.ProvisionZeroBoss);
+            // 忍び足: 追跡者のいる層で、 ボスを倒した時に追跡者がまだいて、 一度も見つかっていない (追跡者を倒した = 捕まった = 見つかった)
+            if (sim != null && sim.HasFoe && MapSystem.FreeMove.FloorPlan.HasWanderer(depth) && !run.floorFound) Unlock(Cat.PursuerUnseen);
+            if (depth >= Depth(2) && run.floorFights == 0) Unlock(Cat.BossOnlyFloor);
+        }
+
+        // ============================================================
+        //  お金・山札・武器・挑戦カード・〈門〉・確信の連鎖
+        // ============================================================
+
+        /// <summary>所持金が変わった (GoldIncome ほか)。</summary>
+        public static void NoteCoins(int coins) { if (Ready && coins >= Cat.GoldGoal) Unlock(Cat.Gold1000); }
+
+        /// <summary>値下げ交渉 (強盗) の戦闘に勝った (GameManager.Combat)。</summary>
+        public static void NoteRobberyWon() { if (Ready) Unlock(Cat.RobberyWin); }
+
+        /// <summary>端子の山札が増えた (報酬・店)。</summary>
+        public static void NoteTerminalDeck(RunState state)
+        {
+            if (Ready && state?.terminalDeck != null && state.terminalDeck.Count >= Cat.DeckBigGoal) Unlock(Cat.Deck30);
+        }
+
+        /// <summary>武器を最後の段 (T4+) まで鍛えた (GameManager.TryUpgradeWeapon)。 <paramref name="family"/> = items.json の family。</summary>
+        public static void NoteWeaponMaxed(string family)
+        {
+            if (!Ready) return;
+            Unlock(Cat.WeaponTop);
+            var meta = Meta;
+            if (meta == null || string.IsNullOrEmpty(family)) return;
+            if (meta.achievementWeaponFamiliesMaxed == null) meta.achievementWeaponFamiliesMaxed = new List<string>();
+            AddMeta(meta.achievementWeaponFamiliesMaxed, family);
+            foreach (var f in ItemIds.WeaponFamilies) if (!meta.achievementWeaponFamiliesMaxed.Contains(f)) return;
+            Unlock(Cat.WeaponAllTop);
+        }
+
+        /// <summary>挑戦カードを 1 枚受けた (GameManager.TakeChallengeCard)。 <paramref name="buff"/> = 裏のバフ (無ければ null)。</summary>
+        public static void NoteChallengeCardTaken(ChallengeCards.Card buff)
+        {
+            if (!Ready || buff == null) return;
+            var meta = Meta;
+            if (meta == null) return;
+            if (meta.achievementBuffsTaken == null) meta.achievementBuffsTaken = new List<string>();
+            AddMeta(meta.achievementBuffsTaken, buff.kind);
+            foreach (var c in ChallengeCards.All)
+                if (c.isBuff && !c.pending && !meta.achievementBuffsTaken.Contains(c.kind)) return;   // 配られない (pending) バフは数えない
+            Unlock(Cat.BuffsAll);
+        }
+
+        /// <summary>〈門〉の 3 工程を決めた (GameManager.CompleteGateRitual)。 <paramref name="flawless"/> = 欠陥 (GateFlaw) が 1 つも無い。</summary>
+        public static void NoteGateCompleted(bool flawless) { if (Ready && flawless) Unlock(Cat.GateFlawless); }
+
+        /// <summary>確信の連鎖 (預言者の石板 → 啓示 → 災厄の予兆) をたどって〈根拠のない確信〉を得た (EventEffectExecutor)。</summary>
+        public static void NoteConvictionChainDone() { if (Ready) Unlock(Cat.Conviction); }
+
+        // ============================================================
+        //  イベント・記録
+        // ============================================================
+
+        /// <summary>イベントに出会った (GameManager.Events)。 <paramref name="eventName"/> = EventDefinition.name。</summary>
+        public static void NoteEventSeen(string eventName)
+        {
+            if (!Ready || string.IsNullOrEmpty(eventName)) return;
+            var meta = Meta;
+            if (meta == null) return;
+            if (meta.achievementEventsSeen == null) meta.achievementEventsSeen = new List<string>();
+            if (!AddMeta(meta.achievementEventsSeen, eventName)) return;
+            // 旅の目録: 召喚専用 (名指しでしか出ない) を除いた全部
+            var all = EventSystem.EventDatabase.All;
+            if (all == null || all.Count == 0) return;
+            foreach (var ev in all)
+                if (ev != null && !(ev.condition != null && ev.condition.summonOnly) && !meta.achievementEventsSeen.Contains(ev.name)) return;
+            Unlock(Cat.EventsAll);
+        }
+
+        /// <summary>イベントの選択肢を選んで終えた (別のイベントへの振り直しは数えない)。</summary>
+        public static void NoteEventDone()
+        {
+            if (!Ready) return;
+            var mgr = MetaProgressManager.Instance;
+            if (mgr?.State == null) return;
+            mgr.State.achievementEventsDone++;
+            if (mgr.State.achievementEventsDone >= Cat.EventsGoal) Unlock(Cat.Events50);
+            else mgr.Save();
+        }
+
+        /// <summary>〈さびれた観測所〉が出た (博士に会った)。</summary>
+        public static void NoteObservatoryMet() { if (Ready) Unlock(Cat.Observatory); }
+
+        /// <summary>記録 (codex) の品と本の埋まり具合を見る (CodexRecorder が記録を足した時・結末の後)。 ランの外でも呼んでよい。
+        /// 品 = 記録の品の升目 (武器・秘宝・消耗品。 手に入れるまで枠を出さない預かり物は分母に入れない)、 本 = 読み物 (<see cref="Codex.WorldVignettes.All"/>)。</summary>
+        public static void CheckCodex()
+        {
+            if (Suppressed) return;
+            var db = ItemSystem.ItemDatabase.Instance;
+            if (db == null) return;
+            int itemTotal = 0, itemOwned = 0;
+            foreach (var it in db.GetAllItems())
+            {
+                if (it == null) continue;
+                if (it.category != ItemSystem.ItemCategory.Weapon && it.category != ItemSystem.ItemCategory.Passive
+                    && it.category != ItemSystem.ItemCategory.Consumable) continue;
+                if (ItemIds.HiddenInCodexUntilOwned(it.id)) continue;
+                itemTotal++;
+                if (Codex.CodexRecord.ItemOwned(it.id)) itemOwned++;
+            }
+            int bookTotal = 0, bookOpen = 0;
+            foreach (var v in Codex.WorldVignettes.All)
+            {
+                if (v == null) continue;
+                bookTotal++;
+                if (Codex.VignetteUnlockState.IsUnlocked(v)) bookOpen++;
+            }
+            if (itemTotal == 0 || bookTotal == 0) return;
+            if (itemOwned * 2 >= itemTotal && bookOpen * 2 >= bookTotal) Unlock(Cat.CodexHalf);
+            if (itemOwned >= itemTotal && bookOpen >= bookTotal) Unlock(Cat.CodexFull);
+        }
+
+        // ============================================================
+        //  整備パネル (ランの外)
+        // ============================================================
+
+        /// <summary>整備パネルに点を振った (MetaProgressManager.TryAssignRank)。</summary>
+        public static void NotePanelAssigned(MetaProgressState s)
+        {
+            if (Suppressed || s == null) return;
+            if (s.TotalAssignedPoints() >= MetaPanel.MaxPoints) Unlock(Cat.PanelFull);
+        }
+
+        // ============================================================
         //  店
         // ============================================================
 
@@ -447,6 +643,8 @@ namespace MetaProgression.Achievements
             public bool active, usedConsumable, purchased, rerolled, playerFled, relicEquipped, cursedRelicEquipped;
             public int startMaxHp, damageTaken, combatRequestedHeal, hpOneStreak, shopPurchases, shopSales, shopRerolls, difficulty;
             public List<string> escapedEnemyIds = new List<string>();
+            public int floorFights, combatMaxEscStage;
+            public bool floorFound, combatBerserk;
         }
 
         public static RunProgressState CaptureRun()
@@ -459,6 +657,7 @@ namespace MetaProgression.Achievements
             s.startMaxHp = run.startMaxHp; s.damageTaken = run.damageTaken; s.combatRequestedHeal = run.combatRequestedHeal;
             s.hpOneStreak = run.hpOneStreak; s.shopPurchases = run.shopPurchases; s.shopSales = run.shopSales;
             s.shopRerolls = run.shopRerolls; s.difficulty = run.difficulty;
+            s.floorFights = run.floorFights; s.floorFound = run.floorFound; s.combatMaxEscStage = run.combatMaxEscStage; s.combatBerserk = run.combatBerserk;
             s.escapedEnemyIds.AddRange(run.escapedEnemyIds);
             s.escapedEnemyIds.Sort(StringComparer.Ordinal);
             return s;
@@ -475,6 +674,7 @@ namespace MetaProgression.Achievements
                 startMaxHp = s.startMaxHp, damageTaken = s.damageTaken, combatRequestedHeal = s.combatRequestedHeal,
                 hpOneStreak = s.hpOneStreak, shopPurchases = s.shopPurchases, shopSales = s.shopSales,
                 shopRerolls = s.shopRerolls, difficulty = s.difficulty,
+                floorFights = s.floorFights, floorFound = s.floorFound, combatMaxEscStage = s.combatMaxEscStage, combatBerserk = s.combatBerserk,
             };
             if (s.escapedEnemyIds != null) foreach (var id in s.escapedEnemyIds) run.escapedEnemyIds.Add(id);
             // 持ち込みの遺物は再開の時に読み直す (中断の間に整備パネルで持ち込むと、 持たざる者を見逃していた・2026-11-17)。

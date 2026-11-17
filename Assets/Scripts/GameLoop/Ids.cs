@@ -215,6 +215,12 @@ namespace GameLoop
         /// <summary>消費アイテムの Tier 段数 (1〜4)。</summary>
         public const int ConsumableMaxTier = 4;
 
+        // === 武器の家系 (items.json の family・2026-11-17 に定数化) ===
+        //   段階式の武器 (WeaponProgression) と実績〈四つの得物〉が読む。 家系は id の綴りでなく items.json の family で読む。
+        public const string FamilySword = "sword", FamilyAxe = "axe", FamilyDagger = "dagger", FamilyShield = "shield";
+        /// <summary>段階式の武器の 4 家系 (剣・斧・短剣・盾)。</summary>
+        public static readonly string[] WeaponFamilies = { FamilySword, FamilyAxe, FamilyDagger, FamilyShield };
+
         /// <summary>系統と Tier(1〜4) から消費アイテムの id を引く。 無ければ null。
         ///
         /// <para><b>id を組み立てない</b> (2026-09-22)。 id は表示名になったので

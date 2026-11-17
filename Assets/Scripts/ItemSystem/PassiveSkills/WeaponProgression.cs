@@ -63,10 +63,10 @@ namespace ItemSystem.PassiveSkills
         // 家系プレフィックス → 構成（上のラダー配列より後に初期化されるよう宣言順に注意）
         private static readonly Dictionary<string, Family> Families = new Dictionary<string, Family>
         {
-            ["sword"]  = new Family { aLine = SwordReach, bLine = Duelist,    uniq1 = "切り返し",   uniq2 = "不滅の刃" },
-            ["axe"]    = new Family { aLine = Fervor,     bLine = ArmorBreak, uniq1 = "捨て身",     uniq2 = "血令" },
-            ["dagger"] = new Family { aLine = SwiftHand,  bLine = VenomHand,  uniq1 = "急所",       uniq2 = "処刑" },
-            ["shield"] = new Family { aLine = Bulwark,    bLine = ShieldBash, uniq1 = "堅守の構え", uniq2 = "黎明" },
+            [GameLoop.ItemIds.FamilySword]  = new Family { aLine = SwordReach, bLine = Duelist,    uniq1 = "切り返し",   uniq2 = "不滅の刃" },
+            [GameLoop.ItemIds.FamilyAxe]    = new Family { aLine = Fervor,     bLine = ArmorBreak, uniq1 = "捨て身",     uniq2 = "血令" },
+            [GameLoop.ItemIds.FamilyDagger] = new Family { aLine = SwiftHand,  bLine = VenomHand,  uniq1 = "急所",       uniq2 = "処刑" },
+            [GameLoop.ItemIds.FamilyShield] = new Family { aLine = Bulwark,    bLine = ShieldBash, uniq1 = "堅守の構え", uniq2 = "黎明" },
             // curse 系列 (curse_t1〜t4) は 2026-07-17 削除。 uniq1=CurseBind / uniq2=Abyss は class 残置・アイテムから参照なし。
             // 複合武器 6 品 (swordaxe/swordshield/sworddagger/axeshield/axedagger/shielddagger) は
             //   2026-09-21 削除。 T2〜T4 の純ラダーで足りる (GAME.md §24)。

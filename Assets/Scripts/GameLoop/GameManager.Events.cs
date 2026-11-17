@@ -129,6 +129,7 @@ namespace GameLoop
                 {
                     Run.ownedFlags.Add(ObservatorySeenFlag);
                     ObservatoryState.NoteMet();
+                    MetaProgression.Achievements.AchievementService.NoteObservatoryMet();   // 実績〈星を数える人〉
                     if (withCopy)
                     {
                         // **選択肢ではなく上乗せ。** ラン跨ぎで持ち越した見返りなので、
@@ -151,6 +152,7 @@ namespace GameLoop
             }
             // メタ: イベント発見トークン
             MetaProgression.MetaTokenEarner.OnEventEncountered();
+            MetaProgression.Achievements.AchievementService.NoteEventSeen(ee.Current.name);   // 実績〈旅の目録〉
             SetPhase(GamePhase.EventEncounter);
         }
 
@@ -167,6 +169,7 @@ namespace GameLoop
             var result = ee.ResolveChoice(index);
             eventChoiceResolved = true;
             if (result == null) return;
+            if (!result.triggerRandomEvent) MetaProgression.Achievements.AchievementService.NoteEventDone();   // 実績〈寄り道の常連〉 (別のイベントへの振り直しは数えない)
 
             // 〈灰に埋もれた基地・再訪〉の「手記の最後の頁を開く」で〈真理〉を立てるのは、 選択肢の効果「真理を得る」(EventEffectType.GainTruth・
             //   EventEffectExecutor) ── 選択肢の並びにも名前にも依存しない。
@@ -191,7 +194,10 @@ namespace GameLoop
             if (result.triggerRandomEvent)
             {
                 if (ee.Begin(Run, excludeRandomEvent: true) && ee.Current != null)
+                {
                     eventChoiceResolved = false;  // 振り直し先を改めて解決させる
+                    MetaProgression.Achievements.AchievementService.NoteEventSeen(ee.Current.name);   // 実績〈旅の目録〉
+                }
                 else
                     eventChoiceResolved = true;   // 該当なし → 通常終了
                 return;

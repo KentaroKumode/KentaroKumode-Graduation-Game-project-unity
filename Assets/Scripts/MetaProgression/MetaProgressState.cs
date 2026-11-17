@@ -47,6 +47,16 @@ namespace MetaProgression
         public List<string> achievementLayer2Bosses = new List<string>();
         /// <summary>[実績] 背負って 3 層のボスを倒した「大罪:○○」の種類 (ChallengeCards の kind・七つの重荷)。</summary>
         public List<string> achievementSinsCarried = new List<string>();
+        /// <summary>[実績] エリートを倒した数 (精鋭狩り)。</summary>
+        public int achievementEliteKills;
+        /// <summary>[実績] 選択肢を選んで終えたイベントの数 (寄り道の常連)。</summary>
+        public int achievementEventsDone;
+        /// <summary>[実績] 出会ったイベントの名前 (EventDefinition.name・旅の目録)。</summary>
+        public List<string> achievementEventsSeen = new List<string>();
+        /// <summary>[実績] 受けた挑戦カードのバフの種類 (ChallengeCards の kind・品揃え)。</summary>
+        public List<string> achievementBuffsTaken = new List<string>();
+        /// <summary>[実績] 最後の段 (T4+) まで鍛えた武器の家系 (items.json の family・四つの得物)。</summary>
+        public List<string> achievementWeaponFamiliesMaxed = new List<string>();
 
         // (旧: 挑戦デバフの配点 `challenge` (§15-2) は 2026-11-10 に撤去 (#9)。 JsonUtility は未知の欄を黙って捨てる)
 

@@ -178,6 +178,9 @@ namespace GameLoop
                 run.equippedWeaponId = next;
             }
             if (!free) run.weaponMaterials -= cost;
+            // 実績〈鍛え上げ〉〈四つの得物〉: 段階式の武器が T4+ (これ以上鍛えられない) になった
+            if (prog && run.weaponPlus > 0 && NextTierWeaponId(run.equippedWeaponId) == null)
+                MetaProgression.Achievements.AchievementService.NoteWeaponMaxed(FamilyTierOf(run.equippedWeaponId).family);
             if (prevWeaponId != run.equippedWeaponId)
             {
                 Loadout.KeepOnlyEquippedWeapon(run);   // 武器は 1 本だけ: 前の段の武器を所持に残さない (2026-11-11)

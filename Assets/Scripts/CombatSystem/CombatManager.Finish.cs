@@ -263,6 +263,7 @@ namespace CombatSystem
                            : ItemSystem.PassiveSkills.DeathCause.Normal,
                 playerDamageBySource = BuildDamageBreakdown(ctx),
                 playerHPAtStart = _hpAtCombatStart,
+                enemyElite = (currentEnemy != null && currentEnemy.elite) || (ctx != null && ctx.currentEnemyKind == EnemyKind.Elite),
             };
         }
 

@@ -54,6 +54,7 @@ namespace GameLoop
             run.coins += granted;
             GainedTotal += granted;
             Note(run, source, granted);
+            MetaProgression.Achievements.AchievementService.NoteCoins(run.coins);   // 実績〈懐が重い〉
             return granted;
         }
 
@@ -66,6 +67,7 @@ namespace GameLoop
             if (granted <= 0) return 0;
             run.coins += granted;
             Note(run, source, granted);     // **免除経路も数える** (売却・開幕所持金)
+            MetaProgression.Achievements.AchievementService.NoteCoins(run.coins);   // 実績〈懐が重い〉
             return granted;
         }
     }

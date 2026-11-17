@@ -194,6 +194,7 @@ namespace GameLoop
         {
             if (CurrentPhase != GamePhase.GateRitual) return;
             RunStats.GateProvisionAfter += Run.provision;    // [計装] 支払い後。 45 (悲観・上限恒久ロック) を割っていないか
+            MetaProgression.Achievements.AchievementService.NoteGateCompleted(Run.gateFlaws == GateFlaw.None);   // 実績〈欠けのない起動〉
             Log(Run.gateFlaws == GateFlaw.None
                 ? "門は完全に起動した。"
                 : $"門が起動した ── 不完全なまま: {Run.gateFlaws}");
