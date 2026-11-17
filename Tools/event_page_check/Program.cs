@@ -73,6 +73,12 @@ static class Program
         Check(w4.Count == 3 && w4[1] == "" && w4[2] == "い", "改行文字の扱いは前と同じ (空行は残し、 末尾の改行は行にしない)");
         var w6 = JpTextLayout.Lines("そっとあなたへ差し出す", 80, a10);
         Check(w6.All(l => l.Length == 0 || l[0] != 'へ'), "ひらがな同士の間では折らない (行頭に「へ」を置かない) → " + string.Join("／", w6));
+        var w7 = JpTextLayout.Lines("隊商付きの売り子らしく", 60, a10);
+        Check(!w7.Any(l => l.EndsWith("売り")), "割らない語の中で折らない (「売り／子」) → " + string.Join("／", w7));
+        var w8 = JpTextLayout.Lines("顔をまともに見た。「私の勘定にはない」", 120, a10);
+        Check(!w8.Any(l => System.Text.RegularExpressions.Regex.IsMatch(l, "「.{0,3}$")), "開き括弧の後ろ 3 字以下で行を終えない → " + string.Join("／", w8));
+        var w9 = JpTextLayout.Lines("ゆっくりとあなたはそれをひろいあげる", 90, a10);
+        Check(w9.Take(w9.Count - 1).All(l => l.EndsWith("は") || l.EndsWith("を") || l.EndsWith("へ")), "ひらがな同士でも「を」「へ」「は」の後では折れる → " + string.Join("／", w9));
         var p9 = JpTextLayout.Pages("一二三四五六七八九", 10, 8, 8, a10);
         Check(p9.Count == 2 && p9[0].Count == 7 && p9[1].Count == 2, "段落が 1 行だけはみ出す時は前の頁から 1 行下ろす (8 + 1 → 7 + 2)");
         var w5 = JpTextLayout.Lines("あいうえおかきくけこさしすせそ", 50, a10);

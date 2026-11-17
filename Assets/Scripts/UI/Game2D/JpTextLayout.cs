@@ -20,7 +20,8 @@ namespace UI.Game2D
         /// <list type="number">
         /// <item><b>文節で折る</b>: 折ってよいのは文節の切れ目 (BudouX の日本語モデル・<see cref="JpBreakModel"/>) と空白の後だけ。 「映ってい／る。」のような語の途中では折らない。
         ///   ただし BudouX の切れ目でも、 ひらがな同士・カタカナ同士・漢字同士の間は捨てる (<see cref="BreakAllowed"/>・2026-11-17: 「護衛な／し」「手の／ひら」「虚／空」「あなた／へ」のような誤判定がこの形だった)。
-        ///   折るのは字の種類が変わる所 (ひらがな → 漢字など) と句読点・括弧の前後。 複合動詞の「拾い／上げ」は組版として許される切れ目なので残す</item>
+        ///   折るのは字の種類が変わる所 (ひらがな → 漢字など) と句読点・括弧の前後。 複合動詞の「拾い／上げ」は組版として許される切れ目なので残す。
+        ///   ひらがな同士でも助詞「を」「へ」「は」の後は折ってよい。 割らない語 (「売り子」) と、 開き括弧の後ろ 3 字以下で行が終わる所 (「「私の／」) では折らない</item>
         /// <item><b>禁則</b>: 行頭に句読点・閉じ括弧・小書きの仮名・長音・中黒などを置かない (<see cref="NoStart"/>)。 行末に開き括弧を置かない (<see cref="NoEnd"/>)。
         ///   ぶら下げはしない (幅 maxW を超えないことを保つ) ── 収まらない時は前の字ごと次の行へ追い出す</item>
         /// <item>文節 1 つが 1 行より長い時だけ、 禁則を守って字の間で折る (それも無理なら字の間で折る)</item>
@@ -163,12 +164,32 @@ namespace UI.Game2D
             return Script.Other;
         }
 
-        /// <summary>s[i-1] と s[i] の間で文節として折ってよいか: BudouX の切れ目で、 かつ字の種類が同じ (ひらがな・カタカナ・漢字) 2 字の間でない (i ≧ 1)。
+        /// <summary>割らない語 (2026-11-17・作者の承認)。 字の種類が変わる所で BudouX が切ってしまう名詞など (「売り／子」)。 見つかったら足す。</summary>
+        private static readonly string[] NoBreakWords = { "売り子" };
+
+        /// <summary>ひらがな同士の間でも、 左の字がこれなら BudouX の切れ目で折ってよい (2026-11-17・作者の承認)。 ほぼ必ず助詞として使う字だけ
+        /// (「と」「の」「か」「が」は「礼と／して」「手の／ひら」「剥が／し」の誤判定があったので入れない)。</summary>
+        private const string HiraParticles = "をへは";
+
+        /// <summary>開き括弧の後ろがこの字数以下で行が終わる折れ方はしない (「「私の／勘定には…」・2026-11-17・作者の承認)。</summary>
+        public const int OpenQuoteMin = 3;
+
+        /// <summary>s[i-1] と s[i] の間で文節として折ってよいか (i ≧ 1): BudouX の切れ目で、 かつ次のどれにも当たらない。
+        /// 字の種類が同じ (ひらがな・カタカナ・漢字) 2 字の間 (ひらがな同士は左が <see cref="HiraParticles"/> なら許す)・
+        /// <see cref="NoBreakWords"/> の語の中・開き括弧の後ろ <see cref="OpenQuoteMin"/> 字以下の所。
         /// 禁則は見ない (<see cref="NoStart"/> / <see cref="NoEnd"/> は別に見る)。</summary>
         public static bool BreakAllowed(string s, int i)
         {
             var a = ScriptOf(s[i - 1]);
-            if (a != Script.Other && a == ScriptOf(s[i])) return false;
+            if (a != Script.Other && a == ScriptOf(s[i]) && !(a == Script.Hira && HiraParticles.IndexOf(s[i - 1]) >= 0)) return false;
+            foreach (var w in NoBreakWords)
+                for (int k = Math.Max(0, i - w.Length + 1); k < i && k + w.Length <= s.Length; k++)
+                    if (string.CompareOrdinal(s, k, w, 0, w.Length) == 0) return false;
+            for (int k = i - 1; k >= 0 && k >= i - 1 - OpenQuoteMin; k--)
+            {
+                if (NoStart(s[k]) && "」』）】〕〉》".IndexOf(s[k]) >= 0) break;
+                if (NoEnd(s[k])) return false;
+            }
             return PhraseBoundary(s, i);
         }
 
