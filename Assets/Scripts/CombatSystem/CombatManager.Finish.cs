@@ -262,6 +262,7 @@ namespace CombatSystem
                 deathCause = (playerHP <= 0 && ctx != null) ? ctx.lastDamageCause
                            : ItemSystem.PassiveSkills.DeathCause.Normal,
                 playerDamageBySource = BuildDamageBreakdown(ctx),
+                playerHPAtStart = _hpAtCombatStart,
             };
         }
 

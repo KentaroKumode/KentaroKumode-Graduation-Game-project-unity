@@ -30,6 +30,10 @@ namespace CombatSystem
         // HP経過
         public int playerHPAfter;
         public int enemyHPAfter;
+
+        // ── 読むための欄 (実績・2026-11-17)。 戦闘の計算には使わない ──
+        /// <summary>このターンの主攻撃を当てる直前の敵の HP (1 体目)。 主攻撃・固定ダメの前 (敵の HP は 0 で止まるので、 倒したターンの「残り HP」は enemyHPAfter から戻せない)。</summary>
+        public int enemyHPBeforeAttack;
     }
 
     /// <summary>
@@ -59,5 +63,10 @@ namespace CombatSystem
         public ItemSystem.PassiveSkills.DeathCause deathCause;
         /// <summary>この戦闘の総被ダメの **ソース別内訳** (キル時でなく支配率診断用)。</summary>
         public Dictionary<ItemSystem.PassiveSkills.DeathCause, int> playerDamageBySource;
+        /// <summary>[読むための欄・実績 2026-11-17] 戦闘の開始時の自 HP。 <see cref="damageTaken"/> は最大 HP 基準 (学習が読む) なので、
+        /// 「この戦闘で HP を減らしたか」は 開始 HP − 終了 HP + 回復 で見る (<see cref="HpLostThisCombat"/>)。</summary>
+        public int playerHPAtStart;
+        /// <summary>この戦闘で失った HP (開始 HP − 終了 HP + 戦闘中の回復・下限 0)。</summary>
+        public int HpLostThisCombat => System.Math.Max(0, playerHPAtStart - System.Math.Max(0, playerHPRemaining) + System.Math.Max(0, healApplied));
     }
 }

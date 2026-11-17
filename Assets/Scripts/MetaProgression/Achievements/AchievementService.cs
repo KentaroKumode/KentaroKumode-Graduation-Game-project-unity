@@ -201,13 +201,20 @@ namespace MetaProgression.Achievements
 
         public static void NoteConsumableUsed() { if (Ready) run.usedConsumable = true; }
         public static void NoteExternalHpDamage(int amount) { if (Ready && amount > 0) run.damageTaken += amount; }
-        public static void NotePlayerFled() { if (Ready) run.playerFled = true; }
-        public static void NoteEnemyEscaped(string enemyId) { if (Ready && !string.IsNullOrEmpty(enemyId)) run.escapedEnemyIds.Add(enemyId); }
+        /// <summary>自分が戦闘から逃げた (GameManager.HandleFledBattle)。 <paramref name="enemyId"/> = 逃げた相手 (昨日の敵は今日も敵)。
+        /// 2026-11-17 まで「敵が逃げた」(偽の商人・旧挑戦デバフと一緒に廃止) を数えていて、 取れなかった。</summary>
+        public static void NotePlayerFled(string enemyId)
+        {
+            if (!Ready) return;
+            run.playerFled = true;
+            if (!string.IsNullOrEmpty(enemyId)) run.escapedEnemyIds.Add(enemyId);
+        }
 
         public static void NoteCombatEnded(RunState state, CombatResult result, CombatContext context)
         {
             if (!Ready || state == null) return;
-            run.damageTaken += Math.Max(0, result.damageTaken);
+            // 受けたダメージは戦闘の開始時の HP を基準に数える (damageTaken は最大 HP 基準で、 減った状態で始めた戦闘を水増しする)
+            run.damageTaken += result.HpLostThisCombat;
             if (!result.playerWon) return;
 
             var mgr = MetaProgressManager.Instance;
@@ -249,11 +256,13 @@ namespace MetaProgression.Achievements
                 }
             }
             if (depth == Depth(3)) CheckLayer3Boss(state);
-            if (result.damageTaken == 0) Unlock(Cat.BossNoHpDamage);
+            // 傷一つなく: 開始時の HP を基準にする (0 層の宝箱は上で外した・2026-11-17 までは攻撃 0 の宝箱で初回ランに勝手に取れていた)
+            if (depth >= Depth(2) && result.HpLostThisCombat == 0) Unlock(Cat.BossNoHpDamage);
             if (depth >= Depth(2) && result.totalTurns <= 1) Unlock(Cat.BossOneTurn);
             if (result.enemyId == BossIds.Layer6Ash)
             {
-                float blaze = context != null ? context.GetAccumulated(ItemSystem.PassiveSkills.Effects.BlazeBrand.StackKey) : 0f;
+                // 灰は灰へ: 戦闘を通して積もった烈炎の累計 (GainedKey) を見る。 今の数 (StackKey) は〈業火〉で 0 に戻るので、 積ませても取れていた (2026-11-17 まで)
+                float blaze = context != null ? context.GetAccumulated(ItemSystem.PassiveSkills.Effects.BlazeBrand.GainedKey) : 1f;
                 if (blaze <= 0f) Unlock(Cat.HiddenNoBlazeBoss6);
                 if (run.difficulty >= ChallengeCards.MaxDifficulty) Unlock(Cat.ChallengeKingD10);
             }
@@ -318,13 +327,14 @@ namespace MetaProgression.Achievements
             return l;
         }
 
+        /// <summary>やりすぎ: 攻撃の前の敵の HP (<see cref="TurnResult.enemyHPBeforeAttack"/>) が 1 で、 そのターンの主攻撃 + 固定ダメージが 100 以上で倒した。
+        /// 2026-11-17 までは「倒した後の HP + 与ダメ」で攻撃前を戻していたが、 敵の HP は 0 で止まるので「残り 1」と「100 以上」が同時に立たなかった。</summary>
         private static void CheckOverkill(CombatResult result)
         {
             if (result.turnLog == null || result.turnLog.Count == 0) return;
             var t = result.turnLog[result.turnLog.Count - 1];
             int dealt = Math.Max(0, t.totalDamage) + Math.Max(0, t.fixedDamage);
-            int hpBefore = t.enemyHPAfter + dealt;
-            if (t.enemyHPAfter <= 0 && hpBefore == 1 && dealt >= Cat.OverkillGoal) Unlock(Cat.HiddenOverkill);
+            if (t.enemyHPAfter <= 0 && t.enemyHPBeforeAttack == 1 && dealt >= Cat.OverkillGoal) Unlock(Cat.HiddenOverkill);
         }
 
         private static void CheckThirteenthEnd(RunState state, CombatResult result)
@@ -345,12 +355,16 @@ namespace MetaProgression.Achievements
             run.shopPurchases = run.shopSales = run.shopRerolls = 0;
         }
 
-        public static void NoteShopPurchase(int coinsAfter)
+        /// <summary>店で買った (棚の品・強化素材・物資の包・囮罠・端子)。
+        /// <paramref name="countsAsItem"/> = 品 (秘宝・武器・消耗品・囮罠) ── 清貧はこれだけ数える (物資の包・強化素材・端子・出目パーツは数えない・作者 2026-11-17)。
+        /// <paramref name="surcharged"/> = 値下げ交渉の後の割増が掛かった店で買った (面の皮)。 しつこい交渉・買い物上手は全部の買い物を数える。</summary>
+        public static void NoteShopPurchase(int coinsAfter, bool countsAsItem, bool surcharged)
         {
             if (!Ready) return;
-            run.purchased = true;
+            if (countsAsItem) run.purchased = true;
             run.shopPurchases++;
             if (coinsAfter == 0) Unlock(Cat.HiddenExactZeroPurchase);
+            if (surcharged) Unlock(Cat.RobberyRebuy);
             CheckStubbornShop();
         }
 
@@ -463,6 +477,11 @@ namespace MetaProgression.Achievements
                 shopRerolls = s.shopRerolls, difficulty = s.difficulty,
             };
             if (s.escapedEnemyIds != null) foreach (var id in s.escapedEnemyIds) run.escapedEnemyIds.Add(id);
+            // 持ち込みの遺物は再開の時に読み直す (中断の間に整備パネルで持ち込むと、 持たざる者を見逃していた・2026-11-17)。
+            //   持たざる者: どちらかの時点で 1 個でも持ち込んだら外れる。 揃いの至宝: 両方の時点で 3 個揃っている時だけ。
+            ReadRelicLoadout(out bool anyNow, out bool fullNow);
+            run.relicEquipped |= anyNow;
+            run.cursedRelicEquipped &= fullNow;
         }
     }
 }

@@ -122,6 +122,7 @@ namespace GameLoop
             if (!ProvisionPayment.TryPay(Run, s.price, "端子を買う")) return false;
             s.sold = true;
             Run.terminalDeck.Add(s.id);
+            MetaProgression.Achievements.AchievementService.NoteShopPurchase(Run.coins, countsAsItem: false, surcharged: false);   // 端子は品ではない (清貧に数えない)
             TerminalDiag.NoteShopBuy(s.id);   // [計装 #106]
             Log($"端子を買った: {s.id} (-{s.price}G・山札 {Run.terminalDeck.Count} 枚)");
             return true;

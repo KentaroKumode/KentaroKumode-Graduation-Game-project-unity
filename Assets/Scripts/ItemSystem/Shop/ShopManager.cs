@@ -155,13 +155,22 @@ namespace ItemSystem.Shop
             run.coinsSpent += ProvisionPackPrice;
             ProvisionPacksLeft--;
             GameLoop.ProvisionSystem.Supply(run, ProvisionPackAmount);
+            MetaProgression.Achievements.AchievementService.NoteShopPurchase(run.coins, countsAsItem: false, surcharged: false);   // 物資の包は品ではない (清貧に数えない)
             Debug.Log($"[ShopManager] 物資を買った +{ProvisionPackAmount} (-{ProvisionPackPrice}G / 残り {ProvisionPacksLeft} 包)");
             return true;
         }
 
         /// <summary>囮罠 (8G) を買う。 在庫の上限は無い。</summary>
         public bool TryBuyLure(RunState run)
-            => TryBuyMapTool(run, GameLoop.ItemIds.Lure, MapSystem.FreeMove.FreeMapParams.ShopLurePrice);
+        {
+            if (!TryBuyMapTool(run, GameLoop.ItemIds.Lure, MapSystem.FreeMove.FreeMapParams.ShopLurePrice)) return false;
+            MetaProgression.Achievements.AchievementService.NoteShopPurchase(run.coins, countsAsItem: true, surcharged: false);   // 囮罠は品 (清貧に数える・作者 2026-11-17)
+            return true;
+        }
+
+        /// <summary>値下げ交渉の後の割増 (<see cref="RobberySurcharge"/>) が今の店の品の値段に掛かっているか (実績〈面の皮〉が読む)。</summary>
+        public static bool RobberySurchargeActive(RunState run)
+            => run != null && run.shopRobberyDone && !RobberyBlocksShops && RobberySurcharge > 1f;
 
         private static bool TryBuyMapTool(RunState run, string id, int price)
         {
@@ -705,7 +714,7 @@ namespace ItemSystem.Shop
                 // 兵站 r10: 不足分は物資で払える。 未解禁ならゴールドのみで判定する。
                 if (!GameLoop.ProvisionPayment.TryPay(run, price, "強化素材"))
                 { Log("ゴールド不足"); return false; }
-                MetaProgression.Achievements.AchievementService.NoteShopPurchase(run.coins);
+                MetaProgression.Achievements.AchievementService.NoteShopPurchase(run.coins, countsAsItem: false, surcharged: RobberySurchargeActive(run));   // 強化素材は品ではない (清貧に数えない)
                 run.weaponMaterials++;
                 Current.materialPurchaseCount++;
                 slot.price = Current.CurrentMaterialPrice; // 表示価格を更新
@@ -734,7 +743,8 @@ namespace ItemSystem.Shop
 
             if (!GameLoop.ProvisionPayment.TryPay(run, pay, slot.itemId))
             { Log("支払いに失敗"); return false; }
-            MetaProgression.Achievements.AchievementService.NoteShopPurchase(run.coins);
+            // 実績: 清貧の「買う」は品だけ (秘宝・武器・消耗品・囮罠)。 出目パーツは数えない (作者 2026-11-17「アイテムのみ」)
+            MetaProgression.Achievements.AchievementService.NoteShopPurchase(run.coins, countsAsItem: slot.kind != ShopSlotKind.FacePart, surcharged: RobberySurchargeActive(run));
             Current.purchaseCount++;
             if (tally && pay < slot.price) { TallyDiscounts++; Log($"〈合札〉: 2 品目以降 {TallyDiscount}G 引き"); }
             if (tradeIn > 0) Log($"下取り: {run.equippedWeaponId} を {tradeIn}G で引き取り、 差額 {pay}G で乗り換え");

@@ -365,7 +365,6 @@ namespace CombatSystem
             if (fleeAfterTurns > 0 && ctx != null && ctx.currentTurn >= fleeAfterTurns
                 && playerHP > 0 && enemyHP > 0)
             {
-                MetaProgression.Achievements.AchievementService.NoteEnemyEscaped(currentEnemy?.id);
                 Debug.Log($"[CombatManager] 偽の商人: {fleeAfterTurns}ターン経過 → 逃走（戦闘強制終了）");
                 FinishCombat();
                 _stepResult = new TurnResult
@@ -1168,6 +1167,7 @@ namespace CombatSystem
                     attackSum, blockSum, dealtDmg + dealtFixed);
             }
 
+            result.enemyHPBeforeAttack = enemyHP;   // [読むための欄・実績〈やりすぎ〉] 主攻撃を当てる直前の敵の HP
             HpLossDiag.Lose(ref enemyHP, dealtDmg, "通常攻撃");
             NoteBossDownMainHit(dealtDmg, ctx.currentTurn);   // ボスのダウン (2026-11-14): 目盛りを割れるのは通常攻撃だけ (固定ダメの枠より前の HP で判定)
             HpLossDiag.Lose(ref enemyHP, dealtFixed, "固定ダメ");

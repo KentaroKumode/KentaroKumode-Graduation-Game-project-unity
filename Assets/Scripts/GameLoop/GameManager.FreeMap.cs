@@ -550,9 +550,9 @@ namespace GameLoop
         /// <summary>戦闘から逃げた。 通常の戦闘なら直前の点へ戻り、 そのマスは使い切りにならない (敵が残る)。</summary>
         private void HandleFledBattle()
         {
-            // 実績〈逃げずに 5 層のボスを倒す〉(NoFleeBoss5) の判定に使う (issue #120)。 使い魔・追跡者・通常の戦闘のどれでも数える。
+            // 実績〈猪突猛進〉(一度も逃げずに 3 層のボス・issue #120) と〈昨日の敵は今日も敵〉(逃げた相手と同じ敵に勝つ) の判定に使う。 使い魔・追跡者・通常の戦闘のどれでも数える。
             //   救済で生き延びた (EndPursuerFightAsFled(payCost: false)) のは自分で逃げたのではないので、 ここを通らず数えない。
-            MetaProgression.Achievements.AchievementService.NotePlayerFled();
+            MetaProgression.Achievements.AchievementService.NotePlayerFled(CurrentEnemy?.id);
             if (_inFamiliarFight)
             {
                 PayFleeCost();
