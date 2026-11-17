@@ -72,7 +72,7 @@ namespace UI.Game2D
         {
             if (_inst == null) { Attach(); if (_inst == null) _inst = FindObjectOfType<Game2DGalleryScreen>(); }
             var s = _inst;
-            if (s == null || _shown || Game2DModal.Active || !CanOpen() || !s.EnsureQuad()) return false;
+            if (s == null || _shown || Game2DModal.Active || Game2DBoot.Waiting || !CanOpen() || !s.EnsureQuad()) return false;      // 起動待ち (TOUCH DISPLAY) の間は開かない
             s._view.Reset();
             if (s._tex == null) { s._tex = new Texture2D(W, H, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp, name = "Game2DGallery" }; s._pix = new KitPix(W, H); }
             _shown = true; s._fadeT = 0f;
