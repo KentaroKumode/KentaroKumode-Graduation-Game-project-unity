@@ -37,7 +37,7 @@ namespace MetaProgression
         /// <summary>着いたことのある層 (Run.Depth)。</summary>
         public List<int> codexFloors = new List<int>();
 
-        // === Achievements (docs/achievements.md) ===
+        // === 実績 (docs/GAME.md §15-6・正本は Achievements/AchievementCatalog.cs) ===
         // Parallel lists keep JsonUtility compatibility. IDs are stable strings.
         public List<string> unlockedAchievementIds = new List<string>();
         public List<long> achievementUnlockUtcTicks = new List<long>();
