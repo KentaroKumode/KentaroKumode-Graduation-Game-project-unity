@@ -318,13 +318,14 @@ namespace MetaProgression.Achievements
                 Unlock(Cat.Clear7);
                 if (VescaClock.Held(state)) Unlock(Cat.VescaClock);
                 if (run.difficulty >= ChallengeCards.MaxDifficulty) Unlock(Cat.ChallengeVescaD10);
+                CheckSinsAtVesca(state);
             }
             // あと一ターンだけ: 〈最後の審判〉の刻限の 1 ターン前 (ラン通算の戦闘ターン・0 層は数えない) にボスを倒す
             int deadline = MetaDebuffApplicator.GetJudgmentTurnThreshold();
             if (deadline > 0 && state.totalCombatTurns == deadline - 1) Unlock(Cat.HiddenTurn124);
         }
 
-        /// <summary>3 層 (深さ 5) のボスを倒した: 挑戦の難易度・職業・縛り・揃いの至宝・七つの重荷。</summary>
+        /// <summary>3 層 (深さ 5) のボスを倒した: 挑戦の難易度・職業・縛り・揃いの至宝。</summary>
         private static void CheckLayer3Boss(RunState state)
         {
             int d = run.difficulty;
@@ -347,9 +348,12 @@ namespace MetaProgression.Achievements
             if (state.coins == 0) Unlock(Cat.ZeroGoldBoss6);
             if (!run.relicEquipped && !run.usedConsumable) Unlock(Cat.NoRelicConsumableClear7);
             if (run.cursedRelicEquipped) Unlock(Cat.CursedRelicClear7);
+        }
 
-            // 七つの重荷: 背負っている「大罪:○○」の種類を通算で数える。
-            //   注意: 大罪は IV の札で 5 層の入口でしか配られないので、 今の配り方ではここで背負っていない (docs/GAME.md §23-31・作者の判断待ち)
+        /// <summary>七つの重荷 (隠し): ヴェスカを倒した時に背負っている「大罪:○○」の種類を通算で数え、 7 種そろったら解除。
+        /// 大罪は難易度 10 の IV の札で 5 層の入口でしか配られないので、 倒す相手はヴェスカ (2026-11-17 作者の決定 a。 それまでは 3 層のボスで、 取れなかった)。</summary>
+        private static void CheckSinsAtVesca(RunState state)
+        {
             var meta = Meta;
             if (meta != null && state.challengePicks != null)
             {

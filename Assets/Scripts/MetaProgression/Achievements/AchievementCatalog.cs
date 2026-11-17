@@ -133,7 +133,7 @@ namespace MetaProgression.Achievements
             D(ChallengeD6, C.Challenge, 4, "向かい風", $"難易度{DifficultyMid}以上で、3層のボスを倒す"),
             D(ChallengeD10, C.Challenge, 5, "底の底", $"難易度{ChallengeCards.MaxDifficulty}で、3層のボスを倒す"),
             // 注意: 大罪は IV の札で、 IV は 5 層の入口でしか配られない ── 今の配り方では 3 層のボスの時に背負っていない (docs/GAME.md §23-31・作者の判断待ち)
-            D(SinsAll, C.Challenge, 5, "七つの重荷", "「大罪:○○」の札を7種それぞれ背負って、3層のボスを倒す（通算）"),
+            D(SinsAll, C.Challenge, 5, "七つの重荷", "「大罪:○○」の札を7種それぞれ背負って、ヴェスカを倒す（通算）", H),   // 2026-11-17 作者の決定: 3 層のボス → ヴェスカ・隠し (大罪は 5 層の入口でしか配られない)
             D(BuffsAll, C.Challenge, 3, "品揃え", "挑戦カードのバフを、全種類受け取る（通算）"),
             D(ChallengeKingD10, C.Challenge, 5, "燃え残り", $"難易度{ChallengeCards.MaxDifficulty}で、灰燼の王を倒す", H),   // 名前は仮 (作者 2026-11-17 の決定待ち)
             D(ChallengeVescaD10, C.Challenge, 5, "底を割る", $"難易度{ChallengeCards.MaxDifficulty}で、ヴェスカを倒す", H),   // 名前は仮 (作者 2026-11-17 の決定待ち)
