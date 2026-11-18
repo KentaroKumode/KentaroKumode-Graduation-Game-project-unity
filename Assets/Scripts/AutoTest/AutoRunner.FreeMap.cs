@@ -244,7 +244,31 @@ namespace AutoTest
                 if (n.revealed && n.EffectiveType == TileType.Boss) boss = i;
             }
             if (navStormOracleBoss) boss = sim.Layout.goal;   // [測定 2026-11-18] 上限の見当: ボスの位置を知っているとして動く (既定 false)
-            return new StormNavView(sim, revealed, boss);
+            var sv = new StormNavView(sim, revealed, boss);
+            // [測定 2026-11-18・第 4 層の踏み込み過ぎの検証] 道すがらの戦闘の点を、 その戦闘で失う HP の見込み × 倍率だけ道の費用に入れる (既定 0 = 足さない)
+            var run = GameManager.Instance?.Run;
+            if (navD6PathFightCost > 0f && run != null && FloorPlan.OrdinalOf(run.Depth) == D6Layer)
+            {
+                var extra = new double[sim.Layout.Count];
+                float maxHp = Mathf.Max(1f, run.playerMaxHP);
+                foreach (var n in map.GetAllNodes())
+                {
+                    int i = n.index;
+                    if (i < 0 || i >= extra.Length || n.activated || i == boss) continue;
+                    char kind = !n.revealed ? 'U' : n.EffectiveType == TileType.Battle ? 'N' : n.EffectiveType == TileType.EliteBattle ? 'E' : ' ';
+                    if (kind == ' ') continue;
+                    // 1 戦の損 (最大 HP の割合): 戦闘名が見えていればその学習値 → 種類の学習値 → 仮置き (MacroFight と同じ順)
+                    string key = n.revealed && n.encounterRevealed ? EncounterDangerStats.KeyOf(n, run.Depth) : null;
+                    double mean;
+                    if (key == null || !EncounterDangerStats.TryGet(key, out _, out mean, out _, out _))
+                        if (!EncounterDangerStats.TryGetKind(D6Layer, kind == 'E' ? 'E' : 'N', out mean, out _))
+                            mean = kind == 'E' ? EliteHpLossFallback : NormalHpLossFallback;
+                    if (kind == 'U') mean *= MacroUnknownWeight;
+                    extra[i] = navD6PathFightCost * mean * maxHp / FreeMapParams.HpPerSupply;
+                }
+                sv.NodeExtraCost = extra;
+            }
+            return sv;
         }
 
         /// <summary>[計装] 層が変わったら判断の記録を戻し、 ボスの点が見えた手番を記録する (種別が見えている点だけを見る・口によらない)。</summary>

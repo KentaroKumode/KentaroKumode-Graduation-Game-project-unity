@@ -252,6 +252,9 @@ namespace AutoTest
         /// <summary>[測定 2026-11-18・同上] Super の計画が、 第 4 層 (深さ 6) の HP の重み (<c>MacroHpPer10</c>・戦闘の損と休憩と嵐の HP に掛かる) に掛ける倍率。 既定 1 = 今までと同じ。
         /// BOT の値付けのつまみ (ゲームの数値ではない)。 乱数は引かない。</summary>
         public float navD6HpWeightMul = 1f;
+        /// <summary>[測定 2026-11-18・同上] 嵐の航行の道選び (<see cref="StormNavView.StormStep"/>) が、 第 4 層 (深さ 6) で道すがらの戦闘の点 (行き先でない・未起動の通常・精鋭・種別の見えていない点)
+        /// を「その戦闘で失う HP の見込み (学習の戦闘名か種類の平均 × 最大 HP) × この倍率」だけ費用に入れる (着いた点は必ず起動するので、 道順は「どのマスを踏むか」)。 0 = 使わない = 既定。 乱数は引かない。</summary>
+        public float navD6PathFightCost = 0f;
         /// <summary>[測定 2026-11-13] 天候の作り。 本体の GameHooks.StormEnabled へ流す (ラン終了で true へ)。
         /// true (既定) = 嵐 (静かな時間のあとに輪が縮む・嵐の中の点への移動で HP・嵐の中の戦闘は敵に〈嵐〉・始点は最外周から・ボスの点は伏せる・GAME.md §5-12)。
         /// BOT は既定 (2026-11-18〜) で嵐を読む (<see cref="navStormAware"/> と第 2 巡の 3 つ = T2)。 口を切ると、 終点の位置を知っていて、 フェーズ 3 で出口へ切り替え、 出口までの見積もりに嵐の HP を足すだけ (最小の対応)。
@@ -913,7 +916,8 @@ namespace AutoTest
                  + $"/ 第 4 層の控え HP {(navD6HpFloorPct > 0 ? navD6HpFloorPct + "% 未満で戦わない" : "使わない")} (navD6HpFloorPct={navD6HpFloorPct})"
                  + $"・精鋭 {(navD6NoElite ? "取らない" : "取る")} (navD6NoElite={navD6NoElite})"
                  + $"・嵐の中の戦闘 {(navD6NoStormFight ? "取らない" : "取る")} (navD6NoStormFight={navD6NoStormFight})"
-                 + $"・HP の重み ×{navD6HpWeightMul:0.##} (navD6HpWeightMul={navD6HpWeightMul:0.##}) "
+                 + $"・HP の重み ×{navD6HpWeightMul:0.##} (navD6HpWeightMul={navD6HpWeightMul:0.##})"
+                 + $"・道すがらの戦闘の費用 ×{navD6PathFightCost:0.##} (navD6PathFightCost={navD6PathFightCost:0.##}) "
                  + $"/ 端子の撃破のボーナス {(terminalKillNeedsAttack ? "攻撃したターンだけ (旧い条件)" : "経路を問わない")} "
                  + $"/ 手札 {(handCarry == CombatSystem.HandCarryMode.Pick ? "印を付けた端子だけ残す (Pick)" : handCarry == CombatSystem.HandCarryMode.All ? "挿さなかった端子は全部残る (All)" : "毎ターン捨てる (Off・旧い規則)")}"
                  + $"{(handCarry == CombatSystem.HandCarryMode.Pick ? " 残す方策 " + EffectiveHandKeepPolicy + " (handKeepPolicy=" + handKeepPolicy + ")" : "")} "
