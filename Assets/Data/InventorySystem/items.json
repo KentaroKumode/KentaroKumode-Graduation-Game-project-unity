@@ -1011,8 +1011,8 @@
       "description": "攻撃時、敵出血1消費で与ダメージ+スタック値×3（消費前の値で計算）。",
       "flavorText": "極東の宿場で、一晩に三十人を斬った剣客の刀。打ち首の朝、役人の蔵から消えていた。",
       "category": "Passive",
-      "rarity": "GOLD",
-      "basePrice": 9,
+      "rarity": "LEGENDARY",
+      "basePrice": 10,
       "skill": "血桜",
       "axis": "出血"
     },
