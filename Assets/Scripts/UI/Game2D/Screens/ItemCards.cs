@@ -38,13 +38,18 @@ namespace UI.Game2D
                 sell = ItemSystem.Shop.ShopManager.WeaponMaterialSellPrice + "G (1 つ)",
             };
 
-        /// <summary>出目パーツ (サイコロの面 1 つ)。 字は目の数・段は点の数。</summary>
-        public static ItemCardInfo Part(DiceFaceParts.Part p)
-            => new ItemCardInfo
+        /// <summary>装備中の賽 (ADR-0015・持つ賽は 1 個)。 説明の後に面を並べる。 売れない・手放せない (替えるのは店とイベント)。</summary>
+        public static ItemCardInfo Die(string id)
+        {
+            var data = string.IsNullOrEmpty(id) ? null : ItemDatabase.Instance?.GetItem(id);
+            string faces = string.Join("・", EquippedDie.FacesOf(id));
+            return new ItemCardInfo
             {
-                kind = ItemCardInfo.Kind.FacePart, kindLabel = "出目パーツ", key = DiceFaceParts.Id(p), name = DiceFaceParts.Label(p),
-                description = DiceFaceParts.Describe(p.tier), tier = (int)p.tier, glyph = p.face.ToString(), pips = (int)p.tier,
+                kind = ItemCardInfo.Kind.Dice, kindLabel = "賽", key = id, name = EquippedDie.Label(id),
+                description = (data != null && !string.IsNullOrEmpty(data.description) ? data.description + "\n" : "") + "面: " + faces,
+                flavor = data?.flavorText, rarity = data != null ? (int)data.rarity : -1, glyph = "賽",
             };
+        }
 
         /// <summary>大事な物 (ownedFlags のフラグの品・items.json に無い)。 説明文は無い。</summary>
         public static ItemCardInfo Keepsake(string flag)
@@ -61,7 +66,7 @@ namespace UI.Game2D
         /// <item>秘宝: ownedPassiveItems (空の名前 "" は数えない ── 今の追加の口 PassiveAddHelper は "" を入れない)</item>
         /// <item>武器: 装備している武器 1 本 + 強化素材 (1 つ以上ある時・数を付ける)</item>
         /// <item>消耗品: ownedConsumables</item>
-        /// <item>出目パーツ: diceFaceParts (サイコロの面の全部・素の面も)</item>
+        /// <item>賽: 装備中の賽 1 個 (equippedDiceId・空なら最初の賽)</item>
         /// <item>大事な物: ownedFlags (〈さびれた観測所〉を見た印 <see cref="GameManager.ObservatorySeenFlag"/> は品でないので出さない)</item>
         /// </list>
         /// </summary>
@@ -74,7 +79,7 @@ namespace UI.Game2D
             if (!string.IsNullOrEmpty(run.equippedWeaponId)) s[(int)ItemCardInfo.Kind.Weapon].Add(Of(run.equippedWeaponId, 1, run));
             if (run.weaponMaterials > 0) s[(int)ItemCardInfo.Kind.Weapon].Add(Material(run.weaponMaterials));
             Grouped(run.ownedConsumables, s[(int)ItemCardInfo.Kind.Consumable], run);
-            if (run.diceFaceParts != null) foreach (var p in run.diceFaceParts) s[(int)ItemCardInfo.Kind.FacePart].Add(Part(p));
+            s[(int)ItemCardInfo.Kind.Dice].Add(Die(EquippedDie.IdOf(run)));
             if (run.ownedFlags != null)
                 foreach (var f in run.ownedFlags)
                     if (!string.IsNullOrEmpty(f) && f != GameManager.ObservatorySeenFlag) s[(int)ItemCardInfo.Kind.Keepsake].Add(Keepsake(f));

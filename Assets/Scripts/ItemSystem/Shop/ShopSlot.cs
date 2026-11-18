@@ -7,8 +7,6 @@ namespace ItemSystem.Shop
     public class ShopSlot
     {
         public ShopSlotKind kind;
-        /// <summary>出目パーツ枠のときだけ有効。 どの (出目, Tier) を売っているか。</summary>
-        public GameLoop.DiceFaceParts.Part facePart;
         public string itemId;        // null可（強化素材スロット）
         public int price;            // 表示価格 (特売割引適用後)
         public bool sold;
@@ -24,11 +22,9 @@ namespace ItemSystem.Shop
         Passive,
         Consumable,
         Weapon,
-        /// <summary>出目パーツ (2026-08-17)。 **旧 Dice 枠の置き換え**。
-        /// ダイス 10 種は面が全部同じで更新判定が常に false ＝ BOT が 1 個も買わない死に枠だった。
-        /// 「面構成で個性を出す」役割をパーツへ移し、 枠だけを引き継ぐ (陳列数は不変)。
-        /// itemId は使わず、 facePart にどのパーツかを持つ。</summary>
-        FacePart,
+        /// <summary>賽 (ADR-0015・2026-11-18)。 出目パーツの枠 (2026-08-17〜11-18) の置き換え。
+        /// itemId が賽の id (items.json の category Dice)。 買うと装備中の賽が替わる (持つ賽は 1 個)。</summary>
+        Dice,
         WeaponMaterial,      // 武器強化素材（マグナイト等）。在庫無限。
         // [削除 2026-09-11] InventoryExpansion ── インベントリ拡張 (1列追加)。
         //   陳列は 2026-09-03 に撤去済み、 容量という軸自体も 2026-07-29 に撤廃済みで、

@@ -1393,9 +1393,6 @@ namespace AutoTest
         private static string DisplayName(string id)
         {
             if (string.IsNullOrEmpty(id)) return id;
-            // 出目パーツは items.json に無い ── 生成元 (DiceFaceParts) から表示名を引く
-            var partLabel = GameLoop.DiceFaceParts.LabelOfId(id);
-            if (partLabel != null) return "出目パーツ:" + partLabel;
             // 末尾ローマ数字 → 汎用パッシブ
             if (_romanSuffix.IsMatch(id)) return "汎用パッシブ:" + id;
             // items.json 解決

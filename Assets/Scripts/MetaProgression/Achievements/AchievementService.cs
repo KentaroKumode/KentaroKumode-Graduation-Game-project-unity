@@ -214,7 +214,8 @@ namespace MetaProgression.Achievements
             if (Ready) run.rerolled = true;
         }
 
-        /// <summary>役が発動した。 <paramref name="tier"/> = その目の出目パーツの段 (奥の手)。</summary>
+        /// <summary>役が発動した。 <paramref name="tier"/> は使わない (出目パーツの段・2026-11-18 から全部の面が同じ扱い)。
+        /// 「奥の手」は LEGENDARY の賽で役を出すこと、 「型を極める」は<b>どれかの賽が持つ目</b>の役を全部出すこと (9 の面を持つ賽が無いので 18 種のままだと取れない)。</summary>
         public static void NoteRoleFired(RoleKind role, DiceFaceParts.Tier tier)
         {
             if (!Ready) return;
@@ -228,10 +229,22 @@ namespace MetaProgression.Achievements
             }
             Unlock(Cat.FirstRole);
             if (YachtRoles.IsTriple(role)) Unlock(Cat.RoleZoro);
-            if (tier >= Cat.TopFaceTier) Unlock(Cat.RoleTop);
-            int allMask = 0;
-            foreach (RoleKind k in YachtRoles.All) allMask |= 1 << (int)k;
+            var die = ItemSystem.ItemDatabase.Instance?.GetItem(EquippedDie.IdOf(GameManager.Instance?.Run));
+            if (die != null && die.rarity == ItemSystem.ItemRarity.LEGENDARY) Unlock(Cat.RoleTop);
+            int allMask = AttainableRoleMask();
             if ((mgr.State.achievementRoleMask & allMask) == allMask) Unlock(Cat.AllRoles);
+        }
+
+        /// <summary>どれかの賽が持つ目の役 (2 個そろいとゾロ目) の印。 賽の面は items.json の diceFaces。</summary>
+        private static int AttainableRoleMask()
+        {
+            int mask = 0;
+            foreach (var id in EquippedDie.AllIds())
+                foreach (int f in EquippedDie.FacesOf(id))
+                    if (f >= DiceFaceParts.MinFace && f <= DiceFaceParts.MaxFace)
+                        mask |= (1 << (int)YachtRoles.Of(f, false)) | (1 << (int)YachtRoles.Of(f, true));
+            if (mask == 0) foreach (RoleKind k in YachtRoles.All) mask |= 1 << (int)k;
+            return mask;
         }
 
         public static void NoteConsumableUsed() { if (Ready) run.usedConsumable = true; }

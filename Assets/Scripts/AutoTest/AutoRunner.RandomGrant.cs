@@ -64,17 +64,16 @@ namespace AutoTest
             }
             if (randomGrantAllKinds && !randomGrantTerminals)
             {
-                // 出目パーツは ItemDatabase に無い (DiceFaceParts.cs の規約コメント)。
-                //   36 種を ID で列挙する ── 所持済みの除外は配る側 (ApplyGrants) で見る。
-                foreach (var kind in GameLoop.DiceFaceParts.AllKinds())
-                { pool.Add(GameLoop.DiceFaceParts.Id(kind)); nPart++; }
+                // 賽 (ADR-0015): 最初の賽は配らない (全員が持っている)。 配ると装備が替わる。
+                foreach (var dieId in GameLoop.EquippedDie.AllIds())
+                    if (dieId != GameLoop.ItemIds.StartingDie) { pool.Add(dieId); nPart++; }
             }
             if (pool.Count == 0) return;
             if (!_grantPoolLogged)
             {
                 _grantPoolLogged = true;
                 Debug.Log($"[AutoRunner] 付与プール {pool.Count} {(randomGrantTerminals ? "端子" : "品")}"
-                        + $" (パッシブ {nPassive} / 消耗品 {nCons} / 武器 {nWeapon} / 出目パーツ {nPart})"
+                        + $" (パッシブ {nPassive} / 消耗品 {nCons} / 武器 {nWeapon} / 賽 {nPart})"
                         + $" / 1品あたり付与確率 {Mathf.Clamp01(randomGrantExpectedItems / pool.Count):P2}"
                         + $" / 期待付与数 {randomGrantExpectedItems:F1}");
             }
@@ -161,13 +160,11 @@ namespace AutoTest
                 return;
             }
 
-            // 出目パーツ: ItemDatabase に無いので ID から復元する。
-            if (GameLoop.DiceFaceParts.IsPartId(id))
+            // 賽 (ADR-0015): 配ると装備中の賽と入れ替わる。 同じ賽なら何も起きない。
+            if (GameLoop.EquippedDie.IsDie(id))
             {
-                if (!GameLoop.DiceFaceParts.TryParseId(id, out var part)) { NoteGrant(0, false); return; }
-                if (run.diceFaceParts == null) { NoteGrant(0, false); return; }
-                // 同じ目は 1 枚まで: 同じか低い Tier なら何も起きない (差し替えは高い Tier の時だけ)。
-                bool changed = GameLoop.DiceFaceParts.AddOrReplace(run.diceFaceParts, part);
+                bool changed = GameLoop.EquippedDie.IdOf(run) != id;
+                GameLoop.EquippedDie.Equip(run, id);
                 NoteGrant(0, changed);
                 return;
             }

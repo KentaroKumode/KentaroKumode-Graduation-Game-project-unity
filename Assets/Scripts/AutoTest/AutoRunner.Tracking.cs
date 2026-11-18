@@ -272,7 +272,7 @@ namespace AutoTest
                     else if (fam == GameLoop.ItemIds.ConsShieldFamily) def++;
                 }
             _cur.stateSnaps.AddRange(new[] { kind, run.Depth, hp, run.playerMaxHP, run.ownedPassiveItems?.Count ?? 0, run.coins,
-                                             heal, def, run.diceFaceParts?.Count ?? 0, run.provision });
+                                             heal, def, GameLoop.EquippedDie.FacesOf(GameLoop.EquippedDie.IdOf(run)).Length, run.provision });
         }
 
         private void OnBattleEnded(CombatResult r)
@@ -538,11 +538,12 @@ namespace AutoTest
                 if (run.ownedConsumables != null)
                     foreach (var id in run.ownedConsumables) if (!string.IsNullOrEmpty(id)) _cur.acquiredItemsEver.Add(id);
                 if (!string.IsNullOrEmpty(run.equippedWeaponId)) _cur.acquiredItemsEver.Add(run.equippedWeaponId);
-                // 装備ダイスは 2026-08-17 に廃止 (equippedDiceId はセーブ互換の残置)。
-                // **所持した出目パーツを学習へ載せる。** 購入時にも Buy() が積むが、
-                //   イベント等ショップ以外の入手経路が付いたときに取りこぼさないよう最終所持でも union する。
-                if (run.diceFaceParts != null)
-                    foreach (var p in run.diceFaceParts) _cur.acquiredItemsEver.Add(GameLoop.DiceFaceParts.Id(p));
+                // **装備中の賽を学習へ載せる** (ADR-0015)。 購入時にも Buy() が積むが、 付与・交換など店以外の入手を取りこぼさないよう最終所持でも union する。
+                //   最初の賽は全員が持つので載せない (差の出ない品を学習に混ぜない)。
+                {
+                    string dieId = GameLoop.EquippedDie.IdOf(run);
+                    if (dieId != GameLoop.ItemIds.StartingDie) _cur.acquiredItemsEver.Add(dieId);
+                }
                 _cur.finalWeaponTier = run.equippedWeaponId ?? "";
                 _cur.finalLimitBreak = run.limitBreakStage;
                 _cur.totalCoinsSpent = run.coinsSpent;

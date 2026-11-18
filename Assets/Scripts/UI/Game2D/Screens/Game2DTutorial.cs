@@ -25,7 +25,7 @@ namespace UI.Game2D
         public const string GrowDeck = "端子を増やす";
         public const string Order = "解決の順番";
         public const string Long = "戦闘の長期化";
-        public const string FacePart = "出目パーツ";
+        public const string Dice = "賽";
         public const string Role = "役";
         public const string Crit = "会心";
         public const string ForceCrit = "確定会心";
@@ -97,7 +97,7 @@ namespace UI.Game2D
         /// <summary>
         /// 契機の表 (並び = handbook の並び = 同時に頼まれた時に出す順)。 頼む所:
         /// <list type="bullet">
-        /// <item>ランと帰還 / 層の歩き方 / 前哨基地 / 出目パーツ / 役 / キーワード / 毒 / 出血 / 充電 / 臨界 / 物資 / 持ち物 ── この部品が状態を見て頼む (<see cref="Watch"/>)</item>
+        /// <item>ランと帰還 / 層の歩き方 / 前哨基地 / 賽 / 役 / キーワード / 毒 / 出血 / 充電 / 臨界 / 物資 / 持ち物 ── この部品が状態を見て頼む (<see cref="Watch"/>)</item>
         /// <item>巡回するもの ── 魔石が初めて反応した時 (<see cref="Game2DRadar.SetStone"/>)</item>
         /// <item>戦闘の形式 / 層とボス / 端子の山札 / ダイスを振る / 敵の予告 / 端子に挿す / 端子の種類 / 解決の順番 / 戦闘の長期化 / 会心 / 確定会心 / 逃げる ── 戦闘の流れ (<see cref="Game2DBattleSim"/>)</item>
         /// <item>端子を増やす / 装備と強化 (休憩・武器の入れ替え) / ショップ ── 場面の窓 (<see cref="Game2DPhaseScreens"/>)</item>
@@ -122,7 +122,7 @@ namespace UI.Game2D
             new Topic(TutorialTopics.GrowDeck, Scene.Any),
             new Topic(TutorialTopics.Order, Scene.Battle),
             new Topic(TutorialTopics.Long, Scene.Battle),
-            new Topic(TutorialTopics.FacePart, Scene.Any),
+            new Topic(TutorialTopics.Dice, Scene.Any),
             new Topic(TutorialTopics.Role, Scene.Battle),
             new Topic(TutorialTopics.Crit, Scene.Battle),
             new Topic(TutorialTopics.ForceCrit, Scene.Battle),
@@ -292,7 +292,7 @@ namespace UI.Game2D
         // ラン中の増減を見る節 (物資・持ち物) の前の値。 ランが替わったら (新しいラン・続きから) 取り直す。
         private GameLoop.RunState _watchRun; private int _lastProv, _lastItems;
 
-        /// <summary>ランの状態を見て頼む節: 前哨基地 / 出目パーツ / 物資 / 持ち物。</summary>
+        /// <summary>ランの状態を見て頼む節: 前哨基地 / 賽 / 物資 / 持ち物。</summary>
         private void WatchRun(GameLoop.RunState run, GameManager.GamePhase ph)
         {
             int items = (run.ownedPassiveItems != null ? run.ownedPassiveItems.Count : 0) + (run.ownedConsumables != null ? run.ownedConsumables.Count : 0);
@@ -317,11 +317,9 @@ namespace UI.Game2D
                 if (items > _lastItems) Request(TutorialTopics.Inventory);
                 _lastItems = items;
             }
-            // 「出目パーツ」: 素の面 (DiceFaceParts.StartingParts) に無い面を持っている = 出目パーツを手にした
-            if (run.diceFaceParts != null && !TutorialSeen.Has(TutorialTopics.FacePart))
-                foreach (var p in run.diceFaceParts)
-                    if (p.tier != GameLoop.DiceFaceParts.Tier.T1 || System.Array.IndexOf(GameLoop.DiceFaceParts.StartingFaces, p.face) < 0)
-                    { Request(TutorialTopics.FacePart); break; }
+            // 「賽」: 最初の賽から替えた (ADR-0015)
+            if (!TutorialSeen.Has(TutorialTopics.Dice) && GameLoop.EquippedDie.IdOf(run) != GameLoop.ItemIds.StartingDie)
+                Request(TutorialTopics.Dice);
         }
 
         /// <summary>第三層をクリアした記録がメタ進行にあるか: エンドの記録 (<see cref="Codex.VignetteUnlockState.OnRunClear"/>) か、 挑戦の踏破の記録。</summary>

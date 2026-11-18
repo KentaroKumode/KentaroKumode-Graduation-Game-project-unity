@@ -567,7 +567,7 @@ namespace GameLoop
                 case ShopSlotKind.Passive:        return "秘宝";
                 case ShopSlotKind.Consumable:     return "消費";
                 case ShopSlotKind.Weapon:         return "武器";
-                case ShopSlotKind.FacePart:       return "出目パーツ";
+                case ShopSlotKind.Dice:           return "賽";
                 case ShopSlotKind.WeaponMaterial: return "強化素材";
                 default: return "?";
             }

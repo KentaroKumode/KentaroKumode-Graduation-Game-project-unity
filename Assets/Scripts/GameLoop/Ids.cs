@@ -21,6 +21,10 @@ namespace GameLoop
         /// <summary>シュヴァリエのレイピア: コントラタック切替 (Consumables.TryUseRapier)。</summary>
         public const string ChevalierRapier = "シュヴァリエのレイピア";
 
+        /// <summary>最初に持つ賽 (ADR-0015・2026-11-18)。 面 2,3,4,5・効果なし。 店には並ばない。
+        /// 墓標の賽が砕けた後もこれに戻る。</summary>
+        public const string StartingDie = "角の取れた賽";
+
         // === 店連動パッシブ (2026-09-15) ===
         //   ShopManager が所持判定に使う ＝ 跨ファイル参照なのでここを経由する。
         //   下の帯 (BRONZE/SILVER) に店の機能へ触る品が 1 つも無かったのを埋めるもの。

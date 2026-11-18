@@ -1648,6 +1648,9 @@ namespace AutoTest
         public bool botBuysWeapons = false;
         private bool WouldBuyWeapon(GameLoop.RunState run, string itemId)
             => botBuysWeapons && GameLoop.Loadout.WouldUpgrade(run, itemId);
+        /// <summary>賽を買うか (ADR-0015): 買うと今の賽と入れ替わるので、 今の賽より値踏みが高い時だけ。</summary>
+        private static bool WouldBuyDie(GameLoop.RunState run, string itemId)
+            => AutoTest.InventoryPower.DiePowerDelta(run, itemId) > 0;
         public int axisPackageCount = 10;
         [Tooltip("ラン数")]
         public int randomGrantRuns = 5000;
@@ -1993,8 +1996,6 @@ namespace AutoTest
                 UnityEditor.EditorPrefs.GetFloat("AutoRun.PartPair", AutoTest.InventoryPower.TierGainPair);
             AutoTest.InventoryPower.TierGainTriple =
                 UnityEditor.EditorPrefs.GetFloat("AutoRun.PartTriple", AutoTest.InventoryPower.TierGainTriple);
-            AutoTest.InventoryPower.TierGainT4Extra =
-                UnityEditor.EditorPrefs.GetFloat("AutoRun.PartT4", AutoTest.InventoryPower.TierGainT4Extra);
 #endif
             if (!shieldAbsorbsUnmitigable)
                 Debug.LogWarning("[AutoRunner] **対照群**: 軽減無視をシールドで肩代わりしない (製品挙動ではない)");

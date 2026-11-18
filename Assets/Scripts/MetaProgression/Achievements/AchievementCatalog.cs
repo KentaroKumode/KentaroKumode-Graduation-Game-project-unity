@@ -66,8 +66,7 @@ namespace MetaProgression.Achievements
         public const int BleedGoal = 50, ChargeGoal = 30, BurstGoal = 5, CritGoal = 100, OverkillGoal = 100;
         public const int DeckBigGoal = 30, CrateSlowTurns = 30, ThirteenTurn = 13, ThirteenDamage = 13;
         public const int CalmDownTurns = 3, PerpetualHealTimes = 3, TheseusTimes = 10, StubbornCount = 3;
-        /// <summary>出目と役の「いちばん上の段」。</summary>
-        public const GameLoop.DiceFaceParts.Tier TopFaceTier = GameLoop.DiceFaceParts.Tier.T4;
+        // [2026-11-18] TopFaceTier (出目パーツの最上段 T4) は削除。 ADR-0015 で段が無くなり、 「奥の手」は LEGENDARY の賽で役を出すことにした (仮・作者の確認待ち)。
 
         // ===== 系統 =====
 
@@ -158,9 +157,9 @@ namespace MetaProgression.Achievements
 
             // ── 出目と役 ──
             D(FirstRole, C.DiceRole, 1, "型を知る", "初めて役を発動する"),
-            D(AllRoles, C.DiceRole, 5, "型を極める", $"{CombatSystem.YachtRoles.Count}種の役を、すべて発動する（通算）"),
+            D(AllRoles, C.DiceRole, 5, "型を極める", "賽で出せる役を、すべて発動する（通算）"),
             D(RoleZoro, C.DiceRole, 2, "三つ揃い", "ゾロ目の役（「・揃」の役）を発動する"),
-            D(RoleTop, C.DiceRole, 3, "奥の手", "いちばん上の段の出目パーツで、役を発動する"),
+            D(RoleTop, C.DiceRole, 3, "奥の手", "LEGENDARY の賽で、役を発動する"),
 
             // ── 端子 ──
             D(DeckMin, C.Terminal, 3, "身軽", $"山札を、これ以上抜けない枚数（{CombatSystem.TerminalCards.MinDeckSize}枚）まで減らして、戦闘に勝つ"),

@@ -266,6 +266,8 @@ namespace GameLoop
             //   面は DiceFaceParts.BaseFaces + 出目パーツ から組む (GatherPlayerCombatStats)。
             //   `dice_wood` を入れ続けると存在しない ID が acquiredItemsEver に混ざり、
             //   学習統計に幽霊エントリが残るだけだった。 equippedDiceId 自体はセーブ互換で残置。
+            // 2026-11-18 (ADR-0015): 賽を 1 個装備する形へ戻した。 全員が最初の賽から始める。
+            Run.equippedDiceId = ItemIds.StartingDie;
 
             // 初期武器: 職業固定 (2026-07-14 ランダム配布から変更 ── 出自選択画面の
             // 「メイン武器」表示と実体を一致させる。正本: ClassStarter.GetWeaponId)

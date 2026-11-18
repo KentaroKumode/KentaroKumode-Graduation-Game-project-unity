@@ -72,7 +72,7 @@ namespace CombatSystem
         ///
         /// <para>2 個そろい = ちょうど 2 個、 または T2 のまま 3 個。 ゾロ目 = 3 個かつ T3 以上。
         /// 同じ目の面は 1 枚までなので、 同じ出目なら同じ面 (同じ Tier) に止まっている。</para></summary>
-        /// <param name="faceIdx">ダイスごとの止まった面の添字 (<see cref="DiceFaceParts.Build"/> と対)。</param>
+        /// <param name="faceIdx">ダイスごとの止まった面の添字 (<see cref="EquippedDie.Build"/> と対)。</param>
         /// <param name="tiers">面添字ごとの Tier。 null なら役は何も成立しない。</param>
         public static void Evaluate(int[] dice, int[] faceIdx, DiceFaceParts.Tier[] tiers, List<RoleKind> into)
         {

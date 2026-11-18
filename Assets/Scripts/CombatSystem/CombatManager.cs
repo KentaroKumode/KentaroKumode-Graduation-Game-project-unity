@@ -662,7 +662,7 @@ namespace CombatSystem
             if (ctx != null && equippedDiceFaces != null)
             {
                 ctx.equippedDiceFaces = equippedDiceFaces;
-                // 出目パーツ: 面添字ごとの Tier。 面と対で渡ってくる (DiceFaceParts.Build)。
+                // 面添字ごとの Tier。 面と対で渡ってくる (EquippedDie.Build)。
                 ctx.equippedFaceTiers = equippedFaceTiers;
             }
             // ADR-0010〈無銘の賽〉: このダイスでは端子役が成立しない (手札役・配線役は通常どおり)。

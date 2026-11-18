@@ -76,7 +76,7 @@ namespace UI.Game2D
             bool evKeys = ph == GameManager.GamePhase.EventEncounter && _evPlan != null && Game2DEventScreen.Showing && !modal.IsOpen;
             GameManager.EventKeysByScreen = evKeys;
             if (evKeys && !Game2DLoadingScreen.Blocking) EventKeys(gm);
-            if (ph != _shown) { _shown = ph; _dirty = true; _shopSell = false; _shopSupply = false; _robArmed = false; _sellPage = 0; _restFaces = false; _shopTerm = false; _termPick = TermPick.None; _termDeckPage = 0; if (ph != GameManager.GamePhase.EventEncounter) _eventResult = null; if (ph == GameManager.GamePhase.GateRitual) System.Array.Clear(_gateOffer, 0, 3); }
+            if (ph != _shown) { _shown = ph; _dirty = true; _shopSell = false; _shopSupply = false; _robArmed = false; _sellPage = 0; _shopTerm = false; _termPick = TermPick.None; _termDeckPage = 0; if (ph != GameManager.GamePhase.EventEncounter) _eventResult = null; if (ph == GameManager.GamePhase.GateRitual) System.Array.Clear(_gateOffer, 0, 3); }
             // 画面の外で所持金・HP が変わった時も描き直す (買える品の明暗・副題の数字)
             int coins = gm.Run != null ? gm.Run.coins : 0, hp = gm.Run != null ? gm.Run.playerHP : 0;
             if (coins != _lastCoins || hp != _lastHp) { _lastCoins = coins; _lastHp = hp; if (_open || Game2DEventScreen.Showing) _dirty = true; }
@@ -257,24 +257,18 @@ namespace UI.Game2D
         }
 
         // ── 休憩 ──
-        //   休む / 多めに休む (ターンが進む) / 鍛える / 面を外す (どの面かを選ぶ画面へ)。 どれも 1 回の休憩で 1 つだけ。
-
-        private bool _restFaces;
+        //   休む / 多めに休む (ターンが進む) / 鍛える / 山札から抜く。 どれも 1 回の休憩で 1 つだけ (面を外すは 2026-11-18 に削除・ADR-0015)。
 
         private ScreenDef Rest(GameManager gm)
         {
             var run = gm.Run;
             Game2DTutorial.Request(TutorialTopics.Equip);      // 手引き「装備と強化」: 初めて休憩に入った (武器の強化・面を外す)
-            if (_restFaces) return RestFaces(gm);
             if (_termPick == TermPick.Rest) return TerminalDeckList(gm);
             var d = New("休憩", "HP " + run.playerHP + "/" + run.playerMaxHP + "  素材 " + run.weaponMaterials);
             int more = Mathf.RoundToInt(MapSystem.FreeMove.FreeMapParams.RestMoreRatio * 100);
             d.Items.Add(new ModalItem { name = "休む", desc = "HP を回復する。 ターンは進まない。" });
             d.Items.Add(new ModalItem { name = "多めに休む", value = "+" + MapSystem.FreeMove.FreeMapParams.RestMoreTurns + " ターン", desc = "最大 HP の " + more + "% を回復する。 代わりにターンが進む (追跡者が動く)。" });
             d.Items.Add(new ModalItem { name = "鍛える", value = "素材 " + run.weaponMaterials, desc = "素材を使って武器を 1 段強化する (強化できなければ休む)。" });
-            bool canRemove = gm.TryGetFaceRemovalCost(out int g, out int m);
-            d.Items.Add(new ModalItem { name = "面を外す", value = canRemove ? g + "G 素材" + m : "外せない", disabled = !canRemove,
-                desc = canRemove ? "ダイスの面を 1 枚外す (出目の合計と、 その目の役を失う)。 外す面を次に選ぶ。" : "面はこれ以上外せない。" });
             // 端子の山札 (ADR-0014): 回復の代わりに 1 枚抜く (無料)。 山札が手札の枚数を下回る抜き方はできない
             bool canTerm = gm.CanRemoveTerminal; int deckN = run.terminalDeck != null ? run.terminalDeck.Count : 0;
             d.Items.Add(new ModalItem { name = "山札から抜く", value = canTerm ? "山札 " + deckN + " 枚" : "抜けない", disabled = !canTerm,
@@ -287,37 +281,8 @@ namespace UI.Game2D
                 {
                     case 1: gm.RestHealMore(); break;
                     case 2: gm.RestUpgrade(); break;
-                    case 3: if (canRemove) _restFaces = true; break;
-                    case 4: if (canTerm) { _termPick = TermPick.Rest; _termDeckPage = 0; } break;
+                    case 3: if (canTerm) { _termPick = TermPick.Rest; _termDeckPage = 0; } break;
                     default: gm.RestHeal(); break;
-                }
-                Refresh();
-            };
-            return d;
-        }
-
-        private ScreenDef RestFaces(GameManager gm)
-        {
-            var run = gm.Run; gm.TryGetFaceRemovalCost(out int g, out int m);
-            var d = New("面を外す", g + "G・素材 " + m + "  (所持 " + run.coins + "G・素材 " + run.weaponMaterials + ")", 420); d.cols = 2;
-            var faces = new List<int>();
-            if (run.diceFaceParts != null)
-                foreach (var p in run.diceFaceParts)
-                {
-                    faces.Add(p.face);
-                    d.Items.Add(new ModalItem { name = DiceFaceParts.Label(p), desc = DiceFaceParts.Describe(p.tier) });
-                }
-            bool afford = run.coins >= g && run.weaponMaterials >= m;
-            d.buttons.Add(B("外す", "remove", true));
-            d.buttons.Add(B("戻る", "back"));
-            d.footer = afford ? "外す面を選ぶ" : "払えない (ゴールドか素材が足りない)";
-            d.onAction = (a, sel) =>
-            {
-                if (a == "back") _restFaces = false;
-                else if (a == "remove" && sel >= 0 && sel < faces.Count)
-                {
-                    if (gm.RestRemoveFace(faces[sel])) { _restFaces = false; Game2DSfx.Play("ui_confirm"); }
-                    else modal.ShowError("外せない (ゴールドか素材が足りない)");
                 }
                 Refresh();
             };
@@ -673,24 +638,23 @@ namespace UI.Game2D
             switch (s.kind)
             {
                 case ShopSlotKind.WeaponMaterial: return "強化素材";
-                case ShopSlotKind.FacePart: return "出目パーツ " + DiceFaceParts.Label(s.facePart);
             }
             if (string.IsNullOrEmpty(s.itemId)) return "(空)";
             return ItemDatabase.DisplayNameOf(s.itemId);
         }
 
-        /// <summary>行の左のアイコン: 品は id (Resources/Icons/Items)、 素材・出目パーツは枠だけ ("")。</summary>
-        /// <summary>行の枠のレアリティ (2026-11-08)。 素材・出目パーツ・品の無い枠は null (従来の灰色の枠)。</summary>
+        /// <summary>行の左のアイコン: 品は id (Resources/Icons/Items)、 素材は枠だけ ("")。</summary>
+        /// <summary>行の枠のレアリティ (2026-11-08)。 素材・品の無い枠は null (従来の灰色の枠)。</summary>
         private static ItemRarity? SlotRarity(ShopSlot s)
         {
-            if (s.kind == ShopSlotKind.WeaponMaterial || s.kind == ShopSlotKind.FacePart || string.IsNullOrEmpty(s.itemId)) return null;
+            if (s.kind == ShopSlotKind.WeaponMaterial || string.IsNullOrEmpty(s.itemId)) return null;
             var data = ItemDatabase.Instance?.GetItem(s.itemId);
             return data != null ? data.rarity : (ItemRarity?)null;
         }
 
         private static string SlotIcon(ShopSlot s)
         {
-            if (s.kind == ShopSlotKind.WeaponMaterial || s.kind == ShopSlotKind.FacePart || string.IsNullOrEmpty(s.itemId)) return "";
+            if (s.kind == ShopSlotKind.WeaponMaterial || string.IsNullOrEmpty(s.itemId)) return "";
             var data = ItemDatabase.Instance?.GetItem(s.itemId);
             return data != null ? data.id : s.itemId;
         }
@@ -700,7 +664,7 @@ namespace UI.Game2D
             switch (s.kind)
             {
                 case ShopSlotKind.WeaponMaterial: return "武器を強化する素材 (休憩で使う)。 在庫に限りは無い。";
-                case ShopSlotKind.FacePart: return DiceFaceParts.Describe(s.facePart.tier);
+                case ShopSlotKind.Dice: return ItemCards.Die(s.itemId).description + "\n買うと、 今の賽 (" + EquippedDie.Label(EquippedDie.IdOf(GameManager.Instance?.Run)) + ") と入れ替わる。";
             }
             var data = string.IsNullOrEmpty(s.itemId) ? null : ItemDatabase.Instance?.GetItem(s.itemId);
             return data != null ? data.description : null;

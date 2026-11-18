@@ -548,10 +548,8 @@ namespace AutoTest
                     //   移って既存の基準値が変わる**。 挙動は 1 ビットも変えない。
                     if (restPick == RestUpgradeIndex) { gm.RestUpgrade(); return false; }
 
-                    // 2026-11-04: 回復の場面で使える休憩の残り 2 つ (多めに休む・面を外す)。
+                    // 2026-11-04: 回復の場面で使える休憩の残り (多めに休む・山札から抜く)。 面を外すは 2026-11-18 に削除 (ADR-0015)。
                     //   どちらも「回復を選んだ」後の枝で、 強化を選ぶ基準 (上の分岐) は変えない。
-                    //   面を外す: HP が満ちていて回復が無駄になる場面だけ。 役を持たない低い目 (2 以下) を外して出目の平均を上げる
-                    if (hpR >= 0.95f && TryRestRemoveLowFace(gm)) return false;
                     //   山札から抜く (ADR-0014): 同じく HP が満ちている時だけ。 基本の端子が多ければ 1 枚 (AutoRunner.Terminals)
                     if (hpR >= 0.95f && TryRestRemoveTerminal(gm)) return false;
                     //   多めに休む: HP が 6 割を切っていて、 追跡者に捕捉されていない時 (1 ターン進むので、 追われている時は使わない)
@@ -626,20 +624,5 @@ namespace AutoTest
         }
 
         // ===== 行動方針: 前進貪欲 + 生存重視 =====
-
-        /// <summary>休憩で面を 1 枚外す (2026-11-04)。 役を持たない (T1 以下の) いちばん低い目で、 その目が 2 以下の時だけ。
-        /// 払えなければ外さない。 外したら true (休憩の行動を使った)。</summary>
-        private static bool TryRestRemoveLowFace(GameManager gm)
-        {
-            var run = gm?.Run;
-            if (run?.diceFaceParts == null) return false;
-            if (!gm.TryGetFaceRemovalCost(out int gold, out int materials)) return false;
-            if (run.weaponMaterials < materials || run.coins < gold) return false;
-            int face = int.MaxValue;
-            foreach (var p in run.diceFaceParts)
-                if (p.tier <= DiceFaceParts.Tier.T1 && p.face < face) face = p.face;
-            if (face > 2) return false;
-            return gm.RestRemoveFace(face);
-        }
     }
 }

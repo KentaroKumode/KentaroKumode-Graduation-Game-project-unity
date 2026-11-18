@@ -2640,6 +2640,206 @@
       "rarity": "GOLD",
       "basePrice": 9,
       "unique": true
+    },
+    {
+      "id": "角の取れた賽",
+      "name": "角の取れた賽",
+      "description": "効果なし。誰もが最初に持つ賽。",
+      "flavorText": "",
+      "category": "Dice",
+      "rarity": "BRONZE",
+      "basePrice": 7,
+      "diceFaces": [2, 3, 4, 5]
+    },
+    {
+      "id": "軽石の賽",
+      "name": "軽石の賽",
+      "description": "効果なし。面が 3 つしかないので、目がそろいやすい。",
+      "flavorText": "",
+      "category": "Dice",
+      "rarity": "BRONZE",
+      "basePrice": 7,
+      "diceFaces": [2, 3, 4]
+    },
+    {
+      "id": "錆釘の賽",
+      "name": "錆釘の賽",
+      "description": "攻撃に挿した目が 5 以上なら、攻撃 +1。",
+      "flavorText": "",
+      "category": "Dice",
+      "rarity": "BRONZE",
+      "basePrice": 7,
+      "diceFaces": [1, 2, 5, 6]
+    },
+    {
+      "id": "拾い物の賽",
+      "name": "拾い物の賽",
+      "description": "①が出たターンの終わりに 1G。",
+      "flavorText": "",
+      "category": "Dice",
+      "rarity": "BRONZE",
+      "basePrice": 7,
+      "diceFaces": [1, 2, 3, 4, 5, 6]
+    },
+    {
+      "id": "鈍色の賽",
+      "name": "鈍色の賽",
+      "description": "偶数なら防御 +1、奇数なら攻撃 +1（挿した先が合えば）。",
+      "flavorText": "",
+      "category": "Dice",
+      "rarity": "BRONZE",
+      "basePrice": 7,
+      "diceFaces": [1, 2, 3, 4, 5, 6]
+    },
+    {
+      "id": "残り火の賽",
+      "name": "残り火の賽",
+      "description": "挿さずに捨てた目の 2 倍を、次のターンの攻撃に足す（次のターンに攻撃へ挿した目がある時だけ・持ち越すのは 1 ターン分）。",
+      "flavorText": "",
+      "category": "Dice",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "diceFaces": [2, 3, 4, 5, 6, 7]
+    },
+    {
+      "id": "渡し守の賽",
+      "name": "渡し守の賽",
+      "description": "振り直しの後に出た目なら、攻撃 +2。",
+      "flavorText": "",
+      "category": "Dice",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "diceFaces": [2, 3, 4, 5, 6, 7]
+    },
+    {
+      "id": "夜番の賽",
+      "name": "夜番の賽",
+      "description": "防御に挿した目が、敵の出目の最大より大きければ、シールド +3。",
+      "flavorText": "",
+      "category": "Dice",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "diceFaces": [1, 2, 3, 4, 5, 6]
+    },
+    {
+      "id": "秤の賽",
+      "name": "秤の賽",
+      "description": "目がほかの 2 つの目の間の値なら、どこに挿しても +1。",
+      "flavorText": "",
+      "category": "Dice",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "diceFaces": [1, 2, 3, 4, 5, 6]
+    },
+    {
+      "id": "逆目の賽",
+      "name": "逆目の賽",
+      "description": "攻撃に挿すと、攻撃 +（7 − 目）÷ 2。",
+      "flavorText": "",
+      "category": "Dice",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "diceFaces": [1, 2, 3, 4, 5, 6]
+    },
+    {
+      "id": "古銭の賽",
+      "name": "古銭の賽",
+      "description": "⑧が出たターンに敵を倒すと、ゴールド +3。",
+      "flavorText": "",
+      "category": "Dice",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "diceFaces": [1, 2, 3, 4, 5, 6, 7, 8]
+    },
+    {
+      "id": "繋ぎの賽",
+      "name": "繋ぎの賽",
+      "description": "ターンの終わりに、このターン目を挿した端子を 1 枚だけ選んで、次のターンの手札に残せる。",
+      "flavorText": "",
+      "category": "Dice",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "diceFaces": [1, 2, 3, 4, 5, 6]
+    },
+    {
+      "id": "目利きの賽",
+      "name": "目利きの賽",
+      "description": "振り直す時、目を 1 つだけ残して、ほかの 2 つを振り直してよい。",
+      "flavorText": "",
+      "category": "Dice",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "diceFaces": [2, 3, 4, 5, 6, 7]
+    },
+    {
+      "id": "大技読みの賽",
+      "name": "大技読みの賽",
+      "description": "敵の大技の予告が出ているターンは、どこに挿しても +目の半分。",
+      "flavorText": "",
+      "category": "Dice",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "diceFaces": [1, 2, 3, 4, 5, 6, 7, 8]
+    },
+    {
+      "id": "墓標の賽",
+      "name": "墓標の賽",
+      "description": "HP が 0 になった時に 1 度だけ砕けて、HP 1 で踏みとどまる。砕けた後は角の取れた賽に戻る。",
+      "flavorText": "",
+      "category": "Dice",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "diceFaces": [2, 3, 4, 5]
+    },
+    {
+      "id": "刻みの賽",
+      "name": "刻みの賽",
+      "description": "振った後、2 以上の目を 1 つ選んで刻める。刻んだ目は次のターン、振らずにそのまま残る（3 つのうち 1 つが決まった状態で始まる・振り直しはできない）。",
+      "flavorText": "",
+      "category": "Dice",
+      "rarity": "LEGENDARY",
+      "basePrice": 10,
+      "diceFaces": [1, 2, 3, 4, 5, 6]
+    },
+    {
+      "id": "時計の賽",
+      "name": "時計の賽",
+      "description": "目を 1 つ時計に挿すと、その数だけエスカレーションの時計を進めるか戻すかを選べる（1 ターンに 1 つ）。",
+      "flavorText": "",
+      "category": "Dice",
+      "rarity": "LEGENDARY",
+      "basePrice": 10,
+      "diceFaces": [1, 2, 3, 4, 5, 6]
+    },
+    {
+      "id": "賭場の賽",
+      "name": "賭場の賽",
+      "description": "振り直しが無料。代わりに、振り直すたびに HP −1。",
+      "flavorText": "",
+      "category": "Dice",
+      "rarity": "LEGENDARY",
+      "basePrice": 10,
+      "diceFaces": [1, 2, 3, 4, 5, 6]
+    },
+    {
+      "id": "連なりの賽",
+      "name": "連なりの賽",
+      "description": "このランでは「3 つの連番」も役になる。",
+      "flavorText": "",
+      "category": "Dice",
+      "rarity": "LEGENDARY",
+      "basePrice": 10,
+      "diceFaces": [1, 2, 3, 4, 5, 6]
+    },
+    {
+      "id": "分け身の賽",
+      "name": "分け身の賽",
+      "description": "攻撃に挿した目の合計を、2 回の攻撃に分ける（1 回あたり半分・切り上げ）。攻撃のたびに起きる効果（出血を付ける・会心の判定・血桜の消費など）は 2 回とも起きる。",
+      "flavorText": "",
+      "category": "Dice",
+      "rarity": "LEGENDARY",
+      "basePrice": 10,
+      "diceFaces": [1, 2, 3, 4, 5, 6]
     }
   ]
 }

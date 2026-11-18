@@ -88,19 +88,8 @@ namespace AutoTest
             }
             Add(run.equippedWeaponId);
             Add(run.equippedDiceId);
-            // 所持している出目パーツ (2026-08-17)。 **足した順に評価する** ──
-            //   面が増えるほど 1 枚あたりの平均押し上げは小さくなるので、
-            //   途中経過の面構成を再現しないと過大評価になる。
-            if (run.diceFaceParts != null && run.diceFaceParts.Count > 0)
-            {
-                var acc = new List<GameLoop.DiceFaceParts.Part>(run.diceFaceParts.Count);
-                var tmp = new RunState { diceFaceParts = acc };
-                for (int i = 0; i < run.diceFaceParts.Count; i++)
-                {
-                    sum += FacePartPower(tmp, run.diceFaceParts[i]);
-                    acc.Add(run.diceFaceParts[i]);
-                }
-            }
+            // 装備中の賽の面と役 (ADR-0015・2026-11-18。 旧: 所持している出目パーツを足した順に評価)
+            sum += UnityEngine.Mathf.RoundToInt(DieRaw(GameLoop.EquippedDie.IdOf(run)) / PowerCalibration);
             if (run.ownedPassiveItems != null)
                 foreach (var id in run.ownedPassiveItems) Add(id);
             // 昇華済みパッシブ (グリッド外永久) も実発動するため Power に含める
@@ -117,14 +106,9 @@ namespace AutoTest
         public static int SimulateAddItemDelta(RunState run, string itemId)
         {
             if (run == null || string.IsNullOrEmpty(itemId)) return 0;
-            // 出目パーツ: ID から現物へ戻して面の増分を評価する (2026-08-17b)。
+            // 賽 (ADR-0015): 今の賽と入れ替わるので、 増分は「新しい賽 − 今の賽」 (負なら 0)。
             //   **呼び出し側で場合分けしない** ── ΔPower の入口をここ 1 箇所に保つ。
-            if (GameLoop.DiceFaceParts.TryParseId(itemId, out var part))
-            {
-                // 同じ目は 1 枚まで: 持つ面と同じか低い Tier は増分 0 (差し替えは高い Tier の時だけ)。
-                if ((int)part.tier <= (int)GameLoop.DiceFaceParts.TierOfFace(run.diceFaceParts, part.face)) return 0;
-                return FacePartPower(run, part);
-            }
+            if (GameLoop.EquippedDie.IsDie(itemId)) return System.Math.Max(0, DiePowerDelta(run, itemId));
             // 既所持なら delta = 0 (HashSet dedup される)
             if (itemId == run.equippedWeaponId || itemId == run.equippedDiceId) return 0;
             if (run.ownedPassiveItems != null && run.ownedPassiveItems.Contains(itemId)) return 0;
@@ -169,48 +153,31 @@ namespace AutoTest
         /// 掃引の途中で「どの値で回したか」が分からなくなると全部やり直しになる。</para>
         public static float PowerCalibration = 2f;
 
-        /// <summary>2 個そろいが 1 ターンに成立する確率 1 あたりの Power 換算 (ADR-0011・暫定)。
-        /// 面数 4 の 2 個そろいは約 14% なので、 14% で約 1 出目換算になるよう置いてある。 実測ではない。</summary>
+        /// <summary>2 個そろいが 1 ターンに成立する確率 1 あたりの Power 換算 (ADR-0011・暫定)。 実測ではない。</summary>
         public static float TierGainPair = 8f;
         /// <summary>ゾロ目の同換算。 効果の大きさが 2〜3 倍・成立率が 1/10 程度なので、 係数は大きく取る (暫定)。</summary>
         public static float TierGainTriple = 40f;
-        /// <summary>T4 の固有効果ぶんの上乗せ (出目換算・暫定)。</summary>
-        public static float TierGainT4Extra = 1.0f;
 
-        public static int FacePartPower(RunState run, GameLoop.DiceFaceParts.Part part)
+        /// <summary>賽 1 個の素の値 (出目換算・ADR-0015・暫定)。 面の平均の素の賽 (平均 3.5) との差 × 3 回 と、
+        /// 3 回振って役が出る見込み (面 n が等確率: 2 個そろい 3(n−1)/n²・ゾロ目 1/n²・全部の面で役が効く) を足す。
+        /// <b>賽のパッシブはまだ数えない</b> (手順 4 で入れる)。 学習が乗れば学習の値が優先される。</summary>
+        public static float DieRaw(string dieId)
         {
-            int[] faces;
-            GameLoop.DiceFaceParts.Tier[] tiers;
-            GameLoop.DiceFaceParts.Build(run != null ? run.diceFaceParts : null, out faces, out tiers);
-            if (faces == null || faces.Length == 0) return 0;
-
-            // 同じ目の面があれば差し替え (面の枚数は変わらず、 その面の値は同じ)、 無ければ 1 枚追加。
-            int existing = -1;
-            for (int i = 0; i < faces.Length; i++) if (faces[i] == part.face) { existing = i; break; }
-
-            int sum = 0;
+            var faces = GameLoop.EquippedDie.FacesOf(dieId);
+            if (faces == null || faces.Length == 0) return 0f;
+            float n = faces.Length, sum = 0f;
             for (int i = 0; i < faces.Length; i++) sum += faces[i];
-            float meanBefore = sum / (float)faces.Length;
-            float meanAfter = existing >= 0 ? meanBefore : (sum + part.face) / (float)(faces.Length + 1);
+            const int Rolls = 3;   // 毎ターン 3 回振る (ADR-0015)
+            float gain = (sum / n - 3.5f) * Rolls;
+            float pair = 3f * (n - 1f) / (n * n), triple = 1f / (n * n);
+            return gain + pair * TierGainPair + triple * TierGainTriple;
+        }
 
-            const int DiceCount = 3;   // ダイスは 3 個 (ADR-0011)
-            float gain = (meanAfter - meanBefore) * DiceCount;
-
-            // Tier の効果 = 役の発動。 2 個そろい (T2〜) とゾロ目 (T3〜) の期待値を面数から概算する。
-            //   面数 n のとき特定の目の 2 個そろいは 3(1/n)²(1−1/n)、 ゾロ目は (1/n)³ (1 回振り)。
-            //   T1 は何も起きない。 T4 は固有効果ぶんを定数で上乗せする。
-            int nAfter = existing >= 0 ? faces.Length : faces.Length + 1;
-            float q = 1f / nAfter;
-            float pair = 3f * q * q * (1f - q), triple = q * q * q;
-            float tierGain;
-            switch (part.tier)
-            {
-                case GameLoop.DiceFaceParts.Tier.T2: tierGain = pair * TierGainPair; break;
-                case GameLoop.DiceFaceParts.Tier.T3: tierGain = pair * TierGainPair + triple * TierGainTriple; break;
-                case GameLoop.DiceFaceParts.Tier.T4: tierGain = pair * TierGainPair + triple * TierGainTriple + TierGainT4Extra; break;
-                default:                             tierGain = 0f; break;
-            }
-            return UnityEngine.Mathf.RoundToInt((gain + tierGain) / PowerCalibration);
+        /// <summary>その賽に替えた時の Power の増分 (負もありうる)。 BOT の「今の賽より良い時だけ買う」(WouldBuyDie) が読む。</summary>
+        public static int DiePowerDelta(RunState run, string dieId)
+        {
+            if (string.IsNullOrEmpty(dieId) || dieId == GameLoop.EquippedDie.IdOf(run)) return 0;
+            return UnityEngine.Mathf.RoundToInt((DieRaw(dieId) - DieRaw(GameLoop.EquippedDie.IdOf(run))) / PowerCalibration);
         }
 
         /// <summary>Power 換算値 (0〜6) を**準パワースケール**へ写す (2026-08-17b)。
