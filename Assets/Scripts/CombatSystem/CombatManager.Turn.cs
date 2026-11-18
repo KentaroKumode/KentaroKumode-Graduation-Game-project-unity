@@ -214,6 +214,8 @@ namespace CombatSystem
             //   パッシブの発火順に頼らずここで確定させる。
             // 端子の撃破のボーナス (#117): このターン最後の確かめ (ターン終了時の効果の削りを SyncHPFromContext で拾った後・次の形態へ移す前)
             SettleTerminalKillBonus(enemyHP, final: true);
+            // 賽のパッシブ (ADR-0015): 拾い物 (①が出た)・古銭 (⑧が出て敵を倒した) のゴールド。 次の形態へ移る前に撃破を見る
+            DiePassives.OnTurnEnd(GameLoop.GameManager.Instance?.Run, ctx.playerDice, enemyHP <= 0 && playerHP > 0);
             if (enemyHP <= 0 && playerHP > 0) TryAdvanceVescaChain();
 
             // 2 体戦の締め。 SetSecondaryEnemy の不変条件 (2 体目の HP ≤ 1 体目) が成り立つ限り
@@ -539,6 +541,7 @@ namespace CombatSystem
             // --- 1. 敵ロール (スタンスなし = ADR-0005 は superseded) ---
             int actualPlayerDiceCount = playerDiceCount;
             int[] enemyDice = RollEnemyAttack(currentEnemy, enemyExtraDice);
+            _enemyDiceNow = enemyDice;
             int actualEnemyDiceCount = enemyDice.Length;
 
             // --- 3. 自ロール ---

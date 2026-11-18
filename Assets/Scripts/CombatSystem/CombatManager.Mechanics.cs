@@ -159,7 +159,8 @@ namespace CombatSystem
         /// 無料の振り直し (〈特別・対〉) は 0 で、 上乗せも足さない。 本体の支払い・画面の費用の表示 (<see cref="TurnPause.rerollCost"/>)・
         /// BOT の振り直しの方策 (AutoRunner.MutualRerollPolicy) がここを読む。 式の正本は <see cref="EventSystem.TimedEffects.TimedDebuffRule.RerollCost"/>。</summary>
         public static int RerollCostNow(int diceCount, int nth, bool free)
-            => EventSystem.TimedEffects.TimedDebuffRule.RerollCost(diceCount, nth, free,
+            => DiePassives.FreeRerollByDie(GameLoop.GameManager.Instance?.Run) ? 0      // 賭場の賽 (ADR-0015): 充電は払わない (代わりに HP を払う・RerollPhase)
+             : EventSystem.TimedEffects.TimedDebuffRule.RerollCost(diceCount, nth, free,
                 EventSystem.TimedEffects.TimedDebuffRule.RerollSurcharge(GameLoop.GameManager.Instance?.Run?.timedDebuffs));
 
         private IEnumerator<TurnPause> RerollPhase(CombatContext ctx, int[] playerDice, int[] enemyDice, int playerDiceMax,
@@ -227,8 +228,17 @@ namespace CombatSystem
 
                 bool usedFree = freeRerolls > 0;
                 int cost = RerollCostNow(rerollIdx.Count, nth, usedFree);   // 〈無力感〉の +1 もここ (無料の時は足さない)
+                // 賭場の賽 (ADR-0015): 充電の代わりに HP を払う。 HP が払えない (払うと 0 になる) なら振り直せない
+                bool gamble = DiePassives.FreeRerollByDie(GameLoop.GameManager.Instance?.Run);
+                if (gamble && playerHP <= DiePassives.GambleHpCost) break;
                 if (usedFree) freeRerolls--;
                 if (!ctx.ConsumeCharge(cost)) break;   // 払えなければそこで打ち切り
+                if (gamble)
+                {
+                    playerHP -= DiePassives.GambleHpCost;
+                    ctx.playerCurrentHP = playerHP;
+                    Debug.Log($"[賽] 賭場の賽: 振り直しの代わりに HP −{DiePassives.GambleHpCost} → {playerHP}");
+                }
 
                 for (int k = 0; k < rerollIdx.Count; k++)
                 {
@@ -281,6 +291,22 @@ namespace CombatSystem
             if (playerHP > 0) return;
             var run = GameLoop.GameManager.Instance?.Run;
             if (run == null) return;
+            // 墓標の賽 (ADR-0015): 1 度だけ砕けて HP 1 で踏みとどまる。 砕けた後は最初の賽に戻る (この戦闘の残りの面も替える)。
+            //   ラストスタンド (メタ) より先 ── 賽の約束を先に果たし、 ラストスタンドは次の死に残す。
+            if (GameLoop.EquippedDie.IdOf(run) == GameLoop.DieIds.Gravestone)
+            {
+                GameLoop.EquippedDie.Equip(run, GameLoop.DieIds.Starting);
+                if (ctx != null)
+                {
+                    GameLoop.EquippedDie.Build(run, out var faces, out var tiers);
+                    ctx.equippedDiceFaces = faces;
+                    ctx.equippedFaceTiers = tiers;
+                }
+                playerHP = 1;
+                if (ctx != null) ctx.playerCurrentHP = playerHP;
+                Debug.Log("[賽] 墓標の賽が砕けた: HP 1 で踏みとどまり、 角の取れた賽に戻った");
+                return;
+            }
             bool isBoss = MapSystem.MapManager.Instance?.CurrentNode != null
                 && MapSystem.MapManager.Instance.CurrentNode.type == MapSystem.TileType.Boss;
             if (!GameLoop.LastStand.TryConsumeLastStandInCombat(run, isBoss)) return;

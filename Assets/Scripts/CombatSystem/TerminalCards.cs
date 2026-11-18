@@ -102,6 +102,8 @@ namespace CombatSystem
         public int foundryBonus;
         /// <summary>〈千刃〉をこの戦闘で使った回数。</summary>
         public int mainsUses;
+        /// <summary>残り火の賽 (ADR-0015): このターンの攻撃に足す分 (前のターンに捨てた目 × 2) / 次のターンへ渡す分。 持ち越すのは 1 ターン分だけ。</summary>
+        public int emberCarry, emberNext;
         /// <summary>ヴェスカ〈停滞する時間〉: このターン止まっている場の端子 (添字 = 場の位置・null = 止まっている端子なし)。
         /// <see cref="TerminalDeckState.DrawTurn"/> が毎ターン作り直す。 止まった端子には挿せない (<see cref="TerminalCards.Resolve"/> が外す)。</summary>
         public bool[] stopped;
@@ -128,6 +130,7 @@ namespace CombatSystem
         {
             ignoreCond = ignoreCondNext; ignoreCondNext = false;
             storedAttack += storedAttackNext; storedAttackNext = 0;
+            emberCarry = emberNext; emberNext = 0;
             int extra = extraDrawNext; extraDrawNext = 0;
             return extra;
         }
@@ -150,6 +153,14 @@ namespace CombatSystem
         /// <see cref="TerminalCards.Resolve"/> の「5. 効果」で、 端子へ入る出目の合計を作る所だけで引く (端子の条件は挿した目そのもので見る)。
         /// 本体・画面の見込み・BOT の配線の評価はどれも CombatManager.TerminalEnvNow の盤面を Resolve に渡すので、 同じ値を読む。</summary>
         public int blockDieCut;
+        /// <summary>装備中の賽の id (ADR-0015)。 空なら賽のパッシブを足さない (<see cref="DiePassives.ApplyToTerminals"/>)。</summary>
+        public string dieId;
+        /// <summary>このターンに振り直したか (渡し守の賽)。 振り直しは全部の目を振る。</summary>
+        public bool diceRerolled;
+        /// <summary>このターンの敵の出目の最大 (夜番の賽)。</summary>
+        public int enemyMaxDie;
+        /// <summary>このターンが敵の大技か (大技読みの賽)。</summary>
+        public bool heavyTurn;
     }
 
     /// <summary>1 ターンの端子の結果。 本体がこれを攻撃・防御・充電・戦闘の情報へ反映する。</summary>
@@ -555,6 +566,9 @@ namespace CombatSystem
             state.firedTotal += o.firedNonBasic;
             // 次に攻撃するターンの攻撃に足す分
             if (o.attackDice > 0 && state.storedAttack > 0) { o.attackAdd += state.storedAttack; state.storedAttack = 0; }
+
+            // ── 6b. 装備中の賽のパッシブ (ADR-0015): 挿した目ごとに効く・残り火の持ち越し。 封じ (7) より前 ──
+            DiePassives.ApplyToTerminals(env, state, o, defs, v);
 
             // ── 7. 誓約の封じ: 封じた軸の資源を足す分だけを落とす (攻撃・ブロックへ入る出目は残す) ──
             //   本体の口 (AddStatus の毒・AddEnemyBleed・Kw.AddHeat・AddCharge・consShield・会心の判定) と同じ物を落とす。

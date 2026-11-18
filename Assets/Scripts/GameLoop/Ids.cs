@@ -8,6 +8,31 @@ namespace GameLoop
     ///       必ずここ (または BossIds / ClassStarter) の定数を経由する。
     ///       items.json 内の表示・価格データの正本性は変わらない (ここはコード参照用のミラー)。
     /// </summary>
+    /// <summary>賽の id (ADR-0015・2026-11-18)。 id = 表示名 (items.json の category Dice)。 賽のパッシブ (CombatSystem.DiePassives) が分岐に使う。</summary>
+    public static class DieIds
+    {
+        public const string Starting   = "角の取れた賽";
+        public const string Pumice     = "軽石の賽";
+        public const string RustyNail  = "錆釘の賽";
+        public const string Scavenger  = "拾い物の賽";
+        public const string Dull       = "鈍色の賽";
+        public const string Ember      = "残り火の賽";
+        public const string Ferry      = "渡し守の賽";
+        public const string NightWatch = "夜番の賽";
+        public const string Scale      = "秤の賽";
+        public const string Reverse    = "逆目の賽";
+        public const string OldCoin    = "古銭の賽";
+        public const string Link       = "繋ぎの賽";
+        public const string Appraiser  = "目利きの賽";
+        public const string HeavyRead  = "大技読みの賽";
+        public const string Gravestone = "墓標の賽";
+        public const string Carve      = "刻みの賽";
+        public const string Clock      = "時計の賽";
+        public const string Gamble     = "賭場の賽";
+        public const string Straight   = "連なりの賽";
+        public const string Split      = "分け身の賽";
+    }
+
     public static class ItemIds
     {
         // === 名前付きパッシブ (日本語 ID ── items.json の id と一致必須) ===
@@ -23,7 +48,7 @@ namespace GameLoop
 
         /// <summary>最初に持つ賽 (ADR-0015・2026-11-18)。 面 2,3,4,5・効果なし。 店には並ばない。
         /// 墓標の賽が砕けた後もこれに戻る。</summary>
-        public const string StartingDie = "角の取れた賽";
+        public const string StartingDie = DieIds.Starting;
 
         // === 店連動パッシブ (2026-09-15) ===
         //   ShopManager が所持判定に使う ＝ 跨ファイル参照なのでここを経由する。

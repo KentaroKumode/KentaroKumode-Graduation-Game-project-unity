@@ -11,6 +11,8 @@ namespace CombatSystem
     {
         /// <summary>この戦闘の山札。 戦闘の始め (<see cref="BeginTerminalDeck"/>) に必ず作る (最初の戦闘の前だけ null)。</summary>
         private TerminalDeckState _deck;
+        /// <summary>このターンの敵の出目 (夜番の賽が読む・ロールの直後に入れる)。</summary>
+        private int[] _enemyDiceNow;
         /// <summary>このターンの端子の結果 (配線の前は null)。</summary>
         private TerminalOutcome _termOutcome;
         /// <summary>次のターンも手札に残す端子 (〈有効活用〉)。</summary>
@@ -129,6 +131,13 @@ namespace CombatSystem
             // 誓約の封じ (OathSeals.Apply が戦闘の始めに立てる)。 Resolve が同じ物を結果から落とす
             e.sealPoison = ctx.poisonSealed; e.sealBleed = ctx.bleedSealed; e.sealHeat = ctx.heatSealed;
             e.sealCharge = ctx.chargeSealed; e.sealShield = ctx.shieldSealed; e.sealCrit = ctx.critSealed;
+            // 賽のパッシブ (ADR-0015・DiePassives)
+            e.dieId = GameLoop.EquippedDie.IdOf(run);
+            e.diceRerolled = ctx.rerollsThisTurn > 0;
+            int emax = 0;
+            if (_enemyDiceNow != null) foreach (int d in _enemyDiceNow) if (d > emax) emax = d;
+            e.enemyMaxDie = emax;
+            e.heavyTurn = Escalation.IsHeavyTurn(currentEnemy, ctx.currentTurn);
             return e;
         }
 
