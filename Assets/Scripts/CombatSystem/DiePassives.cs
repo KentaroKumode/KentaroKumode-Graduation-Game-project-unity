@@ -11,7 +11,7 @@ namespace CombatSystem
     /// <para><b>戦闘の他の所で効く物</b>: 拾い物・古銭 = <see cref="OnTurnEnd"/> (ターンの終わり)・賭場 = 振り直しの費用 (CombatManager.RerollCostNow) と HP の支払い・
     /// 墓標 = HP 0 からの踏みとどまり (CombatManager.TryLastStandRevive)。</para>
     ///
-    /// <para><b>ほかの所にある賽</b>: 目利き = 振り直し (CombatManager.RerollPhase・残す目)・刻み = 次のターンの 1 つ目 (CombatManager.DecideCarve)・
+    /// <para><b>ほかの所にある賽</b>: 目利き = 振り直し (CombatManager.RerollPhase・残す目)・逆巻き = エスカレーションの段階 (ApplyRewind・Escalation.StageOffset)・
     /// 繋ぎ = 残す印 (TerminalDeckState.KeepFromMarks)・時計 = 常設の〈時計〉の端子 (TerminalIds.Clock)・分け身 = 主攻撃を 2 回 (CombatManager.Turn)・
     /// 連なり = 役〈連なり〉(YachtRoles / YachtRoleEffects)。 効果の数値はすべて仮の値 (items.json の説明文と同じ)。</para>
     ///
@@ -132,6 +132,24 @@ namespace CombatSystem
         {
             for (int i = 0; i < dice.Length; i++) if (dice[i] == face) return true;
             return false;
+        }
+
+        /// <summary>逆巻きの賽: 攻撃の種類の端子に入った目がこれ以上のターンに発動する。</summary>
+        public const int RewindNeed = 3;
+
+        /// <summary>逆巻きの賽 (作者 2026-11-18): 攻撃に目を 3 つ挿したターン、 エスカレーションの段階を 1 つ下げる (2 → 1・0 → −1)。
+        /// エスカレーションはふつうに進む (ターンの閾値で 1 つ上がる)。 段階がマイナスの間は、 自分の与ダメに同じ段の倍率を足す (−1 で +30%)。
+        /// 敵の攻撃に効くのは次のターンから (このターンの予告はもう決まっている)。 配線の結果が決まった直後・主攻撃より前に呼ぶ。</summary>
+        public static void ApplyRewind(ItemSystem.PassiveSkills.CombatContext ctx, TerminalOutcome term, int escTurn)
+        {
+            if (ctx == null || term == null || EquippedDie.IdOf(GameManager.Instance?.Run) != DieIds.Rewind) return;
+            if (term.attackDice >= RewindNeed && Escalation.EffectiveStage(escTurn) > Escalation.MinStage)
+            {
+                Escalation.StageOffset++;
+                UnityEngine.Debug.Log($"[賽] 逆巻きの賽: 段階を 1 つ下げた → {Escalation.EffectiveStage(escTurn)}");
+            }
+            int s = Escalation.EffectiveStage(escTurn);
+            if (s < 0) ctx.outgoingDamageMultiplier += Escalation.NegativeStageBuff(-s);
         }
 
         /// <summary>賭場の賽: 振り直しが無料 (費用 0)・代わりに振り直すたびに HP −N。</summary>

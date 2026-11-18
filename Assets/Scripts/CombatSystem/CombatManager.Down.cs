@@ -27,7 +27,7 @@ namespace CombatSystem
                 Debug.Log("[戦闘] " + GameLoop.VescaClock.BattleLine);
             if (VescaClockActive) Debug.Log($"[ダウン] 〈{GameLoop.VescaClock.Name}〉: {enemy?.displayName} の目盛りに {BossParams.VescaClockNotch * 100f:0}% を足した");
             BossDown.ActiveNow = false; BossDown.TakenMulNow = false;
-            if (newCombat) { Escalation.HeavyCycleOffset = 0; Escalation.HeavyHpRatio = 1f; TenyoHeavy.Reset(); }
+            if (newCombat) { Escalation.HeavyCycleOffset = 0; Escalation.StageOffset = 0; Escalation.HeavyHpRatio = 1f; TenyoHeavy.Reset(); }
             BossDownDiag.BeginFight(enemy?.id, _down.Enabled);
             HeavyHitDiag.BeginFight(enemy?.id);   // [計装 2026-11-14] 大技の被ダメ
             FightEndDiag.Begin();   // [計装 2026-11-18] 戦闘の終わりの診断
@@ -167,6 +167,7 @@ namespace CombatSystem
             BossDown.ActiveNow = false; BossDown.TakenMulNow = false;
             _down.downNow = false; _down.downWeakNow = false;
             Escalation.HeavyCycleOffset = 0;
+            Escalation.StageOffset = 0;
             Escalation.HeavyHpRatio = 1f;
         }
 

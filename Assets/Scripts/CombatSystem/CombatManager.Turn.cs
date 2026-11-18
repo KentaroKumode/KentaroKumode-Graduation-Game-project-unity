@@ -550,17 +550,6 @@ namespace CombatSystem
             //   playerFaceIdx を必ず同期すること ── 忘れると別の面の効果が発火する。
             int[] playerFaceIdx;
             int[] playerDice = RollDice(actualPlayerDiceCount, playerDiceMax, ctx.equippedDiceFaces, out playerFaceIdx);
-            // 刻みの賽 (ADR-0015): 前のターンに刻んだ目を 1 つ目に置く (振った値を捨てて置き換える・この目は振り直さない)
-            _carveFixed = -1;
-            if (_carveNext > 0 && playerDice.Length > 0
-                && GameLoop.EquippedDie.IdOf(GameLoop.GameManager.Instance?.Run) == GameLoop.DieIds.Carve)
-            {
-                playerDice[0] = _carveNext;
-                if (playerFaceIdx != null && playerFaceIdx.Length > 0)
-                    playerFaceIdx[0] = ctx.equippedDiceFaces != null ? System.Array.IndexOf(ctx.equippedDiceFaces, _carveNext) : -1;
-                _carveFixed = 0;
-            }
-            _carveNext = 0;
             CombatStats.NoteFirstRoll(actualPlayerDiceCount, ctx, playerDice);
 
             // 恒久デバフ〈コルヴェンの憤怒〉: ボス戦の 1 ターン目は自ダイスが全て最大値 (HP 半減は戦闘開始時に済ませてある)。
@@ -721,7 +710,7 @@ namespace CombatSystem
                 turn = ctx.currentTurn,
                 enemyAttackValue = enemyAtkValue,
                 secondaryAttackValue = _secondaryAtkThisTurn,
-                escalationStage = Escalation.StageOf(escTurn),
+                escalationStage = Escalation.EffectiveStage(escTurn),
                 nextThresholdTurn = Escalation.NextThresholdTurn(escTurn),
                 turnsToHeavy = Escalation.TurnsToHeavy(currentEnemy, ctx.currentTurn),
                 heavyMul = (currentEnemy?.heavyMul ?? 0f) > 0f ? currentEnemy.heavyMul + MetaProgression.MetaDebuffApplicator.GetHeavyMulBonus() : 0f,   // 挑戦カード: 大技の倍率 +N も予告に出す
@@ -789,10 +778,8 @@ namespace CombatSystem
                     _pause.catDie = _catDie; _pause.catSlot = _catSlot;
                     yield return _pause;
                     slots = _pause.slots; targets = _pause.targets; goldAsk = _pause.goldSpend; keepMarks = _pause.keep;
-                    DecideCarve(playerDice, _pause.carveDie, human: true);
                 }
                 else if (WiringPolicy != null) { var plan = WiringPolicy(playerDice, tele); slots = plan.slots; targets = plan.targets; goldAsk = plan.goldSpend; keepMarks = plan.keep; }
-                if (!_interactiveTurn) DecideCarve(playerDice, -1, human: false);   // 刻みの賽: BOT の経路はいちばん大きい目を刻む
                 if (slots == null) slots = TerminalWiring.Auto(_deck.board, playerDice, tenv, _deck.state, _catDie, _catSlot);
                 // 猫の 1 組は答えに関わらず入れる (外した答え・同じ口に挿しすぎた答えは、 猫の組を残して直す)
                 if (_catDie >= 0) slots = TerminalWiring.WithPair(slots, playerDice.Length, _deck.board, _catDie, _catSlot);
@@ -801,6 +788,8 @@ namespace CombatSystem
                 _termWanted = (int[])slots.Clone();   // [計装 #106] 直す前の挿し方 (挿したが不発の数え)
                 mutualWiring = term.kindOfDie;
                 _termOutcome = term;
+                // 逆巻きの賽 (ADR-0015): 攻撃に目を 3 つ挿したら段階を 1 つ下げ、 マイナスの段階ならこのターンの与ダメに得を足す
+                DiePassives.ApplyRewind(ctx, term, EscalationTurn(ctx));
                 // 〈有効活用〉(手札の持ち越しの規則): 捨て札から次のターンの手札に戻す 1 枚。 対象 (targets の値) は捨て札の添字・選ばなければ最後に捨てた 1 枚
                 _deck.recallNext = term.recall ? TerminalDeckState.RecallPick(_deck.discard, TerminalWiring.RecallWant(_deck.board, term, targets)) : null;
                 // 手札の規則 Pick: 残す印 (挿さなかった手札の端子だけ・人 = 画面 / BOT = 方策)。 Off・All では読まない
@@ -942,7 +931,7 @@ namespace CombatSystem
                 playerDiceTotal = ctx.playerDiceTotal,
                 enemyDiceTotal = ctx.enemyDiceTotal,
                 // [読むための欄・実績] 戦闘の計算には使わない
-                escalationStage = Escalation.StageOf(escTurn),
+                escalationStage = Escalation.EffectiveStage(escTurn),
                 secondaryHPAtStart = secondaryHpAtTurnStart,
                 wiredKinds = (attackDiceCount > 0 ? TurnResult.WiredAttack : 0) | (blockDiceCount > 0 ? TurnResult.WiredBlock : 0)
                            | (chargeDiceCount > 0 ? TurnResult.WiredCharge : 0) | (specialCount > 0 ? TurnResult.WiredSupport : 0),
