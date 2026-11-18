@@ -1560,6 +1560,7 @@ namespace CombatSystem
                 (primaryAttacked ? enemyAtkBeforeDefense : 0) + (secondaryAttacked ? secondaryAtkBeforeDefense : 0);
             ctx.accumulatedValues[ItemSystem.PassiveSkills.Effects.MutualKeys.HpLossFromEnemy] = takenApplied;
             BossDownDiag.NoteEnemyTurn(diagHeavyKind, takenApplied);   // [診断 2026-11-14] 大技 / 小技のターンの被ダメ (防御・シールドの後)
+            FightEndDiag.NoteEnemyTurn(diagHeavyKind, primaryAttacked, takenApplied);   // [計装 2026-11-18] 戦闘の終わりの診断 (読むだけ)
             if ((diagHeavyKind == 0 || diagHeavyKind == 2) && primaryAttacked)   // [計装 2026-11-14] 大技の被ダメ (実際に撃った大技 / 小技のターン)
                 HeavyHitDiag.NoteHit(diagHeavyKind, enemyAtkBeforeDefense, takenApplied, playerMaxHP, diagHpBeforeEnemy, playerHP <= 0, blockDiceCount,
                                      diagHitMain, diagBurst, diagHeavyKind == 0 ? diagBlazeStacks : 0);

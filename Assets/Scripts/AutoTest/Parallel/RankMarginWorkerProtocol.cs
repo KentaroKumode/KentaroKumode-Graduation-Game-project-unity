@@ -75,6 +75,8 @@ namespace AutoTest.ParallelSweep
         public int[] stormLayers = Array.Empty<int>();
         /// <summary>[計装 2026-11-14] 嵐の層の航行の判断 (10 列ずつ・列は AutoRunner.RunRec.stormNav と同じ。 第 2 巡で 5 → 10 列: ボスに入ったか・死んだ層も載る)。</summary>
         public int[] stormNav = Array.Empty<int>();
+        /// <summary>[計装 2026-11-18] 嵐の層の HP と物資の流れ (12 列ずつ・列は AutoRunner.RunRec.layerFlow と同じ)。</summary>
+        public int[] layerFlow = Array.Empty<int>();
         /// <summary>[計装 2026-11-10] ラン開始時に実際に入っていた整備パネルの段。</summary>
         public string metaRanks = "";
         /// <summary>[計装 2026-11-12] ラン開始時の職業 (lockWeaponFamily の測定では武器の家系)。</summary>
@@ -119,6 +121,7 @@ namespace AutoTest.ParallelSweep
                 mapVisit = r.mapVisit != null ? r.mapVisit.ToArray() : Array.Empty<int>(),
                 stormLayers = r.stormLayers != null ? r.stormLayers.ToArray() : Array.Empty<int>(),
                 stormNav = r.stormNav != null ? r.stormNav.ToArray() : Array.Empty<int>(),
+                layerFlow = r.layerFlow != null ? r.layerFlow.ToArray() : Array.Empty<int>(),
                 metaRanks = r.metaRanks ?? "",
                 startClass = r.startClass ?? "",
                 ashBase = r.ashBase, ashBaseRevisit = r.ashBaseRevisit, ashBaseChoice = r.ashBaseChoice, ashBaseTurn = r.ashBaseTurn,
@@ -151,8 +154,22 @@ namespace AutoTest.ParallelSweep
                     heavyHits = c.heavyHits, heavyTaken = c.heavyTaken, heavyMax = c.heavyMax,
                     stormIn = c.stormIn, stormPhase = c.stormPhase, stormInst = c.stormInst,
                     maxTurnLanded = c.maxTurnLanded, maxTurnRequested = c.maxTurnRequested, held = c.held ?? Array.Empty<string>(),
+                    fin = c.fin ?? Array.Empty<int>(),
+                    lastCause = c.isFightEnd && !c.won ? (int)c.deathCause : -1,
+                    takenSrc = TakenSrc(c.playerDamageBySource),
                 };
             }
+            return a;
+        }
+
+        /// <summary>[計装 2026-11-18] 被ダメの出どころ (DeathCause の番号ごとの量・0 の末尾は詰める)。</summary>
+        private static int[] TakenSrc(System.Collections.Generic.Dictionary<ItemSystem.PassiveSkills.DeathCause, int> m)
+        {
+            if (m == null || m.Count == 0) return Array.Empty<int>();
+            int n = 0;
+            foreach (var kv in m) if (kv.Value != 0) n = Math.Max(n, (int)kv.Key + 1);
+            var a = new int[n];
+            foreach (var kv in m) if ((int)kv.Key >= 0 && (int)kv.Key < n) a[(int)kv.Key] = kv.Value;
             return a;
         }
 
@@ -211,6 +228,12 @@ namespace AutoTest.ParallelSweep
         public int maxTurnLanded, maxTurnRequested;
         /// <summary>[計装 2026-11-17] ボス戦の開始時の持ち物 (ボス戦の終わりの行だけ・それ以外は空)。</summary>
         public string[] held = Array.Empty<string>();
+        /// <summary>[計装 2026-11-18] 戦闘の終わりの診断 (10 列・AutoRunner.CombatRec.fin と同じ)。</summary>
+        public int[] fin = Array.Empty<int>();
+        /// <summary>[計装 2026-11-18] 負けた戦闘のとどめの出どころ (ItemSystem.PassiveSkills.DeathCause の番号・勝った戦闘と途中の段は −1)。</summary>
+        public int lastCause = -1;
+        /// <summary>[計装 2026-11-18] この戦闘の被ダメの出どころ別の量 (DeathCause の番号が添字・CombatManager.BuildDamageBreakdown)。</summary>
+        public int[] takenSrc = Array.Empty<int>();
     }
 
     [Serializable]

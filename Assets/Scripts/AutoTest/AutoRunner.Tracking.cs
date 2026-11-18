@@ -35,6 +35,17 @@ namespace AutoTest
             RecordStormNav(gm, true);
         }
 
+        /// <summary>[計装 2026-11-18] 嵐の層の HP と物資の流れを <see cref="RunRec.layerFlow"/> へ 1 層ぶん足す (ボスに入った時と、 その層で死んだ時)。 読むだけ。</summary>
+        private void RecordLayerFlow(GameManager gm, bool atBoss)
+        {
+            var sim = gm?.FreeMap;
+            if (_cur == null || sim == null || !sim.InstabilityMode || gm.Run == null) return;
+            int depth = gm.Run.Depth;
+            for (int i = 0; i + LayerFlowCols <= _cur.layerFlow.Count; i += LayerFlowCols) if (_cur.layerFlow[i] == depth) return;
+            _cur.layerFlow.AddRange(new[] { depth, atBoss ? 1 : 0, sim.Turn, sim.StormStepsTaken, sim.StormHpPaid, sim.StarveHpPaid,
+                gm.Run.provision, gm.Run.playerHP, gm.Run.playerMaxHP, sim.Instability, sim.StormPhase, sim.CollapseTurn });
+        }
+
         /// <summary>[計装 2026-11-14] 嵐の層の航行の判断を <see cref="RunRec.stormNav"/> へ 1 層ぶん足す (ボスに入った時と、 その層で死んだ時)。 同じ深さの 2 度目は足さない。
         /// この層の航行の判断を見ていなければ -1 のまま。 読むだけ。</summary>
         private void RecordStormNav(GameManager gm, bool atBoss)
@@ -134,7 +145,7 @@ namespace AutoTest
             _pendingEnemyId = e != null && e.id != null ? e.id : "";
             // ボス判定は敵IDのみで厳密に行う（ノード種別フォールバックは誤検出の元）
             _pendingEnemyIsBoss = GameLoop.BossIds.IsBoss(_pendingEnemyId);
-            if (_pendingEnemyIsBoss && !isChainSwap) RecordStormLayer(gm);   // [計装 2026-11-13] 層を抜けた時の不安定化 (読むだけ)
+            if (_pendingEnemyIsBoss && !isChainSwap) { RecordStormLayer(gm); RecordLayerFlow(gm, true); }   // [計装 2026-11-13 / 11-18] 層を抜けた時の不安定化・HP と物資の流れ (読むだけ)
             // 戦闘名の鍵 (追跡者の戦闘は点に載っていないので鍵なし)
             _pendingEncounterKey = (gm != null && !gm.InPursuerCombat)
                 ? (EncounterDangerStats.KeyOf(MapSystem.MapManager.Instance?.CurrentNode, gm.Run?.Depth ?? 1) ?? "") : "";
@@ -307,6 +318,7 @@ namespace AutoTest
                 stormIn = _pendingStormIn, stormPhase = _pendingStormPhase, stormInst = _pendingStormInst,   // [計装 2026-11-14・嵐の航行]
                 maxTurnLanded = (int)System.Math.Round(_tdMaxLanded), maxTurnRequested = (int)System.Math.Round(_tdMaxReq),   // [計装 2026-11-17]
                 held = _pendingEnemyIsBoss ? _pendingHeld : null,
+                fin = CombatSystem.FightEndDiag.Snapshot(r.playerHPRemaining),   // [計装 2026-11-18] 戦闘の終わりの診断 (読むだけ)
             };
             _cur.combats.Add(rec);
             _cur.totalCombats++;
@@ -441,7 +453,7 @@ namespace AutoTest
             {
                 _cur.deathInBossFight = bossFight;
                 _cur.fatalEnemy = fatal;
-                if (!bossFight) RecordStormNav(GameManager.Instance, false);   // [計装 2026-11-14] 死んだ嵐の層の航行の判断 (ボス戦の死はボスに入った時に載っている)
+                if (!bossFight) { RecordStormNav(GameManager.Instance, false); RecordLayerFlow(GameManager.Instance, false); }   // [計装 2026-11-14 / 11-18] 死んだ嵐の層の航行の判断・HP と物資の流れ (ボス戦の死はボスに入った時に載っている)
             }
             Finish(Outcome.GameOver, $"敗北 cause={cause}", cause);
         }

@@ -30,6 +30,7 @@ namespace CombatSystem
             if (newCombat) { Escalation.HeavyCycleOffset = 0; Escalation.HeavyHpRatio = 1f; TenyoHeavy.Reset(); }
             BossDownDiag.BeginFight(enemy?.id, _down.Enabled);
             HeavyHitDiag.BeginFight(enemy?.id);   // [計装 2026-11-14] 大技の被ダメ
+            FightEndDiag.Begin();   // [計装 2026-11-18] 戦闘の終わりの診断
         }
 
         /// <summary>ターン <paramref name="turn"/> がダウンだったら、 敵の周期 (大技・構え・〈業火の予兆〉) を取り消して頭に戻すか (<see cref="BossDown.CancelsCycle"/>)。
@@ -67,6 +68,7 @@ namespace CombatSystem
             _diagHpTurnHead = playerHP; _diagChargeTurn = false;
             // 灰燼の王の〈業火〉の周期は HP 50% で 4 → 3 ターン (2026-11-14)。 このターンの周期の数え方に使う HP の割合をターンの頭に決める (取り消しの判定より前)
             Escalation.HeavyHpRatio = currentEnemy != null ? enemyHP / (float)System.Math.Max(1, EnemyMaxHP) : 1f;
+            FightEndDiag.NoteTurnHead(ctx?.currentTurn ?? 0, playerHP, Escalation.HeavyHpRatio);   // [計装 2026-11-18] 読むだけ
             BossDown.ActiveNow = false; BossDown.TakenMulNow = false;
             if (!_down.Enabled || ctx == null) { _down.downNow = false; _down.downWeakNow = false; return; }
             if (!_down.BeginTurn()) return;

@@ -238,17 +238,19 @@ namespace MapSystem.FreeMove
         public StormClock Clock { get; private set; } = StormClock.Instability;
         /// <summary>嵐が不安定化ポイントで進む層か (嵐の層で、 時計が <see cref="StormClock.Instability"/>)。</summary>
         public bool InstabilityMode => StormMode && Clock == StormClock.Instability;
-        /// <summary>不安定化ポイントの累計 (2026-11-13・0 以上)。 深さ 6 は InstabilityDepth6Start (= 崩れ始める境目 15) から始まる。 不安定化の時計でない時は 0 のまま。 中断セーブに写す。</summary>
+        /// <summary>不安定化ポイントの累計 (2026-11-13・0 以上)。 深さ 6 は InstabilityDepth6Start (2026-11-18〜 12 = 崩れ始める境目 15 の 3 つ手前・旧 15) から始まる。 不安定化の時計でない時は 0 のまま。 中断セーブに写す。</summary>
         public int Instability { get; private set; }
         /// <summary>累計の内訳 (<see cref="Instability.PartTake"/> ほか・この層で溜まった分。 深さ 6 の始まりの分は入らない)。 中断セーブに写す。</summary>
         public int[] InstabilityParts { get; } = new int[MapSystem.FreeMove.Instability.Parts];
         /// <summary>崩れ始めたか (不安定化の累計が最初の境目以上)。 ここから先は 1 歩・待つ・偵察でも溜まる。 不安定化の時計でなければ false。</summary>
         public bool Collapsing => InstabilityMode && MapSystem.FreeMove.Instability.Collapsing(Instability);
-        /// <summary>[計装 2026-11-13] 崩れ始めた手番 (<see cref="Turn"/>・まだなら -1・深さ 6 は 0)。 数えるだけで動きに使わない。 中断セーブには写さない (戻した時は今の状態から数え直す)。</summary>
+        /// <summary>[計装 2026-11-13] 崩れ始めた手番 (<see cref="Turn"/>・まだなら -1・深さ 6 は 2026-11-18 より前は 0)。 数えるだけで動きに使わない。 中断セーブには写さない (戻した時は今の状態から数え直す)。</summary>
         public int CollapseTurn { get; private set; } = -1;
         /// <summary>[計装 2026-11-13] この層で嵐の中の点へ動いた歩数 (1 歩・〈補給線〉) と、 嵐で払った HP (歩く・待つ・偵察・〈補給線〉)。 数えるだけ・中断セーブには写さない。</summary>
         public int StormStepsTaken { get; private set; }
         public int StormHpPaid { get; private set; }
+        /// <summary>[計装 2026-11-18] この層で物資切れの歩行で払った HP (払わせた量・HP が尽きる所で頭打ちでも要求の量)。 数えるだけ・中断セーブには写さない。</summary>
+        public int StarveHpPaid { get; private set; }
         /// <summary>イベントの「前線を遠ざける / 近づける」で動かした嵐の時計のずらし (手番・正 = 進めた)。 中断セーブに写す。 手番の時計だけが使う。</summary>
         public int StormShift { get; private set; }
         /// <summary>段の長さ (時計の単位ごと)。</summary>
@@ -285,7 +287,7 @@ namespace MapSystem.FreeMove
         }
 
         /// <summary>嵐の時計の種類を決める (層を作った直後・最初の操作と <see cref="LoadState"/> の前に 1 回)。 累計は層の始まりの値に戻す
-        /// (深さ 6 = 10・ほか 0。 不安定化の時計でなければ 0)。 <see cref="Version"/> は動かさない (手番の時計で storm-boss と写しが揃うように)。</summary>
+        /// (深さ 6 = FreeMapParams.InstabilityDepth6Start・ほか 0。 不安定化の時計でなければ 0)。 <see cref="Version"/> は動かさない (手番の時計で storm-boss と写しが揃うように)。</summary>
         public void ConfigureStorm(StormClock clock)
         {
             Clock = clock;
@@ -1220,6 +1222,7 @@ namespace MapSystem.FreeMove
             int short_ = cost - pay;
             if (short_ <= 0) return false;
             HpPayReason = "物資切れの歩行";
+            StarveHpPaid += short_ * FreeMapParams.HpPerSupply;   // [計装 2026-11-18]
             return _wallet.PayHp(short_ * FreeMapParams.HpPerSupply);
         }
 
