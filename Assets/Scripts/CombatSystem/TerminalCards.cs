@@ -858,10 +858,17 @@ namespace CombatSystem
         {
             var l = new List<string>();
             if (board == null || marks == null) return l;
+            // 繋ぎの賽 (ADR-0015): 挿した (発動した) 手札の端子も 1 枚だけ残せる。 左から最初の 1 枚
+            bool link = GameLoop.EquippedDie.IdOf(GameLoop.GameManager.Instance?.Run) == GameLoop.DieIds.Link;
+            bool linkUsed = false;
             for (int s = permCount; s < board.Count && s < marks.Length; s++)
             {
                 if (!marks[s]) continue;
-                if (o != null && o.fired.Contains(s)) continue;
+                if (o != null && o.fired.Contains(s))
+                {
+                    if (link && !linkUsed) { linkUsed = true; l.Add(board[s]); }
+                    continue;
+                }
                 if (o?.stopped != null && s < o.stopped.Length && o.stopped[s]) continue;
                 l.Add(board[s]);
             }

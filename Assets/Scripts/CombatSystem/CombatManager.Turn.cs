@@ -1063,10 +1063,24 @@ namespace CombatSystem
             ctx.fixedDamageToEnemy += ItemSystem.PassiveSkills.Keywords.Kw.TakePendingEnemyDamage(ctx);
             // [診断] この呼び出しだけが「プレイヤー勝利の主攻撃」。 段別計測はここでのみ積む。
             CombatStats.DiagWinAttack = true;
+            // 分け身の賽 (ADR-0015): 攻撃を 2 回に分ける (1 回あたり攻撃値の半分・切り上げ)。 攻撃のたびに起きる効果
+            //   (ProcessDamage の中の会心の判定・OnPreDealDamage・敵の防御、 ApplyWinDamageModifiers) は 2 回とも起きる。
+            bool splitHits = !skipAttack && atkBase > 1
+                && GameLoop.EquippedDie.IdOf(GameLoop.GameManager.Instance?.Run) == GameLoop.DieIds.Split;
+            int hitBase = splitHits ? (atkBase + 1) / 2 : atkBase;
             var (dealtDmg, dealtFixed, isCrit) = psm.ProcessDamage(
-                atkBase, ctx.pursuitDamage, playerCritBaseRate);
+                hitBase, ctx.pursuitDamage, playerCritBaseRate);
             int lbStage = GameLoop.GameManager.Instance?.Run?.limitBreakStage ?? 0;
             dealtDmg = ApplyWinDamageModifiers(dealtDmg, ref dealtFixed, ref isCrit, lbStage, psm, ctx);
+            if (splitHits)
+            {
+                // 2 回目の前に固定ダメの枠を空にする ── 空にしないと 1 回目の固定ダメ (毒・爆発・品が預けた分) が 2 回目にも返って二重に入る。
+                ctx.fixedDamageToEnemy = 0;
+                var (dmg2, fix2, crit2) = psm.ProcessDamage(hitBase, 0, playerCritBaseRate);
+                dmg2 = ApplyWinDamageModifiers(dmg2, ref fix2, ref crit2, lbStage, psm, ctx);
+                dealtDmg += dmg2; dealtFixed += fix2; isCrit |= crit2;
+                Debug.Log($"[賽] 分け身の賽: 攻撃 {atkBase} → {hitBase} × 2 回 (与ダメ {dealtDmg})");
+            }
             // 攻撃しないターン (攻撃端子 0 本・逃げる) は主攻撃を 0 にする (2026-11-04)。
             //   atkBase を 0 にしても、 ProcessDamage の中でバフ (damageBonus) と OnPreDealDamage のパッシブが
             //   主攻撃へ加算していたので、 攻撃しないはずのターンに 1 以上のダメージが入っていた。 会心も立てない。

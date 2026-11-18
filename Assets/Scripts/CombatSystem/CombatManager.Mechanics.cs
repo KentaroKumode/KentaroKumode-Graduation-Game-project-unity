@@ -203,6 +203,7 @@ namespace CombatSystem
             //   いまは (1) 方策の pick は「振るかどうか」だけを表し、 中身は読まない ── 振り直せない面以外を全部振る
             //   (2) 費用 = 振り直す個数 × (この戦闘で払った回数 + 1)。 ターンでは戻らない。 docs/GAME.md §6-3。
             //   (3) 時限デバフ〈無力感〉(2026-11-16) を持っていれば毎回 +1 (無料の振り直しには足さない)。 式は RerollCostNow の 1 か所。
+            bool appraiser = GameLoop.EquippedDie.IdOf(GameLoop.GameManager.Instance?.Run) == GameLoop.DieIds.Appraiser;   // 目利きの賽
             int attempt = 1;   // このターンの何回目か (乱数の添字にだけ使う)
             int guard = 16;    // 方策が空でない配列を返し続けても止まるようにする
             var rerollIdx = new List<int>(playerDice.Length);
@@ -217,14 +218,18 @@ namespace CombatSystem
                     // 振り直すかを決める時も手札と場を見せる (手札は振り直しで変わらない)。 敵の攻撃は予告の近似で組む
                     if (_deck != null) { _pause.board = _deck.board; _pause.terminalEnv = TerminalEnvNow(ctx, tele.enemyAttackValue); _pause.terminalState = _deck.state; }
                     yield return _pause;
-                    pick = _pause.reroll ? AllDiceIndex(playerDice.Length) : null;
+                    pick = !_pause.reroll ? null
+                         : appraiser ? AllDiceIndexExcept(playerDice.Length, _pause.rerollKeep) : AllDiceIndex(playerDice.Length);
                 }
                 else pick = RerollPolicy(playerDice, tele, nth);
                 if (pick == null || pick.Length == 0) break;
 
                 // ADR-0011: 振り直せない面は無い。 常に全ダイスを振り直す。
+                //   例外は目利きの賽 (ADR-0015): 方策 / 画面が 1 つ除いた添字を返したら、 その目を残して残りを振る。
                 rerollIdx.Clear();
-                for (int i = 0; i < playerDice.Length; i++) rerollIdx.Add(i);
+                if (appraiser && pick.Length == playerDice.Length - 1)
+                    foreach (int i in pick) { if (i >= 0 && i < playerDice.Length) rerollIdx.Add(i); }
+                else for (int i = 0; i < playerDice.Length; i++) rerollIdx.Add(i);
 
                 bool usedFree = freeRerolls > 0;
                 int cost = RerollCostNow(rerollIdx.Count, nth, usedFree);   // 〈無力感〉の +1 もここ (無料の時は足さない)

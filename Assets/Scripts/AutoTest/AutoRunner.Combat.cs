@@ -1752,7 +1752,7 @@ namespace AutoTest
                 //   リロールが 3 分の 1 に減り 5 層のボス戦が 36.7% → 65.1% の死亡に悪化した。 長い戦闘では充電が溜まる。)
                 const float ChargeUtilityPerUnit = 1.2f;
                 float scarcity = 1f - UnityEngine.Mathf.Clamp01(ctx.GetCharge() / (float)CombatSystem.CombatManager.ChargeMax);
-                return ev - ChargeUtilityPerUnit * scarcity * costE > cur ? all.ToArray() : null;
+                return ev - ChargeUtilityPerUnit * scarcity * costE > cur ? RerollPickForDie(dice, all) : null;
             }
 
             // S2: 大きい攻撃の予告なら、 止めきれない手は平均近くでも振り直し、 充電の予備も使う
@@ -1760,7 +1760,7 @@ namespace AutoTest
             {
                 int freeH = ctx.currentBuffs.TryGetValue(CombatSystem.YachtRoleEffects.FreeRerollKey, out float ffH) ? (int)ffH : 0;
                 int costH = CombatSystem.CombatManager.RerollCostNow(all.Count, attempt, freeH > 0);
-                return ctx.GetCharge() >= costH ? all.ToArray() : null;
+                return ctx.GetCharge() >= costH ? RerollPickForDie(dice, all) : null;
             }
 
             // ② 平均を下回る手だけ振り直す
@@ -1770,7 +1770,16 @@ namespace AutoTest
                 ? (int)ff : 0;
             int cost = CombatSystem.CombatManager.RerollCostNow(all.Count, attempt, freeLeft > 0);
             if (ctx.GetCharge() - RerollChargeReserve < cost) return null;
-            return all.ToArray();
+            return RerollPickForDie(dice, all);
+        }
+
+        /// <summary>振り直す目の添字。 目利きの賽 (ADR-0015) を持つ時は、 いちばん大きい目を残して残りを振る。</summary>
+        private static int[] RerollPickForDie(int[] dice, List<int> all)
+        {
+            if (GameLoop.EquippedDie.IdOf(GameLoop.GameManager.Instance?.Run) != GameLoop.DieIds.Appraiser || dice.Length < 2) return all.ToArray();
+            int best = 0;
+            for (int i = 1; i < dice.Length; i++) if (dice[i] > dice[best]) best = i;
+            return CombatSystem.CombatManager.AllDiceIndexExcept(dice.Length, best);
         }
 
         /// <summary>1 ターンあたりのリロール上限。 全部振り直しは賭けなので、 同じターンに何度も重ねない。

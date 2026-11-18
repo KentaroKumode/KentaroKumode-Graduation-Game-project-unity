@@ -370,7 +370,11 @@ namespace UI.Game2D.Battle
             var cm = CombatManager.Instance;
             if (cm == null || !CanRerollNow) return;
             Game2DSfx.Play("decide"); Game2DSfx.DiceRoll();
-            cm.AnswerReroll(true);
+            // 目利きの賽 (ADR-0015): 端子に挿してある目のうち左の 1 つを残して振る
+            int keep = -1;
+            if (EquippedDie.IdOf(GameManager.Instance?.Run) == DieIds.Appraiser)
+                for (int i = 0; i < slot.Length; i++) if (slot[i] >= 0) { keep = i; break; }
+            cm.AnswerReroll(true, keep);
             if (!cm.IsAwaitingDecision) { Resolve(cm); return; }
             phase = P.PRoll; t = 0; rolled = false; rollSeq = null; SyncDecision(cm, false); Touch();
         }
@@ -760,7 +764,16 @@ namespace UI.Game2D.Battle
         public bool IsKept(int s)
         {
             if (s < 0 || s >= keepMark.Length || !keepMark[s]) return false;
-            for (int i = 0; i < slot.Length; i++) if (slot[i] == s) return false;
+            bool plugged = false;
+            for (int i = 0; i < slot.Length; i++) if (slot[i] == s) plugged = true;
+            if (!plugged) return true;
+            // 繋ぎの賽 (ADR-0015): 挿した端子も、 印の付いた左から最初の 1 枚だけ残る (本体の KeepFromMarks と同じ選び方)
+            if (EquippedDie.IdOf(GameManager.Instance?.Run) != DieIds.Link) return false;
+            for (int t = 0; t < s && t < keepMark.Length; t++)
+            {
+                if (!keepMark[t]) continue;
+                for (int i = 0; i < slot.Length; i++) if (slot[i] == t) return false;   // もっと左に、 挿して印の付いた端子がある
+            }
             return true;
         }
 

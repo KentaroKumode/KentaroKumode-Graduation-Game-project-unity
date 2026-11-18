@@ -837,6 +837,35 @@ namespace AutoTest
              + $"({100.0 * DownAimHeld / DownAimDecisions:0.0}%) / 待つ手に足した値の平均 {_downAimGainSum / DownAimDecisions:0.00} (HP 相当)";
 
         /// <summary>対象の点: 基本の端子 1 (報酬の足切りと同じ見方)・それ以外は報酬の素の点。</summary>
+        /// <summary>繋ぎの賽 (ADR-0015): 挿した手札の端子のうち、 基本の端子以外でいちばん値打ちのある 1 枚に残す印を足す (基本しか無ければ基本の 1 枚)。
+        /// 印は本体と同じ KeepFromMarks で読まれ、 挿した端子は左から最初の 1 枚だけ残る ── だから選んだ 1 枚にだけ付ける。</summary>
+        private bool[] AddLinkDieKeep(bool[] keep, int[] rolls, MutualTurnTelegraph tele, int[] slots)
+        {
+            if (TerminalCards.CarryMode != HandCarryMode.Pick) return keep;
+            var run = GameManager.Instance?.Run;
+            if (EquippedDie.IdOf(run) != DieIds.Link) return keep;
+            var deck = CombatManager.Instance?.TerminalDeck;
+            if (deck == null || rolls == null || rolls.Length == 0) return keep;
+            var ev = PrepareDeckEval(rolls, tele);
+            EvalDeckWiring(in ev, rolls, slots, out _, out var o, out _, out _);
+            var board = ev.board; int perm = deck.permanent.Count;
+            int best = -1; float bestW = float.NegativeInfinity;
+            foreach (int s in o.fired)
+            {
+                if (s < perm || s >= board.Count) continue;
+                var d = TerminalCards.Get(board[s]);
+                if (d == null || d.permanent) continue;
+                float w = TargetWorth(d, run) + (d.basic ? 0f : 1000f);
+                if (w > bestW) { bestW = w; best = s; }
+            }
+            if (best < 0) return keep;
+            var k = keep != null && keep.Length >= board.Count ? (bool[])keep.Clone() : new bool[board.Count];
+            if (keep != null) for (int s = 0; s < keep.Length && s < k.Length; s++) k[s] = keep[s];
+            for (int s = 0; s < k.Length; s++) if (s != best && o.fired.Contains(s)) k[s] = false;   // 挿した端子の印は選んだ 1 枚だけ
+            k[best] = true;
+            return k;
+        }
+
         private static float TargetWorth(TerminalDef d, RunState run)
             => d == null ? 0f : d.basic ? 1f : RewardBaseScore(d, run);
 
@@ -860,6 +889,7 @@ namespace AutoTest
             }
             // 手札の規則 Pick (2026-11-13): 次のターンも手札に残す印 (方策 handKeepPolicy・Off / All では null)
             bool[] keep = slots != null ? ChooseHandKeep(rolls, tele, slots) : null;
+            if (slots != null) keep = AddLinkDieKeep(keep, rolls, tele, slots);
             if (predTrace) BeginPredTrace(tele.turn);
             BeginMainCorrTurn(_lastPredA);
             _fbDecided++; if (_lastFreeBlock) _fbTurns++; if (_lastKillsNow) _fbKillTurns++;
