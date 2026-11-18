@@ -276,6 +276,8 @@ namespace AutoTest
             //   1 つも消費しないので、 付与あり/なしで乱数列はずれない ＝ ペアが保たれる。
             if (!string.IsNullOrEmpty(_pendingGrantItemId) && gm.Run != null)
                 ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(gm.Run, _pendingGrantItemId);
+            // [測定の口] 最初の賽を指定する (ADR-0015 の賽の確かめ・既定は空 = 角の取れた賽)。 乱数は引かない。
+            if (!string.IsNullOrEmpty(forceStartDie) && gm.Run != null) GameLoop.EquippedDie.Equip(gm.Run, forceStartDie);
 
             // [計装 2026-11-10] 実際に入っていた整備パネルの段 (配点の指定が予算で切り詰められていないかを、 ランの記録で確かめる)
             if (_cur != null)
