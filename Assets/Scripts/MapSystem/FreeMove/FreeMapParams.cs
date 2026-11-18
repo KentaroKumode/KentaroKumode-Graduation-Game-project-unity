@@ -138,8 +138,11 @@ namespace MapSystem.FreeMove
         /// 2026-11-13 作者の決定で 10/20/30/35 → 15/30/45/50 (2 度目の置き値・輪の中で粘っても 1 層に 12〜19 点しか踏めなかったため)。
         /// 手番の時計 (stormClock = Turns) の段の長さは上の <see cref="StormQuietTurns"/> / <see cref="StormPhase1Turns"/> ほかで、 これとは共有しない。</summary>
         public const int InstabilityPhase1At = 15, InstabilityPhase2At = 30, InstabilityPhase3At = 45, InstabilityPhase4At = 50;
-        /// <summary>深さ 6 (画面の第 4 層) の累計の始まり (入った時から崩れ始めている = <see cref="InstabilityPhase1At"/>)。</summary>
-        public const int InstabilityDepth6Start = InstabilityPhase1At;
+        /// <summary>深さ 6 (画面の第 4 層) の累計の始まり。 2026-11-18 (作者の指示「4 層は嵐の開始を 3 ターン遅らせ」) で 15 (= <see cref="InstabilityPhase1At"/>・入った時から崩れ始めている) → 12。
+        /// 換算: 崩れ始める前は歩く・待つ・偵察で溜まらないので、 静かな間に溜まるのは歩く以外 (取る・激化・イベントのターン・嵐を動かす) だけ。
+        /// 深さ 6 のその増え方は 1 手番あたり 1.04 (案 B の測定・Super・ボスに着いた 6,199 層・層ごとの中央 1.06) → 3 手番 ≈ 3 ポイント。
+        /// 崩れ始めた後の動きは前と同じで、 嵐の全体が約 3 手番遅れる (GAME.md §5-12)。 手番の時計 (stormClock = Turns・測定の口) の <see cref="Storm.QuietTurns"/> は変えていない。</summary>
+        public const int InstabilityDepth6Start = 12;
 
         // ── 縄張り ─────────────────────────────────────────────
         public const int TerritoryMin = 7;

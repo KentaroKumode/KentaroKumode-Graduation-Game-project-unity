@@ -1341,7 +1341,7 @@
       "displayName": "審判官",
       "description": "管轄の果てである五層の底に立ち、降りてきた者の罪を量る執行者。白い法衣の背に日輪を負い、手にした天秤は一度も揺れたことがない。",
       "floor": 5,
-      "maxHP": 1150,
+      "maxHP": 1835,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 6,

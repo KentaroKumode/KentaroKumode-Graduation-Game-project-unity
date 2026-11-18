@@ -295,13 +295,21 @@ static partial class T
                 s.MoveTo(j);
                 if (!s.InFight) snow &= inS && s.Instability == p + FreeMapParams.StormSnowTurns;
             }
-            // 深さ 6 は崩れ始める境目 (15) から (入った時からフェーズ 1)
+            // 深さ 6 は InstabilityDepth6Start から (2026-11-18〜 12 = 境目 15 の 3 つ手前・静かな間は歩いても溜まらない。 旧 15 = 入った時からフェーズ 1)
             for (int salt = 1; salt <= 100; salt++)
             {
                 var s = MakeInst(salt, 6);
-                d6 &= FreeMapParams.InstabilityDepth6Start == FreeMapParams.InstabilityPhase1At && s.Instability == FreeMapParams.InstabilityDepth6Start && s.StormPhase == 1 && s.Collapsing && s.InstabilityParts.All(x => x == 0);
+                bool startCollapsed = FreeMapParams.InstabilityDepth6Start >= FreeMapParams.InstabilityPhase1At;
+                d6 &= s.Instability == FreeMapParams.InstabilityDepth6Start && s.Collapsing == startCollapsed
+                    && s.StormPhase == (startCollapsed ? 1 : 0) && s.InstabilityParts.All(x => x == 0);
                 var nb = s.Neighbors(s.Me); s.MoveTo(nb[0]);
-                if (!s.InFight) d6 &= s.Instability == FreeMapParams.InstabilityDepth6Start + 1;
+                if (!s.InFight) d6 &= s.Instability == FreeMapParams.InstabilityDepth6Start + (startCollapsed ? 1 : 0);
+                // 取って境目を越えたら崩れ始め、 そこからは歩くと +1
+                if (!startCollapsed && !s.InFight)
+                {
+                    s.AddInstability(InstabilitySource.Treasure, 1);
+                    d6 &= s.Collapsing == (s.Instability >= FreeMapParams.InstabilityPhase1At);
+                }
             }
             // 深さ 0・7 は嵐が無い: 何を足しても 0
             foreach (int floor in new[] { 0, 7 })
