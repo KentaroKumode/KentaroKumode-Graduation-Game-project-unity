@@ -415,7 +415,7 @@
       "displayName": "双角の暴牛",
       "description": "かつて荷運びの牛が三層のゆがみにのまれ、二本足で立ち上がった末裔。通路の岩壁には、やつが角を研いだ深い溝が幾筋も刻まれている。",
       "floor": 3,
-      "maxHP": 190,
+      "maxHP": 150,
       "criticalNumerator": 0,
       "threat": 7,
       "passiveSkills": [
@@ -432,9 +432,9 @@
           "flavorText": "「当たっただけじゃ終わらんのか」「終わってたら苦労してない」"
         }
       ],
-      "baseAttack": 7,
+      "baseAttack": 5,
       "attackRollMin": 1,
-      "attackRollMax": 7,
+      "attackRollMax": 6,
       "defense": 6,
       "danger": 27,
       "scale": 0.5
@@ -445,7 +445,7 @@
       "description": "ちぎれた鼻環の鎖を垂らし、白い泡を吹いて通路を駆け回る狂乱個体。折れた片角の断面には、乾いた血と岩くずがこびりついている。",
       "floor": 3,
       "elite": true,
-      "maxHP": 300,
+      "maxHP": 210,
       "criticalNumerator": 0,
       "threat": 10,
       "passiveSkills": [
@@ -467,9 +467,9 @@
           "description": "毎ターン、攻撃+1"
         }
       ],
-      "baseAttack": 8,
+      "baseAttack": 5,
       "attackRollMin": 1,
-      "attackRollMax": 8,
+      "attackRollMax": 6,
       "defense": 6,
       "danger": 48,
       "scale": 0.5
@@ -542,9 +542,9 @@
           "description": "偶数ターンは霊体になり、受ける攻撃のダメージを1に減らす。霊体でないターンは攻撃の出目を1つ多く振る"
         }
       ],
-      "baseAttack": 10,
+      "baseAttack": 9,
       "attackRollMin": 1,
-      "attackRollMax": 7,
+      "attackRollMax": 6,
       "danger": 189,
       "scale": 0.95
     },
@@ -874,7 +874,7 @@
       "description": "「あいつは獣のように襲ってはこない。晩餐の席へ招くように一礼し、気づいた時にはもう喉元が冷たくなっている」——五層生還者の手記。",
       "floor": 5,
       "elite": true,
-      "maxHP": 765,
+      "maxHP": 610,
       "criticalNumerator": 0,
       "threat": 9,
       "passiveSkills": [
@@ -902,7 +902,7 @@
           "description": "防御+2／3ターンごとに攻撃+1（累積）"
         }
       ],
-      "baseAttack": 10,
+      "baseAttack": 8,
       "attackRollMin": 1,
       "attackRollMax": 5,
       "danger": 170,
@@ -989,7 +989,7 @@
           "description": "防御+2／3ターンごとに攻撃+1（累積）"
         }
       ],
-      "baseAttack": 10,
+      "baseAttack": 9,
       "attackRollMin": 1,
       "attackRollMax": 5,
       "defense": 16,

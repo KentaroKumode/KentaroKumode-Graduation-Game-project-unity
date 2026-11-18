@@ -249,9 +249,10 @@ namespace AutoTest
         public bool navD6NoElite = false;
         /// <summary>[測定 2026-11-18・同上] Super の計画 (嵐の航行) が、 第 4 層 (深さ 6) で着いた時に嵐の中になる戦闘の点 (通常・精鋭・種別の見えていない点) を回り方に入れない。 既定 false。 乱数は引かない。</summary>
         public bool navD6NoStormFight = false;
-        /// <summary>[測定 2026-11-18・同上] Super の計画が、 第 4 層 (深さ 6) の HP の重み (<c>MacroHpPer10</c>・戦闘の損と休憩と嵐の HP に掛かる) に掛ける倍率。 既定 1 = 今までと同じ。
-        /// BOT の値付けのつまみ (ゲームの数値ではない)。 乱数は引かない。</summary>
-        public float navD6HpWeightMul = 1f;
+        /// <summary>Super の計画が、 第 4 層 (深さ 6) の HP の重み (<c>MacroHpPer10</c>・戦闘の損と休憩と嵐の HP に掛かる) に掛ける倍率。
+        /// <b>既定 3</b> (2026-11-18・作者の承認): 控えの 5 腕の同じシードの比較で、 第 4 層の死亡率 34.6 → 31.1% (z −7.8)・クリア 19.5 → 20.0% と、 いちばん効いた控え方だった
+        /// (Captures/experience_storm_d/work/cmp_arms.md)。 1 にすると 2026-11-18 までと同じ。 BOT の値付けのつまみ (ゲームの数値ではない)。 乱数は引かない。</summary>
+        public float navD6HpWeightMul = 3f;
         /// <summary>[測定 2026-11-18・同上] 嵐の航行の道選び (<see cref="StormNavView.StormStep"/>) が、 第 4 層 (深さ 6) で道すがらの戦闘の点 (行き先でない・未起動の通常・精鋭・種別の見えていない点)
         /// を「その戦闘で失う HP の見込み (学習の戦闘名か種類の平均 × 最大 HP) × この倍率」だけ費用に入れる (着いた点は必ず起動するので、 道順は「どのマスを踏むか」)。 0 = 使わない = 既定。 乱数は引かない。</summary>
         public float navD6PathFightCost = 0f;
