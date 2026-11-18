@@ -8,6 +8,31 @@ namespace GameLoop
     ///       必ずここ (または BossIds / ClassStarter) の定数を経由する。
     ///       items.json 内の表示・価格データの正本性は変わらない (ここはコード参照用のミラー)。
     /// </summary>
+    /// <summary>賽の id (ADR-0015・2026-11-18)。 id = 表示名 (items.json の category Dice)。 賽のパッシブ (CombatSystem.DiePassives) が分岐に使う。</summary>
+    public static class DieIds
+    {
+        public const string Starting   = "角の取れた賽";
+        public const string Pumice     = "軽石の賽";
+        public const string RustyNail  = "錆釘の賽";
+        public const string Scavenger  = "拾い物の賽";
+        public const string Dull       = "鈍色の賽";
+        public const string Ember      = "残り火の賽";
+        public const string Ferry      = "渡し守の賽";
+        public const string NightWatch = "夜番の賽";
+        public const string Scale      = "秤の賽";
+        public const string Reverse    = "逆目の賽";
+        public const string OldCoin    = "古銭の賽";
+        public const string Link       = "繋ぎの賽";
+        public const string Appraiser  = "目利きの賽";
+        public const string HeavyRead  = "大技読みの賽";
+        public const string Gravestone = "墓標の賽";
+        public const string Carve      = "刻みの賽";
+        public const string Clock      = "時計の賽";
+        public const string Gamble     = "賭場の賽";
+        public const string Straight   = "連なりの賽";
+        public const string Split      = "分け身の賽";
+    }
+
     public static class ItemIds
     {
         // === 名前付きパッシブ (日本語 ID ── items.json の id と一致必須) ===
@@ -20,6 +45,10 @@ namespace GameLoop
         public const string Ryusen = "竜閃";
         /// <summary>シュヴァリエのレイピア: コントラタック切替 (Consumables.TryUseRapier)。</summary>
         public const string ChevalierRapier = "シュヴァリエのレイピア";
+
+        /// <summary>最初に持つ賽 (ADR-0015・2026-11-18)。 面 2,3,4,5・効果なし。 店には並ばない。
+        /// 墓標の賽が砕けた後もこれに戻る。</summary>
+        public const string StartingDie = DieIds.Starting;
 
         // === 店連動パッシブ (2026-09-15) ===
         //   ShopManager が所持判定に使う ＝ 跨ファイル参照なのでここを経由する。
@@ -49,17 +78,19 @@ namespace GameLoop
         //   | Undroppable (手放せない) | 確信の 3 品 + Entrusted                | CanSell      → ShopManager.TrySell (人・BOT・キー操作)・売る画面 SellList |
         //   |                          |                                        | CanTradeAway → GameManager.LowestTierPassiveIndex (交換マス・イベントの取り替え) |
         //   |                          |                                        | CanBeLost    → GameManager.LoseRandomPassiveItem (偽の商人に敗北)           |
-        //   | Entrusted (預かり物)     | 止まらない時計                         | HiddenInCodexUntilOwned → Game2DCodexPanel (手に入れるまで枠も出さない)    |
-        //   |                          |                                        | IsEntrusted  → ItemCards (持ち物の画面の印「預かり物」)                    |
+        //   | Entrusted (預かり物)     | 止まらない時計                         | IsEntrusted  → ItemCards (持ち物の画面の印「預かり物」)                    |
         //   | ProgressionItems (進行用) | 確信の 3 品・時計・灯火・レイピア・    | CanOfferAtGate   → GameManager.OfferGateRelics (〈門〉で捧げない)          |
         //   |                          | 初期装備・武器階梯 T2/T3 ほか          | CanBeTakenBySin  → GameManager.Challenge (大罪の強欲・色欲)               |
         //   |                          |                                        | (直接) AutoTest.ItemLearningStats.ExcludedFromLift (BOT の学習から外す)  |
         //
+        //   | EndingKeyItems (結末に関わる品) | 確信の 3 品・時計               | HiddenInCodexUntilOwned → GalleryView (手に入れるまで影も出さない)・      |
+        //   |                          |                                        |   AchievementService.CheckCodex (埋まり具合の分母に入れない)              |
+        //
         //   名指しで外す経路 (イベントの「廃棄」・灯火/フルーレ・バレエの自壊・剣の舞の集約) は集合を読まない。
         //   〈ちいさな灯火〉〈シュヴァリエのレイピア〉は手放せない品ではなく、 売値 0G (items.json の noSellValue・BOT は売らない・ShopManager.SellsForNothing)。
 
-        /// <summary>**預かり物** (2026-11-13): 人から預かった秘宝。 この集合が<b>単独で</b>決めるのは「記録 (図鑑) には手に入れるまで
-        /// 「？？？」の枠も並べない」(超低確率のイベントの種明かしになるため・<see cref="HiddenInCodexUntilOwned"/>) だけ。
+        /// <summary>**預かり物** (2026-11-13): 人から預かった秘宝。 この集合が<b>単独で</b>決めるのは持ち物の画面の印「預かり物」(<see cref="IsEntrusted"/>) だけ。
+        /// 図鑑で手に入れるまで隠すのは <see cref="EndingKeyItems"/> (この集合を含む・2026-11-17〜)。
         /// 売れない・取り替えに出さない・ランダムに失わないは <see cref="Undroppable"/> (この集合を含む) が決める。
         /// 〈門〉・大罪 (強欲・色欲)・BOT の学習から外すのは <see cref="ProgressionItems"/> の側 (両方に入れる)。</summary>
         public static readonly System.Collections.Generic.HashSet<string> Entrusted =
@@ -72,6 +103,16 @@ namespace GameLoop
         /// 確信を売っても資格は残り、 品だけが消えて〈決意〉〈真理〉が持ち物と図鑑に出なかった (GAME.md §24)。</para>
         /// <para><see cref="Entrusted"/> より後に置く (静的フィールドの初期化は書いた順)。</para></summary>
         public static readonly System.Collections.Generic.HashSet<string> Undroppable =
+            new System.Collections.Generic.HashSet<string>(Entrusted)
+        {
+            ConvictionSystem.IdConviction, ConvictionSystem.IdResolve, ConvictionSystem.IdTruth,
+        };
+
+        /// <summary>**結末に関わる品** (2026-11-17・作者の決定 (a)): 結末の道の種明かしになる品。 図鑑 (ギャラリーの品) では<b>手に入れるまで影も出さない</b>
+        /// (<see cref="HiddenInCodexUntilOwned"/>)。 中身は確信の 3 品 (〈根拠のない確信〉〈決意〉〈真理〉) と預かり物 (〈止まらない時計〉・<see cref="Entrusted"/>)。
+        /// 結末に関わる品を足す時はここに足す。 <see cref="Undroppable"/> と同じ中身だが、 「手放せない」と「図鑑で隠す」は別の決まりなので集合を分けておく。
+        /// <para><see cref="Entrusted"/> より後に置く (静的フィールドの初期化は書いた順)。</para></summary>
+        public static readonly System.Collections.Generic.HashSet<string> EndingKeyItems =
             new System.Collections.Generic.HashSet<string>(Entrusted)
         {
             ConvictionSystem.IdConviction, ConvictionSystem.IdResolve, ConvictionSystem.IdTruth,
@@ -97,8 +138,8 @@ namespace GameLoop
         public static bool CanBeLost(string id) => !string.IsNullOrEmpty(id) && !Undroppable.Contains(id);
         /// <summary>預かり物か (<see cref="Entrusted"/>)。 持ち物の画面の詳細の欄が印「預かり物」を出すのに読む (2026-11-13)。 売れるか等は <see cref="CanSell"/> の側。</summary>
         public static bool IsEntrusted(string id) => !string.IsNullOrEmpty(id) && Entrusted.Contains(id);
-        /// <summary>図鑑で、 手に入れるまで「？？？」の枠も出さない品か (預かり物 <see cref="Entrusted"/> だけ)。</summary>
-        public static bool HiddenInCodexUntilOwned(string id) => !string.IsNullOrEmpty(id) && Entrusted.Contains(id);
+        /// <summary>図鑑 (ギャラリーの品) で、 手に入れるまで影も出さない品か (<see cref="EndingKeyItems"/>)。</summary>
+        public static bool HiddenInCodexUntilOwned(string id) => !string.IsNullOrEmpty(id) && EndingKeyItems.Contains(id);
         /// <summary>〈門〉で秘宝として捧げられるか。 進行用の品 (<see cref="ProgressionItems"/>) は false。</summary>
         public static bool CanOfferAtGate(string id) => !string.IsNullOrEmpty(id) && !ProgressionItems.Contains(id);
         /// <summary>大罪 (強欲・色欲) が封じる・奪う対象になり得るか。 進行用の品 (<see cref="ProgressionItems"/>) は false。</summary>
@@ -214,6 +255,12 @@ namespace GameLoop
 
         /// <summary>消費アイテムの Tier 段数 (1〜4)。</summary>
         public const int ConsumableMaxTier = 4;
+
+        // === 武器の家系 (items.json の family・2026-11-17 に定数化) ===
+        //   段階式の武器 (WeaponProgression) と実績〈四つの得物〉が読む。 家系は id の綴りでなく items.json の family で読む。
+        public const string FamilySword = "sword", FamilyAxe = "axe", FamilyDagger = "dagger", FamilyShield = "shield";
+        /// <summary>段階式の武器の 4 家系 (剣・斧・短剣・盾)。</summary>
+        public static readonly string[] WeaponFamilies = { FamilySword, FamilyAxe, FamilyDagger, FamilyShield };
 
         /// <summary>系統と Tier(1〜4) から消費アイテムの id を引く。 無ければ null。
         ///

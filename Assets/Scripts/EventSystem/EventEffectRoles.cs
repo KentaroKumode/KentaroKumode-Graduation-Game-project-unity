@@ -121,6 +121,111 @@ namespace EventSystem
             }
         }
 
+        // ── 代償を見せるか (2026-11-16・作者の決定) ──────────────────────────────
+        //   線引き: 「自分から差し出す物は見せる・ハプニング (行動の結果として失う物) は見せない」。 得る物は見せない (見出しの文が語る)。
+        //   既定は効果の種類で決める (ShownByDefault)。 例外はイベントの定義ファイルの印で、 効果ごとに書く:
+        //     〔見せる〕物資-3  /  〔伏せる〕武器強化素材-2     (EventEffect.costMark・EventParser が外して読む)
+        //   BOT は印を読まない (値付けは全部の効果を読む・完全情報のまま)。 選べない理由は印に関係なく必ず出す。
+
+        /// <summary>効果の頭に付けて「この代償を選択肢の下に見せる」印 (既定が見せない効果に付ける)。</summary>
+        public const string ShowMark = "〔見せる〕";
+        /// <summary>効果の頭に付けて「この代償を見せない」印 (既定が見せる効果に付ける)。</summary>
+        public const string HideMark = "〔伏せる〕";
+
+        /// <summary><b>伏せた支払いは、 足りなくても選べて「ある分だけ失う」か</b> (2026-11-16・司令塔の前提・作者の明示の承認は未)。
+        /// true = 見せない支払い (伏せた物資-N・素材-N) は選べるかの判定に入れない (確率分岐の中の物資と同じ扱い) /
+        /// false = 旧い規則 (確率分岐の外の支払いは、 見せても見せなくても足りなければ選べない)。 <b>切り替えはこの 1 か所</b>
+        /// (EventChoice.UnavailableReason と、 それを通す EventEncounter.IsChoiceSelectable・BOT の EventChoiceScorer が読む)。</summary>
+        public const bool HiddenPaymentMayFallShort = true;
+
+        /// <summary>種類で決まる既定: 選択肢の下に見せる代償か (確率分岐の外・「勝利後」でない効果について)。
+        /// 見せる = ターン+N・ゴールド-N・武器強化素材-N・秘宝の廃棄・秘宝を差し出して替える。
+        /// 見せない = 物資-N・HP-N・最大HP-N・HP の半分・HP が N になる・戦闘・時限 / 永続デバフ・追跡者を呼ぶ・前線を近づける・フラグの廃棄 (進行用)・得る物すべて。</summary>
+        public static bool ShownByDefault(EventEffect e)
+        {
+            if (e == null) return false;
+            switch (e.type)
+            {
+                case EventEffectType.TurnsPass:          return e.amount > 0;
+                case EventEffectType.GoldDelta:          return e.amount < 0;
+                case EventEffectType.MaterialDelta:      return e.amount < 0;
+                case EventEffectType.DiscardPassiveItem: return true;
+                case EventEffectType.TradePassive:       return true;
+                default:                                 return false;
+            }
+        }
+
+        /// <summary>この効果 (選択肢の効果の並びの 1 つ) を選択肢の下に見せるか。 確率分岐 (と中の物すべて)・「勝利後」は見せない (印があっても)。
+        /// それ以外は印 (<see cref="EventEffect.costMark"/>) があれば印のとおり、 無ければ <see cref="ShownByDefault"/>。</summary>
+        public static bool IsShownCost(EventEffect e)
+        {
+            if (e == null || e.postCombat || e.type == EventEffectType.Probability) return false;
+            return e.costMark != 0 ? e.costMark > 0 : ShownByDefault(e);
+        }
+
+        /// <summary>支払い (ゴールド・物資・素材の -N) が足りない時に、 選択肢を選べなくするか。 見せる支払いは選べなくする (理由を出す)。
+        /// 見せない支払いは <see cref="HiddenPaymentMayFallShort"/> が true なら選べて、 ある分だけ失う。</summary>
+        public static bool BlocksWhenShort(EventEffect e) => !HiddenPaymentMayFallShort || IsShownCost(e);
+
+        /// <summary>見せる代償の短い文 (選択肢の下の説明に並べる)。 ターンは捕捉中の見込みを呼び手が後ろに付ける。 文を持たない効果は null。</summary>
+        public static string ShownCostText(EventEffect e)
+        {
+            if (e == null) return null;
+            int n = System.Math.Abs(e.amount);
+            switch (e.type)
+            {
+                case EventEffectType.TurnsPass:          return n + " ターンを使う";
+                case EventEffectType.GoldDelta:          return e.amount < 0 ? n + "ゴールドを払う" : null;
+                case EventEffectType.MaterialDelta:      return e.amount < 0 ? "素材を" + n + "個渡す" : null;
+                case EventEffectType.ProvisionDelta:
+                case EventEffectType.HungerDelta:        return e.amount < 0 ? "物資を" + n + "個渡す" : null;
+                case EventEffectType.DiscardPassiveItem: return string.IsNullOrEmpty(e.param) ? "秘宝を 1 つ手放す" : "〈" + e.param + "〉を手放す";
+                case EventEffectType.TradePassive:       return "秘宝を 1 つ差し出す";
+                case EventEffectType.HpDelta:            return e.amount < 0 ? "HP " + n + " を失う" : null;
+                case EventEffectType.MaxHpDelta:         return e.amount < 0 ? "最大 HP " + n + " を失う" : null;
+                case EventEffectType.HpHalve:            return "HP の半分を払う";
+                case EventEffectType.HpSetTo:            return "HP が " + e.amount + " になる";
+                case EventEffectType.EnterCombat:        return "戦闘になる";
+                case EventEffectType.EnterEliteCombat:   return "強敵との戦闘になる";
+                case EventEffectType.TimedDebuff:
+                case EventEffectType.PermanentDebuff:    return "〈" + e.param + "〉を受ける";
+                case EventEffectType.PullPursuer:        return "追跡者を呼ぶ";
+                case EventEffectType.ShiftFront:         return e.amount > 0 ? "前線が近づく" : null;
+                default:                                 return null;
+            }
+        }
+
+        /// <summary>見せる代償の札の短い文 (2026-11-16・イベントの画面の選択肢の箱の右端・<see cref="ShownCostText"/> の札の版)。
+        /// ターンは数だけ (画面が砂時計の絵を前に付ける)・ゴールド「10G」・素材「素材3」・物資「物資3」・秘宝を手放す / 差し出す「手放す」。
+        /// 見せるかの判定はしない (呼び手が <see cref="IsShownCost"/> を通す)。 札の文を持たない効果は null。</summary>
+        public static string ShownCostChip(EventEffect e)
+        {
+            if (e == null) return null;
+            int n = System.Math.Abs(e.amount);
+            switch (e.type)
+            {
+                case EventEffectType.TurnsPass:          return e.amount > 0 ? n.ToString() : null;
+                case EventEffectType.GoldDelta:          return e.amount < 0 ? n + "G" : null;
+                case EventEffectType.MaterialDelta:      return e.amount < 0 ? "素材" + n : null;
+                case EventEffectType.ProvisionDelta:
+                case EventEffectType.HungerDelta:        return e.amount < 0 ? "物資" + n : null;
+                case EventEffectType.DiscardPassiveItem:
+                case EventEffectType.TradePassive:       return "手放す";
+                // 以下は既定で見せない物 (印〔見せる〕を付けた時だけ札になる・2026-11-16 の時点で付いた例は無い)
+                case EventEffectType.HpDelta:            return e.amount < 0 ? "HP" + n : null;
+                case EventEffectType.MaxHpDelta:         return e.amount < 0 ? "最大HP" + n : null;
+                case EventEffectType.HpHalve:            return "HP半分";
+                case EventEffectType.HpSetTo:            return "HP" + e.amount + "に";
+                case EventEffectType.EnterCombat:        return "戦闘";
+                case EventEffectType.EnterEliteCombat:   return "強敵";
+                case EventEffectType.TimedDebuff:
+                case EventEffectType.PermanentDebuff:    return "〈" + e.param + "〉";
+                case EventEffectType.PullPursuer:        return "追跡者";
+                case EventEffectType.ShiftFront:         return e.amount > 0 ? "前線" : null;
+                default:                                 return null;
+            }
+        }
+
         /// <summary>この効果が今の状況で起きない理由 (画面に出す短い文)。 起きるなら null。
         /// 得になる効果にも代償にも使う ── 選べるかの判定 (<see cref="NothingGainedReason"/>) と、 選んだ後の結果の行 (<c>EventEffectExecutor</c>) が同じ文を出す。</summary>
         public static string NotHappeningReason(EventEffect e, in EventEffectSituation s)

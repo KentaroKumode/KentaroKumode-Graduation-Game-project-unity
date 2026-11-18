@@ -161,6 +161,8 @@ namespace GameLoop
             {
                 Run.bossDefeatedThisFloor = true;
                 Run.lastBossId = CurrentEnemy?.id ?? Run.lastBossId; // エンディング分岐用（最後に撃破したボス）
+                // 実績 (嵐の目・荷は空・忍び足・素通り): 地図がまだこの層のうちに読む
+                MetaProgression.Achievements.AchievementService.NoteBossNodeWon(Run, FreeMap);
 
                 // 灰燼の王 (深さ 6 = 画面の第 4 層のボス) を倒した瞬間に、 ランの外の記録へ立てる (2026-11-13・結末の種類によらない)。
                 //   次のランから深さ 6 の〈灰に埋もれた基地〉が再訪の版になる (AshBaseEvent)

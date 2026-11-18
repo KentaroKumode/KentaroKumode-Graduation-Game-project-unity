@@ -164,13 +164,12 @@ namespace GameLoop
 
         /// <summary>ヴェスカ撃破後の一択を確定してランを閉じる。
         ///
-        /// <para><paramref name="leaveOpen"/> = false → <b>裂け目を閉じる</b> (TRUE END〈帳尻〉)。
+        /// <para><paramref name="leaveOpen"/> = false → <b>裂け目を閉じる</b> (TRUE END〈終始〉)。
         /// 自分と遺物の山とヴェスカを対価に帳尻を合わせる。 遺物経済は破綻し、
-        /// 主人公は行方不明になる。 数年後に七層の調査で見つかる手記から、
-        /// この盤上遊戯の原作『大穴』が書かれる ── <b>額縁が閉じるのはこちら側だけ</b>。</para>
+        /// 主人公は帰らず、 大穴の広がりは数年かけて止まる。</para>
         ///
-        /// <para><paramref name="leaveOpen"/> = true → <b>閉じない</b> (GOOD END〈見送り〉)。
-        /// 世界は残るが本は書かれない。 額縁に接続しないことがこのエンドの代償にあたる。</para>
+        /// <para><paramref name="leaveOpen"/> = true → <b>閉じない</b> (GOOD END〈帰路〉)。
+        /// 主人公は秘宝を持って登り、 家族のもとへ帰る。 穴は残り、 誰も何も書かない。</para>
         ///
         /// <para>正本: <see cref="Endings"/> / docs/GAME.md §20。</para></summary>
         public void ChooseRiftFate(bool leaveOpen)
@@ -195,6 +194,7 @@ namespace GameLoop
         {
             if (CurrentPhase != GamePhase.GateRitual) return;
             RunStats.GateProvisionAfter += Run.provision;    // [計装] 支払い後。 45 (悲観・上限恒久ロック) を割っていないか
+            MetaProgression.Achievements.AchievementService.NoteGateCompleted(Run.gateFlaws == GateFlaw.None);   // 実績〈欠けのない起動〉
             Log(Run.gateFlaws == GateFlaw.None
                 ? "門は完全に起動した。"
                 : $"門が起動した ── 不完全なまま: {Run.gateFlaws}");

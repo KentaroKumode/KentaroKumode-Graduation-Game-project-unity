@@ -21,6 +21,7 @@ static class Program
     static int fails;
     static Func<char, int> Adv;
     static int LineH;
+    static int lineGap, charGap;      // 設定の行間・字間 (2026-11-16)
     static HashSet<int> Have = new HashSet<int>();
 
     static void Check(bool ok, string what)
@@ -38,8 +39,13 @@ static class Program
         int cell = b[4], n = BitConverter.ToInt32(b, 5), o = 9;
         var map = new Dictionary<int, int>();
         for (int i = 0; i < n && o + 5 + 2 * cell <= b.Length; i++) { map[(int)BitConverter.ToUInt32(b, o)] = b[o + 4]; o += 5 + 2 * cell; }
-        Adv = ch => map.TryGetValue(ch, out var a) ? a : cell / 2;      // Game2DJpFont.Advance と同じ
-        LineH = cell + 1;
+        // 設定の行間・字間 (2026-11-16・GameSettings.LineGap / CharGap): 環境変数 EVPC_GAPS="行間,字間" (run.py が 0,0 と最大の 2 回回す)
+        lineGap = 0; charGap = 0;
+        var gaps = Environment.GetEnvironmentVariable("EVPC_GAPS");
+        if (!string.IsNullOrEmpty(gaps)) { var sp = gaps.Split(','); lineGap = int.Parse(sp[0]); charGap = int.Parse(sp[1]); }
+        Console.WriteLine($"[設定] 行間 +{lineGap}・字間 +{charGap}");
+        Adv = ch => (map.TryGetValue(ch, out var a) ? a : cell / 2) + charGap;      // Game2DJpFont.Advance と同じ
+        LineH = cell + 1 + lineGap;
         Have = new HashSet<int>(map.Keys);
         Console.WriteLine($"ドット字: 字の高さ {cell}・行送り {LineH}・{map.Count} 字");
     }
@@ -90,7 +96,9 @@ static class Program
         Check(inv.Inside(screen), $"戦闘の画面の入口 {inv} が 480×270 の中");
         Check(inv.Inside(BattleHudLayout.Safe), $"戦闘の画面の入口 {inv} が液晶の安全に見える範囲 {BattleHudLayout.Safe} の中 (湾曲で縁が欠けない)");
         Check(hit.Count == 0, "戦闘の画面の入口が、 秘宝の列・山と捨て札・敵・手札・床の出目に重ならない" + (hit.Count > 0 ? ": " + string.Join(" ", hit) : ""));
-        Check(Width(BattleHudLayout.InvLabel) + 6 <= inv.w && LineH <= inv.h + 1, $"入口の字「{BattleHudLayout.InvLabel}」{Width(BattleHudLayout.InvLabel)} dot が入口 ({inv.w}×{inv.h}) に入る");
+        // 入口の箱 BattleHudLayout.Inv は旧い戦闘の HUD の寸法 (今の戦闘の画面 Game2DBattleLcd.InvRect は字の幅から箱を作る)。 行間・字間を足した設定では参考に出すだけ
+        if (lineGap > 1 || charGap > 0) Console.WriteLine($"参考 (旧い HUD の固定の箱・今は字の幅から箱を作る): 入口の字「{BattleHudLayout.InvLabel}」{Width(BattleHudLayout.InvLabel)} dot・入口 ({inv.w}×{inv.h})");
+        else Check(Width(BattleHudLayout.InvLabel) + 6 <= inv.w && LineH <= inv.h + 1, $"入口の字「{BattleHudLayout.InvLabel}」{Width(BattleHudLayout.InvLabel)} dot が入口 ({inv.w}×{inv.h}) に入る");
     }
 
     // ===== 2. 品の数 =====

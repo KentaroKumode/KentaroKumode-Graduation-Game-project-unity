@@ -2,7 +2,9 @@
 // 2026-11-02 に効果を絞って作り直した: 走査線 (横) / 画面の湾曲 / 色収差 / 発光のにじみ (ブルーム) + 自動露出 / ノイズ (横線ノイズ + フィルムの粒)。 もう 1 つのビネットは外枠まで覆うので Game2D/LcdFx 側。
 //   (画素の格子・サブピクセル・ドットの芯・バックライトのにじみ・ちらつきは、 この作り直しで外した。 git の履歴に残る。 ブルームと自動露出は同日に戻した)
 //   湾曲 → 色収差 → 残像 (起動の瞬間用) → 横線ノイズ → 走査線 → ブルーム → 露出 → 粒。 走査線と横線ノイズは湾曲した後の座標で引くので、 画面と一緒に曲がる。
-// 地図 (この Quad) にだけ掛かる。 外枠の GUI (Canvas) には掛けない。
+// 2026-11-16 (作者の決定「外の部品はもう無い」): GUI (計器盤・帯・窓・手引き) の RT (Game2DGuiRt・960×540・中身の RT と同じ格子) も、 ここで湾曲した後の同じ座標で読んで
+//   中身に重ね、 そのあと効果 (色収差・残像・横線ノイズ・走査線・ブルーム・露出・粒) を全部掛ける。 GUI はグローバルの _Game2DGuiTex (_Game2DGuiOn = 1 の時だけ)。
+//   残像・ブルーム・自動露出の元の絵 (_PrevTex など・Game2DLcdGhost) にも GUI を重ねてある。 ボスの大技の揺れ・暗転・赤・白も GUI へここで掛ける (旧: 提示の板 Game2D/GuiPresent)。
 Shader "Game2D/LcdScreen"
 {
     Properties
@@ -12,6 +14,7 @@ Shader "Game2D/LcdScreen"
         _Ghost ("残像の濃さ (液晶の応答の遅れ・点灯の瞬間は Game2DBoot が上げる)", Range(0, 1)) = 0.38
         _Curve ("湾曲 (0 = 平ら)", Range(0, 0.2)) = 0.03
         _Back ("画面の外の色", Color) = (0.027, 0.02, 0.008, 1)
+        _CurveFit ("湾曲の外形の合わせ方 (1 = 縁の中央を絵の端に合わせる・絵の外形が樽型・既定 2026-11-16 作者の決定 / 0 = 旧い合わせ方: 四隅を絵の端に合わせ見える範囲は長方形)", Range(0, 1)) = 1
         _Power ("電源 (Game2DBoot が入れる・0 = 消灯 / 1 = 点灯済み)", Range(0, 1)) = 1
         _Distort ("画面の歪み (Game2DBoot が点灯の瞬間だけ入れる・0 = なし)", Range(0, 1)) = 0
         _Scan ("走査線の濃さ (横線の暗い帯の暗さ・0 = なし)", Range(0, 1)) = 0.4
@@ -21,7 +24,7 @@ Shader "Game2D/LcdScreen"
         _BloomTexB ("ブルーム (1/8)", 2D) = "black" {}
         _Bloom ("発光のにじみ (明るい画素のまわりへ光が漏れる)", Range(0, 1)) = 0.35
         _BloomThr ("にじみ始める明るさ", Range(0, 1)) = 0.22
-        _Exposure ("自動露出 (Game2DLcdGhost が毎フレーム入れる・1 = 変えない)", Float) = 1
+        _Exposure ("自動露出 (Game2DLcdGhost が毎フレーム入れる・1 = 変えない・2026-11-17〜 止めて 1 固定)", Float) = 1
         _BloomFar ("広いにじみ (1/8) の混ぜ具合 (小さいほど光の届く範囲が狭い。 近くの強さは変えない)", Range(0, 1)) = 0.12
         _BloomSoft ("ぼかしの広がり (大きいほど柔らかく広い・Game2DLcdGhost が読む)", Range(0.5, 4)) = 1.1
         _BloomTint ("にじみの色味 (元の絵の色を、 この色へ寄せる)", Color) = (0.72, 0.88, 1.0, 1)
@@ -51,9 +54,37 @@ Shader "Game2D/LcdScreen"
             struct v2f { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; };
 
             sampler2D _MainTex, _PrevTex, _NoiseTex, _BloomTex, _BloomTexB;
-            float _Chroma, _Distort, _Power, _Ghost, _Curve, _Scan, _ScanRows, _Grain, _GrainFps, _Bloom, _BloomThr, _Halo, _BloomTintAmt, _BloomFar, _Exposure;
+            float _Chroma, _Distort, _Power, _Ghost, _Curve, _CurveFit, _Scan, _ScanRows, _Grain, _GrainFps, _Bloom, _BloomThr, _Halo, _BloomTintAmt, _BloomFar, _Exposure;
             fixed4 _Back, _Ink, _BloomTint;
             float4 _GrainCells;
+            // GUI (2026-11-16・Game2DGuiRt がグローバルで入れる)
+            sampler2D _Game2DGuiTex;
+            float _Game2DGuiOn, _Game2DGuiFxOn, _Game2DGuiFxDark, _Game2DGuiFxRed;
+            // 走査線の形 (2026-11-16・作者「走査線で文章が読みづらい」・グローバル)。 <b>ビットの組</b> (2026-11-17・重ねて見比べるため)。 0 = 旧い縞 (形なし)。
+            //   既定は 3 = 1+2 (2026-11-17・作者の決定・Full HD の実機で字の行ごとの明るさのばらつき 15.9 → 7.4)。 入れるのは Game2DSettingsApply.ScanMode (見比べは QaBattle.ScanMode)
+            //   1 = 縞を dot の行の半分の細かさにして、 どの dot の行も同じ明るさ (下半分が暗い) にする / 2 = 明るい所 (字・明るい線) ほど走査線を弱める /
+            //   4 = GUI (計器盤・帯・窓・手引き) の覆っている所だけ走査線を弱める。 例 3 = 1+2・6 = 2+4・7 = 1+2+4
+            float _Game2DScanMode;
+            float4 _Game2DGuiFxWhite, _Game2DGuiFxShake;
+
+            // 中身の色 lcd の上に、 GUI の RT の uv の所を重ねる。 GUI の RT は UI の通常の合成 (SrcAlpha, OneMinusSrcAlpha) で透明な地へ書かれているので、
+            // かぶり率 = sqrt(alpha)・色はかぶり率を掛けた色 (旧 Game2D/GuiPresent と同じ読み方)。 ボスの大技は GUI 全体に同じ強さで掛ける (中身と同じに)。
+            float3 GuiOver(float3 lcd, float2 uv)
+            {
+                if (_Game2DGuiOn < 0.5) return lcd;
+                if (_Game2DGuiFxOn > 0.5) uv += float2(-_Game2DGuiFxShake.x / 480.0, _Game2DGuiFxShake.y / 270.0);      // 揺れ (dot)。 中身の揺れは絵を (dx, dy) ずらす = ここでは (−dx, +dy) から読む
+                float4 g = tex2D(_Game2DGuiTex, uv);
+                float cov = sqrt(saturate(g.a));
+                float3 rgb = g.rgb;
+                if (_Game2DGuiFxOn > 0.5)
+                {
+                    // 暗幕 → 赤 (王) → 白 (発光は赤の上)。 暗幕の倍率が負 (シュヴァリエの真っ黒の一拍) は 0 = 黒
+                    rgb *= max(_Game2DGuiFxDark, 0.0);
+                    rgb = float3(min(cov, rgb.r + 26.0 / 255.0 * _Game2DGuiFxRed * cov), rgb.g * (1.0 - 0.45 * _Game2DGuiFxRed), rgb.b * (1.0 - 0.6 * _Game2DGuiFxRed));
+                    rgb = lerp(rgb, _Game2DGuiFxWhite.rgb * cov, saturate(_Game2DGuiFxWhite.a));
+                }
+                return lcd * (1.0 - cov) + rgb;
+            }
 
             v2f vert (appdata v) { v2f o; o.pos = UnityObjectToClipPos(v.vertex); o.uv = v.uv; return o; }
 
@@ -82,12 +113,20 @@ Shader "Game2D/LcdScreen"
 
             fixed4 frag (v2f i) : SV_Target
             {
-                // ── 画面の湾曲 (樽型): 元 = 中心 × (1 + k·r²) / (1 + 2k)。 四隅がちょうど絵の端に合う (縁の中央は少し内側を見る) = 外が見えず、 黒い角が出ない
+                // ── 画面の湾曲 (樽型): 元 = 中心 × (1 + k·r²) / (1 + k·(2 − f))。 c と r² は縦横とも −1〜1 に正規化した座標。
+                //   f = _CurveFit = 1 (既定・2026-11-16 作者の決定): 分母 1 + k。 縁の中央 (左右は c = (±1, 0)・上下は c = (0, ±1)・どちらも r² = 1) がちょうど絵の端に合い、 四隅は絵の外 (_Back) を見る
+                //     = 絵の外形が樽型になり、 中身の曲がりとそろう。 絵は 1 画素も画面の外へ出ない。 式は縦横で同じ (r² が正規化した座標なので、 左右と上下の縁の中央が同時に合う)
+                //   f = 0 (旧い合わせ方・見比べ用 QaBattle.LcdCurveFit(0)): 分母 1 + 2k。 四隅 (r² = 2) がちょうど絵の端に合い、 見える範囲は長方形のまま (縁の中央の近くの絵は画面の外へ押し出される)
+                //   値は Game2DSettingsApply.CurveFit が実行時の材質へ入れる (アセットの材質が古い値を持っていても既定になるように)
+                //   マウスの当たり (画面の位置 → 液晶の dot) は同じ式を Game2DPointer.LcdDot が持つ
                 float2 c = i.uv * 2.0 - 1.0;
                 float r2 = dot(c, c);
-                float2 s = c * (1.0 + _Curve * r2) / (1.0 + 2.0 * _Curve);
+                float2 s = c * (1.0 + _Curve * r2) / (1.0 + _Curve * (2.0 - _CurveFit));
                 float2 suv = s * 0.5 + 0.5;
                 if (suv.x < 0 || suv.y < 0 || suv.x > 1 || suv.y > 1) return fixed4(_Back.rgb, 1);
+                // 絵の外形の縁 (f > 0 の時だけ): 画面の 1 画素ぶんで _Back へ寄せ、 樽型の縁が画面の画素でギザギザにならないようにする (f = 0 は今までどおり何もしない)
+                float edgeM = min(min(suv.x, 1.0 - suv.x), min(suv.y, 1.0 - suv.y));
+                float edgeA = _CurveFit > 0.001 && _Curve > 0.0001 ? saturate(edgeM / max(fwidth(edgeM), 1e-5)) : 1.0;      // 湾曲 0 (設定で平ら) なら外形は画面の縁そのもの・寄せない
                 float2 panelUv = suv;      // 走査線は液晶の板そのもの。 点灯の瞬間の歪み (絵のずれ) には付いていかない
 
                 // 点灯の瞬間の歪み: 行ごとの横ずれ (走査のちぎれ)・ブロックごとの大きな横ずれ・縦の揺れ。 強さ _Distort は点灯直後に最大から急に減る
@@ -104,7 +143,8 @@ Shader "Game2D/LcdScreen"
 
                 // ── 色収差: 中心から外向きに、 赤は外へ・青は内へずれる (レンズの色ずれ)。 中心にも少し残し、 縁へ行くほど強くなる。 緑は動かさない
                 float2 ca = c * _Chroma * (0.25 + 0.75 * r2);
-                fixed3 cur = fixed3(tex2D(_MainTex, suv + ca).r, tex2D(_MainTex, suv).g, tex2D(_MainTex, suv - ca).b);
+                //   GUI も同じ座標で重ねてから色をずらす (計器や窓の字も中身と同じに色がずれる)
+                fixed3 cur = fixed3(GuiOver(tex2D(_MainTex, suv + ca).rgb, suv + ca).r, GuiOver(tex2D(_MainTex, suv).rgb, suv).g, GuiOver(tex2D(_MainTex, suv - ca).rgb, suv - ca).b);
 
                 // 残像 (点灯の瞬間の液晶の応答の遅れ): 前のフレームを lighten で薄く重ねる
                 fixed3 prev = tex2Dlod(_PrevTex, float4(suv, 0, 0)).rgb;
@@ -115,12 +155,21 @@ Shader "Game2D/LcdScreen"
 
                 // ── 走査線 (横): 絵の 1 ドット行ごとに 明・暗 を交互に並べる (暗線の太さ = 絵の 1 ドット)。 湾曲した後の座標で数えるので、 絵の行と一緒に曲がる。
                 //   行の境目だけ、 画面の 1 画素の幅でなめらかにする (ドットが画面の 1 画素に近い小さい窓では、 そこから先は線を弱めてちらつきを防ぐ)
-                float v = panelUv.y * _ScanRows;                                    // 絵のドット行の番号 (小数)
+                // 形のビット (整数の演算を使わず float で取り出す ── どの描き方でも同じに読めるように)
+                float scanBits = round(_Game2DScanMode);
+                float scanHalf = fmod(scanBits, 2.0);                               // 1: 半ドットの縞
+                float scanBright = fmod(floor(scanBits / 2.0), 2.0);                // 2: 明るい所ほど弱める
+                float scanGui = fmod(floor(scanBits / 4.0), 2.0);                   // 4: GUI の覆う所だけ弱める
+                float v = panelUv.y * _ScanRows * (scanHalf > 0.5 ? 2.0 : 1.0);      // 絵のドット行の番号 (小数)。 形 1 は 1 dot の行を明・暗の 2 本に割る
                 float fw = max(fwidth(v), 1e-5);
                 float rowDark = fmod(floor(v), 2.0);                               // この行が暗 (1) か 明 (0) か
                 float e = min(frac(v), 1.0 - frac(v));                              // 行の境目までの距離
                 float dark = lerp(rowDark, 1.0 - rowDark, 0.5 * saturate(1.0 - e / (0.5 * fw)));
                 float scan = _Scan * saturate((1.0 - fw) / 0.5);
+                //   2 と 4 は掛け合わせる (両方の条件で弱まる)。 足し合わせ (弱め方の大きい方を取る) にしなかったのは、 GUI の暗い板 (明るさでは弱まらない) と
+                //   液晶の中の明るい字 (GUI ではない) を、 それぞれ片方の条件だけでも弱められるようにするため。 両方当たる所 (GUI の明るい字) は最も弱くなる
+                if (scanBright > 0.5) scan *= 1.0 - 0.75 * smoothstep(0.30, 0.80, dot(col, float3(0.299, 0.587, 0.114)));      // 明るい所ほど弱める (字の画が縞で切れない)
+                if (scanGui > 0.5 && _Game2DGuiOn > 0.5) scan *= 1.0 - 0.85 * sqrt(saturate(tex2D(_Game2DGuiTex, panelUv).a));      // GUI の覆っている所だけ弱める
                 col *= (1.0 - scan * dark) / (1.0 - scan * 0.5);                    // 暗い行は半分 = 平均の暗さ (濃さ / 2) を割って、 画面全体の明るさは変えない
 
                 // ── 発光のにじみ (ブルーム): 明るい画素のまわりへ光が漏れる。 走査線の暗い帯にも回り込む = 画素が自ら光っている見え方なので、 走査線の後に足す。
@@ -156,6 +205,7 @@ Shader "Game2D/LcdScreen"
                 #endif
 
                 col = PowerOn(col, _Power);                   // 起動演出 (電源オン)
+                col = lerp(_Back.rgb, col, edgeA);            // 絵の外形の縁 (f > 0 の時だけ・上の edgeA)
                 return fixed4(col, 1);
             }
             ENDCG

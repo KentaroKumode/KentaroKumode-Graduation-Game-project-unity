@@ -201,6 +201,7 @@ namespace UI.Game2D.Battle
             _poisonShown = _bleedPending = _mistPending = 0; _countDots = false;
             playerHp = cm.PlayerHP; playerMax = Mathf.Max(1, cm.PlayerMaxHP); baseAtk = cm.PlayerAttackPower;
             fx.SetEnemyHp(cm.EnemyHP, cm.EnemyMaxHP);
+            fx.SetBackdrop(BattleBackdrops.NameForCurrent(cm.CurrentEnemy?.id));      // 層とボスの背景 (見せる層の番号 currentFloor で引く・2026-11-16)
             fx.WeaponIndex = WeaponIndexOf(GameManager.Instance?.Run?.equippedWeaponId);
             fx.WeaponSheetFamily = FxLayerPreload.WeaponFamilyOf(GameManager.Instance?.Run?.equippedWeaponId);      // 絵は層の頭で読んである (FxLayerPreload・戦闘の入りには読まない)
             _chevPhase = -1; _blazeStacks = 0; _flameShown = false; _vescaStage = BossIds.VescaStageOf(cm.CurrentEnemy?.id);
@@ -295,6 +296,7 @@ namespace UI.Game2D.Battle
                 for (int i = 0; i < slot.Length; i++) slot[i] = -1;
                 for (int s = 0; s < target.Length; s++) target[s] = -1;
                 for (int s = 0; s < keepMark.Length; s++) keepMark[s] = false;
+                carveDie = -1;
                 lastOutcome = null; focusSlot = -1;
                 if (AutoWireOnTurnStart) AutoWire(false);
             }
@@ -349,7 +351,7 @@ namespace UI.Game2D.Battle
                     {
                         Game2DSfx.Play("decide");
                         int n = p.playerDice != null ? p.playerDice.Length : 0;
-                        cm.AnswerWiringSlots(BuildSlots(n), (int[])target.Clone(), 0, (bool[])keepMark.Clone());   // 残す印は本体が KeepFromMarks で直す (挿した端子には効かない)
+                        cm.AnswerWiringSlots(BuildSlots(n), (int[])target.Clone(), 0, (bool[])keepMark.Clone(), carveDie);   // 残す印は本体が KeepFromMarks で直す (挿した端子には効かない)
                         if (!cm.IsAwaitingDecision) Resolve(cm);
                     }
                     break;
@@ -369,7 +371,11 @@ namespace UI.Game2D.Battle
             var cm = CombatManager.Instance;
             if (cm == null || !CanRerollNow) return;
             Game2DSfx.Play("decide"); Game2DSfx.DiceRoll();
-            cm.AnswerReroll(true);
+            // 目利きの賽 (ADR-0015): 端子に挿してある目のうち左の 1 つを残して振る
+            int keep = -1;
+            if (EquippedDie.IdOf(GameManager.Instance?.Run) == DieIds.Appraiser)
+                for (int i = 0; i < slot.Length; i++) if (slot[i] >= 0) { keep = i; break; }
+            cm.AnswerReroll(true, keep);
             if (!cm.IsAwaitingDecision) { Resolve(cm); return; }
             phase = P.PRoll; t = 0; rolled = false; rollSeq = null; SyncDecision(cm, false); Touch();
         }
@@ -481,6 +487,31 @@ namespace UI.Game2D.Battle
         public int[] target = new int[0];
         /// <summary>手札の規則 Pick (2026-11-13): 次のターンも手札に残す印 (添字 = 場の位置)。 挿していない手札の端子を押すと付け外しする。 長さ = 場の枚数。</summary>
         public bool[] keepMark = new bool[0];
+        /// <summary>刻みの賽 (ADR-0015): 刻む目の添字 (−1 = 刻まない)。 Shift を押しながら目を押すと付け外し。 配線の答えと一緒に渡す。</summary>
+        public int carveDie = -1;
+
+        /// <summary>刻みの賽で、 目 i を刻めるか (判断の間・2 以上・前のターンに刻んで置いた目ではない)。</summary>
+        public bool CanCarve(int i)
+        {
+            var cm = CombatManager.Instance;
+            return CanOperate && cm != null && EquippedDie.IdOf(GameManager.Instance?.Run) == DieIds.Carve
+                && i >= 0 && i < pd.Length && cm.CanCarve(pd, i);
+        }
+
+        /// <summary>目 i の刻む印を付け外しする (1 つだけ)。 できなければ false。</summary>
+        public bool ToggleCarve(int i)
+        {
+            if (!CanCarve(i)) return false;
+            carveDie = carveDie == i ? -1 : i;
+            Game2DSfx.Play("ui_click", 1f, carveDie == i ? 1.2f : 0.9f);
+            Touch();
+            return true;
+        }
+
+        /// <summary>目 i に刻む印が付いているか (前のターンに刻んで置いた目は IsCarvedFixed)。</summary>
+        public bool IsCarved(int i) => carveDie == i && CanCarve(i);
+        /// <summary>目 i が、 前のターンに刻んで置いた目か (振り直しでも変わらない)。</summary>
+        public bool IsCarvedFixed(int i) => CombatManager.Instance != null && CombatManager.Instance.CarvedFixedDie == i;
         /// <summary>このターンの場の写し (添字 = 挿し先)。</summary>
         public readonly List<string> board = new List<string>();
         /// <summary>今の挿し方の見込み。 解決した後は結果 (<see cref="lastOutcome"/> と同じ)。 null あり。</summary>
@@ -759,7 +790,16 @@ namespace UI.Game2D.Battle
         public bool IsKept(int s)
         {
             if (s < 0 || s >= keepMark.Length || !keepMark[s]) return false;
-            for (int i = 0; i < slot.Length; i++) if (slot[i] == s) return false;
+            bool plugged = false;
+            for (int i = 0; i < slot.Length; i++) if (slot[i] == s) plugged = true;
+            if (!plugged) return true;
+            // 繋ぎの賽 (ADR-0015): 挿した端子も、 印の付いた左から最初の 1 枚だけ残る (本体の KeepFromMarks と同じ選び方)
+            if (EquippedDie.IdOf(GameManager.Instance?.Run) != DieIds.Link) return false;
+            for (int t = 0; t < s && t < keepMark.Length; t++)
+            {
+                if (!keepMark[t]) continue;
+                for (int i = 0; i < slot.Length; i++) if (slot[i] == t) return false;   // もっと左に、 挿して印の付いた端子がある
+            }
             return true;
         }
 
@@ -940,7 +980,7 @@ namespace UI.Game2D.Battle
             int st = BossIds.VescaStageOf(cm.CurrentEnemy?.id);
             if (st <= 0 || _vescaStage <= 0 || st <= _vescaStage) { if (st > 0) _vescaStage = st; return false; }
             _vescaStage = st;
-            fx.VescaTransition(st == 4);
+            fx.VescaTransition(st == 4, BattleBackdrops.NameForCurrent(cm.CurrentEnemy?.id));      // 4 段へは信号が切れた所で背景も替える
             fx.SetEnemyHp(cm.EnemyHP, cm.EnemyMaxHP);
             return true;
         }

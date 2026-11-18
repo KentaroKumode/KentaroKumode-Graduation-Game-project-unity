@@ -66,7 +66,7 @@ namespace ItemSystem.PassiveSkills
 
         /// <summary>[persistent] <see cref="equippedDiceFaces"/> と**添字が 1 対 1 で対応する** Tier 配列。
         /// 素の面 {2,3,4,5} は T1 (無能力)、 出目パーツで得た面はその Tier (T2 = 2 個そろい、 T3 = ゾロ目、 T4 = 固有効果)。
-        /// <see cref="GameLoop.DiceFaceParts.Build"/> が faces と対で組む ── 別々に作らないこと。
+        /// <see cref="GameLoop.EquippedDie.Build"/> が faces と対で組む ── 別々に作らないこと。
         /// null なら役は何も成立しない。</summary>
         public GameLoop.DiceFaceParts.Tier[] equippedFaceTiers;
 

@@ -20,6 +20,7 @@ namespace UI
             if (_spawned) return;
             var lcd = Object.FindObjectOfType<Lcd.LcdScreen>();
             if (lcd == null) return;
+            TitleMenuLayout.Apply();      // ホーム画面の配置と 4 つ目の SETTINGS (2026-11-16・シーンは触らずここで置き直す)
 
             // ---- 職業選択: 手配置があれば使い、 無ければタイトルと同方式のリグを自動構築 ----
             var classSelect = Object.FindObjectOfType<ClassSelect.ClassSelectView>(true);

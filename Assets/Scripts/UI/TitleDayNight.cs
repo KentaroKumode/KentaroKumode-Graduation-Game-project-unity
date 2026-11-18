@@ -58,6 +58,33 @@ namespace UI
         private void OnValidate() { Apply(); }
 #endif
 
+        /// <summary>差し替えの表に 1 行足す (実行時に作った部品・ホーム画面の SETTINGS・<see cref="TitleMenuLayout"/>)。 足したらすぐ今の昼夜で当てる。</summary>
+        public void AddSlot(SpriteRenderer target, Sprite day, Sprite night)
+        {
+            var list = new System.Collections.Generic.List<Slot>(slots ?? new Slot[0]);
+            list.Add(new Slot { target = target, day = day, night = night });
+            slots = list.ToArray();
+            Apply();
+        }
+
+        // 夜の絵を昼の絵と同じ大きさ (世界の寸法) で出す (2026-11-16): ロゴの夜の絵 title_night.png は 480×240 px で、 昼の title_day.png (120×60 px) の 4 倍の画素数なのに
+        //   取り込みの PPU が同じ 8 なので、 そのまま差し替えると 4 倍の大きさで出ていた。 .meta (取り込みの設定) は git 管理外で直せないので、
+        //   実行時に、 昼の絵と同じ幅になる PPU の Sprite を作り直して使う (縦横の比が同じなら高さも合う)。 大きさが同じ絵 (背景・ボタン) はそのまま。
+        private static readonly System.Collections.Generic.Dictionary<Sprite, Sprite> _fit = new System.Collections.Generic.Dictionary<Sprite, Sprite>();
+        private static Sprite FitTo(Sprite sp, Sprite reference)
+        {
+            if (sp == null || reference == null) return sp;
+            Vector3 a = sp.bounds.size, b = reference.bounds.size;
+            if (b.x <= 0f || (Mathf.Abs(a.x - b.x) < 0.01f && Mathf.Abs(a.y - b.y) < 0.01f)) return sp;
+            if (!Application.isPlaying) return sp;      // 編集中は作らない (作った Sprite がシーンに残らないように)
+            if (_fit.TryGetValue(sp, out var f) && f != null) return f;
+            var pivot = new Vector2(sp.pivot.x / sp.rect.width, sp.pivot.y / sp.rect.height);
+            f = Sprite.Create(sp.texture, sp.rect, pivot, sp.pixelsPerUnit * a.x / b.x, 0, SpriteMeshType.FullRect);
+            f.name = sp.name + " (昼の大きさ)";
+            _fit[sp] = f;
+            return f;
+        }
+
         /// <summary>コードから昼/夜を切り替える。</summary>
         public void SetMode(Mode m) { mode = m; Apply(); }
 
@@ -69,7 +96,7 @@ namespace UI
                 foreach (var s in slots)
                 {
                     if (s == null || s.target == null) continue;
-                    var sp = night ? s.night : s.day;
+                    var sp = night ? FitTo(s.night, s.day) : s.day;
                     if (sp != null) s.target.sprite = sp;
                 }
 

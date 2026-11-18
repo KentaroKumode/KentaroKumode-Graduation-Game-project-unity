@@ -141,6 +141,12 @@ namespace AutoTest
         public WiringSkill EffectiveWiringSkill
             => wiringSkill == WiringSkill.Ultra ? WiringSkill.Super : wiringSkill;
 
+        /// <summary>[アブレーション 2026-11-17・体験の物差し] 戦闘の技量だけを潰す: true なら配線を素朴版 (本体の既定の挿し方)・リロールなしにする。
+        /// 航行・店・イベント・消耗品の判断は <see cref="wiringSkill"/> のまま。 既定 false (今の挙動と同じ)。 乱数は引かない。</summary>
+        public bool combatNaive = false;
+        /// <summary>戦闘の配線とリロールが使う技量 (<see cref="combatNaive"/> なら Naive・それ以外は <see cref="EffectiveWiringSkill"/>)。</summary>
+        public WiringSkill CombatWiringSkill => combatNaive ? WiringSkill.Naive : EffectiveWiringSkill;
+
         /// <summary>SuperV3 の実験スイッチ (Optimal + 改善案)。 全 OFF なら Optimal と同一。</summary>
         public V3Flags v3 = new V3Flags();
 
@@ -201,27 +207,62 @@ namespace AutoTest
         /// Rank の航行は避けたい点 (averse と同じ 90) にする。 行き先に選ばないだけで、 出口への道の上の点は踏む (禁止ではない)。
         /// false = 今までと完全に同じ動き。 乱数は引かない。 エリート・宝・店・休憩・イベントの値付けは変えない。</summary>
         public bool navToilAware = true;
-        /// <summary>[2026-11-14・#140 の 2] 航行が嵐 (不安定化の時計) を読むか。 false (既定) = 今までと完全に同じ動き (乱数の消費も同じ・終点の位置を知っている・フェーズ 3 で出口へ)。
+        /// <summary>[2026-11-14・#140 の 2] 航行が嵐 (不安定化の時計) を読むか。 false = 旧い動き (乱数の消費も同じ・終点の位置を知っている・フェーズ 3 で出口へ)。
+        /// <b>2026-11-18〜 既定 true</b> (測定の基準を「嵐あり + 嵐を読む BOT (T2 = この口と第 2 巡の 3 つ)」に切り替えた・GAME.md §13-5)。
+        /// 根拠: 嵐あり・Super・同じシード 4,000 ランで、 読まない 2.1% → T2 9.7% (53 対 356・p=3e-56)。 読まない BOT は嵐を値付けしないので、 嵐ありの測定がゲームでなく BOT の穴を測っていた。
+        /// 旧い基準の数字 (読まない・嵐なし) と比べる腕は false を明示する。 BOT の口なので、 ゲームの挙動は変わらない (猫の手の写しは配線しか使わない)。
         /// true = Optimal / Super (追跡者を避ける方策) が、 嵐の層で <see cref="StormNavView"/> の見方を使う ──
         /// 隠れたボスの点を読まない (候補から探す)・点を取る価値から「溜まるポイントで嵐が早まる代償」を引く・「まだ取る」と「出口へ」を値で比べる (フェーズ 3 の規則は外す)・
         /// 嵐の中の 1 歩の HP を道の費用に入れる。 Naive は読まない (嵐を読まない下限)。 手番の時計 (stormClock=Turns)・嵐の無い層では効かない。 乱数は引かない。</summary>
-        public bool navStormAware = false;
+        public bool navStormAware = true;
         /// <summary>[2026-11-14・#140 の 2 第 2 巡] 嵐の航行 (navStormAware) が、 出口までの道と計画の中の道で「歩いて HP が尽きる」確率を値付けするか。
         /// true = 確率 Φ((道の嵐の HP − 見込みの HP) ÷ 散らばり) × 死の損 (<c>MacroDeathCost</c>) を代償に足す。 散らばり = 計画の中の戦闘の損の分散 (学習の種類ごとの標準偏差) + ボスが隠れている時の候補の間の道の HP の分散。
-        /// false (既定) = 第 1 巡と同じ (道の死を数えない)。 根拠: 第 1 巡の測定で、 戦闘の後に歩いて死んだランが Super 665 / 3000 (読まない時 265・嵐なし 101)。</summary>
-        public bool navStormExitDeath = false;
+        /// false = 第 1 巡と同じ (道の死を数えない)。 根拠: 第 1 巡の測定で、 戦闘の後に歩いて死んだランが Super 665 / 3000 (読まない時 265・嵐なし 101)。
+        /// 2026-11-18〜 既定 true (T2 の一部・<see cref="navStormAware"/> の注釈)。</summary>
+        public bool navStormExitDeath = true;
         /// <summary>[2026-11-14・第 2 巡] 嵐の中の戦闘の敵の〈嵐〉の見積もりを、 攻撃の上乗せ (<c>FreeMapParams.StormEnemyAttack</c>) × その種類の戦闘のターン数 (このランで見た平均) に替えるか。
-        /// false (既定) = 第 1 巡の「被ダメ × (1 + 上乗せ ÷ 層の最大の 1 発)」。 このランでまだその種類と戦っていなければ第 1 巡の式のまま。</summary>
-        public bool navStormFightModel = false;
+        /// false = 第 1 巡の「被ダメ × (1 + 上乗せ ÷ 層の最大の 1 発)」。 このランでまだその種類と戦っていなければ第 1 巡の式のまま。
+        /// 2026-11-18〜 既定 true (T2 の一部・<see cref="navStormAware"/> の注釈)。</summary>
+        public bool navStormFightModel = true;
         /// <summary>[2026-11-14・第 2 巡] 嵐の航行の計画で、 戦闘の死の見込みを HP に合わせて読むか。 true = 死の確率 = max(学習の敗北率, Φ((戦闘の損の平均 − 今の HP) ÷ 標準偏差)) × 死の損。
-        /// false (既定) = 第 1 巡と同じ (敗北率 × 死の損 × HP の余裕の逆数・HP 20% で頭打ち)。 根拠: 第 1 巡の測定で、 負けた通常の戦闘に入った時の HP の割合が 6% 前後。</summary>
-        public bool navStormFightDeath = false;
+        /// false = 第 1 巡と同じ (敗北率 × 死の損 × HP の余裕の逆数・HP 20% で頭打ち)。 根拠: 第 1 巡の測定で、 負けた通常の戦闘に入った時の HP の割合が 6% 前後。
+        /// 2026-11-18〜 既定 true (T2 の一部・<see cref="navStormAware"/> の注釈)。</summary>
+        public bool navStormFightDeath = true;
         /// <summary>[2026-11-14・第 2 巡] 嵐の航行の代償のうち、 嵐の HP の損 (歩く間・出口まで) に掛ける HP の重み (Super の計画の層ごとの HP の重み) の倍率。 既定 1 = 第 1 巡と同じ。
         /// 測定で振るつまみ (隠し倍率ではない・実効状態の行に出る)。 死の確率の項 (navStormExitDeath) には掛からない。</summary>
         public float navStormHpWeightMul = 1f;
+        /// <summary>[測定 2026-11-18・嵐の原因調査] 嵐の航行 (navStormAware) が、 隠れたボスの点の位置を最初から知っているとして動くか (上限の見当のための口・人には出来ない)。
+        /// true = <see cref="StormNavView"/> にボスの点 (<c>FreeMapLayout.goal</c>) を「見えている」として渡す (探す歩・候補の平均の出口の見込みが消える)。
+        /// false (既定) = 見えている点だけを読む (今までと同じ)。 乱数は引かない。 本体の挙動は変えない。</summary>
+        public bool navStormOracleBoss = false;
+        /// <summary>[測定 2026-11-18・嵐の原因調査] Super の計画 (嵐の航行) が、 不安定化ポイント 1 点ごとに引く値段 (クリアの対数オッズ・既定 0 = 今までと同じ)。
+        /// 着いた点で溜まる分と歩いて溜まる分の両方に掛ける (嵐を「取れる量の予算」と見る影の値段)。 測定で振るつまみ。 乱数は引かない。</summary>
+        public float navStormPointPrice = 0f;
+        /// <summary>[測定 2026-11-18・嵐の原因調査] 嵐の航行 (navStormAware) が、 不安定化の累計がこの値以上になったら出口へ向かう (人の「ここまで取ったら出る」の規則・0 = 使わない = 既定)。
+        /// 取る量と嵐の HP の引き換えの曲線を、 値で切り上げる規則と別に描くためのつまみ。 乱数は引かない。</summary>
+        public int navStormExitAtPts = 0;
+        /// <summary>[測定 2026-11-18・第 4 層の踏み込み過ぎの検証] Super の計画 (<c>MacroTarget</c>) が、 第 4 層 (深さ 6) で計画の中の HP がこの割合 (%) を下回ったら
+        /// 戦闘の点 (通常・精鋭・種別の見えていない点) を回り方に入れない (休憩・店などは残す・どれも得にならなければ出口へ)。 0 = 使わない = 既定。
+        /// 人の「王の前にこれだけは残す」の規則。 乱数は引かない。 第 4 層の外・Rank の航行 (Optimal) には効かない。</summary>
+        public int navD6HpFloorPct = 0;
+        /// <summary>[測定 2026-11-18・同上] Super の計画が、 第 4 層 (深さ 6) で精鋭の点 (種別が見えている) を回り方に入れない。 既定 false。 乱数は引かない。</summary>
+        public bool navD6NoElite = false;
+        /// <summary>[測定 2026-11-18・同上] Super の計画 (嵐の航行) が、 第 4 層 (深さ 6) で着いた時に嵐の中になる戦闘の点 (通常・精鋭・種別の見えていない点) を回り方に入れない。 既定 false。 乱数は引かない。</summary>
+        public bool navD6NoStormFight = false;
+        /// <summary>Super の計画が、 第 4 層 (深さ 6) の HP の重み (<c>MacroHpPer10</c>・戦闘の損と休憩と嵐の HP に掛かる) に掛ける倍率。
+        /// <b>既定 3</b> (2026-11-18・作者の承認): 控えの 5 腕の同じシードの比較で、 第 4 層の死亡率 34.6 → 31.1% (z −7.8)・クリア 19.5 → 20.0% と、 いちばん効いた控え方だった
+        /// (Captures/experience_storm_d/work/cmp_arms.md)。 1 にすると 2026-11-18 までと同じ。 BOT の値付けのつまみ (ゲームの数値ではない)。 乱数は引かない。</summary>
+        public float navD6HpWeightMul = 3f;
+        /// <summary>[測定の口・2026-11-18] 最初に持つ賽を指定する (ADR-0015 の賽 20 種の確かめ)。 空 = 製品と同じ (角の取れた賽)。
+        /// ゲームの数値ではない・乱数は引かない。 v3_queue の腕で <c>forceStartDie=刻みの賽</c> のように渡す。</summary>
+        public string forceStartDie = "";
+        /// <summary>[測定 2026-11-18・同上] 嵐の航行の道選び (<see cref="StormNavView.StormStep"/>) が、 第 4 層 (深さ 6) で道すがらの戦闘の点 (行き先でない・未起動の通常・精鋭・種別の見えていない点)
+        /// を「その戦闘で失う HP の見込み (学習の戦闘名か種類の平均 × 最大 HP) × この倍率」だけ費用に入れる (着いた点は必ず起動するので、 道順は「どのマスを踏むか」)。 0 = 使わない = 既定。 乱数は引かない。</summary>
+        public float navD6PathFightCost = 0f;
         /// <summary>[測定 2026-11-13] 天候の作り。 本体の GameHooks.StormEnabled へ流す (ラン終了で true へ)。
         /// true (既定) = 嵐 (静かな時間のあとに輪が縮む・嵐の中の点への移動で HP・嵐の中の戦闘は敵に〈嵐〉・始点は最外周から・ボスの点は伏せる・GAME.md §5-12)。
-        /// BOT は終点の位置を今までどおり知っていて、 フェーズ 3 で出口へ切り替え、 出口までの見積もりに嵐の HP を足す (最小の対応)。
+        /// BOT は既定 (2026-11-18〜) で嵐を読む (<see cref="navStormAware"/> と第 2 巡の 3 つ = T2)。 口を切ると、 終点の位置を知っていて、 フェーズ 3 で出口へ切り替え、 出口までの見積もりに嵐の HP を足すだけ (最小の対応)。
+        /// 測定の基準は嵐あり (2026-11-18〜・GAME.md §13-5)。 嵐なし (false) の数字は育てる時間を無制限に与えた条件で、 嵐ありの数字と直接比べない。
         /// false = 旧い作り (左から右へ進む前線・崩れる地平と沈み続ける湖面あり・始点は左端 = main と全件一致のはず)。</summary>
         public bool stormEnabled = true;
         /// <summary>[測定 2026-11-13 二版] 嵐の時計の種類。 本体の GameHooks.StormClock へ流す (ラン終了で Instability へ)。
@@ -872,7 +913,15 @@ namespace AutoTest
                  + $"/ 嵐の航行の直し 道の死 {(navStormExitDeath ? "数える" : "数えない")} (navStormExitDeath={navStormExitDeath})"
                  + $"・嵐の中の戦闘 {(navStormFightModel ? "上乗せ × ターン数" : "最大の 1 発の比")} (navStormFightModel={navStormFightModel})"
                  + $"・戦闘の死 {(navStormFightDeath ? "HP に合わせる" : "第 1 巡の式")} (navStormFightDeath={navStormFightDeath})"
-                 + $"・嵐の HP の重み ×{navStormHpWeightMul:0.##} (navStormHpWeightMul={navStormHpWeightMul:0.##}) "
+                 + $"・嵐の HP の重み ×{navStormHpWeightMul:0.##} (navStormHpWeightMul={navStormHpWeightMul:0.##})"
+                 + $"・ボスの位置 {(navStormOracleBoss ? "知っている (上限の見当・測定の口)" : "見えた時だけ")} (navStormOracleBoss={navStormOracleBoss})"
+                 + $"・1 点の値段 {navStormPointPrice:0.###} (navStormPointPrice={navStormPointPrice:0.###})"
+                 + $"・累計で出る {(navStormExitAtPts > 0 ? navStormExitAtPts + " 以上で出口へ" : "使わない")} (navStormExitAtPts={navStormExitAtPts}) "
+                 + $"/ 第 4 層の控え HP {(navD6HpFloorPct > 0 ? navD6HpFloorPct + "% 未満で戦わない" : "使わない")} (navD6HpFloorPct={navD6HpFloorPct})"
+                 + $"・精鋭 {(navD6NoElite ? "取らない" : "取る")} (navD6NoElite={navD6NoElite})"
+                 + $"・嵐の中の戦闘 {(navD6NoStormFight ? "取らない" : "取る")} (navD6NoStormFight={navD6NoStormFight})"
+                 + $"・HP の重み ×{navD6HpWeightMul:0.##} (navD6HpWeightMul={navD6HpWeightMul:0.##})"
+                 + $"・道すがらの戦闘の費用 ×{navD6PathFightCost:0.##} (navD6PathFightCost={navD6PathFightCost:0.##}) "
                  + $"/ 端子の撃破のボーナス {(terminalKillNeedsAttack ? "攻撃したターンだけ (旧い条件)" : "経路を問わない")} "
                  + $"/ 手札 {(handCarry == CombatSystem.HandCarryMode.Pick ? "印を付けた端子だけ残す (Pick)" : handCarry == CombatSystem.HandCarryMode.All ? "挿さなかった端子は全部残る (All)" : "毎ターン捨てる (Off・旧い規則)")}"
                  + $"{(handCarry == CombatSystem.HandCarryMode.Pick ? " 残す方策 " + EffectiveHandKeepPolicy + " (handKeepPolicy=" + handKeepPolicy + ")" : "")} "
@@ -1602,6 +1651,9 @@ namespace AutoTest
         public bool botBuysWeapons = false;
         private bool WouldBuyWeapon(GameLoop.RunState run, string itemId)
             => botBuysWeapons && GameLoop.Loadout.WouldUpgrade(run, itemId);
+        /// <summary>賽を買うか (ADR-0015): 買うと今の賽と入れ替わるので、 今の賽より値踏みが高い時だけ。</summary>
+        private static bool WouldBuyDie(GameLoop.RunState run, string itemId)
+            => AutoTest.InventoryPower.DiePowerDelta(run, itemId) > 0;
         public int axisPackageCount = 10;
         [Tooltip("ラン数")]
         public int randomGrantRuns = 5000;
@@ -1947,8 +1999,6 @@ namespace AutoTest
                 UnityEditor.EditorPrefs.GetFloat("AutoRun.PartPair", AutoTest.InventoryPower.TierGainPair);
             AutoTest.InventoryPower.TierGainTriple =
                 UnityEditor.EditorPrefs.GetFloat("AutoRun.PartTriple", AutoTest.InventoryPower.TierGainTriple);
-            AutoTest.InventoryPower.TierGainT4Extra =
-                UnityEditor.EditorPrefs.GetFloat("AutoRun.PartT4", AutoTest.InventoryPower.TierGainT4Extra);
 #endif
             if (!shieldAbsorbsUnmitigable)
                 Debug.LogWarning("[AutoRunner] **対照群**: 軽減無視をシールドで肩代わりしない (製品挙動ではない)");

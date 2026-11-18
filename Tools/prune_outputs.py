@@ -29,6 +29,10 @@ WORKER = os.path.join(ROOT, "UltraProductionWorkerBuild")
 KEEP_RUNS = 20        # スイープ・バッチ・並列ランナーのセッション
 KEEP_BACKUPS = 2      # 学習データのバックアップ (リセット前の退避)
 KEEP_LOOSE = 30       # AutoRunLogs 直下のばらのレポート (itemablation_*.txt など)
+# 並列の学習・測定 (learn_parallel・ItemLearningParallelRunner) は 1 つの測定が数十〜数百のフォルダになるので、
+# 件数でなく日数で残す: いちばん新しいフォルダから KEEP_PARALLEL_DAYS 日以内。 2026-11-18 まで対象外で、
+# 11-04〜11-13 の分が 117 GB たまってディスクの空きが 1.7 GB まで減った。 基準として残したい測定は Captures/ へ写す。
+KEEP_PARALLEL_DAYS = 7
 
 # ワーカー用ビルドの本体。 **これ以外の直下ディレクトリは古い実験の出力**として扱う。
 WORKER_BUILD_PARTS = {"AutoRunLogs", "MonoBleedingEdge", "UltraProductionWorker_Data"}
@@ -71,6 +75,12 @@ def _plan():
     keep_newest(subdirs(LOGS, lambda x: x.startswith("batch_")), KEEP_RUNS, "バッチ")
     keep_newest(subdirs(os.path.join(LOGS, "rank_margin_parallel")), KEEP_RUNS, "並列ランナー")
     keep_newest(subdirs(os.path.join(LOGS, "grant_trial")), KEEP_RUNS, "付与試行")
+    par = subdirs(os.path.join(LOGS, "learn_parallel"))
+    if par:
+        newest = max(os.path.getmtime(p) for p in par)
+        for p in par:
+            if os.path.getmtime(p) < newest - KEEP_PARALLEL_DAYS * 86400:
+                doomed.append((p, "並列の学習・測定"))
     loose = [os.path.join(LOGS, x) for x in os.listdir(LOGS)] if os.path.isdir(LOGS) else []
     keep_newest([p for p in loose if os.path.isfile(p)], KEEP_LOOSE, "ばらのレポート")
 

@@ -489,7 +489,7 @@ namespace AutoTest
                        && guardPack++ < ShopManager.ProvisionPackStock
                        && sm.TryBuyProvisionPack(gm.Run)) { }
 
-                // 囮罠 (2026-11-04): 追跡者の居る層では 2 個まで持っておく。 補足された時に航行の BOT が使う (AutoRunner.FreeMap)。
+                // 囮罠 (2026-11-04): 追跡者の居る層では 2 個まで持っておく。 捕捉された時に航行の BOT が使う (AutoRunner.FreeMap)。
                 //   棚の品より先に買うが、 所持金が 20G を切る時は買わない (8G の道具で棚を買えなくしない)
                 if (MapSystem.FreeMove.FloorPlan.HasWanderer(gm.Run.Depth))
                 {
@@ -515,6 +515,23 @@ namespace AutoTest
                         var os = inv.slots[oi];
                         if (os != null && !string.IsNullOrEmpty(os.itemId))
                             _cur.offeredItemsEver.Add(os.itemId);
+                    }
+                    // [計装 2026-11-17・引きの質] 入った時の棚を順に残す (最初の 8 回まで・同じ棚の続けての記録は 1 回)。 読むだけ。
+                    if (_cur.shelves.Count < 8)
+                    {
+                        var sb = new System.Text.StringBuilder();
+                        sb.Append(run != null ? run.Depth : 0).Append('|');
+                        bool first = true;
+                        for (int oi = 0; oi < inv.slots.Count; oi++)
+                        {
+                            var os = inv.slots[oi];
+                            if (os == null || string.IsNullOrEmpty(os.itemId)) continue;
+                            if (!first) sb.Append(';');
+                            sb.Append((int)os.kind).Append(':').Append(os.itemId).Append(':').Append(os.price);
+                            first = false;
+                        }
+                        string shelf = sb.ToString();
+                        if (_cur.shelves.Count == 0 || _cur.shelves[_cur.shelves.Count - 1] != shelf) _cur.shelves.Add(shelf);
                     }
                 }
 
@@ -557,7 +574,7 @@ namespace AutoTest
                             case ItemSystem.Shop.ShopSlotKind.Passive:        _cur.shopBuyPassive++; if (shopPassiveAudit) _auBought[AuditRarity(id)]++; break;
                             case ItemSystem.Shop.ShopSlotKind.Consumable:     _cur.shopBuyConsumable++; break;
                             case ItemSystem.Shop.ShopSlotKind.Weapon:         _cur.shopBuyWeapon++; break;
-                            case ItemSystem.Shop.ShopSlotKind.FacePart:       _cur.shopBuyDice++; break;
+                            case ItemSystem.Shop.ShopSlotKind.Dice:           _cur.shopBuyDice++; break;
                             case ItemSystem.Shop.ShopSlotKind.WeaponMaterial: _cur.shopBuyMaterial++; break;
                         }
                         if (AutoTest.LearnedPriorityProvider.IsPriority(id)) _cur.priorityItemsAcquired++;
@@ -861,12 +878,14 @@ namespace AutoTest
                     if (s.price > GameLoop.ProvisionPayment.PolicyAffordable(run) - _shopReserve) return false;
                     // **武器は装備判定を通す** (2026-08-10)。 主経路にゲートが無く素通りしていた。
                     if (s.kind == ShopSlotKind.Weapon && !WouldBuyWeapon(run, s.itemId)) return false;
+                    // 賽は買うと今の賽と入れ替わる (ADR-0015)。 今の賽より良い時だけ買う (武器の装備判定と同じ関所)。
+                    if (s.kind == ShopSlotKind.Dice && !WouldBuyDie(run, s.itemId)) return false;
                     if (SealedPassive(s)) return false;
                     float step = AutoTest.LearnedPriorityProvider.StepPerTier;
-                    if (s.kind == ShopSlotKind.FacePart
+                    if (s.kind == ShopSlotKind.Dice
                         && !AutoTest.LearnedPriorityProvider.HasLearned(s.itemId))
                     {
-                        int raw = AutoTest.InventoryPower.FacePartPower(run, s.facePart);
+                        int raw = AutoTest.InventoryPower.DiePowerDelta(run, s.itemId);
                         if (raw <= 0) return false;
                         pw = AutoTest.InventoryPower.BootstrapPowerScore(raw);
                     }
@@ -877,14 +896,10 @@ namespace AutoTest
                            + AutoTest.BuildSynergy.ScoreAdjust(s.itemId, run);
                         // 丸めた序列では同じ段の品が同点になる。 人が同格の品で迷ったら安い方を選ぶ
                         if (AutoTest.LearnedPriorityProvider.BuyTierCount > 0 && !v3.tierNoPriceTie) pw -= s.price * 0.0001f;
-                        if (v3.partPenalty > 0f && s.kind == ShopSlotKind.FacePart) pw -= v3.partPenalty;
-                        if (v3.partDelta && s.kind == ShopSlotKind.FacePart && run.diceFaceParts != null)
-                            foreach (var owned in run.diceFaceParts)
-                                if (owned.face == s.facePart.face)
-                                {
-                                    pw -= AutoTest.LearnedPriorityProvider.PowerScore(GameLoop.DiceFaceParts.Id(owned));
-                                    break;
-                                }
+                        if (v3.partPenalty > 0f && s.kind == ShopSlotKind.Dice) pw -= v3.partPenalty;
+                        // 賽は入れ替え: 今の賽の価値を引く (旧: 同じ目の出目パーツを差し替える時の差分)
+                        if (v3.partDelta && s.kind == ShopSlotKind.Dice)
+                            pw -= AutoTest.LearnedPriorityProvider.PowerScore(GameLoop.EquippedDie.IdOf(run));
                     }
                     // 軸に絞る買い方 (v3.axisCommitBuy・Super)。 軸が深ければ ① / ② / 誓約 を最優先、 誓約は浅いうちは買わない。
                     if (v3.axisCommitBuy && s.kind == ShopSlotKind.Passive && !string.IsNullOrEmpty(s.itemId)
@@ -957,7 +972,7 @@ namespace AutoTest
                         if (s == null || s.sold) continue;
                         if (s.kind == ShopSlotKind.Weapon && run.coins > weaponGate
                             && WouldBuyWeapon(run, s.itemId)) Buy(i);
-                        else if (s.kind == ShopSlotKind.FacePart && run.coins > s.price) Buy(i);
+                        else if (s.kind == ShopSlotKind.Dice && run.coins > s.price && WouldBuyDie(run, s.itemId)) Buy(i);
                         else if (s.kind == ShopSlotKind.Passive && run.coins > passiveGate) Buy(i);
                     }
                 }
@@ -981,13 +996,13 @@ namespace AutoTest
                         if (s == null || s.sold) continue;
                         bool p3 =
                             (s.kind == ShopSlotKind.Passive  && after > passiveGate) ||
-                            (s.kind == ShopSlotKind.FacePart && after > s.price) ||
+                            (s.kind == ShopSlotKind.Dice && after > s.price && WouldBuyDie(run, s.itemId)) ||
                             (s.kind == ShopSlotKind.Weapon   && after > weaponGate
                                 && WouldBuyWeapon(run, s.itemId));
                         if (!p3) continue;
                         DiscardItemsByNth[nth]++;
                         if (s.kind == ShopSlotKind.Passive) DiscardPassive++;
-                        else if (s.kind == ShopSlotKind.FacePart) DiscardPart++;
+                        else if (s.kind == ShopSlotKind.Dice) DiscardPart++;
                         else DiscardWeapon++;
                         if (TrySlotPower(i, out float pw))
                         {
@@ -1334,7 +1349,7 @@ namespace AutoTest
                         //   ダイス 5 個すべてに毎ターン効くので、 費用対効果で上回る可能性がある。
                         //   **ただし旧ダイス用の高いゲート (75G) を外しただけでは足りない**ことが
                         //   実測で分かったので、 順序そのものを入れ替えて比較する。
-                        if (BuyKindP3(ShopSlotKind.FacePart)) { bought = true; continue; }
+                        if (BuyKindP3(ShopSlotKind.Dice)) { bought = true; continue; }
                         // **パッシブを先に買う** (2026-08-10)。 同じ金額ならパッシブの方が強い
                         //   ことが実測で出ている (ダイスが陳列から消えるだけで +9.4pt)。
                         if (BuyKindP3(ShopSlotKind.Passive)) { bought = true; continue; }
@@ -1376,7 +1391,7 @@ namespace AutoTest
                     {
                         int g3 = 0;
                         while (BuyRanked(ShopSlotKind.Weapon, weaponGate) && g3++ < 30) { }
-                        while (BuyRanked(ShopSlotKind.FacePart, 0) && g3++ < 60) { }
+                        while (BuyRanked(ShopSlotKind.Dice, 0) && g3++ < 60) { }
                         while (BuyRanked(ShopSlotKind.Passive, passiveGate) && g3++ < 90) { }
                     }
                     else
@@ -1385,12 +1400,11 @@ namespace AutoTest
                         if (inv.slots[i] != null && !inv.slots[i].sold && run.coins > weaponGate
                             && inv.slots[i].kind == ShopSlotKind.Weapon
                             && WouldBuyWeapon(run, inv.slots[i].itemId)) Buy(i);
-                    // 出目パーツは「増設」なので武器のような更新判定を通さない (面が 1 枚増えるだけ)。
-                    //   恒久強化なので、 素材や消耗品より先に取る。
+                    // 賽は入れ替え (ADR-0015) なので、 武器と同じく今より良い時だけ買う。
                     for (int i = 0; i < inv.slots.Count; i++)
                         if (inv.slots[i] != null && !inv.slots[i].sold
-                            && inv.slots[i].kind == ShopSlotKind.FacePart
-                            && run.coins > inv.slots[i].price) Buy(i);
+                            && inv.slots[i].kind == ShopSlotKind.Dice
+                            && run.coins > inv.slots[i].price && WouldBuyDie(run, inv.slots[i].itemId)) Buy(i);
                     for (int i = 0; i < inv.slots.Count; i++)
                         if (inv.slots[i] != null && !inv.slots[i].sold && run.coins > passiveGate
                             && inv.slots[i].kind == ShopSlotKind.Passive) Buy(i);
@@ -1474,7 +1488,7 @@ namespace AutoTest
                             //   T1 でも「持っている」ことに意味がある (次の 1 撃で死ぬ判定で使える)。
                             if (EnsureHealStock()) { bought = true; continue; }
                             if (BuyKindP3(ShopSlotKind.Weapon)) { bought = true; continue; }
-                            if (BuyKindP3(ShopSlotKind.FacePart)) { bought = true; continue; }
+                            if (BuyKindP3(ShopSlotKind.Dice)) { bought = true; continue; }
                             if (BuyKindP3(ShopSlotKind.Passive)) { bought = true; continue; }
                             if (BuyConsumableAtLeast(minTier)) { bought = true; continue; }
                             if (GameManager.CanSpendMaterials(run)
@@ -1519,7 +1533,7 @@ namespace AutoTest
                             if (BuyKindP3(ShopSlotKind.Weapon)) { bought = true; continue; }
                             if (BuyKindP3(ShopSlotKind.Passive)) { bought = true; continue; }
                             if (BuyKind(ShopSlotKind.Consumable)) { bought = true; continue; }
-                            if (BuyKindP3(ShopSlotKind.FacePart)) { bought = true; continue; }
+                            if (BuyKindP3(ShopSlotKind.Dice)) { bought = true; continue; }
                         }
                         while (bought && buyGuard++ < 32);
 

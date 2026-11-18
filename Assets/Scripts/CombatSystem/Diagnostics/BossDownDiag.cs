@@ -288,4 +288,47 @@ namespace CombatSystem
             return sb.ToString();
         }
     }
+
+    /// <summary>
+    /// [計装 2026-11-18] 戦闘 (ヴェスカは段) の終わりの診断: 最後のターンに敵が何をしたか・その頭の敵と自分の HP・敵の攻撃が当たった回数。
+    /// 「とどめの一撃」(死因) と「HP を削った量の内訳」を別々に読むための記録 (Captures/experience_storm_c)。 数えるだけ・結果を変えない・乱数も引かない。
+    /// AutoRunner が戦闘の終わりに <see cref="Snapshot"/> を読む (CombatRec.fin)。
+    /// </summary>
+    public static class FightEndDiag
+    {
+        /// <summary>最後に敵が動いたターンの行動 (大技 0 / チャージ 1 / 小技 2 / それ以外 −1 = ダウン・〈封じ・揃〉・大技なしの敵)。</summary>
+        public static int LastKind = -1;
+        /// <summary>最後のターンの頭の敵の HP (最大 HP の千分率)・自分の HP・ターン番号。</summary>
+        public static int HeadEnemyPermille = 1000, HeadPlayerHp, HeadTurn;
+        /// <summary>敵が攻撃したターン (1 体目) / うち HP が減った / うち大技で HP が減った・敵の攻撃で減った HP の合計 (1 体目と 2 体目・〈連撃〉)・
+        /// 頭の敵の HP が 50% 以下だったターン。</summary>
+        public static int Attacks, Landed, LandedHeavy, AttackTaken, LowHpTurns;
+
+        /// <summary>戦闘の始め・段の交代 (CombatManager.ResetBossDown)。</summary>
+        public static void Begin()
+        {
+            LastKind = -1; HeadEnemyPermille = 1000; HeadPlayerHp = 0; HeadTurn = 0;
+            Attacks = Landed = LandedHeavy = AttackTaken = LowHpTurns = 0;
+        }
+
+        /// <summary>ターンの頭 (ダウンの処理の頭・敵が振る前)。</summary>
+        public static void NoteTurnHead(int turn, int playerHp, float enemyRatio)
+        {
+            HeadTurn = turn; HeadPlayerHp = playerHp;
+            HeadEnemyPermille = (int)Math.Round(Math.Max(0f, enemyRatio) * 1000f);
+            if (enemyRatio <= 0.5f) LowHpTurns++;
+        }
+
+        /// <summary>敵の攻撃の枝の後。 <paramref name="kind"/> は HeavyHitDiag と同じ (大技 0 / チャージ 1 / 小技 2 / −1)。</summary>
+        public static void NoteEnemyTurn(int kind, bool attacked, int taken)
+        {
+            LastKind = kind;
+            if (attacked) { Attacks++; if (taken > 0) { Landed++; if (kind == 0) LandedHeavy++; } }
+            AttackTaken += Math.Max(0, taken);
+        }
+
+        /// <summary>[最後の行動, 頭の敵の HP ‰, 頭の自 HP, 最後のターンの HP の減り (頭 − 今), ターン, 攻撃したターン, 当たった, 大技で当たった, 敵の攻撃の被ダメ合計, 敵の HP 50% 以下のターン]。</summary>
+        public static int[] Snapshot(int playerHpNow)
+            => new[] { LastKind, HeadEnemyPermille, HeadPlayerHp, Math.Max(0, HeadPlayerHp - playerHpNow), HeadTurn, Attacks, Landed, LandedHeavy, AttackTaken, LowHpTurns };
+    }
 }

@@ -71,6 +71,21 @@ namespace UI.Game2D.Battle
             return ok;
         }
 
+        /// <summary>ランの見せる層の番号 (<c>RunState.currentFloor</c>・0 = 序層 / 1〜5 = 第一〜第五層) を替える (確認専用・セーブを止める)。 戦闘の背景はこの番号で選ぶ
+        /// (<see cref="BattleBackdrops"/>)。 <see cref="Start"/> の新しいランは 0 層なので、 層の背景を見る時は Start の後にこれを呼んでから <see cref="Restart"/>。
+        /// 例: <c>UI.Game2D.Battle.QaBattle.SetFloor(3); UI.Game2D.Battle.QaBattle.Restart("boss_layer5")</c>。 ランが無ければ false。</summary>
+        public static bool SetFloor(int floor)
+        {
+            SaveGuard.Suppressed = true;
+            var run = GameManager.Instance?.Run; if (run == null) { Debug.LogWarning("[QaBattle] ランが無い (先に Start)"); return false; }
+            run.currentFloor = Mathf.Clamp(floor, MapSystem.FreeMove.FloorPlan.FarmFloor, MapSystem.FreeMove.FloorPlan.LastOrdinal);
+            Debug.Log($"[QaBattle] 層 {run.currentFloor} (深さ {run.Depth}) → 背景 {BattleBackdrops.ForFloor(run.currentFloor)}");
+            return true;
+        }
+
+        /// <summary>今の戦闘の背景 (Resources/Game2DBackdrops の名前・"-" = 仮の背景) と、 ヴェスカ 4 段への移行で替える予定の背景。 例: "bg_vesca (次 bg_vesca_p4)"。</summary>
+        public static string Backdrop() { var f = Fx; if (f == null) return "(戦闘の画面が無い)"; return (f.BackdropName ?? "-") + (f.PendingBackdropName != null ? " (次 " + f.PendingBackdropName + ")" : ""); }
+
         /// <summary>手引きを全部「見た」にする (手元だけ・SaveGuard で書かない)。 戦闘の画面の上に手引きの窓が出て止まらないように。</summary>
         private static void MarkAllTutorialsSeen()
         {
@@ -176,7 +191,7 @@ namespace UI.Game2D.Battle
         public static void ForceStow(int mode) => Game2DBattleFx.QaStow = mode < 0 ? -1 : mode > 0 ? 1 : 0;
 
         /// <summary>エンディングの画面を直接出す (#328・<see cref="Game2DEndingScreen.QaShow"/>・セーブを止める・フェーズは変えない)。
-        /// id = end1 / end2 / end3 / end_true (後日談つき) / end_good / epilogue。 例: <c>UI.Game2D.Battle.QaBattle.ShowEnding("end_true")</c></summary>
+        /// id = end1 / end2 / end3 / end_true / end_good。 例: <c>UI.Game2D.Battle.QaBattle.ShowEnding("end_true")</c></summary>
         public static bool ShowEnding(string id) => Game2DEndingScreen.QaShow(id);
 
         /// <summary>本物と同じ経路でエンディングを出す (#328): セーブを止め、 ランが無ければ始め、 最後に倒したボスと裂け目の選択を id に合わせて入れて踏破 (RunClear) のフェーズへ入る。
@@ -208,7 +223,7 @@ namespace UI.Game2D.Battle
         public static string Status()
         {
             var gm = GameManager.Instance; var s = Sim; var f = Fx; var cm = CombatManager.Instance;
-            return $"phase={gm?.CurrentPhase} enemy={cm?.CurrentEnemy?.id} turn={cm?.CurrentCombatTurn} sim={s?.phase} heavyIn={s?.heavyIn} charging={s?.charging} down={s?.down} " +
+            return $"phase={gm?.CurrentPhase} floor={gm?.Run?.currentFloor} bg={Backdrop()} enemy={cm?.CurrentEnemy?.id} turn={cm?.CurrentCombatTurn} sim={s?.phase} heavyIn={s?.heavyIn} charging={s?.charging} down={s?.down} " +
                    $"hp={s?.playerHp}/{s?.playerMax} vescaShield={ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context?.vescaShield} fxIdle={f?.IsIdle} bossIdling={f?.BossIdling} go={Runner.State} loading={Game2DLoadingScreen.Blocking} ending={Game2DEndingScreen.Blocking} modal={Game2DModal.Active} saveSuppressed={SaveGuard.Suppressed} " +
                    $"stow=[{(f != null && f.GuiStowed ? "格納" : "出")} hud={StowNow()} force={Game2DBattleFx.QaStow}] gui=[on={Game2DGuiRt.FxOn} weight={Game2DGuiRt.FxWeightReady} dark={Game2DGuiRt.FxDark:0.00} red={Game2DGuiRt.FxRed:0.00} white={Game2DGuiRt.FxWhite:0.00} shake={Game2DGuiRt.FxShake}]";
         }
@@ -290,6 +305,160 @@ namespace UI.Game2D.Battle
         public static void SetSpeed(float speed) => Game2DBattleFx.QaSpeed = Mathf.Max(0f, speed);
         /// <summary>1 コマ (1/8 秒) だけ進める (一時停止の間に使う)。</summary>
         public static void StepFrame() => Game2DBattleFx.QaStepSeconds += 0.125f;
+
+        // ── イベントの画面 (2026-11-16・EventScreenView) ──
+
+        /// <summary>名前を指定したイベントの画面を出す (セーブを止める・ランが無ければ新しいランを始める・戦闘中なら打ち切る)。
+        /// floor = 見せる層の番号 (背景の絵が替わる・-1 = 今のまま)・coins = 所持金 (-1 = 今のまま・0 で「ゴールドが足りない」の箱を見る)・
+        /// eta = 捕捉されていて N ターンで捕まる見込みにする (-1 = 本物の見込み・1 でターンの札の警告と箱の下の説明を見る)。
+        /// 例: <c>UI.Game2D.Battle.QaBattle.ShowEvent("老婆の商店", 2, 0, 1)</c>・<c>UI.Game2D.Battle.QaBattle.ShowEvent("さびれた観測所・再訪・写し", 4)</c></summary>
+        public static bool ShowEvent(string eventName, int floor = -1, int coins = -1, int eta = -1)
+        {
+            SaveGuard.Suppressed = true;
+            if (!Application.isPlaying) { Debug.LogWarning("[QaBattle] Play モードで呼ぶ"); return false; }
+            var gm = GameManager.Instance;
+            if (gm == null) { Debug.LogWarning("[QaBattle] GameManager が無い"); return false; }
+            MarkAllTutorialsSeen();
+            if (gm.Run == null || gm.CurrentPhase == GameManager.GamePhase.Title || gm.CurrentPhase == GameManager.GamePhase.GameOver)
+                gm.StartNewRun();
+            if (gm.CurrentPhase == GameManager.GamePhase.Combat) CombatManager.Instance?.QaAbortCombat();
+            var run = gm.Run;
+            if (floor >= 0) run.currentFloor = Mathf.Clamp(floor, MapSystem.FreeMove.FloorPlan.FarmFloor, MapSystem.FreeMove.FloorPlan.LastOrdinal);
+            if (coins >= 0) run.coins = coins;
+            EventSystem.EventEncounter.QaCatchEta = eta;
+            bool ok = gm.QaStartEvent(eventName);
+            Game2DLoadingScreen.QaDismiss();
+            UI.Game2D.Game2DPhaseScreens.RequestRebuild();      // 同じフェーズ・同じイベントのまま層や所持金を替えて出し直した時も、 最初の頁から描き直す
+            Debug.Log($"[QaBattle] イベント {eventName} / 層 {run.currentFloor} (背景 {UI.Game2D.EventScreenView.BackdropName(EventSystem.EventEncounter.Instance?.Current)}) / 所持金 {run.coins} / 見込み {eta} → {(ok ? "開始" : "失敗")}");
+            return ok;
+        }
+
+        /// <summary>イベントの画面の板と箱の濃さを試しに替える (0〜255・-1 で定数 EventScreenView.PlateAlpha に戻す)。 液晶のブルーム・自動露出の上での見え方を見る用。
+        /// 決めた値は EventScreenView.PlateAlpha に書く。 例: <c>UI.Game2D.Battle.QaBattle.EventPlateAlpha(245)</c></summary>
+        public static void EventPlateAlpha(int a)
+        {
+            UI.Game2D.EventScreenView.QaPlateAlpha = a;
+            UI.Game2D.Game2DPhaseScreens.RequestRebuild();
+        }
+
+        // ── 液晶の湾曲 (2026-11-16・見比べ用。 既定は外形を湾曲に合わせる f = 1) ──
+
+        /// <summary>液晶の板の材質 (Game2D/LcdScreen・設定が作った複製)。 無ければ null。</summary>
+        private static Material LcdMat()
+        {
+            var g = Object.FindObjectOfType<Game2DLcdGhost>();
+            var m = g != null && g.surface != null ? g.surface.sharedMaterial : null;
+            return m != null && m.HasProperty("_CurveFit") ? m : null;
+        }
+
+        /// <summary>マウスの当たりが読む材質 (Game2DScreen.lcdQuad の材質) が液晶の板の材質と別なら、 同じ値を写す (見た目と当たりがずれないように)。</summary>
+        private static void SyncPointerMat(Material m)
+        {
+            var sc = Object.FindObjectOfType<Game2DScreen>();
+            var mr = sc != null && sc.lcdQuad != null ? sc.lcdQuad.GetComponent<MeshRenderer>() : null;
+            var pm = mr != null ? mr.sharedMaterial : null;
+            if (pm == null || pm == m || !pm.HasProperty("_CurveFit")) return;
+            pm.SetFloat("_Curve", m.GetFloat("_Curve")); pm.SetFloat("_CurveFit", m.GetFloat("_CurveFit"));
+            Debug.LogWarning("[QaBattle] マウスの当たりが読む材質と液晶の板の材質が別だった (値を写した)");
+        }
+
+        /// <summary>湾曲の外形の合わせ方 <c>_CurveFit</c> を実行中に替える (1 = 縁の中央を合わせる・絵の外形が樽型・既定 / 0 = 旧い合わせ方: 四隅を絵の端に合わせる・間は線形)。 設定を変えると既定 (Game2DSettingsApply.CurveFit) へ戻る。
+        /// マウスの当たり (Game2DPointer.LcdDot) も同じ材質から読むので一緒に変わる。 保存はしない (Play を抜けると戻る)。 戻り値 = 今の値の説明。
+        /// 例: <c>UI.Game2D.Battle.QaBattle.LcdCurveFit(1)</c></summary>
+        public static string LcdCurveFit(float fit)
+        {
+            var m = LcdMat(); if (m == null) return "(液晶の材質が無い)";
+            m.SetFloat("_CurveFit", Mathf.Clamp01(fit)); SyncPointerMat(m);
+            return LcdCurveNow();
+        }
+
+        /// <summary>湾曲の強さ <c>_Curve</c> を実行中に替える (0〜0.2・材質の既定 0.07 × 設定の倍率)。 設定を変えると設定の値で上書きされる。 保存はしない。
+        /// 例: <c>UI.Game2D.Battle.QaBattle.LcdCurve(0.1f)</c></summary>
+        public static string LcdCurve(float k)
+        {
+            var m = LcdMat(); if (m == null) return "(液晶の材質が無い)";
+            m.SetFloat("_Curve", Mathf.Clamp(k, 0f, 0.2f)); SyncPointerMat(m);
+            return LcdCurveNow();
+        }
+
+        /// <summary>GUI (計器盤・帯・窓・手引き) の合成の形を替える (2026-11-16・見比べ用・保存しない)。 true = 液晶の中身として合成 (既定・湾曲と液晶の効果が全部掛かる) /
+        /// false = 旧い提示の板 (湾曲しない層で液晶の上に重ね、 影と上下の色調を付ける)。 押す所の変換 (Game2DPointer.TryDot) も一緒に切り替わる。
+        /// 例: <c>UI.Game2D.Battle.QaBattle.GuiInLcd(false)</c></summary>
+        public static string GuiInLcd(bool on)
+        {
+            Game2DGuiRt.InLcd = on;
+            return "guiInLcd=" + Game2DGuiRt.InLcd;
+        }
+
+        /// <summary>走査線の試しの形 (2026-11-16・作者「走査線で文章が読みづらい」の改善案の見比べ用・保存しない)。 液晶のシェーダのグローバル <c>_Game2DScanMode</c>。
+        /// <b>ビットの組 (0〜7・2026-11-17・重ねて見比べる)</b>: 1 = 縞を dot の行の半分の細かさに (どの dot の行も同じ明るさ) / 2 = 明るい所 (字) ほど走査線を弱める /
+        /// 4 = GUI の覆っている所だけ弱める。 2 と 4 を重ねると弱め方は掛け合わせ。 0 = 旧い縞 (形なし)。
+        /// 既定は 3 = 1+2 (2026-11-17・作者の決定・本体の <see cref="Game2DSettingsApply.ScanMode"/> が起動時と設定の変更時に入れる)。 ここで替えた値は設定を変えると既定へ戻る。
+        /// 例: 3 = 1+2・6 = 2+4・7 = 1+2+4。 走査線の濃さそのものは設定の「走査線」(0 で切)。 例: <c>UI.Game2D.Battle.QaBattle.ScanMode(3)</c></summary>
+        public static string ScanMode(int mode)
+        {
+            mode = Mathf.Clamp(mode, 0, 7);
+            Shader.SetGlobalFloat("_Game2DScanMode", mode);
+            return "scanMode=" + mode + " (" + (mode == 0 ? "今のまま" : ((mode & 1) != 0 ? "1 半ドットの縞 " : "") + ((mode & 2) != 0 ? "2 明るい所を弱める " : "") + ((mode & 4) != 0 ? "4 GUI の所を弱める" : "")).TrimEnd() + ")";
+        }
+
+        // ── ブルームを周りの明るさで変える試し (2026-11-17・作者「周りが明るい所はブルームを抑えたい」・見比べ用・保存しない) ──
+
+        /// <summary>ブルームの形: 0 = 旧い形 (絶対のしきい値) / 1 = 周りが明るい所ほど抑える / 2 = 周りより明るい分だけ光る (既定・2026-11-17〜・k 2.0・thr 0.08・広さ 1/16)。
+        /// 自動露出は形に関係なく止めてある (1 固定)。 既定は本体の Game2DLcdGhost.Default*。 例: <c>UI.Game2D.Battle.QaBattle.BloomMode(0)</c></summary>
+        public static string BloomMode(int mode)
+        {
+            Game2DLcdGhost.BloomMode = Mathf.Clamp(mode, 0, 2);
+            return BloomNow();
+        }
+
+        /// <summary>形 1 (抑える) の値: lo = 周りの輝度がここから下げ始める・hi = ここで消える (液晶の RT の値・リニア・0〜1)・level = 周りを測る広さ
+        /// (0 = 1/4 細かい / 1 = 1/8 / 2 = 1/16 広い・-1 = 今のまま)。 例: <c>UI.Game2D.Battle.QaBattle.BloomSuppress(0.10f, 0.35f, 2)</c></summary>
+        public static string BloomSuppress(float lo, float hi, int level = -1)
+        {
+            Game2DLcdGhost.SupLo = Mathf.Clamp01(lo); Game2DLcdGhost.SupHi = Mathf.Clamp01(Mathf.Max(hi, lo));
+            if (level >= 0) Game2DLcdGhost.SurLevel = Mathf.Clamp(level, 0, 2);
+            return BloomNow();
+        }
+
+        /// <summary>形 2 (周りより明るい分だけ) の値: しきい値 = thr + k × 周り。 level は <see cref="BloomSuppress"/> と同じ。 例: <c>UI.Game2D.Battle.QaBattle.BloomRelative(1.0f, 0.08f)</c></summary>
+        public static string BloomRelative(float k, float thr, int level = -1)
+        {
+            Game2DLcdGhost.RelK = Mathf.Max(0f, k); Game2DLcdGhost.RelThr = Mathf.Clamp01(thr);
+            if (level >= 0) Game2DLcdGhost.SurLevel = Mathf.Clamp(level, 0, 2);
+            return BloomNow();
+        }
+
+        /// <summary>今のブルームの形と値・自動露出 (「bloom=1 lo=0.10 hi=0.35 level=2 k=1.00 thr=0.08 exposure=1.00」)。</summary>
+        public static string BloomNow()
+        {
+            var g = Object.FindObjectOfType<Game2DLcdGhost>();
+            return $"bloom={Game2DLcdGhost.BloomMode} lo={Game2DLcdGhost.SupLo:0.00} hi={Game2DLcdGhost.SupHi:0.00} level={Game2DLcdGhost.SurLevel} k={Game2DLcdGhost.RelK:0.00} thr={Game2DLcdGhost.RelThr:0.00} exposure={(g != null ? g.Exposure : 1f):0.00}";
+        }
+
+        /// <summary>今の湾曲 (「curve=0.070 fit=0.00」)。</summary>
+        public static string LcdCurveNow() { var m = LcdMat(); return m == null ? "(液晶の材質が無い)" : $"curve={m.GetFloat("_Curve"):0.000} fit={m.GetFloat("_CurveFit"):0.00}"; }
+
+        /// <summary>イベントの画面の背景を、 どのイベントでも名指しの絵にする (Resources/Game2DBackdrops の名前・"ev_wave" など・null か "" で対応表どおりに戻す)。
+        /// 絵ごとに板と列に隠れる具合を撮る用。 先に <see cref="ShowEvent"/> で画面を出しておく。 戻り値 = 今出している絵の名前 (読めない名前なら層の絵になり、 警告が出る)。
+        /// 例: <c>UI.Game2D.Battle.QaBattle.EventBackdrop("ev_wave")</c></summary>
+        public static string EventBackdrop(string name)
+        {
+            UI.Game2D.EventScreenView.QaBackdrop = string.IsNullOrEmpty(name) ? null : name;
+            UI.Game2D.Game2DPhaseScreens.RequestRebuild();
+            var ev = EventSystem.EventEncounter.Instance != null ? EventSystem.EventEncounter.Instance.Current : null;
+            string bg = UI.Game2D.EventScreenView.BackdropName(ev);
+            if (BattleBackdrops.Load(bg) == null) Debug.LogWarning($"[QaBattle] 背景 {bg} を読めない");
+            return bg;
+        }
+
+        /// <summary>イベントの名前の一覧 (定義ファイルの順・「、」区切り)。 例: <c>UI.Game2D.Battle.QaBattle.EventNames()</c></summary>
+        public static string EventNames()
+        {
+            var sb = new System.Text.StringBuilder();
+            foreach (var e in EventSystem.EventDatabase.All) sb.Append(sb.Length > 0 ? "、" : "").Append(e.name);
+            return sb.ToString();
+        }
 
         /// <summary>自分の攻撃 (キー Space)。 family = sword / axe / dagger / shield (絵を流す) か null (手描き)。</summary>
         public static void DemoAttack(string family, bool crit, int dealt = 20)

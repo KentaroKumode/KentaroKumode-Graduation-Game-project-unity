@@ -8,14 +8,14 @@ namespace EventSystem
     ///
     /// <para>イベントの出現条件に札 (「重み[追跡]」など) を書くと、 今の状況で札の条件が立っている時だけ、
     /// 抽選の重み (稀 = 0.33・ふつう = 1) にこの倍率が掛かる。 札が複数なら掛け合わせ。
-    /// 条件の判定は汎用の状態 (補足・魔石の反応・明かした点の割合・素材の手持ち) だけを読み、 イベントの名前は見ない。</para>
+    /// 条件の判定は汎用の状態 (捕捉・魔石の反応・明かした点の割合・素材の手持ち) だけを読み、 イベントの名前は見ない。</para>
     ///
     /// <para>数値は全部仮置き・未測定 (イベントはまだ測定に戻していない)。 重みは乱数の消費本数を変えない
     /// (<see cref="EventDatabase.Pick"/> は重みに関わらず 2 本引く) ので、 同一シードのペア比較は保たれる。</para>
     /// </summary>
     public static class EventWeights
     {
-        /// <summary>追跡者を撒く・遠ざける系。 補足されている時ほど出やすい。</summary>
+        /// <summary>追跡者を撒く・遠ざける系。 捕捉されている時ほど出やすい。</summary>
         public const string TagPursuit = "追跡";
         /// <summary>地図を明かす系。 この層で明かした点が少ないほど出やすい。</summary>
         public const string TagMap = "地図";
@@ -23,10 +23,10 @@ namespace EventSystem
         public const string TagMaterial = "素材";
 
         // ── 追跡 ──
-        /// <summary>補足されている (追跡者・猟犬・使い魔に追われている) 時の倍率。</summary>
+        /// <summary>捕捉されている (追跡者・猟犬・使い魔に追われている) 時の倍率。</summary>
         public const float PursuitChasedMul = 3f;
-        /// <summary>補足はされていないが、 追跡者が魔石の反応する距離 (道で <see cref="FreeMapParams.StoneFar"/> 歩以内) に居る時の倍率。
-        /// 縄張りを出ない番人 (既定) では、 自分が縄張りの中に居る時だけ (外では補足されないので・2026-11-13)。</summary>
+        /// <summary>捕捉はされていないが、 追跡者が魔石の反応する距離 (道で <see cref="FreeMapParams.StoneFar"/> 歩以内) に居る時の倍率。
+        /// 縄張りを出ない番人 (既定) では、 自分が縄張りの中に居る時だけ (外では捕捉されないので・2026-11-13)。</summary>
         public const float PursuitNearMul = 2f;
 
         // ── 地図 ──
@@ -61,7 +61,7 @@ namespace EventSystem
                 {
                     if (sim == null || !sim.FoeAlive) return 1f;
                     if (sim.Eta().Valid) return PursuitChasedMul;
-                    // 補足されていないが近い: 補足は縄張りの中でしか起きないので、 縄張りの外に居る時は掛けない (2026-11-13・縄張りの番人)
+                    // 捕捉されていないが近い: 捕捉は縄張りの中でしか起きないので、 縄張りの外に居る時は掛けない (2026-11-13・縄張りの番人)
                     return sim.Stone().level >= 1 && !sim.OutsideFoeReach ? PursuitNearMul : 1f;
                 }
                 case TagMap:

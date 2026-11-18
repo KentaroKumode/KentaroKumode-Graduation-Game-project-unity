@@ -75,6 +75,8 @@ namespace AutoTest.ParallelSweep
         public int[] stormLayers = Array.Empty<int>();
         /// <summary>[計装 2026-11-14] 嵐の層の航行の判断 (10 列ずつ・列は AutoRunner.RunRec.stormNav と同じ。 第 2 巡で 5 → 10 列: ボスに入ったか・死んだ層も載る)。</summary>
         public int[] stormNav = Array.Empty<int>();
+        /// <summary>[計装 2026-11-18] 嵐の層の HP と物資の流れ (12 列ずつ・列は AutoRunner.RunRec.layerFlow と同じ)。</summary>
+        public int[] layerFlow = Array.Empty<int>();
         /// <summary>[計装 2026-11-10] ラン開始時に実際に入っていた整備パネルの段。</summary>
         public string metaRanks = "";
         /// <summary>[計装 2026-11-12] ラン開始時の職業 (lockWeaponFamily の測定では武器の家系)。</summary>
@@ -87,6 +89,10 @@ namespace AutoTest.ParallelSweep
         public bool ashBaseOpened;
         /// <summary>[計装 2026-11-14] 〈徒労〉の記録 (AutoRunner.RunRec と同じ意味): 掛かった通常の戦闘の勝ち・止めた品のドロップ・開けた宝箱・〈徒労〉で空だった宝箱。</summary>
         public int toilNothingBattles, toilBlockedDrops, chestsOpened, toilEmptyChests;
+        /// <summary>[計装 2026-11-17・引きの質] 入った店の棚 (AutoRunner.RunRec.shelves と同じ・最初の 8 回)。</summary>
+        public string[] shelves = Array.Empty<string>();
+        /// <summary>[計装 2026-11-17] ラン開始時に実際に効いていた方策の設定 (AutoRunner.PolicySignature)。</summary>
+        public string policySig = "";
 
         public static LearnRunRow From(AutoRunner.RunRec r)
         {
@@ -115,11 +121,13 @@ namespace AutoTest.ParallelSweep
                 mapVisit = r.mapVisit != null ? r.mapVisit.ToArray() : Array.Empty<int>(),
                 stormLayers = r.stormLayers != null ? r.stormLayers.ToArray() : Array.Empty<int>(),
                 stormNav = r.stormNav != null ? r.stormNav.ToArray() : Array.Empty<int>(),
+                layerFlow = r.layerFlow != null ? r.layerFlow.ToArray() : Array.Empty<int>(),
                 metaRanks = r.metaRanks ?? "",
                 startClass = r.startClass ?? "",
                 ashBase = r.ashBase, ashBaseRevisit = r.ashBaseRevisit, ashBaseChoice = r.ashBaseChoice, ashBaseTurn = r.ashBaseTurn,
                 ashBaseOpened = r.ashBaseOpened,
                 toilNothingBattles = r.toilNothingBattles, toilBlockedDrops = r.toilBlockedDrops, chestsOpened = r.chestsOpened, toilEmptyChests = r.toilEmptyChests,
+                shelves = r.shelves != null ? r.shelves.ToArray() : Array.Empty<string>(), policySig = r.policySig ?? "",
             };
         }
 
@@ -145,8 +153,23 @@ namespace AutoTest.ParallelSweep
                     escRises = c.escRises, instEsc = c.instEsc, downs = c.downs,
                     heavyHits = c.heavyHits, heavyTaken = c.heavyTaken, heavyMax = c.heavyMax,
                     stormIn = c.stormIn, stormPhase = c.stormPhase, stormInst = c.stormInst,
+                    maxTurnLanded = c.maxTurnLanded, maxTurnRequested = c.maxTurnRequested, held = c.held ?? Array.Empty<string>(),
+                    fin = c.fin ?? Array.Empty<int>(),
+                    lastCause = c.isFightEnd && !c.won ? (int)c.deathCause : -1,
+                    takenSrc = TakenSrc(c.playerDamageBySource),
                 };
             }
+            return a;
+        }
+
+        /// <summary>[計装 2026-11-18] 被ダメの出どころ (DeathCause の番号ごとの量・0 の末尾は詰める)。</summary>
+        private static int[] TakenSrc(System.Collections.Generic.Dictionary<ItemSystem.PassiveSkills.DeathCause, int> m)
+        {
+            if (m == null || m.Count == 0) return Array.Empty<int>();
+            int n = 0;
+            foreach (var kv in m) if (kv.Value != 0) n = Math.Max(n, (int)kv.Key + 1);
+            var a = new int[n];
+            foreach (var kv in m) if ((int)kv.Key >= 0 && (int)kv.Key < n) a[(int)kv.Key] = kv.Value;
             return a;
         }
 
@@ -201,6 +224,16 @@ namespace AutoTest.ParallelSweep
         public int heavyHits, heavyTaken, heavyMax;
         /// <summary>[計装 2026-11-14・嵐の航行] 戦闘が始まった時の嵐: -1 = 不安定化の時計の層でない / 0 = 嵐の外 / 1 = 嵐の中 (敵に〈嵐〉)。 と、 その時のフェーズ (0〜4)・不安定化の累計。</summary>
         public int stormIn = -1, stormPhase, stormInst;
+        /// <summary>[計装 2026-11-17・体験の物差し] 1 ターンに敵の HP を減らした量の最大 (入った量 / 要求した量・AutoRunner.CombatRec と同じ)。</summary>
+        public int maxTurnLanded, maxTurnRequested;
+        /// <summary>[計装 2026-11-17] ボス戦の開始時の持ち物 (ボス戦の終わりの行だけ・それ以外は空)。</summary>
+        public string[] held = Array.Empty<string>();
+        /// <summary>[計装 2026-11-18] 戦闘の終わりの診断 (10 列・AutoRunner.CombatRec.fin と同じ)。</summary>
+        public int[] fin = Array.Empty<int>();
+        /// <summary>[計装 2026-11-18] 負けた戦闘のとどめの出どころ (ItemSystem.PassiveSkills.DeathCause の番号・勝った戦闘と途中の段は −1)。</summary>
+        public int lastCause = -1;
+        /// <summary>[計装 2026-11-18] この戦闘の被ダメの出どころ別の量 (DeathCause の番号が添字・CombatManager.BuildDamageBreakdown)。</summary>
+        public int[] takenSrc = Array.Empty<int>();
     }
 
     [Serializable]
@@ -534,10 +567,12 @@ namespace AutoTest.ParallelSweep
                 "toilDamageDownPct",
                 // 2026-11-14: 航行が〈徒労〉を読むか (True = 既定・持っている間 通常の戦闘の点は報酬なし・False = 旧い動き)
                 "navToilAware",
-                // 2026-11-14 (#140 の 2): 航行が嵐を読むか (False = 既定・旧い動き / True = 隠れたボスを探す・取る代償・値で切り上げ・嵐の HP を道の費用に)
+                // 2026-11-14 (#140 の 2): 航行が嵐を読むか (False = 旧い動き / True = 隠れたボスを探す・取る代償・値で切り上げ・嵐の HP を道の費用に)。 2026-11-18〜 既定 True (測定の基準 T2)
                 "navStormAware",
-                // 2026-11-14 (#140 の 2 第 2 巡): 嵐の航行の直し (道の死・嵐の中の戦闘の見積もり・戦闘の死・嵐の HP の重みの倍率)。 False / 1 = 第 1 巡と同じ
+                // 2026-11-14 (#140 の 2 第 2 巡): 嵐の航行の直し (道の死・嵐の中の戦闘の見積もり・戦闘の死・嵐の HP の重みの倍率)。 False / 1 = 第 1 巡と同じ。 2026-11-18〜 3 つとも既定 True (T2)
                 "navStormExitDeath", "navStormFightModel", "navStormFightDeath", "navStormHpWeightMul",
+                // 2026-11-18 (嵐の原因調査): 上限の見当の口 (ボスの位置を知る) と、 計画の 1 点の値段 (既定 false / 0 = 今までと同じ)
+                "navStormOracleBoss", "navStormPointPrice", "navStormExitAtPts",
                 // 2026-11-14: ボスの機構の値の差し替え (id:名前:値・灰燼の王の予兆 JudgmentDice / 憤怒 FuryAttack / 再生 RegrowthRate)。
                 //   灰燼の王の基礎の攻撃・最大 HP は上の enemyAttackSpec / enemyHpSpec (boss_layer6:N)。 足りなかった enemyHpMul も並べる
                 "bossParamSpec", "enemyHpMul",
@@ -545,6 +580,11 @@ namespace AutoTest.ParallelSweep
                 "v3.oldNoAttackBaseDmg",
                 // 2026-11-12 (#134): Optimal の配線のミスの率 (0 = ミスなし・Super と素朴版は経路を通らない)
                 "optimalMistakeRate",
+                // 2026-11-17 (体験の物差し): 知識の段・アブレーションの口と、 腕ごとに振る序列の段・価格の差し引き。
+                //   Super が Begin で立てる物 (v3 の各スイッチ) はここでは Begin の前の値なので、 ランの記録の policySig (Begin の後) で確かめる。
+                "combatNaive", "ablateShop", "ablateShopScore", "ablateEvent", "ablateFreeNav",
+                "optimalBuyTiers", "superBuyTiers", "ittPriceK", "superIttPriceK", "superOwnItt",
+                "v3.superDefense", "v3.superConsumables", "v3.superNav", "v3.macroPlan", "v3.phase3Ranked",
             };
             var sb = new System.Text.StringBuilder();
             foreach (string name in watched)

@@ -39,20 +39,10 @@ namespace UI.Game2D
         private string[] _idByIndex;
         private int _idFloor = -1;
 
-        /// <summary>画面の位置 (GUI の dot) → 液晶の絵 (480×270 のバッファ) の dot。 液晶は樽型に湾曲している (Game2D/LcdScreen の <c>_Curve</c>) ので、
-        /// 見えている位置と絵の位置がずれる。 シェーダと同じ式 「元 = 中心 × (1 + k·r²) / (1 + 2k)」 で、 見えている点が絵のどこを映しているかを求める
+        /// <summary>画面の位置 (GUI の dot) → 液晶の絵 (480×270 のバッファ) の dot。 液晶は樽型に湾曲している (Game2D/LcdScreen の <c>_Curve</c>・<c>_CurveFit</c>) ので、
+        /// 見えている位置と絵の位置がずれる。 式は <see cref="Game2DPointer.LcdDot(Transform, Vector2)"/> の 1 か所 (シェーダと同じ式)
         /// (点の表示と当たり判定を合わせる)。 GUI (パネル・入れ物) は湾曲しないので、 こちらは地図の点にだけ使う。</summary>
-        private Vector2 ScreenToMapDot(Vector2 d)
-        {
-            float k = 0f;
-            if (lcdQuad != null) { var mr = lcdQuad.GetComponent<MeshRenderer>(); if (mr != null && mr.sharedMaterial != null && mr.sharedMaterial.HasProperty("_Curve")) k = mr.sharedMaterial.GetFloat("_Curve"); }
-            if (k <= 0f) return d;
-            // 画面の uv (上 = 1): c = uv × 2 − 1
-            float cx = d.x / W * 2f - 1f, cy = (1f - d.y / H) * 2f - 1f;
-            float r2 = cx * cx + cy * cy, f = (1f + k * r2) / (1f + 2f * k);
-            float sx = cx * f, sy = cy * f;                              // 絵の uv (−1..1)
-            return new Vector2((sx * 0.5f + 0.5f) * W, (1f - (sy * 0.5f + 0.5f)) * H);
-        }
+        private Vector2 ScreenToMapDot(Vector2 d) => Game2DPointer.LcdDot(lcdQuad, d);
 
         private void ZoomTo(int z)
         {
@@ -86,7 +76,8 @@ namespace UI.Game2D
             if (wheel != 0f && inside && Time.unscaledTime - _wheelAt >= 0.14f) { _wheelAt = Time.unscaledTime; ZoomTo(_zoom + (wheel > 0 ? 1 : -1)); }
 
             bool consumes = inside && ((panel != null && panel.Consumes(d.x, d.y)) || Game2DNavExtras.Consumes(d));      // ボタン・計器の上のクリックは地図へ渡さない
-            var dm = ScreenToMapDot(d);                                  // 地図の点の判定は、 湾曲を戻した位置で行う
+            // 地図の点の判定は、 湾曲を戻した位置で行う。 GUI を液晶の中身として合成している間 (既定) は TryDot が戻し済み (2026-11-16)・旧い提示の板の時だけここで戻す
+            var dm = Game2DGuiRt.InLcd ? d : ScreenToMapDot(d);
 
             // ドラッグ (拡大中・ボタンの上でないところから)
             var mp = (Vector2)Input.mousePosition;

@@ -49,11 +49,11 @@ namespace AutoTest
         static float ConsumablePrice(RunState run) => PRICE_CONSUMABLE * Prog(run);
 
         // ===== ターンを使う選択肢 (2026-11-11・issue #17) =====
-        /// <summary>補足されていない時の 1 ターンの値段。 巡回中の追跡者がいる層は、 その場に留まると通りかかられる見込みがある。</summary>
+        /// <summary>捕捉されていない時の 1 ターンの値段。 巡回中の追跡者がいる層は、 その場に留まると通りかかられる見込みがある。</summary>
         const float V_TURN_FOE_PATROL = -1.0f;
         /// <summary>追跡者のいない層 (または倒した後) の 1 ターン。 天候の前線が進むだけ。</summary>
         const float V_TURN_NO_FOE     = -0.3f;
-        /// <summary>補足されているが、 使うターンの間には捕まらない時の 1 ターン (距離が詰まる)。</summary>
+        /// <summary>捕捉されているが、 使うターンの間には捕まらない時の 1 ターン (距離が詰まる)。</summary>
         const float V_TURN_CHASED     = -3.0f;
         /// <summary>使うターンの間に捕まる: 追跡者 (本体・猟犬) との戦闘。 勝てば物資 +6 とアイテムが入るので、 エリートの戦闘より少し軽く見る。</summary>
         const float V_CAUGHT_BODY     = -18.0f;
@@ -61,6 +61,27 @@ namespace AutoTest
         const float V_CAUGHT_FAMILIAR = -8.0f;
         /// <summary>時限バフ / デバフ: 消耗品の半分 (多くは次の 1 戦闘だけ効く)。</summary>
         const float TIMED_VS_CONSUMABLE = 0.5f;
+
+        // ===== イベントの「悪い行い」の罰の時限デバフ (2026-11-16・作者の決定) =====
+        //  上の「消耗品の半分」は〈感傷〉が 1 戦闘だった頃の値 (= 1 戦闘・全部の出目 −1 を 1 とする)。 3 つは
+        //  重さ (1 戦闘あたり・〈感傷〉1 戦闘 = 1) × 続く戦闘の数 (TimedEffectRegistry の既定の数 = 本体と同じ) を掛ける。 ほかの時限デバフは 1 のまま。
+        /// <summary>〈感傷〉1 戦闘の重さ (基準)。 全部の出目 −1 (下限 1) = 1 ターン 3 個で出目の合計 −3 前後。</summary>
+        const float W_SENTIMENT_PER_FIGHT = 1.0f;
+        /// <summary>〈罪悪感〉1 戦闘の重さ。 防御に挿した出目だけ −2 (下限 0)。 防御に挿すのはおおむね 3 個のうち 1 個 (守りのターンで 2 個) なので
+        /// 1 ターン −2〜−4 で〈感傷〉と並ぶが、 攻撃・充電は削らず、 挿し先を攻撃へ寄せて避けられる。 〈感傷〉の 0.7。</summary>
+        const float W_GUILT_PER_FIGHT = 0.7f;
+        /// <summary>〈無力感〉1 戦闘の重さ。 振り直しの費用 +1 (充電)。 BOT の振り直しは 1 ターン高々 1 回で、 振らないターンには効かない
+        /// (1 戦闘で充電 2〜4 ほど・充電 1 の効用は配線評価の 1.2 = 出目 1 よりやや上)。 出目を直接削る〈感傷〉より軽く 0.3。</summary>
+        const float W_HELPLESS_PER_FIGHT = 0.3f;
+
+        /// <summary>時限デバフの重み (消耗品の半分を 1 とする)。 3 つは 1 戦闘の重さ × 続く戦闘の数・ほかは 1 (旧い値付けのまま)。</summary>
+        static float TimedDebuffWeight(string id)
+        {
+            float per = id == EventSystem.TimedEffects.TimedDebuffRule.SentimentName ? W_SENTIMENT_PER_FIGHT
+                      : id == EventSystem.TimedEffects.TimedDebuffRule.GuiltName     ? W_GUILT_PER_FIGHT
+                      : id == EventSystem.TimedEffects.TimedDebuffRule.HelplessName  ? W_HELPLESS_PER_FIGHT : -1f;
+            return per < 0f ? 1f : per * EventSystem.TimedEffects.TimedEffectRegistry.GetDefaultCharges(id);
+        }
         const float V_GAIN_FLAG  = +30.0f;
         const float V_DISC_FLAG  = -22.0f;
         const float V_ARMOR_DUR  = -3.5f;
@@ -291,7 +312,7 @@ namespace AutoTest
                     return V_ARMOR_DUR;
 
                 case EventEffectType.TimedBuff:    return  TIMED_VS_CONSUMABLE * ConsumablePrice(run);
-                case EventEffectType.TimedDebuff:  return -TIMED_VS_CONSUMABLE * ConsumablePrice(run);
+                case EventEffectType.TimedDebuff:  return -TIMED_VS_CONSUMABLE * ConsumablePrice(run) * TimedDebuffWeight(e.param);
                 case EventEffectType.PermanentDebuff: return -PassivePrice(run);
 
                 case EventEffectType.GainPassiveItem:
@@ -404,10 +425,10 @@ namespace AutoTest
         const float V_SCOUT_POINT = 0.05f;
         /// <summary>補給の場所が分かる: まだ分かっていない店・休憩 1 つ = 1 歩 (物資 1)。</summary>
         const float V_SUPPLY_POINT = 1.0f;
-        /// <summary>追跡者を撒く (補足中): 捕まる見込みの 6 割を消す。 補足されていなくても近い時は少し。</summary>
+        /// <summary>追跡者を撒く (捕捉中): 捕まる見込みの 6 割を消す。 捕捉されていなくても近い時は少し。</summary>
         const float V_SHAKE_CHASED = 0.6f;
         const float V_SHAKE_NEAR = 2.0f;
-        /// <summary>追跡者を遠ざける: 補足中は 1 歩 = 補足中の 1 ターンぶん (V_TURN_CHASED)、 巡回中は 1 歩 0.3。</summary>
+        /// <summary>追跡者を遠ざける: 捕捉中は 1 歩 = 捕捉中の 1 ターンぶん (V_TURN_CHASED)、 巡回中は 1 歩 0.3。</summary>
         const float V_PUSH_PATROL = 0.3f;
         /// <summary>前線 1 段 (= 5 ターンぶんの前線の進み) = 物資 0.5。 今いる所に前線が届いていれば倍。</summary>
         const float V_FRONT_STEP = 0.5f;
@@ -459,7 +480,7 @@ namespace AutoTest
                 float hpPct = run != null ? (float)run.playerHP / UnityEngine.Mathf.Max(1, run.playerMaxHP) : 1f;
                 return -V_CAUGHT_BODY * V_SHAKE_CHASED * (hpPct < 0.65f ? 1.8f : 1f);
             }
-            // 補足は縄張りの中でしか起きない (2026-11-13・縄張りの番人): 縄張りの外に居れば「近い」は撒く理由にならない
+            // 捕捉は縄張りの中でしか起きない (2026-11-13・縄張りの番人): 縄張りの外に居れば「近い」は撒く理由にならない
             return sim.Stone().level >= 1 && !sim.OutsideFoeReach ? V_SHAKE_NEAR : 0f;
         }
 
@@ -479,13 +500,13 @@ namespace AutoTest
             if (sim.Eta().Valid) return V_TURN_CHASED * steps;
             int d = sim.HopsFrom(sim.Me)[sim.FoeNode];
             int after = d == int.MaxValue ? int.MaxValue : UnityEngine.Mathf.Max(1, d - steps);
-            // 補足される距離まで来るなら、 捕まる見込みの半分 (補足されても逃げ切れることがある)
+            // 捕捉される距離まで来るなら、 捕まる見込みの半分 (捕捉されても逃げ切れることがある)
             if (after <= sim.DetectHops) return 0.5f * V_CAUGHT_BODY;
             return V_TURN_FOE_PATROL * steps;
         }
 
         /// <summary>近道+N (2026-11-12 に作り替え): この後の移動 N 回ぶん、 物資を使わずターンも進まない。
-        /// 1 回 = 物資 1 の値段 + 1 ターンぶんの値段 (ターンを使う時の値段の符号を返したもの: 補足中 3・巡回中 1・追跡者なし 0.3。
+        /// 1 回 = 物資 1 の値段 + 1 ターンぶんの値段 (ターンを使う時の値段の符号を返したもの: 捕捉中 3・巡回中 1・追跡者なし 0.3。
         /// 縄張りを出ない番人で自分が縄張りの外なら、 追跡者なしと同じ 0.3)。
         /// 層を出たら残りは消えるので、 数えるのは終点までの歩数まで。</summary>
         private static float ScoreShortcut(int steps, RunState run)
@@ -517,7 +538,7 @@ namespace AutoTest
         }
 
         /// <summary>その場で N ターンを使う値段 (2026-11-11・issue #17)。 本体と同じ見込み (<see cref="EventEncounter.CatchEtaNow"/>・
-        /// 補足中に「留まったら何ターンで捕まるか」) を読む。 **捕まるなら戦闘 1 回ぶん**、 捕まらないなら 1 ターンごとの小さな値段。</summary>
+        /// 捕捉中に「留まったら何ターンで捕まるか」) を読む。 **捕まるなら戦闘 1 回ぶん**、 捕まらないなら 1 ターンごとの小さな値段。</summary>
         private static float ScoreTurns(int turns)
         {
             if (turns <= 0) return 0f;

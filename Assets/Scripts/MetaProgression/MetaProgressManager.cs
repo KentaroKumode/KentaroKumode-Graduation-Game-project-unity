@@ -187,6 +187,7 @@ namespace MetaProgression
             State.SetRank(kind, cur + 1);
             OnStateChanged?.Invoke();
             Save();
+            Achievements.AchievementService.NotePanelAssigned(State);   // 実績〈整備完了〉
             return true;
         }
 

@@ -69,6 +69,16 @@ namespace UI.Lcd
 
             Vector2 uv = hit.textureCoord; // MeshCollider のみ有効
             if (uv.x < 0f || uv.x > 1f || uv.y < 0f || uv.y > 1f) return null;
+            // 液晶は樽型に湾曲している (Game2D/LcdScreen): 面の uv = 見えている位置なので、 湾曲を戻した絵の uv にする (2026-11-16・式は Game2DPointer.LcdDot の 1 か所)。
+            //   今までは戻していなかったので、 タイトル・職業選択のボタンの当たりが湾曲の分だけずれていた
+            {
+                var r = surfaceCollider.GetComponent<MeshRenderer>(); var m = r != null ? r.sharedMaterial : null;
+                float k = m != null && m.HasProperty("_Curve") ? m.GetFloat("_Curve") : 0f, fit = m != null && m.HasProperty("_CurveFit") ? m.GetFloat("_CurveFit") : 0f;
+                const float W = UI.Game2D.Game2DLayout.Width, H = UI.Game2D.Game2DLayout.Height;
+                var d = UI.Game2D.Game2DPointer.LcdDot(new Vector2(uv.x * W, (1f - uv.y) * H), k, fit);
+                uv = new Vector2(d.x / W, 1f - d.y / H);
+                if (uv.x < 0f || uv.x > 1f || uv.y < 0f || uv.y > 1f) return null;      // 絵の外 (四隅の楔)
+            }
 
             // ② UV → コンテンツカメラの描画先(RT)ピクセル座標。 RT-target カメラの pixelWidth/Height は RT 解像度。
             float px = uv.x * contentCamera.pixelWidth;

@@ -60,7 +60,7 @@ namespace UI.Game2D
         public bool jp;
         /// <summary>題の下に出す本文 (イベントの文・結果の記録など)。 jp のときだけ。</summary>
         public string body;
-        /// <summary>本文の最大行数。 超えた行は描かない ── 長い文は呼ぶ側が頁に割る (<see cref="JpTextLayout.Pages"/>・イベントは <see cref="EventPaging"/>)。</summary>
+        /// <summary>本文の最大行数。 超えた行は描かない ── 長い文は呼ぶ側が頁に割る (<see cref="JpTextLayout.Pages"/>)。</summary>
         public int bodyLines = 5;
         /// <summary>題の行の右端に暗い字で出す頁の位置 (「2/4」など・jp のときだけ・2026-11-13)。 null は出さない。</summary>
         public string pageMark;
@@ -115,7 +115,9 @@ namespace UI.Game2D
 #endif
 
         /// <summary>窓が出ている (閉じる途中も含む) か、 手引きの板 (<see cref="Game2DTutorial"/>) が出ている間 true。 後ろの画面 (地図・戦闘・帯) はこれを見て手を止める。</summary>
-        public static bool Active { get => _active || Game2DTutorial.Blocking; private set => _active = value; }
+        /// <remarks>イベントの画面 (<see cref="Game2DEventScreen"/>・2026-11-16〜 液晶の中身として描く) を出している間も true (窓で出していた時と同じく後ろを止める)。
+        /// ギャラリーの画面 (<see cref="Game2DGalleryScreen"/>・2026-11-17) を出している間と閉じたフレームも true (Esc で入口 → タイトルへ戻った同じ Esc で設定の窓を開かない)。</remarks>
+        public static bool Active { get => _active || Game2DTutorial.Blocking || Game2DEventScreen.Showing || Game2DGalleryScreen.Blocking; private set => _active = value; }
         private static bool _active;
         /// <summary>窓だけが出ているか (手引きの板を数えない・手引きが「窓が出ていない時」を見分けるのに使う)。</summary>
         public static bool WindowActive => _active;
@@ -412,7 +414,7 @@ namespace UI.Game2D
         private static int BodyLinesOf(ScreenDef d)
             => string.IsNullOrEmpty(d.body) ? 0 : Mathf.Min(d.bodyLines, Game2DJpFont.Lines(d.body, ModalJpMetrics.BodyW(d.w)).Count);
 
-        /// <summary>式は <see cref="ModalJpMetrics"/> の 1 か所 (検算 Tools/event_page_check と同じ)。</summary>
+        /// <summary>式は <see cref="ModalJpMetrics"/> の 1 か所 (検算 Tools/inventory_check と同じ)。</summary>
         private static int AutoHeightJp(ScreenDef d)
         {
             int cols = Mathf.Max(1, d.cols), rows = (d.Items.Count + cols - 1) / cols;

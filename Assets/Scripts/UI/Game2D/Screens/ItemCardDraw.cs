@@ -21,10 +21,10 @@ namespace UI.Game2D
             else if (!string.IsNullOrEmpty(c.glyph))
             {
                 int gw = Game2DJpFont.Width(c.glyph);
-                var col = c.kind == ItemCardInfo.Kind.FacePart ? Game2DKit.Ivory : Game2DKit.Ink;
+                var col = c.kind == ItemCardInfo.Kind.Dice ? Game2DKit.Ivory : Game2DKit.Ink;
                 Game2DJpFont.Draw(p, c.glyph, x + 1 + (I - gw) / 2, y + 1 + (I - Game2DJpFont.Cell) / 2 - (c.pips > 0 ? 1 : 0), col);
             }
-            if (c.pips > 0)          // 出目パーツの段: 下の辺に点を段の数だけ
+            if (c.pips > 0)          // 下の辺に点を pips の数だけ
                 for (int k = 0; k < c.pips; k++) p.Rect(x + 1 + (I - (c.pips * 3 - 1)) / 2 + k * 3, y + S - 4, 2, 2, Game2DKit.Gold);
             var fr = c.rarity >= 0 ? Game2DKit.RarityFrame((ItemSystem.ItemRarity)c.rarity) : null;
             if (fr != null)

@@ -17,7 +17,7 @@ namespace UI.Codex
     /// カテゴリ分け（4種）:
     ///   ① 第五層 (end1: 5層本ボス・英雄の帰還)
     ///   ② 第五層裏 (end2: 5裏・無明の剣)
-    ///   ③ 第六層 (end3: 6ボス・空の玉座)
+    ///   ③ 第六層 (end3: 6ボス・灰の玉座)
     ///   ④ 終層 (end4 最後の見出し + end5 シグナル・リターン + capstone)
     ///
     /// ナビ: 数字キー1-4 でカテゴリ切替、 矢印UP/DOWN でヴィネット切替、 ホイールで本文スクロール、 ESC で閉じる
@@ -137,9 +137,16 @@ namespace UI.Codex
             _wired = false;
         }
 
-        /// <summary>タイトルの「GALLERY」。 Game2D の記録の窓 (<see cref="Game2D.Game2DCodexPanel"/>・未解禁は伏せ字) を開く (2026-11-11〜)。
-        /// 窓が開けない環境 (Game2D の GUI が無い) でだけ、 この旧い閲覧画面 (TMP・debugUnlockAll で全部読める) を開く。</summary>
-        private void HandleGalleryClick() { if (_mode != Mode.Closed) return; if (Game2D.Game2DCodexPanel.Open()) return; Open(); }
+        /// <summary>タイトルの「GALLERY」。 Game2D のギャラリーの画面 (<see cref="Game2D.Game2DGalleryScreen"/>・入口 → 品・本・実績・2026-11-17〜) を開く。
+        /// 開けない環境 (Game2D が無い) でだけ、 この旧い閲覧画面 (TMP・debugUnlockAll で全部読める) を開く。
+        /// ほかの窓が出ている・ギャラリーが既に出ている時は何もしない。</summary>
+        private void HandleGalleryClick()
+        {
+            if (_mode != Mode.Closed || Game2D.Game2DGalleryScreen.Showing || Game2D.Game2DModal.Active) return;
+            if (Game2D.Game2DGalleryScreen.Open()) return;
+            if (FindObjectOfType<Game2D.Game2DGalleryScreen>() != null) return;      // Game2D はあるが今は開けない (タイトルでない など)
+            Open();
+        }
 
         // ----------------------------------------------------------------
         //  Open / Close

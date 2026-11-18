@@ -269,7 +269,7 @@ namespace EventSystem
                     // 〈灰に埋もれた基地・再訪〉の「手記の最後の頁を開く」(2026-11-13)。 〈決意〉が無いラン (起きないはず) では何もしない
                     if (GameLoop.ConvictionSystem.RevealTruthInLayer6(run))
                     {
-                        MetaProgression.Achievements.AchievementService.NoteFinalPageOpened();
+                        // (実績〈最後の頁〉は 2026-11-17 に〈裂け目の縁〉(5 層へ降りる) へまとめた・docs/GAME.md §24)
                         result.log.Add($"〈{GameLoop.ConvictionSystem.IdResolve}〉が〈{GameLoop.ConvictionSystem.IdTruth}〉に変わった（七層へ進める）");
                     }
                     break;
@@ -549,6 +549,7 @@ namespace EventSystem
                 case GameLoop.ConvictionSystem.IdConviction:
                 {
                     GameLoop.ConvictionSystem.OnFirstAcquired(run);
+                    MetaProgression.Achievements.AchievementService.NoteConvictionChainDone();   // 実績〈根拠は要らない〉 (災厄の予兆で〈根拠のない確信〉を得た = 連鎖の 3 つ目)
                     result.log.Add("根拠のない確信が芽吹いた (確信段階1)。エリート撃破毎に成長する。");
                     break;
                 }

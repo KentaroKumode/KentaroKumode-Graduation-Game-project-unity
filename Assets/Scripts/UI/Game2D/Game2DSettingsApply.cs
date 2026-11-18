@@ -7,7 +7,7 @@ namespace UI.Game2D
     /// 設定 (<see cref="GameSettings"/>) を実際に効かせる係 (#85・2026-11-11)。 実行時に 1 つ作り、 シーンを跨いで残る。
     /// <list type="bullet">
     /// <item>音: メイン = <c>AudioListener.volume</c>・SE = <see cref="Game2DSfx.Volume"/>・BGM = <see cref="TitleBgm"/> が自分で読む。</item>
-    /// <item>液晶の Quad (Game2D/LcdScreen): 走査線 <c>_Scan</c>・湾曲 <c>_Curve</c>・色収差 <c>_Chroma</c>・フィルムの粒 <c>_Grain</c>。
+    /// <item>液晶の Quad (Game2D/LcdScreen): 走査線 <c>_Scan</c>・湾曲 <c>_Curve</c>・色収差 <c>_Chroma</c>・フィルムの粒 <c>_Grain</c>・ブルーム <c>_Bloom</c> と <c>_Halo</c> (2026-11-17)。
     ///   アセットのマテリアルは書き換えず、 <b>実行時の複製</b>を Quad に付けて、 そこへ「元の値 × 倍率」を入れる。
     ///   MaterialPropertyBlock にしないのは、 地図の入力 (Game2DMapView.Input) が湾曲を sharedMaterial から読んでクリック位置を直すため ──
     ///   複製を sharedMaterial にすれば、 湾曲を変えてもクリックの位置がずれない。</item>
@@ -40,14 +40,28 @@ namespace UI.Game2D
 
         // 液晶の Quad
         private Renderer _lcd; private Material _lcdMat;
-        private float _scan0, _curve0, _chroma0, _grain0;
+        private float _scan0, _curve0, _chroma0, _grain0, _bloom0, _halo0;
         // 横線ノイズ
         private Game2DLcdNoise _noise; private float _gain0;
         // 外枠の仕上げ
         private Graphic _fx; private Material _fxMat; private float _vig0;
 
+        /// <summary>液晶の湾曲の外形の合わせ方 (Game2D/LcdScreen の <c>_CurveFit</c>)。 1 = 縁の中央を絵の端に合わせる (絵の外形が樽型・2026-11-16 作者の決定)。
+        /// シェーダの既定も 1 だが、 アセットの材質 (git 管理外) が試作の頃の 0 を持っていても既定になるよう、 実行時の複製へここで入れる。 置き場はこの 1 か所。
+        /// 見比べは QA の口 <c>QaBattle.LcdCurveFit(0)</c> (設定を変えるとここの値へ戻る)。</summary>
+        public const float CurveFit = 1f;
+
+        /// <summary>走査線の形 (Game2D/LcdScreen のグローバル <c>_Game2DScanMode</c>・ビットの組: 1 = 半ドットの縞 / 2 = 明るい所ほど弱める / 4 = GUI の所を弱める)。
+        /// <b>既定 3 = 1+2</b> (2026-11-17・作者の決定: Full HD の実機で、 字の行ごとの明るさのばらつきが 15.9 → 7.4 に減った)。 4 は GUI の窓の場面で後で見比べる。
+        /// 置き場はこの 1 か所。 見比べは QA の口 <c>QaBattle.ScanMode(n)</c> (設定を変えるとここの値へ戻る)。 縞の濃さは設定の「走査線」(0 なら形に関係なく縞は出ない)。
+        /// 描くだけの値なので、 バッチ (画面なし)・BOT の測定には関わらない (この部品はバッチでは作らない)。</summary>
+        public const int ScanMode = 3;
+        private static readonly int ScanModeId = Shader.PropertyToID("_Game2DScanMode");
+        private static readonly int CurveFitId = Shader.PropertyToID("_CurveFit");
+
         private static readonly int ScanId = Shader.PropertyToID("_Scan"), CurveId = Shader.PropertyToID("_Curve"), ChromaId = Shader.PropertyToID("_Chroma"),
-            GrainId = Shader.PropertyToID("_Grain"), VigId = Shader.PropertyToID("_Vignette"), BrightId = Shader.PropertyToID("_Bright");
+            GrainId = Shader.PropertyToID("_Grain"), VigId = Shader.PropertyToID("_Vignette"), BrightId = Shader.PropertyToID("_Bright"),
+            BloomId = Shader.PropertyToID("_Bloom"), HaloId = Shader.PropertyToID("_Halo");
 
         private void OnDestroy()
         {
@@ -78,6 +92,7 @@ namespace UI.Game2D
                     var src = r.sharedMaterial;
                     if (_lcdMat != null) Destroy(_lcdMat);
                     _scan0 = src.GetFloat(ScanId); _curve0 = src.GetFloat(CurveId); _chroma0 = src.GetFloat(ChromaId); _grain0 = src.GetFloat(GrainId);
+                    _bloom0 = src.GetFloat(BloomId); _halo0 = src.GetFloat(HaloId);
                     _lcdMat = new Material(src) { name = src.name + " (settings)" };
                     r.sharedMaterial = _lcdMat; _lcd = r; found = true;
                 }
@@ -103,16 +118,34 @@ namespace UI.Game2D
             return found;
         }
 
+        /// <summary>マウスの当たり (Game2DPointer.LcdDot) が読む材質 (Game2DScreen.lcdQuad の材質) が、 描く材質 (_lcdMat) と別物なら同じ湾曲を写す
+        /// (ふつうは同じ Quad なので何もしない)。 見た目と当たりがずれないように。</summary>
+        private void SyncPointerMaterial()
+        {
+            var sc = FindObjectOfType<Game2DScreen>();
+            var mr = sc != null && sc.lcdQuad != null ? sc.lcdQuad.GetComponent<MeshRenderer>() : null;
+            var pm = mr != null ? mr.sharedMaterial : null;
+            if (pm == null || pm == _lcdMat || !pm.HasProperty(CurveFitId)) return;
+            pm.SetFloat(CurveId, _lcdMat.GetFloat(CurveId)); pm.SetFloat(CurveFitId, _lcdMat.GetFloat(CurveFitId));
+        }
+
         private void Apply()
         {
+            Shader.SetGlobalFloat(ScanModeId, ScanMode);      // 走査線の形の既定 (グローバル・液晶の材質が見つかる前から効く)
             AudioListener.volume = GameSettings.Master01;
             Game2DSfx.Volume = GameSettings.Se01;
             if (_lcdMat != null)
             {
                 _lcdMat.SetFloat(ScanId, Mathf.Clamp01(_scan0 * GameSettings.FxScale(GameSettings.Key.Scan)));
                 _lcdMat.SetFloat(CurveId, Mathf.Clamp(_curve0 * GameSettings.FxScale(GameSettings.Key.Curve), 0f, 0.2f));
+                if (_lcdMat.HasProperty(CurveFitId)) _lcdMat.SetFloat(CurveFitId, CurveFit);
+                SyncPointerMaterial();
                 _lcdMat.SetFloat(ChromaId, Mathf.Clamp(_chroma0 * GameSettings.FxScale(GameSettings.Key.Chroma), 0f, 0.02f));
                 _lcdMat.SetFloat(GrainId, Mathf.Clamp(_grain0 * GameSettings.FxScale(GameSettings.Key.Noise), 0f, 0.3f));
+                // ブルーム (2026-11-17): 面の光 _Bloom と縁の光 _Halo に倍率を掛ける (50 → ×1 = 今の値そのまま・0 → 両方 0 = 光らない)。 周りの明るさでの抑え方 (Game2DLcdGhost の形・k・thr) は変えない
+                float bs = GameSettings.FxScale(GameSettings.Key.Bloom);
+                _lcdMat.SetFloat(BloomId, Mathf.Clamp01(_bloom0 * bs));
+                _lcdMat.SetFloat(HaloId, Mathf.Clamp01(_halo0 * bs));
             }
             if (_noise != null) _noise.gain = _gain0 * GameSettings.FxScale(GameSettings.Key.Noise);
             if (_fxMat != null)

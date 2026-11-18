@@ -37,12 +37,26 @@ namespace MetaProgression
         /// <summary>着いたことのある層 (Run.Depth)。</summary>
         public List<int> codexFloors = new List<int>();
 
-        // === Achievements (docs/achievements.md) ===
+        // === 実績 (docs/GAME.md §15-6・正本は Achievements/AchievementCatalog.cs) ===
         // Parallel lists keep JsonUtility compatibility. IDs are stable strings.
         public List<string> unlockedAchievementIds = new List<string>();
         public List<long> achievementUnlockUtcTicks = new List<long>();
         public int achievementCombatWins;
         public int achievementRoleMask;
+        /// <summary>[実績] 倒したことのある 2 層 (深さ 3) のボスの id (三つの玉座・ランを跨いで数える)。 書くのは AchievementService だけ。</summary>
+        public List<string> achievementLayer2Bosses = new List<string>();
+        /// <summary>[実績] 背負って 3 層のボスを倒した「大罪:○○」の種類 (ChallengeCards の kind・七つの重荷)。</summary>
+        public List<string> achievementSinsCarried = new List<string>();
+        /// <summary>[実績] エリートを倒した数 (精鋭狩り)。</summary>
+        public int achievementEliteKills;
+        /// <summary>[実績] 選択肢を選んで終えたイベントの数 (寄り道の常連)。</summary>
+        public int achievementEventsDone;
+        /// <summary>[実績] 出会ったイベントの名前 (EventDefinition.name・旅の目録)。</summary>
+        public List<string> achievementEventsSeen = new List<string>();
+        /// <summary>[実績] 受けた挑戦カードのバフの種類 (ChallengeCards の kind・品揃え)。</summary>
+        public List<string> achievementBuffsTaken = new List<string>();
+        /// <summary>[実績] 最後の段 (T4+) まで鍛えた武器の家系 (items.json の family・四つの得物)。</summary>
+        public List<string> achievementWeaponFamiliesMaxed = new List<string>();
 
         // (旧: 挑戦デバフの配点 `challenge` (§15-2) は 2026-11-10 に撤去 (#9)。 JsonUtility は未知の欄を黙って捨てる)
 

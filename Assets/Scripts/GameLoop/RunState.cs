@@ -317,7 +317,8 @@ namespace GameLoop
         /// <summary>店のサービスで山札から端子を抜いた回数 (抜く値段が上がる・ラン単位・上限なし)。 休憩で抜いた分は数えない。</summary>
         public int terminalShopRemovals;
 
-        /// <summary>装備中のダイスアイテムID（空=武器ダイス使用）。取得時に Loadout.TryAutoEquip で更新。</summary>
+        /// <summary>装備中の賽の id (ADR-0015・2026-11-18)。 持つ賽は 1 個で、 これを毎ターン 3 回振る。
+        /// 空なら最初の賽 (<see cref="ItemIds.StartingDie"/>)。 読むのは <see cref="EquippedDie"/> を通す。 [persistent]</summary>
         public string equippedDiceId = "";
 
         /// <summary>ラン開始時の最大HP。 挑戦デバフ〈長引く負傷〉の閾値判定の**固定基準**。
@@ -349,13 +350,8 @@ namespace GameLoop
             if (run == null) return null;
             return run._cardMap ??= MetaProgression.ChallengeCards.Collect(run.challengePicks);
         }
-        /// <summary>サイコロの**面の全部**（<see cref="DiceFaceParts"/>）。 素の面 {2,3,4,5} も T1 としてここに入る
-        /// （ADR-0011・2026-10-18）。 同じ目は 1 枚まで。 面を外すと減る。
-        /// セーブ対象。 適用は GameManager の戦闘開始時（面配列の解決地点）。</summary>
-        public List<DiceFaceParts.Part> diceFaceParts = DiceFaceParts.StartingParts();
-        /// <summary>このランで面を外した回数。 外す価格が回数で上がる（ラン通算・ADR-0011）。
-        /// [persistent]</summary>
-        public int faceRemovals;
+        // [削除 2026-11-18] diceFaceParts (出目パーツの面の全部) と faceRemovals (面を外した回数)。
+        //   ADR-0015: 賽を 1 個装備して 3 回振る形へ。 面は装備中の賽 (equippedDiceId) の diceFaces が持つ (EquippedDie)。
         /// <summary>〈富〉(目 9) の役で積んだ、 この戦闘のゴールド報酬への加算 (%)。
         /// 戦闘開始時に 0 へ戻し、 勝利報酬の計算で使い切る。 [perCombat]</summary>
         public int roleGoldBonusPct;
@@ -365,8 +361,7 @@ namespace GameLoop
         /// <para>エンディングはこの 1 択だけで決まる。 false なら TRUE END〈裂け目を閉じる〉、
         /// true なら GOOD END〈閉じない〉。 撃破時に一度だけ set し、 以後は動かさない。</para>
         ///
-        /// <para><b>既定は false (閉じる)</b> ── 額縁 (『大穴』の卓上遊戯翻案) が成立するのは
-        /// こちらの分岐だけなので、 未選択のまま終わった場合も物語の筋が通る側へ倒す。</para></summary>
+        /// <para><b>既定は false (閉じる)</b> ── 未選択のまま終わった場合は TRUE END 側へ倒す。</para></summary>
         public bool riftLeftOpen;
 
         /// <summary>行動台帳（<see cref="RunChronicle"/>）。 1 行 = 1 つの出来事を
@@ -534,8 +529,6 @@ namespace GameLoop
             if (sinSealedPassives == null) sinSealedPassives = new List<string>(); else sinSealedPassives.Clear();
             _cardMap = null;
             if (chronicle == null) chronicle = new List<string>(); else chronicle.Clear();
-            diceFaceParts = DiceFaceParts.StartingParts();
-            faceRemovals = 0;
             roleGoldBonusPct = 0;
             riftLeftOpen = false;
             totalCombatTurns = 0;

@@ -39,6 +39,8 @@ namespace CombatSystem
 
         // ===== 答え (CombatManager が読む) =====
         internal bool reroll;
+        /// <summary>目利きの賽 (ADR-0015): 振り直す時に残す目の添字 (−1 = 全部振る)。 目利きの賽を持たない時は読まない。</summary>
+        internal int rerollKeep = -1;
         internal int[] slots;
         /// <summary>〈影写し〉〈火葬の剣〉〈有効活用〉の対象 (添字 = その端子の場の位置・値 = 対象の場の位置・−1 = 選ばない)。 null あり。</summary>
         internal int[] targets;
@@ -46,11 +48,13 @@ namespace CombatSystem
         internal int goldSpend;
         /// <summary>手札の規則 Pick: 次のターンも手札に残す印 (添字 = 場の位置)。 null = 何も残さない。</summary>
         internal bool[] keep;
+        /// <summary>刻みの賽 (ADR-0015): 刻む目の添字 (−1 = 刻まない)。 刻みの賽を持たない時は読まない。</summary>
+        internal int carveDie = -1;
 
         internal void Set(TurnPauseKind k, int[] dice, int[] faceIdx, MutualTurnTelegraph t)
         {
             kind = k; playerDice = dice; playerFaceIdx = faceIdx; tele = t;
-            rerollCost = 0; reroll = false; slots = null; targets = null; goldSpend = 0; keep = null; board = null; terminalEnv = default; terminalState = null;
+            rerollCost = 0; reroll = false; rerollKeep = -1; carveDie = -1; slots = null; targets = null; goldSpend = 0; keep = null; board = null; terminalEnv = default; terminalState = null;
             catDie = catSlot = -1;
         }
     }
@@ -88,11 +92,13 @@ namespace CombatSystem
             return Advance();
         }
 
-        /// <summary>リロールの判断に答える。 true = 振り直す (払えなければ振らずに配線へ進む)。</summary>
-        public void AnswerReroll(bool reroll)
+        /// <summary>リロールの判断に答える。 true = 振り直す (払えなければ振らずに配線へ進む)。
+        /// keepDie = 目利きの賽を持つ時に残す目の添字 (−1 = 全部振る・目利きの賽を持たなければ読まない)。</summary>
+        public void AnswerReroll(bool reroll, int keepDie = -1)
         {
             if (_activeTurn == null || _pause.kind != TurnPauseKind.Reroll) return;
             _pause.reroll = reroll;
+            _pause.rerollKeep = keepDie;
             Advance();
         }
 
@@ -100,10 +106,11 @@ namespace CombatSystem
         /// targets = 〈影写し〉〈火葬の剣〉〈有効活用〉の対象 (添字 = その端子の場の位置・値 = 対象の場の位置)。 null / −1 / 候補でない対象は左端の候補。
         /// goldSpend = 挑戦カード〈金で殴る〉で払う金額 (G・攻撃するターンだけ所持金まで払う・札が無ければ無視)。</summary>
         /// keep = 手札の規則 Pick の、 次のターンも手札に残す印 (添字 = 場の位置・null = 何も残さない)。 BOT の WiringPlan.keep と同じ口。
-        public void AnswerWiringSlots(int[] slots, int[] targets = null, int goldSpend = 0, bool[] keep = null)
+        /// carveDie = 刻みの賽を持つ時に刻む目の添字 (−1 = 刻まない)。
+        public void AnswerWiringSlots(int[] slots, int[] targets = null, int goldSpend = 0, bool[] keep = null, int carveDie = -1)
         {
             if (_activeTurn == null || _pause.kind != TurnPauseKind.Wiring) return;
-            _pause.slots = slots; _pause.targets = targets; _pause.goldSpend = goldSpend; _pause.keep = keep;
+            _pause.slots = slots; _pause.targets = targets; _pause.goldSpend = goldSpend; _pause.keep = keep; _pause.carveDie = carveDie;
             Advance();
         }
 
@@ -115,6 +122,15 @@ namespace CombatSystem
             _interactiveTurn = false;
             LastInteractiveResult = _stepResult;
             return false;
+        }
+
+        /// <summary>目利きの賽 (ADR-0015): keep を除いた添字 (keep が範囲外なら全部)。</summary>
+        public static int[] AllDiceIndexExcept(int n, int keep)
+        {
+            if (keep < 0 || keep >= n) return AllDiceIndex(n);
+            var a = new int[n - 1];
+            for (int i = 0, j = 0; i < n; i++) if (i != keep) a[j++] = i;
+            return a;
         }
 
         private static int[] AllDiceIndex(int n)

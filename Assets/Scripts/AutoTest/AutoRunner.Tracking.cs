@@ -35,6 +35,17 @@ namespace AutoTest
             RecordStormNav(gm, true);
         }
 
+        /// <summary>[計装 2026-11-18] 嵐の層の HP と物資の流れを <see cref="RunRec.layerFlow"/> へ 1 層ぶん足す (ボスに入った時と、 その層で死んだ時)。 読むだけ。</summary>
+        private void RecordLayerFlow(GameManager gm, bool atBoss)
+        {
+            var sim = gm?.FreeMap;
+            if (_cur == null || sim == null || !sim.InstabilityMode || gm.Run == null) return;
+            int depth = gm.Run.Depth;
+            for (int i = 0; i + LayerFlowCols <= _cur.layerFlow.Count; i += LayerFlowCols) if (_cur.layerFlow[i] == depth) return;
+            _cur.layerFlow.AddRange(new[] { depth, atBoss ? 1 : 0, sim.Turn, sim.StormStepsTaken, sim.StormHpPaid, sim.StarveHpPaid,
+                gm.Run.provision, gm.Run.playerHP, gm.Run.playerMaxHP, sim.Instability, sim.StormPhase, sim.CollapseTurn });
+        }
+
         /// <summary>[計装 2026-11-14] 嵐の層の航行の判断を <see cref="RunRec.stormNav"/> へ 1 層ぶん足す (ボスに入った時と、 その層で死んだ時)。 同じ深さの 2 度目は足さない。
         /// この層の航行の判断を見ていなければ -1 のまま。 読むだけ。</summary>
         private void RecordStormNav(GameManager gm, bool atBoss)
@@ -85,6 +96,7 @@ namespace AutoTest
             SettleMainCorr();   // [V3 mainCorr] 前の段の最後のターンの実際を締める (段の記録に入れる)
             bool isChainSwap = cm != null && cm.IsCombatActive
                 && !string.IsNullOrEmpty(_pendingEnemyId);
+            if (isChainSwap) NoteTurnDealt();   // [計装 2026-11-17] 段を倒したターンの途中までを前の段へ
             if (isChainSwap && _cur != null)
             {
                 // 戦闘中は Run.playerHP が更新されない（戦闘終了時のみ同期）。
@@ -118,6 +130,7 @@ namespace AutoTest
                     damageDealt = CombatSystem.EnemyDatabase.Get(_pendingEnemyId)?.maxHP ?? 0,
                     playerMaxHpEnd = (cm != null && cm.IsCombatActive)
                                    ? cm.PlayerMaxHP : (gm?.Run?.playerMaxHP ?? 0),
+                    maxTurnLanded = (int)System.Math.Round(_tdMaxLanded), maxTurnRequested = (int)System.Math.Round(_tdMaxReq),   // [計装 2026-11-17]
                 };
                 _cur.combats.Add(midRec);
                 // L1学習: チェーン途中で倒した形態も「撃破記録」に入れる
@@ -132,7 +145,7 @@ namespace AutoTest
             _pendingEnemyId = e != null && e.id != null ? e.id : "";
             // ボス判定は敵IDのみで厳密に行う（ノード種別フォールバックは誤検出の元）
             _pendingEnemyIsBoss = GameLoop.BossIds.IsBoss(_pendingEnemyId);
-            if (_pendingEnemyIsBoss && !isChainSwap) RecordStormLayer(gm);   // [計装 2026-11-13] 層を抜けた時の不安定化 (読むだけ)
+            if (_pendingEnemyIsBoss && !isChainSwap) { RecordStormLayer(gm); RecordLayerFlow(gm, true); }   // [計装 2026-11-13 / 11-18] 層を抜けた時の不安定化・HP と物資の流れ (読むだけ)
             // 戦闘名の鍵 (追跡者の戦闘は点に載っていないので鍵なし)
             _pendingEncounterKey = (gm != null && !gm.InPursuerCombat)
                 ? (EncounterDangerStats.KeyOf(MapSystem.MapManager.Instance?.CurrentNode, gm.Run?.Depth ?? 1) ?? "") : "";
@@ -160,6 +173,8 @@ namespace AutoTest
             FlushPredTrace();
             if (_pendingEnemyIsBoss) SnapState(1, _pendingEnemyHpBefore);
             _cwWin = _cwDraw = _cwLoss = _cwLossAbs = 0; // 新戦闘のターン内訳リセット
+            BeginTurnDealtSegment();   // [計装 2026-11-17] 1 ターンの与ダメの最大を段ごとに数え直す
+            if (!isChainSwap) _pendingHeld = _pendingEnemyIsBoss ? HeldSnapshot(gm?.Run) : null;   // [計装 2026-11-17] ボス戦の開始時の持ち物
             ResetMainCorrForm();
         }
 
@@ -174,6 +189,57 @@ namespace AutoTest
         private long _downsAtStart;
         private long _heavyHitsAtStart, _heavyTakenAtStart;
         private int[] _pendingAxis;
+
+        // ── [計装 2026-11-17・体験の物差し] 1 ターンに敵の HP を減らした量の最大 (段ごと) ──
+        //   AutoRunner が ExecuteTurn を呼ぶ前後で EnemyHpLedger の累計の差を取る。 連戦で段を倒したターンは、 段の差し替えの時点までを前の段へ数える。
+        //   読むだけ (乱数も本体の状態も触らない)。
+        private double _tdBaseLanded, _tdBaseReq, _tdMaxLanded, _tdMaxReq;
+        private string[] _pendingHeld;
+
+        private static double LedgerLandedNow()
+        {
+            var c = CombatSystem.EnemyHpLedger.Cum;
+            double t = 0;
+            for (int i = CombatSystem.EnemyHpLedger.Main; i <= CombatSystem.EnemyHpLedger.CtxDirect; i++) t += c[i];
+            return t;
+        }
+
+        private static double LedgerRequestedNow()
+        {
+            var c = CombatSystem.EnemyHpLedger.Cum;
+            return c[CombatSystem.EnemyHpLedger.MainRequested] + c[CombatSystem.EnemyHpLedger.PoisonRequested]
+                 + c[CombatSystem.EnemyHpLedger.BurstRequested] + c[CombatSystem.EnemyHpLedger.OtherFixedRequested]
+                 + c[CombatSystem.EnemyHpLedger.BleedRequested] + c[CombatSystem.EnemyHpLedger.Reflect]
+                 + c[CombatSystem.EnemyHpLedger.CtxDirect];
+        }
+
+        /// <summary>ターンの頭 (ExecuteTurn の前) に呼ぶ: このターンの差の起点を今の累計にする。</summary>
+        private void BeginTurnDealt() { _tdBaseLanded = LedgerLandedNow(); _tdBaseReq = LedgerRequestedNow(); }
+
+        /// <summary>ターンの終わり (ExecuteTurn の後)・段の差し替えの時点に呼ぶ: 起点からの差で最大を更新し、 起点を今へ進める。</summary>
+        private void NoteTurnDealt()
+        {
+            double l = LedgerLandedNow(), r = LedgerRequestedNow();
+            if (l - _tdBaseLanded > _tdMaxLanded) _tdMaxLanded = l - _tdBaseLanded;
+            if (r - _tdBaseReq > _tdMaxReq) _tdMaxReq = r - _tdBaseReq;
+            _tdBaseLanded = l; _tdBaseReq = r;
+        }
+
+        private void BeginTurnDealtSegment()
+        {
+            _tdMaxLanded = _tdMaxReq = 0;
+            _tdBaseLanded = LedgerLandedNow(); _tdBaseReq = LedgerRequestedNow();
+        }
+
+        /// <summary>ボス戦の開始時の持ち物: パッシブ (武器を含む・出目パーツは入らない)。 装備中の武器は "装備:" を付けて別に足す。</summary>
+        private static string[] HeldSnapshot(GameLoop.RunState run)
+        {
+            if (run == null) return null;
+            var l = new List<string>();
+            if (run.ownedPassiveItems != null) l.AddRange(run.ownedPassiveItems);
+            if (!string.IsNullOrEmpty(run.equippedWeaponId)) l.Add("装備:" + run.equippedWeaponId);
+            return l.ToArray();
+        }
 
         private float[] LedgerSinceStart()
         {
@@ -206,7 +272,7 @@ namespace AutoTest
                     else if (fam == GameLoop.ItemIds.ConsShieldFamily) def++;
                 }
             _cur.stateSnaps.AddRange(new[] { kind, run.Depth, hp, run.playerMaxHP, run.ownedPassiveItems?.Count ?? 0, run.coins,
-                                             heal, def, run.diceFaceParts?.Count ?? 0, run.provision });
+                                             heal, def, GameLoop.EquippedDie.FacesOf(GameLoop.EquippedDie.IdOf(run)).Length, run.provision });
         }
 
         private void OnBattleEnded(CombatResult r)
@@ -250,6 +316,9 @@ namespace AutoTest
                 heavyTaken = (int)(CombatSystem.HeavyHitDiag.TotalHeavyTaken - _heavyTakenAtStart),
                 heavyMax = CombatSystem.HeavyHitDiag.SegmentHeavyMax,
                 stormIn = _pendingStormIn, stormPhase = _pendingStormPhase, stormInst = _pendingStormInst,   // [計装 2026-11-14・嵐の航行]
+                maxTurnLanded = (int)System.Math.Round(_tdMaxLanded), maxTurnRequested = (int)System.Math.Round(_tdMaxReq),   // [計装 2026-11-17]
+                held = _pendingEnemyIsBoss ? _pendingHeld : null,
+                fin = CombatSystem.FightEndDiag.Snapshot(r.playerHPRemaining),   // [計装 2026-11-18] 戦闘の終わりの診断 (読むだけ)
             };
             _cur.combats.Add(rec);
             _cur.totalCombats++;
@@ -384,7 +453,7 @@ namespace AutoTest
             {
                 _cur.deathInBossFight = bossFight;
                 _cur.fatalEnemy = fatal;
-                if (!bossFight) RecordStormNav(GameManager.Instance, false);   // [計装 2026-11-14] 死んだ嵐の層の航行の判断 (ボス戦の死はボスに入った時に載っている)
+                if (!bossFight) { RecordStormNav(GameManager.Instance, false); RecordLayerFlow(GameManager.Instance, false); }   // [計装 2026-11-14 / 11-18] 死んだ嵐の層の航行の判断・HP と物資の流れ (ボス戦の死はボスに入った時に載っている)
             }
             Finish(Outcome.GameOver, $"敗北 cause={cause}", cause);
         }
@@ -469,11 +538,12 @@ namespace AutoTest
                 if (run.ownedConsumables != null)
                     foreach (var id in run.ownedConsumables) if (!string.IsNullOrEmpty(id)) _cur.acquiredItemsEver.Add(id);
                 if (!string.IsNullOrEmpty(run.equippedWeaponId)) _cur.acquiredItemsEver.Add(run.equippedWeaponId);
-                // 装備ダイスは 2026-08-17 に廃止 (equippedDiceId はセーブ互換の残置)。
-                // **所持した出目パーツを学習へ載せる。** 購入時にも Buy() が積むが、
-                //   イベント等ショップ以外の入手経路が付いたときに取りこぼさないよう最終所持でも union する。
-                if (run.diceFaceParts != null)
-                    foreach (var p in run.diceFaceParts) _cur.acquiredItemsEver.Add(GameLoop.DiceFaceParts.Id(p));
+                // **装備中の賽を学習へ載せる** (ADR-0015)。 購入時にも Buy() が積むが、 付与・交換など店以外の入手を取りこぼさないよう最終所持でも union する。
+                //   最初の賽は全員が持つので載せない (差の出ない品を学習に混ぜない)。
+                {
+                    string dieId = GameLoop.EquippedDie.IdOf(run);
+                    if (dieId != GameLoop.ItemIds.StartingDie) _cur.acquiredItemsEver.Add(dieId);
+                }
                 _cur.finalWeaponTier = run.equippedWeaponId ?? "";
                 _cur.finalLimitBreak = run.limitBreakStage;
                 _cur.totalCoinsSpent = run.coinsSpent;

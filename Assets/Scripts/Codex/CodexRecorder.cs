@@ -52,7 +52,11 @@ namespace Codex
             }
             if (sig == _sig) return;
             _sig = sig;
-            if (CodexRecord.Note(run, cm)) MetaProgressManager.Instance?.Save();
+            if (CodexRecord.Note(run, cm))
+            {
+                MetaProgressManager.Instance?.Save();
+                MetaProgression.Achievements.AchievementService.CheckCodex();   // 実績〈書き留める癖〉〈目録の完成〉
+            }
         }
     }
 }

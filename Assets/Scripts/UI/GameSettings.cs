@@ -11,7 +11,7 @@ namespace UI
     /// </summary>
     public static class GameSettings
     {
-        public enum Key { Master, Bgm, Se, Bright, Scan, Curve, Chroma, Vignette, Noise }
+        public enum Key { Master, Bgm, Se, Bright, Scan, Curve, Chroma, Vignette, Noise, LineGap, CharGap, Bloom }
 
         public struct Def
         {
@@ -30,6 +30,12 @@ namespace UI
             new Def { pref = "Settings.chroma",   name = "色収差",     min = 0, max = 100, def = 50,  desc = "縁ほど赤と青がずれる強さ。 50 が標準・0 で切。" },
             new Def { pref = "Settings.vignette", name = "ビネット",   min = 0, max = 100, def = 50,  desc = "四隅の暗さ。 50 が標準・0 で切。" },
             new Def { pref = "Settings.noise",    name = "ノイズ",     min = 0, max = 100, def = 50,  desc = "横線のノイズとフィルムの粒。 50 が標準・0 で切。" },
+            // 2026-11-16 (作者の依頼「走査線で文章が読みづらい」): 液晶のドット字の行送りと字の送りに足す dot (Game2DJpFont.LineH / Advance が読む・全部の画面の文に効く)
+            //   行間の既定は 1 (2026-11-17・作者の依頼)。 保存した値がある人はそれが優先 (V の PlayerPrefs.GetInt(pref, def))。 既定に戻すのは設定の窓の [既定に戻す]
+            new Def { pref = "Settings.lineGap",  name = "行間",       min = 0, max = MaxLineGap, def = 1, desc = "文の行と行の間に足す。 1 が標準。" },
+            new Def { pref = "Settings.charGap",  name = "字間",       min = 0, max = MaxCharGap, def = 0, desc = "字と字の間に足す。 0 が標準。" },
+            // 2026-11-17 (作者の依頼): ブルーム (にじみ) の強さ。 液晶の _Bloom と _Halo に掛ける (周りの明るさでの抑え方は変えない・Game2DSettingsApply)
+            new Def { pref = "Settings.bloom",    name = "ブルーム",   min = 0, max = 100, def = 50,  desc = "明るい所から光がにじむ強さ。 50 が標準・0 で切。" },
         };
 
         private static int[] _v;
@@ -51,6 +57,9 @@ namespace UI
         }
 
         public static int Get(Key k) => V[(int)k];
+
+        /// <summary>行間・字間の上限 (dot)。 検算 (Tools/event_page_check ほか) はこの最大でも文が切れず窓が画面に収まる事を見る。</summary>
+        public const int MaxLineGap = 3, MaxCharGap = 2;
 
         /// <summary>値を変える (範囲に収める)。 PlayerPrefs へは書くが、 ディスクへの書き出し (<see cref="Save"/>) は画面を閉じる時にまとめて行う。</summary>
         public static void Set(Key k, int v)

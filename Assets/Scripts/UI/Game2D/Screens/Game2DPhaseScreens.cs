@@ -72,31 +72,49 @@ namespace UI.Game2D
             if (gm == null || GameHooks.BotDriving || Application.isBatchMode) { GameManager.EventKeysByScreen = false; CloseIfOpen(); return; }
             Subscribe();
             var ph = gm.CurrentPhase;
-            // イベントの窓が出ている間は、 キーも画面が受ける (頁送り・2026-11-13)
-            bool evKeys = ph == GameManager.GamePhase.EventEncounter && _open && _evDef != null && modal.IsOpen && modal.Current == _evDef;
+            // イベントの画面が出ている間は、 キーも画面が受ける (頁送り・2026-11-13)
+            bool evKeys = ph == GameManager.GamePhase.EventEncounter && _evPlan != null && Game2DEventScreen.Showing && !modal.IsOpen;
             GameManager.EventKeysByScreen = evKeys;
             if (evKeys && !Game2DLoadingScreen.Blocking) EventKeys(gm);
-            if (ph != _shown) { _shown = ph; _dirty = true; _shopSell = false; _shopSupply = false; _robArmed = false; _sellPage = 0; _restFaces = false; _shopTerm = false; _termPick = TermPick.None; _termDeckPage = 0; if (ph != GameManager.GamePhase.EventEncounter) _eventResult = null; if (ph == GameManager.GamePhase.GateRitual) System.Array.Clear(_gateOffer, 0, 3); }
+            if (ph != _shown) { _shown = ph; _dirty = true; _shopSell = false; _shopSupply = false; _robArmed = false; _sellPage = 0; _shopTerm = false; _termPick = TermPick.None; _termDeckPage = 0; if (ph != GameManager.GamePhase.EventEncounter) _eventResult = null; if (ph == GameManager.GamePhase.GateRitual) System.Array.Clear(_gateOffer, 0, 3); }
             // 画面の外で所持金・HP が変わった時も描き直す (買える品の明暗・副題の数字)
             int coins = gm.Run != null ? gm.Run.coins : 0, hp = gm.Run != null ? gm.Run.playerHP : 0;
-            if (coins != _lastCoins || hp != _lastHp) { _lastCoins = coins; _lastHp = hp; if (_open) _dirty = true; }
+            if (coins != _lastCoins || hp != _lastHp) { _lastCoins = coins; _lastHp = hp; if (_open || Game2DEventScreen.Showing) _dirty = true; }
             int pend = gm.PendingStartingPassiveChoices.Count + gm.PendingEventPassiveOffers.Count * 100000000 + gm.PendingChallengeTiers.Count * 100 + (gm.Run != null ? gm.Run.pendingWeaponIds.Count * 10000 + gm.Run.pendingTerminalOffer.Count * 1000000 : 0);
             if (pend != _lastPending) { _lastPending = pend; _dirty = true; }
+            // イベントが替わった (同じフェーズのまま・QA の口 QaBattle.ShowEvent で続けて出した時など) も描き直す
+            var evNow = ph == GameManager.GamePhase.EventEncounter && EventEncounter.Instance != null ? EventEncounter.Instance.Current : null;
+            if (evNow != _evSeen || (evNow != null && gm.EventChoiceResolved != _evSeenResolved)) { _evSeen = evNow; _evSeenResolved = gm.EventChoiceResolved; _dirty = true; }
+            // 作り直しの依頼 (RequestRebuild・QA の口が同じイベント・同じフェーズのまま層や所持金を替えて出し直した時): 最初の頁から作り直す
+            if (_rebuildSeen != _rebuildSerial) { _rebuildSeen = _rebuildSerial; _evKey = null; _evSelFor = null; _dirty = true; }
             // エンディングの画面 (#328) の間は窓を出さない。 同じフレームで先に開いていたら閉じて、 読み終わってから作り直す
-            if (Game2DEndingScreen.Blocking) { if (_open) { CloseIfOpen(); _dirty = true; } return; }
+            if (Game2DEndingScreen.Blocking) { if (_open || Game2DEventScreen.Showing) { CloseIfOpen(); _dirty = true; } return; }
             if (_endingSerial != Game2DEndingScreen.ClosedSerial) { _endingSerial = Game2DEndingScreen.ClosedSerial; _dirty = true; }      // 読み終わった: 今のフェーズの窓 (踏破) を必ず作り直す
             if (!_dirty) return;
             // ロード画面の間は出さない (終わってから出す・_dirty は残す)。 開いている窓も閉じる ──
             //   「層を抜けた」の窓は押した直後にロード画面が始まるので、 閉じないとロード画面の上に残り続けていた (2026-11-11)
             if (Game2DLoadingScreen.Blocking) { CloseIfOpen(); return; }
             _dirty = false;
+            _evBuilt = false;
             var def = Build(gm, ph);
+            // イベントの画面は液晶の中身として描く (Game2DEventScreen・2026-11-16): 窓は閉じて、 液晶の板に出す
+            if (_evBuilt)
+            {
+                if (_open) { modal.Close(); _open = false; }
+                if (!Game2DEventScreen.Show(_evView)) Debug.LogWarning("[Game2DPhaseScreens] イベントの画面を液晶に出せない (地図の板が無い)");
+                return;
+            }
+            Game2DEventScreen.Hide();
             if (def == null) { CloseIfOpen(); return; }
             if (_open) modal.Replace(def); else modal.Open(def);
             _open = true;
         }
 
-        private void CloseIfOpen() { if (_open) { modal.Close(); _open = false; } }
+        private void CloseIfOpen() { if (_open) { modal.Close(); _open = false; } Game2DEventScreen.Hide(); }
+
+        /// <summary>今の場面の画面を、 最初の頁から作り直させる (同じフェーズ・同じイベントのまま中身を替えた時・QA の口 QaBattle.ShowEvent が呼ぶ)。</summary>
+        public static void RequestRebuild() => _rebuildSerial++;
+        private static int _rebuildSerial; private int _rebuildSeen;
         private int _endingSerial;
 
         /// <summary>操作の後に作り直す (フェーズが変わらない操作 ── 買った・振り直した など)。</summary>
@@ -239,24 +257,18 @@ namespace UI.Game2D
         }
 
         // ── 休憩 ──
-        //   休む / 多めに休む (ターンが進む) / 鍛える / 面を外す (どの面かを選ぶ画面へ)。 どれも 1 回の休憩で 1 つだけ。
-
-        private bool _restFaces;
+        //   休む / 多めに休む (ターンが進む) / 鍛える / 山札から抜く。 どれも 1 回の休憩で 1 つだけ (面を外すは 2026-11-18 に削除・ADR-0015)。
 
         private ScreenDef Rest(GameManager gm)
         {
             var run = gm.Run;
             Game2DTutorial.Request(TutorialTopics.Equip);      // 手引き「装備と強化」: 初めて休憩に入った (武器の強化・面を外す)
-            if (_restFaces) return RestFaces(gm);
             if (_termPick == TermPick.Rest) return TerminalDeckList(gm);
             var d = New("休憩", "HP " + run.playerHP + "/" + run.playerMaxHP + "  素材 " + run.weaponMaterials);
             int more = Mathf.RoundToInt(MapSystem.FreeMove.FreeMapParams.RestMoreRatio * 100);
             d.Items.Add(new ModalItem { name = "休む", desc = "HP を回復する。 ターンは進まない。" });
             d.Items.Add(new ModalItem { name = "多めに休む", value = "+" + MapSystem.FreeMove.FreeMapParams.RestMoreTurns + " ターン", desc = "最大 HP の " + more + "% を回復する。 代わりにターンが進む (追跡者が動く)。" });
             d.Items.Add(new ModalItem { name = "鍛える", value = "素材 " + run.weaponMaterials, desc = "素材を使って武器を 1 段強化する (強化できなければ休む)。" });
-            bool canRemove = gm.TryGetFaceRemovalCost(out int g, out int m);
-            d.Items.Add(new ModalItem { name = "面を外す", value = canRemove ? g + "G 素材" + m : "外せない", disabled = !canRemove,
-                desc = canRemove ? "ダイスの面を 1 枚外す (出目の合計と、 その目の役を失う)。 外す面を次に選ぶ。" : "面はこれ以上外せない。" });
             // 端子の山札 (ADR-0014): 回復の代わりに 1 枚抜く (無料)。 山札が手札の枚数を下回る抜き方はできない
             bool canTerm = gm.CanRemoveTerminal; int deckN = run.terminalDeck != null ? run.terminalDeck.Count : 0;
             d.Items.Add(new ModalItem { name = "山札から抜く", value = canTerm ? "山札 " + deckN + " 枚" : "抜けない", disabled = !canTerm,
@@ -269,37 +281,8 @@ namespace UI.Game2D
                 {
                     case 1: gm.RestHealMore(); break;
                     case 2: gm.RestUpgrade(); break;
-                    case 3: if (canRemove) _restFaces = true; break;
-                    case 4: if (canTerm) { _termPick = TermPick.Rest; _termDeckPage = 0; } break;
+                    case 3: if (canTerm) { _termPick = TermPick.Rest; _termDeckPage = 0; } break;
                     default: gm.RestHeal(); break;
-                }
-                Refresh();
-            };
-            return d;
-        }
-
-        private ScreenDef RestFaces(GameManager gm)
-        {
-            var run = gm.Run; gm.TryGetFaceRemovalCost(out int g, out int m);
-            var d = New("面を外す", g + "G・素材 " + m + "  (所持 " + run.coins + "G・素材 " + run.weaponMaterials + ")", 420); d.cols = 2;
-            var faces = new List<int>();
-            if (run.diceFaceParts != null)
-                foreach (var p in run.diceFaceParts)
-                {
-                    faces.Add(p.face);
-                    d.Items.Add(new ModalItem { name = DiceFaceParts.Label(p), desc = DiceFaceParts.Describe(p.tier) });
-                }
-            bool afford = run.coins >= g && run.weaponMaterials >= m;
-            d.buttons.Add(B("外す", "remove", true));
-            d.buttons.Add(B("戻る", "back"));
-            d.footer = afford ? "外す面を選ぶ" : "払えない (ゴールドか素材が足りない)";
-            d.onAction = (a, sel) =>
-            {
-                if (a == "back") _restFaces = false;
-                else if (a == "remove" && sel >= 0 && sel < faces.Count)
-                {
-                    if (gm.RestRemoveFace(faces[sel])) { _restFaces = false; Game2DSfx.Play("ui_confirm"); }
-                    else modal.ShowError("外せない (ゴールドか素材が足りない)");
                 }
                 Refresh();
             };
@@ -655,24 +638,23 @@ namespace UI.Game2D
             switch (s.kind)
             {
                 case ShopSlotKind.WeaponMaterial: return "強化素材";
-                case ShopSlotKind.FacePart: return "出目パーツ " + DiceFaceParts.Label(s.facePart);
             }
             if (string.IsNullOrEmpty(s.itemId)) return "(空)";
             return ItemDatabase.DisplayNameOf(s.itemId);
         }
 
-        /// <summary>行の左のアイコン: 品は id (Resources/Icons/Items)、 素材・出目パーツは枠だけ ("")。</summary>
-        /// <summary>行の枠のレアリティ (2026-11-08)。 素材・出目パーツ・品の無い枠は null (従来の灰色の枠)。</summary>
+        /// <summary>行の左のアイコン: 品は id (Resources/Icons/Items)、 素材は枠だけ ("")。</summary>
+        /// <summary>行の枠のレアリティ (2026-11-08)。 素材・品の無い枠は null (従来の灰色の枠)。</summary>
         private static ItemRarity? SlotRarity(ShopSlot s)
         {
-            if (s.kind == ShopSlotKind.WeaponMaterial || s.kind == ShopSlotKind.FacePart || string.IsNullOrEmpty(s.itemId)) return null;
+            if (s.kind == ShopSlotKind.WeaponMaterial || string.IsNullOrEmpty(s.itemId)) return null;
             var data = ItemDatabase.Instance?.GetItem(s.itemId);
             return data != null ? data.rarity : (ItemRarity?)null;
         }
 
         private static string SlotIcon(ShopSlot s)
         {
-            if (s.kind == ShopSlotKind.WeaponMaterial || s.kind == ShopSlotKind.FacePart || string.IsNullOrEmpty(s.itemId)) return "";
+            if (s.kind == ShopSlotKind.WeaponMaterial || string.IsNullOrEmpty(s.itemId)) return "";
             var data = ItemDatabase.Instance?.GetItem(s.itemId);
             return data != null ? data.id : s.itemId;
         }
@@ -682,7 +664,7 @@ namespace UI.Game2D
             switch (s.kind)
             {
                 case ShopSlotKind.WeaponMaterial: return "武器を強化する素材 (休憩で使う)。 在庫に限りは無い。";
-                case ShopSlotKind.FacePart: return DiceFaceParts.Describe(s.facePart.tier);
+                case ShopSlotKind.Dice: return ItemCards.Die(s.itemId).description + "\n買うと、 今の賽 (" + EquippedDie.Label(EquippedDie.IdOf(GameManager.Instance?.Run)) + ") と入れ替わる。";
             }
             var data = string.IsNullOrEmpty(s.itemId) ? null : ItemDatabase.Instance?.GetItem(s.itemId);
             return data != null ? data.description : null;
@@ -693,48 +675,90 @@ namespace UI.Game2D
         // 頁送り (2026-11-13・EventPaging): 導入は「／」の段落ごとに 1 頁、 長い段落と結果の文は行数で割る。 選択肢は最後の頁だけ。
         //   頁の位置は画面だけが持つ (進行・セーブには入れない)。 導入 / 結果 / 別のイベントに替わったら最初の頁へ戻る。
         //   _evEpoch は選んだ回数 (OnEventResolved) ── ランダムイベントの振り直しで同じイベントに戻っても最初の頁から出す。
-        private int _evPage, _evEpoch; private string _evKey; private EventPaging.Plan _evPlan; private bool _evResolved; private ScreenDef _evDef;
+        // 2026-11-16: 窓 1 枚から全画面の配置 (背景の絵・左下に本文の板・右に選択肢の列) へ (EventScreenView・EventLayout・作者が見本で承認)。
+        //   絵は窓 (GUI の層) でなく液晶の中身として写す (Game2DEventScreen・液晶の効果を戦闘・結末とそろえる)。 Event() は窓の中身を返さず (null)、 _evBuilt を立てる。
+        //   選択肢の箱を押すと選ぶだけ・確定は操作の行の [選ぶ] か数字のキー (今までの「行を選んでから [選ぶ]」と同じ・誤って即決しない)。
+        private int _evPage, _evEpoch; private string _evKey; private EventPaging.Plan _evPlan; private bool _evResolved; private bool _evBuilt;
+        private readonly EventScreenView _evView = new EventScreenView(); private string _evSelFor; private EventDefinition _evSeen; private bool _evSeenResolved;
 
         private ScreenDef Event(GameManager gm)
         {
             var ev = EventEncounter.Instance != null ? EventEncounter.Instance.Current : null;
-            var d = New(ev != null ? ev.name : "イベント", null, EventPaging.Width);
+            var run = gm.Run;
             bool resolved = gm.EventChoiceResolved;
             string text = resolved ? (string.IsNullOrEmpty(_eventResult) ? "……" : _eventResult) : ev?.flavor;
-            // 選択肢の下に代償 (使うターン・補足中の捕まるまで・足りないゴールド) を出す (2026-11-11・issue #17)
-            var items = new List<ModalItem>(); bool detail = false;
-            if (!resolved && ev != null)
+            var plan = resolved ? EventPaging.Result(text, Game2DJpFont.Advance, Game2DJpFont.LineH) : EventPaging.Intro(text, Game2DJpFont.Advance, Game2DJpFont.LineH);      // 行間・字間の設定は実行時に読む
+            string key = (resolved ? "r:" : "i:") + Game2DJpFont.LineH + ":" + Game2DJpFont.CharGap + ":" + _evEpoch + ":" + (ev != null ? ev.name : "") + ":" + text;
+            bool fresh = key != _evKey;
+            if (fresh) { _evKey = key; _evPage = 0; }
+            _evPage = plan.Clamp(_evPage); _evPlan = plan; _evResolved = resolved; _evBuilt = true;
+            bool last = plan.IsLast(_evPage);
+
+            var v = _evView;
+            v.backdrop = EventScreenView.BackdropName(ev);
+            v.title = ev != null ? ev.name : "イベント";
+            v.bar = EventBar(gm); v.pageMark = plan.Mark(_evPage); v.lines = plan.Lines(_evPage);
+            v.buttons.Clear(); v.choices = null;
+            if (_evPage > 0) v.buttons.Add(new EventScreenView.Btn { label = "前へ", action = "prev" });
+            if (!last) { v.buttons.Add(new EventScreenView.Btn { label = "次へ", action = "page", primary = true }); v.hint = "Space 次へ"; }
+            else if (resolved || ev == null || ev.choices.Count == 0) { v.buttons.Add(new EventScreenView.Btn { label = "次へ", action = "next", primary = true }); v.hint = "Space 次へ"; }
+            else
+            {
+                // 選択肢 (最後の頁だけ): 名前・見せる代償の札・選べないか・捕捉中の見込み・箱の下の説明
+                v.choices = new List<EventScreenView.Choice>();
+                int first = -1;
                 for (int i = 0; i < ev.choices.Count; i++)
                 {
                     var c = ev.choices[i];
-                    var it = new ModalItem { name = c.text, desc = EventEncounter.DescribeCost(c, gm.Run), disabled = !EventEncounter.IsChoiceSelectable(ev, i, gm.Run) };
-                    if (!string.IsNullOrEmpty(it.desc)) detail = true;
-                    items.Add(it);
+                    bool ok = EventEncounter.IsChoiceSelectable(ev, i, run);
+                    if (ok && first < 0) first = i;
+                    v.choices.Add(new EventScreenView.Choice
+                    {
+                        name = c.text, chips = c.CostChips(), disabled = !ok,
+                        warnTurns = EventEncounter.WouldBeCaught(c.TurnCost),
+                        note = EventEncounter.DescribeNote(ev, i, run),
+                    });
                 }
-            var plan = resolved ? EventPaging.Result(text, Game2DJpFont.LineH, Game2DJpFont.Advance)
-                                : EventPaging.Intro(text, items.Count, detail, Game2DJpFont.LineH, Game2DJpFont.Advance);
-            string key = (resolved ? "r:" : "i:") + _evEpoch + ":" + (ev != null ? ev.name : "") + ":" + text;
-            if (key != _evKey) { _evKey = key; _evPage = 0; }
-            _evPage = plan.Clamp(_evPage); _evPlan = plan; _evResolved = resolved; _evDef = d;
-            bool last = plan.IsLast(_evPage);
-            d.h = plan.height; d.rowH = plan.rowH;
-            d.body = plan.Body(_evPage); d.bodyLines = Mathf.Max(1, plan.Lines(_evPage)); d.pageMark = plan.Mark(_evPage);
-            if (_evPage > 0) d.buttons.Add(B("前へ", "prev"));
-            if (!last) d.buttons.Add(B("次へ", "page", true));
-            else if (resolved) d.buttons.Add(B("次へ", "next", true));
-            else { d.Items.AddRange(items); d.buttons.Add(B("選ぶ", "pick", true)); }
-            d.onAction = (a, sel) =>
+                if (_evSelFor != key) { _evSelFor = key; v.ResetSelection(Mathf.Max(0, first)); }      // 選択肢が初めて出た時に、 最初の選べる箱を選んでおく
+                v.buttons.Add(new EventScreenView.Btn { label = "選ぶ", action = "pick", primary = true });
+                v.hint = ev.choices.Count > 1 ? "1〜" + Mathf.Min(9, ev.choices.Count) + " で選ぶ" : "1 で選ぶ";
+            }
+            if (fresh && v.choices == null) v.ResetSelection(0);
+            v.onAction = (a, sel) =>
             {
                 switch (a)
                 {
-                    case "prev": EventPageStep(-1, false); return;      // 押した音は窓が鳴らす
+                    case "prev": EventPageStep(-1, false); return;      // 押した音は画面 (EventScreenView) が鳴らす
                     case "page": EventPageStep(+1, false); return;
                     case "next": gm.ConfirmEventEncounter(); break;
                     case "pick": if (ev != null && sel >= 0 && sel < ev.choices.Count) gm.ResolveEventChoice(sel); break;
                 }
                 Refresh();
             };
-            return d;
+            return null;      // 窓は使わない (Update が _evBuilt を見て液晶の板に出す)
+        }
+
+        /// <summary>イベントの画面の上の帯の値 (2026-11-16): HP・物資・ゴールド・素材・ターン・捕捉中 (地図の帯 Game2DNavExtras と同じ所から読む)。
+        /// 航行マップの無い層では、 ターンと捕捉中を出さない (詰めて並べる)。 結果の頁では選んだ効果の後の値: HP・物資・ゴールド・素材は選んだ時に適用済み、
+        /// ターンは地図へ戻る時に進むので、 まだ進めていない分 (EventEncounter.PendingTurns) を足して見せる。 捕捉中の見込みは今の値 (ターンが進む前)。</summary>
+        private static List<EventLayout.BarItem> EventBar(GameManager gm)
+        {
+            var run = gm.Run; var list = new List<EventLayout.BarItem>();
+            if (run == null) return list;
+            list.Add(new EventLayout.BarItem { label = "HP", value = run.playerHP + "/" + run.playerMaxHP });
+            list.Add(new EventLayout.BarItem { label = "物資", value = run.provision.ToString() });
+            list.Add(new EventLayout.BarItem { value = run.coins + "G" });
+            list.Add(new EventLayout.BarItem { label = "素材", value = run.weaponMaterials.ToString() });
+            var sim = gm.FreeMap;
+            if (sim != null)
+            {
+                int pending = EventEncounter.Instance != null ? EventEncounter.Instance.PendingTurns : 0;
+                list.Add(new EventLayout.BarItem { label = "ターン", value = (sim.Turn + pending).ToString() });
+            }
+            var eta = EventEncounter.CatchEtaNow();
+            if (eta.Valid) list.Add(new EventLayout.BarItem { label = "捕捉中", value = "あと" + eta.turns, warn = true });
+            else if (sim != null && sim.FoeAlive && sim.FoeMode == MapSystem.FreeMove.FoeMode.Chase) list.Add(new EventLayout.BarItem { value = "捕捉中", warn = true });
+            return list;
         }
 
         /// <summary>頁を 1 つ送る・戻す (画面の中だけ)。</summary>
@@ -746,7 +770,7 @@ namespace UI.Game2D
             _evPage = p; if (sound) Game2DSfx.Play("ui_click"); Refresh();
         }
 
-        /// <summary>イベントの窓のキー (手引きの板と同じ操作): Space / Enter / → で次の頁 (結果の最後の頁では地図へ戻る)・← / Backspace で前の頁・
+        /// <summary>イベントの画面のキー (手引きの板と同じ操作): Space / Enter / → で次の頁 (結果の最後の頁では地図へ戻る)・← / Backspace で前の頁・
         /// 1〜9 は最後の頁 (選択肢が出ている頁) でだけ選ぶ。 この間 GameManager のイベントのキー (<see cref="GameManager.EventKeysByScreen"/>) は止める
         /// ── 止めないと Space が結果の頁を飛ばして地図へ戻し、 数字が見えていない選択肢を選んでいた。</summary>
         private void EventKeys(GameManager gm)

@@ -12,14 +12,14 @@ namespace UI.Game2D
     public sealed class ItemCardInfo
     {
         /// <summary>種類 (持ち物の画面の区切りの順)。</summary>
-        public enum Kind { Relic = 0, Weapon = 1, Consumable = 2, FacePart = 3, Keepsake = 4 }
+        public enum Kind { Relic = 0, Weapon = 1, Consumable = 2, Dice = 3, Keepsake = 4 }
         /// <summary>区切りの見出し (<see cref="Kind"/> の順)。 ランの中の持ち物は「秘宝」(CLAUDE.md の用語)。
         /// 「大事な物」は ownedFlags のフラグの品 (イベントの〈苦難の予言〉〈迷い犬の首輪〉など)。</summary>
-        public static readonly string[] KindNames = { "秘宝", "武器", "消耗品", "出目パーツ", "大事な物" };
+        public static readonly string[] KindNames = { "秘宝", "武器", "消耗品", "賽", "大事な物" };
         public const int KindCount = 5;
 
         public Kind kind;
-        /// <summary>アイコンの名前 (Resources/Icons/Items/&lt;iconId&gt;.png)。 null は絵を探さない (出目パーツ・強化素材・大事な物)。</summary>
+        /// <summary>アイコンの名前 (Resources/Icons/Items/&lt;iconId&gt;.png)。 null は絵を探さない (賽・強化素材・大事な物)。</summary>
         public string iconId;
         /// <summary>同じ品を見分ける鍵 (使った後にフォーカスを同じ品へ戻す)。</summary>
         public string key;
@@ -29,7 +29,7 @@ namespace UI.Game2D
         /// <summary>レア度 (ItemSystem.ItemRarity の値)。 -1 は無し。 升目の枠の色はこれで決まる。</summary>
         public int rarity = -1;
         public string axis, family;
-        /// <summary>段 (武器 2〜4・消耗品 1〜4・出目パーツ 1〜4)。 0 は無し。</summary>
+        /// <summary>段 (武器 2〜4・消耗品 1〜4)。 0 は無し。</summary>
         public int tier;
         /// <summary>同じ品の数 (消耗品・強化素材)。 2 以上で升目の右下に数を出す。</summary>
         public int count = 1;
@@ -39,9 +39,9 @@ namespace UI.Game2D
         public string mark;
         /// <summary>今は使えない理由 (消耗品)。 null は無し。</summary>
         public string block;
-        /// <summary>アイコンの無い時の仮の字 (<see cref="Glyph"/>)。 出目パーツは目の数字。</summary>
+        /// <summary>アイコンの無い時の仮の字 (<see cref="Glyph"/>)。 賽は「賽」。</summary>
         public string glyph;
-        /// <summary>出目パーツの段の点の数 (1〜4)。 0 は点を打たない。</summary>
+        /// <summary>升目の下の辺に打つ点の数。 0 は点を打たない (2026-11-18 から使う所は無い・出目パーツの段だった)。</summary>
         public int pips;
         /// <summary>消耗品か (「使う」のボタンを出す)。</summary>
         public bool usable;

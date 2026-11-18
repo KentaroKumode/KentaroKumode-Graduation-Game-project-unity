@@ -155,6 +155,14 @@ namespace CombatSystem
             else foreach (int i in rerolled) playerDice[i] = v;
         }
 
+        /// <summary>振り直し 1 回の費用 (充電) の 1 か所 (2026-11-16)。 = 振る個数 × この戦闘で何回目か + 時限デバフ〈無力感〉の上乗せ (+1)。
+        /// 無料の振り直し (〈特別・対〉) は 0 で、 上乗せも足さない。 本体の支払い・画面の費用の表示 (<see cref="TurnPause.rerollCost"/>)・
+        /// BOT の振り直しの方策 (AutoRunner.MutualRerollPolicy) がここを読む。 式の正本は <see cref="EventSystem.TimedEffects.TimedDebuffRule.RerollCost"/>。</summary>
+        public static int RerollCostNow(int diceCount, int nth, bool free)
+            => DiePassives.FreeRerollByDie(GameLoop.GameManager.Instance?.Run) ? 0      // 賭場の賽 (ADR-0015): 充電は払わない (代わりに HP を払う・RerollPhase)
+             : EventSystem.TimedEffects.TimedDebuffRule.RerollCost(diceCount, nth, free,
+                EventSystem.TimedEffects.TimedDebuffRule.RerollSurcharge(GameLoop.GameManager.Instance?.Run?.timedDebuffs));
+
         private IEnumerator<TurnPause> RerollPhase(CombatContext ctx, int[] playerDice, int[] enemyDice, int playerDiceMax,
                                                    int[] playerFaceIdx = null)
         {
@@ -194,6 +202,8 @@ namespace CombatSystem
             //   1〜2 個を刻んで追えたので、 充電さえあれば役がほぼ任意に作れた (〈極〉が設計 0.077%/T → 充電 12 で約 10%)。
             //   いまは (1) 方策の pick は「振るかどうか」だけを表し、 中身は読まない ── 振り直せない面以外を全部振る
             //   (2) 費用 = 振り直す個数 × (この戦闘で払った回数 + 1)。 ターンでは戻らない。 docs/GAME.md §6-3。
+            //   (3) 時限デバフ〈無力感〉(2026-11-16) を持っていれば毎回 +1 (無料の振り直しには足さない)。 式は RerollCostNow の 1 か所。
+            bool appraiser = GameLoop.EquippedDie.IdOf(GameLoop.GameManager.Instance?.Run) == GameLoop.DieIds.Appraiser;   // 目利きの賽
             int attempt = 1;   // このターンの何回目か (乱数の添字にだけ使う)
             int guard = 16;    // 方策が空でない配列を返し続けても止まるようにする
             var rerollIdx = new List<int>(playerDice.Length);
@@ -204,23 +214,38 @@ namespace CombatSystem
                 if (_interactiveTurn)
                 {
                     _pause.Set(TurnPauseKind.Reroll, playerDice, playerFaceIdx, tele);
-                    _pause.rerollCost = freeRerolls > 0 ? 0 : playerDice.Length * nth;
+                    _pause.rerollCost = RerollCostNow(playerDice.Length, nth, freeRerolls > 0);
                     // 振り直すかを決める時も手札と場を見せる (手札は振り直しで変わらない)。 敵の攻撃は予告の近似で組む
                     if (_deck != null) { _pause.board = _deck.board; _pause.terminalEnv = TerminalEnvNow(ctx, tele.enemyAttackValue); _pause.terminalState = _deck.state; }
                     yield return _pause;
-                    pick = _pause.reroll ? AllDiceIndex(playerDice.Length) : null;
+                    pick = !_pause.reroll ? null
+                         : appraiser ? AllDiceIndexExcept(playerDice.Length, _pause.rerollKeep) : AllDiceIndex(playerDice.Length);
                 }
                 else pick = RerollPolicy(playerDice, tele, nth);
                 if (pick == null || pick.Length == 0) break;
 
                 // ADR-0011: 振り直せない面は無い。 常に全ダイスを振り直す。
+                //   例外は目利きの賽 (ADR-0015): 方策 / 画面が 1 つ除いた添字を返したら、 その目を残して残りを振る。
                 rerollIdx.Clear();
-                for (int i = 0; i < playerDice.Length; i++) rerollIdx.Add(i);
+                if (appraiser && pick.Length == playerDice.Length - 1)
+                    foreach (int i in pick) { if (i >= 0 && i < playerDice.Length) rerollIdx.Add(i); }
+                else for (int i = 0; i < playerDice.Length; i++) rerollIdx.Add(i);
+                rerollIdx.Remove(_carveFixed);   // 刻みの賽: 刻んで置いた目は振り直さない
+                if (rerollIdx.Count == 0) break;
 
-                int cost = rerollIdx.Count * nth;
-                bool usedFree = false;
-                if (freeRerolls > 0) { cost = 0; freeRerolls--; usedFree = true; }
+                bool usedFree = freeRerolls > 0;
+                int cost = RerollCostNow(rerollIdx.Count, nth, usedFree);   // 〈無力感〉の +1 もここ (無料の時は足さない)
+                // 賭場の賽 (ADR-0015): 充電の代わりに HP を払う。 HP が払えない (払うと 0 になる) なら振り直せない
+                bool gamble = DiePassives.FreeRerollByDie(GameLoop.GameManager.Instance?.Run);
+                if (gamble && playerHP <= DiePassives.GambleHpCost) break;
+                if (usedFree) freeRerolls--;
                 if (!ctx.ConsumeCharge(cost)) break;   // 払えなければそこで打ち切り
+                if (gamble)
+                {
+                    playerHP -= DiePassives.GambleHpCost;
+                    ctx.playerCurrentHP = playerHP;
+                    Debug.Log($"[賽] 賭場の賽: 振り直しの代わりに HP −{DiePassives.GambleHpCost} → {playerHP}");
+                }
 
                 for (int k = 0; k < rerollIdx.Count; k++)
                 {
@@ -273,6 +298,22 @@ namespace CombatSystem
             if (playerHP > 0) return;
             var run = GameLoop.GameManager.Instance?.Run;
             if (run == null) return;
+            // 墓標の賽 (ADR-0015): 1 度だけ砕けて HP 1 で踏みとどまる。 砕けた後は最初の賽に戻る (この戦闘の残りの面も替える)。
+            //   ラストスタンド (メタ) より先 ── 賽の約束を先に果たし、 ラストスタンドは次の死に残す。
+            if (GameLoop.EquippedDie.IdOf(run) == GameLoop.DieIds.Gravestone)
+            {
+                GameLoop.EquippedDie.Equip(run, GameLoop.DieIds.Starting);
+                if (ctx != null)
+                {
+                    GameLoop.EquippedDie.Build(run, out var faces, out var tiers);
+                    ctx.equippedDiceFaces = faces;
+                    ctx.equippedFaceTiers = tiers;
+                }
+                playerHP = 1;
+                if (ctx != null) ctx.playerCurrentHP = playerHP;
+                Debug.Log("[賽] 墓標の賽が砕けた: HP 1 で踏みとどまり、 角の取れた賽に戻った");
+                return;
+            }
             bool isBoss = MapSystem.MapManager.Instance?.CurrentNode != null
                 && MapSystem.MapManager.Instance.CurrentNode.type == MapSystem.TileType.Boss;
             if (!GameLoop.LastStand.TryConsumeLastStandInCombat(run, isBoss)) return;
@@ -306,8 +347,8 @@ namespace CombatSystem
         ///
         /// 役は振った時点の 3 個で判定し、 端子への置き方は条件にしない。 1 戦闘 1 回の制限も、
         /// 発動の任意選択も、 使用済みの管理も持たない (ADR-0011 決定 2)。
-        /// 成立するかどうかは「その目の面を持っているか」(出目パーツの Tier) で決まる ──
-        /// T2 以上で 2 個そろい、 T3 以上でゾロ目。 T1 (素の面) は何も起きない。
+        /// 賽がその目の面を持っていれば、 2 個そろいもゾロ目も効く (ADR-0015・Tier は 2026-11-18 にやめた)。
+        /// 連なりの賽を持つ時だけ、 3 つの連番 (連なり) も役になる。
         /// 3 個では 2 つの役を同時に作れないので、 効くのは 1 ターンに高々 1 つ。</summary>
         private RoleOutcome ResolveRoles(CombatContext ctx, int[] playerDice, int[] playerFaceIdx)
         {
@@ -325,11 +366,7 @@ namespace CombatSystem
                 // T4-C〈凶運〉: このランで封印されている役は成立しても効かない。
                 if ((ctx.sealedRoleMask & (1 << (int)k)) != 0) continue;
 
-                // その目の面の Tier (同じ目の面は 1 枚までなので、 同じ出目なら同じ Tier)。
-                int face = YachtRoles.FaceOf(k);
-                var tier = GameLoop.DiceFaceParts.Tier.None;
-                for (int d = 0; d < playerDice.Length; d++)
-                    if (playerDice[d] == face) { tier = YachtRoles.TierAt(ctx.equippedFaceTiers, playerFaceIdx, d); break; }
+                var tier = GameLoop.DiceFaceParts.Tier.T3;   // Tier は使わない (ADR-0015)。 実績の呼び手のために渡すだけ
 
                 YachtRoleEffects.Apply(k, tier, ctx, ref outcome);
                 ctx.firedRolesThisTurn.Add(k);
@@ -338,7 +375,7 @@ namespace CombatSystem
                 // [計装 2026-08-15] ダイス別の発動は戦闘単位で FinishCombat が積む
                 //   (役の発動地点から GameManager.Instance を引かないため)。
                 YachtRoleEffects.FiredThisCombat[(int)k]++;
-                MetaProgression.Achievements.AchievementService.NoteRoleFired(k);
+                MetaProgression.Achievements.AchievementService.NoteRoleFired(k, tier);
             }
 
             if (ctx.firedRolesThisTurn.Count > 0)

@@ -18,7 +18,7 @@ public class Game2DFxTestWindow : EditorWindow
     private static readonly string[] Cats = { "全部", "大技", "通常の技", "武器", "その他" };
     private static readonly string[] Relics = { "攻撃", "防御", "妨害" };
     private static readonly string[] Tenyos = { "none", "sword", "shield", "ring" };
-    private int _tenyo, _forceTenyo = 1;
+    private int _tenyo, _forceTenyo = 1, _heavyPick;
     private static readonly float[] Speeds = { 1f, 0.5f, 0.25f };
 
     private string[] _enemies = new string[0];
@@ -120,6 +120,21 @@ public class Game2DFxTestWindow : EditorWindow
             _relic = EditorGUILayout.Popup("ヴェスカの次の遺物", _relic, Relics);
             if (GUILayout.Button("指定", GUILayout.Width(60))) _last = "ForceRelic → " + QaBattle.ForceRelic(Relics[_relic]);
         }
+
+        // ── ボスの大技を通しで流す (2026-11-17・BossHeavyPreview・メニュー Tools/DICE BOUND/ボスの大技を流す と同じ) ──
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("ボスの大技を通しで流す (チャージ → 待機 → 溜め → 全画面 → 着弾)", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox("タイトル (ランが無い) なら使い捨ての戦闘を立ち上げてから流す (セーブ抑止)。 戦闘中なら判断待ちの時に今の戦闘の上で流す。 航行中は断る。", MessageType.None);
+        var labels = System.Array.ConvertAll(BossHeavyPreview.Entries, e => e.label);
+        _heavyPick = EditorGUILayout.Popup("大技", _heavyPick, labels);
+        BossHeavyPreview.IdleSeconds = EditorGUILayout.Slider("待機を見せる秒", BossHeavyPreview.IdleSeconds, 0.5f, 6f);
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            if (GUILayout.Button("通しで流す")) BossHeavyPreview.Play(_heavyPick);
+            if (GUILayout.Button("もう一度")) BossHeavyPreview.Again();
+            if (GUILayout.Button("止める")) BossHeavyPreview.Stop();
+        }
+        EditorGUILayout.LabelField("様子", BossHeavyPreview.State);
 
         // ── ボスの大技を直接流す ──
         EditorGUILayout.Space();

@@ -181,7 +181,7 @@ namespace CombatSystem
             turnLog.Add(result);
 
             OnTurnEnd?.Invoke(result);
-            MetaProgression.Achievements.AchievementService.NoteTurnEnded(result);
+            MetaProgression.Achievements.AchievementService.NoteTurnEnded(result, ctx);
 
             // ログ出力
             LogTurnResult(result);
@@ -214,6 +214,8 @@ namespace CombatSystem
             //   パッシブの発火順に頼らずここで確定させる。
             // 端子の撃破のボーナス (#117): このターン最後の確かめ (ターン終了時の効果の削りを SyncHPFromContext で拾った後・次の形態へ移す前)
             SettleTerminalKillBonus(enemyHP, final: true);
+            // 賽のパッシブ (ADR-0015): 拾い物 (①が出た)・古銭 (⑧が出て敵を倒した) のゴールド。 次の形態へ移る前に撃破を見る
+            DiePassives.OnTurnEnd(GameLoop.GameManager.Instance?.Run, ctx.playerDice, enemyHP <= 0 && playerHP > 0);
             if (enemyHP <= 0 && playerHP > 0) TryAdvanceVescaChain();
 
             // 2 体戦の締め。 SetSecondaryEnemy の不変条件 (2 体目の HP ≤ 1 体目) が成り立つ限り
@@ -365,7 +367,6 @@ namespace CombatSystem
             if (fleeAfterTurns > 0 && ctx != null && ctx.currentTurn >= fleeAfterTurns
                 && playerHP > 0 && enemyHP > 0)
             {
-                MetaProgression.Achievements.AchievementService.NoteEnemyEscaped(currentEnemy?.id);
                 Debug.Log($"[CombatManager] 偽の商人: {fleeAfterTurns}ターン経過 → 逃走（戦闘強制終了）");
                 FinishCombat();
                 _stepResult = new TurnResult
@@ -528,6 +529,7 @@ namespace CombatSystem
             //   **回復の後・ダメージの前**に取る。 差分で採るのは、 通常ダメージ・固定ダメ・出血・
             //   反射・反撃固定ダメと**削る経路が 5 本ある**ため ── 個別に足すと必ずどれかを取り落とす。
             int primaryHpBeforeDamage = enemyHP;
+            int secondaryHpAtTurnStart = secondaryEnemy != null ? secondaryHP : 0;   // [読むための欄・実績〈一網打尽〉]
 
             int enemyExtraDice = (int)ctx.GetAccumulated("extraDice");
             ctx.accumulatedValues["extraDice"] = 0;
@@ -539,6 +541,7 @@ namespace CombatSystem
             // --- 1. 敵ロール (スタンスなし = ADR-0005 は superseded) ---
             int actualPlayerDiceCount = playerDiceCount;
             int[] enemyDice = RollEnemyAttack(currentEnemy, enemyExtraDice);
+            _enemyDiceNow = enemyDice;
             int actualEnemyDiceCount = enemyDice.Length;
 
             // --- 3. 自ロール ---
@@ -547,6 +550,17 @@ namespace CombatSystem
             //   playerFaceIdx を必ず同期すること ── 忘れると別の面の効果が発火する。
             int[] playerFaceIdx;
             int[] playerDice = RollDice(actualPlayerDiceCount, playerDiceMax, ctx.equippedDiceFaces, out playerFaceIdx);
+            // 刻みの賽 (ADR-0015): 前のターンに刻んだ目を 1 つ目に置く (振った値を捨てて置き換える・この目は振り直さない)
+            _carveFixed = -1;
+            if (_carveNext > 0 && playerDice.Length > 0
+                && GameLoop.EquippedDie.IdOf(GameLoop.GameManager.Instance?.Run) == GameLoop.DieIds.Carve)
+            {
+                playerDice[0] = _carveNext;
+                if (playerFaceIdx != null && playerFaceIdx.Length > 0)
+                    playerFaceIdx[0] = ctx.equippedDiceFaces != null ? System.Array.IndexOf(ctx.equippedDiceFaces, _carveNext) : -1;
+                _carveFixed = 0;
+            }
+            _carveNext = 0;
             CombatStats.NoteFirstRoll(actualPlayerDiceCount, ctx, playerDice);
 
             // 恒久デバフ〈コルヴェンの憤怒〉: ボス戦の 1 ターン目は自ダイスが全て最大値 (HP 半減は戦闘開始時に済ませてある)。
@@ -775,8 +789,10 @@ namespace CombatSystem
                     _pause.catDie = _catDie; _pause.catSlot = _catSlot;
                     yield return _pause;
                     slots = _pause.slots; targets = _pause.targets; goldAsk = _pause.goldSpend; keepMarks = _pause.keep;
+                    DecideCarve(playerDice, _pause.carveDie, human: true);
                 }
                 else if (WiringPolicy != null) { var plan = WiringPolicy(playerDice, tele); slots = plan.slots; targets = plan.targets; goldAsk = plan.goldSpend; keepMarks = plan.keep; }
+                if (!_interactiveTurn) DecideCarve(playerDice, -1, human: false);   // 刻みの賽: BOT の経路はいちばん大きい目を刻む
                 if (slots == null) slots = TerminalWiring.Auto(_deck.board, playerDice, tenv, _deck.state, _catDie, _catSlot);
                 // 猫の 1 組は答えに関わらず入れる (外した答え・同じ口に挿しすぎた答えは、 猫の組を残して直す)
                 if (_catDie >= 0) slots = TerminalWiring.WithPair(slots, playerDice.Length, _deck.board, _catDie, _catSlot);
@@ -925,6 +941,11 @@ namespace CombatSystem
                 enemyDice = enemyDice,
                 playerDiceTotal = ctx.playerDiceTotal,
                 enemyDiceTotal = ctx.enemyDiceTotal,
+                // [読むための欄・実績] 戦闘の計算には使わない
+                escalationStage = Escalation.StageOf(escTurn),
+                secondaryHPAtStart = secondaryHpAtTurnStart,
+                wiredKinds = (attackDiceCount > 0 ? TurnResult.WiredAttack : 0) | (blockDiceCount > 0 ? TurnResult.WiredBlock : 0)
+                           | (chargeDiceCount > 0 ? TurnResult.WiredCharge : 0) | (specialCount > 0 ? TurnResult.WiredSupport : 0),
             };
 
             // --- 6. 解決: プレイヤー攻撃 → 敵攻撃 (自先制・撃破時は敵攻撃なし) ---
@@ -1055,16 +1076,33 @@ namespace CombatSystem
             ctx.fixedDamageToEnemy += ItemSystem.PassiveSkills.Keywords.Kw.TakePendingEnemyDamage(ctx);
             // [診断] この呼び出しだけが「プレイヤー勝利の主攻撃」。 段別計測はここでのみ積む。
             CombatStats.DiagWinAttack = true;
+            // 分け身の賽 (ADR-0015): 攻撃を 2 回に分ける (1 回あたり攻撃値の半分・切り上げ)。 攻撃のたびに起きる効果
+            //   (ProcessDamage の中の会心の判定・OnPreDealDamage・敵の防御、 ApplyWinDamageModifiers) は 2 回とも起きる。
+            bool splitHits = !skipAttack && atkBase > 1
+                && GameLoop.EquippedDie.IdOf(GameLoop.GameManager.Instance?.Run) == GameLoop.DieIds.Split;
+            int hitBase = splitHits ? (atkBase + 1) / 2 : atkBase;
             var (dealtDmg, dealtFixed, isCrit) = psm.ProcessDamage(
-                atkBase, ctx.pursuitDamage, playerCritBaseRate);
+                hitBase, ctx.pursuitDamage, playerCritBaseRate);
             int lbStage = GameLoop.GameManager.Instance?.Run?.limitBreakStage ?? 0;
             dealtDmg = ApplyWinDamageModifiers(dealtDmg, ref dealtFixed, ref isCrit, lbStage, psm, ctx);
+            if (splitHits)
+            {
+                // 2 回目の前に固定ダメの枠を空にする ── 空にしないと 1 回目の固定ダメ (毒・爆発・品が預けた分) が 2 回目にも返って二重に入る。
+                ctx.fixedDamageToEnemy = 0;
+                var (dmg2, fix2, crit2) = psm.ProcessDamage(hitBase, 0, playerCritBaseRate);
+                dmg2 = ApplyWinDamageModifiers(dmg2, ref fix2, ref crit2, lbStage, psm, ctx);
+                dealtDmg += dmg2; dealtFixed += fix2; isCrit |= crit2;
+                Debug.Log($"[賽] 分け身の賽: 攻撃 {atkBase} → {hitBase} × 2 回 (与ダメ {dealtDmg})");
+            }
             // 攻撃しないターン (攻撃端子 0 本・逃げる) は主攻撃を 0 にする (2026-11-04)。
             //   atkBase を 0 にしても、 ProcessDamage の中でバフ (damageBonus) と OnPreDealDamage のパッシブが
             //   主攻撃へ加算していたので、 攻撃しないはずのターンに 1 以上のダメージが入っていた。 会心も立てない。
             //   逃げるターンは固定ダメの枠も捨てる (atkBase の確定後に足された臨界爆発・品が預けた分を含む)。
             //   役の追撃も攻撃に付くものなので、 攻撃しないターンには乗せない。
             if (skipAttack) { dealtDmg = 0; isCrit = false; }
+            // [読むための欄・実績〈鎧通し〉] 主攻撃が通り、 敵の防御を貫通で 0 にした (ProcessDamage の中の防御の計算と同じ式で読むだけ)
+            result.defensePiercedToZero = !skipAttack && dealtDmg > 0 && ctx.enemyDefense > 0
+                && DefenseFormula.Effective(ctx.enemyDefense, ctx.playerArmorPen + (isCrit ? ctx.critArmorPen : 0)) == 0;
             // 画面: 主攻撃の倍率 (会心・与ダメ%・敵の防御まで全部込みの 最終 ÷ 倍率の前の攻撃値) を着弾の数字の横に出す (2026-11-11)
             LastHitMultPct = !skipAttack && atkBase > 0 && dealtDmg > 0 ? Mathf.RoundToInt(dealtDmg * 100f / atkBase) : 0;
             EnemyHpLedger.CommitMainMitigation(!skipAttack);   // [計装] 主攻撃の防御・敵の軽減で削った量
@@ -1168,6 +1206,7 @@ namespace CombatSystem
                     attackSum, blockSum, dealtDmg + dealtFixed);
             }
 
+            result.enemyHPBeforeAttack = enemyHP;   // [読むための欄・実績〈やりすぎ〉] 主攻撃を当てる直前の敵の HP
             HpLossDiag.Lose(ref enemyHP, dealtDmg, "通常攻撃");
             NoteBossDownMainHit(dealtDmg, ctx.currentTurn);   // ボスのダウン (2026-11-14): 目盛りを割れるのは通常攻撃だけ (固定ダメの枠より前の HP で判定)
             HpLossDiag.Lose(ref enemyHP, dealtFixed, "固定ダメ");
@@ -1551,6 +1590,7 @@ namespace CombatSystem
                 (primaryAttacked ? enemyAtkBeforeDefense : 0) + (secondaryAttacked ? secondaryAtkBeforeDefense : 0);
             ctx.accumulatedValues[ItemSystem.PassiveSkills.Effects.MutualKeys.HpLossFromEnemy] = takenApplied;
             BossDownDiag.NoteEnemyTurn(diagHeavyKind, takenApplied);   // [診断 2026-11-14] 大技 / 小技のターンの被ダメ (防御・シールドの後)
+            FightEndDiag.NoteEnemyTurn(diagHeavyKind, primaryAttacked, takenApplied);   // [計装 2026-11-18] 戦闘の終わりの診断 (読むだけ)
             if ((diagHeavyKind == 0 || diagHeavyKind == 2) && primaryAttacked)   // [計装 2026-11-14] 大技の被ダメ (実際に撃った大技 / 小技のターン)
                 HeavyHitDiag.NoteHit(diagHeavyKind, enemyAtkBeforeDefense, takenApplied, playerMaxHP, diagHpBeforeEnemy, playerHP <= 0, blockDiceCount,
                                      diagHitMain, diagBurst, diagHeavyKind == 0 ? diagBlazeStacks : 0);

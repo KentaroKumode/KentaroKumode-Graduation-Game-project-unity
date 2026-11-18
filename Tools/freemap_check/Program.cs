@@ -109,7 +109,7 @@ static partial class T
             for (int i = 0; i < 120 && !s.InFight; i++) { s.Wait(); seen.Add(s.FoeNode); }
             Check(seen.Count >= 3, $"巡回: 追跡者は {seen.Count} 点を回った（縄張り {s.Territory.Count}）");
         }
-        // --- 補足→追跡→捕まる / ETA ---
+        // --- 捕捉→追跡→捕まる / ETA ---
         {
             var s = Make(5, FoeProfile.Brute, WeatherKind.None);
             int target = s.Layout.home; int guard = 0; FreeMapEvent acc = 0; bool detectedSeen = false; bool etaSeen = false;
@@ -120,8 +120,8 @@ static partial class T
                 if ((ev & FreeMapEvent.Detected) != 0) detectedSeen = true;
                 if (s.Eta().Valid) etaSeen = true;
             }
-            Check(detectedSeen, "補足イベントが出る");
-            Check(etaSeen, "補足中は ETA が出る");
+            Check(detectedSeen, "捕捉イベントが出る");
+            Check(etaSeen, "捕捉中は ETA が出る");
             Check((acc & FreeMapEvent.Caught) != 0 && s.Contact == FreeMapSim.ContactKind.Body, "捕まる (Caught)");
             Check(s.PendingArrival == s.Me, "着いた点が戦闘後の発動待ちになる");
             s.ResolveBodyWon();
@@ -223,7 +223,7 @@ static partial class T
             int target = s2.Layout.home; int guard = 0; bool launched = false;
             while (!s2.InFight && guard++ < 60) { int nx = s2.StepToward(s2.Me, target); if (nx == s2.Me) break; var ev = s2.MoveTo(nx); if ((ev & FreeMapEvent.FamiliarLaunched) != 0) launched = true; }
             for (int i = 0; i < 8 && !s2.InFight; i++) { var ev = s2.Wait(); if ((ev & FreeMapEvent.FamiliarLaunched) != 0) launched = true; }
-            Check(launched || s2.InFight, "召喚者は補足中に使い魔を放つ");
+            Check(launched || s2.InFight, "召喚者は捕捉中に使い魔を放つ");
         }
         // --- 近道 (イベント「近道+N」= ただで動ける回数・2026-11-12) ---
         {
@@ -379,7 +379,7 @@ static partial class T
                 }
             Check(oldLayers > 0 && oldDiff == 0, $"イベントの呼ぶ・遠ざける (旧い作り): 縄張りを見ない動きのまま ({oldLayers} 層・食い違い {oldDiff})");
         }
-        // --- 縄張りの外に居れば補足されない・外の囮罠には縁まで引かれて踏まない ---
+        // --- 縄張りの外に居れば捕捉されない・外の囮罠には縁まで引かれて踏まない ---
         foreach (var pr in new[] { FoeProfile.Summoner, FoeProfile.Houndmaster, FoeProfile.Sprinter, FoeProfile.Brute })
         {
             int tested = 0, detected = 0, leftT = 0, lureTrig = 0, alerted = 0, backToPatrol = 0;
@@ -402,7 +402,7 @@ static partial class T
                 if (s.FoeMode == FoeMode.Patrol) backToPatrol++;
             }
             Check(tested > 0 && detected == 0 && leftT == 0 && lureTrig == 0 && (pr.foeSteps == 0 || backToPatrol == tested),   // 動かない召喚者は警戒のまま (旧い作りと同じ)
-                $"縄張りの外 ({pr.id}): 補足されない・外の囮罠は踏まない・囮罠が切れたら巡回へ戻る (試 {tested} / 補足 {detected} / 外へ {leftT} / 踏む {lureTrig} / 気を引かれた {alerted} / 巡回へ {backToPatrol})");
+                $"縄張りの外 ({pr.id}): 捕捉されない・外の囮罠は踏まない・囮罠が切れたら巡回へ戻る (試 {tested} / 捕捉 {detected} / 外へ {leftT} / 踏む {lureTrig} / 気を引かれた {alerted} / 巡回へ {backToPatrol})");
         }
         // --- 縄張りの宝 ---
         {
@@ -537,7 +537,7 @@ static partial class T
                     var L = FreeMapGenerator.Generate(floor);
                     var s = new FreeMapSim(L, new Wallet(), true, pr, WeatherKind.None);
                     s.ConfigureTerritory(true, true); layers++;
-                    s.UseFlare();   // 照明で補足の歩数を伸ばしても (3 歩・召喚者は 5 歩)、 縄張りの外なら気づかれない
+                    s.UseFlare();   // 照明で捕捉の歩数を伸ばしても (3 歩・召喚者は 5 歩)、 縄張りの外なら気づかれない
                     for (int g = 0; g < 80 && s.Me != L.goal; g++)
                     {
                         int nx = s.StepAvoidingTerritory(s.Me, L.goal, out _, out int terr);

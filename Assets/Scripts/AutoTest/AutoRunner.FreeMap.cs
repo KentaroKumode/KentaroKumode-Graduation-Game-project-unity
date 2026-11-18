@@ -11,7 +11,7 @@ namespace AutoTest
     /// <list type="bullet">
     /// <item><b>Naive</b>: 行き先だけを決めて最短の道を歩く。 追跡者を避けない。</item>
     /// <item><b>Optimal / Super / Exact / Ultra</b>: 同じ行き先に加えて、 <b>見えている / 魔石に出ている追跡者を避ける</b>
-    ///       ── 次の 1 歩を、 追跡者に近づかない隣へ振る・補足されたら囮罠を使う。</item>
+    ///       ── 次の 1 歩を、 追跡者に近づかない隣へ振る・捕捉されたら囮罠を使う。</item>
     /// </list>
     /// どの方策も乱数を使わない。 追跡者の性質 (<see cref="FoeProfile"/>) は読まない (プレイヤーには明かされない)。
     ///
@@ -106,6 +106,8 @@ namespace AutoTest
         /// <summary>航行の方策を戦闘の技量から切り離す。 -1 = 技量に従う (既定) / 0 = Naive / 1 以上 = 追跡者を避ける。
         /// 「航行の読みの深さ」と「戦闘の読みの深さ」を別々に測るためのつまみ。</summary>
         [System.NonSerialized] public int freeNavModeOverride = -1;
+        /// <summary>[アブレーション 2026-11-17] 航行マップの行き先を一様抽選へ潰す (既定 false・<see cref="AblationRng"/> を使い GameRng を引かない)。</summary>
+        [System.NonSerialized] public bool ablateFreeNav;
         /// <summary>[計装] 方策ごとの航行判断の回数・逃げた回数・出口へ向かった回数・囮罠を使った回数 (バッチ累計)。添字は 0 Naive / 1 回避あり。</summary>
         public static readonly long[] FreeNavDecisions = new long[2], FreeNavFlees = new long[2], FreeNavExits = new long[2], FreeNavLures = new long[2];
 
@@ -241,7 +243,32 @@ namespace AutoTest
                 revealed[i] = n.revealed;
                 if (n.revealed && n.EffectiveType == TileType.Boss) boss = i;
             }
-            return new StormNavView(sim, revealed, boss);
+            if (navStormOracleBoss) boss = sim.Layout.goal;   // [測定 2026-11-18] 上限の見当: ボスの位置を知っているとして動く (既定 false)
+            var sv = new StormNavView(sim, revealed, boss);
+            // [測定 2026-11-18・第 4 層の踏み込み過ぎの検証] 道すがらの戦闘の点を、 その戦闘で失う HP の見込み × 倍率だけ道の費用に入れる (既定 0 = 足さない)
+            var run = GameManager.Instance?.Run;
+            if (navD6PathFightCost > 0f && run != null && FloorPlan.OrdinalOf(run.Depth) == D6Layer)
+            {
+                var extra = new double[sim.Layout.Count];
+                float maxHp = Mathf.Max(1f, run.playerMaxHP);
+                foreach (var n in map.GetAllNodes())
+                {
+                    int i = n.index;
+                    if (i < 0 || i >= extra.Length || n.activated || i == boss) continue;
+                    char kind = !n.revealed ? 'U' : n.EffectiveType == TileType.Battle ? 'N' : n.EffectiveType == TileType.EliteBattle ? 'E' : ' ';
+                    if (kind == ' ') continue;
+                    // 1 戦の損 (最大 HP の割合): 戦闘名が見えていればその学習値 → 種類の学習値 → 仮置き (MacroFight と同じ順)
+                    string key = n.revealed && n.encounterRevealed ? EncounterDangerStats.KeyOf(n, run.Depth) : null;
+                    double mean;
+                    if (key == null || !EncounterDangerStats.TryGet(key, out _, out mean, out _, out _))
+                        if (!EncounterDangerStats.TryGetKind(D6Layer, kind == 'E' ? 'E' : 'N', out mean, out _))
+                            mean = kind == 'E' ? EliteHpLossFallback : NormalHpLossFallback;
+                    if (kind == 'U') mean *= MacroUnknownWeight;
+                    extra[i] = navD6PathFightCost * mean * maxHp / FreeMapParams.HpPerSupply;
+                }
+                sv.NodeExtraCost = extra;
+            }
+            return sv;
         }
 
         /// <summary>[計装] 層が変わったら判断の記録を戻し、 ボスの点が見えた手番を記録する (種別が見えている点だけを見る・口によらない)。</summary>
@@ -416,7 +443,7 @@ namespace AutoTest
             bool cantFightBlind = hpRatio < dangerTarget;
             int nCount = L.Count;
 
-            // ── 補足されている: 囮罠を使う (回避あり) ──
+            // ── 捕捉されている: 囮罠を使う (回避あり) ──
             if (avoid)
             {
                 var eta = sim.Eta();
@@ -429,7 +456,7 @@ namespace AutoTest
             }
 
             // ── 〈補給線〉(〈兵站〉r10・2026-11-09): 追われていたら、 追跡者から今より 3 歩以上遠い中継点へ跳ぶ ──
-            //   補足は解けない (追跡者は跳んだ先へ向かう) ので、 稼げるのは距離だけ。 ターンを使わないので同じ判断をもう一度する。
+            //   捕捉は解けない (追跡者は跳んだ先へ向かう) ので、 稼げるのは距離だけ。 ターンを使わないので同じ判断をもう一度する。
             //   「今より遠い」でしか跳ばないので、 跳び返して往復することはない。
             if (sim.FoeAlive && sim.FoeMode == MapSystem.FreeMove.FoeMode.Chase && GameManager.SupplyLineUnlocked
                 && run.provision >= FreeMapParams.RelaySupply)
@@ -510,8 +537,10 @@ namespace AutoTest
             bool toExit = _freeMapActions > MaxFreeMapActionsPerFloor
                           || exitHopsAt == int.MaxValue
                           || (!exitOk && !refuelOk)
-                          || (sv == null && sim.StormMode && sim.StormPhase >= 3);   // 嵐 (2026-11-13・(a)): フェーズ 3 に入ったら出口へ (輪がボスの点へ縮み、 フェーズ 4 はボスの点のほか全部が嵐の中)。
+                          || (sv == null && sim.StormMode && sim.StormPhase >= 3)
+                          || (sv != null && navStormExitAtPts > 0 && sim.Instability >= navStormExitAtPts);   // [測定 2026-11-18] 累計で出る規則 (既定 0 = 使わない)   // 嵐 (2026-11-13・(a)): フェーズ 3 に入ったら出口へ (輪がボスの点へ縮み、 フェーズ 4 はボスの点のほか全部が嵐の中)。
                                                                                      //   嵐の見方 (口 navStormAware) では外す ── 切り上げは下の値の比較 (取る価値 − 嵐の代償 ≦ 0) で出る
+            bool forcedExit = toExit, choosing = false;   // [アブレーション 2026-11-17] 行き先を選ぶ枝 (計画 / Rank) に入ったか
             if (!toExit && !exitOk && refuelOk) target = refuel;   // 先に補給
             else if (!toExit && WantsTerritoryTreasure(mm, sim, hopsFromMe, run, hpRatio, sv))
             {
@@ -520,11 +549,13 @@ namespace AutoTest
             }
             else if (!toExit && v3.macroPlan)
             {
+                choosing = true;
                 target = MacroTarget(gm, mm, sim, L, at, hopsFromMe, run, sv);
                 if (target < 0) toExit = true;
             }
             else if (!toExit)
             {
+                choosing = true;
                 int fearR = navFear > 0f ? FearRange() : 0;
                 int[] fearHops = fearR > 0 ? FearFoeHops(sim, at) : null;   // [測定 2026-11-12・#35] 恐れ
                 var rankStorm = sv != null ? new StormRankCtx(this, sv, sim, run, at, hpRatio, dangerTarget) : null;   // 嵐の見方: 点の値から嵐の代償を引く
@@ -547,6 +578,23 @@ namespace AutoTest
                     if (value > best + 1e-6f) { best = value; target = n.index; }
                 }
                 if (target < 0) toExit = true;   // 近くの未使用の点が 1 つも無ければ出口へ
+            }
+            // [アブレーション 2026-11-17・体験の物差し] 航行の行き先の選び方を潰す: 計画 / Rank の代わりに、 未使用で・届いて・行った先から出口か店まで歩ける点から一様に選ぶ。
+            //   補給・縄張りの宝・物資や行動の上限で出口へ向かう規則 (作法) は残す。 「層を出る」判断も潰す (候補が尽きるまで回る)。
+            //   専用乱数 (AblationRng) だけを使い、 GameRng は引かない。 既定 false。
+            if (ablateFreeNav && choosing && !forcedExit)
+            {
+                var cand = new List<int>();
+                foreach (var n in map.GetAllNodes())
+                {
+                    if (n.index < 0 || n.index == at || n.index == (sv == null ? L.goal : sv.Boss) || n.index == L.start) continue;
+                    if (n.activated || sim.IsSunk(n.index)) continue;
+                    if (hopsFromMe[n.index] == int.MaxValue) continue;
+                    if (!SustainableAt(mm, sim, n.index, NavSupply(run, sim) - hopsFromMe[n.index] * FreeMapParams.MoveSupply, run, sv)) continue;
+                    cand.Add(n.index);
+                }
+                if (cand.Count > 0) { target = cand[AblationRng.Next(0, cand.Count)]; toExit = false; }
+                else { target = -1; toExit = true; }
             }
             if (toExit)
             {

@@ -33,9 +33,9 @@ namespace GameEditor
             {
                 // 面は先頭 n 個 (2,3,4,5,1,6,7,8,9 の順)。 確率は面数だけで決まるので並びは検算に影響しない。
                 var order = new[] { 2, 3, 4, 5, 1, 6, 7, 8, 9 };
-                var parts = new List<DiceFaceParts.Part>(n);
-                for (int i = 0; i < n; i++) parts.Add(new DiceFaceParts.Part(order[i], DiceFaceParts.Tier.T4));
-                DiceFaceParts.Build(parts, out int[] faces, out DiceFaceParts.Tier[] tiers);
+                var faces = new int[n];
+                var tiers = new DiceFaceParts.Tier[n];
+                for (int i = 0; i < n; i++) { faces[i] = order[i]; tiers[i] = DiceFaceParts.Tier.T4; }
 
                 long total = 0, any = 0, anyTriple = 0, pairOfFirst = 0, tripleOfFirst = 0;
                 var hand = new int[DiceCount];

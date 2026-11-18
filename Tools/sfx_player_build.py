@@ -12,7 +12,7 @@ GROUPS = [
              ('hit_axe', 'ヒット 斧 (通常)'), ('crit_axe', 'ヒット 斧 (会心)'), ('charge_shield', '盾 チャージ (通常)'), ('charge_shield_crit', '盾 チャージ (会心)'), ('hit_shield', '盾 解放 (通常)'), ('crit_shield', '盾 解放 (会心)'),
              ('battle_start', '戦闘開始'), ('enemy_appear', '敵の登場'), ('victory', '勝利'), ('defeat', '敗北')]),
     ('【画面の中・8bit】航行・地図上のできごと', [('step', '足音'), ('node_hover', 'ノード ホバー'), ('recon', '偵察'), ('flare_launch', '照明 打ち上げ'), ('flare_burst', '照明 開く'), ('lure_set', '囮罠 設置'),
-             ('lure_hit', '囮罠 作動'), ('chase_riser', '追跡者 補足 (上昇)'), ('chase_hit', '追跡者 補足 (衝撃)'), ('alert', '警戒'), ('lost', '見失い'), ('caught', '捕まる'),
+             ('lure_hit', '囮罠 作動'), ('chase_riser', '追跡者 捕捉 (上昇)'), ('chase_hit', '追跡者 捕捉 (衝撃)'), ('alert', '警戒'), ('lost', '見失い'), ('caught', '捕まる'),
              ('familiar', '使い魔'), ('hurt', '被ダメージ'), ('floor_up', '階層移動')]),
     # 2026-11-15 (#334): 天候の音は「嵐の段が進んだ時に、 その嵐の天候の音」(Game2DSfxHost.Weather)。 崩れる地平・沈み続ける湖面 (crumble / sink) は現象の廃止 (GAME.md §5-12) で鳴らないので外した
     ('【画面の中・8bit】嵐の段が進んだ (その嵐の天候)', [('wx_fog', '霧'), ('wx_sand', '削る砂'), ('wx_snow', '朱の雪'), ('wx_hail', '雹')]),

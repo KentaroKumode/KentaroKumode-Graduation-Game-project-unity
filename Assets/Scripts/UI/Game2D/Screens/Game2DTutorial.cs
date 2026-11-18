@@ -25,7 +25,7 @@ namespace UI.Game2D
         public const string GrowDeck = "端子を増やす";
         public const string Order = "解決の順番";
         public const string Long = "戦闘の長期化";
-        public const string FacePart = "出目パーツ";
+        public const string Dice = "賽";
         public const string Role = "役";
         public const string Crit = "会心";
         public const string ForceCrit = "確定会心";
@@ -97,7 +97,7 @@ namespace UI.Game2D
         /// <summary>
         /// 契機の表 (並び = handbook の並び = 同時に頼まれた時に出す順)。 頼む所:
         /// <list type="bullet">
-        /// <item>ランと帰還 / 層の歩き方 / 前哨基地 / 出目パーツ / 役 / キーワード / 毒 / 出血 / 充電 / 臨界 / 物資 / 持ち物 ── この部品が状態を見て頼む (<see cref="Watch"/>)</item>
+        /// <item>ランと帰還 / 層の歩き方 / 前哨基地 / 賽 / 役 / キーワード / 毒 / 出血 / 充電 / 臨界 / 物資 / 持ち物 ── この部品が状態を見て頼む (<see cref="Watch"/>)</item>
         /// <item>巡回するもの ── 魔石が初めて反応した時 (<see cref="Game2DRadar.SetStone"/>)</item>
         /// <item>戦闘の形式 / 層とボス / 端子の山札 / ダイスを振る / 敵の予告 / 端子に挿す / 端子の種類 / 解決の順番 / 戦闘の長期化 / 会心 / 確定会心 / 逃げる ── 戦闘の流れ (<see cref="Game2DBattleSim"/>)</item>
         /// <item>端子を増やす / 装備と強化 (休憩・武器の入れ替え) / ショップ ── 場面の窓 (<see cref="Game2DPhaseScreens"/>)</item>
@@ -122,7 +122,7 @@ namespace UI.Game2D
             new Topic(TutorialTopics.GrowDeck, Scene.Any),
             new Topic(TutorialTopics.Order, Scene.Battle),
             new Topic(TutorialTopics.Long, Scene.Battle),
-            new Topic(TutorialTopics.FacePart, Scene.Any),
+            new Topic(TutorialTopics.Dice, Scene.Any),
             new Topic(TutorialTopics.Role, Scene.Battle),
             new Topic(TutorialTopics.Crit, Scene.Battle),
             new Topic(TutorialTopics.ForceCrit, Scene.Battle),
@@ -292,7 +292,7 @@ namespace UI.Game2D
         // ラン中の増減を見る節 (物資・持ち物) の前の値。 ランが替わったら (新しいラン・続きから) 取り直す。
         private GameLoop.RunState _watchRun; private int _lastProv, _lastItems;
 
-        /// <summary>ランの状態を見て頼む節: 前哨基地 / 出目パーツ / 物資 / 持ち物。</summary>
+        /// <summary>ランの状態を見て頼む節: 前哨基地 / 賽 / 物資 / 持ち物。</summary>
         private void WatchRun(GameLoop.RunState run, GameManager.GamePhase ph)
         {
             int items = (run.ownedPassiveItems != null ? run.ownedPassiveItems.Count : 0) + (run.ownedConsumables != null ? run.ownedConsumables.Count : 0);
@@ -317,11 +317,9 @@ namespace UI.Game2D
                 if (items > _lastItems) Request(TutorialTopics.Inventory);
                 _lastItems = items;
             }
-            // 「出目パーツ」: 素の面 (DiceFaceParts.StartingParts) に無い面を持っている = 出目パーツを手にした
-            if (run.diceFaceParts != null && !TutorialSeen.Has(TutorialTopics.FacePart))
-                foreach (var p in run.diceFaceParts)
-                    if (p.tier != GameLoop.DiceFaceParts.Tier.T1 || System.Array.IndexOf(GameLoop.DiceFaceParts.StartingFaces, p.face) < 0)
-                    { Request(TutorialTopics.FacePart); break; }
+            // 「賽」: 最初の賽から替えた (ADR-0015)
+            if (!TutorialSeen.Has(TutorialTopics.Dice) && GameLoop.EquippedDie.IdOf(run) != GameLoop.ItemIds.StartingDie)
+                Request(TutorialTopics.Dice);
         }
 
         /// <summary>第三層をクリアした記録がメタ進行にあるか: エンドの記録 (<see cref="Codex.VignetteUnlockState.OnRunClear"/>) か、 挑戦の踏破の記録。</summary>
@@ -415,6 +413,24 @@ namespace UI.Game2D
 
         private const int FocusPad = 2;
 
+        /// <summary>液晶の絵の上の範囲 (戦闘の部品・液晶の dot) を、 画面に見えている範囲 (GUI の格子の dot) へ写す (2026-11-16)。 <b>旧い提示の板 (Game2DGuiRt.InLcd = false) の時だけ使う</b> ──
+        /// 既定 (GUI も液晶の中身として同じに曲がる) では、 部品の範囲をそのまま使えば合う (写すと二重になる)。 旧い形では幕と枠を湾曲しない層に描くので、
+        /// 液晶の湾曲の分だけずれていた。 角と辺の中点の 8 点を写した外接の矩形 (湾曲で辺が弓なりになる分も入れる)。 式は <see cref="Game2DPointer.ScreenDotOfLcd"/>。</summary>
+        private static RectInt LcdRectOnScreen(RectInt q)
+        {
+            var sc = FindObjectOfType<Game2DScreen>(); var lq = sc != null ? sc.lcdQuad : null;
+            float x0 = float.MaxValue, y0 = float.MaxValue, x1 = float.MinValue, y1 = float.MinValue;
+            for (int i = 0; i <= 2; i++)
+                for (int j = 0; j <= 2; j++)
+                {
+                    if (i == 1 && j == 1) continue;
+                    var s = Game2DPointer.ScreenDotOfLcd(lq, new Vector2(q.x + q.width * i * 0.5f, q.y + q.height * j * 0.5f));
+                    x0 = Mathf.Min(x0, s.x); x1 = Mathf.Max(x1, s.x); y0 = Mathf.Min(y0, s.y); y1 = Mathf.Max(y1, s.y);
+                }
+            int ix0 = Mathf.FloorToInt(x0), iy0 = Mathf.FloorToInt(y0);
+            return new RectInt(ix0, iy0, Mathf.CeilToInt(x1) - ix0, Mathf.CeilToInt(y1) - iy0);
+        }
+
         /// <summary>部品の範囲 (格子の dot・左上が原点・余白 <see cref="FocusPad"/> 込み・画面の内側に切る)。 部品が無い・隠れている・ほとんど画面の外なら null。</summary>
         private RectInt? FocusRect(string title)
         {
@@ -435,7 +451,7 @@ namespace UI.Game2D
                 {
                     var r = Game2DBattleLcd.Instance.FocusRect(part.Value, title == TutorialTopics.Long);      // 「戦闘の長期化」= 激化 (敵の頭上)
                     if (!r.HasValue) return null;
-                    var q = r.Value; int lx0 = Mathf.Max(0, q.x - FocusPad), ly0 = Mathf.Max(0, q.y - FocusPad);
+                    var q = Game2DGuiRt.InLcd ? r.Value : LcdRectOnScreen(r.Value); int lx0 = Mathf.Max(0, q.x - FocusPad), ly0 = Mathf.Max(0, q.y - FocusPad);
                     int lx1 = Mathf.Min(Game2DLayout.Width, q.xMax + FocusPad), ly1 = Mathf.Min(Game2DLayout.Height, q.yMax + FocusPad);
                     return new RectInt(lx0, ly0, lx1 - lx0, ly1 - ly0);
                 }

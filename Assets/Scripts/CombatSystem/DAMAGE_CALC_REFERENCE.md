@@ -67,7 +67,9 @@ OnTurnEnd の 4 か所。これ以外の位置で敵パッシブが ctx の HP �
 「1 ターン N 回まで」は BOT の方策 `AutoRunner.RerollMaxPerTurn` 側の打ち切り）。
 
 - コスト: 充電 `振り直す個数 × (この戦闘で払った回数 + 1)`（`ctx.rerollsThisCombat`・ターンでは戻らない）を `ctx.ConsumeCharge` で支払い。**払えなければそこで打ち切り**。
-- 〈特別・対〉の無料分（`YachtRoleEffects.FreeRerollKey`）は費用 0 で、回目に数えない。
+  時限デバフ〈無力感〉（2026-11-16）を持っている間は毎回 **+1**（3 個なら 4・7・10）。式は `CombatManager.RerollCostNow` → `TimedDebuffRule.RerollCost` の 1 か所
+  （本体の支払い・画面の費用の表示 `TurnPause.rerollCost`・BOT の `AutoRunner.MutualRerollPolicy` が同じ値を読む）。
+- 〈特別・対〉の無料分（`YachtRoleEffects.FreeRerollKey`）は費用 0 で、回目に数えない。〈無力感〉の +1 も足さない。
 - 振るかどうかは `RerollPolicy`（BOT / UI が差す）。人が操作するターンは `TurnPauseKind.Reroll` で止まって答えを待つ。
 - スキップ: 強制ロール状態（`player_contre`）。
 - 旧規則（物資 30 を払う・毎ターン最大 1 回・期待値割れだけ振り直す自動ポリシー）は廃止。`ProvisionSystem.RerollCost` の定数は参照されていない。
@@ -281,7 +283,7 @@ ShieldBash の空振り（盾 0）が 34.2% → 66.1%、1 機会あたりの攻�
 | `playerDefenseBase` / `playerArmorPenBase`【2026-10-28】 | プレイヤーの防御・貫通の土台 = 初期防御 2 + 武器の `defense` / `armorPen`（[無印,+]） | 戦闘保持(start で設定) |
 | `playerDefense`【2026-10-28】 | プレイヤーの防御値。ステータス `def`・一対一 が OnPostRoll で加算。（旧〈血令〉の 0 へ換算は 2026-11-11 に外した） | BeginNewTurnで土台へ |
 | `enemyArmorPenNegate`【2026-10-28】 | 敵の固定削りを打ち消す量。剣〈間合〉（ステータス `penNeg`）が OnPostRoll で加算 | BeginNewTurnで0 |
-| `playerArmorPen`【2026-10-28】 | プレイヤーの貫通。遺物 +N (BeginNewTurn)・ステータス `pen` (OnPostRoll)・役〈攻め〉T4 +999 | BeginNewTurnで土台+遺物へ |
+| `playerArmorPen`【2026-10-28】 | プレイヤーの貫通。遺物 +N (BeginNewTurn)・ステータス `pen` (OnPostRoll) (役〈攻め〉T4 の +999 は 2026-11-18 に削除) | BeginNewTurnで土台+遺物へ |
 | `winMinDamage`【新】 | 勝利時与ダメ最低保証(既定1,利刃1〜4) | BeginNewTurnで1 |
 | `enemyHealReductionPct`【新】 | 敵回復の減衰率(治癒阻害0.5/遮断1.0)。`ReduceEnemyHeal()`経由で敵自己回復に適用 | 戦闘保持 |
 | `fixedDamageMultiplier`【新】 | 軽減無視ダメ倍率(蒼白の槍騎士1.5)。ProcessDamage末＆引分分岐で fixedDamageToEnemy に乗算 | 戦闘保持(既定1.0) |
@@ -699,8 +701,8 @@ ProcessDamage の中の OnPreDealDamage は「その陣営が攻撃している�
 | JudgmentFlames(審判の炎) | OnTurnEnd | `dmg=min(ChipCap, 1+ceil(currentTurn/3)+罪)`、実プレイヤーへ軽減無視（罪=totalBattles/8,max2 / ChipCap 基準 10・`BossParams` の基準値）。ターン係数は 2026-07-28 に 1→1/2、2026-08-15 に 1/2→1/3 へ緩和（15T 累積 108→90・上限は T≥19 まで届かない）。**シールドは肩代わりする**（③-C） |
 | JudgmentBlaze / AshArmor / AshCarapace | — | 旧 6 層ボスの機構。**[未装備]**（6 層は下の 5 つで組み直した・数値はクラスの XML コメント）。同じ旧機構の RoyalEmber / SinChain / EternalBurning / ReturnToAshes / ImmortalEmber / EmberAura / StarfireProliferation / ScorchedEarth は 2026-11-12 に削除（GAME.md §24） |
 | EmberOmen(業火・旧 業火の予兆) | OnTurnStart | **2026-11-14〜 王の大技〈業火〉の周期**（`EnemyData.heavyCycle = ember`・`Escalation.TurnsToHeavy` が `EmberOmenTiming` を読む）: 業火のターン = 旧予兆ターン（HP>50% は T1/5/9…・HP≤50% は T1/4/7…・HP の割合はターンの頭の `Escalation.HeavyHpRatio`）。1 ターン前はチャージ（攻撃しない）。業火 = 攻撃 × heavyMul（2.0）+ 烈炎 × `BlazeBurstPerStack`（基準 5・軽減無視・シールドは肩代わり・撃ったら烈炎 0・`CombatManager.ApplyBlazeBurst`）。小技 × heavyLightMul（1.0）。このパッシブ自身は攻撃 +N を積まない。旧い形（口 `ashKingHeavy=False`）: 予兆ターン = HP>50% は T1/5/9…（周期4）、HP≤50% は T1/4/7…（周期3）。予兆Tだけ攻撃 +JudgmentDice（基準 12・2026-11-14 に 8 から）。**[#104 修正]** 焦土契約と同じ差分更新（自分の寄与 `ember_omen_applied` を毎T頭に「予兆なら JudgmentDice、それ以外 0」へ合わせて `enemyDiceTotalBonus` を足し引き）。旧: `+=` を戻す処理が無く、予兆のたびに積み上がっていた |
-| AshRegrowth(灰の再生) | OnTurnStart | HP>50% かつ業火でもチャージでもないT（2026-11-14〜・作者の決定: 業火のターンとその 1 ターン前のチャージのターンは回復なし。旧い形 = 口 `ashKingHeavy=False` は予兆Tだけ回復なし）: 最大HP × RegrowthRate（基準 0.03 = 3%・`BossParams`）回復（切り捨て・最低1）。2026-11-14 に直書きの 0.02f を `BossParam.RegrowthRate` へ移し（式は同じ）、同日 0.03 へ |
-| EmberFury(憤怒の残滓) | OnTurnStart | T頭の HP≤50% のT: 攻撃 +FuryAttack（基準 5・2026-11-14 に定数 `EmberFury.Bonus` = 3 から `BossParam.FuryAttack` へ移し、同日 5 へ）（それ以外 0）。**[#104 修正]** 業火の予兆と同じ差分更新（`ember_fury_applied`）。旧: 毎ターン `+=` で積み上がっていた |
+| AshRegrowth(灰の再生) | OnTurnStart | HP>50% かつ業火でもチャージでもないT（2026-11-14〜・作者の決定: 業火のターンとその 1 ターン前のチャージのターンは回復なし。旧い形 = 口 `ashKingHeavy=False` は予兆Tだけ回復なし）: 最大HP × RegrowthRate（基準 0.02 = 2%・`BossParams`）回復（切り捨て・最低1）。2026-11-14 に直書きの 0.02f を `BossParam.RegrowthRate` へ移し（式は同じ）、同日 0.03 へ・2026-11-18 に 0.02 へ戻した（案 B・GAME.md §13-1） |
+| EmberFury(憤怒の残滓) | OnTurnStart | T頭の HP≤50% のT: 攻撃 +FuryAttack（基準 3・2026-11-14 に定数 `EmberFury.Bonus` = 3 から `BossParam.FuryAttack` へ移し、同日 5 へ・2026-11-18 に 3 へ戻した（案 B・GAME.md §13-1））（それ以外 0）。**[#104 修正]** 業火の予兆と同じ差分更新（`ember_fury_applied`）。旧: 毎ターン `+=` で積み上がっていた |
 | ScorchedPact(焦土契約) | OnRollWin/OnTurnStart | 収支負けでスタック+1（上限5）。毎T 差分更新で `enemyDiceTotalBonus` に現在スタック×1 を反映（累積しない） |
 | BlazeBrand(烈炎) | OnTurnEnd/OnTurnStart | **2026-11-14〜 (作者の決定)**: T終了時、 そのTに主攻撃をシールドが肩代わりした量 (`ctx.shieldAbsorbedAttackThisTurn`・③-B) ÷ `BlazePerShield` (基準 10・`BossParams`) の切り捨てだけ烈炎+ (端数は持ち越さない・式は `HeavyCycle.BlazeGain`)。軽減無視の肩代わり (③-C・業火の烈炎の分を含む) は数えない。旧い条件 (口 `blazeStackRule=Guard2`): ブロック端子へ 2 本以上のT終了時に烈炎+1。2026-11-14〜: T開始時の削りは無し（積もった烈炎は〈業火〉で × BlazeBurstPerStack にまとめて返り、撃ったら 0。業火がダウン・〈封じ・揃〉で撃たれなければ持ち越す）。口 `blazeTickEachTurn=True` で旧い削り（T開始時に烈炎の数だけ軽減無視ダメ）も残す |
 | Decree13th(13番目の宣告) | OnTurnStart/OnTurnEnd | 1/13でフラグ、本体が生存していれば成就で ceil((playerDiceTotal+enemyDiceTotal)×2.0) を軽減無視で実プレイヤーへ（2.0 は定数。プレイヤーの criticalMultiplier は 2026-08-08 から読まない・シールドは肩代わり） |
@@ -776,7 +778,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
 
 ```
 リロール (ADR-0010 / ADR-0011・配線より**前**)
-         RerollPhase: 充電を払って**ダイスを全部**振り直す。 コスト = 個数 × この戦闘で何回目か
+         RerollPhase: 充電を払って**ダイスを全部**振り直す。 コスト = 個数 × この戦闘で何回目か (+1 = 時限デバフ〈無力感〉・無料の時は 0)
          (回目はターンでは戻らず戦闘の中で上がる)。 振るかどうかは RerollPolicy が決める (null なら振り直さない)。
          予告は素の敵ダイス合計から仮組みして渡すので、 **完全情報のまま**判断できる (ADR-0009 柱3)。
          〈特別・対〉が前ターンに成立していれば次の N 回 (既定 2) が無料 (currentBuffs["roleFreeReroll"] = 回数)。
@@ -792,6 +794,8 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
            3. 充電の支払い (場の順)。 足りなければその端子は不発。 〈裁きの雷〉は充電 1 以上で通り、 効果の所で全部払う
            4. 〈火葬の剣〉(2026-11-14): 外す端子の候補 (下の「対象」) が無ければ不発 (挿した出目を外す・使い捨ても消費しない)
            5. 効果 (場の順)。 〈残響〉が発動していれば他の端子の効果を 2 回走らせる
+              端子へ入る量 (sum) = 挿した出目の合計。 ただし**防御の種類の端子**に挿した出目は 1 つずつ max(0, 出目 − TerminalEnv.blockDieCut)
+              (時限デバフ〈罪悪感〉で 2・2026-11-16・〈号令の剣〉の +1 の後)。 条件 (2.) は引く前の目で見る。 攻撃・充電・補助の端子の出目は変えない
            6. 他の端子を見る効果: 〈連係斬り〉攻撃 + RelayPerFired × (基本以外の発動数 − 1)、 〈剛腕〉攻撃 + (攻撃の種類の端子を挿した出目の合計)
               溜めた攻撃 (〈力溜め〉〈後の先〉) は、 攻撃の種類の端子を 1 枚以上挿したターンに attackAdd へ足して 0 に戻す
            7. 誓約の封じ (TerminalEnv.seal* = ctx.poisonSealed などの写し): 封じた資源を足す分だけを結果から落とす
@@ -832,24 +836,25 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
            旧: 敵 HP ≤ 0 かつ攻撃の種類の端子を 1 枚以上挿したターンの、 ここまでの撃破だけ (測定の口 GameHooks.TerminalKillBonusNeedsAttack)。
            その後、 使い捨て・〈影写し〉(写しは次のターンの手札へ・引く枚数とは別・2026-11-14)・〈火葬の剣〉・〈保持器〉を山札へ反映
 
-役 (ADR-0011・配線集計の直後 / 攻防の解決より**前**)
-         ResolveRoles: 振った 3 個から **目 × {2 個そろい, ゾロ目}** の 18 種を判定する。
+役 (ADR-0011 → ADR-0015・配線集計の直後 / 攻防の解決より**前**)
+         ResolveRoles: 振った 3 つの目から **目 × {2 個そろい, ゾロ目}** の 18 種と、 連なりの賽を持つ時だけ **連なり (3 つの連番)** を判定する。
          端子の置き方は条件にしない。 **成立すれば自動で効く** (1 戦闘 1 回・任意発動・使用済み管理は無い)。
-         成立するかはその目の面の Tier で決まる: T2 以上で 2 個そろい、 T3 以上でゾロ目。 T1 は何も起きない。
-         効果は既存フィールドへ加算する形に寄せてある (正本は YachtRoleEffects.Apply)。
-           ctx への加算   … 攻め: outgoingDamageMultiplier +0.25 / +0.5 (ゾロ目は forceCritical) ・T4 playerArmorPen +999 (防御無視) /
-                            充電: AddCharge(+3 / 上限まで) ・T4 超過分を mutualAttackBonus /
-                            時間: エスカレーションの遅延 (term Coolant と同じキー) +2 / 1 段戻す ・T4 現在段階×2 を mutualAttackBonus /
-                            封じ T4: enemyPassivesDisabledTurns / 富 T4: 所持ゴールド 5% (最大 10) を mutualAttackBonus
+         **Tier は 2026-11-18 にやめた** (ADR-0015): 賽がその目の面を持っていれば 2 個そろいもゾロ目も効く。 小さい目ほど役が強い (作者 p10)。
+         効果は既存フィールドへ加算する形に寄せてある (正本は YachtRoleEffects.ApplyCore・数値は仮)。
+           ctx への加算   … 攻め: outgoingDamageMultiplier +0.40 / +1.0 (ゾロ目は forceCritical) /
+                            充電: AddCharge(+3 / 上限まで) /
+                            時間: エスカレーションの遅延 (term Coolant と同じキー) +2 / 1 段戻す /
+                            封じ: enemyPassivesDisabledTurns = 2 (2 個そろいもゾロ目も・旧 T4 を本体へ)
            次ターンへ     … 封じ: currentBuffs["roleEnemyAtkCut"] (敵攻撃 −40%) / ["roleEnemyStun"] (敵が行動しない) /
-                            特別: ["roleFreeReroll"] (無料リロール 2 回)
-           特別 T4        … 2 個そろいでも極を撃つ (面数×5%・ボス・ヴェスカは面数×2.5%)
+                            特別: ["roleFreeReroll"] (無料リロール 2 回) / 連なり: ["roleFreeReroll"] +1 と 手札 +1 枚 (端子の extraDrawNext)
+           特別 2 個そろい … 小さな極も撃つ (面数×5%・ボス・ヴェスカは面数×2.5%・旧 T4 を本体へ)
            盤面フラグ (RoleOutcome)
                           … 極 (yachtFired + yachtChunkPct: 敵最大HP の 面数×30% (ボス・ヴェスカは ×15%) を軽減無視) /
-                            追撃 (extraDamageRatio 0.3 / 1.0・ゾロ目は確定ダメージ・T4 は会心判定) /
-                            守り (damageTakenCutPct 25 / 75・T4 は軽減分の半分をシールド) /
-                            癒し (healAmount 2 / 6・T4 は HP 上限超過分をシールド)
-           富             … RunState.roleGoldBonusPct (+5% / +30%) を勝利報酬の割合先に掛ける
+                            追撃 (extraDamageRatio 0.5 / 1.5・ゾロ目は確定ダメージ) /
+                            守り (damageTakenCutPct 40 / 100) /
+                            癒し (healAmount 2 / 6)
+           富             … RunState.roleGoldBonusPct (+5% / +30%) を勝利報酬の割合先に掛ける (9 の面を持つ賽は今は無い)
+         旧 T4 の固有効果のうち、 攻め=防御無視・守り=軽減分をシールド・時間=段階を攻撃・充電=超過を攻撃・癒し=超過をシールド・富=所持金を攻撃 は 2026-11-18 に無くなった。
 
 攻撃しないターン (攻撃端子 0 本 / 逃げる・2026-11-04 修正)
          atkBase = 0・追撃 0 に加えて、 ApplyWinDamageModifiers の後で **主攻撃 dealtDmg = 0・会心なし**。

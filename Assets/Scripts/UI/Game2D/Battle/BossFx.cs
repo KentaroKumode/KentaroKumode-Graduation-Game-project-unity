@@ -86,6 +86,9 @@ namespace UI.Game2D.Battle
         public bool Active => _seg != Seg.None;
         /// <summary>大技 (チャージ・待機でない) の区間か。 白飛びはこの間だけ測る。</summary>
         public bool InHeavy => _seg == Seg.Heavy;
+        /// <summary>ヴェスカ 3→4 段の形態移行で、 信号が切れた後 (乱れが終わり vesca-off を流し始めた所から・画面は黒) か。
+        /// 戦闘の背景をここで 4 段の物へ替える (Game2DBattleFx.VescaTransition・2026-11-16)。</summary>
+        public bool SignalOff => _seg == Seg.Heavy && _transition && _gift == 0 && _kind == Kind.VescaFinal && T - LeadV >= GlitchEnd - 1e-9;
         /// <summary>戦闘の外側の GUI を格納する区間か (2026-11-15・作者の決定「大技発動演出中 (ループ待機を除く) は GUI が格納されるように」):
         /// 大技の発動 (待機のループが終わって溜め・暗転・着弾・白飛び… が流れている間 = <see cref="InHeavy"/>) と、 ヴェスカの形態移行の演出の全部
         /// (待機の時計を見せる 0.75 秒を含む・操作できない間)。 チャージと、 大技を待つ待機のループの間は false (プレイヤーが手を考える時間)。</summary>

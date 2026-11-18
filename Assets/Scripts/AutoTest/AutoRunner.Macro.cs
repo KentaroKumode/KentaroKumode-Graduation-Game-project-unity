@@ -91,6 +91,7 @@ namespace AutoTest
                     shops.Add(n.index);
             int fearR = navFearMacro > 0f ? FearRange() : 0;
             int[] fearHops = fearR > 0 ? FearFoeHops(sim, at) : null;   // [測定 2026-11-12・#35] 恐れ (計画の中の各点に掛ける)
+            bool d6 = layer == D6Layer && (navD6HpFloorPct > 0 || navD6NoElite || navD6NoStormFight);
             float best = 0f; int bestFirst = -1;
             var used = new bool[cands.Count];
 
@@ -128,8 +129,15 @@ namespace AutoTest
                     // 嵐の航行: 歩く間の嵐の HP (輪の縮みを歩数ごとに)・着いた点の戦闘が嵐の中か
                     float stormWalk = 0f;
                     if (storm != null && !storm.Walk(from, c, candNode[i], ref ns, out stormWalk)) continue;
+                    // [測定 2026-11-18・第 4 層の踏み込み過ぎの検証] 控えの口 (既定は全部切 = 何もしない)
+                    if (d6 && D6Skips(candNode[i], c, ns, storm)) continue;
                     float gain = MacroGain(candNode[i], layer, run, ref ns) - steps * MacroStepCost - stormWalk;
-                    if (storm != null) storm.Arrive(candNode[i], ref ns);
+                    if (storm != null)
+                    {
+                        float pts0 = ns.pts;
+                        storm.Arrive(candNode[i], ref ns);
+                        gain -= navStormPointPrice * (ns.pts - pts0);   // [測定 2026-11-18] 1 点の値段 (既定 0 = 今までと同じ)
+                    }
                     if (fearHops != null) gain -= navFearMacro * FearCloseness(fearHops, c, fearR);
                     // 2026-11-09: 踏んだ後に「出口」か「まだ寄っていない補給できる店」まで歩けるか (店で買い足す前提の計画)
                     //   嵐の航行: 出口までの道で払う嵐の HP (見込み) を、 HP で歩ける分から先に引く
@@ -163,6 +171,24 @@ namespace AutoTest
             Search(at, hopsFromMe, start, 0f, -1, 0);
             if (storm != null) StormLastBest = best;
             return bestFirst;
+        }
+
+        /// <summary>第 4 層 (深さ 6) の序数 (<see cref="MacroHpPer10"/> の添字)。</summary>
+        private const int D6Layer = 4;
+
+        /// <summary>[測定 2026-11-18・第 4 層の踏み込み過ぎの検証] 控えの口 (<see cref="navD6HpFloorPct"/> / <see cref="navD6NoElite"/> / <see cref="navD6NoStormFight"/>) で、
+        /// 計画の中で点 <paramref name="n"/> (添字 <paramref name="c"/>) へ着いた状態 <paramref name="s"/> (歩いた後・戦う前) のとき、 その点を回り方に入れないか。
+        /// 戦闘の点 = 通常・精鋭・種別の見えていない点 (<see cref="MacroGain"/> が戦闘として見積もる点)。 乱数は引かない。</summary>
+        private bool D6Skips(MapNode n, int c, MacroSim s, StormCostCtx storm)
+        {
+            if (n == null) return false;
+            bool elite = n.revealed && n.EffectiveType == TileType.EliteBattle;
+            bool fight = !n.revealed || elite || n.EffectiveType == TileType.Battle;
+            if (!fight) return false;
+            if (navD6NoElite && elite) return true;
+            if (navD6HpFloorPct > 0 && s.hp * 100f < navD6HpFloorPct) return true;
+            if (navD6NoStormFight && storm != null && storm.InStorm(c, s)) return true;
+            return false;
         }
 
         /// <summary>[計装] 嵐の航行で、 直近の判断の一番良い回り方の値 (「出口へ今すぐ」との差・対数オッズ)。 0 以下なら出口へ切り上げた。</summary>
@@ -205,7 +231,7 @@ namespace AutoTest
             {
                 _r = r; _sv = sv; _run = run;
                 _maxHp = Mathf.Max(1f, run.playerMaxHP);
-                _wHp = MacroHpPer10[layer] * 10f * r.navStormHpWeightMul;
+                _wHp = MacroHpPer10[layer] * 10f * r.navStormHpWeightMul * (layer == D6Layer ? r.navD6HpWeightMul : 1f);
                 float hit = Mathf.Max(FreeMapParams.StormEnemyAttack, EstimateFloorMaxHit(run));
                 _stormMul = 1f + FreeMapParams.StormEnemyAttack / hit;
                 if (!EncounterDangerStats.TryGetKind(layer, 'B', out _, out _bossLose)) _bossLose = 0.01;
@@ -220,6 +246,9 @@ namespace AutoTest
 
             private static int P(float pts) => Mathf.RoundToInt(pts);
 
+            /// <summary>状態 <paramref name="s"/> (累計の見込み) で点 c が嵐の中か (<see cref="MarkFight"/> と同じ読み方)。</summary>
+            public bool InStorm(int c, MacroSim s) => _sv.InStormAt(c, P(s.pts));
+
             /// <summary>計画の始まりの状態に第 2 巡の口を立てる (戦闘の死を HP に合わせる・HP の散らばりを数える)。 口が全部切なら何もしない。</summary>
             public void Prepare(ref MacroSim s)
             {
@@ -232,9 +261,10 @@ namespace AutoTest
             public bool Walk(int from, int c, MapNode n, ref MacroSim s, out float loss)
             {
                 int hp = _sv.WalkCost(from, c, P(s.pts), c == _sv.Boss, out int pEnd, out _);
-                s.pts += pEnd - P(s.pts);
+                int walkPts = pEnd - P(s.pts);
+                s.pts += walkPts;
                 MarkFight(c, n, ref s);
-                loss = 0f;
+                loss = _r.navStormPointPrice * walkPts;   // [測定 2026-11-18] 歩いて溜まる分の値段 (既定 0)
                 if (hp <= 0) return true;
                 float frac = hp / _maxHp;
                 if (_exitDeath) loss += (float)StormNavView.DeathProb(s.hp, frac, s.var) * MacroDeathCost;
@@ -292,7 +322,7 @@ namespace AutoTest
         private float MacroGain(MapNode n, int layer, RunState run, ref MacroSim s)
         {
             if (n == null) return 0f;
-            float wHp = MacroHpPer10[layer] * 10f;
+            float wHp = MacroHpPer10[layer] * 10f * (layer == D6Layer ? navD6HpWeightMul : 1f);   // [測定 2026-11-18] 第 4 層の HP の重みの口 (既定 1)
             float wItem = MacroItem[layer];
             float wGold = wItem / MacroPrice[layer] * MacroGoldDiscount;
 

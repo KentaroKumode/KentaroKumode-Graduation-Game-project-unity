@@ -30,6 +30,7 @@ namespace CombatSystem
             if (newCombat) { Escalation.HeavyCycleOffset = 0; Escalation.HeavyHpRatio = 1f; TenyoHeavy.Reset(); }
             BossDownDiag.BeginFight(enemy?.id, _down.Enabled);
             HeavyHitDiag.BeginFight(enemy?.id);   // [計装 2026-11-14] 大技の被ダメ
+            FightEndDiag.Begin();   // [計装 2026-11-18] 戦闘の終わりの診断
         }
 
         /// <summary>ターン <paramref name="turn"/> がダウンだったら、 敵の周期 (大技・構え・〈業火の予兆〉) を取り消して頭に戻すか (<see cref="BossDown.CancelsCycle"/>)。
@@ -67,6 +68,7 @@ namespace CombatSystem
             _diagHpTurnHead = playerHP; _diagChargeTurn = false;
             // 灰燼の王の〈業火〉の周期は HP 50% で 4 → 3 ターン (2026-11-14)。 このターンの周期の数え方に使う HP の割合をターンの頭に決める (取り消しの判定より前)
             Escalation.HeavyHpRatio = currentEnemy != null ? enemyHP / (float)System.Math.Max(1, EnemyMaxHP) : 1f;
+            FightEndDiag.NoteTurnHead(ctx?.currentTurn ?? 0, playerHP, Escalation.HeavyHpRatio);   // [計装 2026-11-18] 読むだけ
             BossDown.ActiveNow = false; BossDown.TakenMulNow = false;
             if (!_down.Enabled || ctx == null) { _down.downNow = false; _down.downWeakNow = false; return; }
             if (!_down.BeginTurn()) return;
@@ -78,7 +80,8 @@ namespace CombatSystem
                                                 : BossDown.IsChargeOrClimax(toHeavyAtDown));
             if (DownCancelsCycleAt(currentEnemy, ctx.currentTurn, Escalation.HeavyHpRatio))
                 Escalation.HeavyCycleOffset = ctx.currentTurn;
-            _down.heavyCanceledNow = hadHeavy && (always || canceled);   // 画面の「大技は取り消し」(旧い規則はどのダウンでも大技が先へ延びる)
+            _down.heavyCanceledNow = hadHeavy && (always || canceled);
+            if (canceled) MetaProgression.Achievements.AchievementService.NoteBossDownCanceledHeavy();   // 実績〈出鼻をくじく〉   // 画面の「大技は取り消し」(旧い規則はどのダウンでも大技が先へ延びる)
             BossDown.ActiveNow = true;
             BossDown.TakenMulNow = !_down.downWeakNow;   // ひびで割れた弱いダウン (2026-11-14) は受けるダメージ ×1.5 なし
             BossDownDiag.NoteDown(hadHeavy, canceled, toHeavyAtDown, _down.downWeakNow);
@@ -126,6 +129,7 @@ namespace CombatSystem
             }
             int d = _down.NoteMainHit(enemyHP, currentEnemy.maxHP, mainDmg, turn, out int crackedBroken, out int waitSum);
             if (d <= 0) return;
+            MetaProgression.Achievements.AchievementService.NoteBossDownBroken(d);   // 実績〈二枚抜き〉(1 回の攻撃で 2 つ)
             BossDownDiag.NoteMainBreak(d, crackedBroken, waitSum);
             Debug.Log($"[ダウン] 通常攻撃で目盛りを {d} つ割った (HP {enemyHP}/{currentEnemy.maxHP}"
                     + (crackedBroken > 0 ? $"・うちひびの入った目盛り {crackedBroken}" : "") + $") → 次のターンからダウン {_down.pending} ターン");

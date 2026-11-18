@@ -41,9 +41,9 @@ namespace ItemSystem.Shop
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         static void ResetStatics() { _shuttingDown = false; _instance = null; }
 
-        /// <summary>**計測専用**: 出目パーツを陳列しない (2026-08-17)。 既定 false ＝ 製品挙動。
-        /// 天井AI のロールアウトがパーツの面添字を持たない問題を切り分けるための遮断スイッチ。
-        /// **立てっぱなしにしないこと** ── 以後の全測定がパーツ不在の条件になる。</summary>
+        /// <summary>**計測専用**: 賽の枠を陳列しない (2026-08-17 は出目パーツ・2026-11-18 から賽)。 既定 false ＝ 製品挙動。
+        /// 名前は測定の設定 (suppressFacePartOffers) と合わせて据え置き。
+        /// **立てっぱなしにしないこと** ── 以後の全測定が賽の枠が無い条件になる。</summary>
         public static bool SuppressFacePartOffers = false;
 
         public static ShopManager Instance
@@ -155,13 +155,22 @@ namespace ItemSystem.Shop
             run.coinsSpent += ProvisionPackPrice;
             ProvisionPacksLeft--;
             GameLoop.ProvisionSystem.Supply(run, ProvisionPackAmount);
+            MetaProgression.Achievements.AchievementService.NoteShopPurchase(run.coins, countsAsItem: false, surcharged: false);   // 物資の包は品ではない (清貧に数えない)
             Debug.Log($"[ShopManager] 物資を買った +{ProvisionPackAmount} (-{ProvisionPackPrice}G / 残り {ProvisionPacksLeft} 包)");
             return true;
         }
 
         /// <summary>囮罠 (8G) を買う。 在庫の上限は無い。</summary>
         public bool TryBuyLure(RunState run)
-            => TryBuyMapTool(run, GameLoop.ItemIds.Lure, MapSystem.FreeMove.FreeMapParams.ShopLurePrice);
+        {
+            if (!TryBuyMapTool(run, GameLoop.ItemIds.Lure, MapSystem.FreeMove.FreeMapParams.ShopLurePrice)) return false;
+            MetaProgression.Achievements.AchievementService.NoteShopPurchase(run.coins, countsAsItem: true, surcharged: false);   // 囮罠は品 (清貧に数える・作者 2026-11-17)
+            return true;
+        }
+
+        /// <summary>値下げ交渉の後の割増 (<see cref="RobberySurcharge"/>) が今の店の品の値段に掛かっているか (実績〈面の皮〉が読む)。</summary>
+        public static bool RobberySurchargeActive(RunState run)
+            => run != null && run.shopRobberyDone && !RobberyBlocksShops && RobberySurcharge > 1f;
 
         private static bool TryBuyMapTool(RunState run, string id, int price)
         {
@@ -297,22 +306,15 @@ namespace ItemSystem.Shop
             //   2 枠は過剰なので 1 枠へ。 直引き LEGENDARY の確率は §16-2 の MUST を守り据え置き。
             inv.slots.Add(BuildSlot(ShopSlotKind.Weapon, inv.priceMultiplier));
 
-            // 出目パーツ ×2 (2026-08-17: 旧ダイス枠の置き換え。 陳列数は据え置き)
-            //   **所持済みを弾いたプールから重複なしで引く。** 「出現済み」ではなく所持済みなので、
-            //   序盤に見送った品は何度でも並ぶ ── 買わない判断がランを縛らないようにする。
-            // **計測用の遮断 (2026-08-17)。** 出目パーツを一切並べない条件を作る。
-            //   天井AI のロールアウトは面の「値」しか持たず添字を持たないので、
-            //   未来のターンで T1(振り直し禁止)/T3/T4(ゴースト配線) を評価できない。
-            //   パーツ 0 個なら誤差が消えるので、 技量差が回復するかで仮説を切り分ける。
+            // 賽 ×2 (ADR-0015・2026-11-18: 出目パーツの枠の置き換え。 陳列数は据え置き)
+            //   最初の賽と、 いま装備している賽は並べない (EquippedDie.Offerable)。 同じ店に同じ賽は 2 つ並べない (棚の重複排除)。
+            //   買うと装備が替わる (持つ賽は 1 個)。
             if (!SuppressFacePartOffers)
             {
-                var ownedParts = GameLoop.GameManager.Instance?.Run?.diceFaceParts;
-                var pool = GameLoop.DiceFaceParts.RemainingKinds(ownedParts);
-                for (int i = 0; i < 2 && pool.Count > 0; i++)
+                for (int i = 0; i < 2; i++)
                 {
-                    int pick = GameLoop.GameRng.Range(0, pool.Count, "shop.facePart");
-                    inv.slots.Add(BuildFacePartSlot(pool[pick], inv.priceMultiplier));
-                    pool.RemoveAt(pick);   // 同じ店に同じパーツを 2 つ並べない
+                    var slot = BuildSlot(ShopSlotKind.Dice, inv.priceMultiplier);
+                    if (slot.itemId != null) inv.slots.Add(slot);
                 }
             }
 
@@ -434,62 +436,20 @@ namespace ItemSystem.Shop
             return new ShopSlot { kind = kind, itemId = id, price = price, sold = false };
         }
 
-        /// <summary>出目パーツ枠を組む。 価格は Tier だけで決まる ── 出目の値では変えない。
-        ///
-        /// <para><b>面が 1 枚増えること自体の価値をカタログ中央値の 11 に置き、
-        /// Tier が 1 段動くごとに ±3。</b> 実カタログの basePrice は
-        /// 消費 0〜13 (中央 5) / パッシブ 0〜16 (中央 11) / 武器 8〜20 なので、
-        /// 8〜17 はその帯に収まる。 パーツはラン中ずっと残る恒久強化なので、
-        /// 1 回で消える消費 (中央 5) より高く、 同じく恒久のパッシブ (中央 11) と同格に置く。</para>
-        ///
-        /// <para><b>T3 → T4 を +3 に留めたのは、 効果差が「同一端子に重ねたとき +3」
-        /// という条件付きの上乗せだけだから。</b> 段差の幅と効果の幅を対応させておくと、
-        /// 後から値を動かすときに根拠を辿れる。</para></summary>
         /// <summary>全アイテムの店頭価格に一律で足す額 (2026-09-17)。 <b>倍率ではなく加算</b> ──
         /// 安い品ほど相対的に効くので、 「安物を数で買う」経路を狙って締められる。
         /// 素の帯は BRONZE 7 / SILVER 8 / GOLD 9 / LEGENDARY 10 G。</summary>
         public static int ItemPriceAdd = 0;
-
-        private static int FacePartBasePrice(GameLoop.DiceFaceParts.Tier tier)
-        {
-            switch (tier)
-            {
-                // ADR-0011: 価格は据え置き (8/11/14/17)。 T1 は無能力の素の面になった。
-                case GameLoop.DiceFaceParts.Tier.T1: return  8;
-                case GameLoop.DiceFaceParts.Tier.T2: return 11;   // 2個そろいの解放
-                case GameLoop.DiceFaceParts.Tier.T3: return 14;
-                default:                             return 17;
-            }
-        }
 
         /// <summary>今の層でこの品を店で買う時の価格 (棚の抽選の幅の中央・割引なし)。 品の価値を「買う値段込み」で測る ITT が読む。</summary>
         public static int ExpectedShopPrice(string id, GameLoop.RunState run)
         {
             if (string.IsNullOrEmpty(id)) return 0;
             float prog = ProgressPriceMultiplier(run);
-            if (GameLoop.DiceFaceParts.IsPartId(id))
-                return GameLoop.DiceFaceParts.TryParseId(id, out var part)
-                    ? Mathf.CeilToInt(FacePartBasePrice(part.tier) * ItemPriceScale * prog) + ItemPriceAdd : 0;
             var item = ItemDatabase.Instance?.GetItem(id);
             if (item == null) return 0;
             float basePrice = item.buyPrice != null ? (item.buyPrice.min + item.buyPrice.max) / 2f : 10f;
             return Mathf.CeilToInt(basePrice * ItemPriceScale * RarityPriceMul(item.rarity) * prog) + ItemPriceAdd;
-        }
-
-        private ShopSlot BuildFacePartSlot(GameLoop.DiceFaceParts.Part part, float priceMultiplier)
-        {
-            int basePrice = FacePartBasePrice(part.tier);
-            return new ShopSlot
-            {
-                kind = ShopSlotKind.FacePart,
-                facePart = part,
-                // **itemId を持たせる** (2026-08-17b)。 パーツは items.json に無いが、
-                //   提示/取得の記録も学習の集計も itemId をキーにしている。
-                //   null のままだと学習経路に一切乗らず、 手置きの評価式に頼るしかなくなる。
-                itemId = GameLoop.DiceFaceParts.Id(part),
-                price = Mathf.CeilToInt(basePrice * ItemPriceScale * priceMultiplier) + ItemPriceAdd,
-                sold = false,
-            };
         }
 
         /// <summary>消費枠を id 直指定で組む (2026-08-04)。 系統ごとに 1 枠を保証するため、
@@ -521,6 +481,7 @@ namespace ItemSystem.Shop
                 ShopSlotKind.Passive     => ItemCategory.Passive,
                 ShopSlotKind.Consumable  => ItemCategory.Consumable,
                 ShopSlotKind.Weapon      => ItemCategory.Weapon,
+                ShopSlotKind.Dice        => ItemCategory.Dice,
                 _ => (ItemCategory?)null,
             };
             if (category == null) return null;
@@ -531,6 +492,14 @@ namespace ItemSystem.Shop
             // イベント限定アイテムを除外（ちいさな灯火・決意 等）
             pool = pool.FindAll(EventOnlyItemFilter.IsAllowed);
             if (pool.Count == 0) return null;
+
+            // 賽 (ADR-0015): 最初の賽と、 いま装備している賽は並べない。
+            if (kind == ShopSlotKind.Dice)
+            {
+                var runD = GameLoop.GameManager.Instance?.Run;
+                pool = pool.FindAll(it => GameLoop.EquippedDie.Offerable(it, runD));
+                if (pool.Count == 0) return null;
+            }
 
             // 棚に並んでいる品は引かない (重複陳列の防止)。 尽きた時だけ重複を許す。
             if (_shelfIds.Count > 0)
@@ -705,7 +674,7 @@ namespace ItemSystem.Shop
                 // 兵站 r10: 不足分は物資で払える。 未解禁ならゴールドのみで判定する。
                 if (!GameLoop.ProvisionPayment.TryPay(run, price, "強化素材"))
                 { Log("ゴールド不足"); return false; }
-                MetaProgression.Achievements.AchievementService.NoteShopPurchase(run.coins);
+                MetaProgression.Achievements.AchievementService.NoteShopPurchase(run.coins, countsAsItem: false, surcharged: RobberySurchargeActive(run));   // 強化素材は品ではない (清貧に数えない)
                 run.weaponMaterials++;
                 Current.materialPurchaseCount++;
                 slot.price = Current.CurrentMaterialPrice; // 表示価格を更新
@@ -734,7 +703,8 @@ namespace ItemSystem.Shop
 
             if (!GameLoop.ProvisionPayment.TryPay(run, pay, slot.itemId))
             { Log("支払いに失敗"); return false; }
-            MetaProgression.Achievements.AchievementService.NoteShopPurchase(run.coins);
+            // 実績: 清貧の「買う」は品だけ (秘宝・武器・消耗品・囮罠)。 賽は数えない (作者 2026-11-17「アイテムのみ」は出目パーツを除く意味・賽も同じ扱いで据え置き)
+            MetaProgression.Achievements.AchievementService.NoteShopPurchase(run.coins, countsAsItem: slot.kind != ShopSlotKind.Dice, surcharged: RobberySurchargeActive(run));
             Current.purchaseCount++;
             if (tally && pay < slot.price) { TallyDiscounts++; Log($"〈合札〉: 2 品目以降 {TallyDiscount}G 引き"); }
             if (tradeIn > 0) Log($"下取り: {run.equippedWeaponId} を {tradeIn}G で引き取り、 差額 {pay}G で乗り換え");
@@ -748,11 +718,10 @@ namespace ItemSystem.Shop
                     // 武器は 1 本だけ (2026-11-11): 店で買う武器は入れ替えを承知して買ったもの (画面は「買う」の 2 度押しで確かめる)
                     GameLoop.Loadout.Gain(run, slot.itemId, confirmed: slot.kind == ShopSlotKind.Weapon && GameLoop.Loadout.HumanPlaying);
                     break;
-                case ShopSlotKind.FacePart:
-                    // 同じ目の面があれば差し替え (Tier が上がる時だけ並ぶ)、 無ければ追加。
-                    GameLoop.DiceFaceParts.AddOrReplace(run.diceFaceParts, slot.facePart);
-                    Debug.Log($"[ShopManager] 出目パーツ装着: {GameLoop.DiceFaceParts.Label(slot.facePart)}"
-                            + $" ({GameLoop.DiceFaceParts.Describe(slot.facePart.tier)})");
+                case ShopSlotKind.Dice:
+                    // 持つ賽は 1 個 (ADR-0015)。 買うと装備が替わり、 前の賽は手元に残らない。
+                    Debug.Log($"[ShopManager] 賽を替えた: {GameLoop.EquippedDie.Label(GameLoop.EquippedDie.IdOf(run))} → {GameLoop.EquippedDie.Label(slot.itemId)}");
+                    GameLoop.EquippedDie.Equip(run, slot.itemId);
                     break;
                 case ShopSlotKind.Consumable:
                     run.TryAddConsumable(slot.itemId);
@@ -766,15 +735,12 @@ namespace ItemSystem.Shop
                 switch (slot.kind)
                 {
                     case ShopSlotKind.Weapon:     code = GameLoop.RunChronicle.BuyWeapon;     break;
-                    case ShopSlotKind.FacePart:   code = GameLoop.RunChronicle.BuyDice;       break;
+                    case ShopSlotKind.Dice:       code = GameLoop.RunChronicle.BuyDice;       break;
                     case ShopSlotKind.Consumable: code = GameLoop.RunChronicle.BuyConsumable; break;
                     case ShopSlotKind.Passive:    code = GameLoop.RunChronicle.BuyPassive;    break;
                 }
                 if (code != null)
-                    GameLoop.RunChronicle.Buy(run, code,
-                        slot.kind == ShopSlotKind.FacePart
-                            ? GameLoop.DiceFaceParts.Label(slot.facePart) : slot.itemId,
-                        pay);
+                    GameLoop.RunChronicle.Buy(run, code, slot.itemId, pay);
             }
 
             // ショップ購入記録 (BOT 売却判定で「ショップ由来」 のみ売却可)
@@ -787,9 +753,7 @@ namespace ItemSystem.Shop
             slot.sold = true;
 
             var data = ItemDatabase.Instance?.GetItem(slot.itemId);
-            // パーツは ItemDatabase に無い ── GetItem は null を返すので表示名は自前で引く。
-            string label = data != null ? data.displayName
-                         : (GameLoop.DiceFaceParts.LabelOfId(slot.itemId) ?? slot.itemId);
+            string label = data != null ? data.displayName : slot.itemId;
             Debug.Log($"[ShopManager] 購入: {label} -{slot.price}G");
             OnShopUpdated?.Invoke();
             return true;
@@ -822,7 +786,6 @@ namespace ItemSystem.Shop
 
             // 振り直さない枠 (売却済み) の品は棚に残る。 振り直す枠の品は棚から外す (同じ品が引き直されてよい)。
             _shelfIds.Clear();
-            var shelfParts = new List<GameLoop.DiceFaceParts.Part>();
             foreach (var s in Current.slots)
                 if (s != null && s.sold && !string.IsNullOrEmpty(s.itemId)) _shelfIds.Add(s.itemId);
 
@@ -836,18 +799,6 @@ namespace ItemSystem.Shop
                 ShopSlot fresh;
                 switch (s.kind)
                 {
-                    // 出目パーツは items.json に無いので BuildSlot では作れない (2026-11-04 修正)。
-                    //   以前は空の枠 (出目0・None) に化けていた。 棚生成と同じく、 所持済みと棚の他のパーツを除いて引く。
-                    case ShopSlotKind.FacePart:
-                    {
-                        var pool = GameLoop.DiceFaceParts.RemainingKinds(run.diceFaceParts);
-                        pool.RemoveAll(p => shelfParts.Contains(p));
-                        if (pool.Count == 0) { fresh = s; break; }
-                        var part = pool[GameLoop.GameRng.Range(0, pool.Count, "shop.facePart")];
-                        shelfParts.Add(part);
-                        fresh = BuildFacePartSlot(part, Current.priceMultiplier);
-                        break;
-                    }
                     // 消費は系統ごとに 1 枠 (回復固定 + 残り 2 系統) の並びを保つ。 振り直すのは Tier だけ。
                     //   以前は全消費アイテムから引き直しており、 回復が消えたり同じ系統が 2 枠並んだりした。
                     case ShopSlotKind.Consumable:
@@ -865,7 +816,6 @@ namespace ItemSystem.Shop
                         fresh = BuildSlot(s.kind, Current.priceMultiplier);
                         break;
                 }
-                if (fresh.kind == ShopSlotKind.FacePart && fresh == s) shelfParts.Add(s.facePart);
                 Current.slots[i] = fresh;
                 rerolled++;
             }

@@ -178,6 +178,9 @@ namespace GameLoop
                 run.equippedWeaponId = next;
             }
             if (!free) run.weaponMaterials -= cost;
+            // 実績〈鍛え上げ〉〈四つの得物〉: 段階式の武器が T4+ (これ以上鍛えられない) になった
+            if (prog && run.weaponPlus > 0 && NextTierWeaponId(run.equippedWeaponId) == null)
+                MetaProgression.Achievements.AchievementService.NoteWeaponMaxed(FamilyTierOf(run.equippedWeaponId).family);
             if (prevWeaponId != run.equippedWeaponId)
             {
                 Loadout.KeepOnlyEquippedWeapon(run);   // 武器は 1 本だけ: 前の段の武器を所持に残さない (2026-11-11)
@@ -225,37 +228,7 @@ namespace GameLoop
             SetPhase(GamePhase.MapNavigation);
         }
 
-        /// <summary>ADR-0011: 面を 1 枚外す価格。 外せない (最少枚数) なら false。</summary>
-        public bool TryGetFaceRemovalCost(out int gold, out int materials)
-        {
-            gold = 0; materials = 0;
-            if (Run == null || Run.diceFaceParts == null) return false;
-            return DiceFaceParts.RemovalCost(Run.faceRemovals, Run.diceFaceParts.Count, out gold, out materials);
-        }
-
-        /// <summary>ADR-0011: 休憩の「強化」の一つとして、 ゴールドと強化素材を払って面を 1 枚外す。
-        /// **回復・武器強化と択一** ── 1 回の休憩で外せるのは 1 枚で、 休憩の行動を消費する。
-        /// 外すと出目の合計と、 その目の役 (T2 以上のパーツ) を失う。 払えない / 最少枚数なら何も起きない。</summary>
-        public bool RestRemoveFace(int face)
-        {
-            if (CurrentPhase != GamePhase.RestStop || Run == null || Run.diceFaceParts == null) return false;
-            if (!TryGetFaceRemovalCost(out int gold, out int materials)) { Log("面はこれ以上外せない"); return false; }
-
-            int at = -1;
-            for (int i = 0; i < Run.diceFaceParts.Count; i++)
-                if (Run.diceFaceParts[i].face == face) { at = i; break; }
-            if (at < 0) { Log($"出目 {face} の面を持っていない"); return false; }
-            if (Run.weaponMaterials < materials) { Log($"強化素材不足 (必要{materials}/所持{Run.weaponMaterials})"); return false; }
-            if (!ProvisionPayment.TryPay(Run, gold, "面を外す")) { Log("ゴールド不足"); return false; }
-
-            Run.weaponMaterials -= materials;
-            var removed = Run.diceFaceParts[at];
-            Run.diceFaceParts.RemoveAt(at);
-            Run.faceRemovals++;
-            Log($"面を外した: {DiceFaceParts.Label(removed)} (-{gold}G, 素材-{materials}, 残り{Run.diceFaceParts.Count}面, 通算{Run.faceRemovals}回目)");
-            ReturnToMapOrClearFloor();
-            return true;
-        }
+        // [削除 2026-11-18] 休憩で面を外す (TryGetFaceRemovalCost / RestRemoveFace)。 ADR-0015: 賽を装備する形になり、 面は賽が持つ (作者 p11)。
 
     }
 }

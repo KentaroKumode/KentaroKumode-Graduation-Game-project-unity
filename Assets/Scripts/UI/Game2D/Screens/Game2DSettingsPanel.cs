@@ -5,7 +5,7 @@ namespace UI.Game2D
 {
     /// <summary>
     /// 設定の画面 (#85・<b>仮置き</b>・2026-11-11・docs/design/gui-needed.md #41)。 共通の板のモーダルに、 値ごとのスライダーを並べる。
-    /// 頁: 画面 (明るさ・走査線・湾曲・色収差・ビネット・ノイズ) / 音 (メイン・BGM・SE)。 値の置き場・範囲・既定は <see cref="GameSettings"/>、
+    /// 頁: 画面 (明るさ・走査線・湾曲・色収差・ビネット・ノイズ・ブルーム・行間・字間) / 音 (メイン・BGM・SE)。 値の置き場・範囲・既定は <see cref="GameSettings"/>、
     /// 効かせるのは <see cref="Game2DSettingsApply"/>。 動かすとその場で効き、 閉じる時に保存する (次の起動でも効く)。
     /// <para>開き方: Esc (タイトル・航行・戦闘で、 ほかの窓が出ていない時)。 もう一度 Esc か「閉じる」で閉じる。
     /// 操作: バーを押す・引く / 選んだ行を [−] [+] か ← → (Shift で 10 ずつ)。 タイトルにはまだ設定のボタンの絵が無いので Esc だけ。</para>
@@ -15,7 +15,8 @@ namespace UI.Game2D
     {
         public Game2DModal modal;
 
-        private static readonly GameSettings.Key[] ScreenKeys = { GameSettings.Key.Bright, GameSettings.Key.Scan, GameSettings.Key.Curve, GameSettings.Key.Chroma, GameSettings.Key.Vignette, GameSettings.Key.Noise };
+        private static readonly GameSettings.Key[] ScreenKeys = { GameSettings.Key.Bright, GameSettings.Key.Scan, GameSettings.Key.Curve, GameSettings.Key.Chroma, GameSettings.Key.Vignette, GameSettings.Key.Noise,
+                                                                  GameSettings.Key.Bloom, GameSettings.Key.LineGap, GameSettings.Key.CharGap };      // ブルーム (2026-11-17)・行間・字間 (2026-11-16)
         private static readonly GameSettings.Key[] SoundKeys = { GameSettings.Key.Master, GameSettings.Key.Bgm, GameSettings.Key.Se };
 
         private static Game2DSettingsPanel _inst;
@@ -63,6 +64,16 @@ namespace UI.Game2D
 
         private GameSettings.Key[] Keys => _page == 0 ? ScreenKeys : SoundKeys;
 
+        /// <summary>ホーム画面の「SETTINGS」から開く (2026-11-16・<see cref="TitleMenuLayout"/>)。 Esc と同じ窓・同じ条件 (<see cref="CanOpenNow"/>・ほかの窓が出ていない)。 開いたら true。</summary>
+        public static bool OpenFromMenu()
+        {
+            var s = _inst;
+            if (s == null || s.modal == null || s.IsShown) return s != null && s.IsShown;
+            if (s.modal.IsOpen || Game2DModal.Active || !CanOpenNow()) return false;
+            s.Open();
+            return true;
+        }
+
         private void Open()
         {
             _page = 0;
@@ -94,6 +105,7 @@ namespace UI.Game2D
             int v = GameSettings.Get(k);
             if (k == GameSettings.Key.Master || k == GameSettings.Key.Bgm || k == GameSettings.Key.Se) return v >= 100 ? "最大" : "";
             if (k == GameSettings.Key.Bright) return v == 50 ? "標準" : "標準の ×" + GameSettings.Brightness.ToString("0.00");
+            if (k == GameSettings.Key.LineGap || k == GameSettings.Key.CharGap) return v == GameSettings.Defs[(int)k].def ? "標準" : "+" + v + " dot";      // 標準 = 既定の値 (行間は 1・2026-11-17)
             if (v == 0) return "切";
             return v == 50 ? "標準" : "標準の ×" + GameSettings.FxScale(k).ToString("0.00");
         }
@@ -103,7 +115,9 @@ namespace UI.Game2D
             var keys = Keys;
             var d = new ScreenDef
             {
-                id = "settings_panel", jp = true, w = 472, cols = 1, rowH = 15, sliders = true, sliderNoTicks = true, sliderNameW = 74,
+                // rowH 13: 画面の頁は 9 行 (2026-11-17・ブルームを足した)。 窓の高さ = 16 + 20 + 4 + 9 × (13 + 1) + (2 × 行送り + 6) + 4 + 行送り + 4 + 22 + 16
+                //   = 行間 0 (行送り 13) で 257・行間 3 (行送り 16) で 266 (上限 ModalJpMetrics.MaxH = 266 ちょうど)。 14 のままだと行間 1 で 269・行間 3 で 275 になり下の行が描かれなかった
+                id = "settings_panel", jp = true, w = 472, cols = 1, rowH = 13, sliders = true, sliderNoTicks = true, sliderNameW = 74,
                 title = _page == 0 ? "設定 ― 画面" : "設定 ― 音",
                 sub = "動かすとすぐ効く。 閉じると保存する",
             };

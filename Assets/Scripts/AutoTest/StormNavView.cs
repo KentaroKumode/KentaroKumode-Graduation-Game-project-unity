@@ -257,6 +257,9 @@ namespace AutoTest
         /// (物資が尽きた後の 1 歩の値段で HP を物資に直す・本体の交換の比)。 歩くほど溜まって輪が縮むのを、 道の上の歩数ごとに数える。
         /// 見えているボスの点は行き先でなければ通らない (踏むとボス戦に入るので)。 最小の費用の道 (同点は歩数の少ない方・添字の小さい方) の最初の 1 歩。
         /// 着けなければ <see cref="FreeMapSim.StepToward"/>。</summary>
+        /// <summary>[測定 2026-11-18・AutoRunner.navD6PathFightCost] 点ごとに <see cref="StormStep"/> の 1 歩の費用へ足す量 (物資の単位)。 行き先の点には足さない。 null = 足さない (既定・今までと同じ)。</summary>
+        public double[] NodeExtraCost;
+
         public int StormStep(int at, int target)
         {
             if (at == target) return at;
@@ -279,7 +282,8 @@ namespace AutoTest
                     if (done[v] || Sim.IsSunk(v)) continue;
                     if (v == Boss && v != target) continue;
                     int p = pts[u];
-                    double c = cost[u] + StepSupply(v, p) + (double)StepHp(v, p) / FreeMapParams.HpPerSupply;
+                    double c = cost[u] + StepSupply(v, p) + (double)StepHp(v, p) / FreeMapParams.HpPerSupply
+                             + (NodeExtraCost != null && v != target ? NodeExtraCost[v] : 0.0);
                     int hv = hop[u] + 1;
                     if (c < cost[v] - 1e-9 || (Math.Abs(c - cost[v]) <= 1e-9 && hv < hop[v]))
                     {

@@ -338,7 +338,7 @@ namespace GameLoop
                 sb.AppendLine($"ターン {sim.Turn} / 魔石 {sim.Stone().Text} / 天候 {sim.Weather.DisplayName()}"
                             + (sim.FlareOn ? " / 照明中" : ""));
                 var eta = sim.Eta();
-                if (eta.Valid) sb.AppendLine($"補足されている ── 最短 {eta.turns} 手で捕まる（{eta.WhoName}）");
+                if (eta.Valid) sb.AppendLine($"捕捉されている ── 最短 {eta.turns} 手で捕まる（{eta.WhoName}）");
                 sb.AppendLine("[W] 待つ  [R] 偵察  [F] 照明  [L] 囮罠");
             }
             sb.AppendLine("移動先 (道):");
@@ -567,7 +567,7 @@ namespace GameLoop
                 case ShopSlotKind.Passive:        return "秘宝";
                 case ShopSlotKind.Consumable:     return "消費";
                 case ShopSlotKind.Weapon:         return "武器";
-                case ShopSlotKind.FacePart:       return "出目パーツ";
+                case ShopSlotKind.Dice:           return "賽";
                 case ShopSlotKind.WeaponMaterial: return "強化素材";
                 default: return "?";
             }

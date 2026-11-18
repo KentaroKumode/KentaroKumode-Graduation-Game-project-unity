@@ -206,8 +206,7 @@ namespace AutoTest
             // 出目パーツの評価係数。 **掃引中はこの行が唯一の「どの値で回したか」の記録**。
             sb.AppendLine($"出目パーツ: 較正={AutoTest.InventoryPower.PowerCalibration:F2}"
                         + $" / 対={AutoTest.InventoryPower.TierGainPair:F1}"
-                        + $" 揃={AutoTest.InventoryPower.TierGainTriple:F1}"
-                        + $" T4+={AutoTest.InventoryPower.TierGainT4Extra:F1}");
+                        + $" 揃={AutoTest.InventoryPower.TierGainTriple:F1}");
             bool validSeed = GameLoop.GameRng.TryParseSeed(masterSeed, out ulong parsedSeed);
             sb.AppendLine($"決定seed  : {(validSeed ? GameLoop.GameRng.FormatSeed(parsedSeed) : string.IsNullOrWhiteSpace(masterSeed) ? "なし（ランダム）" : $"不正 '{masterSeed}'（ランダムへフォールバック）")}");
             sb.AppendLine($"総ラン数  : {_records.Count}  (戦闘貪欲={greedy.Count} / 戦闘回避={averse.Count})");

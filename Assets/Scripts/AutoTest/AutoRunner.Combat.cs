@@ -77,7 +77,7 @@ namespace AutoTest
             // ADR-0009/0010: 配線・リロール・役の 3 方策を注入 (パイプライン OFF 時は未使用)。
             //   素朴版は **リロールと役を一切使わない** ＝ ADR-0010 以前と同じ打ち方。
             //   最適版との差が「役システムが開けた技量帯の幅」そのものになる (Verification ①)。
-            WiringSkill effectiveSkill = EffectiveWiringSkill;
+            WiringSkill effectiveSkill = CombatWiringSkill;   // [アブレーション 2026-11-17] combatNaive なら配線・リロールだけ素朴版
             // 6 層・7 層のボス戦で Super を Optimal の方策へ切り替える分岐 (superLayer6/7OptimalCombatRoutine) と、
             //   旧い先読み方策 (ExactCombatAI・SuperCombatAI) の BeginCombat は 2026-11-12 に削除した。
             //   切り替えの先も元も、 下で必ず同じ山札の方策に上書きされていたので、 分岐の結果を読む所が無かった。
@@ -137,7 +137,9 @@ namespace AutoTest
                 // 逃げる (2026-09-28): 追跡者の戦闘は、 頭で HP が少なければ逃げる。
                 if (cm.CurrentCombatTurn <= 1 && ShouldFleePursuer(run, GameManager.Instance) && cm.RequestFlee())
                     FreeMapPursuerFlees++;
+                BeginTurnDealt();   // [計装 2026-11-17] 1 ターンの与ダメ
                 var tr = cm.ExecuteTurn();
+                NoteTurnDealt();
                 if (tr.isDraw) _cwDraw++;
                 else if (tr.playerWon) _cwWin++;
                 else { _cwLoss++; if (tr.totalDamage <= 0) _cwLossAbs++; }
@@ -1704,7 +1706,8 @@ namespace AutoTest
         ///   ② 振る合計が、 面平均 × 個数 を下回る → 振る
         ///   ③ それ以外 → 振らない
         ///
-        /// 費用は `振り直す個数 × この戦闘で何回目か`（attempt が戦闘の通し番号）。 **充電を使い切らない** ──
+        /// 費用は `振り直す個数 × この戦闘で何回目か`（attempt が戦闘の通し番号）+ 時限デバフ〈無力感〉の +1。 本体と同じ
+        /// <see cref="CombatSystem.CombatManager.RerollCostNow"/> を読む (2026-11-16)。 **充電を使い切らない** ──
         /// 充電は端子へ挿さなかったダイスの対価なので、 全部リロールへ流すと配線の判断そのものが消える。</summary>
         private int[] MutualRerollPolicy(int[] dice, CombatSystem.MutualTurnTelegraph tele, int attempt)
         {
@@ -1739,7 +1742,7 @@ namespace AutoTest
             if (v3.rerollEv)
             {
                 int freeLeftE = ctx.currentBuffs.TryGetValue(CombatSystem.YachtRoleEffects.FreeRerollKey, out float ffE) ? (int)ffE : 0;
-                int costE = freeLeftE > 0 ? 0 : all.Count * System.Math.Max(1, attempt);
+                int costE = CombatSystem.CombatManager.RerollCostNow(all.Count, attempt, freeLeftE > 0);
                 if (ctx.GetCharge() - RerollChargeReserve < costE) return null;
                 var faceVals = (faces != null && faces.Length > 0) ? faces : new[] { 1, 2, 3, 4, 5, 6 };
                 float cur = BestUtilityOf(dice, tele);
@@ -1749,15 +1752,15 @@ namespace AutoTest
                 //   リロールが 3 分の 1 に減り 5 層のボス戦が 36.7% → 65.1% の死亡に悪化した。 長い戦闘では充電が溜まる。)
                 const float ChargeUtilityPerUnit = 1.2f;
                 float scarcity = 1f - UnityEngine.Mathf.Clamp01(ctx.GetCharge() / (float)CombatSystem.CombatManager.ChargeMax);
-                return ev - ChargeUtilityPerUnit * scarcity * costE > cur ? all.ToArray() : null;
+                return ev - ChargeUtilityPerUnit * scarcity * costE > cur ? RerollPickForDie(dice, all) : null;
             }
 
             // S2: 大きい攻撃の予告なら、 止めきれない手は平均近くでも振り直し、 充電の予備も使う
             if (heavyNow && rerollSum < tele.enemyAttackValue && rerollSum < meanFace * all.Count * 1.15f)
             {
                 int freeH = ctx.currentBuffs.TryGetValue(CombatSystem.YachtRoleEffects.FreeRerollKey, out float ffH) ? (int)ffH : 0;
-                int costH = freeH > 0 ? 0 : all.Count * System.Math.Max(1, attempt);
-                return ctx.GetCharge() >= costH ? all.ToArray() : null;
+                int costH = CombatSystem.CombatManager.RerollCostNow(all.Count, attempt, freeH > 0);
+                return ctx.GetCharge() >= costH ? RerollPickForDie(dice, all) : null;
             }
 
             // ② 平均を下回る手だけ振り直す
@@ -1765,9 +1768,18 @@ namespace AutoTest
 
             int freeLeft = ctx.currentBuffs.TryGetValue(CombatSystem.YachtRoleEffects.FreeRerollKey, out float ff)
                 ? (int)ff : 0;
-            int cost = freeLeft > 0 ? 0 : all.Count * System.Math.Max(1, attempt);
+            int cost = CombatSystem.CombatManager.RerollCostNow(all.Count, attempt, freeLeft > 0);
             if (ctx.GetCharge() - RerollChargeReserve < cost) return null;
-            return all.ToArray();
+            return RerollPickForDie(dice, all);
+        }
+
+        /// <summary>振り直す目の添字。 目利きの賽 (ADR-0015) を持つ時は、 いちばん大きい目を残して残りを振る。</summary>
+        private static int[] RerollPickForDie(int[] dice, List<int> all)
+        {
+            if (GameLoop.EquippedDie.IdOf(GameLoop.GameManager.Instance?.Run) != GameLoop.DieIds.Appraiser || dice.Length < 2) return all.ToArray();
+            int best = 0;
+            for (int i = 1; i < dice.Length; i++) if (dice[i] > dice[best]) best = i;
+            return CombatSystem.CombatManager.AllDiceIndexExcept(dice.Length, best);
         }
 
         /// <summary>1 ターンあたりのリロール上限。 全部振り直しは賭けなので、 同じターンに何度も重ねない。

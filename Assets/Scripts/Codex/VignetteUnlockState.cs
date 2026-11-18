@@ -7,7 +7,7 @@ namespace Codex
 {
     /// <summary>
     /// 読み物（WorldVignettes）の解禁判定 + メタ永続状態への読み書き。
-    /// MonoBehaviour 非依存。 画面は UI.Game2D.Game2DCodexPanel (タイトルの GALLERY・2026-11-11)。
+    /// MonoBehaviour 非依存。 画面は UI.Game2D.GalleryView の「本」(タイトルの GALLERY・2026-11-17〜)。
     /// 段の定義と割り当て表は docs/GAME.md §20「codex の解禁」。
     ///
     /// 永続化は MetaProgressState に追加した並列リストフィールドを介して
@@ -51,6 +51,7 @@ namespace Codex
                 meta.endingMaxDiffCleared.Add(endingId);
 
             MetaProgressManager.Instance.Save();
+            MetaProgression.Achievements.AchievementService.CheckCodex();   // 実績: 結末で読み物が開いたか (BOT の間は CheckCodex が止める)
         }
 
         // ----------------------------------------------------------------
@@ -153,11 +154,11 @@ namespace Codex
 
         private static bool AllEndingsMaxDifficultyCleared(MetaProgressState meta)
         {
-            // capstone「最後の一筆」廃止に伴い、 **EndTrue〈帳尻〉** を事実上の最高難度
+            // capstone「最後の一筆」廃止に伴い、 **EndTrue〈終始〉** を事実上の最高難度
             // オールクリアとして扱う。 7 層ヴェスカ 4 段連戦の踏破を要求するため、 これ単独で
             // 全制覇相当のゲートとなる。
             // 2026-08-17: 旧 "end5" (勝利で無条件に出ていたエンド) を EndTrue/EndGood に割った際、
-            //   ここも "end_true" へ移した。 **EndGood は数えない** ── 閉じなかった側は額縁に繋がらない。
+            //   ここも "end_true" へ移した。 **EndGood は数えない**。
             // ※ AllEndingsMaxDifficulty 階層を使う vignette は現時点で無い (将来の専用 codex 用)。
             if (meta.endingMaxDiffCleared == null) return false;
             return meta.endingMaxDiffCleared.Contains(GameLoop.Endings.EndTrueId);

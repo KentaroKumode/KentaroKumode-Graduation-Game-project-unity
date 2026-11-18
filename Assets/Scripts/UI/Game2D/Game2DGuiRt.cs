@@ -13,6 +13,13 @@ namespace UI.Game2D
     /// 接している画素で 1.0、 離れるほど滑らかに落ちる (<see cref="HalfDots"/> ドットごとに半分)。 重みは GUI の RT のアルファから距離を測って作る
     /// (<see cref="RequestWeightMap"/>・大技の区間が始まる時に 1 回・480×270)。 乱れ (帯のずれ) と割れ (破片)・効果の絵そのものは GUI に掛けない。
     /// 値が 0 の時は、 シェーダは今までと同じ計算だけを通る (_FxOn = 0)。</para>
+    ///
+    /// <para><b>GUI を液晶の中身として合成する (2026-11-16・作者の決定「外の部品はもう無い」・<see cref="InLcd"/> = true が既定)</b>:
+    /// 提示の板 (<c>Game2D/GuiPresent</c>・影と上下の色調) は使わず、 この RT をグローバル (<c>_Game2DGuiTex</c>) で液晶のシェーダ (<c>Game2D/LcdScreen</c>) に渡す。
+    /// 液晶のシェーダが湾曲した後の同じ座標で中身に重ね、 効果を全部掛ける。 残像・ブルーム・自動露出の元の絵には <see cref="Game2DLcdGhost"/> が重ねる。
+    /// 液晶のシェーダより先に GUI を描くよう、 GUI のカメラの描く順を液晶を写すカメラ (<see cref="Game2DScreen.screenCamera"/>) の前へ回す。
+    /// ボスの大技の揺れ・暗転・赤・白は、 液晶のシェーダが GUI 全体に同じ強さで掛ける (距離の重み <see cref="RequestWeightMap"/> は旧い提示の板の時だけ使う)。
+    /// 見比べ用に QA の口 <c>QaBattle.GuiInLcd(false)</c> で旧い提示の板へ戻せる。</para>
     /// </summary>
     public class Game2DGuiRt : MonoBehaviour
     {
@@ -30,6 +37,38 @@ namespace UI.Game2D
         private const int MapW = 480, MapH = 270;
 
         public static Game2DGuiRt Current { get; private set; }
+
+        /// <summary>GUI を液晶の中身として合成するか (true = 既定・2026-11-16 / false = 旧い提示の板で液晶の上に重ねる・見比べ用)。</summary>
+        public static bool InLcd = DefaultInLcd;
+        public const bool DefaultInLcd = true;
+        /// <summary>GUI の RT (液晶の中身と同じ 960×540)。</summary>
+        public RenderTexture Texture => _rt;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics() { InLcd = DefaultInLcd; }
+
+        private static readonly int GuiTexId = Shader.PropertyToID("_Game2DGuiTex"), GuiOnId = Shader.PropertyToID("_Game2DGuiOn"),
+            GFxOnId = Shader.PropertyToID("_Game2DGuiFxOn"), GFxDarkId = Shader.PropertyToID("_Game2DGuiFxDark"), GFxRedId = Shader.PropertyToID("_Game2DGuiFxRed"),
+            GFxWhiteId = Shader.PropertyToID("_Game2DGuiFxWhite"), GFxShakeId = Shader.PropertyToID("_Game2DGuiFxShake");
+        private float _camDepth0 = float.NaN; private Camera _screenCam;
+
+        /// <summary>合成の形を当てる (毎フレーム・カメラが描く前): 提示の板の出し入れ・液晶のシェーダへ渡す GUI・GUI のカメラの描く順。</summary>
+        private void Update()
+        {
+            bool on = InLcd && _rt != null;
+            if (present != null && present.enabled == on) present.enabled = !on;
+            Shader.SetGlobalTexture(GuiTexId, _rt);
+            Shader.SetGlobalFloat(GuiOnId, on ? 1f : 0f);
+            if (guiCamera == null) return;
+            if (float.IsNaN(_camDepth0)) _camDepth0 = guiCamera.depth;
+            float want = _camDepth0;
+            if (on)
+            {
+                if (_screenCam == null) { var sc = FindObjectOfType<Game2DScreen>(); _screenCam = sc != null ? sc.screenCamera : null; }
+                if (_screenCam != null) want = Mathf.Min(_camDepth0, _screenCam.depth - 1f);      // 液晶を写すカメラより先に描く (同じフレームの GUI を液晶のシェーダが読む)
+            }
+            if (guiCamera.depth != want) guiCamera.depth = want;
+        }
 
         private RenderTexture _rt, _small;
         private Material _mat;
@@ -69,6 +108,9 @@ namespace UI.Game2D
 
         private void OnDisable()
         {
+            Shader.SetGlobalFloat(GuiOnId, 0f);
+            if (present != null) present.enabled = true;
+            if (guiCamera != null && !float.IsNaN(_camDepth0)) guiCamera.depth = _camDepth0;
             if (guiCamera != null && guiCamera.targetTexture == _rt) guiCamera.targetTexture = null;
             if (Current == this) Current = null;
         }
@@ -90,6 +132,11 @@ namespace UI.Game2D
         public static void SetBossFx(bool on, float dark, float red, float white, Color whiteColor, Vector2 shake)
         {
             FxOn = on; FxDark = on ? dark : 1f; FxRed = on ? red : 0f; FxWhite = on ? white : 0f; FxShake = on ? shake : Vector2.zero;
+            // 液晶の中身として合成する時 (InLcd): 液晶のシェーダが GUI 全体に同じ強さで掛ける (グローバル)
+            Shader.SetGlobalFloat(GFxOnId, on ? 1f : 0f);
+            Shader.SetGlobalFloat(GFxDarkId, FxDark); Shader.SetGlobalFloat(GFxRedId, FxRed);
+            Shader.SetGlobalVector(GFxWhiteId, new Vector4(whiteColor.r, whiteColor.g, whiteColor.b, FxWhite));
+            Shader.SetGlobalVector(GFxShakeId, new Vector4(FxShake.x, FxShake.y, 0, 0));
             var g = Current; if (g == null || g._mat == null) return;
             if (!on || g._weight == null) { g._mat.SetFloat(FxOnId, 0f); return; }      // 重みがまだ無い = 掛けない
             g._mat.SetFloat(FxOnId, 1f);

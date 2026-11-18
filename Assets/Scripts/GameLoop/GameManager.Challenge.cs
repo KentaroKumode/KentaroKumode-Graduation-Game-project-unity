@@ -103,6 +103,7 @@ namespace GameLoop
             Run.InvalidateCardChallenge();
             ChallengeCards.Split(card, out var deb, out var buf);
             Log($"挑戦カード: − {ChallengeCards.Text(deb)} ／ + {ChallengeCards.Text(buf)}");
+            MetaProgression.Achievements.AchievementService.NoteChallengeCardTaken(buf);   // 実績〈品揃え〉
             // 七つの大罪 (IV・2026-11-10): 受けた時に効く 2 枚
             if (deb != null && deb.kind == ChallengeCards.SinGreed)
             {

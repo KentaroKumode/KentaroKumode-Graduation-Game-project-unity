@@ -125,6 +125,7 @@ namespace GameLoop
                     gold = GoldIncome.Gain(Run, gold, "値下げ交渉");
                     Run.playerHP = Mathf.Max(1, result.playerHPRemaining);
                     RunStats.RobberyWins++;
+                    MetaProgression.Achievements.AchievementService.NoteRobberyWon();   // 実績〈値切りの腕〉
                     RunStats.RobberyLootTotal += loot;
                     Log($"値下げ交渉勝利: 戦利品{loot}件 +{gold}G");
                     OnBattleEnded?.Invoke(result);
@@ -342,6 +343,21 @@ namespace GameLoop
             SetPhase(GamePhase.RunClear);
         }
 
+        /// <summary>[実機の確認用・2026-11-16] 今のランのまま、 名前を指定したイベントを始める (マスを踏まない・抽選を通さない・乱数を使わない)。
+        /// 呼ぶのは <c>UI.Game2D.Battle.QaBattle.ShowEvent</c> だけ (セーブを止めた後)。 定義が無ければ false。</summary>
+        public bool QaStartEvent(string eventName)
+        {
+            var ee = EventSystem.EventEncounter.Instance;
+            if (Run == null || ee == null) return false;
+            var def = EventSystem.EventDatabase.GetByName(eventName);
+            if (def == null) { Debug.LogWarning($"[QaBattle] イベント '{eventName}' が無い"); return false; }
+            eventChoiceResolved = false; returnToMapAfterEventCombat = false; _bossAfterAshBase = false;
+            ee.TakePendingTurns(); ee.TakePendingNav();
+            if (!ee.BeginWith(Run, def) || ee.Current == null) return false;
+            SetPhase(GamePhase.EventEncounter);
+            return true;
+        }
+
         /// <summary>[実機の確認用・2026-11-14] 今のランのまま、 指定した敵との戦闘をボス戦と同じ手順で始める (マスを踏まない・報酬や集計の前処理はしない)。
         /// 呼ぶのは <c>UI.Game2D.Battle.QaBattle.Start</c> だけ (セーブを止めた後)。 敵が無ければ false。</summary>
         public bool QaStartCombat(string enemyId)
@@ -394,7 +410,7 @@ namespace GameLoop
             // 会心率は % で持つ (2026-09-19 統一・5% 刻み)。 武器なしの素値は 5%。
             float critRatePct = 5f;
             int[] diceFaces = null;
-            // 出目パーツ: 面添字ごとの Tier。 diceFaces と 1 対 1 で対応する (DiceFaceParts.Build)。
+            // 面添字ごとの Tier。 diceFaces と 1 対 1 で対応する (EquippedDie.Build)。
             DiceFaceParts.Tier[] faceTiers = null;
             // ADR-0010〈無銘の賽〉: 端子役を成立させないダイスか。 面と同じ経路で解決する。
             bool suppressTerminalRoles = false;
@@ -411,12 +427,9 @@ namespace GameLoop
                     critRatePct = w.critRatePct;
                 }
             }
-            // --- サイコロの面 (2026-08-17: ダイスというアイテム種別を廃止) ---
-            //   素の 6 面は全員共通。 個性は出目パーツだけで付く。
-            //   faces と tiers は **必ず Build で対に組む** ── 別々に作ると
-            //   素の面とパーツ面で添字がずれ、 効果が別の面に付く。
-            DiceFaceParts.Build(Run != null ? Run.diceFaceParts : null,
-                                out diceFaces, out faceTiers);
+            // --- サイコロの面 (ADR-0015・2026-11-18: 賽を 1 個装備して 3 回振る) ---
+            //   面は装備中の賽の diceFaces。 faces と tiers は **必ず Build で対に組む**。
+            EquippedDie.Build(Run, out diceFaces, out faceTiers);
 
             // 面/最大出目は装備ダイス由来。diceMax は面の最大値から導出（RollDice・メタ補正・運命等が参照）。
             if (diceFaces != null && diceFaces.Length > 0)

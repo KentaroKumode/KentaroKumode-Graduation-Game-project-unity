@@ -209,7 +209,7 @@ namespace AutoTest
             int catDie = cm.CatPawDie, catSlot = cm.CatPawSlot;
 
             // 素朴版: 本体の既定 (素朴な点) と同じ。 旧い配線の素朴版 (出目降順の本数分割) に当たる「深く考えない」打ち方。
-            if (EffectiveWiringSkill == WiringSkill.Naive)
+            if (CombatWiringSkill == WiringSkill.Naive)   // [アブレーション 2026-11-17] combatNaive も素朴版の配線
             {
                 bestU = 0f;
                 return TerminalWiring.Auto(board, rolls, cm.TerminalEnvNow(ctx, tele.enemyAttackValue), deck.state, catDie, catSlot);
@@ -837,6 +837,53 @@ namespace AutoTest
              + $"({100.0 * DownAimHeld / DownAimDecisions:0.0}%) / 待つ手に足した値の平均 {_downAimGainSum / DownAimDecisions:0.00} (HP 相当)";
 
         /// <summary>対象の点: 基本の端子 1 (報酬の足切りと同じ見方)・それ以外は報酬の素の点。</summary>
+        /// <summary>繋ぎの賽 (ADR-0015): 挿した手札の端子のうち、 基本の端子以外でいちばん値打ちのある 1 枚に残す印を足す (基本しか無ければ基本の 1 枚)。
+        /// 印は本体と同じ KeepFromMarks で読まれ、 挿した端子は左から最初の 1 枚だけ残る ── だから選んだ 1 枚にだけ付ける。</summary>
+        private bool[] AddLinkDieKeep(bool[] keep, int[] rolls, MutualTurnTelegraph tele, int[] slots)
+        {
+            if (TerminalCards.CarryMode != HandCarryMode.Pick) return keep;
+            var run = GameManager.Instance?.Run;
+            if (EquippedDie.IdOf(run) != DieIds.Link) return keep;
+            var deck = CombatManager.Instance?.TerminalDeck;
+            if (deck == null || rolls == null || rolls.Length == 0) return keep;
+            var ev = PrepareDeckEval(rolls, tele);
+            EvalDeckWiring(in ev, rolls, slots, out _, out var o, out _, out _);
+            var board = ev.board; int perm = deck.permanent.Count;
+            int best = -1; float bestW = float.NegativeInfinity;
+            foreach (int s in o.fired)
+            {
+                if (s < perm || s >= board.Count) continue;
+                var d = TerminalCards.Get(board[s]);
+                if (d == null || d.permanent) continue;
+                float w = TargetWorth(d, run) + (d.basic ? 0f : 1000f);
+                if (w > bestW) { bestW = w; best = s; }
+            }
+            if (best < 0) return keep;
+            var k = keep != null && keep.Length >= board.Count ? (bool[])keep.Clone() : new bool[board.Count];
+            if (keep != null) for (int s = 0; s < keep.Length && s < k.Length; s++) k[s] = keep[s];
+            for (int s = 0; s < k.Length; s++) if (s != best && o.fired.Contains(s)) k[s] = false;   // 挿した端子の印は選んだ 1 枚だけ
+            k[best] = true;
+            return k;
+        }
+
+        /// <summary>時計の賽 (ADR-0015): 挿さずに余った目があれば、 いちばん小さい目を〈時計〉の端子へ挿す (配線の評価は時計の値を知らないので、 余った目だけを使う)。</summary>
+        private static int[] AddClockDiePlug(int[] slots, int[] rolls)
+        {
+            if (EquippedDie.IdOf(GameManager.Instance?.Run) != DieIds.Clock || rolls == null) return slots;
+            var deck = CombatManager.Instance?.TerminalDeck;
+            if (deck == null) return slots;
+            int clock = deck.board.IndexOf(TerminalIds.Clock);
+            if (clock < 0 || deck.state.IsStopped(clock)) return slots;
+            for (int i = 0; i < slots.Length; i++) if (slots[i] == clock) return slots;   // もう挿してある
+            int pick = -1;
+            for (int i = 0; i < slots.Length && i < rolls.Length; i++)
+                if (slots[i] < 0 && (pick < 0 || rolls[i] < rolls[pick])) pick = i;
+            if (pick < 0) return slots;
+            var r = (int[])slots.Clone();
+            r[pick] = clock;
+            return r;
+        }
+
         private static float TargetWorth(TerminalDef d, RunState run)
             => d == null ? 0f : d.basic ? 1f : RewardBaseScore(d, run);
 
@@ -859,7 +906,9 @@ namespace AutoTest
                 if (_lastChosenA == 0) { NoAttackChosen++; if (!_lastAttackCandExists) NoAttackNoChoice++; }
             }
             // 手札の規則 Pick (2026-11-13): 次のターンも手札に残す印 (方策 handKeepPolicy・Off / All では null)
+            if (slots != null) slots = AddClockDiePlug(slots, rolls);
             bool[] keep = slots != null ? ChooseHandKeep(rolls, tele, slots) : null;
+            if (slots != null) keep = AddLinkDieKeep(keep, rolls, tele, slots);
             if (predTrace) BeginPredTrace(tele.turn);
             BeginMainCorrTurn(_lastPredA);
             _fbDecided++; if (_lastFreeBlock) _fbTurns++; if (_lastKillsNow) _fbKillTurns++;

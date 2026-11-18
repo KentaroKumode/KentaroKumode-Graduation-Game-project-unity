@@ -16,7 +16,7 @@ namespace MapSystem.FreeMove
         public double traceLifeMul = 1.0;
         /// <summary>使い魔がプレイヤーを見つける歩数。 〈鏡の護符〉で 0 (重なった時だけ)。</summary>
         public int familiarSee = FreeMapParams.FamiliarSee;
-        /// <summary>層ごとの〈煙玉〉の回数 (補足された瞬間に自動で発動し、 追跡者を警戒へ落とす)。</summary>
+        /// <summary>層ごとの〈煙玉〉の回数 (捕捉された瞬間に自動で発動し、 追跡者を警戒へ落とす)。</summary>
         public int smokeCharges;
         /// <summary>層ごとの〈前哨の旗〉の回数 (今いる点に偵察拠点を置く)。</summary>
         public int beaconCharges;
@@ -30,7 +30,7 @@ namespace MapSystem.FreeMove
         public int beaconRange = BeaconRangeDefault;
 
         public const int BeaconRangeDefault = 3;
-        /// <summary>〈煙玉〉が効いた後、 追跡者が補足し直さないターン (減らしてから判定するので、 実際の猶予は 1 少ない)。</summary>
+        /// <summary>〈煙玉〉が効いた後、 追跡者が捕捉し直さないターン (減らしてから判定するので、 実際の猶予は 1 少ない)。</summary>
         public const int SmokeRestTurns = 3;
 
         public static readonly FreeMapPerks None = new FreeMapPerks();

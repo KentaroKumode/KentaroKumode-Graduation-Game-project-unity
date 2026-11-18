@@ -87,6 +87,46 @@ namespace AutoTest
             public int heavyHits, heavyTaken, heavyMax;
             /// <summary>[計装 2026-11-14・嵐の航行] 戦闘が始まった時の嵐: -1 = 不安定化の時計の層でない / 0 = 嵐の外 / 1 = 嵐の中 (敵に〈嵐〉)・その時のフェーズ・不安定化の累計。</summary>
             public int stormIn = -1, stormPhase, stormInst;
+            /// <summary>[計装 2026-11-17・体験の物差し] この戦闘 (ヴェスカは段) で、 1 ターンに敵の HP を実際に減らした量の最大 (EnemyHpLedger の入った量 0〜6 の和・はみ出しは入らない) と、
+            /// 1 ターンに要求した量の最大 (主攻撃・毒・爆発・その他の固定・出血の要求 + 反射・ctx の直接・はみ出しの前)。 「1 ターンに最大 HP の何割」の候補。</summary>
+            public int maxTurnLanded, maxTurnRequested;
+            /// <summary>[計装 2026-11-17・体験の物差し] ボス戦の開始時 (連戦は最初の段) に持っていた品 (パッシブ・装備中の武器。 出目パーツは入らない)。 ボス戦の終わりの記録だけが持つ。</summary>
+            public string[] held;
+            /// <summary>[計装 2026-11-18] 戦闘 (段) の終わりの診断 (<see cref="CombatSystem.FightEndDiag.Snapshot"/> の 10 列・戦闘の終わりの記録だけ):
+            /// 最後の行動 (大技 0 / チャージ 1 / 小技 2 / −1), 最後のターンの頭の敵の HP ‰, 頭の自 HP, 最後のターンの HP の減り, ターン, 攻撃したターン, 当たった, 大技で当たった, 敵の攻撃の被ダメ合計, 敵の HP 50% 以下のターン。</summary>
+            public int[] fin;
+        }
+
+        /// <summary>[計装 2026-11-17・体験の物差し] ラン開始時に実際に効いていた方策の設定を 1 行にする。 Begin が技量から立てる物
+        /// (Super の v3 の各スイッチ・序列の段・価格の差し引き・ITT の版・ミスの率・戦闘名の危険度) とアブレーションの口を、 送った値ではなく入っていた値で読む。</summary>
+        public string PolicySignature()
+        {
+            var b = new System.Text.StringBuilder();
+            b.Append("skill=").Append(EffectiveWiringSkill).Append(" combat=").Append(CombatWiringSkill)
+             .Append(" tiers=").Append(LearnedPriorityProvider.BuyTierCount)
+             .Append(" priceK=").Append(LearnedPriorityProvider.IttPriceK.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture))
+             .Append(" itt=").Append(string.IsNullOrEmpty(GrantItt.Variant) ? "base" : GrantItt.Variant)
+             .Append(" mistake=").Append(wiringMistakeRate.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture))
+             .Append(" freeBlock=").Append(FreeBlockRule ? 1 : 0)
+             .Append(" def=").Append(v3.superDefense ? 1 : 0).Append(" cons=").Append(v3.superConsumables ? 1 : 0)
+             .Append(" nav=").Append(v3.superNav ? 1 : 0).Append(" plan=").Append(v3.macroPlan ? 1 : 0)
+             .Append(" p3=").Append(v3.phase3Ranked ? 1 : 0).Append(" commit=").Append(v3.axisCommitBuy ? 1 : 0)
+             .Append(" out=").Append(ReadOutgoingMultEffective ? 1 : 0).Append(" epas=").Append(ReadEnemyPassivesEffective ? 1 : 0)
+             .Append(" danger=").Append(UseLearnedDanger ? 1 : 0)
+             .Append(" abl=").Append(ablateShop ? "S" : "").Append(ablateShopScore ? "R" : "").Append(ablateEvent ? "E" : "")
+             .Append(ablateFreeNav ? "N" : "").Append(combatNaive ? "C" : "")
+             .Append(" events=").Append(suppressEvents ? 0 : 1).Append(" storm=").Append(stormEnabled ? 1 : 0)
+             .Append(" snav=").Append(navStormAware ? 1 : 0).Append(navStormExitDeath ? "D" : "").Append(navStormFightModel ? "M" : "").Append(navStormFightDeath ? "F" : "")
+             .Append(navStormOracleBoss ? "O" : "")
+             .Append(" shpw=").Append(navStormHpWeightMul.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture))
+             .Append(" sprice=").Append(navStormPointPrice.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture))
+             .Append(" sexit=").Append(navStormExitAtPts);
+            // [測定 2026-11-18] 第 4 層の控えの口 (既定のままなら何も足さない = 前の記録と同じ文字列)
+            if (navD6HpFloorPct > 0 || navD6NoElite || navD6NoStormFight || navD6HpWeightMul != 1f || navD6PathFightCost > 0f)
+                b.Append(" d6=").Append(navD6HpFloorPct).Append(navD6NoElite ? "E" : "").Append(navD6NoStormFight ? "S" : "")
+                 .Append("w").Append(navD6HpWeightMul.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture))
+                 .Append(navD6PathFightCost > 0f ? "p" + navD6PathFightCost.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) : "");
+            return b.ToString();
         }
 
         /// <summary><see cref="RunRec.stormNav"/> の 1 層の列の数 (第 2 巡で 5 → 10)。</summary>
@@ -94,6 +134,9 @@ namespace AutoTest
 
         /// <summary><see cref="RunRec.stormLayers"/> の 1 層の列の数。</summary>
         public const int StormLayerCols = 12;
+
+        /// <summary><see cref="RunRec.layerFlow"/> の 1 層の列の数。</summary>
+        public const int LayerFlowCols = 12;
 
         [Serializable]
         public class RunRec
@@ -126,7 +169,7 @@ namespace AutoTest
             /// <summary>[計装 2026-11-09] 航行マップの層ごとの踏破: 4 列ずつ (深さ, マスの種別 TileType, 層にあった数, 踏んだ数)。</summary>
             public List<int> mapVisit = new List<int>();
             /// <summary>[計装 2026-11-13] 嵐の層の不安定化: 層ごとに <see cref="StormLayerCols"/> (= 12) 列ずつ。 ボスの点の戦闘に入った時 (= 層を抜けた時) の値:
-            /// (深さ, 累計, フェーズ 0〜4, 内訳 取る, 激化, 歩く, イベントのターン, 嵐を動かす, 崩れ始めた手番 (-1 = 崩れなかった・深さ 6 は 0), 嵐の中を歩いた歩数, 嵐で払った HP, 航行の手番)。
+            /// (深さ, 累計, フェーズ 0〜4, 内訳 取る, 激化, 歩く, イベントのターン, 嵐を動かす, 崩れ始めた手番 (-1 = 崩れなかった・深さ 6 は 2026-11-18 より前は 0), 嵐の中を歩いた歩数, 嵐で払った HP, 航行の手番)。
             /// 内訳は層で溜まった分だけ (深さ 6 の始まりの分は入らない = 累計 − 内訳の和)。 stormEnabled=False・stormClock=Turns の層と、 ボスへ届かなかった層は載らない。</summary>
             public List<int> stormLayers = new List<int>();
             /// <summary>[計装 2026-11-14] 嵐の層の航行の判断: 層ごとに <see cref="StormNavCols"/> (= 10) 列ずつ。 ボスの点の戦闘に入った時か、 その層で死んだ時の値:
@@ -136,6 +179,14 @@ namespace AutoTest
             /// 8 切り上げた後に嵐で払った HP, 9 その層で嵐で払った HP)。 第 2 巡 (2026-11-14) で 5 → 10 列に・死んだ層も載せる。
             /// 不安定化の時計でない層は載らない。 口 navStormAware が切れていても、 判断の時点は同じ定義で記録する。</summary>
             public List<int> stormNav = new List<int>();
+            /// <summary>[計装 2026-11-18] 嵐の層の HP と物資の流れ: 層ごとに <see cref="LayerFlowCols"/> (= 12) 列ずつ。 ボスの点の戦闘に入った時か、 その層で (ボス戦の外で) 死んだ時の値:
+            /// (0 深さ, 1 ボスに入った (1) / 死んだ (0), 2 航行の手番, 3 嵐の中を歩いた歩数, 4 嵐で払った HP, 5 物資切れで払った HP, 6 物資, 7 HP, 8 最大 HP, 9 不安定化の累計, 10 フェーズ, 11 崩れ始めた手番)。
+            /// 層に入った時の HP は stateSnaps (種別 0)。 同じ深さの 2 度目は足さない。 読むだけ。</summary>
+            public List<int> layerFlow = new List<int>();
+            /// <summary>[計装 2026-11-17・引きの質] 入った店の棚 (入った順・最初の 8 回まで)。 1 行 = "深さ|種類:id;種類:id;…" (入った時の棚・買う前・リロールの前)。</summary>
+            public List<string> shelves = new List<string>();
+            /// <summary>[計装 2026-11-17] ラン開始時に実際に効いていた方策の設定 (Begin が技量から立てた物を含む・<see cref="PolicySignature"/>)。</summary>
+            public string policySig = "";
             /// <summary>[計装 2026-11-13] 深さ 6 (画面の第 4 層) の〈灰に埋もれた基地〉: 0 = 起きていない / 1 = 最初に踏んだイベントマスで起きた
             /// / 2 = イベントマスを踏まずに終点へ着き、 安全弁がボス戦の前に出した。 深さ 6 へ届かなかったランと、 イベントなしの測定は 0。</summary>
             public int ashBase;

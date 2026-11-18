@@ -74,7 +74,7 @@ namespace GameLoop
         /// <summary>〈補給線〉が使えるか (整備パネル〈兵站〉r10)。</summary>
         public static bool SupplyLineUnlocked => MetaProgression.MetaBuffApplicator.IsSupplyLineUnlocked();
 
-        /// <summary>〈補給線〉: この層で一度着いた前哨基地・店へ跳ぶ (物資 1・ターンを使わない・補足は解けない)。</summary>
+        /// <summary>〈補給線〉: この層で一度着いた前哨基地・店へ跳ぶ (物資 1・ターンを使わない・捕捉は解けない)。</summary>
         public bool RelayStep(string nodeId)
         {
             var sim = FreeMapForAction();
@@ -185,12 +185,15 @@ namespace GameLoop
             if (ev == FreeMapEvent.None) return;
             var pf = sim.Profile;
             if ((ev & FreeMapEvent.SmokeUsed) != 0) Log($"〈{ItemIds.NavSmokeBall}〉が弾けた ── 追跡者は見失い、 最後に見た所を探している（この層ではもう使えない）");
-            if ((ev & FreeMapEvent.Detected) != 0) Log($"〈{pf.displayName}〉に補足された");
+            if ((ev & FreeMapEvent.Detected) != 0) Log($"〈{pf.displayName}〉に捕捉された");
             if ((ev & FreeMapEvent.FoeLost) != 0) Log($"〈{pf.displayName}〉は見失った");
             if ((ev & FreeMapEvent.FoeAlerted) != 0) Log("（追跡者が何かに気づいた）");
             if ((ev & FreeMapEvent.FamiliarLaunched) != 0) Log("使い魔が放たれた");
             if ((ev & FreeMapEvent.FamiliarVanished) != 0) Log("（使い魔は見失って消えた）");
             if ((ev & FreeMapEvent.LureTriggered) != 0) NavDiag.NoteLure(true);   // [計装]
+            if ((ev & FreeMapEvent.LureTriggered) != 0) MetaProgression.Achievements.AchievementService.NoteLureHit();   // 実績〈罠師〉
+            if ((ev & (FreeMapEvent.Detected | FreeMapEvent.Caught | FreeMapEvent.FamiliarContact)) != 0)
+                MetaProgression.Achievements.AchievementService.NoteFoundByPursuer();   // 実績〈忍び足〉 (この層で見つかった)
             if ((ev & FreeMapEvent.LureTriggered) != 0) Log($"（囮罠が作動した）追跡者が{FreeMapParams.LureHoldTurns}ターン足止めされた");
             if ((ev & FreeMapEvent.FrontAdvanced) != 0 && sim.Weather != WeatherKind.None)
                 Log($"前線が左から {System.Math.Min(sim.Front, FreeMapParams.Width):0.0} まで届いた（{sim.Weather.DisplayName()}）");
@@ -462,6 +465,7 @@ namespace GameLoop
         {
             _inPursuerFight = false;
             NavDiag.End(NavDiag.Won, Run);   // [計装]
+            MetaProgression.Achievements.AchievementService.NotePursuerWon();   // 実績〈狩る側〉
             FreeMap?.ResolveBodyWon();
             AddBattleWinInstability(elite: false, pursuer: true);   // 不安定化: 番人を倒した +2 (報酬の秘宝は GrantRewardItem で +3)
             int before = Run.provision;
@@ -542,6 +546,7 @@ namespace GameLoop
         private void HandleFamiliarFightWon()
         {
             ProvisionSystem.Supply(Run, FreeMapParams.RewardBattle);
+            MetaProgression.Achievements.AchievementService.NoteFamiliarWon();   // 実績〈猟犬払い〉
             Log("使い魔を退けた");
             AddBattleWinInstability(elite: false, pursuer: false);   // 不安定化: 通常の戦闘と同じ +1 (2026-11-13)
             EndFamiliarFight(fled: false);
@@ -550,9 +555,9 @@ namespace GameLoop
         /// <summary>戦闘から逃げた。 通常の戦闘なら直前の点へ戻り、 そのマスは使い切りにならない (敵が残る)。</summary>
         private void HandleFledBattle()
         {
-            // 実績〈逃げずに 5 層のボスを倒す〉(NoFleeBoss5) の判定に使う (issue #120)。 使い魔・追跡者・通常の戦闘のどれでも数える。
+            // 実績〈猪突猛進〉(一度も逃げずに 3 層のボス・issue #120) と〈昨日の敵は今日も敵〉(逃げた相手と同じ敵に勝つ) の判定に使う。 使い魔・追跡者・通常の戦闘のどれでも数える。
             //   救済で生き延びた (EndPursuerFightAsFled(payCost: false)) のは自分で逃げたのではないので、 ここを通らず数えない。
-            MetaProgression.Achievements.AchievementService.NotePlayerFled();
+            MetaProgression.Achievements.AchievementService.NotePlayerFled(CurrentEnemy?.id);
             if (_inFamiliarFight)
             {
                 PayFleeCost();

@@ -662,7 +662,7 @@ namespace CombatSystem
             if (ctx != null && equippedDiceFaces != null)
             {
                 ctx.equippedDiceFaces = equippedDiceFaces;
-                // 出目パーツ: 面添字ごとの Tier。 面と対で渡ってくる (DiceFaceParts.Build)。
+                // 面添字ごとの Tier。 面と対で渡ってくる (EquippedDie.Build)。
                 ctx.equippedFaceTiers = equippedFaceTiers;
             }
             // ADR-0010〈無銘の賽〉: このダイスでは端子役が成立しない (手札役・配線役は通常どおり)。
@@ -814,7 +814,7 @@ namespace CombatSystem
                 ctx, GameLoop.GameManager.Instance?.Run, this);
 
             OnCombatStart?.Invoke(enemy.id);
-            MetaProgression.Achievements.AchievementService.NoteCombatStarted();
+            MetaProgression.Achievements.AchievementService.NoteCombatStarted(enemy.id);
 
             
             // 恒久デバフ「コルヴェンの憤怒」: ボス戦の戦闘開始時、現在HP半減（1T目のダイス最大化は OnRoll で処理）

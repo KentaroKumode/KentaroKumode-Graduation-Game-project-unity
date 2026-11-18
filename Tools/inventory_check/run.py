@@ -20,7 +20,7 @@ UNITY = 'C:/Program Files/Unity/Hub/Editor/2022.3.22f1/Editor/Data'
 DOTNET_UNITY = UNITY + '/NetCoreRuntime/dotnet.exe'
 CSC = UNITY + '/DotNetSdkRoslyn/csc.dll'
 RUNTIME = 'C:/Program Files/dotnet/shared/Microsoft.NETCore.App'
-SOURCES = ['Assets/Scripts/UI/Game2D/JpTextLayout.cs', 'Assets/Scripts/UI/Game2D/Screens/ModalJpMetrics.cs',
+SOURCES = ['Assets/Scripts/UI/Game2D/JpTextLayout.cs', 'Assets/Scripts/UI/Game2D/JpBreakModel.cs', 'Assets/Scripts/UI/Game2D/Screens/ModalJpMetrics.cs',
            'Assets/Scripts/UI/Game2D/Screens/InventoryLayout.cs', 'Assets/Scripts/UI/Game2D/Screens/ItemCardInfo.cs',
            'Assets/Scripts/UI/Game2D/BattleHudLayout.cs', 'Assets/Scripts/UI/Game2D/BattleLcdLayout.cs']
 
@@ -55,10 +55,14 @@ def main():
         sys.exit(1)
     with open(os.path.join(out, 'check.runtimeconfig.json'), 'w', encoding='utf-8') as f:
         f.write('{ "runtimeOptions": { "tfm": "netcoreapp3.1", "framework": { "name": "Microsoft.NETCore.App", "version": "3.1.0" } } }\n')
-    r = subprocess.run(['dotnet', os.path.join(out, 'check.dll'), '.'], capture_output=True)
-    sys.stdout.buffer.write(r.stdout)
-    sys.stdout.buffer.flush()
-    sys.exit(r.returncode)
+    # 設定の行間・字間 (2026-11-16): 既定 (行間 1・字間 0・2026-11-17〜) と最大 (3,2) の 2 回回す
+    code = 0
+    for gaps in ('1,0', '3,2'):
+        r = subprocess.run(['dotnet', os.path.join(out, 'check.dll'), '.'], capture_output=True, env=dict(os.environ, EVPC_GAPS=gaps))
+        sys.stdout.buffer.write(r.stdout)
+        sys.stdout.buffer.flush()
+        code = code or r.returncode
+    sys.exit(code)
 
 
 if __name__ == '__main__':

@@ -45,22 +45,66 @@ namespace EventSystem
         /// <summary>記録の文を分岐ごとに分けて書いてあるか (分けてある時だけ、 引いた分岐を戦記に残す)。</summary>
         public bool DigestSplitByBranch => digestByBranch != null;
 
-        /// <summary>選択肢の下に出す説明の文 (選べない理由・使うターン・補足中の捕まるまで)。 何も無ければ null。
-        /// 組み立ては <c>EventEncounter.DescribeCost</c> から呼ぶ (検算 Tools/event_page_check が最も長い形で窓の 2 行に収まるかを見る)。
-        /// etaTurns = 補足されている時の捕まるまでのターン (-1 = 補足されていない)。</summary>
-        public static string CostText(string why, int turns, int etaTurns)
+        /// <summary>選択肢の下に出す説明の文 (2026-11-16 に作り直し・作者の決定「自分から差し出す物は見せる・ハプニングは見せない」)。 何も無ければ null。
+        /// 並びは 選べない理由 → 見せる代償 (効果の並びの順・<see cref="EventEffectRoles.IsShownCost"/>・文は <see cref="EventEffectRoles.ShownCostText"/>)。
+        /// ターンの後ろには捕捉中の捕まるまでを付ける (etaTurns = 捕捉されている時の捕まるまでのターン・-1 = 捕捉されていない)。
+        /// 選べない時 (why あり) は、 理由とターンだけを出す ── 足りない支払いは理由の文が言うので、 ほかの支払いを並べて 2 行を越えないようにする。
+        /// 組み立ては <c>EventEncounter.DescribeCost</c> から呼ぶ (検算 Tools/event_page_check が最も長い形で窓の 2 行に収まるかを見る)。 得る物は書かない。</summary>
+        public string CostText(string why, int etaTurns)
         {
             var sb = new System.Text.StringBuilder();
             if (why != null) sb.Append(why);
-            if (turns > 0)
-            {
-                if (sb.Length > 0) sb.Append("・");
-                sb.Append($"{turns} ターンを使う");
-                if (etaTurns >= 0)
-                    sb.Append(etaTurns <= turns ? $"（補足されている: {etaTurns} ターンで捕まる）"
-                                                : $"（補足されている: 最短 {etaTurns} ターンで捕まる）");
-            }
+            bool etaDone = false;
+            if (effects != null)
+                foreach (var e in effects)
+                {
+                    if (!EventEffectRoles.IsShownCost(e)) continue;
+                    if (why != null && e.type != EventEffectType.TurnsPass) continue;
+                    string t = EventEffectRoles.ShownCostText(e);
+                    if (t == null) continue;
+                    if (sb.Length > 0) sb.Append("・");
+                    sb.Append(t);
+                    if (e.type == EventEffectType.TurnsPass && etaTurns >= 0 && !etaDone)
+                    {
+                        etaDone = true;
+                        int turns = TurnCost;
+                        sb.Append(etaTurns <= turns ? $"（捕捉されている: {etaTurns} ターンで捕まる）"
+                                                    : $"（捕捉されている: 最短 {etaTurns} ターンで捕まる）");
+                    }
+                }
             return sb.Length > 0 ? sb.ToString() : null;
+        }
+
+        /// <summary>選択肢の箱の右端の札 1 枚 (2026-11-16・イベントの画面)。 turns = ターンの札 (画面が砂時計の絵を前に付け、 text は数だけ)。</summary>
+        public struct CostChip { public bool turns; public string text; }
+
+        /// <summary>選択肢の箱の右端に並べる「見せる代償」の札 (2026-11-16・効果の並びの順)。 どれを見せるかは <see cref="EventEffectRoles.IsShownCost"/>・
+        /// 札の文は <see cref="EventEffectRoles.ShownCostChip"/>。 得る物は出さない。 選べない時も全部並べる (画面が赤くする・理由は箱の下の説明が言う)。</summary>
+        public List<CostChip> CostChips()
+        {
+            var list = new List<CostChip>();
+            if (effects != null)
+                foreach (var e in effects)
+                {
+                    if (!EventEffectRoles.IsShownCost(e)) continue;
+                    string t = EventEffectRoles.ShownCostChip(e);
+                    if (t != null) list.Add(new CostChip { turns = e.type == EventEffectType.TurnsPass, text = t });
+                }
+            return list;
+        }
+
+        /// <summary>選んでいる箱の下に出す説明 (2026-11-16・イベントの画面・行は改行で分ける)。 何も無ければ null。
+        /// why = 選べない理由 (選べる箱は null を渡す)・etaTurns = 捕捉されている時の捕まるまでのターン (-1 = 捕捉されていない)。
+        /// 捕捉中の見込みはターンを使う選択肢だけに付ける。 札が言う代償 (ターン・ゴールド …) はここに繰り返さない。
+        /// 箱の下の 2 行に収まるかは検算 Tools/event_page_check が見る。</summary>
+        public string NoteText(string why, int etaTurns)
+        {
+            string eta = null;
+            int turns = TurnCost;
+            if (turns > 0 && etaTurns >= 0)
+                eta = etaTurns <= turns ? $"捕捉されている。{etaTurns} ターンで捕まる" : $"捕捉中。最短 {etaTurns} ターンで捕まる";      // 「捕捉されている。最短 99 ターン…」は箱の下の 1 行 (156 dot) に入らない
+            if (why == null) return eta;
+            return eta == null ? why : why + "\n" + eta;
         }
 
         /// <summary>この選択肢が使うターン (効果「ターン+N」の合計・確率分岐の中は数えない)。 0 なら時間を使わない。</summary>
@@ -103,7 +147,7 @@ namespace EventSystem
         }
 
         /// <summary>この選択肢で払う物資 (効果「物資-N」の合計・確率分岐の中と「勝利後」は数えない)。 2026-11-13。
-        /// 足りなければ選べない (<see cref="UnavailableReason"/>)。 確率分岐の中の物資-N は支払いでなく結果として失う物なので、 ここには入れない。</summary>
+        /// 確率分岐の中の物資-N は支払いでなく結果として失う物なので、 ここには入れない。 選べるかの判定は見せる支払いだけを数える (<see cref="BlockingPayment"/>・2026-11-16)。</summary>
         public int ProvisionCost
         {
             get
@@ -114,6 +158,19 @@ namespace EventSystem
                         if (e != null && !e.postCombat && (e.type == EventEffectType.ProvisionDelta || e.type == EventEffectType.HungerDelta) && e.amount < 0) n -= e.amount;
                 return n;
             }
+        }
+
+        /// <summary>足りなければ選べなくする支払いの合計 (2026-11-16)。 確率分岐の外・「勝利後」でない -N のうち、 <see cref="EventEffectRoles.BlocksWhenShort"/> の物だけ
+        /// (見せる支払い。 伏せた支払いは足りなくても選べて、 ある分だけ失う)。 <paramref name="provision"/> = 物資 (旧表記の空腹度も) を数える。</summary>
+        private int BlockingPayment(EventEffectType type, bool provision = false)
+        {
+            int n = 0;
+            if (effects != null)
+                foreach (var e in effects)
+                    if (e != null && !e.postCombat && e.amount < 0
+                        && (e.type == type || (provision && e.type == EventEffectType.HungerDelta))
+                        && EventEffectRoles.BlocksWhenShort(e)) n -= e.amount;
+            return n;
         }
 
         /// <summary>この選択肢が効果 type を (確率分岐の外に) 持つか。</summary>
@@ -135,15 +192,17 @@ namespace EventSystem
         public bool IsAvailable(GameLoop.RunState run) => UnavailableReason(run) == null;
 
         /// <summary>選べない理由 (画面に出す短い文)。 選べるなら null。
-        /// 判定の順は (a) ゴールド → 物資 → 素材 (鍛える素材を含む)、 (b) 得になる効果が何ひとつ起きない (最初に書かれた得の効果の理由)。</summary>
+        /// 判定の順は (a) ゴールド → 物資 → 素材 (鍛える素材を含む)、 (b) 得になる効果が何ひとつ起きない (最初に書かれた得の効果の理由)。
+        /// (a) に数えるのは見せる支払いだけ (2026-11-16・<see cref="EventEffectRoles.BlocksWhenShort"/>・切り替えは <see cref="EventEffectRoles.HiddenPaymentMayFallShort"/>)。</summary>
         public string UnavailableReason(GameLoop.RunState run)
         {
             if (run == null) return null;
-            int g = GoldCost;
+            // 支払いは見せる物だけ (2026-11-16・EventEffectRoles.BlocksWhenShort)。 伏せた支払いは足りなくても選べて、 ある分だけ失う
+            int g = BlockingPayment(EventEffectType.GoldDelta);
             if (run.coins < g) return $"ゴールドが足りない（{g}G）";
-            int p = ProvisionCost;
+            int p = BlockingPayment(EventEffectType.ProvisionDelta, provision: true);
             if (run.provision < p) return $"物資が足りない（{p}）";
-            int m = MaterialCost;
+            int m = BlockingPayment(EventEffectType.MaterialDelta);
             if (Has(EventEffectType.ForgeWeapon))
             {
                 int cost = GameLoop.GameManager.WeaponUpgradeCost(run);

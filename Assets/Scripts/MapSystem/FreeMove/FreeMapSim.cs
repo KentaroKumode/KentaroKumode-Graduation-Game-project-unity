@@ -10,7 +10,7 @@ namespace MapSystem.FreeMove
         Patrol = 0,
         /// <summary>プレイヤーの新しい痕跡、 または置かれた囮罠に気づいて、 そちらへ向かう。</summary>
         Alert = 1,
-        /// <summary>補足したプレイヤーを追う。</summary>
+        /// <summary>捕捉したプレイヤーを追う。</summary>
         Chase = 2,
     }
 
@@ -21,7 +21,7 @@ namespace MapSystem.FreeMove
         None = 0,
         /// <summary>点に着いた (<see cref="FreeMapSim.LastArrived"/>)。</summary>
         Arrived = 1 << 0,
-        /// <summary>補足された (追跡者が追跡に入った瞬間)。</summary>
+        /// <summary>捕捉された (追跡者が追跡に入った瞬間)。</summary>
         Detected = 1 << 1,
         /// <summary>追跡者が見失った。</summary>
         FoeLost = 1 << 2,
@@ -45,7 +45,7 @@ namespace MapSystem.FreeMove
         MapChanged = 1 << 11,
         /// <summary>物資が尽き、 HP も尽きた。</summary>
         Died = 1 << 12,
-        /// <summary>〈煙玉〉が発動した (補足される代わりに、 追跡者は警戒へ落ちた)。 Detected は立たない。</summary>
+        /// <summary>〈煙玉〉が発動した (捕捉される代わりに、 追跡者は警戒へ落ちた)。 Detected は立たない。</summary>
         SmokeUsed = 1 << 13,
         /// <summary>嵐の段が変わった (2026-11-13・<see cref="FreeMapSim.StormPhase"/>)。 嵐の層だけで鳴る。</summary>
         StormAdvanced = 1 << 14,
@@ -88,7 +88,7 @@ namespace MapSystem.FreeMove
         }
     }
 
-    /// <summary>補足されている時の「最短で何手で捕まるか」(こちらがその場に留まった場合)。</summary>
+    /// <summary>捕捉されている時の「最短で何手で捕まるか」(こちらがその場に留まった場合)。</summary>
     public struct CatchEta
     {
         public int turns;
@@ -162,12 +162,12 @@ namespace MapSystem.FreeMove
         public bool FoeAlive { get; private set; }
         public int FoeNode { get; private set; }
         public FoeMode FoeMode { get; private set; }
-        /// <summary>追跡者が最後にプレイヤーを補足した点。</summary>
+        /// <summary>追跡者が最後にプレイヤーを捕捉した点。</summary>
         public int LastSeen { get; private set; } = -1;
         private int _lose;
         /// <summary>今の追跡が続いているターン数 (<see cref="FreeMapParams.ChaseGiveUp"/> で諦める)。</summary>
         private int _chaseTurns;
-        /// <summary>諦めた後に補足しない残りターン。</summary>
+        /// <summary>諦めた後に捕捉しない残りターン。</summary>
         private int _chaseRest;
         private int _patrol;
         private int _sinceSummon = 99;
@@ -178,7 +178,7 @@ namespace MapSystem.FreeMove
 
         // ── 縄張りと宝 (2026-11-12) ──
         /// <summary>true = 追跡者 (本体と使い魔) は<b>縄張りの外へ出ない</b> (既定)。 縄張りの外に居るプレイヤーには気づかず、
-        /// 追跡の途中でもその先へは進まない (縁で止まり、 補足できないまま見失う)。
+        /// 追跡の途中でもその先へは進まない (縁で止まり、 捕捉できないまま見失う)。
         /// false = 旧い作り (層のどこまでも追う)。 本体 (MapManager) が層を作った時に <see cref="ConfigureTerritory"/> で決める。</summary>
         public bool Leashed { get; private set; } = true;
         /// <summary>縄張りの宝の点 (-1 = 無い)。 層に入った時から地図に印が見える (点の種類は見えないまま)。
@@ -238,17 +238,19 @@ namespace MapSystem.FreeMove
         public StormClock Clock { get; private set; } = StormClock.Instability;
         /// <summary>嵐が不安定化ポイントで進む層か (嵐の層で、 時計が <see cref="StormClock.Instability"/>)。</summary>
         public bool InstabilityMode => StormMode && Clock == StormClock.Instability;
-        /// <summary>不安定化ポイントの累計 (2026-11-13・0 以上)。 深さ 6 は InstabilityDepth6Start (= 崩れ始める境目 15) から始まる。 不安定化の時計でない時は 0 のまま。 中断セーブに写す。</summary>
+        /// <summary>不安定化ポイントの累計 (2026-11-13・0 以上)。 深さ 6 は InstabilityDepth6Start (2026-11-18〜 12 = 崩れ始める境目 15 の 3 つ手前・旧 15) から始まる。 不安定化の時計でない時は 0 のまま。 中断セーブに写す。</summary>
         public int Instability { get; private set; }
         /// <summary>累計の内訳 (<see cref="Instability.PartTake"/> ほか・この層で溜まった分。 深さ 6 の始まりの分は入らない)。 中断セーブに写す。</summary>
         public int[] InstabilityParts { get; } = new int[MapSystem.FreeMove.Instability.Parts];
         /// <summary>崩れ始めたか (不安定化の累計が最初の境目以上)。 ここから先は 1 歩・待つ・偵察でも溜まる。 不安定化の時計でなければ false。</summary>
         public bool Collapsing => InstabilityMode && MapSystem.FreeMove.Instability.Collapsing(Instability);
-        /// <summary>[計装 2026-11-13] 崩れ始めた手番 (<see cref="Turn"/>・まだなら -1・深さ 6 は 0)。 数えるだけで動きに使わない。 中断セーブには写さない (戻した時は今の状態から数え直す)。</summary>
+        /// <summary>[計装 2026-11-13] 崩れ始めた手番 (<see cref="Turn"/>・まだなら -1・深さ 6 は 2026-11-18 より前は 0)。 数えるだけで動きに使わない。 中断セーブには写さない (戻した時は今の状態から数え直す)。</summary>
         public int CollapseTurn { get; private set; } = -1;
         /// <summary>[計装 2026-11-13] この層で嵐の中の点へ動いた歩数 (1 歩・〈補給線〉) と、 嵐で払った HP (歩く・待つ・偵察・〈補給線〉)。 数えるだけ・中断セーブには写さない。</summary>
         public int StormStepsTaken { get; private set; }
         public int StormHpPaid { get; private set; }
+        /// <summary>[計装 2026-11-18] この層で物資切れの歩行で払った HP (払わせた量・HP が尽きる所で頭打ちでも要求の量)。 数えるだけ・中断セーブには写さない。</summary>
+        public int StarveHpPaid { get; private set; }
         /// <summary>イベントの「前線を遠ざける / 近づける」で動かした嵐の時計のずらし (手番・正 = 進めた)。 中断セーブに写す。 手番の時計だけが使う。</summary>
         public int StormShift { get; private set; }
         /// <summary>段の長さ (時計の単位ごと)。</summary>
@@ -285,7 +287,7 @@ namespace MapSystem.FreeMove
         }
 
         /// <summary>嵐の時計の種類を決める (層を作った直後・最初の操作と <see cref="LoadState"/> の前に 1 回)。 累計は層の始まりの値に戻す
-        /// (深さ 6 = 10・ほか 0。 不安定化の時計でなければ 0)。 <see cref="Version"/> は動かさない (手番の時計で storm-boss と写しが揃うように)。</summary>
+        /// (深さ 6 = FreeMapParams.InstabilityDepth6Start・ほか 0。 不安定化の時計でなければ 0)。 <see cref="Version"/> は動かさない (手番の時計で storm-boss と写しが揃うように)。</summary>
         public void ConfigureStorm(StormClock clock)
         {
             Clock = clock;
@@ -744,7 +746,7 @@ namespace MapSystem.FreeMove
         /// <remarks>嵐の層 (2026-11-13) では嵐の HP (<see cref="StormHpFor"/>) ── 近道の残りがある間も払う。</remarks>
         public int HpLossFor(int j) => StormMode ? StormHpFor(j) : FreeMovesLeft > 0 ? 0 : WeatherAt(j, WeatherKind.Hail) ? 1 : 0;
 
-        /// <summary>追跡者がいま補足に使う歩数 (性質と照明で変わる)。 表示 (気配の輪) もこれを読む。</summary>
+        /// <summary>追跡者がいま捕捉に使う歩数 (性質と照明で変わる)。 表示 (気配の輪) もこれを読む。</summary>
         public int DetectHops
         {
             get
@@ -802,7 +804,7 @@ namespace MapSystem.FreeMove
             return sector == 0 ? 0 : sector == 1 ? 7 : 6;
         }
 
-        /// <summary>補足されている時の「最短で何手で捕まるか」(こちらが留まった場合)。</summary>
+        /// <summary>捕捉されている時の「最短で何手で捕まるか」(こちらが留まった場合)。</summary>
         public CatchEta Eta()
         {
             var best = CatchEta.None;
@@ -838,7 +840,7 @@ namespace MapSystem.FreeMove
 
         /// <summary>隣の点 j へ 1 歩。 物資を払い、 痕跡を残し、 追跡者が動く。
         /// <para>近道の残り (<see cref="FreeMovesLeft"/>) がある間は<b>ただの 1 歩</b>: 物資を払わず、 ターンを進めず (追跡者・使い魔・前線・
-        /// 照明と囮罠の残りが動かない)、 雹の HP も払わず (2026-11-13)、 残りを 1 減らす。 痕跡・着いた点の起動は通常の 1 歩と同じ。 補足の判定は
+        /// 照明と囮罠の残りが動かない)、 雹の HP も払わず (2026-11-13)、 残りを 1 減らす。 痕跡・着いた点の起動は通常の 1 歩と同じ。 捕捉の判定は
         /// 追跡者の手番 (= 次にターンが進んだ時) にしか無いので、 ここでは鳴らない。 追跡者・使い魔の居る点へ自分から踏み込んだ時だけ、 その場で接触する。</para></summary>
         public FreeMapEvent MoveTo(int j)
         {
@@ -873,9 +875,9 @@ namespace MapSystem.FreeMove
             return ev;
         }
 
-        /// <summary>ターンを進めずに点 j へ着いた時の接触: 追跡者の本体の居る点なら捕まる (補足もその場で入る)、
-        /// 使い魔・猟犬の居る点なら接触する。 補足の範囲に入っただけでは何も起きない (判定は次の追跡者の手番)。
-        /// 〈煙玉〉は補足を外す品で、 踏み込んだ接触には効かない。</summary>
+        /// <summary>ターンを進めずに点 j へ着いた時の接触: 追跡者の本体の居る点なら捕まる (捕捉もその場で入る)、
+        /// 使い魔・猟犬の居る点なら接触する。 捕捉の範囲に入っただけでは何も起きない (判定は次の追跡者の手番)。
+        /// 〈煙玉〉は捕捉を外す品で、 踏み込んだ接触には効かない。</summary>
         private FreeMapEvent ContactWithoutTurn(int j)
         {
             var ev = FreeMapEvent.None;
@@ -899,7 +901,7 @@ namespace MapSystem.FreeMove
             => !Dead && !InFight && j >= 0 && j < _adj.Length && j != Me && !_sunk[j] && _relays.Contains(j);
 
         /// <summary>〈補給線〉: 一度着いた前哨基地・店へ跳ぶ。 物資 <see cref="FreeMapParams.RelaySupply"/>・<b>ターンは使わない</b> (追跡者は動かない)。
-        /// <para><b>補足は解けない</b> ── 追いかけている追跡者は跳んだ先を知っていて、 そこへ向かう。 距離は稼げるが撒けない (2026-11-09)。</para></summary>
+        /// <para><b>捕捉は解けない</b> ── 追いかけている追跡者は跳んだ先を知っていて、 そこへ向かう。 距離は稼げるが撒けない (2026-11-09)。</para></summary>
         public FreeMapEvent RelayTo(int j)
         {
             if (!CanRelayTo(j)) return FreeMapEvent.None;
@@ -913,7 +915,7 @@ namespace MapSystem.FreeMove
             _trace[j] = Turn;
             Known[j] = true;
             LastArrived = j;
-            // 縄張りの外へ跳んだ時は、 縄張りを出ない追跡者には追う先が無い (最後に見た点のまま・補足できずに見失う)
+            // 縄張りの外へ跳んだ時は、 縄張りを出ない追跡者には追う先が無い (最後に見た点のまま・捕捉できずに見失う)
             if (FoeAlive && FoeMode == FoeMode.Chase && (!Leashed || InTerritory(j))) LastSeen = j;
             ev |= FreeMapEvent.Arrived;
             if ((ev & FreeMapEvent.Died) != 0) { Dead = true; return ev; }
@@ -956,7 +958,7 @@ namespace MapSystem.FreeMove
         }
 
         /// <summary>照明 (ターンは使わない): 物資を払い、 <see cref="FreeMapParams.FlareTurns"/> ターンのあいだ
-        /// 道で <see cref="FreeMapParams.FlareRange"/> 歩先まで見える。 追跡者の補足の歩数も同じだけ伸びる。</summary>
+        /// 道で <see cref="FreeMapParams.FlareRange"/> 歩先まで見える。 追跡者の捕捉の歩数も同じだけ伸びる。</summary>
         public FreeMapEvent UseFlare()
         {
             if (Dead || InFight) return FreeMapEvent.None;
@@ -1038,7 +1040,7 @@ namespace MapSystem.FreeMove
             return fresh;
         }
 
-        /// <summary>補足を外す: 追跡者は見失って巡回へ戻り、 <see cref="FreeMapParams.ChaseRest"/> ターンは補足しない
+        /// <summary>捕捉を外す: 追跡者は見失って巡回へ戻り、 <see cref="FreeMapParams.ChaseRest"/> ターンは捕捉しない
         /// (追跡の上限で諦めた時と同じ休み)。 放たれた使い魔は消え、 猟犬は本体の元へ戻る。 追跡者が居なければ何もしない。</summary>
         public FreeMapEvent ShakeOff()
         {
@@ -1054,7 +1056,7 @@ namespace MapSystem.FreeMove
 
         /// <summary>追跡者の本体を道で steps 歩、 自分から遠ざける (毎歩、 自分からの歩数がいちばん増える隣へ・同点は隣接表の並び)。
         /// これ以上離れられなければそこで止まる。 動かない性質 (召喚者) も動かす ── 本体の性質ではなく、 イベントの出来事として動く。
-        /// 猟犬は本体の元へ戻る。 追跡中なら追跡は続く (最後に補足した点へ向かう)。
+        /// 猟犬は本体の元へ戻る。 追跡中なら追跡は続く (最後に捕捉した点へ向かう)。
         /// <para>縄張りを出ない追跡者 (<see cref="Leashed"/>・既定) は、 縄張りの中の隣へしか動かさない ── 縄張りの縁で止まる (2026-11-13)。
         /// 自分からの歩数は層の全部の道で数える (縄張りの中で、 自分から一番遠い側へ寄る)。 旧い作り (縄張りの外まで追う) の動きは変えない。</para></summary>
         public FreeMapEvent PushFoe(int steps)
@@ -1077,7 +1079,7 @@ namespace MapSystem.FreeMove
         }
 
         /// <summary>追跡者の本体を道で steps 歩、 自分へ近づける (代償の効果)。 自分の隣で止まる (この効果では捕まらない)。
-        /// 補足するかどうかは次のターンの追跡者の手番が決める。
+        /// 捕捉するかどうかは次のターンの追跡者の手番が決める。
         /// <para>縄張りを出ない追跡者 (<see cref="Leashed"/>・既定) は、 追跡者が歩く時と同じ道 (<see cref="FoeStepToward"/>) で寄せる ──
         /// 自分が縄張りの外に居れば、 縄張りの縁 (自分へ道で一番近づける点) で止まる (2026-11-13)。 旧い作りの動きは変えない。</para></summary>
         public FreeMapEvent PullFoe(int steps)
@@ -1220,6 +1222,7 @@ namespace MapSystem.FreeMove
             int short_ = cost - pay;
             if (short_ <= 0) return false;
             HpPayReason = "物資切れの歩行";
+            StarveHpPaid += short_ * FreeMapParams.HpPerSupply;   // [計装 2026-11-18]
             return _wallet.PayHp(short_ * FreeMapParams.HpPerSupply);
         }
 
@@ -1292,12 +1295,12 @@ namespace MapSystem.FreeMove
                 var dMe = HopsFrom(Me);
                 int detect = DetectHops;
                 if (_chaseRest > 0) _chaseRest--;
-                // 縄張りを出ない追跡者は、 縄張りの外に居るプレイヤーには気づかない (追跡中なら、 補足できないまま見失う側へ数える)
+                // 縄張りを出ない追跡者は、 縄張りの外に居るプレイヤーには気づかない (追跡中なら、 捕捉できないまま見失う側へ数える)
                 bool sees = _chaseRest == 0 && dMe[FoeNode] <= detect && (!Leashed || InTerritory(Me));
                 if (sees && FoeMode != FoeMode.Chase && SmokeLeft > 0)
                 {
-                    // 〈煙玉〉(層に 1 回・自動): 補足される代わりに、 追跡者は警戒へ落ちて痕跡をたどる (最後の位置 = 発動した地点)。
-                    //   すぐ補足し直さないよう、 数ターンは補足しない。 その間にどこへ逃げるかは問われる (痕跡を踏まれれば追いつかれる)
+                    // 〈煙玉〉(層に 1 回・自動): 捕捉される代わりに、 追跡者は警戒へ落ちて痕跡をたどる (最後の位置 = 発動した地点)。
+                    //   すぐ捕捉し直さないよう、 数ターンは捕捉しない。 その間にどこへ逃げるかは問われる (痕跡を踏まれれば追いつかれる)
                     SmokeLeft--;
                     FoeMode = FoeMode.Alert; _alertLure = -1; _chaseRest = FreeMapPerks.SmokeRestTurns;
                     ev |= FreeMapEvent.SmokeUsed;
@@ -1311,7 +1314,7 @@ namespace MapSystem.FreeMove
                 {
                     FoeMode = FoeMode.Patrol; ev |= FreeMapEvent.FoeLost;
                 }
-                // 追跡の上限: 追い続けて捕まえられなければ諦め、 しばらくは補足しない (2026-11-04)
+                // 追跡の上限: 追い続けて捕まえられなければ諦め、 しばらくは捕捉しない (2026-11-04)
                 if (FoeMode == FoeMode.Chase && ++_chaseTurns > FreeMapParams.ChaseGiveUp)
                 {
                     FoeMode = FoeMode.Patrol; _chaseTurns = 0; _chaseRest = FreeMapParams.ChaseRest;

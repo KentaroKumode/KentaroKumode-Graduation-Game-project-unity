@@ -36,6 +36,7 @@ namespace GameLoop
             {
                 string id = Run.pendingTerminalOffer[index];
                 Run.terminalDeck.Add(id);
+                MetaProgression.Achievements.AchievementService.NoteTerminalDeck(Run);   // 実績〈紙の城〉
                 Log($"端子を山札に加えた: {id} (山札 {Run.terminalDeck.Count} 枚)");
             }
             Run.pendingTerminalOffer.Clear();
@@ -122,6 +123,8 @@ namespace GameLoop
             if (!ProvisionPayment.TryPay(Run, s.price, "端子を買う")) return false;
             s.sold = true;
             Run.terminalDeck.Add(s.id);
+            MetaProgression.Achievements.AchievementService.NoteTerminalDeck(Run);   // 実績〈紙の城〉
+            MetaProgression.Achievements.AchievementService.NoteShopPurchase(Run.coins, countsAsItem: false, surcharged: false);   // 端子は品ではない (清貧に数えない)
             TerminalDiag.NoteShopBuy(s.id);   // [計装 #106]
             Log($"端子を買った: {s.id} (-{s.price}G・山札 {Run.terminalDeck.Count} 枚)");
             return true;
