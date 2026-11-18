@@ -346,11 +346,17 @@ namespace UI.Game2D
         }
         private void Box(int x, int y, int w, int h, Color32 fill, Color32 edge) { Rect(x, y, w, h, edge); Rect(x + 1, y + 1, w - 2, h - 2, fill); }
 
-        /// <summary>ドット字 (既定のフォント・Game2DJpFont)。 edge = 周り 8 方向に暗い縁取り (背景の上で読めるように)。</summary>
+        /// <summary>ドット字 (既定のフォント・Game2DJpFont)。 edge = 周り 8 方向に暗い縁取り (背景の上で読めるように)。
+        /// 読みやすさの A (<see cref="BattleReadability.Outline"/>・2026-11-16・見比べ用) の間は、 縁取りを 2 ドット (半径 2・四隅を落とす) に太らせる。
+        /// edge を使うのはカードの外の字 (右の列・右上・左上・左下・敵の HP の数・頭上の字) だけで、 カードと説明の帯の中の字 (edge = false) は変わらない。</summary>
         private void Txt(string s, int x, int y, Color32 col, bool edge = true)
         {
             if (string.IsNullOrEmpty(s)) return;
-            if (edge) { var e = C(Edge); Game2DJpFont.Draw((px, py) => { for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++) Put(px + dx, py + dy, e); }, s, x, y); }
+            if (edge)
+            {
+                var e = C(Edge); int r = BattleReadability.Outline ? 2 : 1;
+                Game2DJpFont.Draw((px, py) => { for (int dy = -r; dy <= r; dy++) for (int dx = -r; dx <= r; dx++) if (r == 1 || BattleReadability.InRim2(dx, dy)) Put(px + dx, py + dy, e); }, s, x, y);
+            }
             var cc = C(col); Game2DJpFont.Draw((px, py) => Put(px, py, cc), s, x, y);
         }
         private void TxtC(string s, int cx, int y, Color32 col, bool edge = true) => Txt(s, cx - Game2DJpFont.Width(s) / 2, y, col, edge);
@@ -369,6 +375,20 @@ namespace UI.Game2D
         }
 
         private void DrawDie(int x, int y, int v, float k = 1f) => Stamp(Game2DDiceRoll.FaceImg(v), Game2DDiceRoll.Face, Game2DDiceRoll.Face, x, y, k);
+
+        /// <summary>読みやすさの A (2026-11-16・見比べ用): 床の出目の形 (不透明な画素) の周りに暗い縁を打つ ── 左と上は 1 ドット、 右と下は 2 ドット
+        /// (= 1 ドットの落ち影)。 出目を打つ前に呼ぶ。 色は字の縁取りと同じ Edge・混色なし。</summary>
+        private void DieRim(Color32[] img, int w, int h, int x, int y, bool bottomUp)
+        {
+            var e = C(Edge);
+            for (int j = 0; j < h; j++)
+                for (int i = 0; i < w; i++)
+                {
+                    if (img[(bottomUp ? h - 1 - j : j) * w + i].a < 128) continue;
+                    for (int dy = -1; dy <= 2; dy++) for (int dx = -1; dx <= 2; dx++)
+                            if (!(dx == -1 && dy == 2) && !(dx == 2 && dy == -1)) Put(x + i + dx, y + j + dy, e);
+                }
+        }
 
         private void Frame1(int x, int y, int w, int h, Color32 c)
         {
@@ -673,11 +693,12 @@ namespace UI.Game2D
         private readonly Color32[] _rollBuf = new Color32[Game2DDiceRoll.TexSize * Game2DDiceRoll.TexSize];
 
         /// <summary>回っている出目 (Game2DDiceRoll の 1 コマ・TexSize 四方・下の行から) を、 18×18 の左上 (x, y) に中心を合わせて打つ。</summary>
-        private void DrawRolling(int i, int x, int y)
+        private void DrawRolling(int i, int x, int y, bool rim = false)
         {
-            var s = _sim; if (s.rollSeq == null || i >= s.rollSeq.Length) { DrawDie(x, y, s.pd[i]); return; }
+            var s = _sim; if (s.rollSeq == null || i >= s.rollSeq.Length) { if (rim) DieRim(Game2DDiceRoll.FaceImg(s.pd[i]), Game2DDiceRoll.Face, Game2DDiceRoll.Face, x, y, false); DrawDie(x, y, s.pd[i]); return; }
             Game2DDiceRoll.Render(_rollBuf, s.rollSeq[i], s.RollTime, Game2DDiceRoll.DurOf(i), false);
             int n = Game2DDiceRoll.TexSize, ox = x + Game2DDiceRoll.Face / 2 - Game2DDiceRoll.Reach, oy = y + Game2DDiceRoll.Face / 2 - Game2DDiceRoll.Reach;
+            if (rim) DieRim(_rollBuf, n, n, ox, oy, true);
             for (int j = 0; j < n; j++)
                 for (int k = 0; k < n; k++) { var c = _rollBuf[(n - 1 - j) * n + k]; if (c.a >= 128) Px(ox + k, oy + j, c); }
         }
@@ -691,9 +712,10 @@ namespace UI.Game2D
                 BattleLcdLayout.FloorPos(i, out int x, out int y);
                 // 床の影 (網点・見本の楕円の影の代わり)
                 for (int q = -1; q < Game2DDiceRoll.Face + 1; q++) if (((q + y) & 1) == 0) Px(x + q, y + Game2DDiceRoll.Face + 1, Edge);
-                if (s.Rolling(i)) DrawRolling(i, x, y);
-                else if (!s.rolled && s.phase != Game2DBattleSim.P.PRoll) { Box(x, y, 18, 18, Game2DKit.Ivory, Edge); TxtC("?", x + 9, y + 3, Edge, false); }
-                else DrawDie(x, y, s.pd[i]);
+                bool rim = BattleReadability.Outline;      // 読みやすさの A: 出目の周りに暗い縁と 1 ドットの落ち影
+                if (s.Rolling(i)) DrawRolling(i, x, y, rim);
+                else if (!s.rolled && s.phase != Game2DBattleSim.P.PRoll) { if (rim) { Rect(x - 1, y - 1, 20, 20, Edge); Rect(x + 1, y + 1, 19, 19, Edge); } Box(x, y, 18, 18, Game2DKit.Ivory, Edge); TxtC("?", x + 9, y + 3, Edge, false); }
+                else { if (rim) DieRim(Game2DDiceRoll.FaceImg(s.pd[i]), Game2DDiceRoll.Face, Game2DDiceRoll.Face, x, y, false); DrawDie(x, y, s.pd[i]); }
                 if (s.IsRoleDie(i)) Frame1(x - 1, y - 1, 20, 20, Game2DKit.Gold);
                 if (s.IsCatLocked(i)) Frame1(x - 1, y - 1, 20, 20, Amber);
                 if (s.IsCarved(i) || s.IsCarvedFixed(i)) Frame1(x - 1, y - 1, 20, 20, BlueC);      // 刻みの賽: 刻む印 / 刻んで置いた目
