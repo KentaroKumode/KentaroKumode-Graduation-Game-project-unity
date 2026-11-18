@@ -15,7 +15,7 @@
 読むもの: 各腕の round_000/c*/learn_runs.json (ラン)・response.json (実効状態・学習の読み)・worker.log (Item not found)。
 書くもの (出力フォルダ):
   summary.md                 表 (条件・n・単位・信頼区間・検定)
-  ore_candidates_<腕>.csv    俺ツエーの候補 1 ラン 1 行
+  ore_candidates_<腕>.csv    蹂躙の候補 1 ラン 1 行
   luck_scores.csv            引きの質 (棚の版・結果の版) 1 シード 1 行
 
 単位の決まり: 「クリア率」は %、 差は「クリア率の差 (百分率ポイント)」、 ITT の値は「ITT の Δクリア率 (百分率ポイント・Optimal の表)」。
@@ -105,12 +105,12 @@ def _won_turns(rw, k):
 
 
 def ore_a(rw):
-    """俺ツエーの候補 A: 第 3 層 (深さ 5) のボスを 5 ターン以内。"""
+    """蹂躙の候補 A: 第 3 層 (深さ 5) のボスを 5 ターン以内。"""
     return _won_turns(rw, 'boss_d5') and rw['boss_d5_turns'] <= 5
 
 
 def ore_c(rw):
-    """俺ツエーの判定 (候補 C・作者 2026-11-18): 第 3 層のボス ≤5 ターン・第 4 層 (深さ 6) のボス ≤6 ターン・ヴェスカ 4 段の合計 ≤20 ターンのどれか。"""
+    """蹂躙の判定 (候補 C・作者 2026-11-18): 第 3 層のボス ≤5 ターン・第 4 層 (深さ 6) のボス ≤6 ターン・ヴェスカ 4 段の合計 ≤20 ターンのどれか。"""
     return (ore_a(rw) or (_won_turns(rw, 'boss_d6') and rw['boss_d6_turns'] <= 6)
             or (rw.get('vesca_won') == 1 and rw.get('vesca_turns', '') != '' and rw['vesca_turns'] <= 20))
 
@@ -169,7 +169,7 @@ def paired_line(b, c):
     return f'不一致 {b}対{c} (z {z:+.2f}・正確 p={p:.2g}・対のオッズ比 {orr:.2f})'
 
 
-# ---------------------------------------------------------------- 俺ツエーの候補
+# ---------------------------------------------------------------- 蹂躙の候補
 def boss_rows(r):
     """ボス戦の段の記録 (Vesca は段ごと)。"""
     out = []
@@ -308,7 +308,7 @@ def auc(score, runs, idx):
     return (rank_sum - len(pos) * (len(pos) + 1) / 2) / (len(pos) * len(neg))
 
 
-# ---------------------------------------------------------------- 俺ツエーの回の中身
+# ---------------------------------------------------------------- 蹂躙の回の中身
 def boss_end_rows(r):
     return [f for f in r.get('fights', []) if f.get('enemyId', '').startswith('boss_layer') and f.get('end')
             and not f['enemyId'].startswith('boss_layer7')]
@@ -316,7 +316,7 @@ def boss_end_rows(r):
 
 def ore_contents(runs, P):
     """候補の判定に入ったボス戦と、 同じ深さのボスに勝った残りの戦闘を比べる (勝った戦闘だけが母集団 = 生存の偏りを揃える)。"""
-    P('## 俺ツエーの回の中身 (腕 S・同じ深さのボスに勝った戦闘どうしで比べる)\n')
+    P('## 蹂躙の回の中身 (腕 S・同じ深さのボスに勝った戦闘どうしで比べる)\n')
     P('lift = (判定に入った戦闘でその品を持っていた割合) ÷ (同じ深さのボスに勝った残りの戦闘で持っていた割合)。 持ち物はボス戦の開始時。'
       ' 持ち物の数が群で違うと lift は数の差を拾うので、 平均の持ち物の数を並べる。\n')
     defs = [
@@ -406,9 +406,9 @@ def main():
     P(f'全腕に共通するシード: {len(common)} 本\n')
 
     # ---- クリア率
-    P('## クリア率と俺ツエーの率 (全ラン・難易度 0・Wilson 95%)\n')
-    P('俺ツエーの判定は候補 C (作者 2026-11-18): 第 3 層 (深さ 5) のボスを 5 ターン以内・第 4 層 (深さ 6) のボスを 6 ターン以内・ヴェスカ 4 段を合計 20 ターン以内のどれか。 候補 A = 第 3 層のボスを 5 ターン以内だけ。 分母は全ラン。\n')
-    P('| 腕 | クリア率 | 俺ツエー (候補 C) | うちクリア | 候補 A |')
+    P('## クリア率と蹂躙率 (全ラン・難易度 0・Wilson 95%)\n')
+    P('蹂躙の判定は候補 C (作者 2026-11-18): 第 3 層 (深さ 5) のボスを 5 ターン以内・第 4 層 (深さ 6) のボスを 6 ターン以内・ヴェスカ 4 段を合計 20 ターン以内のどれか。 候補 A = 第 3 層のボスを 5 ターン以内だけ。 分母は全ラン。\n')
+    P('| 腕 | クリア率 | 蹂躙 (候補 C) | うちクリア | 候補 A |')
     P('|---|---|---|---|---|')
     for lab, a in arms.items():
         rs = list(a['runs'].values())
@@ -455,7 +455,7 @@ def main():
             P(f'| {lab} | {nm} | {n} | ' + ' | '.join(f'{c[k]} ({100 * c[k] / n:.0f}%)' for k in ('boss', 'road_out', 'road_in', 'walk')) + ' |')
     P('')
 
-    # ---- 俺ツエーの候補
+    # ---- 蹂躙の候補
     if 'S' in arms:
         for lab in [l for l in arms if l == 'S' or l.startswith('P')]:
             a = arms[lab]
@@ -471,7 +471,7 @@ def main():
                 for rw in rows:
                     w.writerow(rw)
         rows = [ore_candidates(r) for r in arms['S']['runs'].values()]
-        P('## 俺ツエーの候補の分布 (腕 S = Super・難易度 0・パネル 24 点)\n')
+        P('## 蹂躙の候補の分布 (腕 S = Super・難易度 0・パネル 24 点)\n')
         P('ボスは深さ (Run.Depth) で書く。 ターン数は勝った戦闘だけ。 「1 ターンの最大」= 1 ターンに要求した与ダメ (はみ出しの前) ÷ ボスの最大 HP。\n')
         bkeys = sorted({k[:-6] for rw in rows for k in rw if k.startswith('boss_d') and k.endswith('_turns')})
         P('| 候補 | n (戦った / 勝った) | 10% | 25% | 50% | 75% | 90% | 95% | 99% |')
