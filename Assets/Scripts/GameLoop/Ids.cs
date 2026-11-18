@@ -26,7 +26,7 @@ namespace GameLoop
         public const string Appraiser  = "目利きの賽";
         public const string HeavyRead  = "大技読みの賽";
         public const string Gravestone = "墓標の賽";
-        public const string Carve      = "刻みの賽";
+        public const string Rewind     = "逆巻きの賽";
         public const string Clock      = "時計の賽";
         public const string Gamble     = "賭場の賽";
         public const string Straight   = "連なりの賽";

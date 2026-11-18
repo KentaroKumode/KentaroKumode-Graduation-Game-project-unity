@@ -59,6 +59,18 @@ namespace CombatSystem
             return s;
         }
 
+        /// <summary>逆巻きの賽 (ADR-0015・2026-11-18) で下げた段数。 今の段階 = ターンから出た段階 (<see cref="StageOf"/>) − これ。
+        /// 戦闘の始めに 0 へ戻す (<see cref="HeavyCycleOffset"/> と同じ所)。 BOT の見積もりも同じ値を読む。</summary>
+        public static int StageOffset;
+        /// <summary>今の段階がこれより下がらない (−4 = 段階の数の鏡)。</summary>
+        public const int MinStage = -4;
+
+        /// <summary>今の段階 (逆巻きの賽で下げた分を引いた値・<see cref="MinStage"/> 〜 4)。 マイナスの段階は自分の得 (<see cref="NegativeStageBuff"/>)、 敵の攻撃は段階 0 のまま。</summary>
+        public static int EffectiveStage(int turn) => Math.Max(MinStage, StageOf(turn) - StageOffset);
+
+        /// <summary>マイナスの段階 k (1〜4) で自分の与ダメに足す割合 (標準の曲線の鏡: −1 で +30%・−4 で +130%)。</summary>
+        public static float NegativeStageBuff(int k) => k <= 0 ? 0f : CurveStd[Math.Min(k, CurveStd.Length - 1)] - 1f;
+
         /// <summary>いまの戦闘がボス戦か (CombatManager が戦闘開始時に立てる)。 挑戦カード「ボス戦ではエスカレーションが毎ターン進む」が読む。</summary>
         public static bool BossFight;
 
@@ -103,7 +115,7 @@ namespace CombatSystem
         /// (予告の前・EnemyAttackValue の 1 回の四捨五入の中。 BOT の先読みも同じ関数を通るので見える)。</summary>
         private static float CurveMultiplier(string profile, int turn)
         {
-            int stage = StageOf(turn);
+            int stage = Mathf.Clamp(EffectiveStage(turn), 0, CurveStd.Length - 1);   // 逆巻きの賽で下げた分も (敵は段階 0 より下がらない)
             switch (profile)
             {
                 case ProfileRush: return CurveRush[stage];
