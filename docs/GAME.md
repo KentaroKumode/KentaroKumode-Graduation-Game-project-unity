@@ -1144,7 +1144,7 @@ A = 崩れ始めたら終点へ / B = 輪の中で粘る（行って終点まで
 - **軸を持たない**（作者 2026-11-18）。軸は秘宝の仕上げが受け持つ（`docs/experience-goal.md` の「蹂躙の作り方」）。
 - **釣り合いの線**: 平均 5 以上の賽は置かない・面の種類は 4 以上（軽石だけ例外）・LEGENDARY も 1 個で蹂躙が起きる形にしない。
 - 20 種（5-5-5-5）の面と効果の一覧は [ADR-0015](adr/0015-equipped-die.md)。**正本は実コード**: items.json（面・説明）・
-  [DiePassives.cs](../Assets/Scripts/CombatSystem/DiePassives.cs)（挿した目に効く物・金）・CombatManager（目利き=振り直し / 刻み=次のターンの 1 つ目 / 賭場 / 墓標 / 分け身）・
+  [DiePassives.cs](../Assets/Scripts/CombatSystem/DiePassives.cs)（挿した目に効く物・金）・CombatManager（目利き=振り直し / 賭場 / 墓標 / 分け身）・Escalation（逆巻き=段階を下げる StageOffset・マイナスの段階は自分の与ダメの得）・
   TerminalCards（時計の端子・繋ぎの残す印）・YachtRoles（連なり）。数値はすべて仮・未測定。
 
 ### 6-15. ボスのダウン（HP の目盛り・2026-11-13）

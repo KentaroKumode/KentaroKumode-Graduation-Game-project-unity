@@ -296,7 +296,6 @@ namespace UI.Game2D.Battle
                 for (int i = 0; i < slot.Length; i++) slot[i] = -1;
                 for (int s = 0; s < target.Length; s++) target[s] = -1;
                 for (int s = 0; s < keepMark.Length; s++) keepMark[s] = false;
-                carveDie = -1;
                 lastOutcome = null; focusSlot = -1;
                 if (AutoWireOnTurnStart) AutoWire(false);
             }
@@ -351,7 +350,7 @@ namespace UI.Game2D.Battle
                     {
                         Game2DSfx.Play("decide");
                         int n = p.playerDice != null ? p.playerDice.Length : 0;
-                        cm.AnswerWiringSlots(BuildSlots(n), (int[])target.Clone(), 0, (bool[])keepMark.Clone(), carveDie);   // 残す印は本体が KeepFromMarks で直す (挿した端子には効かない)
+                        cm.AnswerWiringSlots(BuildSlots(n), (int[])target.Clone(), 0, (bool[])keepMark.Clone());   // 残す印は本体が KeepFromMarks で直す (挿した端子には効かない)
                         if (!cm.IsAwaitingDecision) Resolve(cm);
                     }
                     break;
@@ -487,31 +486,6 @@ namespace UI.Game2D.Battle
         public int[] target = new int[0];
         /// <summary>手札の規則 Pick (2026-11-13): 次のターンも手札に残す印 (添字 = 場の位置)。 挿していない手札の端子を押すと付け外しする。 長さ = 場の枚数。</summary>
         public bool[] keepMark = new bool[0];
-        /// <summary>刻みの賽 (ADR-0015): 刻む目の添字 (−1 = 刻まない)。 Shift を押しながら目を押すと付け外し。 配線の答えと一緒に渡す。</summary>
-        public int carveDie = -1;
-
-        /// <summary>刻みの賽で、 目 i を刻めるか (判断の間・2 以上・前のターンに刻んで置いた目ではない)。</summary>
-        public bool CanCarve(int i)
-        {
-            var cm = CombatManager.Instance;
-            return CanOperate && cm != null && EquippedDie.IdOf(GameManager.Instance?.Run) == DieIds.Carve
-                && i >= 0 && i < pd.Length && cm.CanCarve(pd, i);
-        }
-
-        /// <summary>目 i の刻む印を付け外しする (1 つだけ)。 できなければ false。</summary>
-        public bool ToggleCarve(int i)
-        {
-            if (!CanCarve(i)) return false;
-            carveDie = carveDie == i ? -1 : i;
-            Game2DSfx.Play("ui_click", 1f, carveDie == i ? 1.2f : 0.9f);
-            Touch();
-            return true;
-        }
-
-        /// <summary>目 i に刻む印が付いているか (前のターンに刻んで置いた目は IsCarvedFixed)。</summary>
-        public bool IsCarved(int i) => carveDie == i && CanCarve(i);
-        /// <summary>目 i が、 前のターンに刻んで置いた目か (振り直しでも変わらない)。</summary>
-        public bool IsCarvedFixed(int i) => CombatManager.Instance != null && CombatManager.Instance.CarvedFixedDie == i;
         /// <summary>このターンの場の写し (添字 = 挿し先)。</summary>
         public readonly List<string> board = new List<string>();
         /// <summary>今の挿し方の見込み。 解決した後は結果 (<see cref="lastOutcome"/> と同じ)。 null あり。</summary>
