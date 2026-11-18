@@ -11,8 +11,9 @@ namespace CombatSystem
     /// <para><b>戦闘の他の所で効く物</b>: 拾い物・古銭 = <see cref="OnTurnEnd"/> (ターンの終わり)・賭場 = 振り直しの費用 (CombatManager.RerollCostNow) と HP の支払い・
     /// 墓標 = HP 0 からの踏みとどまり (CombatManager.TryLastStandRevive)。</para>
     ///
-    /// <para><b>まだ入れていない物</b> (ADR-0015 手順 4 の後半): 選ぶ操作が要る刻み・時計・繋ぎ・目利き、 攻撃を 2 回に分ける分け身、 役の効果を決める必要がある連なり。
-    /// 効果の数値はすべて仮の値 (items.json の説明文と同じ)。</para>
+    /// <para><b>ほかの所にある賽</b>: 目利き = 振り直し (CombatManager.RerollPhase・残す目)・刻み = 次のターンの 1 つ目 (CombatManager.DecideCarve)・
+    /// 繋ぎ = 残す印 (TerminalDeckState.KeepFromMarks)・時計 = 常設の〈時計〉の端子 (TerminalIds.Clock)・分け身 = 主攻撃を 2 回 (CombatManager.Turn)・
+    /// 連なり = 役〈連なり〉(YachtRoles / YachtRoleEffects)。 効果の数値はすべて仮の値 (items.json の説明文と同じ)。</para>
     ///
     /// <para><b>出目は書き換えない</b> (ADR-0015 の 2)。 ここは出目が決まって端子に挿された後の上乗せだけ。</para>
     /// </summary>

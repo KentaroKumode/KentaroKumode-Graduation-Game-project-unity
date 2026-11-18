@@ -230,6 +230,8 @@ namespace CombatSystem
                 if (appraiser && pick.Length == playerDice.Length - 1)
                     foreach (int i in pick) { if (i >= 0 && i < playerDice.Length) rerollIdx.Add(i); }
                 else for (int i = 0; i < playerDice.Length; i++) rerollIdx.Add(i);
+                rerollIdx.Remove(_carveFixed);   // 刻みの賽: 刻んで置いた目は振り直さない
+                if (rerollIdx.Count == 0) break;
 
                 bool usedFree = freeRerolls > 0;
                 int cost = RerollCostNow(rerollIdx.Count, nth, usedFree);   // 〈無力感〉の +1 もここ (無料の時は足さない)

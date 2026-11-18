@@ -550,6 +550,17 @@ namespace CombatSystem
             //   playerFaceIdx を必ず同期すること ── 忘れると別の面の効果が発火する。
             int[] playerFaceIdx;
             int[] playerDice = RollDice(actualPlayerDiceCount, playerDiceMax, ctx.equippedDiceFaces, out playerFaceIdx);
+            // 刻みの賽 (ADR-0015): 前のターンに刻んだ目を 1 つ目に置く (振った値を捨てて置き換える・この目は振り直さない)
+            _carveFixed = -1;
+            if (_carveNext > 0 && playerDice.Length > 0
+                && GameLoop.EquippedDie.IdOf(GameLoop.GameManager.Instance?.Run) == GameLoop.DieIds.Carve)
+            {
+                playerDice[0] = _carveNext;
+                if (playerFaceIdx != null && playerFaceIdx.Length > 0)
+                    playerFaceIdx[0] = ctx.equippedDiceFaces != null ? System.Array.IndexOf(ctx.equippedDiceFaces, _carveNext) : -1;
+                _carveFixed = 0;
+            }
+            _carveNext = 0;
             CombatStats.NoteFirstRoll(actualPlayerDiceCount, ctx, playerDice);
 
             // 恒久デバフ〈コルヴェンの憤怒〉: ボス戦の 1 ターン目は自ダイスが全て最大値 (HP 半減は戦闘開始時に済ませてある)。
@@ -778,8 +789,10 @@ namespace CombatSystem
                     _pause.catDie = _catDie; _pause.catSlot = _catSlot;
                     yield return _pause;
                     slots = _pause.slots; targets = _pause.targets; goldAsk = _pause.goldSpend; keepMarks = _pause.keep;
+                    DecideCarve(playerDice, _pause.carveDie, human: true);
                 }
                 else if (WiringPolicy != null) { var plan = WiringPolicy(playerDice, tele); slots = plan.slots; targets = plan.targets; goldAsk = plan.goldSpend; keepMarks = plan.keep; }
+                if (!_interactiveTurn) DecideCarve(playerDice, -1, human: false);   // 刻みの賽: BOT の経路はいちばん大きい目を刻む
                 if (slots == null) slots = TerminalWiring.Auto(_deck.board, playerDice, tenv, _deck.state, _catDie, _catSlot);
                 // 猫の 1 組は答えに関わらず入れる (外した答え・同じ口に挿しすぎた答えは、 猫の組を残して直す)
                 if (_catDie >= 0) slots = TerminalWiring.WithPair(slots, playerDice.Length, _deck.board, _catDie, _catSlot);

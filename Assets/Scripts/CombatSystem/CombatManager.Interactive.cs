@@ -48,11 +48,13 @@ namespace CombatSystem
         internal int goldSpend;
         /// <summary>手札の規則 Pick: 次のターンも手札に残す印 (添字 = 場の位置)。 null = 何も残さない。</summary>
         internal bool[] keep;
+        /// <summary>刻みの賽 (ADR-0015): 刻む目の添字 (−1 = 刻まない)。 刻みの賽を持たない時は読まない。</summary>
+        internal int carveDie = -1;
 
         internal void Set(TurnPauseKind k, int[] dice, int[] faceIdx, MutualTurnTelegraph t)
         {
             kind = k; playerDice = dice; playerFaceIdx = faceIdx; tele = t;
-            rerollCost = 0; reroll = false; rerollKeep = -1; slots = null; targets = null; goldSpend = 0; keep = null; board = null; terminalEnv = default; terminalState = null;
+            rerollCost = 0; reroll = false; rerollKeep = -1; carveDie = -1; slots = null; targets = null; goldSpend = 0; keep = null; board = null; terminalEnv = default; terminalState = null;
             catDie = catSlot = -1;
         }
     }
@@ -104,10 +106,11 @@ namespace CombatSystem
         /// targets = 〈影写し〉〈火葬の剣〉〈有効活用〉の対象 (添字 = その端子の場の位置・値 = 対象の場の位置)。 null / −1 / 候補でない対象は左端の候補。
         /// goldSpend = 挑戦カード〈金で殴る〉で払う金額 (G・攻撃するターンだけ所持金まで払う・札が無ければ無視)。</summary>
         /// keep = 手札の規則 Pick の、 次のターンも手札に残す印 (添字 = 場の位置・null = 何も残さない)。 BOT の WiringPlan.keep と同じ口。
-        public void AnswerWiringSlots(int[] slots, int[] targets = null, int goldSpend = 0, bool[] keep = null)
+        /// carveDie = 刻みの賽を持つ時に刻む目の添字 (−1 = 刻まない)。
+        public void AnswerWiringSlots(int[] slots, int[] targets = null, int goldSpend = 0, bool[] keep = null, int carveDie = -1)
         {
             if (_activeTurn == null || _pause.kind != TurnPauseKind.Wiring) return;
-            _pause.slots = slots; _pause.targets = targets; _pause.goldSpend = goldSpend; _pause.keep = keep;
+            _pause.slots = slots; _pause.targets = targets; _pause.goldSpend = goldSpend; _pause.keep = keep; _pause.carveDie = carveDie;
             Advance();
         }
 

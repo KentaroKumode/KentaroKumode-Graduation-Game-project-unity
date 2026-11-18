@@ -189,7 +189,12 @@ namespace UI.Game2D
             if (!moved)
             {
                 // 押しただけ: 出目 = 行き先を順に変える (1〜9 キーと同じ) / 札 = 〈有効活用〉なら戻す 1 枚の窓・それ以外は「残す」の印の付け外し
-                if (die >= 0) sim.CycleWire(die, 1);
+                if (die >= 0)
+                {
+                    // 刻みの賽 (ADR-0015): Shift を押しながら押すと、 刻む印の付け外し
+                    if ((Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) && sim.ToggleCarve(die)) return;
+                    sim.CycleWire(die, 1);
+                }
                 else if (card >= 0)
                 {
                     if (sim.IsRecaller(card)) { if (_win != null) _win.OpenRecall(card); }
@@ -651,6 +656,7 @@ namespace UI.Game2D
                     else DrawRolling(i, sr.x + 1, sr.y + 1);
                     if (sim.IsRoleDie(i)) Frame1(sr.x, sr.y, sr.width, sr.height, Game2DKit.Gold);
                     if (sim.IsCatLocked(i)) Frame1(sr.x, sr.y, sr.width, sr.height, Amber);
+                    if (sim.IsCarved(i) || sim.IsCarvedFixed(i)) Frame1(sr.x, sr.y, sr.width, sr.height, BlueC);      // 刻みの賽: 刻む印 / 刻んで置いた目
                     k2++;
                 }
                 else if (q == 0 && !string.IsNullOrEmpty(d.condLabel)) Txt(d.condLabel, sr.x + 2, sr.y + 4, dim ? Half(kc) : kc, false);
@@ -690,13 +696,15 @@ namespace UI.Game2D
                 else DrawDie(x, y, s.pd[i]);
                 if (s.IsRoleDie(i)) Frame1(x - 1, y - 1, 20, 20, Game2DKit.Gold);
                 if (s.IsCatLocked(i)) Frame1(x - 1, y - 1, 20, 20, Amber);
+                if (s.IsCarved(i) || s.IsCarvedFixed(i)) Frame1(x - 1, y - 1, 20, 20, BlueC);      // 刻みの賽: 刻む印 / 刻んで置いた目
                 if (_hoverCard < 0 && _hasMouse && In(_mouse, new RectInt(x, y, 18, 18)) && s.CanOperate) Frame1(x - 1, y - 1, 20, 20, Bone);
             }
             // 役 (仮): 床の出目の上に名前 (出目は金の縁)
             if (s.rolled && s.roles.Count > 0)
             {
                 var k = s.roles[0]; int face = YachtRoles.FaceOf(k);
-                string t = "役 " + YachtRoles.NameOf(k) + " (" + face + "・" + face + (YachtRoles.IsTriple(k) ? "・" + face : "") + ")";
+                string t = k == RoleKind.Straight ? "役 " + YachtRoles.NameOf(k)
+                         : "役 " + YachtRoles.NameOf(k) + " (" + face + "・" + face + (YachtRoles.IsTriple(k) ? "・" + face : "") + ")";
                 BattleLcdLayout.FloorPos(Mathf.Max(0, n - 1), out _, out int ty);
                 Txt(t, BattleLcdLayout.FloorX, Mathf.Min(BattleLcdLayout.FloorY, ty) - 15, Gold);
             }

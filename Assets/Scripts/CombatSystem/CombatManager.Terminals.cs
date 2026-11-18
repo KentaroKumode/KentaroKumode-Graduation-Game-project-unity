@@ -13,6 +13,32 @@ namespace CombatSystem
         private TerminalDeckState _deck;
         /// <summary>このターンの敵の出目 (夜番の賽が読む・ロールの直後に入れる)。</summary>
         private int[] _enemyDiceNow;
+        /// <summary>刻みの賽 (ADR-0015): 次のターンの 1 つ目に置く目 (0 = 無し) / このターンに刻んで置いた目の添字 (−1 = 無し・振り直さない・続けて刻めない)。</summary>
+        private int _carveNext, _carveFixed = -1;
+        /// <summary>このターン、 前のターンに刻んだ目を置いた添字 (−1 = 無し)。 画面が「続けて刻めない」を見るのに読む。</summary>
+        public int CarvedFixedDie => _carveFixed;
+
+        /// <summary>刻みの賽: 刻む目を決めて次のターンへ渡す。 want = 人の答え (−1 = 刻まない)。 BOT の経路 (人の答えが無い) は、 刻める目のうちいちばん大きい目。</summary>
+        private void DecideCarve(int[] dice, int want, bool human)
+        {
+            _carveNext = 0;
+            if (dice == null || GameLoop.EquippedDie.IdOf(GameLoop.GameManager.Instance?.Run) != GameLoop.DieIds.Carve) return;
+            int pick = want;
+            if (!human)
+            {
+                pick = -1;
+                for (int i = 0; i < dice.Length; i++)
+                    if (CanCarve(dice, i) && (pick < 0 || dice[i] > dice[pick])) pick = i;
+            }
+            if (pick >= 0 && pick < dice.Length && CanCarve(dice, pick))
+            {
+                _carveNext = dice[pick];
+                Debug.Log($"[賽] 刻みの賽: {dice[pick]} を刻んだ (次のターンの 1 つ目)");
+            }
+        }
+
+        /// <summary>刻めるか: 2 以上の目で、 このターンに刻んで置いた目ではない (続けて刻めない)。</summary>
+        public bool CanCarve(int[] dice, int i) => dice != null && i >= 0 && i < dice.Length && dice[i] >= 2 && i != _carveFixed;
         /// <summary>このターンの端子の結果 (配線の前は null)。</summary>
         private TerminalOutcome _termOutcome;
         /// <summary>次のターンも手札に残す端子 (〈有効活用〉)。</summary>
@@ -42,6 +68,7 @@ namespace CombatSystem
         private void BeginTerminalDeck()
         {
             _termOutcome = null; _termRetain = null; _termDamageMul = 1f; _catDie = _catSlot = -1; _termKillPending = null;
+            _carveNext = 0; _carveFixed = -1;   // 刻みの賽は戦闘をまたがない
             // 山札は常に有る (旧い配線の経路は 2026-11-11 に削除)。 ランが無い戦闘 (単体の試験など) は開始の山札で戦う。
             var run = GameLoop.GameManager.Instance?.Run;
             List<string> runDeck;
@@ -53,6 +80,8 @@ namespace CombatSystem
             else runDeck = TerminalCards.StartingDeck();
             _deck = new TerminalDeckState();
             _deck.BeginBattle(runDeck);
+            // 時計の賽 (ADR-0015): 〈時計〉の端子を常設として場に置く (山札には入れない・戦闘の間ずっと場にある)
+            if (GameLoop.EquippedDie.IdOf(run) == GameLoop.DieIds.Clock) _deck.permanent.Add(TerminalIds.Clock);
             TerminalDiag.NoteBattle(runDeck);   // [計装 2026-11-12]
         }
 
@@ -162,6 +191,11 @@ namespace CombatSystem
             if (o.poison > 0) ItemSystem.PassiveSkills.Effects.Rw.Poison(ctx, o.poison);
             if (o.heat > 0) { ItemSystem.PassiveSkills.Keywords.Kw.EnableHeat(ctx); ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, o.heat); }
             if (o.retreatStage) YachtRoleEffects.AddEscalationDelay(ctx, YachtRoleEffects.TurnsToRetreatOneStage(ctx));
+            if (o.escalationDelay > 0)      // 時計の賽 (ADR-0015)
+            {
+                YachtRoleEffects.AddEscalationDelay(ctx, o.escalationDelay);
+                Debug.Log($"[賽] 時計の賽: エスカレーションの次の段階を {o.escalationDelay} ターン先へ");
+            }
             if (o.enemyStunNext) ctx.nextTurnBuffs[YachtRoleEffects.EnemyStunKey] = 1f;
             if (o.ignoreDefense) ctx.playerArmorPen += DefenseFormula.IgnoreAll;
             if (o.forceCrit) ctx.forceCritical = true;

@@ -866,6 +866,24 @@ namespace AutoTest
             return k;
         }
 
+        /// <summary>時計の賽 (ADR-0015): 挿さずに余った目があれば、 いちばん小さい目を〈時計〉の端子へ挿す (配線の評価は時計の値を知らないので、 余った目だけを使う)。</summary>
+        private static int[] AddClockDiePlug(int[] slots, int[] rolls)
+        {
+            if (EquippedDie.IdOf(GameManager.Instance?.Run) != DieIds.Clock || rolls == null) return slots;
+            var deck = CombatManager.Instance?.TerminalDeck;
+            if (deck == null) return slots;
+            int clock = deck.board.IndexOf(TerminalIds.Clock);
+            if (clock < 0 || deck.state.IsStopped(clock)) return slots;
+            for (int i = 0; i < slots.Length; i++) if (slots[i] == clock) return slots;   // もう挿してある
+            int pick = -1;
+            for (int i = 0; i < slots.Length && i < rolls.Length; i++)
+                if (slots[i] < 0 && (pick < 0 || rolls[i] < rolls[pick])) pick = i;
+            if (pick < 0) return slots;
+            var r = (int[])slots.Clone();
+            r[pick] = clock;
+            return r;
+        }
+
         private static float TargetWorth(TerminalDef d, RunState run)
             => d == null ? 0f : d.basic ? 1f : RewardBaseScore(d, run);
 
@@ -888,6 +906,7 @@ namespace AutoTest
                 if (_lastChosenA == 0) { NoAttackChosen++; if (!_lastAttackCandExists) NoAttackNoChoice++; }
             }
             // 手札の規則 Pick (2026-11-13): 次のターンも手札に残す印 (方策 handKeepPolicy・Off / All では null)
+            if (slots != null) slots = AddClockDiePlug(slots, rolls);
             bool[] keep = slots != null ? ChooseHandKeep(rolls, tele, slots) : null;
             if (slots != null) keep = AddLinkDieKeep(keep, rolls, tele, slots);
             if (predTrace) BeginPredTrace(tele.turn);

@@ -35,6 +35,8 @@ namespace CombatSystem
     {
         // 基本
         public const string Attack = "攻撃", Block = "防御", Charge = "充電";
+        /// <summary>時計の賽 (ADR-0015) の常設の端子。 山札には入らない (時計の賽を持つ戦闘の始めに場へ置く・報酬にも店にも出ない)。</summary>
+        public const string Clock = "時計";
         // コモン
         public const string Igniter = "牽制斬り", Detector = "片刃斬り", DischargeTube = "雷撃", Deathwish = "諸刃の剣", Relay = "連係斬り",
             Grinder = "号令の剣", Oscillator = "反復突き", Twin = "二刀流", Fuse = "小盾", Ground = "受け流し", Insulator = "二重障壁",
@@ -188,6 +190,8 @@ namespace CombatSystem
         public bool chargeFill;
         public int poison, heat, bleedOnHit;
         public bool retreatStage, enemyStunNext, ignoreDefense;
+        /// <summary>時計の賽の端子: エスカレーションの次の段階を何ターン先へ送るか (挿した出目の合計)。</summary>
+        public int escalationDelay;
         /// <summary>このターンに発動した端子 (場の添字)。</summary>
         public readonly List<int> fired = new List<int>();
         /// <summary>このターンに発動した基本以外の端子の数。</summary>
@@ -303,6 +307,7 @@ namespace CombatSystem
         private static TerminalDef RunOnce(TerminalDef d) { d.disposable = true; d.leavesRunDeck = true; return d; }
         private static TerminalDef Cost(TerminalDef d, int n) { d.chargeCost = n; return d; }
         private static TerminalDef Cap(TerminalDef d, int n) { d.capacity = n; return d; }
+        private static TerminalDef ClockDef(TerminalDef d) { d.basic = true; d.permanent = true; return d; }
 
         public static readonly List<TerminalDef> All = Build();
 
@@ -318,6 +323,8 @@ namespace CombatSystem
                 Basic(D(TerminalIds.Attack, A, "出目を攻撃に。")),
                 Basic(D(TerminalIds.Block,  B, "出目をブロックに。")),
                 Basic(D(TerminalIds.Charge, C, "出目を充電に。")),
+                // ── 賽の端子 (ADR-0015)。 基本扱い (報酬・店・付与に出ない)・常設 ──
+                ClockDef(D(TerminalIds.Clock, S, "時計の賽の端子。出目の数だけ、エスカレーションの次の段階を先へ送る。一度に 1 つ。")),
                 // ── コモン ──
                 D(TerminalIds.Igniter, A, "攻撃 +" + IgniterAttack + "。", TerminalCond.AtMost3),
                 D(TerminalIds.Detector, A, "出目 ×" + DetectorMul + " を攻撃に。", TerminalCond.Odd),
@@ -678,6 +685,7 @@ namespace CombatSystem
                 case TerminalIds.Resonator: o.damageMul *= ResonatorMul; break;
                 case TerminalIds.Foundry: st.foundryBonus += Gauge(st, id, sum, FoundryNeed); break;
                 case TerminalIds.Coolant: if (Gauge(st, id, sum, CoolantNeed) > 0) o.retreatStage = true; break;
+                case TerminalIds.Clock: o.escalationDelay += sum; break;      // 時計の賽 (ADR-0015)
                 case TerminalIds.Preheater: o.blockAdd += sum; st.ignoreCondNext = true; break;
                 case TerminalIds.Mains: o.attackAdd += sum + MainsPerUse * st.mainsUses; st.mainsUses++; break;
                 case TerminalIds.TwinShot: o.attackAdd += sum * TwinShotMul; break;
