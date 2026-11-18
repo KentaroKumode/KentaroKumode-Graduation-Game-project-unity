@@ -26,8 +26,8 @@ namespace CombatSystem
         MirrorReflectCap,  // 鏡の双子・鏡映の応答の反射ダメ上限。 基準9
         GoblinCall,        // ゴブリン王・号令の毎ターンの敵攻撃加算。 基準3
         // 2026-11-14 (灰燼の王の測定の口): 末尾に足す (番号で保存している所は無いが、 並びは動かさない)
-        FuryAttack,        // 6層 灰燼の王・〈憤怒の残滓〉の HP 50% 以下のターンの敵攻撃上乗せ。 基準5 (2026-11-14〜・旧 3・旧 EmberFury.Bonus)
-        RegrowthRate,      // 6層 灰燼の王・〈灰の再生〉の毎ターンの回復 = 最大 HP × この値 (割合・%ではない)。 基準0.03 (= 3%・2026-11-14〜・旧 0.02)
+        FuryAttack,        // 6層 灰燼の王・〈憤怒の残滓〉の HP 50% 以下のターンの敵攻撃上乗せ。 基準3 (2026-11-18〜 案 B・11-14〜11-17 は 5・その前 3・旧 EmberFury.Bonus)
+        RegrowthRate,      // 6層 灰燼の王・〈灰の再生〉の毎ターンの回復 = 最大 HP × この値 (割合・%ではない)。 基準0.02 (= 2%・2026-11-18〜 案 B・11-14〜11-17 は 0.03・その前 0.02)
         BlazeBurstPerStack, // 6層 灰燼の王・大技〈業火〉の烈炎 1 つあたりの軽減無視ダメージ (業火 = 攻撃 × heavyMul + 烈炎 × これ・撃ったら烈炎 0)。 基準5 (2026-11-14・作者の決定)
         BlazePerShield,    // 6層 灰燼の王・〈烈炎〉が積もる量: そのターンに敵の主攻撃をシールドで肩代わりした量 この値 ごとに烈炎 +1 (切り捨て・HeavyCycle.BlazeGain)。
                            //   基準10 (2026-11-14・作者の決定・未測定)。 測定の口 blazeStackRule=Guard2 (旧い「防御 2 個以上」) では読まない
@@ -84,10 +84,12 @@ namespace CombatSystem
                 //   根拠: 2026-11-14 測定 (Super・3000 ラン・嵐なし) で王の勝率 〈徒労〉なし 74.1% (docs/GAME.md §13 の灰燼の王)。
                 //   RegrowthRate は割合のまま持つ ── 測定の口が読んだ "0.03" と同じ float 定数 0.03f にしておくと、 回復量の式 (最大 HP × 割合) が口で振った時と 1 ビットも変わらない
                 //   (% で持って実行時に /100f すると Mono の float で丸めが割れることがある)。
-                case BossParam.FuryAttack:        return new ParamSpec( 5f, 0f, 20f);
+                // 2026-11-18 (作者の承認・案 B・嵐あり + T2 の基準に敵を合わせる): 憤怒 FuryAttack 5 → 3・再生 RegrowthRate 0.03 → 0.02
+                //   (基礎の攻撃 21 → 13・最大 HP 3800 → 2200 は enemies.json)。 根拠: Captures/experience_storm/results.md §3・docs/GAME.md §13-1 の灰燼の王。
+                case BossParam.FuryAttack:        return new ParamSpec( 3f, 0f, 20f);
                 case BossParam.BlazeBurstPerStack: return new ParamSpec( 5f, 0f, 20f);
                 case BossParam.BlazePerShield:    return new ParamSpec(10f, 1f, 100f);   // 2026-11-14: 烈炎はシールドで受けた量で積もる (作者の決定)
-                case BossParam.RegrowthRate:      return new ParamSpec(0.03f, 0f, 0.10f);
+                case BossParam.RegrowthRate:      return new ParamSpec(0.02f, 0f, 0.10f);
                 case BossParam.TenyoShieldPct:    return new ParamSpec(20f, 0f, 100f);   // 2026-11-15 天与の盾 (仮)
                 case BossParam.TenyoSwordBite:    return new ParamSpec( 6f, 0f, 50f);    // 2026-11-15 天与の剣 (仮・〈灼〉の 2 倍)
                 default:                          return new ParamSpec( 1f, 0f,  1f);
@@ -245,10 +247,10 @@ namespace CombatSystem
             { GameLoop.BossIds.Layer3Goblin, new[] { 0.70f, 0.35f } },   // 〈号令〉で毎ターン攻撃が乗る → 早めの目盛りで、 前のめりに割る価値を作る
             { GameLoop.BossIds.Layer3Marsh,  new[] { 0.60f } },          // 長引くほど毒が深い敵 → 目盛り 1 つ (割り時を 1 度だけ選ぶ・長引かせる理由を作らない)
             { GameLoop.BossIds.Layer3Mirror, new[] { 0.75f, 0.40f } },   // 浅い一撃を返す鏡 → 溜めて一気に割る遊びと〈鏡映の応答〉(大きく殴れ) の向きが揃う
-            // 深さ 5 (HP 1835): 10 ターン前後
+            // 深さ 5 (HP 1150・2026-11-18〜 案 B・旧 1835): 10 ターン前後
             { GameLoop.BossIds.Layer5Judgment, new[] { 0.75f, 0.50f, 0.25f } },   // 毎ターンの〈審判の炎〉に耐える長丁場 → 目盛り 3 つ
             { GameLoop.BossIds.Layer5Hidden,   new[] { 0.65f, 0.30f } },          // 形態の循環で間合いが変わる → 少なめ
-            // 深さ 6 (HP 3800・2026-11-14〜・目盛りの位置は 1945 の時のまま): 50% は段の切り替え (再生が止まり予兆が速まる) なので避ける
+            // 深さ 6 (HP 2200・2026-11-18〜 案 B・旧 3800・目盛りの位置は 1945 の時のまま): 50% は段の切り替え (再生が止まり予兆が速まる) なので避ける
             { GameLoop.BossIds.Layer6Ash, new[] { 0.80f, 0.30f } },
             // 深さ 7 ヴェスカ: 4 段で段ごとに HP が別 → 段ごとに 1 つ。 天与 (p4) は 66% / 33% が〈天与の才〉なので 50%
             { GameLoop.BossIds.VescaP1,    new[] { 0.60f } },
