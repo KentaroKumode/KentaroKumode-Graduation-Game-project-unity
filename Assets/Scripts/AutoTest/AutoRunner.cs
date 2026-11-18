@@ -241,6 +241,17 @@ namespace AutoTest
         /// <summary>[測定 2026-11-18・嵐の原因調査] 嵐の航行 (navStormAware) が、 不安定化の累計がこの値以上になったら出口へ向かう (人の「ここまで取ったら出る」の規則・0 = 使わない = 既定)。
         /// 取る量と嵐の HP の引き換えの曲線を、 値で切り上げる規則と別に描くためのつまみ。 乱数は引かない。</summary>
         public int navStormExitAtPts = 0;
+        /// <summary>[測定 2026-11-18・第 4 層の踏み込み過ぎの検証] Super の計画 (<c>MacroTarget</c>) が、 第 4 層 (深さ 6) で計画の中の HP がこの割合 (%) を下回ったら
+        /// 戦闘の点 (通常・精鋭・種別の見えていない点) を回り方に入れない (休憩・店などは残す・どれも得にならなければ出口へ)。 0 = 使わない = 既定。
+        /// 人の「王の前にこれだけは残す」の規則。 乱数は引かない。 第 4 層の外・Rank の航行 (Optimal) には効かない。</summary>
+        public int navD6HpFloorPct = 0;
+        /// <summary>[測定 2026-11-18・同上] Super の計画が、 第 4 層 (深さ 6) で精鋭の点 (種別が見えている) を回り方に入れない。 既定 false。 乱数は引かない。</summary>
+        public bool navD6NoElite = false;
+        /// <summary>[測定 2026-11-18・同上] Super の計画 (嵐の航行) が、 第 4 層 (深さ 6) で着いた時に嵐の中になる戦闘の点 (通常・精鋭・種別の見えていない点) を回り方に入れない。 既定 false。 乱数は引かない。</summary>
+        public bool navD6NoStormFight = false;
+        /// <summary>[測定 2026-11-18・同上] Super の計画が、 第 4 層 (深さ 6) の HP の重み (<c>MacroHpPer10</c>・戦闘の損と休憩と嵐の HP に掛かる) に掛ける倍率。 既定 1 = 今までと同じ。
+        /// BOT の値付けのつまみ (ゲームの数値ではない)。 乱数は引かない。</summary>
+        public float navD6HpWeightMul = 1f;
         /// <summary>[測定 2026-11-13] 天候の作り。 本体の GameHooks.StormEnabled へ流す (ラン終了で true へ)。
         /// true (既定) = 嵐 (静かな時間のあとに輪が縮む・嵐の中の点への移動で HP・嵐の中の戦闘は敵に〈嵐〉・始点は最外周から・ボスの点は伏せる・GAME.md §5-12)。
         /// BOT は既定 (2026-11-18〜) で嵐を読む (<see cref="navStormAware"/> と第 2 巡の 3 つ = T2)。 口を切ると、 終点の位置を知っていて、 フェーズ 3 で出口へ切り替え、 出口までの見積もりに嵐の HP を足すだけ (最小の対応)。
@@ -899,6 +910,10 @@ namespace AutoTest
                  + $"・ボスの位置 {(navStormOracleBoss ? "知っている (上限の見当・測定の口)" : "見えた時だけ")} (navStormOracleBoss={navStormOracleBoss})"
                  + $"・1 点の値段 {navStormPointPrice:0.###} (navStormPointPrice={navStormPointPrice:0.###})"
                  + $"・累計で出る {(navStormExitAtPts > 0 ? navStormExitAtPts + " 以上で出口へ" : "使わない")} (navStormExitAtPts={navStormExitAtPts}) "
+                 + $"/ 第 4 層の控え HP {(navD6HpFloorPct > 0 ? navD6HpFloorPct + "% 未満で戦わない" : "使わない")} (navD6HpFloorPct={navD6HpFloorPct})"
+                 + $"・精鋭 {(navD6NoElite ? "取らない" : "取る")} (navD6NoElite={navD6NoElite})"
+                 + $"・嵐の中の戦闘 {(navD6NoStormFight ? "取らない" : "取る")} (navD6NoStormFight={navD6NoStormFight})"
+                 + $"・HP の重み ×{navD6HpWeightMul:0.##} (navD6HpWeightMul={navD6HpWeightMul:0.##}) "
                  + $"/ 端子の撃破のボーナス {(terminalKillNeedsAttack ? "攻撃したターンだけ (旧い条件)" : "経路を問わない")} "
                  + $"/ 手札 {(handCarry == CombatSystem.HandCarryMode.Pick ? "印を付けた端子だけ残す (Pick)" : handCarry == CombatSystem.HandCarryMode.All ? "挿さなかった端子は全部残る (All)" : "毎ターン捨てる (Off・旧い規則)")}"
                  + $"{(handCarry == CombatSystem.HandCarryMode.Pick ? " 残す方策 " + EffectiveHandKeepPolicy + " (handKeepPolicy=" + handKeepPolicy + ")" : "")} "

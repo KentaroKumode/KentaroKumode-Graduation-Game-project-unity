@@ -121,6 +121,10 @@ namespace AutoTest
              .Append(" shpw=").Append(navStormHpWeightMul.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture))
              .Append(" sprice=").Append(navStormPointPrice.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture))
              .Append(" sexit=").Append(navStormExitAtPts);
+            // [測定 2026-11-18] 第 4 層の控えの口 (既定のままなら何も足さない = 前の記録と同じ文字列)
+            if (navD6HpFloorPct > 0 || navD6NoElite || navD6NoStormFight || navD6HpWeightMul != 1f)
+                b.Append(" d6=").Append(navD6HpFloorPct).Append(navD6NoElite ? "E" : "").Append(navD6NoStormFight ? "S" : "")
+                 .Append("w").Append(navD6HpWeightMul.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture));
             return b.ToString();
         }
 
