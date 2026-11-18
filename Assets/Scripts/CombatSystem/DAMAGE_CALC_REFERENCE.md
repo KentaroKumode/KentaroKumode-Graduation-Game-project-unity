@@ -283,7 +283,7 @@ ShieldBash の空振り（盾 0）が 34.2% → 66.1%、1 機会あたりの攻�
 | `playerDefenseBase` / `playerArmorPenBase`【2026-10-28】 | プレイヤーの防御・貫通の土台 = 初期防御 2 + 武器の `defense` / `armorPen`（[無印,+]） | 戦闘保持(start で設定) |
 | `playerDefense`【2026-10-28】 | プレイヤーの防御値。ステータス `def`・一対一 が OnPostRoll で加算。（旧〈血令〉の 0 へ換算は 2026-11-11 に外した） | BeginNewTurnで土台へ |
 | `enemyArmorPenNegate`【2026-10-28】 | 敵の固定削りを打ち消す量。剣〈間合〉（ステータス `penNeg`）が OnPostRoll で加算 | BeginNewTurnで0 |
-| `playerArmorPen`【2026-10-28】 | プレイヤーの貫通。遺物 +N (BeginNewTurn)・ステータス `pen` (OnPostRoll)・役〈攻め〉T4 +999 | BeginNewTurnで土台+遺物へ |
+| `playerArmorPen`【2026-10-28】 | プレイヤーの貫通。遺物 +N (BeginNewTurn)・ステータス `pen` (OnPostRoll) (役〈攻め〉T4 の +999 は 2026-11-18 に削除) | BeginNewTurnで土台+遺物へ |
 | `winMinDamage`【新】 | 勝利時与ダメ最低保証(既定1,利刃1〜4) | BeginNewTurnで1 |
 | `enemyHealReductionPct`【新】 | 敵回復の減衰率(治癒阻害0.5/遮断1.0)。`ReduceEnemyHeal()`経由で敵自己回復に適用 | 戦闘保持 |
 | `fixedDamageMultiplier`【新】 | 軽減無視ダメ倍率(蒼白の槍騎士1.5)。ProcessDamage末＆引分分岐で fixedDamageToEnemy に乗算 | 戦闘保持(既定1.0) |
@@ -836,24 +836,25 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
            旧: 敵 HP ≤ 0 かつ攻撃の種類の端子を 1 枚以上挿したターンの、 ここまでの撃破だけ (測定の口 GameHooks.TerminalKillBonusNeedsAttack)。
            その後、 使い捨て・〈影写し〉(写しは次のターンの手札へ・引く枚数とは別・2026-11-14)・〈火葬の剣〉・〈保持器〉を山札へ反映
 
-役 (ADR-0011・配線集計の直後 / 攻防の解決より**前**)
-         ResolveRoles: 振った 3 個から **目 × {2 個そろい, ゾロ目}** の 18 種を判定する。
+役 (ADR-0011 → ADR-0015・配線集計の直後 / 攻防の解決より**前**)
+         ResolveRoles: 振った 3 つの目から **目 × {2 個そろい, ゾロ目}** の 18 種と、 連なりの賽を持つ時だけ **連なり (3 つの連番)** を判定する。
          端子の置き方は条件にしない。 **成立すれば自動で効く** (1 戦闘 1 回・任意発動・使用済み管理は無い)。
-         成立するかはその目の面の Tier で決まる: T2 以上で 2 個そろい、 T3 以上でゾロ目。 T1 は何も起きない。
-         効果は既存フィールドへ加算する形に寄せてある (正本は YachtRoleEffects.Apply)。
-           ctx への加算   … 攻め: outgoingDamageMultiplier +0.25 / +0.5 (ゾロ目は forceCritical) ・T4 playerArmorPen +999 (防御無視) /
-                            充電: AddCharge(+3 / 上限まで) ・T4 超過分を mutualAttackBonus /
-                            時間: エスカレーションの遅延 (term Coolant と同じキー) +2 / 1 段戻す ・T4 現在段階×2 を mutualAttackBonus /
-                            封じ T4: enemyPassivesDisabledTurns / 富 T4: 所持ゴールド 5% (最大 10) を mutualAttackBonus
+         **Tier は 2026-11-18 にやめた** (ADR-0015): 賽がその目の面を持っていれば 2 個そろいもゾロ目も効く。 小さい目ほど役が強い (作者 p10)。
+         効果は既存フィールドへ加算する形に寄せてある (正本は YachtRoleEffects.ApplyCore・数値は仮)。
+           ctx への加算   … 攻め: outgoingDamageMultiplier +0.40 / +1.0 (ゾロ目は forceCritical) /
+                            充電: AddCharge(+3 / 上限まで) /
+                            時間: エスカレーションの遅延 (term Coolant と同じキー) +2 / 1 段戻す /
+                            封じ: enemyPassivesDisabledTurns = 2 (2 個そろいもゾロ目も・旧 T4 を本体へ)
            次ターンへ     … 封じ: currentBuffs["roleEnemyAtkCut"] (敵攻撃 −40%) / ["roleEnemyStun"] (敵が行動しない) /
-                            特別: ["roleFreeReroll"] (無料リロール 2 回)
-           特別 T4        … 2 個そろいでも極を撃つ (面数×5%・ボス・ヴェスカは面数×2.5%)
+                            特別: ["roleFreeReroll"] (無料リロール 2 回) / 連なり: ["roleFreeReroll"] +1 と 手札 +1 枚 (端子の extraDrawNext)
+           特別 2 個そろい … 小さな極も撃つ (面数×5%・ボス・ヴェスカは面数×2.5%・旧 T4 を本体へ)
            盤面フラグ (RoleOutcome)
                           … 極 (yachtFired + yachtChunkPct: 敵最大HP の 面数×30% (ボス・ヴェスカは ×15%) を軽減無視) /
-                            追撃 (extraDamageRatio 0.3 / 1.0・ゾロ目は確定ダメージ・T4 は会心判定) /
-                            守り (damageTakenCutPct 25 / 75・T4 は軽減分の半分をシールド) /
-                            癒し (healAmount 2 / 6・T4 は HP 上限超過分をシールド)
-           富             … RunState.roleGoldBonusPct (+5% / +30%) を勝利報酬の割合先に掛ける
+                            追撃 (extraDamageRatio 0.5 / 1.5・ゾロ目は確定ダメージ) /
+                            守り (damageTakenCutPct 40 / 100) /
+                            癒し (healAmount 2 / 6)
+           富             … RunState.roleGoldBonusPct (+5% / +30%) を勝利報酬の割合先に掛ける (9 の面を持つ賽は今は無い)
+         旧 T4 の固有効果のうち、 攻め=防御無視・守り=軽減分をシールド・時間=段階を攻撃・充電=超過を攻撃・癒し=超過をシールド・富=所持金を攻撃 は 2026-11-18 に無くなった。
 
 攻撃しないターン (攻撃端子 0 本 / 逃げる・2026-11-04 修正)
          atkBase = 0・追撃 0 に加えて、 ApplyWinDamageModifiers の後で **主攻撃 dealtDmg = 0・会心なし**。

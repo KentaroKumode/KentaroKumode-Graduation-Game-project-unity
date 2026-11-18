@@ -340,8 +340,8 @@ namespace CombatSystem
         ///
         /// 役は振った時点の 3 個で判定し、 端子への置き方は条件にしない。 1 戦闘 1 回の制限も、
         /// 発動の任意選択も、 使用済みの管理も持たない (ADR-0011 決定 2)。
-        /// 成立するかどうかは「その目の面を持っているか」(出目パーツの Tier) で決まる ──
-        /// T2 以上で 2 個そろい、 T3 以上でゾロ目。 T1 (素の面) は何も起きない。
+        /// 賽がその目の面を持っていれば、 2 個そろいもゾロ目も効く (ADR-0015・Tier は 2026-11-18 にやめた)。
+        /// 連なりの賽を持つ時だけ、 3 つの連番 (連なり) も役になる。
         /// 3 個では 2 つの役を同時に作れないので、 効くのは 1 ターンに高々 1 つ。</summary>
         private RoleOutcome ResolveRoles(CombatContext ctx, int[] playerDice, int[] playerFaceIdx)
         {
@@ -359,11 +359,7 @@ namespace CombatSystem
                 // T4-C〈凶運〉: このランで封印されている役は成立しても効かない。
                 if ((ctx.sealedRoleMask & (1 << (int)k)) != 0) continue;
 
-                // その目の面の Tier (同じ目の面は 1 枚までなので、 同じ出目なら同じ Tier)。
-                int face = YachtRoles.FaceOf(k);
-                var tier = GameLoop.DiceFaceParts.Tier.None;
-                for (int d = 0; d < playerDice.Length; d++)
-                    if (playerDice[d] == face) { tier = YachtRoles.TierAt(ctx.equippedFaceTiers, playerFaceIdx, d); break; }
+                var tier = GameLoop.DiceFaceParts.Tier.T3;   // Tier は使わない (ADR-0015)。 実績の呼び手のために渡すだけ
 
                 YachtRoleEffects.Apply(k, tier, ctx, ref outcome);
                 ctx.firedRolesThisTurn.Add(k);

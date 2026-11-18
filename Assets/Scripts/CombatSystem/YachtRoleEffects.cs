@@ -12,19 +12,19 @@ namespace CombatSystem
         public bool yachtFired;
         /// <summary>〈極〉: 敵の最大HP の N% を軽減無視で削る。 面数 × 30% (ボス・ヴェスカは × 15%)。</summary>
         public float yachtChunkPct;
-        /// <summary>〈追撃〉: 与えたダメージの何割を追加で与えるか (0.3 / 1.0)。 0 なら無し。</summary>
+        /// <summary>〈追撃〉: 与えたダメージの何割を追加で与えるか (0.5 / 1.5)。 0 なら無し。</summary>
         public float extraDamageRatio;
         /// <summary>〈追撃〉ゾロ目: 追加分を<b>確定</b>ダメージ (軽減無視) にする。 false は通常ダメージに上乗せ。</summary>
         public bool extraDamageTrue;
-        /// <summary>〈追撃〉T4: 追加ダメージが会心判定を持つ。</summary>
+        /// <summary>追加ダメージが会心判定を持つ (旧〈追撃〉T4・2026-11-18 から立てる役は無い)。</summary>
         public bool extraDamageCanCrit;
-        /// <summary>〈守り〉: このターンの被ダメを何 % 減らすか (25 / 75)。</summary>
+        /// <summary>〈守り〉: このターンの被ダメを何 % 減らすか (40 / 100)。</summary>
         public int damageTakenCutPct;
-        /// <summary>〈守り〉T4: 軽減した分の半分をシールドにする。</summary>
+        /// <summary>軽減した分の半分をシールドにする (旧〈守り〉T4・2026-11-18 から立てる役は無い)。</summary>
         public bool guardToShield;
         /// <summary>〈癒し〉: 回復量。</summary>
         public int healAmount;
-        /// <summary>〈癒し〉T4: HP 上限を超えた回復分をシールドにする。</summary>
+        /// <summary>HP 上限を超えた回復分をシールドにする (旧〈癒し〉T4・2026-11-18 から立てる役は無い)。</summary>
         public bool healOverflowToShield;
         /// <summary>〈封じ〉ゾロ目: 敵に次ターン行動不能 (この行動で ctx.nextTurnBuffs に積む)。</summary>
         public bool enemyStunned;
@@ -47,7 +47,7 @@ namespace CombatSystem
         public const float YachtPctPerFaceNormal = 30f;
         /// <summary>〈極〉(ゾロ目) の面数あたり割合。 ボス・ヴェスカの各形態。</summary>
         public const float YachtPctPerFaceBoss = 15f;
-        /// <summary>T4 の 2 個そろい〈極〉の面数あたり割合 (通常)。 ボスは半分。</summary>
+        /// <summary>〈特別〉2 個そろいの小さな〈極〉の面数あたり割合 (通常)。 ボスは半分。 旧 T4 の固有効果を本体へ移した (ADR-0015)。</summary>
         public const float YachtPairPctPerFaceNormal = 5f;
 
         // ── 持ち越しキー (nextTurnBuffs → currentBuffs) ──
@@ -58,19 +58,24 @@ namespace CombatSystem
         /// <summary>〈封じ〉2 個そろい: 次ターンの敵の攻撃を N% 減らす (値 = N)。</summary>
         public const string EnemyAtkCutKey = "roleEnemyAtkCut";
 
-        // ── 数値の叩き台 ──
+        // ── 数値 (ADR-0015・作者 2026-11-18。 小さい目ほど役が強く、 大きい目ほど数字が強い。 仮の値) ──
         const int CutPairPct = 40;          // 封じ 2 個そろい
-        const float AttackMulPair = 0.25f;  // 攻め 2 個そろい: 与ダメ +25%
-        const float AttackMulTriple = 0.5f; // 攻め ゾロ目: ×1.5
-        const int GuardPairPct = 25, GuardTriplePct = 75;
+        const float AttackMulPair = 0.40f;  // 攻め 2 個そろい: 与ダメ +40% (旧 +25%)
+        const float AttackMulTriple = 1.0f; // 攻め ゾロ目: ×2.0 (旧 ×1.5)
+        const float PursuitPair = 0.5f;     // 追撃 2 個そろい: 与えたダメージの 50% (旧 30%)
+        const float PursuitTriple = 1.5f;   // 追撃 ゾロ目: 150% を確定ダメージ (旧 100%)
+        const int GuardPairPct = 40, GuardTriplePct = 100;   // 守り (旧 25 / 75)。 ゾロ目はそのターンの敵の攻撃を受けない
         const int ChargePair = 3;
         const int HealPair = 2, HealTriple = 6;
         const int GoldPairPct = 5, GoldTriplePct = 30;
-        const int GoldAttackCap = 10;       // 富 T4: 所持ゴールドの 5% (最大 10) を攻撃 +N
         const int EscalationDelayPair = 2;  // 時間 2 個そろい: 次の段階を 2 ターン先へ
         const int FreeRerollPair = 2;       // 特別 2 個そろい
+        /// <summary>封じ: 敵のパッシブ・ターン効果を止めるターン (BeginNewTurn で 1 ずつ減る → 2 で「このターンの残り + 次のターン」)。 旧 T4 を本体へ移した。</summary>
+        const int SealPassiveTurns = 2;
+        /// <summary>連なり (連なりの賽): 次のターンの振り直しの無料 +1 回・手札 +1 枚。</summary>
+        const int StraightFreeReroll = 1, StraightExtraDraw = 1;
 
-        /// <summary>役を適用する。 <paramref name="tier"/> はその目の面の Tier (T4 の固有効果の判定に使う)。</summary>
+        /// <summary>役を適用する。 <paramref name="tier"/> は使わない (ADR-0015 で Tier をやめた・呼び手の互換のため残す)。</summary>
         public static void Apply(RoleKind role, DiceFaceParts.Tier tier, CombatContext ctx, ref RoleOutcome outcome)
         {
             if (ctx == null) return;
@@ -78,87 +83,76 @@ namespace CombatSystem
             string dsKey = "役〈" + YachtRoles.NameOf(role) + "〉";
             DmgSourceDiag.Universal.Add(dsKey);
             var dsBefore = DmgSourceDiag.Take(ctx);
-            ApplyCore(role, tier, ctx, ref outcome);
+            ApplyCore(role, ctx, ref outcome);
             DmgSourceDiag.Attribute(dsKey, dsBefore, ctx);
         }
 
-        static void ApplyCore(RoleKind role, DiceFaceParts.Tier tier, CombatContext ctx, ref RoleOutcome outcome)
+        static void ApplyCore(RoleKind role, CombatContext ctx, ref RoleOutcome outcome)
         {
+            if (role == RoleKind.Straight)
+            {
+                // 連なり: 次のターンの流れを作る (ダメージではない)
+                ctx.nextTurnBuffs.TryGetValue(FreeRerollKey, out float fr);
+                ctx.nextTurnBuffs[FreeRerollKey] = fr + StraightFreeReroll;
+                var deck = CombatManager.Instance?.TerminalDeck;
+                if (deck?.state != null) deck.state.extraDrawNext += StraightExtraDraw;
+                return;
+            }
+
             int face = YachtRoles.FaceOf(role);
             bool triple = YachtRoles.IsTriple(role);
-            bool t4 = tier == DiceFaceParts.Tier.T4;
 
             switch (face)
             {
-                case 1:   // 特別: 無料リロール / 〈極〉
+                case 1:   // 特別: 無料の振り直し 2 回 + 小さな〈極〉(面数 × 5%) / 〈極〉
                     if (!triple)
                     {
                         ctx.nextTurnBuffs[FreeRerollKey] = FreeRerollPair;
-                        if (t4) FireYacht(ctx, ref outcome, YachtPairPctPerFaceNormal, YachtPairPctPerFaceNormal * 0.5f);
+                        FireYacht(ctx, ref outcome, YachtPairPctPerFaceNormal, YachtPairPctPerFaceNormal * 0.5f);
                     }
                     else FireYacht(ctx, ref outcome, YachtPctPerFaceNormal, YachtPctPerFaceBoss);
                     break;
 
-                case 2:   // 封じ: 敵の次の攻撃 −40% / 次ターン行動しない
+                case 2:   // 封じ: 敵の次の攻撃 −40% / 次ターン行動しない。 どちらも敵のパッシブ・ターン効果を次のターンまで止める
                     if (!triple) ctx.nextTurnBuffs[EnemyAtkCutKey] = CutPairPct;
                     else { ctx.nextTurnBuffs[EnemyStunKey] = 1f; outcome.enemyStunned = true; }
-                    // T4: 封じた敵は、 攻撃だけでなくパッシブ・ターン効果も次のターン止まる。
-                    //   enemyPassivesDisabledTurns は BeginNewTurn で 1 ずつ減るので、 2 で「このターンの残り + 次のターン」。
-                    if (t4) ctx.enemyPassivesDisabledTurns = Mathf.Max(ctx.enemyPassivesDisabledTurns, 2);
+                    ctx.enemyPassivesDisabledTurns = Mathf.Max(ctx.enemyPassivesDisabledTurns, SealPassiveTurns);
                     break;
 
-                case 3:   // 追撃: 与えたダメージの 30% を追加 / 100% を追加確定ダメージ
-                    outcome.extraDamageRatio = triple ? 1.0f : 0.3f;
+                case 3:   // 追撃: 与えたダメージの 50% を追加 / 150% を追加確定ダメージ
+                    outcome.extraDamageRatio = triple ? PursuitTriple : PursuitPair;
                     outcome.extraDamageTrue = triple;
-                    outcome.extraDamageCanCrit = t4;
                     break;
 
-                case 4:   // 攻め: 与ダメ +25% / ×1.5 ＋会心確定
+                case 4:   // 攻め: 与ダメ +40% / ×2.0 ＋会心確定
                     ctx.outgoingDamageMultiplier += triple ? AttackMulTriple : AttackMulPair;
                     if (triple) ctx.forceCritical = true;
-                    // T4: 敵の防御を無視する (ADR-0013: 防御値をすべて剥がす貫通)。
-                    if (t4) ctx.playerArmorPen += DefenseFormula.IgnoreAll;
                     break;
 
-                case 5:   // 守り: 被ダメ −25% / −75%
+                case 5:   // 守り: 被ダメ −40% / −100%
                     outcome.damageTakenCutPct = triple ? GuardTriplePct : GuardPairPct;
-                    outcome.guardToShield = t4;
                     break;
 
                 case 6:   // 時間: エスカレーションの次の段階を 2 ターン先へ / 段階を 1 つ戻す
                     if (!triple) AddEscalationDelay(ctx, EscalationDelayPair);
                     else AddEscalationDelay(ctx, TurnsToRetreatOneStage(ctx));
-                    // T4: 時間を力に変える ── エスカレーションの現在の段階 × 2 を攻撃 +N に加算する。
-                    if (t4) ctx.mutualAttackBonus += CurrentStage(ctx) * 2;
                     break;
 
                 case 7:   // 充電: +3 / 上限まで満たす
                 {
-                    int cur = ctx.GetCharge();
                     int cap = CombatManager.ChargeMax + MetaProgression.MetaBuffApplicator.GetChargeCapBonus();
-                    int gain = triple ? cap : ChargePair;
-                    ctx.AddCharge(gain);
-                    // T4: 上限を超えた分を、 このターンの攻撃 +N に変える。
-                    if (t4)
-                    {
-                        int overflow = Mathf.Max(0, cur + gain - cap);
-                        if (overflow > 0) ctx.mutualAttackBonus += overflow;
-                    }
+                    ctx.AddCharge(triple ? cap : ChargePair);
                     break;
                 }
 
                 case 8:   // 癒し: HP +2 / +6
                     outcome.healAmount += triple ? HealTriple : HealPair;
-                    outcome.healOverflowToShield = t4;
                     break;
 
-                case 9:   // 富: ゴールド報酬 +5% / +30%
+                case 9:   // 富: ゴールド報酬 +5% / +30% (9 の面を持つ賽は今は無い)
                 {
                     var run = GameManager.Instance?.Run;
                     if (run != null) run.roleGoldBonusPct += triple ? GoldTriplePct : GoldPairPct;
-                    // T4 (2 個そろい): 所持ゴールドの 5% (最大 10) を攻撃 +N に加算。
-                    if (t4 && !triple && run != null)
-                        ctx.mutualAttackBonus += Mathf.Min(GoldAttackCap, Mathf.FloorToInt(run.coins * 0.05f));
                     break;
                 }
             }

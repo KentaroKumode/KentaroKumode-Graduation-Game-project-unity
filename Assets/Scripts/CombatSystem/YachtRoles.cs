@@ -21,6 +21,9 @@ namespace CombatSystem
         Pair7, Triple7,
         Pair8, Triple8,
         Pair9, Triple9,
+        /// <summary>連なり (ADR-0015・2026-11-18): 3 つの目が連番 (例 2・3・4)。 連なりの賽を持つ時だけ成立する。
+        /// 目の役ではないので <see cref="YachtRoles.FaceOf"/> は 10 (どの目でもない) を返す。</summary>
+        Straight,
     }
 
     /// <summary>
@@ -33,8 +36,8 @@ namespace CombatSystem
     /// </summary>
     public static class YachtRoles
     {
-        /// <summary>役の総数 (配列の長さ)。</summary>
-        public const int Count = 18;
+        /// <summary>役の総数 (配列の長さ)。 目 9 × {2 個そろい, ゾロ目} の 18 と、 連なり。</summary>
+        public const int Count = 19;
 
         /// <summary>全役。 順序は enum 定義順。</summary>
         public static readonly RoleKind[] All = (RoleKind[])System.Enum.GetValues(typeof(RoleKind));
@@ -66,18 +69,28 @@ namespace CombatSystem
 
         /// <summary>表示名。 ログと BOT レポートで使う。 例: 3 の 2 個そろい → 「追撃・対」。</summary>
         public static string NameOf(RoleKind k)
-            => ThemeOf(FaceOf(k)) + (IsTriple(k) ? "・揃" : "・対");
+            => k == RoleKind.Straight ? "連なり" : ThemeOf(FaceOf(k)) + (IsTriple(k) ? "・揃" : "・対");
 
-        /// <summary>出た 3 個 (<paramref name="dice"/>) から成立する役を <paramref name="into"/> へ足す。
+        /// <summary>連なり (3 つの連番) が役になるか: 連なりの賽を持っている時だけ。</summary>
+        public static bool StraightsEnabled()
+            => EquippedDie.IdOf(GameManager.Instance?.Run) == DieIds.Straight;
+
+        /// <summary>出た 3 つの目 (<paramref name="dice"/>) から成立する役を <paramref name="into"/> へ足す。
         ///
-        /// <para>2 個そろい = ちょうど 2 個、 または T2 のまま 3 個。 ゾロ目 = 3 個かつ T3 以上。
-        /// 同じ目の面は 1 枚までなので、 同じ出目なら同じ面 (同じ Tier) に止まっている。</para></summary>
-        /// <param name="faceIdx">ダイスごとの止まった面の添字 (<see cref="EquippedDie.Build"/> と対)。</param>
-        /// <param name="tiers">面添字ごとの Tier。 null なら役は何も成立しない。</param>
+        /// <para><b>Tier は見ない</b> (ADR-0015・作者 2026-11-18: 賽がその目の面を持っていれば、 2 個そろいもゾロ目も効く)。
+        /// 2 個そろい = ちょうど 2 つ、 ゾロ目 = 3 つ。 連なりの賽を持つ時だけ、 3 つの連番 (<see cref="RoleKind.Straight"/>) も役になる。</para></summary>
+        /// <param name="faceIdx">使わない (呼び手の互換のため残す)。</param>
+        /// <param name="tiers">使わない (呼び手の互換のため残す)。</param>
         public static void Evaluate(int[] dice, int[] faceIdx, DiceFaceParts.Tier[] tiers, List<RoleKind> into)
         {
             if (into == null || dice == null || dice.Length < 2) return;
-            if (tiers == null || faceIdx == null) return;
+
+            if (dice.Length == 3 && StraightsEnabled())
+            {
+                int a = dice[0], b = dice[1], c = dice[2];
+                int lo = System.Math.Min(a, System.Math.Min(b, c)), hi = System.Math.Max(a, System.Math.Max(b, c));
+                if (a != b && b != c && a != c && hi - lo == 2) { into.Add(RoleKind.Straight); return; }
+            }
 
             for (int i = 0; i < dice.Length; i++)
             {
@@ -94,9 +107,7 @@ namespace CombatSystem
                 }
                 if (!firstOccurrence || count < 2) continue;
 
-                var tier = TierAt(tiers, faceIdx, i);
-                if (count >= 3 && tier >= DiceFaceParts.Tier.T3) into.Add(Of(v, true));
-                else if (tier >= DiceFaceParts.Tier.T2)          into.Add(Of(v, false));
+                into.Add(Of(v, count >= 3));
             }
         }
 
