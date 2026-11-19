@@ -12,8 +12,9 @@ namespace CombatSystem
     /// 墓標 = HP 0 からの踏みとどまり (CombatManager.TryLastStandRevive)。</para>
     ///
     /// <para><b>ほかの所にある賽</b>: 目利き = 振り直し (CombatManager.RerollPhase・残す目)・逆巻き = エスカレーションの段階 (ApplyRewind・Escalation.StageOffset)・
-    /// 繋ぎ = 残す印 (TerminalDeckState.KeepFromMarks)・時計 = 常設の〈時計〉の端子 (TerminalIds.Clock)・分け身 = 主攻撃を 2 回 (CombatManager.Turn)・
-    /// 連なり = 役〈連なり〉(YachtRoles / YachtRoleEffects)。 効果の数値はすべて仮の値 (items.json の説明文と同じ)。</para>
+    /// 繋ぎ = 残す印 (TerminalDeckState.KeepFromMarks)・時計 = 常設の〈時計〉の端子 (TerminalIds.Clock)・
+    /// 連なり = 役〈連なり〉(YachtRoles / YachtRoleEffects)。 呪物 = 店とイベントの秘宝の LEGENDARY の重み (<see cref="LegendaryOfferMul"/>) と
+    /// 秘宝を手に入れた時の最大 HP (<see cref="OnPassiveAcquired"/>)。 効果の数値はすべて仮の値 (items.json の説明文と同じ)。</para>
     ///
     /// <para><b>出目は書き換えない</b> (ADR-0015 の 2)。 ここは出目が決まって端子に挿された後の上乗せだけ。</para>
     /// </summary>
@@ -32,6 +33,22 @@ namespace CombatSystem
         /// <summary>古銭: ⑧が出たターンに敵を倒すとゴールド +N。</summary>
         public const int OldCoinGold = 3;
         public const int OldCoinFace = 8;
+        /// <summary>呪物の賽 (ADR-0016・2026-11-20): 店とイベントで秘宝を選ぶ時の LEGENDARY の重みに掛ける数 (他のレア度の重みはそのまま)。</summary>
+        public const float CursedLegendaryMul = 3f;
+        /// <summary>呪物の賽: 秘宝を手に入れるたびに減る最大 HP (このランの間・1 より下にはならない)。</summary>
+        public const int CursedMaxHpPerPassive = 3;
+
+        /// <summary>店とイベントで秘宝を選ぶ時の LEGENDARY の重みの倍率 (呪物の賽なら <see cref="CursedLegendaryMul"/>・それ以外 1)。 戦闘の報酬には掛けない。</summary>
+        public static float LegendaryOfferMul(RunState run) => EquippedDie.IdOf(run) == DieIds.Cursed ? CursedLegendaryMul : 1f;
+
+        /// <summary>秘宝 (category Passive) を手に入れた (PassiveAddHelper.AddPassiveItem)。 呪物の賽なら最大 HP −<see cref="CursedMaxHpPerPassive"/>。</summary>
+        public static void OnPassiveAcquired(RunState run)
+        {
+            if (run == null || EquippedDie.IdOf(run) != DieIds.Cursed) return;
+            run.playerMaxHP = System.Math.Max(1, run.playerMaxHP - CursedMaxHpPerPassive);
+            if (run.playerHP > run.playerMaxHP) run.playerHP = run.playerMaxHP;
+            UnityEngine.Debug.Log($"[賽] 呪物の賽: 秘宝を手に入れた → 最大 HP {run.playerMaxHP}");
+        }
 
         /// <summary>端子の結果へ賽のパッシブを足す。 <paramref name="v"/> は端子に入る目 (〈号令の剣〉の +1 の後)。
         /// 誓約の封じ (シールド) より前に呼ぶ ── 夜番のシールドも封じで落ちる。</summary>

@@ -34,9 +34,11 @@ namespace ItemSystem
         private static float Biased(float w, float bias)
             => bias <= 0f ? w : Mathf.Pow(w, 1f - Mathf.Clamp01(bias));
 
+        /// <param name="legendaryMul">LEGENDARY の重みに掛ける数 (呪物の賽・店とイベントの秘宝だけ・CombatSystem.DiePassives.LegendaryOfferMul)。</param>
         public static CompleteItemData Pick(List<CompleteItemData> pool, ItemRarity? minRarity = null,
-                                            float rarityBias = 0f)
+                                            float rarityBias = 0f, float legendaryMul = 1f)
         {
+            float W(ItemRarity r, float w) => Biased(w, rarityBias) * (r == ItemRarity.LEGENDARY ? legendaryMul : 1f);
             if (pool == null || pool.Count == 0) return null;
 
             // min rarity フィルタ
@@ -60,7 +62,7 @@ namespace ItemSystem
             // 利用可能 rarity の合計重み
             float total = 0f;
             foreach (var (rarity, weight) in tierWeights)
-                if (available.Contains(rarity)) total += Biased(weight, rarityBias);
+                if (available.Contains(rarity)) total += W(rarity, weight);
 
             if (total <= 0f)
                 return filtered[GameLoop.GameRng.RangeAuto("RarityWeightedPicker.2", 0, filtered.Count)];
@@ -71,7 +73,7 @@ namespace ItemSystem
             foreach (var (rarity, weight) in tierWeights)
             {
                 if (!available.Contains(rarity)) continue;
-                if ((r -= Biased(weight, rarityBias)) <= 0f) { chosen = rarity; break; }
+                if ((r -= W(rarity, weight)) <= 0f) { chosen = rarity; break; }
             }
 
             // 該当 rarity 内からフラット抽選

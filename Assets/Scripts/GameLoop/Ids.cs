@@ -30,7 +30,7 @@ namespace GameLoop
         public const string Clock      = "時計の賽";
         public const string Gamble     = "賭場の賽";
         public const string Straight   = "連なりの賽";
-        public const string Split      = "分け身の賽";
+        public const string Cursed     = "呪物の賽";
     }
 
     public static class ItemIds
