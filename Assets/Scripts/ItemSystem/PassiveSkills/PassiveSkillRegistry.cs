@@ -261,6 +261,7 @@ namespace ItemSystem.PassiveSkills
             Register(new DeathMaskVisor());
             Register(new ReturningBloodSickle()); Register(new BloodWedge());
             Register(new CorrosionCrown()); Register(new BoneMeltOil());
+            Register(new WildKilnHearth()); Register(new PillarBreakerCharge());
 
             // ============================
             //  汎用パッシブ
