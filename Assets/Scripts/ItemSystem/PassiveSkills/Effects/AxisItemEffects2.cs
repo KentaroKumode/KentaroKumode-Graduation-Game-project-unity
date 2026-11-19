@@ -174,7 +174,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (Rw.PlayerHit(ctx) && Rw.OncePerTurn(ctx, "ax2.flintNeedle")) ctx.AddCharge(1);
+            if (Rw.PlayerHit(ctx)) ctx.AddCharge(1);
         }
     }
 
@@ -249,7 +249,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (Rw.PlayerHit(ctx) && Rw.OncePerTurn(ctx, "ax2.chipped")) ctx.AddEnemyBleed(1);
+            if (Rw.PlayerHit(ctx)) ctx.AddEnemyBleed(1);
         }
     }
 
@@ -273,7 +273,7 @@ namespace ItemSystem.PassiveSkills.Effects
         {
             int mn = Ax2.Count(ctx, MutualKeys.AttackDiceMin);
             if (!Rw.PlayerHit(ctx) || mn < 1 || mn > 2) return;
-            if (Rw.OncePerTurn(ctx, "ax2.riftWedge")) ctx.AddEnemyBleed(3);
+            ctx.AddEnemyBleed(3);
         }
     }
 
@@ -344,7 +344,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (Rw.PlayerHit(ctx) && Rw.OncePerTurn(ctx, "ax2.needleRing")) Rw.Poison(ctx, Ax2.Count(ctx, MutualKeys.AttackDiceCount));
+            if (Rw.PlayerHit(ctx)) Rw.Poison(ctx, Ax2.Count(ctx, MutualKeys.AttackDiceCount));
         }
     }
 

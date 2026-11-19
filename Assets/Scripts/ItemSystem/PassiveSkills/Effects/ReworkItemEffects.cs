@@ -255,7 +255,6 @@ namespace ItemSystem.PassiveSkills.Effects
             if (t == PassiveSkillTrigger.OnRinkaiBurst) { ctx.accumulatedValues[PctKey] = ctx.GetAccumulated(PctKey) + PctPerBurst; return; }
             if (t == PassiveSkillTrigger.OnPostRoll) { ctx.AddOutgoingPct(ctx.GetAccumulated(PctKey)); return; }
             if (!ctx.playerWonRoll || Rw.Count(ctx, Kw.BurstThisAttackKey) <= 0) return;
-            if (!Rw.OncePerTurn(ctx, "rw.arato")) return;
             ctx.AddEnemyBleed(4);
         }
     }
@@ -655,7 +654,7 @@ namespace ItemSystem.PassiveSkills.Effects
         {
             if (t == PassiveSkillTrigger.OnPostDealDamage)
             {
-                if (ctx.AxisRank(AxisRules.Poison) == 0 && Rw.PlayerHit(ctx) && Rw.OncePerTurn(ctx, "rw.greenKnife")) Rw.Poison(ctx, 2);
+                if (ctx.AxisRank(AxisRules.Poison) == 0 && Rw.PlayerHit(ctx)) Rw.Poison(ctx, 2);
                 return;
             }
             int n = ctx.EnemyPoison / PerStacks;

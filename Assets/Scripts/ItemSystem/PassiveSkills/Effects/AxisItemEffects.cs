@@ -151,7 +151,7 @@ namespace ItemSystem.PassiveSkills.Effects
             switch (_when)
             {
                 case When.TurnStart:   return 1;
-                case When.PlayerHit:   return Rw.PlayerHit(ctx) && Rw.OncePerTurn(ctx, "ax.entry." + SkillId) ? 1 : 0;
+                case When.PlayerHit:   return Rw.PlayerHit(ctx) ? 1 : 0;
                 case When.PerBlockDie: return Ax.BlockDice(ctx);
                 case When.EnemyAttacked:
                     return Ax.Count(ctx, MutualKeys.EnemyAtkPreDefense) > 0 ? 1 : 0;
@@ -266,7 +266,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (!Rw.PlayerHit(ctx) || Ax.AtkDice(ctx) < 2) return;
-            if (Rw.OncePerTurn(ctx, "ax.clasp")) ctx.AddEnemyBleed(2);
+            ctx.AddEnemyBleed(2);
         }
     }
 
@@ -312,7 +312,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (!Rw.PlayerHit(ctx) || Ax.BlockDice(ctx) < 2) return;
-            if (Rw.OncePerTurn(ctx, "ax.spoon")) Rw.Poison(ctx, 3);
+            Rw.Poison(ctx, 3);
         }
     }
 
