@@ -230,6 +230,31 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
+    /// <summary>四つ打ちの鉄芯: 充電が上限の間、 攻撃が通るたびに数え (この戦闘の間・上限でない時の攻撃は数えない)、 4 回目ごとに
+    /// 充電 × 電流 × 50% (切り捨て) の軽減不可ダメージ (Kw.DamageEnemy)。 充電は使わない。</summary>
+    public class FourthStrikeCore : IPassiveSkillEffect, IRelicDisplay
+    {
+        public const string Id = "四つ打ちの鉄芯";
+        public string SkillId => Id;
+        public const int Every = 4, PctPerAxis = 50;
+        private const string CountKey = "ax3.fourthStrike";
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.GetCharge() >= ctx.ChargeCap);
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage };
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
+        {
+            if (!Rw.PlayerHit(ctx) || ctx.enemyCurrentHP <= 0) return;
+            int charge = ctx.GetCharge();
+            if (charge <= 0 || charge < ctx.ChargeCap) return;
+            int n = (int)ctx.GetAccumulated(CountKey) + 1;
+            ctx.accumulatedValues[CountKey] = n % Every;
+            if (n < Every) return;
+            int dmg = (int)((long)charge * ctx.AxisDepth(AxisRules.Charge) * PctPerAxis / 100);
+            if (dmg <= 0) return;
+            Kw.DamageEnemy(ctx, dmg);
+            Rw.Log($"[四つ打ちの鉄芯] 4 回目 → 充電 {charge} × 電流 {ctx.AxisDepth(AxisRules.Charge)} × 50% = {dmg} (軽減不可)");
+        }
+    }
+
     // ============================================================
     //  シールド
     // ============================================================
