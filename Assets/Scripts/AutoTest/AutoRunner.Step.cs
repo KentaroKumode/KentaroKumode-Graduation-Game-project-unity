@@ -283,6 +283,7 @@ namespace AutoTest
             ItemSystem.PassiveSkills.PassiveSkillManager.ChainMaxDepth = 0;
             ItemSystem.PassiveSkills.PassiveSkillManager.ChainRepeats = 0;
             ItemSystem.PassiveSkills.PassiveSkillManager.ChainGuardHits = 0;
+            ItemSystem.PassiveSkills.PassiveSkillManager.ChainDeepestPath = "";
 
             // [計装 2026-11-10] 実際に入っていた整備パネルの段 (配点の指定が予算で切り詰められていないかを、 ランの記録で確かめる)
             if (_cur != null)
