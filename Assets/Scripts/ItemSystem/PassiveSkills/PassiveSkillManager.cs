@@ -422,6 +422,10 @@ namespace ItemSystem.PassiveSkills
         /// <summary>連鎖の深さと、 この連鎖で既に働いた品 (2026-10-31 アイテム再編)。</summary>
         private int _kwDepth;
         private readonly HashSet<string> _kwFired = new HashSet<string>();
+        /// <summary>[計装 2026-11-19] 連鎖の深さの最大 / 同じ品が 1 つの連鎖で 2 度以上働いた回数 (① を外した時だけ数える) / 網に掛かった回数。 BOT がランの始めに 0 へ戻す。</summary>
+        public static int ChainMaxDepth, ChainRepeats, ChainGuardHits;
+        /// <summary>不具合の網 (遊びの決まりではない): 連鎖がこの深さに達したら、 そこで止めてエラーを出す。 正しく作られた品なら届かない深さ。</summary>
+        public const int ChainGuardDepth = 200;
 
         /// <summary>キーワードの出来事を配る。 量は <see cref="Keywords.Kw.EventAmount"/> で読める。
         ///
@@ -433,7 +437,14 @@ namespace ItemSystem.PassiveSkills
             if (context == null || amount <= 0) return;
             if (!activeSkillsByTrigger.TryGetValue(trigger, out var skills) || skills.Count == 0) return;
             if (_kwDepth == 0) _kwFired.Clear();
+            if (_kwDepth >= ChainGuardDepth)
+            {
+                ChainGuardHits++;
+                Debug.LogError($"[PassiveSkillManager] 連鎖が {ChainGuardDepth} 段に達した ({trigger})。 止まらない輪を作る品の組み合わせがある (不具合)");
+                return;
+            }
             _kwDepth++;
+            if (_kwDepth > ChainMaxDepth) ChainMaxDepth = _kwDepth;
             float prevAmount = context.GetAccumulated(Keywords.Kw.AmountKey);
             try
             {
@@ -442,7 +453,11 @@ namespace ItemSystem.PassiveSkills
                 for (int i = 0; i < list.Length; i++)
                 {
                     var s = list[i];
-                    if (!_kwFired.Add(s.SkillId)) continue;
+                    if (!_kwFired.Add(s.SkillId))
+                    {
+                        if (!GameLoop.GameHooks.KeywordChainRepeat) continue;   // 安全装置 ①
+                        ChainRepeats++;
+                    }
                     context.accumulatedValues[Keywords.Kw.AmountKey] = amount;
                     try
                     {
