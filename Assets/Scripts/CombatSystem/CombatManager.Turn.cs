@@ -1037,7 +1037,7 @@ namespace CombatSystem
                 //   実効 150〜300 になっていた。
                 //   §9.2 の「爆発 flat」という設計意図どおり、 倍率の乗らない
                 //   fixedDamageToEnemy (軽減無視の固定ダメ枠) へ回す。
-                // 〈帳簿外の爆薬〉で同じターンに何度も爆発したら、 その回数ぶん乗る。 品の上乗せ (〈溢れ取りの鋳型〉) は Kw.BurstBonusKey。
+                // 〈帳簿外の爆薬〉で同じターンに何度も爆発したら、 その回数ぶん乗る。 超臨界爆発の ×1.5 の分 (基礎の半分・2026-11-20) は Kw.BurstBonusKey。
                 int burstN = Math.Max(1, (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.BurstCountKey));
                 int burstBonus = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.BurstBonusKey);
                 int burstDmg = ItemSystem.PassiveSkills.Keywords.Kw.BurstBase(ctx) * burstN + burstBonus;

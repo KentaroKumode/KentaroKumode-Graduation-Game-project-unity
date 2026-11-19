@@ -39,13 +39,17 @@ namespace ItemSystem.PassiveSkills.Keywords
         public const string BurstTotalKey = "kw.burstTotal";
         /// <summary>閾値を超えて溜まっていた臨界 (〈溢れ取りの鋳型〉が読む)。</summary>
         public const string BurstExcessKey = "kw.burstExcess";
-        /// <summary>爆発に上乗せするダメージ (品が積む。 爆発を使ったら 0)。</summary>
+        /// <summary>爆発に上乗せするダメージ (超臨界爆発の ×1.5 の分・品が積む。 爆発を使ったら 0)。</summary>
         public const string BurstBonusKey = "kw.burstBonus";
         /// <summary>この攻撃が爆発を使った (〈荒砥〉〈爆破祭の小切手〉が読む)。 毎ターン攻撃の前に書き直す。</summary>
         public const string BurstThisAttackKey = "kw.burstThisAttack";
         /// <summary>直近に爆発を使ったターンと、 そのダメージ (〈二度目の打金〉が読む)。</summary>
         public const string BurstAppliedTurnKey = "kw.burstAppliedTurn";
         public const string BurstAppliedDmgKey = "kw.burstAppliedDmg";
+        /// <summary>いま決まった爆発が超臨界か (1/0・爆発の出来事を配っている間に読む)。 超臨界爆発 = 閾値を引く前の臨界が閾値の 2 倍以上 (2026-11-20・§23-32)。</summary>
+        public const string BurstSuperKey = "kw.burstSuper";
+        /// <summary>いま決まった爆発 1 回のダメージ (<see cref="BurstBase"/>・超臨界なら ×1.5・爆発の出来事を配っている間に読む)。</summary>
+        public const string BurstDamageNowKey = "kw.burstDamageNow";
 
         /// <summary>臨界を有効にする (どれか 1 つの臨界の品が戦闘開始時に呼べば動き出す)。</summary>
         public static void EnableHeat(CombatContext ctx)
@@ -106,14 +110,25 @@ namespace ItemSystem.PassiveSkills.Keywords
             while (ctx.rinkaiThreshold > 0 && ctx.rinkaiMeter >= ctx.rinkaiThreshold)
             {
                 int th = ctx.rinkaiThreshold;
+                // 超臨界爆発 (2026-11-20・§23-32): 閾値を引く前の臨界が閾値の 2 倍以上。 その爆発のダメージ ×1.5 (上乗せ = 基礎の半分・切り捨て)
+                bool super = ctx.rinkaiMeter >= 2 * th;
                 int excess = ctx.rinkaiMeter - th;
                 ctx.rinkaiMeter = ctx.rinkaiMultiBurst ? excess : 0;
                 ctx.rinkaiBurstActive = true;
                 ctx.accumulatedValues[BurstCountKey] = ctx.GetAccumulated(BurstCountKey) + 1;
                 ctx.accumulatedValues[BurstTotalKey] = ctx.GetAccumulated(BurstTotalKey) + 1;
                 ctx.accumulatedValues[BurstExcessKey] = ctx.rinkaiMultiBurst ? 0 : excess;
-                Debug.Log($"[臨界] 閾値{th} 到達 → 爆発 (超過 {excess}・残 {ctx.rinkaiMeter})");
+                int burstDmg = BurstBase(ctx);
+                if (super)
+                {
+                    ctx.accumulatedValues[BurstBonusKey] = ctx.GetAccumulated(BurstBonusKey) + burstDmg / 2;
+                    burstDmg += burstDmg / 2;
+                }
+                ctx.accumulatedValues[BurstSuperKey] = super ? 1 : 0;
+                ctx.accumulatedValues[BurstDamageNowKey] = burstDmg;
+                Debug.Log($"[臨界] 閾値{th} 到達 → {(super ? "超臨界" : "")}爆発 (超過 {excess}・残 {ctx.rinkaiMeter}・ダメージ {burstDmg})");
                 Raise(ctx, PassiveSkillTrigger.OnRinkaiBurst, th);
+                if (super) Raise(ctx, PassiveSkillTrigger.OnSuperBurst, burstDmg);
                 int relicSh = MetaProgression.Relics.RelicApplicator.GetBurstShield();   // 遺物 炉温 3 個: 爆発のたびにシールド +6
                 if (relicSh > 0) { ctx.consShield += relicSh; ctx.shieldGainedTotal += relicSh; CombatSystem.ShieldDiag.Note("遺物〈炉温〉3", relicSh); }
                 if (!ctx.rinkaiMultiBurst) break;
@@ -183,8 +198,17 @@ namespace ItemSystem.PassiveSkills.Keywords
         {
             if (ctx == null || dmg <= 0) return;
             if (ctx.GetAccumulated(ResolvingKey) > 0) Add(ctx, PendingEnemyDamageKey, dmg);
-            else ctx.enemyCurrentHP = System.Math.Max(0, ctx.enemyCurrentHP - CombatSystem.BossDown.ApplyTakenNow(MetaProgression.MetaDebuffApplicator.ApplyOutgoingCut(dmg)));   // 預けた分は HpLossDiag.Lose で掛かる (ボスのダウンの ×1.5 も)
+            else ctx.enemyCurrentHP = System.Math.Max(0, ctx.enemyCurrentHP - CombatSystem.BossDown.ApplyTakenNow(MetaProgression.MetaDebuffApplicator.ApplyOutgoingCut(ApplyFinalDamage(ctx, dmg))));   // 預けた分は HpLossDiag.Lose で掛かる (最終与ダメージ倍率・ボスのダウンの ×1.5 も)
         }
+
+        /// <summary>最終与ダメージ倍率 (2026-11-20・GAME.md §23-32)。 すべての倍率の後・敵の軽減パッシブと防御の前に掛ける (切り捨て)。
+        /// 掛ける口は大罪:怠惰 (<see cref="MetaProgression.MetaDebuffApplicator.ApplyOutgoingCut"/>) と同じ所: 主攻撃 = CombatManager.Damage.cs・
+        /// 主攻撃以外 = HpLossDiag.Lose・<see cref="DamageEnemy"/> の直接の口・〈逆綴じの止血帯〉。 BOT の見積もり (AutoRunner.Combat.cs) も同じ位置。</summary>
+        public static int ApplyFinalDamage(CombatContext ctx, int dmg)
+            => ctx != null && dmg > 0 && ctx.finalDamagePct != 0 ? (int)((long)dmg * (100 + ctx.finalDamagePct) / 100) : dmg;
+
+        /// <summary>今の戦闘の ctx で <see cref="ApplyFinalDamage"/> (戦闘の外では素通し)。</summary>
+        public static int ApplyFinalDamageNow(int dmg) => ApplyFinalDamage(PassiveSkillManager.Instance?.Context, dmg);
 
         /// <summary>預かっている敵へのダメージを取り出して 0 に戻す。</summary>
         public static int TakePendingEnemyDamage(CombatContext ctx)

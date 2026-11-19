@@ -586,6 +586,20 @@ namespace ItemSystem.PassiveSkills
         /// <summary>[persistent] 〈廃庭の霧吹き〉: 毒のダメージが、 ターン開始に加えて敵が攻撃するたびにも入る。</summary>
         public bool poisonTickOnEnemyAttack;
 
+        // ---- 軸の締めの LEGENDARY (2026-11-20・GAME.md §23-32) ----
+        /// <summary>[persistent・戦闘開始で 0] 最終与ダメージ倍率の上乗せ (%)。 すべての倍率 (会心・与ダメ % の池・端子の別枠) の後、
+        /// 敵の軽減パッシブと防御の前に ×(100 + これ)/100 で掛ける (<see cref="Keywords.Kw.ApplyFinalDamage"/>・大罪:怠惰と同じ位置)。 〈防人の軍標〉が積む。</summary>
+        public int finalDamagePct;
+        /// <summary>[persistent] 〈腐蝕の王冠〉: 敵の毒の上限 (99) が無くなる (AddStatus)。</summary>
+        public bool poisonCapRemoved;
+        /// <summary>[persistent] 〈血の楔〉: 敵が得るシールドと回復の量、 敵の被ダメ軽減のパッシブで減る量を 出血 ÷ (出血 + 40) だけ弱める (<see cref="WedgeEnemyGain"/>)。</summary>
+        public bool bleedWedge;
+        /// <summary>〈血の楔〉の割る数の足し分 (出血 ÷ (出血 + これ))。</summary>
+        public const int BleedWedgeK = 40;
+        /// <summary>〈血の楔〉: 敵の得る量 n を 40 ÷ (出血 + 40) 倍にする (切り捨て)。 品が無い・出血 0 なら素通し。</summary>
+        public int WedgeEnemyGain(int n)
+            => bleedWedge && n > 0 && enemyBleedStacks > 0 ? (int)((long)n * BleedWedgeK / (enemyBleedStacks + BleedWedgeK)) : n;
+
         // ---- 誓約の封じ (2026-11-06 軸の品)。 [persistent] ----
         //   **戦闘の情報を作った直後に、 所持品から立てる** (OathSeals.Apply)。 品の OnBattleStart で立てると、
         //   遺物の開幕の毒・出血・充電と臨界の持ち越し (OnBattleStart より前) が漏れた (2026-11-07)。
