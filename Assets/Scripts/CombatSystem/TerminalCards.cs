@@ -194,6 +194,8 @@ namespace CombatSystem
         public int escalationDelay;
         /// <summary>このターンに発動した端子 (場の添字)。</summary>
         public readonly List<int> fired = new List<int>();
+        /// <summary>[計装 2026-11-19] 攻撃の合計 (attackAdd) を増やした所ごとの量 (「端子名:+N」)。 判断には使わない。</summary>
+        public readonly List<string> attackLog = new List<string>();
         /// <summary>このターンに発動した基本以外の端子の数。</summary>
         public int firedNonBasic;
         /// <summary>〈有効活用〉〈影写し〉〈火葬の剣〉の対象 (場の添字・−1 = なし)。 選んだ対象 (Resolve の wantTarget) が候補なら それ、
@@ -558,7 +560,9 @@ namespace CombatSystem
                     default: o.supportDice += num; break;
                 }
                 int times = doubler && id != TerminalIds.Doubler ? 2 : 1;
+                int atkBefore = o.attackAdd, chgBefore = charge;
                 for (int t = 0; t < times; t++) Effect(id, s, sum, env, state, o, ref charge, Empty);
+                if (o.attackAdd != atkBefore) o.attackLog.Add($"{id}(目{sum}{(times > 1 ? "・倍化" : "")}{(chgBefore != charge ? "・充電" + chgBefore + "→" + charge : "")}):+{o.attackAdd - atkBefore}");
             }
 
             // ── 6. 他の端子を見る効果 (全部の発動が決まった後) ──
@@ -572,10 +576,14 @@ namespace CombatSystem
             // 〈柔軟な戦略〉: 基本以外の発動の累計 (付けていなくても数える・積むのは持っている時だけ = 山札にあれば効く)
             state.firedTotal += o.firedNonBasic;
             // 次に攻撃するターンの攻撃に足す分
+            int atk6 = o.attackAdd;
             if (o.attackDice > 0 && state.storedAttack > 0) { o.attackAdd += state.storedAttack; state.storedAttack = 0; }
+            if (o.attackAdd != atk6) o.attackLog.Add($"連係・変圧・溜めた攻撃:+{o.attackAdd - atk6}");
 
             // ── 6b. 装備中の賽のパッシブ (ADR-0015): 挿した目ごとに効く・残り火の持ち越し。 封じ (7) より前 ──
+            int atkDie = o.attackAdd;
             DiePassives.ApplyToTerminals(env, state, o, defs, v);
+            if (o.attackAdd != atkDie) o.attackLog.Add($"賽:+{o.attackAdd - atkDie}");
 
             // ── 7. 誓約の封じ: 封じた軸の資源を足す分だけを落とす (攻撃・ブロックへ入る出目は残す) ──
             //   本体の口 (AddStatus の毒・AddEnemyBleed・Kw.AddHeat・AddCharge・consShield・会心の判定) と同じ物を落とす。
