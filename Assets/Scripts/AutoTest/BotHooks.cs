@@ -27,8 +27,15 @@ namespace AutoTest
         public static int AxisFocusBonus = 1;
 
         private static bool IsFocusItem(string id)
-            => !string.IsNullOrEmpty(AxisFocus) && !string.IsNullOrEmpty(id)
-            && ItemSystem.ItemDatabase.Instance?.GetItem(id)?.axis == AxisFocus;
+            => !string.IsNullOrEmpty(id) && InFocus(ItemSystem.ItemDatabase.Instance?.GetItem(id)?.axis);
+
+        /// <summary>軸 <paramref name="axis"/> が寄せる軸か。 <see cref="AxisFocus"/> は「、」か「,」区切りで複数の軸を書ける (2026-11-20・軸の組み合わせの測定)。</summary>
+        public static bool InFocus(string axis)
+        {
+            if (string.IsNullOrEmpty(AxisFocus) || string.IsNullOrEmpty(axis)) return false;
+            foreach (var a in AxisFocus.Split(',', '、')) if (a.Trim() == axis) return true;
+            return false;
+        }
 
         public static void Install()
         {
@@ -60,7 +67,7 @@ namespace AutoTest
                     _ => null,
                 };
                 float score = axis != null ? ItemSystem.PassiveSkills.AxisRules.Count(run, axis) : 1f;
-                if (axis != null && !string.IsNullOrEmpty(AxisFocus) && axis == AxisFocus) score += 1000f;   // [2026-11-10] 軸に寄せる方策
+                if (InFocus(axis)) score += 1000f;   // [2026-11-10] 軸に寄せる方策
                 if (score > bestScore) { bestScore = score; best = i; }
             }
             return best;

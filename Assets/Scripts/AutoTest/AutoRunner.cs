@@ -374,7 +374,7 @@ namespace AutoTest
         /// <summary>品 <paramref name="itemId"/> が <see cref="buyAxisFocus"/> の軸か (items.json の axis を読む・id の綴りは読まない)。</summary>
         private bool IsAxisFocusItem(string itemId)
             => !string.IsNullOrEmpty(buyAxisFocus) && !string.IsNullOrEmpty(itemId)
-            && ItemSystem.ItemDatabase.Instance?.GetItem(itemId)?.axis == buyAxisFocus;
+            && BotHooks.InFocus(ItemSystem.ItemDatabase.Instance?.GetItem(itemId)?.axis);   // 複数の軸は「,」区切り (BotHooks.AxisFocus と同じ値)
 
         [Header("天井AI・最大難度ルーチン")]
         [Tooltip("満点難度のSuperだけ、6層固定ショップで所持金を高分散な再入荷へ全投入する")]
