@@ -86,6 +86,7 @@ namespace AutoTest.ParallelSweep
         /// <summary>[計装 2026-11-13] 基地の版 (true = 再訪)・選んだ選択肢・起きた時の深さ 6 の航行の手番 (起きていなければ -1)・手記の最後の頁を開いたか。</summary>
         public bool ashBaseRevisit;
         public int ashBaseChoice = -1, ashBaseTurn = -1;
+        public int chainMaxDepth, chainRepeats, chainGuardHits;
         public bool ashBaseOpened;
         /// <summary>[計装 2026-11-14] 〈徒労〉の記録 (AutoRunner.RunRec と同じ意味): 掛かった通常の戦闘の勝ち・止めた品のドロップ・開けた宝箱・〈徒労〉で空だった宝箱。</summary>
         public int toilNothingBattles, toilBlockedDrops, chestsOpened, toilEmptyChests;
@@ -124,7 +125,7 @@ namespace AutoTest.ParallelSweep
                 layerFlow = r.layerFlow != null ? r.layerFlow.ToArray() : Array.Empty<int>(),
                 metaRanks = r.metaRanks ?? "",
                 startClass = r.startClass ?? "",
-                ashBase = r.ashBase, ashBaseRevisit = r.ashBaseRevisit, ashBaseChoice = r.ashBaseChoice, ashBaseTurn = r.ashBaseTurn,
+                ashBase = r.ashBase, ashBaseRevisit = r.ashBaseRevisit, ashBaseChoice = r.ashBaseChoice, chainMaxDepth = r.chainMaxDepth, chainRepeats = r.chainRepeats, chainGuardHits = r.chainGuardHits, ashBaseTurn = r.ashBaseTurn,
                 ashBaseOpened = r.ashBaseOpened,
                 toilNothingBattles = r.toilNothingBattles, toilBlockedDrops = r.toilBlockedDrops, chestsOpened = r.chestsOpened, toilEmptyChests = r.toilEmptyChests,
                 shelves = r.shelves != null ? r.shelves.ToArray() : Array.Empty<string>(), policySig = r.policySig ?? "",

@@ -278,6 +278,11 @@ namespace AutoTest
                 ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(gm.Run, _pendingGrantItemId);
             // [測定の口] 最初の賽を指定する (ADR-0015 の賽の確かめ・既定は空 = 角の取れた賽)。 乱数は引かない。
             if (!string.IsNullOrEmpty(forceStartDie) && gm.Run != null) GameLoop.EquippedDie.Equip(gm.Run, forceStartDie);
+            // [測定の口] 安全装置 ① を外すか・連鎖の計装を 0 へ (2026-11-19)
+            GameLoop.GameHooks.KeywordChainRepeat = keywordChainRepeat;
+            ItemSystem.PassiveSkills.PassiveSkillManager.ChainMaxDepth = 0;
+            ItemSystem.PassiveSkills.PassiveSkillManager.ChainRepeats = 0;
+            ItemSystem.PassiveSkills.PassiveSkillManager.ChainGuardHits = 0;
 
             // [計装 2026-11-10] 実際に入っていた整備パネルの段 (配点の指定が予算で切り詰められていないかを、 ランの記録で確かめる)
             if (_cur != null)
