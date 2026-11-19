@@ -635,7 +635,7 @@ CombatManager に預け、 プレイヤーの攻撃の直前に固定ダメ枠�
 | 計算の位置 | 式 |
 |---|---|
 | 爆発 1 回の基礎 (`Kw.BurstBase`) | `burstCritRule ? 15 + 炉温 / 2 : rinkaiBurstDamage (既定 30)` → 〈炉心の誓約〉で ×2 → `+ burstStackBonus` (〈二度詰めの雷管〉が爆発のたび +5 (2026-11-10: 旧 +6)・ターン開始時に 1/4 を失う)。 2026-11-07: 既定 50 → 30 |
-| 爆発に会心 (〈火花読みの眼鏡〉) | 主攻撃の会心の判定後、 この攻撃が爆発を使っていれば `dealtFixed += floor(爆発 × max(0, criticalMultiplier / 2 − 1))` (2026-11-10: 会心倍率の半分で乗る・旧 `criticalMultiplier − 1`) |
+| 爆発に会心 (〈火花読みの眼鏡〉) | 爆発のたびに会心の判定をし (CombatManager.LandBurst・2026-11-20)、 会心なら `+ floor(爆発 × max(0, criticalMultiplier / 2 − 1))` (2026-11-10: 会心倍率の半分で乗る・旧 `criticalMultiplier − 1`。 2026-11-20 まで主攻撃の会心に合わせて乗った) |
 | 臨界を得る (`Kw.AddHeat`) | `n + heatGainBonus` (〈焚き足しの炭〉で +1)。 閾値は 50 固定 (〈早沸かし釜〉は −15) |
 | 重ね会心 (〈重ね斬りの型〉) | 会心時、 会心率の加算合計 > 100% なら `(合計 − 100) / 100` の確率で会心倍率 +1.0 (`PassiveSkillManager`) |
 | 出血のダメージ | `ApplyBleedModifiers`: `floor(出血 × (1 + bleedDamagePct))` (〈血止め知らずの針箱〉が 血晶 × 3%) |
@@ -735,7 +735,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
 | 欠陥 | 掛かる位置 | 効果 |
 |---|---|---|
 | 〈不完全な修復〉 | `ExecuteTurnMutual` ターン終了（充電の獲得より後・次Tの消費より前） | `ConsumeHalfCharge()`（切り捨て）。**支出には計上しない** ── `ConsumeCharge` を使うと〈短絡〉と充電経済の計装が汚れる |
-| 〈不完全な起動〉 | `atkBase` 確定の直後（`GateFlaws.ApplyIgnitionCut`） | `atkBase -= floor(atkBase × IgnitionAttackCutPct)`（既定 0.12）。旧「1 端子 2 本まで」（`SanitizeWiring`）は 2026-09-14 に撤去・`SanitizeWiring` 自体も 2026-11-11 に削除 |
+| 〈不完全な起動〉 | `atkBase` 確定の直後（`GateFlaws.ApplyIgnitionCut`） | 1 撃ごとに `hitBases[h] -= floor(hitBases[h] × IgnitionAttackCutPct)`（既定 0.12・ADR-0016）。旧「1 端子 2 本まで」（`SanitizeWiring`）は 2026-09-14 に撤去・`SanitizeWiring` 自体も 2026-11-11 に削除 |
 | 〈不完全な転移〉 | `blockSum` 確定後・〈貫きの錐〉の**直後** | `blockSum -= floor(blockSum × 0.50)`。錐（敵攻撃値に比例）と違い**ブロック量に比例**するので、厚く配線した分は必ず一定割合残る。両方掛かるときは錐で削られた残りへ乗る |
 
 > 〈不完全な転移〉の 0.50 は**未計測の仮置き**。8 層ボス戦のブロック／被ダメ分布を採ってから決めること。
@@ -866,25 +866,29 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
          atkBase = 0・追撃 0 に加えて、 ApplyWinDamageModifiers の後で **主攻撃 dealtDmg = 0・会心なし**。
          (旧: ProcessDamage の damageBonus バフと OnPreDealDamage のパッシブが主攻撃へ加算し、 攻撃しないターンに 1 以上入っていた)
          役の追撃も乗せない。 攻撃端子 0 本のターンは固定ダメ枠 (反撃・出血・毒・〈虚空〉など) を通す。
-         **逃げるターンは固定ダメ枠も 0** (臨界爆発・品が預けた分を含む・爆発の予約は消費される)。 出血の DOT は別の段なので入る。
+         **逃げるターンは固定ダメ枠も 0** (品が預けた分を含む)。 出血の DOT は別の段なので入る。 臨界の爆発はその場で入る (下の「臨界」) ので逃げるターンも入る。
 
-自攻撃   atkBase   = playerAttackPower + attackSum + ctx.mutualAttackBonus
-           attackSum = 端子の結果の attackAdd + 端子調律メタ(攻撃の個数×N) + floor(chargeSum × ctx.chargeToAttackPct)
-         ctx.mutualAttackBonus には、 atkBase の直前に **ceil(attackSum × ctx.attackDicePct)** が足される
-           (2026-11-06・攻撃の端子を挿した出目への上乗せ率。 品は OnPostRoll までに AddAttackDicePct で率を積み、 ここで 1 回だけ掛ける。
-            攻撃端子 0 本なら 0。 ステータス `atkDicePct` / 〈間合〉〈一対一〉〈猛り〉など武器の段。
+自攻撃   **攻撃の端子 1 枚につき 1 撃 (ADR-0016・2026-11-20)**。 撃 h の攻撃値 hitBases[h]:
+           hitBases[h] = 端子 h の出力 + 端子の外の攻撃 (毎回に乗せる)
+             端子 h の出力 = TerminalOutcome.attackHits[h] (その端子の効果で attackAdd が増えた分・〈残響〉で 2 回発動ならその合計)
+                             + attackHitDice[h] × 端子調律メタ (挿した出目の数 × N)
+                             + ceil(その撃の端子の出力 × ctx.attackDicePct) (2026-11-06 の出目 +%・1 撃ごとに掛ける)
+             端子の外の攻撃 = playerAttackPower + ctx.mutualAttackBonus (品の攻撃 +N) + consAtk (消耗品) + relicAtk (遺物)
+           端子に紐づかない攻撃の加算は **最初の 1 撃 (h = 0) だけ** に入る:
+             連係・変圧・溜めた攻撃 (〈力溜め〉〈後の先〉)・賽の加算 (attackAdd − Σ attackHits) と floor(chargeSum × ctx.chargeToAttackPct) (〈電流〉の②)・
+             挑戦カード〈金で殴る〉(#6) の GoldPunchAttack(G) (攻撃するターンだけ・払った金 G・所持金まで)
+           (品は OnPostRoll までに AddAttackDicePct で率を積む。 攻撃端子 0 本なら 0。 ステータス `atkDicePct` / 〈間合〉〈一対一〉〈猛り〉など武器の段。
             [剣の舞] 4 種・刻みを使い切る 3 品・充電/出血/シールドの 5 品は 2026-11-10 に与ダメージ +% (`AddOutgoingPct` → outgoingDamageMultiplier) へ移した)
-         (式の上では消費の攻撃 consAtk と遺物の攻撃 relicAtk も同じ和に入る)
-         → 挑戦カード〈金で殴る〉(#6・2026-11-12): 攻撃するターンだけ、 払った金 G に対して atkBase += ChallengeCards.GoldPunchAttack(G)
-           (= floor(G × 札の値)・所持金まで・1 ターンの上限なし)。 攻撃+N の枠なので、 この後の麻痺毒の減算・〈不完全な起動〉・会心・与ダメ% ・防御がそのまま掛かる
-         → 臨界爆発 (予約消費): rinkaiBurstActive なら fixedDamageToEnemy += rinkaiBurstDamage
-           (rinkaiCritOnBurst なら forceCritical=true。消費後 false に戻す)
-         → ProcessDamage(atkBase, pursuitDamage, playerCriticalNumerator)
+           麻痺毒の減算 (playerAttackPowerPenalty) と〈不完全な起動〉も 1 撃ごと (各撃の攻撃値から引く・各撃に掛ける)。
+           atkBase = Σ hitBases (画面の倍率・計装が読む合計)。 ターンの終わりに臨界へ足す attackSum は端子の合計のまま。
+         各撃 h について (2 撃目以降は、 1 撃目の前の与ダメの池・会心倍率・会心率へ戻してから通す ── 同じ % を重ねて足さない。 固定ダメの枠も空にする):
+         → ProcessDamage(hitBases[h], h == 0 ? pursuitDamage : 0, playerCriticalNumerator)   ← 会心の判定・OnPreDealDamage / OnPostDealDamage (「攻撃が通るたび」)・敵の防御
          → ApplyWinDamageModifiers（旧勝利分岐と同一チェーン）
            その末尾 (練度不足の後・大罪:怠惰と敵の軽減パッシブの前) で **端子の別枠**:
            totalDmg = max(1, round(totalDmg × _termDamageMul))  (〈激昂〉1 + AmplifierPerPip × 出目・〈共鳴〉ResonatorMul。 _termDamageMul ≠ 1 かつ totalDmg > 0 のときだけ)
          → 物資の疲労（15% で**最終ダメージ半減**。 isCrit は落とさない）
-         → 敵HP -= dealtDmg + dealtFixed
+         → 敵HP -= 撃ごとの dealtDmg (1 撃ずつ HP へ入れ、 〈天眼の鍔〉の首落とし・ボスの目盛りを割る判定も 1 撃ごと。
+              合計が役〈追撃〉・ヴェスカの守りで変わった分は配り直す: 減った分は後ろの撃から、 増えた分は最後の撃へ) → 敵HP -= dealtFixed
          → 鋼の皮膚
          → **役の追撃**: ApplyWinDamageModifiers の直後に ApplyRoleExtraDamage (与ダメ内訳の算出後)。
            敵の〈飛翔〉〈不動〉が ProcessDamage の中で nullifyPursuitDamage を立てていれば入れない (2026-11-11 #104)
@@ -996,21 +1000,23 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
          **溜める処理は Kw.AddHeat の 1 か所** (2026-10-31 アイテム再編)。 ターン終わりに meter += attackSum、
            品が溜める分 (被弾・充電・会心・毒のダメージ・移動・開幕) はその出来事の時点で同じ関数を通る。
          meter >= rinkaiThreshold (基準50 /〈早沸かし釜〉で35) をまたいだ瞬間に爆発が決まる
-           → 次の攻撃に乗る予約 (rinkaiBurstActive=true・回数 Kw.BurstCountKey)、 meter = 0、 OnRinkaiBurst を配る。
-           〈帳簿外の爆薬〉(rinkaiMultiBurst): meter を閾値ぶんだけ減らし、 溜まっている限り同じ処理で何度でも爆発する。
-         爆発 flat = Kw.BurstBase (既定 30) × 回数 ＋ Kw.BurstBonusKey (超臨界爆発の上乗せ)。
-         **超臨界爆発 (2026-11-20・GAME.md §23-32)**: 爆発が決まった時、 閾値を引く前の meter が閾値の 2 倍以上なら超臨界。 その爆発のダメージ ×1.5 =
-           Kw.BurstBonusKey += floor(BurstBase / 2) (爆発が決まった時の BurstBase で数える)。 OnRinkaiBurst の直後に OnSuperBurst を配る。
-           出来事の間は Kw.BurstSuperKey (1/0) と Kw.BurstDamageNowKey (その爆発 1 回のダメージ) が読める。
-         **2026-11-10: 爆発を主攻撃へ返す品** (爆発そのものは増やさない・与ダメージ +% = outgoingDamageMultiplier の加算プール):
+           → **その場でダメージを出す (ADR-0016・2026-11-20・CombatManager.LandBurst)**、 meter = 0、 OnRinkaiBurst を配る。
+             旧: 次の攻撃の固定ダメの枠に乗せる予約 (rinkaiBurstActive・BurstCountKey) ── 2026-08-03 の修正の名残で理由は残っていなかった。
+           〈帳簿外の爆薬〉(rinkaiMultiBurst): meter を閾値ぶんだけ減らし、 溜まっている限り同じ処理で何度でも爆発する (1 回ごとにその場で入る)。
+         爆発 1 回の量 = Kw.BurstBase (既定 30・その時の〈二度詰めの雷管〉の上乗せ込み)、 超臨界なら + floor(BurstBase / 2)。
+           **軽減無視・倍率は乗らない** (会心・与ダメの池・敵の防御を通さない)。 最終与ダメージ倍率・大罪:怠惰・ダウンの ×1.5 は HpLossDiag.Lose (channel "臨界の爆発") が掛ける。
+           〈火花読みの眼鏡〉(burstCritRule): 爆発のたびに会心の判定 (CritRateOf・封印で外れ・forceCritical で確定) をし、 会心なら
+             + floor(爆発 × max(0, criticalMultiplier / 2 − 1)) (会心倍率の半分が乗る)。
+           遺物 (§15-5) の臨界軸: 爆発 1 回ごとに + floor(その時の敵の現在HP × N%)。
+           ターンの解決中は CombatManager の手元の HP を減らす (ターンの終わりの meter += attackSum も、 手元の HP を ctx へ書き戻す前に置く)。 解決の外は ctx の HP。
+         **超臨界爆発 (2026-11-20・GAME.md §23-32)**: 爆発が決まった時、 閾値を引く前の meter が閾値の 2 倍以上なら超臨界。 その爆発のダメージ ×1.5。
+           OnRinkaiBurst の直後に OnSuperBurst を配る。 出来事の間は Kw.BurstSuperKey (1/0) と Kw.BurstDamageNowKey (その爆発 1 回のダメージ) が読める。
+         **爆発を読む品** (爆発そのものは増やさない・与ダメージ +% = outgoingDamageMultiplier の加算プール):
            〈溢れ取りの鋳型〉: 爆発のとき、 閾値を超えた臨界 1 につき次の攻撃の与ダメージ +2% (攻撃したら使い切る・旧: 爆発 +2)。
-           〈二度目の打金〉: 爆発した次のターン、 与ダメージ +30% (旧: その爆発ダメージの半分を固定ダメ枠へ)。
-           〈荒砥〉: 爆発 1 回につき、 この戦闘中の与ダメージ +5% (積もる)。
-         **2026-08-03 修正: 爆発は atkBase ではなく fixedDamageToEnemy へ入る。**
-           旧実装は atkBase へ加算していたため、 その後の会心 ×3.0 と outgoingDamageMultiplier
-           が丸ごと乗り、 「flat 50」が実効 150〜300 になっていた。
-           固定ダメ枠へ移したことで倍率が乗らなくなった代わりに、 敵の基礎防御%も通らなくなる。
-         遺物 (§15-5) の臨界軸 (爆発時に敵の現在HP の N%) も同じ枠へ入る。
+           〈二度目の打金〉: 爆発した (Kw.BurstTurnKey) 次のターン、 与ダメージ +30%。
+           〈荒砥〉: 爆発のたび敵に出血 +2 (2026-11-20・旧: 爆発した攻撃が通ると出血 +4)。 爆発 1 回につき、 この戦闘中の与ダメージ +5% (積もる)。
+           〈爆破祭の小切手〉: 爆発のダメージそのもので敵が倒れた戦闘 (Kw.BurstKilledKey) に勝つと +4G。
+           〈柱折りの発破筒〉: 「爆発のダメージ」= その場の 1 回の量 (Kw.BurstDamageNowKey)。
 ```
 
 ### 9.3 収支トリガー（柱2 の再定義・§0 の敵視点は変わらない）
