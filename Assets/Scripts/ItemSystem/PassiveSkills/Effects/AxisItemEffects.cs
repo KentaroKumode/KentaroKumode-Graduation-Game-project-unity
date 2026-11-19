@@ -377,7 +377,8 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>火花読みの眼鏡 (②【規則】): 爆発に会心が**会心倍率の半分**で乗る (2026-11-10: 旧 会心倍率そのまま・倍率が 2 以下なら増えない)。 代わりに爆発の基礎が 30 から「15 + 炉温の半分」になる (Kw.BurstBase)。</summary>
+    /// <summary>火花読みの眼鏡 (②【規則】): 爆発のたびに会心の判定をし、 会心なら**会心倍率の半分**が乗る (CombatManager.LandBurst・2026-11-20 ADR-0016: 旧 主攻撃の会心に合わせて乗った。
+    /// 2026-11-10: 旧 会心倍率そのまま・倍率が 2 以下なら増えない)。 代わりに爆発の基礎が 30 から「15 + 炉温の半分」になる (Kw.BurstBase)。</summary>
     public class SparkReadingGlasses : IPassiveSkillEffect
     {
         public string SkillId => "火花読みの眼鏡";

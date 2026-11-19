@@ -562,11 +562,6 @@ namespace ItemSystem.PassiveSkills
         /// 閾値 (RinkaiThreshold 基準50、LowerThreshold で下がる) 到達で 次T の攻撃に爆発ボーナス +RinkaiBurstDamage を付与し、0リセット。
         /// パッシブ「連鎖爆発」で爆発T会心確定、「不朽の熱」で致命耐え、「余熱」で爆発後20残し、等の派生あり。</summary>
         public int rinkaiMeter;
-        /// <summary>[persistent] 臨界爆発が予約されているか (前Tに meter 閾値到達で set)。
-        /// ProcessDamage が finalDamage += RinkaiBurstDamage を適用してから false に戻す。
-        /// 攻撃機会のない T (自撃破後等) を跨いでも予約は残る = 持続扱い。</summary>
-        public bool rinkaiBurstActive;
-
         /// <summary>[persistent] 直近ターンにプレイヤーが与えた総ダメージ。
         /// オーバーロードの発動判断 (「倍にすれば倒し切れるか」) にだけ使う。
         /// ctx は戦闘ごとに作り直されるので戦闘跨ぎでは残らない。</summary>
@@ -639,7 +634,7 @@ namespace ItemSystem.PassiveSkills
         public float bleedDamagePct;
         /// <summary>[persistent] 臨界を得るたびの上乗せ (Kw.AddHeat)。 〈炉温〉の①。</summary>
         public int heatGainBonus;
-        /// <summary>[persistent] 〈炉温〉の②: 爆発に会心が乗る。 代わりに爆発の基礎が 15 + 炉温 / 2。</summary>
+        /// <summary>[persistent] 〈炉温〉の②: 爆発のたびに会心の判定をし、 会心なら会心倍率の半分が乗る (CombatManager.LandBurst)。 代わりに爆発の基礎が 15 + 炉温 / 2。</summary>
         public bool burstCritRule;
         /// <summary>[persistent] 〈炉心の誓約〉: 爆発の基礎が 2 倍。</summary>
         public bool burstDoubled;

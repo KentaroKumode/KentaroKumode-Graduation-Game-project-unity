@@ -170,18 +170,19 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>二度目の打金: 爆発した次のターン、 与ダメージ +30%。
-    /// 2026-11-10: 旧「爆発した次のターンも、 追加ダメージの半分が乗る」(爆発の残響 = 固定ダメ枠) から主攻撃へ返す形に変えた。</summary>
+    /// 2026-11-10: 旧「爆発した次のターンも、 追加ダメージの半分が乗る」(爆発の残響 = 固定ダメ枠) から主攻撃へ返す形に変えた。
+    /// 2026-11-20 (ADR-0016): 爆発がその場でダメージを出すようになったので、 「爆発を攻撃で使ったターン」ではなく「爆発したターン」を読む。</summary>
     public class SecondStrike : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "二度目の打金";
         /// <summary>秘宝の列 (#320) の見え方。</summary>
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(Rw.Count(ctx, Kw.BurstAppliedTurnKey) > 0 && (Rw.Count(ctx, Kw.BurstAppliedTurnKey) == ctx.currentTurn || Rw.Count(ctx, Kw.BurstAppliedTurnKey) == ctx.currentTurn - 1));
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(Rw.Count(ctx, Kw.BurstTurnKey) > 0 && (Rw.Count(ctx, Kw.BurstTurnKey) == ctx.currentTurn || Rw.Count(ctx, Kw.BurstTurnKey) == ctx.currentTurn - 1));
         public const float Pct = 0.30f;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnPostRoll };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (t == PassiveSkillTrigger.OnBattleStart) { Kw.EnableHeat(ctx); return; }
-            int turn = Rw.Count(ctx, Kw.BurstAppliedTurnKey);
+            int turn = Rw.Count(ctx, Kw.BurstTurnKey);
             if (turn <= 0 || turn != ctx.currentTurn - 1) return;
             ctx.AddOutgoingPct(Pct);
         }
@@ -237,8 +238,9 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>荒砥: 爆発した攻撃が通ると敵に出血 +4。 爆発 1 回につき、 この戦闘中の与ダメージ +5% (積もる・上限なし)。
-    /// 2026-11-10: 「攻撃が通るたび臨界 +3」を与ダメージへ差し替えた (爆発が主攻撃へ返る口)。</summary>
+    /// <summary>荒砥: 爆発のたび、 敵に出血 +2。 爆発 1 回につき、 この戦闘中の与ダメージ +5% (積もる・上限なし)。
+    /// 2026-11-10: 「攻撃が通るたび臨界 +3」を与ダメージへ差し替えた (爆発が主攻撃へ返る口)。
+    /// 2026-11-20 (ADR-0016): 旧「爆発した攻撃が通ると出血 +4」→ 爆発がその場でダメージを出すようになったので「爆発のたび出血 +2」。</summary>
     public class RoughWhetstone : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "荒砥";
@@ -247,15 +249,18 @@ namespace ItemSystem.PassiveSkills.Effects
         public const float PctPerBurst = 0.05f;
         /// <summary>[persistent・戦闘開始で 0] 積もった与ダメージの率。</summary>
         public const string PctKey = "rw.aratoPct";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnRinkaiBurst,
-                                                         PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnPostDealDamage };
+        public const int BleedPerBurst = 2;
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnRinkaiBurst, PassiveSkillTrigger.OnPostRoll };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (t == PassiveSkillTrigger.OnBattleStart) { Kw.EnableHeat(ctx); ctx.accumulatedValues[PctKey] = 0f; return; }
-            if (t == PassiveSkillTrigger.OnRinkaiBurst) { ctx.accumulatedValues[PctKey] = ctx.GetAccumulated(PctKey) + PctPerBurst; return; }
-            if (t == PassiveSkillTrigger.OnPostRoll) { ctx.AddOutgoingPct(ctx.GetAccumulated(PctKey)); return; }
-            if (!ctx.playerWonRoll || Rw.Count(ctx, Kw.BurstThisAttackKey) <= 0) return;
-            ctx.AddEnemyBleed(4);
+            if (t == PassiveSkillTrigger.OnRinkaiBurst)
+            {
+                ctx.accumulatedValues[PctKey] = ctx.GetAccumulated(PctKey) + PctPerBurst;
+                ctx.AddEnemyBleed(BleedPerBurst);
+                return;
+            }
+            ctx.AddOutgoingPct(ctx.GetAccumulated(PctKey));   // OnPostRoll
         }
     }
 
@@ -928,7 +933,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>爆破祭の小切手: 臨界の爆発でとどめを刺すたび +4G。</summary>
+    /// <summary>爆破祭の小切手: 臨界の爆発でとどめを刺すたび +4G。 2026-11-20 (ADR-0016): 爆発のダメージそのもので敵が倒れた戦闘 (Kw.BurstKilledKey)。</summary>
     public class BlastPrize : IPassiveSkillEffect
     {
         public string SkillId => "爆破祭の小切手";
@@ -936,7 +941,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (t == PassiveSkillTrigger.OnBattleStart) { Kw.EnableHeat(ctx); return; }
-            if (Rw.Won(ctx) && Rw.Count(ctx, Kw.BurstThisAttackKey) > 0) Rw.Gold(4, SkillId);
+            if (Rw.Won(ctx) && Rw.Count(ctx, Kw.BurstKilledKey) > 0) Rw.Gold(4, SkillId);
         }
     }
 

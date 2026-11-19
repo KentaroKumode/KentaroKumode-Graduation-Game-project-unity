@@ -245,6 +245,39 @@ namespace CombatSystem
         ///   - シールドは通常ダメージから先に吸い、 余れば固定ダメージも吸う。
         ///     吸収量は反射（返しの盾/不落の城盾）の原資として記録する。
         /// </summary>
+        /// <summary>臨界の爆発 1 回のダメージをその場で入れる (ADR-0016・Kw.AddHeat の中から呼ばれる)。 軽減無視 (会心・与ダメの池・防御は乗らない。
+        /// 最終与ダメージ倍率・怠惰・ダウンの ×1.5 は HpLossDiag.Lose が掛ける)。 <paramref name="burstDmg"/> = 爆発 1 回の量 (Kw.BurstBase・超臨界なら ×1.5)。
+        /// 〈火花読みの眼鏡〉(burstCritRule) なら爆発ごとに会心の判定をし、 会心なら会心倍率の半分が乗る。
+        /// 遺物 (§15-5) 臨界の「爆発時に敵の現在 HP の N%」も 1 回ごとに足す (現在 HP 比なので自己減衰し、 撃破には届かない)。
+        /// ターンの解決中は手元の HP (enemyHP)、 それ以外は ctx の HP を減らす。 戻り値 = この爆発で敵が倒れた。</summary>
+        public bool LandBurst(ItemSystem.PassiveSkills.CombatContext ctx, int burstDmg)
+        {
+            if (ctx == null || burstDmg <= 0 || !isCombatActive) return false;
+            bool resolving = ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.ResolvingKey) > 0;
+            int hp = resolving ? enemyHP : ctx.enemyCurrentHP;
+            if (hp <= 0) return false;
+            int dmg = burstDmg;
+            bool crit = false;
+            if (ctx.burstCritRule)
+            {
+                int n = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.BurstTotalKey);
+                // 本判定と同じ優先順 (ApplyRoleExtraDamage と同じ): 封印 (無心の刃) で外れ、 forceCritical が最後に確定で上書きする
+                crit = (!ctx.critSuppressed && GameLoop.GameRng.Chance(CritRateOf(ctx, pendingBuff: false), "combat.burstCrit", RngIdx(50 + n % 50)))
+                    || ctx.forceCritical;
+                if (crit) dmg += Mathf.FloorToInt(burstDmg * Math.Max(0f, ctx.criticalMultiplier / 2f - 1f));
+            }
+            float rinPct = MetaProgression.Relics.RelicApplicator.GetRinkaiCurrentHpPct(GameLoop.GameManager.Instance?.Run, ctx);
+            int relicBurst = rinPct > 0f ? Mathf.FloorToInt(hp * rinPct) : 0;
+            // [測定用の物差し 2026-11-10] 入る量だけに掛ける
+            int landed = EnemyHpLedger.ProbePassive(dmg) + EnemyHpLedger.ProbePassive(relicBurst);
+            int before = hp;
+            HpLossDiag.Lose(ref hp, landed, "臨界の爆発");
+            CombatStats.DamageBreakdown[22] += before - hp;   // [計装] 臨界の爆発
+            if (resolving) enemyHP = hp; else ctx.enemyCurrentHP = hp;
+            Debug.Log($"[臨界爆発] {burstDmg}{(crit ? $" 会心 → {dmg}" : "")}{(relicBurst > 0 ? $" ＋遺物 {relicBurst} (現在HP {before} の {rinPct:P0})" : "")} → 敵HP {hp}");
+            return hp <= 0;
+        }
+
         private void ApplyVescaDefense(ItemSystem.PassiveSkills.CombatContext ctx,
                                        ref int dealtDmg, ref int dealtFixed)
         {
@@ -1058,45 +1091,7 @@ namespace CombatSystem
                     Debug.Log($"[不完全な起動] 出力不足 atkBase {beforeIg} → {atkBase}");
             }
 
-            // 臨界爆発の予約消費 (臨界が閾値に達した時点で予約される・Kw.AddHeat)
-            ctx.accumulatedValues[ItemSystem.PassiveSkills.Keywords.Kw.BurstThisAttackKey] = 0;
-            if (ctx.rinkaiBurstActive)
-            {
-                // **atkBase に足さない (2026-08-03 修正)。**
-                //   旧実装は atkBase へ加算していたため、 その後の会心 ×3.0 と
-                //   outgoingDamageMultiplier が丸ごと乗り、 「flat 50」のつもりの数字が
-                //   実効 150〜300 になっていた。
-                //   §9.2 の「爆発 flat」という設計意図どおり、 倍率の乗らない
-                //   fixedDamageToEnemy (軽減無視の固定ダメ枠) へ回す。
-                // 〈帳簿外の爆薬〉で同じターンに何度も爆発したら、 その回数ぶん乗る。 超臨界爆発の ×1.5 の分 (基礎の半分・2026-11-20) は Kw.BurstBonusKey。
-                int burstN = Math.Max(1, (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.BurstCountKey));
-                int burstBonus = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.BurstBonusKey);
-                int burstDmg = ItemSystem.PassiveSkills.Keywords.Kw.BurstBase(ctx) * burstN + burstBonus;
-                // [測定用の物差し 2026-11-10] 入る量だけに掛ける (BurstAppliedDmgKey = 〈二度目の打金〉の元は素の量のまま)
-                int burstLanded = EnemyHpLedger.ProbePassive(burstDmg);
-                ctx.fixedDamageToEnemy += burstLanded;
-                ctx.accumulatedValues[ItemSystem.PassiveSkills.Keywords.Kw.BurstCountKey] = 0;
-                ctx.accumulatedValues[ItemSystem.PassiveSkills.Keywords.Kw.BurstBonusKey] = 0;
-                ctx.accumulatedValues[ItemSystem.PassiveSkills.Keywords.Kw.BurstThisAttackKey] = 1;
-                ctx.accumulatedValues[ItemSystem.PassiveSkills.Keywords.Kw.BurstAppliedTurnKey] = ctx.currentTurn;
-                ctx.accumulatedValues[ItemSystem.PassiveSkills.Keywords.Kw.BurstAppliedDmgKey] = burstDmg;
-                // 遺物 (§15-5) 臨界: 爆発時に **敵の現在HP** の N% を上乗せする。
-                //   最大HP 比だと削っても威力が落ちず、 1 戦闘 8 回の爆発で合計が最大HP の
-                //   180% に達して遺物 1 個でボスを 2 回殺せる量になった (§24)。
-                //   現在HP 比なら自己減衰し、 撃破もできない (漸近するだけ)。
-                //   **これも固定ダメ枠へ。** 旧実装は atkBase 経由だったので同じ二重取りをしていた。
-                float rinPct = MetaProgression.Relics.RelicApplicator
-                               .GetRinkaiCurrentHpPct(GameLoop.GameManager.Instance?.Run, ctx);
-                int relicBurst = rinPct > 0f && ctx.enemyCurrentHP > 0
-                               ? Mathf.FloorToInt(ctx.enemyCurrentHP * rinPct) : 0;
-                relicBurst = EnemyHpLedger.ProbePassive(relicBurst);   // [測定用の物差し]
-                if (relicBurst > 0) ctx.fixedDamageToEnemy += relicBurst;
-                CombatStats.DamageBreakdown[22] += burstLanded + relicBurst;   // [計装] 臨界の爆発
-                EnemyHpLedger.NoteBurstIntoFixed(burstLanded + relicBurst);
-                ctx.rinkaiBurstActive = false;
-                Debug.Log($"[臨界爆発] ×{burstN} 固定ダメ +{burstDmg}"
-                    + (relicBurst > 0 ? $" ＋遺物 {relicBurst} (現在HP {ctx.enemyCurrentHP} の {rinPct:P0})" : ""));
-            }
+            // (臨界の爆発は閾値に届いたその場でダメージを出す ── ADR-0016・LandBurst。 旧: ここで次の攻撃の固定ダメの枠へ入れていた)
             // 品がここまでに預けた敵へのダメージは、 この攻撃の固定ダメ枠で通す (Kw.DamageEnemy)。
             ctx.fixedDamageToEnemy += ItemSystem.PassiveSkills.Keywords.Kw.TakePendingEnemyDamage(ctx);
             // [診断] この呼び出しだけが「プレイヤー勝利の主攻撃」。 段別計測はここでのみ積む。
@@ -1145,18 +1140,6 @@ namespace CombatSystem
             EnemyHpLedger.CommitMainMitigation(!skipAttack);   // [計装] 主攻撃の防御・敵の軽減で削った量
             if (isCrit) ctx.accumulatedValues[MetaProgression.Relics.RelicApplicator.ShinganCritKey] = 1f;   // 遺物 心眼 3 個 (次のターンの会心率)
             if (_fleeRequested) dealtFixed = 0;
-            // 〈炉温〉の②: この攻撃の爆発に会心が乗る (爆発は固定ダメ枠なので、 会心の判定が済んだここで差分を足す)。
-            if (ctx.burstCritRule && isCrit && !_fleeRequested
-                && ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.BurstThisAttackKey) > 0)
-            {
-                int burstApplied = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.BurstAppliedDmgKey);
-                // 2026-11-10: 爆発に乗る会心は会心倍率の半分 ((基礎 + 追加) / 2)。 倍率 3.0 なら爆発 ×1.5。
-                int critExtra = Mathf.FloorToInt(burstApplied * Math.Max(0f, ctx.criticalMultiplier / 2f - 1f));
-                critExtra = EnemyHpLedger.ProbePassive(critExtra);   // [測定用の物差し] 爆発の会心の上乗せも爆発の量
-                dealtFixed += critExtra;
-                CombatStats.DamageBreakdown[22] += critExtra;   // [計装] 臨界の爆発
-                EnemyHpLedger.NoteBurstIntoFixed(critExtra);
-            }
             // 敵の〈飛翔〉〈不動〉「追撃ダメージを受けない」: 上の ProcessDamage の中で敵の OnPrePursuitDamage が立てる (2026-11-11 #104)。
             //   いまの「追撃」のダメージは役〈追撃〉の追加ダメージだけなので、 それを入れない。
             if (!skipAttack && ctx.nullifyPursuitDamage && roleOutcome.extraDamageRatio > 0f)
@@ -1218,8 +1201,7 @@ namespace CombatSystem
                     BossDmgDiag.AddSpike(
                         $"{(currentEnemy != null ? currentEnemy.displayName : ctx.bossId)} T{ctx.currentTurn} "
                       + $"主{dealtDmg} 固{dealtFixed} | crit={isCrit} critMul={ctx.criticalMultiplier:F2} "
-                      + $"outMul={ctx.outgoingDamageMultiplier:F2} 臨界burst={ctx.rinkaiBurstActive} "
-                      + $"burstDmg={ctx.rinkaiBurstDamage} 脆弱={ctx.enemyVulnerabilityMultiplier:F2} "
+                      + $"outMul={ctx.outgoingDamageMultiplier:F2} burstDmg={ctx.rinkaiBurstDamage} 脆弱={ctx.enemyVulnerabilityMultiplier:F2} "
                       + $"armorPen={ctx.playerArmorPen} 敵防御={ctx.enemyDefense} 画竜={ctx.garyoProc} "
                       + $"atkDice={(int)ctx.GetAccumulated("mutualAttackDiceCount")} "
                       + $"pRoll={ctx.playerDiceTotal} 武器={GameLoop.GameManager.Instance?.Run?.equippedWeaponId}");
@@ -1659,6 +1641,12 @@ namespace CombatSystem
             //   1 回目を敵攻撃より前に置くのは、 致死打で `enemyHP > 0` が落ちて
             //   **ヴェスカがそのターンを丸ごと飛ばす**のを防ぐため (踏みとどまった以上は殴り返す)。
             //   よってこの 2 点セットで 1 ターン分を覆う。 ClampToThreshold は冪等。
+            // --- 臨界メーター (Rinkai) 更新 ---
+            //   攻撃端子の出目の合計を溜める。 閾値をまたいだらその場で爆発のダメージが入る (Kw.AddHeat → LandBurst・ADR-0016)。
+            //   品が溜める分 (被弾・充電・会心など) は、 それぞれの出来事の時点で Kw.AddHeat を通る。
+            //   **手元の HP を ctx へ書き戻す前 (解決中) に置く** ── 書き戻しの後だと爆発で減らした ctx の HP が上書きされて消える。
+            if (ctx.rinkaiThreshold > 0 && attackSum > 0)
+                ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, attackSum, "ターンの終わり(攻撃の端子の合計)");
             // 攻撃の後に品が預けた敵へのダメージ (Kw.DamageEnemy) をここで通す。 踏みとどまりの clamp より前。
             {
                 int pendingKw = ItemSystem.PassiveSkills.Keywords.Kw.TakePendingEnemyDamage(ctx);
@@ -1678,12 +1666,6 @@ namespace CombatSystem
             AccumulateRunCombatTotals(ctx);
             CombatStats.RecordTurn(ctx, attackDiceCount, blockDiceCount, chargeDiceCount, blockSum, enemyAtkValue);
             EnemyHpLedger.NoteWiring(attackDiceCount, blockDiceCount, chargeDiceCount);   // [計装 2026-11-10] 戦闘ごとの配線の集計
-
-            // --- 臨界メーター (Rinkai) 更新 ---
-            //   攻撃端子の出目の合計を溜める。 閾値をまたいだ時点で爆発が決まり、 次の攻撃に乗る (Kw.AddHeat)。
-            //   品が溜める分 (被弾・充電・会心など) は、 それぞれの出来事の時点で Kw.AddHeat を通る。
-            if (ctx.rinkaiThreshold > 0 && attackSum > 0)
-                ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, attackSum, "ターンの終わり(攻撃の端子の合計)");
 
             // --- 収支トリガー (柱2: OnRollWin/Lose の再定義 = 収支±のターン。解決後に発火) ---
             int balance = (dealtDmg + dealtFixed) - takenApplied;
