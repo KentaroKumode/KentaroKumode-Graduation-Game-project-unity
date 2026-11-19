@@ -706,6 +706,11 @@ static class T
             var w = new BossDownState(); w.Reset(NN);
             bool wa = w.NoteTurnEndCracks(740, M, 3, 0, false, out _) == 1 && w.BeginTurn() && !w.downWeakNow;
             Check(wa, "downCrackWeak=False: ひびで割れたダウンも被ダメ ×1.5 (満額)");
+            // 〈骨溶かしの黒油〉(2026-11-20): 毒のターンに入った強いひびは割れても満額・次のひび (毒なし) は弱いまま
+            var bo = new BossDownState(); bo.Reset(NN);
+            bool boa = bo.NoteTurnEndCracks(740, M, 3, 0, true, out _, strongNew: true) == 1 && bo.BeginTurn() && !bo.downWeakNow
+                    && bo.NoteTurnEndCracks(480, M, 4, 0, true, out _) == 1 && bo.BeginTurn() && bo.downWeakNow;
+            Check(boa, "〈骨溶かしの黒油〉: 毒のターンのひびは割れても満額のダウン・毒の無いターンのひびは弱いダウン");
             // 1 回の主攻撃で 2 つまたぐ → 2 ターン続けて満額のダウン / 通常攻撃 → ひびの順に積む
             var t2 = new BossDownState(); t2.Reset(NN);
             bool two = t2.NoteMainHit(400, M, 600, 1, out _, out _) == 2 && t2.BeginTurn() && !t2.downWeakNow && t2.BeginTurn() && !t2.downWeakNow && !t2.BeginTurn();

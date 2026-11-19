@@ -260,6 +260,7 @@ namespace ItemSystem.PassiveSkills
             // 軸の締めの LEGENDARY (2026-11-20・AxisItemEffects3.cs・GAME.md §23-32)
             Register(new DeathMaskVisor());
             Register(new ReturningBloodSickle()); Register(new BloodWedge());
+            Register(new CorrosionCrown()); Register(new BoneMeltOil());
 
             // ============================
             //  汎用パッシブ

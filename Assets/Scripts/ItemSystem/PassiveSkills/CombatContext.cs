@@ -871,6 +871,7 @@ namespace ItemSystem.PassiveSkills
             var dict = target == StatusTarget.Enemy ? enemyStatusStacks : playerStatusStacks;
             int cur = dict.TryGetValue(id, out var v) ? v : 0;
             int max = StatusRegistry.Defs.TryGetValue(id, out var def) ? def.maxStacks : int.MaxValue;
+            if (poisonCapRemoved && target == StatusTarget.Enemy && id == "poison") max = int.MaxValue;   // 〈腐蝕の王冠〉(2026-11-20)
             int next = System.Math.Max(0, System.Math.Min(max, cur + stacks));
             dict[id] = next;
             if (target == StatusTarget.Enemy && id == "poison" && stacks > 0)   // [計装 2026-11-05] 毒の付与量を出どころ別に
