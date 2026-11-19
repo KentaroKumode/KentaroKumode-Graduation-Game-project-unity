@@ -257,6 +257,8 @@ namespace ItemSystem.PassiveSkills
             Register(new AcidVial()); Register(new NeedleRing()); Register(new LeafMoldBag());
             Register(new MiasmaMantle()); Register(new PoolKeeper());
             Register(new RivetPlate()); Register(new CatchBracer()); Register(new LayeredTagShield()); Register(new BrokenShieldGrudge());
+            // 軸の締めの LEGENDARY (2026-11-20・AxisItemEffects3.cs・GAME.md §23-32)
+            Register(new DeathMaskVisor());
 
             // ============================
             //  汎用パッシブ
