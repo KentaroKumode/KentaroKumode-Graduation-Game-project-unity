@@ -800,6 +800,11 @@ namespace CombatSystem
 
             // 端子の山札: 合計も個数も端子の結果から (出目をそのまま足さない ── 端子ごとに入る量が違う)
             int attackSum = term.attackAdd, blockSum = term.blockAdd, chargeSum = term.chargeAdd;
+            if (attackSum > AttackSumMax)      // [計装 2026-11-19] ランの中で最大の攻撃の端子の合計の内訳
+            {
+                AttackSumMax = attackSum;
+                AttackSumMaxInfo = $"T{ctx.currentTurn} 合計 {attackSum} = " + string.Join(" + ", term.attackLog) + $" (目 {string.Join(",", playerDice)}・場 {string.Join("/", _deck.board)})";
+            }
             int attackDiceCount = term.attackDice, blockDiceCount = term.blockDice, chargeDiceCount = term.chargeDice;
             // 既存の品が読む「特殊に挿した個数」(MutualKeys.SpecialDiceCount) = 補助の端子に挿した個数
             int specialCount = term.supportDice;

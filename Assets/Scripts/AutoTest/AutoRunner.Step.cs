@@ -286,6 +286,8 @@ namespace AutoTest
             ItemSystem.PassiveSkills.PassiveSkillManager.ChainDeepestPath = "";
             ItemSystem.PassiveSkills.Keywords.Kw.HeatMaxBurstsOneAdd = 0;
             ItemSystem.PassiveSkills.Keywords.Kw.HeatMaxBurstsInfo = "";
+            CombatSystem.CombatManager.AttackSumMax = 0;
+            CombatSystem.CombatManager.AttackSumMaxInfo = "";
 
             // [計装 2026-11-10] 実際に入っていた整備パネルの段 (配点の指定が予算で切り詰められていないかを、 ランの記録で確かめる)
             if (_cur != null)

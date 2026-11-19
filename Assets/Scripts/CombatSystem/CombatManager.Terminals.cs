@@ -11,6 +11,9 @@ namespace CombatSystem
     {
         /// <summary>この戦闘の山札。 戦闘の始め (<see cref="BeginTerminalDeck"/>) に必ず作る (最初の戦闘の前だけ null)。</summary>
         private TerminalDeckState _deck;
+        /// <summary>[計装 2026-11-19] ランの中で最大の攻撃の端子の合計と、 その内訳。 BOT がランの始めに空にする。</summary>
+        public static int AttackSumMax;
+        public static string AttackSumMaxInfo = "";
         /// <summary>このターンの敵の出目 (夜番の賽が読む・ロールの直後に入れる)。</summary>
         private int[] _enemyDiceNow;
         /// <summary>このターンの端子の結果 (配線の前は null)。</summary>
