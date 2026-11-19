@@ -227,7 +227,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>雷鳴の太鼓: 電流 1 につき充電の上限 +3 (2026-11-07: 旧 +2)。</summary>
+    /// <summary>雷鳴の太鼓: 電流 1 につき充電の上限 +2 (2026-11-19: +3 → +2・〈雷壷〉と掛け合わさって充電が 150 まで溜まった)。</summary>
     public class ThunderDrum : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "雷鳴の太鼓";
@@ -235,7 +235,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.AxisDepth(AxisRules.Charge) > 0);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-            => ctx.chargeCapBonus = System.Math.Max(ctx.chargeCapBonus, 3 * ctx.AxisDepth(AxisRules.Charge));
+            => ctx.chargeCapBonus = System.Math.Max(ctx.chargeCapBonus, 2 * ctx.AxisDepth(AxisRules.Charge));
     }
 
     // ============================================================

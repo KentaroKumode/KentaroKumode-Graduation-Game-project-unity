@@ -383,7 +383,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>雷壷【規則】: 充電の上限が無くなる。 代わりにターン開始時、 上限を超えている分の半分が捨てられる。</summary>
+    /// <summary>雷壷【規則】: 充電の上限が無くなる。 代わりにターン開始時、 上限を超えている分の 75% が捨てられる。</summary>
     public class ThunderJar : IPassiveSkillEffect
     {
         public string SkillId => "雷壷";

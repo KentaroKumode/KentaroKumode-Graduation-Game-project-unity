@@ -579,7 +579,7 @@ namespace ItemSystem.PassiveSkills
         // ---- 規則の品 (2026-10-31 アイテム再編)。 どれも戦闘開始時に品が立てる [persistent] ----
         /// <summary>[persistent] 〈帳簿外の爆薬〉: 爆発で臨界を 0 にせず閾値ぶんだけ減らし、 溜まっている限り何度でも爆発する。</summary>
         public bool rinkaiMultiBurst;
-        /// <summary>[persistent] 〈雷壷〉: 充電の上限が無くなる。 代わりにターン開始時、 上限を超えている分の半分が捨てられる (過充電)。</summary>
+        /// <summary>[persistent] 〈雷壷〉: 充電の上限が無くなる。 代わりにターン開始時、 上限を超えている分の 75% が捨てられる (過充電)。</summary>
         public bool chargeCapRemoved;
         /// <summary>[persistent] 〈脈なしの鋼心臓〉: シールドがターン開始時に半減しない。</summary>
         public bool shieldNoHalve;
@@ -1165,14 +1165,14 @@ namespace ItemSystem.PassiveSkills
                 _consShield -= lost;
                 Keywords.Kw.Raise(this, PassiveSkillTrigger.OnShieldDecay, lost);
             }
-            // 〈雷壷〉: 上限を超えている充電の半分 (切り捨て) を捨てる。 捨てた分は過充電として配る。
+            // 〈雷壷〉: 上限を超えている充電の 75% (切り捨て・2026-11-19 半分 → 75%) を捨てる。 捨てた分は過充電として配る。
             if (chargeCapRemoved)
             {
                 int cap = ChargeCap;
                 int ch = GetCharge();
                 if (ch > cap)
                 {
-                    int leak = (ch - cap) / 2;
+                    int leak = (ch - cap) * 3 / 4;
                     if (leak > 0)
                     {
                         accumulatedValues["mutualCharge"] = ch - leak;
@@ -1311,7 +1311,7 @@ namespace ItemSystem.PassiveSkills
             if (n <= 0 || chargeSealed) return;   // 誓約で封じた
             if (chargeDoubled) n *= 2;
             int cur = GetCharge();
-            // 〈雷壷〉は上限を外す (超えた分はターン開始時に半分捨てる・BeginNewTurn の Phase C)。
+            // 〈雷壷〉は上限を外す (超えた分はターン開始時に 75% 捨てる・BeginNewTurn の Phase C)。
             int cap = chargeCapRemoved ? int.MaxValue : ChargeCap;
             int next = (int)System.Math.Min((long)cap, (long)cur + n);
             // [計装] 充電経済。 **上限で捨てられた分**を分けて数える ── 収入が支出を上回って
