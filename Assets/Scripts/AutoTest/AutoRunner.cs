@@ -256,8 +256,6 @@ namespace AutoTest
         /// <summary>[測定の口・2026-11-18] 最初に持つ賽を指定する (ADR-0015 の賽 20 種の確かめ)。 空 = 製品と同じ (角の取れた賽)。
         /// ゲームの数値ではない・乱数は引かない。 v3_queue の腕で <c>forceStartDie=逆巻きの賽</c> のように渡す。</summary>
         public string forceStartDie = "";
-        /// <summary>[測定の口・2026-11-19] true = 安全装置 ① を外す (GameHooks.KeywordChainRepeat)。 既定 false。 乱数は引かない。</summary>
-        public bool keywordChainRepeat = false;
         /// <summary>[測定 2026-11-18・同上] 嵐の航行の道選び (<see cref="StormNavView.StormStep"/>) が、 第 4 層 (深さ 6) で道すがらの戦闘の点 (行き先でない・未起動の通常・精鋭・種別の見えていない点)
         /// を「その戦闘で失う HP の見込み (学習の戦闘名か種類の平均 × 最大 HP) × この倍率」だけ費用に入れる (着いた点は必ず起動するので、 道順は「どのマスを踏むか」)。 0 = 使わない = 既定。 乱数は引かない。</summary>
         public float navD6PathFightCost = 0f;

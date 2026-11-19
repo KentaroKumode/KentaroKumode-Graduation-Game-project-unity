@@ -147,9 +147,6 @@ namespace GameLoop
         /// (攻撃の端子に出目を挿したターンの、 主攻撃までの撃破だけ・ターン終了時の撃破には配らない)。 既定 false = 説明文どおり、 撃破の経路を問わない。
         /// AutoRunner.terminalKillNeedsAttack が毎ランの始めに入れ、 ラン終了で false へ戻す。</summary>
         public static bool TerminalKillBonusNeedsAttack;
-        /// <summary>[測定 2026-11-19] true = 安全装置 ① (同じ品は 1 つの連鎖で 1 度だけ・PassiveSkillManager.RaiseKeyword) を外す。 既定 false = 今の決まり。
-        /// 「品の側の制限だけで輪が止まるか」を確かめるための口。 AutoRunner.keywordChainRepeat が毎ランの始めに入れる。</summary>
-        public static bool KeywordChainRepeat;
         /// <summary>[測定 2026-11-13] 手札の規則 (<see cref="CombatSystem.HandCarryMode"/>・GAME.md §6-4)。 既定 Pick = 残す印を付けた端子だけ残る。
         /// Off = 旧い規則 (全部捨てる・印の仕組みも無い・〈有効活用〉は旧い〈保持器〉の動き) / All = 挿さなかった端子は全部残る (測定用)。
         /// AutoRunner.handCarry が毎ランの始めに入れ、 ラン終了で Pick へ戻す。</summary>

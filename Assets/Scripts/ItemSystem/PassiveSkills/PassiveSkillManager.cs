@@ -422,7 +422,7 @@ namespace ItemSystem.PassiveSkills
         /// <summary>連鎖の深さと、 この連鎖で既に働いた品 (2026-10-31 アイテム再編)。</summary>
         private int _kwDepth;
         private readonly HashSet<string> _kwFired = new HashSet<string>();
-        /// <summary>[計装 2026-11-19] 連鎖の深さの最大 / 同じ品が 1 つの連鎖で 2 度以上働いた回数 (① を外した時だけ数える) / 網に掛かった回数。 BOT がランの始めに 0 へ戻す。</summary>
+        /// <summary>[計装 2026-11-19] 連鎖の深さの最大 / 同じ品が 1 つの連鎖で 2 度以上働いた回数 / 網に掛かった回数。 BOT がランの始めに 0 へ戻す。</summary>
         public static int ChainMaxDepth, ChainRepeats, ChainGuardHits;
         /// <summary>[計装 2026-11-19] いちばん深くなった時の並び (「出来事:品(量) → …」)。 BOT がランの始めに空にする。</summary>
         public static string ChainDeepestPath = "";
@@ -432,9 +432,9 @@ namespace ItemSystem.PassiveSkills
 
         /// <summary>キーワードの出来事を配る。 量は <see cref="Keywords.Kw.EventAmount"/> で読める。
         ///
-        /// <para><b>1 つの出来事から続く一続き (連鎖) の中では、 同じ品は 1 度しか働かない。</b>
-        /// 出来事の処理中に起きた出来事は同じ連鎖として数え、 いちばん外の出来事が終わったら数え直す。
-        /// これが無いと「爆発 → 充電 → 臨界 → 爆発」のような輪が 1 拍の中で回り続ける。</para></summary>
+        /// <para>同じ品が 1 つの連鎖で何度働いてもよい (2026-11-19・作者の決定で旧い決まり「同じ品は 1 つの連鎖で 1 度だけ」を削除)。
+        /// 書かれていない決まりで止めず、 輪は品の文の制限 (回数・割合・資源を使い切る) だけで止める。
+        /// 2026-11-19 の測定 (① を外した 4,300 ラン) で、 今の品では止まらない輪は出なかった。 <see cref="ChainGuardDepth"/> は不具合の網。</para></summary>
         public void RaiseKeyword(PassiveSkillTrigger trigger, int amount)
         {
             if (context == null || amount <= 0) return;
@@ -456,11 +456,7 @@ namespace ItemSystem.PassiveSkills
                 for (int i = 0; i < list.Length; i++)
                 {
                     var s = list[i];
-                    if (!_kwFired.Add(s.SkillId))
-                    {
-                        if (!GameLoop.GameHooks.KeywordChainRepeat) continue;   // 安全装置 ①
-                        ChainRepeats++;
-                    }
+                    if (!_kwFired.Add(s.SkillId)) ChainRepeats++;   // 計装だけ (止めない)
                     context.accumulatedValues[Keywords.Kw.AmountKey] = amount;
                     try
                     {
