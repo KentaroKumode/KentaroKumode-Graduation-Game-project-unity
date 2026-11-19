@@ -424,6 +424,9 @@ namespace ItemSystem.PassiveSkills
         private readonly HashSet<string> _kwFired = new HashSet<string>();
         /// <summary>[計装 2026-11-19] 連鎖の深さの最大 / 同じ品が 1 つの連鎖で 2 度以上働いた回数 (① を外した時だけ数える) / 網に掛かった回数。 BOT がランの始めに 0 へ戻す。</summary>
         public static int ChainMaxDepth, ChainRepeats, ChainGuardHits;
+        /// <summary>[計装 2026-11-19] いちばん深くなった時の並び (「出来事:品(量) → …」)。 BOT がランの始めに空にする。</summary>
+        public static string ChainDeepestPath = "";
+        private readonly List<string> _kwPath = new List<string>();
         /// <summary>不具合の網 (遊びの決まりではない): 連鎖がこの深さに達したら、 そこで止めてエラーを出す。 正しく作られた品なら届かない深さ。</summary>
         public const int ChainGuardDepth = 200;
 
@@ -444,7 +447,7 @@ namespace ItemSystem.PassiveSkills
                 return;
             }
             _kwDepth++;
-            if (_kwDepth > ChainMaxDepth) ChainMaxDepth = _kwDepth;
+            if (_kwDepth > ChainMaxDepth) { ChainMaxDepth = _kwDepth; ChainDeepestPath = string.Join(" → ", _kwPath) + " → " + trigger + "(" + amount + ")"; }
             float prevAmount = context.GetAccumulated(Keywords.Kw.AmountKey);
             try
             {
@@ -462,6 +465,7 @@ namespace ItemSystem.PassiveSkills
                     try
                     {
                         CombatContext.CurrentSkillId = s.SkillId;
+                        _kwPath.Add(trigger + "(" + amount + "):" + s.SkillId);
                         bool probe = RelicFireProbe.Active && RelicFireProbe.Wants(s); ulong fp = probe ? RelicFireProbe.Take(context) : 0;      // 秘宝の発動の表示 (#320)
                         s.Execute(trigger, context);
                         if (probe) RelicFireProbe.After(s.SkillId, fp, context);
@@ -472,6 +476,7 @@ namespace ItemSystem.PassiveSkills
                     {
                         Debug.LogError($"[PassiveSkillManager] Error in skill '{s.SkillId}' ({trigger}): {e.Message}");
                     }
+                    finally { if (_kwPath.Count > 0) _kwPath.RemoveAt(_kwPath.Count - 1); }
                 }
             }
             finally
