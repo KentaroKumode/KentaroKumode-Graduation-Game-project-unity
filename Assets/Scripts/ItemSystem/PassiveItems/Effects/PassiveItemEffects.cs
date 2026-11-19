@@ -34,7 +34,7 @@ namespace ItemSystem.PassiveItems.Effects
         public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
         {
             if (run == null) return;
-            GameLoop.GoldIncome.Gain(run, Gain, "黄金色の封蝋");
+            GameLoop.GoldIncome.Gain(run, Gain, "黄金色の封蝋", GameLoop.GoldOrigin.Item);
             Debug.Log($"[PassiveItem] 道銭の帯封: 層突入 ゴールド+{Gain} (所持 {run.coins})");
         }
     }

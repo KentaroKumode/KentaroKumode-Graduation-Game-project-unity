@@ -355,6 +355,9 @@ namespace GameLoop
         /// <summary>〈富〉(目 9) の役で積んだ、 この戦闘のゴールド報酬への加算 (%)。
         /// 戦闘開始時に 0 へ戻し、 勝利報酬の計算で使い切る。 [perCombat]</summary>
         public int roleGoldBonusPct;
+        /// <summary>溶金の領主剣 (2026-11-19): 持っている間に秘宝・賽・イベントから得た金の累計 (<see cref="GoldIncome.CountWindfall"/>)。
+        /// 1G につき与ダメージ +2% (items.json の stats・per = swordWindfall)。 [persistent]</summary>
+        public int swordWindfallGold;
 
         /// <summary>ヴェスカ撃破後の選択 (2026-08-17)。 **true = 裂け目を閉じなかった**。
         ///
@@ -530,6 +533,7 @@ namespace GameLoop
             _cardMap = null;
             if (chronicle == null) chronicle = new List<string>(); else chronicle.Clear();
             roleGoldBonusPct = 0;
+            swordWindfallGold = 0;
             riftLeftOpen = false;
             totalCombatTurns = 0;
             judgmentPostDamage = judgmentHealRequested = judgmentHealActual = judgmentHealPrevented = 0;
