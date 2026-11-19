@@ -263,6 +263,7 @@ namespace ItemSystem.PassiveSkills
             Register(new CorrosionCrown()); Register(new BoneMeltOil());
             Register(new WildKilnHearth()); Register(new PillarBreakerCharge());
             Register(new ThunderReliquary());
+            Register(new FallenCastleCornerstone()); Register(new BorderGuardStandard());
 
             // ============================
             //  汎用パッシブ
