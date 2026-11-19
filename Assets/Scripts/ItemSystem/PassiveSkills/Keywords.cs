@@ -101,8 +101,9 @@ namespace ItemSystem.PassiveSkills.Keywords
             float relicHeat = MetaProgression.Relics.RelicApplicator.GetHeatGainPct();   // 遺物 炉温 2 個: 臨界の獲得量 +20% (切り上げ)
             if (relicHeat > 0f) n += (int)System.Math.Ceiling(n * relicHeat);
             ctx.rinkaiMeter += n;
-            int guard = 0;
-            while (ctx.rinkaiMeter >= ctx.rinkaiThreshold && guard++ < 50)
+            // 1 回の足し込みで爆発できる回数に上限は無い (2026-11-19・作者の決定で旧い「最大 50 回」を削除)。
+            //   〈帳簿外の爆薬〉でも 1 回ごとに閾値 (≥ 1) ずつ減るので必ず止まる。
+            while (ctx.rinkaiThreshold > 0 && ctx.rinkaiMeter >= ctx.rinkaiThreshold)
             {
                 int th = ctx.rinkaiThreshold;
                 int excess = ctx.rinkaiMeter - th;
