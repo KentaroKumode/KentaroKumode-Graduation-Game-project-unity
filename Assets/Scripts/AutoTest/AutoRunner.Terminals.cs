@@ -82,7 +82,7 @@ namespace AutoTest
             int k = rolls.Length;
             var ws = WiredSums.None();
             // ---- 今ターンの合計と個数 (本体 CombatManager.Turn の「5. 配線」と同じく、 端子の結果から) ----
-            ws.aCount = o.attackDice; ws.bCount = o.blockDice;
+            ws.aCount = o.attackDice; ws.bCount = o.blockDice; ws.aHits = o.attackHits.Count;
             ws.aSum = o.attackAdd; ws.blockRaw = o.blockAdd; ws.chargeRaw = o.chargeAdd;
             for (int i = 0; i < k && i < o.kindOfDie.Length; i++)
                 if (o.kindOfDie[i] == DiceTerminal.Block && rolls[i] > ws.maxBlockDie) ws.maxBlockDie = rolls[i];

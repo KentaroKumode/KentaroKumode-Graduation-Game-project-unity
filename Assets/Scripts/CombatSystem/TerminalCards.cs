@@ -196,6 +196,9 @@ namespace CombatSystem
         public readonly List<int> fired = new List<int>();
         /// <summary>[計装 2026-11-19] 攻撃の合計 (attackAdd) を増やした所ごとの量 (「端子名:+N」)。 判断には使わない。</summary>
         public readonly List<string> attackLog = new List<string>();
+        /// <summary>攻撃の端子 1 枚ごとの攻撃の量と挿した出目の数 (場の順・ADR-0016: 攻撃は端子 1 枚につき 1 回当たる)。
+        /// attackAdd のうちここに入らない分 (連係・変圧・溜めた攻撃・賽の加算) は、 本体が最初の 1 撃に入れる。</summary>
+        public readonly List<int> attackHits = new List<int>(), attackHitDice = new List<int>();
         /// <summary>このターンに発動した基本以外の端子の数。</summary>
         public int firedNonBasic;
         /// <summary>〈有効活用〉〈影写し〉〈火葬の剣〉の対象 (場の添字・−1 = なし)。 選んだ対象 (Resolve の wantTarget) が候補なら それ、
@@ -563,6 +566,7 @@ namespace CombatSystem
                 int times = doubler && id != TerminalIds.Doubler ? 2 : 1;
                 int atkBefore = o.attackAdd, chgBefore = charge;
                 for (int t = 0; t < times; t++) Effect(id, s, sum, env, state, o, ref charge, Empty);
+                if (d.kind == TerminalKind.Attack) { o.attackHits.Add(o.attackAdd - atkBefore); o.attackHitDice.Add(num); }
                 if (o.attackAdd != atkBefore) o.attackLog.Add($"{id}(目{sum}{(times > 1 ? "・倍化" : "")}{(chgBefore != charge ? "・充電" + chgBefore + "→" + charge : "")}):+{o.attackAdd - atkBefore}");
             }
 

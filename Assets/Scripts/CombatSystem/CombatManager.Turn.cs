@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using ItemSystem;
 using ItemSystem.PassiveSkills;
@@ -953,17 +954,42 @@ namespace CombatSystem
             // 遺物 (§15-5) 攻撃+N。 パッシブ由来の mutualAttackBonus と同じ枠へ足す。
             int relicAtk = MetaProgression.Relics.RelicApplicator
                            .GetAttackBonus(GameLoop.GameManager.Instance?.Run, ctx);
-            // 攻撃に挿した出目への上乗せ率 (2026-11-06・ctx.attackDicePct): 出目の合計 × 率 (切り上げ) を 1 回だけ足す
+            // ADR-0016: 攻撃は、 攻撃の端子 1 枚につき 1 回当たる。 1 撃の量 = その端子の出力 + 端子の外の攻撃 (武器の攻撃力・品の攻撃 +N・消耗品・遺物 = 毎回に乗せる)。
+            //   端子の出力 = 端子の結果 (TerminalOutcome.attackHits) + 端子調律の 1 本あたり +N。
+            //   端子に紐づかない攻撃の加算 (連係・変圧・溜めた攻撃・賽の加算・〈電流〉の②) は最初の 1 撃に入れる。
+            int itemAtk = ctx.mutualAttackBonus;   // 品の攻撃 +N (下の出目 +% は足す前に控える ── 出目 +% は端子ごとの 1 撃に入れる)
+            var hitBases = new List<int>();
+            {
+                int metaPerDie = MetaProgression.MetaBuffApplicator.GetAttackTerminalPerDice();
+                int rest = attackSum;
+                for (int h = 0; h < term.attackHits.Count; h++)
+                {
+                    int v = term.attackHits[h] + term.attackHitDice[h] * metaPerDie;
+                    hitBases.Add(v); rest -= v;
+                }
+                if (hitBases.Count > 0) hitBases[0] += rest;
+            }
+            // 攻撃に挿した出目への上乗せ率 (2026-11-06・ctx.attackDicePct): 1 撃ごとに、 その端子の出力 × 率 (切り上げ) を足す
             if (ctx.attackDicePct > 0f && attackSum > 0)
             {
-                int diceScaled = CombatRules.AttackDiceScaled(attackSum, ctx.attackDicePct);
+                int diceScaled = 0;
+                for (int h = 0; h < hitBases.Count; h++)
+                {
+                    int add = hitBases[h] > 0 ? CombatRules.AttackDiceScaled(hitBases[h], ctx.attackDicePct) : 0;
+                    hitBases[h] += add; diceScaled += add;
+                }
                 string prevSkill = ItemSystem.PassiveSkills.CombatContext.CurrentSkillId;
                 ItemSystem.PassiveSkills.CombatContext.CurrentSkillId = "攻撃の端子を挿した出目 +%";
-                ctx.AddPlayerAttackOrDiceBonus(diceScaled);
+                ctx.AddPlayerAttackOrDiceBonus(diceScaled);   // [計装] 品ごとの攻撃 +N の記録 (1 撃の量には上で足した)
                 ItemSystem.PassiveSkills.CombatContext.CurrentSkillId = prevSkill;
                 ctx.diceDerivedAttack += diceScaled;
             }
-            int atkBase = playerAttackPower + attackSum + ctx.mutualAttackBonus + consAtk + relicAtk;
+            {
+                int outside = playerAttackPower + itemAtk + consAtk + relicAtk;
+                for (int h = 0; h < hitBases.Count; h++) hitBases[h] += outside;
+            }
+            // atkBase = 1 撃ずつの合計 (画面・計装が読む)。 1 撃ずつの量は hitBases
+            int atkBase = hitBases.Sum();
 
             // 攻撃端子への配線が 0 本なら、**このターンは攻撃を行わない** (2026-07-28)。
             //   意図: 端子への配線を「威力を足す作業」ではなく **攻撃するかどうかの宣言** にする。
@@ -987,6 +1013,7 @@ namespace CombatSystem
                     Debug.Log($"[配線] 攻撃端子が空 → **攻撃を行わない** "
                             + $"(素火力{playerAttackPower} 込み {atkBase} / 追撃 {ctx.pursuitDamage} を破棄)");
                 atkBase = 0;
+                hitBases.Clear();
                 ctx.pursuitDamage = 0;
             }
             // 挑戦カード〈金で殴る〉(#6): 攻撃するターンだけ、 払った金を攻撃+N にする (定義は ChallengeCards.GoldPunchAttack の 1 か所)。
@@ -999,6 +1026,7 @@ namespace CombatSystem
                 if (paid > 0 && goldAtk > 0)
                 {
                     goldRun.coins -= paid;
+                    hitBases[0] += goldAtk;   // 端子に紐づかない攻撃の加算なので最初の 1 撃へ (攻撃するターンは攻撃の端子が 1 枚以上ある)
                     atkBase += goldAtk;
                     GoldPunchPaidTotal += paid; GoldPunchTurnsTotal++;   // [計装]
                     Debug.Log($"[金で殴る] {paid}G を払って攻撃 +{goldAtk} (残り {goldRun.coins}G)");
@@ -1006,10 +1034,12 @@ namespace CombatSystem
             }
             // 7層ヴェスカ〈麻痺毒の小瓶〉・敵〈罠師〉〈呪縛〉: このターンのプレイヤー攻撃力を減算 (0 で床)。
             // 武器 attackPower は LEG でも 4〜8 なので実効は「武器素火力を消す」。 配線出目の分は残る。
+            //   ADR-0016: 1 撃ごとに引く (攻撃 +N が 1 撃ごとに乗るのと同じ向き)。
             if (ctx.playerAttackPowerPenalty > 0)
             {
                 int before = atkBase;
-                atkBase = Math.Max(0, atkBase - ctx.playerAttackPowerPenalty);
+                for (int h = 0; h < hitBases.Count; h++) hitBases[h] = Math.Max(0, hitBases[h] - ctx.playerAttackPowerPenalty);
+                atkBase = hitBases.Sum();
                 Debug.Log($"[攻撃力の減算] 攻撃力 {before} → {atkBase} (-{ctx.playerAttackPowerPenalty}, 0で床)");
             }
             // 〈不完全な起動〉(門を不完全に起動した罰・2026-09-14)。
@@ -1022,7 +1052,8 @@ namespace CombatSystem
             {
                 var igRun = GameLoop.GameManager.Instance?.Run;
                 int beforeIg = atkBase;
-                atkBase = GameLoop.GateFlaws.ApplyIgnitionCut(igRun, atkBase);
+                for (int h = 0; h < hitBases.Count; h++) hitBases[h] = GameLoop.GateFlaws.ApplyIgnitionCut(igRun, hitBases[h]);
+                atkBase = hitBases.Sum();
                 if (atkBase != beforeIg)
                     Debug.Log($"[不完全な起動] 出力不足 atkBase {beforeIg} → {atkBase}");
             }
@@ -1070,38 +1101,42 @@ namespace CombatSystem
             ctx.fixedDamageToEnemy += ItemSystem.PassiveSkills.Keywords.Kw.TakePendingEnemyDamage(ctx);
             // [診断] この呼び出しだけが「プレイヤー勝利の主攻撃」。 段別計測はここでのみ積む。
             CombatStats.DiagWinAttack = true;
-            // 分け身の賽 (ADR-0015): 攻撃を 2 回に分ける (1 回あたり攻撃値の半分・切り上げ)。 攻撃のたびに起きる効果
-            //   (ProcessDamage の中の会心の判定・OnPreDealDamage・敵の防御、 ApplyWinDamageModifiers) は 2 回とも起きる。
-            bool splitHits = !skipAttack && atkBase > 1
-                && GameLoop.EquippedDie.IdOf(GameLoop.GameManager.Instance?.Run) == GameLoop.DieIds.Split;
-            int hitBase = splitHits ? (atkBase + 1) / 2 : atkBase;
-            // 2 打目を 1 打目と同じ条件で通すため、 1 打目の前の値を控える (2026-11-19 監査で見つけた漏れ:
-            //   ProcessDamage の OnPreDealDamage と ApplyWinDamageModifiers は与ダメの池・会心倍率・会心率を ctx の上で足すので、
-            //   戻さずに 2 打目を通すと同じ % が 2 回足され、 安全装置 ② (池は 1 回だけ) が抜けていた)
-            float splitPool = ctx.outgoingDamageMultiplier, splitCritMul = ctx.criticalMultiplier, splitCritAdd = ctx.critRatePctAdd;
-            var (dealtDmg, dealtFixed, isCrit) = psm.ProcessDamage(
-                hitBase, ctx.pursuitDamage, playerCritBaseRate);
+            // ADR-0016: 攻撃の端子 1 枚につき 1 撃。 会心の判定・OnPreDealDamage / OnPostDealDamage (「攻撃が通るたび」)・敵の防御・
+            //   ApplyWinDamageModifiers は 1 撃ごとに起きる。 攻撃しないターンも 1 回だけ通す (固定ダメの枠を取り出すため・主攻撃は下で 0)。
+            //   2 撃目以降は 1 撃目の前の値から通す (2026-11-19 監査で見つけた漏れ: ProcessDamage の OnPreDealDamage と ApplyWinDamageModifiers は
+            //   与ダメの池・会心倍率・会心率を ctx の上で足すので、 戻さずに次の撃を通すと同じ % が重ねて足され、 安全装置 ② (池は 1 回だけ) が抜ける)
+            float hitPool = ctx.outgoingDamageMultiplier, hitCritMul = ctx.criticalMultiplier, hitCritAdd = ctx.critRatePctAdd;
+            float afterPool = hitPool, afterCritMul = hitCritMul, afterCritAdd = hitCritAdd;
             int lbStage = GameLoop.GameManager.Instance?.Run?.limitBreakStage ?? 0;
-            dealtDmg = ApplyWinDamageModifiers(dealtDmg, ref dealtFixed, ref isCrit, lbStage, psm, ctx);
-            if (splitHits)
+            int dealtDmg = 0, dealtFixed = 0; bool isCrit = false;
+            var hitDealt = new List<int>(); var hitCrit = new List<bool>();
+            int nHits = Math.Max(1, hitBases.Count);
+            for (int h = 0; h < nHits; h++)
             {
-                // 2 回目の前に固定ダメの枠を空にする ── 空にしないと 1 回目の固定ダメ (毒・爆発・品が預けた分) が 2 回目にも返って二重に入る。
-                ctx.fixedDamageToEnemy = 0;
-                float afterPool = ctx.outgoingDamageMultiplier, afterCritMul = ctx.criticalMultiplier, afterCritAdd = ctx.critRatePctAdd;
-                ctx.outgoingDamageMultiplier = splitPool; ctx.criticalMultiplier = splitCritMul; ctx.critRatePctAdd = splitCritAdd;
-                var (dmg2, fix2, crit2) = psm.ProcessDamage(hitBase, 0, playerCritBaseRate);
-                dmg2 = ApplyWinDamageModifiers(dmg2, ref fix2, ref crit2, lbStage, psm, ctx);
-                // この後の処理 (計装・画面の倍率) は 1 打目の後の値を読む前提なので、 1 打目の後の値へ戻す
+                if (h > 0)
+                {
+                    // 次の撃の前に固定ダメの枠を空にする ── 空にしないと 1 撃目の固定ダメ (毒・品が預けた分) が次の撃にも返って二重に入る。
+                    ctx.fixedDamageToEnemy = 0;
+                    ctx.outgoingDamageMultiplier = hitPool; ctx.criticalMultiplier = hitCritMul; ctx.critRatePctAdd = hitCritAdd;
+                }
+                var (d, f, c) = psm.ProcessDamage(h < hitBases.Count ? hitBases[h] : 0, h == 0 ? ctx.pursuitDamage : 0, playerCritBaseRate);
+                d = ApplyWinDamageModifiers(d, ref f, ref c, lbStage, psm, ctx);
+                if (h == 0) { afterPool = ctx.outgoingDamageMultiplier; afterCritMul = ctx.criticalMultiplier; afterCritAdd = ctx.critRatePctAdd; }
+                hitDealt.Add(d); hitCrit.Add(c);
+                dealtDmg += d; dealtFixed += f; isCrit |= c;
+            }
+            if (nHits > 1)
+            {
+                // この後の処理 (計装・画面の倍率) は 1 撃目の後の値を読む前提なので、 1 撃目の後の値へ戻す
                 ctx.outgoingDamageMultiplier = afterPool; ctx.criticalMultiplier = afterCritMul; ctx.critRatePctAdd = afterCritAdd;
-                dealtDmg += dmg2; dealtFixed += fix2; isCrit |= crit2;
-                Debug.Log($"[賽] 分け身の賽: 攻撃 {atkBase} → {hitBase} × 2 回 (与ダメ {dealtDmg})");
+                Debug.Log($"[攻撃] 端子ごとに {nHits} 撃: 攻撃 {string.Join("/", hitBases)} → 与ダメ {string.Join("/", hitDealt)}");
             }
             // 攻撃しないターン (攻撃端子 0 本・逃げる) は主攻撃を 0 にする (2026-11-04)。
             //   atkBase を 0 にしても、 ProcessDamage の中でバフ (damageBonus) と OnPreDealDamage のパッシブが
             //   主攻撃へ加算していたので、 攻撃しないはずのターンに 1 以上のダメージが入っていた。 会心も立てない。
             //   逃げるターンは固定ダメの枠も捨てる (atkBase の確定後に足された臨界爆発・品が預けた分を含む)。
             //   役の追撃も攻撃に付くものなので、 攻撃しないターンには乗せない。
-            if (skipAttack) { dealtDmg = 0; isCrit = false; }
+            if (skipAttack) { dealtDmg = 0; isCrit = false; hitDealt.Clear(); hitCrit.Clear(); }
             // [読むための欄・実績〈鎧通し〉] 主攻撃が通り、 敵の防御を貫通で 0 にした (ProcessDamage の中の防御の計算と同じ式で読むだけ)
             result.defensePiercedToZero = !skipAttack && dealtDmg > 0 && ctx.enemyDefense > 0
                 && DefenseFormula.Effective(ctx.enemyDefense, ctx.playerArmorPen + (isCrit ? ctx.critArmorPen : 0)) == 0;
@@ -1209,21 +1244,29 @@ namespace CombatSystem
             }
 
             result.enemyHPBeforeAttack = enemyHP;   // [読むための欄・実績〈やりすぎ〉] 主攻撃を当てる直前の敵の HP
-            HpLossDiag.Lose(ref enemyHP, dealtDmg, "通常攻撃");
-            // 〈天眼の鍔〉(2026-11-20・§23-32): 会心の一撃のあと、 敵の HP が「会心倍率 × 5%」以下なら倒す (ボスはその半分)。 〈百人切りの鉈〉と同じく CanExecuteEnemy で止まる
-            if (isCrit && dealtDmg > 0 && enemyHP > 0)
+            // ADR-0016: 主攻撃は 1 撃ずつ HP へ入れ、 首落とし (天眼の鍔) とボスの目盛りを割る判定も 1 撃ごと。
+            //   合計 (dealtDmg) は役〈追撃〉・ヴェスカの守りで変わっているので配り直す: 減った分は後ろの撃から削り、 増えた分は最後の撃に乗せる。
+            int hitLeft = dealtDmg;
+            for (int h = 0; h < hitDealt.Count; h++)
             {
-                int line = ItemSystem.PassiveSkills.Effects.HeavenEyeGuard.KillLine(ctx);
-                if (line >= 0 && enemyHP <= line && ctx.CanExecuteEnemy())
+                int hitDmg = h == hitDealt.Count - 1 ? hitLeft : Math.Min(hitDealt[h], hitLeft);
+                hitLeft -= hitDmg;
+                HpLossDiag.Lose(ref enemyHP, hitDmg, "通常攻撃");
+                // 〈天眼の鍔〉(2026-11-20・§23-32): 会心の一撃のあと、 敵の HP が「会心倍率 × 5%」以下なら倒す (ボスはその半分)。 〈百人切りの鉈〉と同じく CanExecuteEnemy で止まる
+                if (hitCrit[h] && hitDmg > 0 && enemyHP > 0)
                 {
-                    int left = enemyHP;
-                    enemyHP = 0;
-                    HpLossDiag.Add("経路:処刑(天眼の鍔)", left);
-                    EnemyHpLedger.Land("処刑(天眼の鍔)", left, left);
-                    Debug.Log($"[天眼の鍔] 会心のあと敵 HP {left} ≤ {line} → 倒す");
+                    int line = ItemSystem.PassiveSkills.Effects.HeavenEyeGuard.KillLine(ctx);
+                    if (line >= 0 && enemyHP <= line && ctx.CanExecuteEnemy())
+                    {
+                        int left = enemyHP;
+                        enemyHP = 0;
+                        HpLossDiag.Add("経路:処刑(天眼の鍔)", left);
+                        EnemyHpLedger.Land("処刑(天眼の鍔)", left, left);
+                        Debug.Log($"[天眼の鍔] 会心のあと敵 HP {left} ≤ {line} → 倒す");
+                    }
                 }
+                NoteBossDownMainHit(hitDmg, ctx.currentTurn);   // ボスのダウン (2026-11-14): 目盛りを割れるのは通常攻撃だけ (固定ダメの枠より前の HP で判定)
             }
-            NoteBossDownMainHit(dealtDmg, ctx.currentTurn);   // ボスのダウン (2026-11-14): 目盛りを割れるのは通常攻撃だけ (固定ダメの枠より前の HP で判定)
             HpLossDiag.Lose(ref enemyHP, dealtFixed, "固定ダメ");
             if (_diagKind == SkillDiag.Boss && currentEnemy != null)
             {

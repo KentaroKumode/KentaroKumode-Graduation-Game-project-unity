@@ -595,7 +595,20 @@ namespace AutoTest
         private static int ReadOutMainDamage(in OptimalTurnState s, int aCount, int bCount, int aSum, in WiredSums ws)
         {
             if (aCount <= 0) return 0;   // 攻撃端子 0 本 = 攻撃しない (本体の skipAttack)
-            int raw = s.atkPower + s.atkFlat + aSum;
+            // ADR-0016: 攻撃の端子 1 枚につき 1 撃 (本体 CombatManager.Turn の hitBases)。 端子の外の攻撃 (武器・攻撃 +N・消耗品・遺物)・
+            //   麻痺毒の減算・〈不完全な起動〉・バフ・会心の期待値は 1 撃ごと。
+            //   shortcut: 端子ごとの出力は持たないので攻撃の合計を撃の数で等分する (端数は 1 撃目)。 端子ごとの差で丸めが変わる時は TerminalOutcome.attackHits を運ぶ。
+            int hits = System.Math.Max(1, ws.aHits);
+            float total = 0f;
+            for (int h = 0; h < hits; h++)
+                total += ReadOutOneHit(in s, bCount, h == 0 ? aSum - (hits - 1) * (aSum / hits) : aSum / hits, in ws);
+            return Mathf.RoundToInt(total);
+        }
+
+        /// <summary>主攻撃 1 撃の与ダメの期待値 (<paramref name="termAtk"/> = その撃の端子の出力)。 <see cref="ReadOutMainDamage"/> が撃の数だけ呼ぶ。</summary>
+        private static float ReadOutOneHit(in OptimalTurnState s, int bCount, int termAtk, in WiredSums ws)
+        {
+            int raw = s.atkPower + s.atkFlat + termAtk;
             raw = System.Math.Max(0, raw - s.atkPenalty);
             if (s.igCut > 0f && raw > 0) raw -= Mathf.FloorToInt(raw * s.igCut);
             raw += s.dmgBonus;
@@ -635,8 +648,7 @@ namespace AutoTest
                 return d;
             }
             float p = ws.forceCrit ? 1f : s.critP;
-            float e = p >= 1f ? D(true) : p <= 0f ? D(false) : p * D(true) + (1f - p) * D(false);
-            return Mathf.RoundToInt(e);
+            return p >= 1f ? D(true) : p <= 0f ? D(false) : p * D(true) + (1f - p) * D(false);
         }
 
         /// <summary>与ダメ倍率の池: ApplyWinDamageModifiers と同じ足し方 (加算の池)。 読むだけ。
@@ -784,6 +796,8 @@ namespace AutoTest
         private struct WiredSums
         {
             public int aCount, bCount;
+            /// <summary>攻撃の端子の枚数 = 主攻撃の撃の数 (ADR-0016・TerminalOutcome.attackHits)。 0 = 旧い配線 (1 撃とみなす)。</summary>
+            public int aHits;
             /// <summary>充電の価値の単位 (旧い配線 = 充電に挿したダイスの本数。 山札 = 実際に増える充電 ÷ <c>DeckChargePipsPerDie</c>)。</summary>
             public float chargeUnits;
             public int aSum, blockRaw, chargeRaw, maxBlockDie;
@@ -883,7 +897,8 @@ namespace AutoTest
             //   2026-11-13 まで旧の式はこの手でも武器の素火力 (atkBase) を与ダメに数えていた (新しい式 ReadOutMainDamage は 0)。
             //   攻撃なしでも通る削り (〈黎明〉〈虚空〉) は下で effDmg / noAtkDmg へ別に足すので、 ここで 0 にしても消えない。
             //   v3.oldNoAttackBaseDmg = true で旧い挙動 (素火力を数える) に戻す (測定の口)。
-            int dmg = (aCount > 0 || v3.oldNoAttackBaseDmg) ? atkBase + aSum : 0;
+            //   ADR-0016: 素の攻撃力は撃の数だけ乗る (攻撃の端子 1 枚につき 1 撃・端子の外の攻撃は毎回)。
+            int dmg = (aCount > 0 || v3.oldNoAttackBaseDmg) ? atkBase * System.Math.Max(1, ws.aHits) + aSum : 0;
             // 剣〈不滅の刃〉: 両方の端子を挿したターンが続くたび与ダメ +8% (このターンで続けば streak+1)。
             //   [#122] 本体は与ダメ倍率の池 (加算) へ足すので、 伸びは (池 + 0.08n) / 池 倍。 旧: 池と別に (1 + 0.08n) 倍を掛けていた。
             //   旧の式は池そのものを掛けない (どの配線でも共通の係数) ので、 比だけを掛ける。 池が読めない (0) ときは 1 = 旧と同じ。
