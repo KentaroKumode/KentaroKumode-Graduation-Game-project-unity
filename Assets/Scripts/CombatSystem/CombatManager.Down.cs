@@ -154,8 +154,10 @@ namespace CombatSystem
                 return;
             }
             _downMainWouldBreak = 0;
+            // 〈骨溶かしの黒油〉(2026-11-20): このターンに毒のダメージが入っていれば、 このターンに入るひびは割れても弱いダウンにならない
+            bool strong = ItemSystem.PassiveSkills.Effects.BoneMeltOil.PoisonTurnNow(PassiveSkillManager.Instance?.Context);
             int c = _down.NoteTurnEndCracks(enemyHP, currentEnemy.maxHP, turn, GameLoop.GameHooks.DownCrackGrace, GameLoop.GameHooks.DownCrackWeak,
-                                            out int newCracks);
+                                            out int newCracks, strong);
             BossDownDiag.NoteCracks(newCracks, c);
             if (newCracks > 0) Debug.Log($"[ダウン] 通常攻撃以外で目盛りを下回った: ひび {newCracks} (HP {enemyHP}/{currentEnemy.maxHP})");
             if (c > 0) Debug.Log($"[ダウン] ひびの猶予が切れて目盛りが {c} つひとりでに割れた → 次のターンからダウン {_down.pending} ターン");
