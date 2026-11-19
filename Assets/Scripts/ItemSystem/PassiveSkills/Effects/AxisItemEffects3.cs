@@ -181,4 +181,29 @@ namespace ItemSystem.PassiveSkills.Effects
         /// <summary>この戦闘でこの品が働いている。</summary>
         public static bool Held(CombatContext ctx) => ctx != null && ctx.GetAccumulated(HeldKey) > 0f;
     }
+
+    // ============================================================
+    //  充電
+    // ============================================================
+
+    /// <summary>積雷の黒舎利: 毎ターンの終わり、 充電が 30 を超えている分 10 につき、 敵に最大 HP の 1% の軽減不可ダメージ (切り捨て・Kw.DamageEnemy)。
+    /// 30 は固定 (充電の上限が伸びても動かない)。 充電は使わない。</summary>
+    public class ThunderReliquary : IPassiveSkillEffect, IRelicDisplay
+    {
+        public const string Id = "積雷の黒舎利";
+        public string SkillId => Id;
+        public const int Base = 30, Per = 10, PctPerStep = 1;
+        /// <summary>秘宝の列の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.GetCharge() >= Base + Per);
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
+        {
+            int steps = (ctx.GetCharge() - Base) / Per;
+            if (steps <= 0 || ctx.enemyCurrentHP <= 0) return;
+            int dmg = (int)((long)steps * PctPerStep * ctx.enemyMaxHP / 100);
+            if (dmg <= 0) return;
+            Kw.DamageEnemy(ctx, dmg);
+            Rw.Log($"[積雷の黒舎利] 充電 {ctx.GetCharge()} → 30 を超えた分 {steps} × 最大 HP の 1% = {dmg} (軽減不可)");
+        }
+    }
 }
