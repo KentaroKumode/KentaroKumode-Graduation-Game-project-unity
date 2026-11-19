@@ -19,6 +19,29 @@ namespace ItemSystem.PassiveSkills.Effects
     //  会心
     // ============================================================
 
+    /// <summary>天眼の鍔: 会心の一撃 (主攻撃) のあと、 敵の HP が「会心倍率 × 5%」(最大 HP 比) 以下なら倒す (ボスはその半分・BountyHunterHelper.IsBoss = BossIds.IsBoss)。
+    /// 会心倍率はその攻撃に掛かった倍率 (<see cref="Kw.LastCritMulKey"/>)。 判定と倒すのは CombatManager (主攻撃を HP から引いた直後・<see cref="KillLine"/>)。
+    /// 倒し方は〈百人切りの鉈〉と同じ (〈回帰性真理〉の CanExecuteEnemy で止まる)。</summary>
+    public class HeavenEyeGuard : IPassiveSkillEffect
+    {
+        public const string Id = "天眼の鍔";
+        public string SkillId => Id;
+        public const float PctPerMul = 0.05f;
+        /// <summary>[persistent] この品を持っている (CombatManager が読む)。</summary>
+        public const string HeldKey = "ax3.tengan.held";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.accumulatedValues[HeldKey] = 1;
+
+        /// <summary>この品を持っている時の、 倒せる HP の線 (これ以下なら倒す・持っていない・会心倍率が無い時は −1)。</summary>
+        public static int KillLine(CombatContext ctx)
+        {
+            if (ctx == null || ctx.GetAccumulated(HeldKey) <= 0f || ctx.enemyMaxHP <= 0) return -1;
+            float frac = ctx.GetAccumulated(Kw.LastCritMulKey) * PctPerMul;
+            if (BountyHunterHelper.IsBoss(ctx)) frac /= 2f;
+            return frac > 0f ? (int)(ctx.enemyMaxHP * frac) : -1;
+        }
+    }
+
     /// <summary>死相の面頬: 会心したターン、 そのターンの敵の攻撃を (会心倍率 − 1) × 20% 減らす (最大 −50%)。
     /// 会心倍率は会心した時の <see cref="CombatContext.criticalMultiplier"/>。 減らすのは敵の攻撃の解決 (CombatManager.ApplyLossDamageModifiers)。</summary>
     public class DeathMaskVisor : IPassiveSkillEffect, IRelicDisplay

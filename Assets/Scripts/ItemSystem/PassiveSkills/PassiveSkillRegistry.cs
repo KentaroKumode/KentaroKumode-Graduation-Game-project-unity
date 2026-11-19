@@ -258,7 +258,7 @@ namespace ItemSystem.PassiveSkills
             Register(new MiasmaMantle()); Register(new PoolKeeper());
             Register(new RivetPlate()); Register(new CatchBracer()); Register(new LayeredTagShield()); Register(new BrokenShieldGrudge());
             // 軸の締めの LEGENDARY (2026-11-20・AxisItemEffects3.cs・GAME.md §23-32)
-            Register(new DeathMaskVisor());
+            Register(new HeavenEyeGuard()); Register(new DeathMaskVisor());
             Register(new ReturningBloodSickle()); Register(new BloodWedge());
             Register(new CorrosionCrown()); Register(new BoneMeltOil());
             Register(new WildKilnHearth()); Register(new PillarBreakerCharge());

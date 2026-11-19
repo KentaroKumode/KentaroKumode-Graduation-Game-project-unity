@@ -682,6 +682,7 @@ namespace ItemSystem.PassiveSkills
                     && GameLoop.GameRng.Value("PassiveSkillManager.critStack") < context.lastCritAddPct - 1f)
                     effCritMul += 1f;
                 totalDamage = (int)(totalDamage * effCritMul);
+                if (!attackerIsEnemy) context.accumulatedValues[Keywords.Kw.LastCritMulKey] = effCritMul;   // 〈天眼の鍔〉が読む (2026-11-20)
                 // [診断] 会心倍率は 3.0 固定ではない (メタ精密 r10 の逓減還元・一点集中 等)。
                 // 実測の平均を取らないと会心係数を 1+p×2 で見積もれない。
                 if (diag) { CombatSystem.CombatStats.Stage(16, context.criticalMultiplier); CombatSystem.CombatStats.Stage(17, 1); }

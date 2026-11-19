@@ -1210,6 +1210,19 @@ namespace CombatSystem
 
             result.enemyHPBeforeAttack = enemyHP;   // [読むための欄・実績〈やりすぎ〉] 主攻撃を当てる直前の敵の HP
             HpLossDiag.Lose(ref enemyHP, dealtDmg, "通常攻撃");
+            // 〈天眼の鍔〉(2026-11-20・§23-32): 会心の一撃のあと、 敵の HP が「会心倍率 × 5%」以下なら倒す (ボスはその半分)。 〈百人切りの鉈〉と同じく CanExecuteEnemy で止まる
+            if (isCrit && dealtDmg > 0 && enemyHP > 0)
+            {
+                int line = ItemSystem.PassiveSkills.Effects.HeavenEyeGuard.KillLine(ctx);
+                if (line >= 0 && enemyHP <= line && ctx.CanExecuteEnemy())
+                {
+                    int left = enemyHP;
+                    enemyHP = 0;
+                    HpLossDiag.Add("経路:処刑(天眼の鍔)", left);
+                    EnemyHpLedger.Land("処刑(天眼の鍔)", left, left);
+                    Debug.Log($"[天眼の鍔] 会心のあと敵 HP {left} ≤ {line} → 倒す");
+                }
+            }
             NoteBossDownMainHit(dealtDmg, ctx.currentTurn);   // ボスのダウン (2026-11-14): 目盛りを割れるのは通常攻撃だけ (固定ダメの枠より前の HP で判定)
             HpLossDiag.Lose(ref enemyHP, dealtFixed, "固定ダメ");
             if (_diagKind == SkillDiag.Boss && currentEnemy != null)
