@@ -539,6 +539,7 @@ namespace AutoTest
             public bool vitalIgnore;           // 短剣〈急所〉: 会心は防御を無視
             public int minDmg;                 // 勝利時の与ダメ最低保証
             public float berserkMul;           // 狂暴化 (敵の被ダメ倍率)
+            public int finalPct;               // 最終与ダメージ倍率の上乗せ % (ctx.finalDamagePct・〈防人の軍標〉・2026-11-20)
             /// <summary>[#105 山札の先読み] 攻撃の端子を挿せる手が 1 つも無い (手札に攻撃の端子が無い・条件に合わない) 次のターン。
             /// 「攻撃 0 本」の抑止 (−10000) は選べる時の手の形を決める装置なので、 選べないターンには掛けない
             /// (掛けると、 次のターンの手札の引きの差が −10000 ÷ 標本数の桁で先読みの値を支配する)。 既定 false = 今までどおり。</summary>
@@ -588,6 +589,9 @@ namespace AutoTest
 
         /// <summary>[V3 readOutgoingMult] 配線時点で分かる範囲で、 本体と同じ順に主攻撃 (ヴェスカの防御の前) の期待値を出す。
         /// 会心は確率で 2 通りを混ぜる。 配線の後で積まれる分 (OnWired・OnPreDealDamage・OnCriticalCheck・追撃・役の追撃・敵の軽減パッシブ・脆弱) は入らない。</summary>
+        /// <summary>最終与ダメージ倍率 (本体の Kw.ApplyFinalDamage と同じ式・切り捨て)。</summary>
+        private static int ApplyFinalPct(int d, int pct) => d > 0 && pct != 0 ? (int)((long)d * (100 + pct) / 100) : d;
+
         private static int ReadOutMainDamage(in OptimalTurnState s, int aCount, int bCount, int aSum, in WiredSums ws)
         {
             if (aCount <= 0) return 0;   // 攻撃端子 0 本 = 攻撃しない (本体の skipAttack)
@@ -600,6 +604,7 @@ namespace AutoTest
             // 端子の山札 (旧い配線では全部「なし」): 与ダメ% は池へ足す (ctx.AddOutgoingPct)・会心倍率 +N・必ず会心・別枠の掛け算・防御の無視
             outMul += ws.outPctAdd;
             float termMul = ws.damageMul;
+            int fpct = s.finalPct;   // ローカル関数は in の引数を捕まえられないので写す
             int minDmg = s.minDmg, consBurst = s.consBurst, eDef = ws.ignoreDefense ? 0 : s.eDefNow, pen = s.myPen, critPen = s.critPen;
             float critMulEff = s.critMulEff + ws.critMultAdd, nonCritMul = s.nonCritMul, berserk = s.berserkMul;
             bool pinpoint = s.pinpointCut, vital = s.vitalIgnore, down = s.enemyDown && !s.enemyDownWeak;   // ひびの弱いダウン (2026-11-14) は ×1.5 なし
@@ -617,6 +622,7 @@ namespace AutoTest
                 d += consBurst;
                 if (termMul != 1f && d > 0) d = System.Math.Max(1, Mathf.RoundToInt(d * termMul));   // 〈激昂〉〈共鳴〉: 本体と同じ位置 (攻撃バーストの後・物差しの前)
                 d = CombatSystem.EnemyHpLedger.ProbeMain(d);   // [測定用の物差し 2026-11-10] 本体と同じ位置 (攻撃バーストの後・防御の前)
+                d = ApplyFinalPct(d, fpct);                             // 最終与ダメージ倍率: 本体と同じ位置 (物差しの直後・怠惰の前)
                 d = MetaProgression.MetaDebuffApplicator.ApplyOutgoingCut(d);   // [#121] 〈大罪:怠惰〉: 本体と同じ位置 (物差しの直後・防御の前・CombatManager.Damage.cs)
                 d = CombatSystem.BossDown.ApplyTaken(d, down);               // ボスのダウン ×1.5: 本体と同じ位置 (怠惰の直後)
                 if (eDef > 0 && d > 0 && !(crit && vital))
@@ -681,6 +687,7 @@ namespace AutoTest
             st.nonCritMul = ctx.nonCritOutgoingMultiplier;
             st.pinpointCut = ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.PinpointEye.NonCritCutKey) > 0f;
             st.outMul = OutgoingPoolNow(ctx, run);
+            st.finalPct = ctx.finalDamagePct;
             st.consBurst = ctx.consAtkBurst;
             st.critPen = ctx.critArmorPen;
             st.vitalIgnore = ItemSystem.PassiveSkills.Effects.VitalStrike.IgnoresDefense(ctx);
@@ -895,6 +902,7 @@ namespace AutoTest
                 if (ws.damageMul != 1f) dmg = System.Math.Max(1, Mathf.RoundToInt(dmg * ws.damageMul));
             }
             if (aCount > 0) dmg = CombatSystem.EnemyHpLedger.ProbeMain(dmg);   // [測定用の物差し 2026-11-10] 旧の式にも同じ位置で (防御の前)
+            if (aCount > 0) dmg = ApplyFinalPct(dmg, s.finalPct);   // 最終与ダメージ倍率: 本体と同じ位置 (物差しの直後・怠惰の前)
             if (aCount > 0) dmg = MetaProgression.MetaDebuffApplicator.ApplyOutgoingCut(dmg);   // [#121] 〈大罪:怠惰〉: 本体と同じ位置 (物差しの直後・防御の前)
             if (aCount > 0) dmg = CombatSystem.BossDown.ApplyTaken(dmg, s.enemyDown && !s.enemyDownWeak);   // ボスのダウン ×1.5: 本体と同じ位置 (怠惰の直後・ひびの弱いダウンは無し)
             // 敵の防御 (このターンの値) で軽減

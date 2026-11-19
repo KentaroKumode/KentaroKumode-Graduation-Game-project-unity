@@ -150,6 +150,9 @@ outgoingDamageMultiplier += メタ% + 遺物% + 研磨剤1.5 + consDmgMultPct/10
 + consAtkBurst                     ← 消費:攻撃バースト(単発)
 + メタ会心ボーナス(会心時)
 − メタデバフ向かい風(最低1)
+× (100 + finalDamagePct)/100      ← 最終与ダメージ倍率【2026-11-20・GAME.md §23-32】(Kw.ApplyFinalDamage・切り捨て・既定 0 = 素通し)。 〈防人の軍標〉がシールドを得るたび +5 (この戦闘・上限なし)。
+                                     怠惰の直前 = すべての倍率 (会心・与ダメ% の池・端子の別枠・物差し) の後・敵の軽減パッシブと防御の前。 与ダメ% の池には足さない。
+                                     掛ける口は怠惰と同じ 4 つ (主攻撃 = ApplyWinDamageModifiers / HpLossDiag.Lose (channel ≠ "通常攻撃") / 〈逆綴じの止血帯〉/ Kw.DamageEnemy の直接)。 BOT の見積もりも同じ位置 (AutoRunner.ApplyFinalPct)
 × (100 − 30)/100                  ← 大罪:怠惰 (挑戦カード IV) を受けている時だけ・与えるダメージ −30%【2026-11-11】(主攻撃はすべての倍率の後・敵の防御の前・切り捨て。 毒・出血・爆発・固定ダメ・反射・品の直接は敵の HP を減らす口 HpLossDiag.Lose で同じく −30%)
                                      〈徒労〉の戦闘のデバフ【2026-11-14・GameHooks.ToilDamageDownPct・既定 50 (BattleBoonRule.DefaultToilDamageDownPct・作者の決定)・測定の口 toilDamageDownPct で 0 にすれば切れる】も同じ枠: 〈徒労〉を持っている間 −N% (既定 −50%)。
                                      実体は MetaDebuffApplicator.ApplyOutgoingCut の 1 つで、 怠惰と重なったら厳しい方 1 つ (× (100 − max(30, N))/100・足さない・掛けない)。
@@ -160,6 +163,8 @@ outgoingDamageMultiplier += メタ% + 遺物% + 研磨剤1.5 + consDmgMultPct/10
                                      怠惰の直後 = すべての倍率の後・敵の軽減パッシブと敵の防御の前。 与ダメ% の池には足さない (別枠の掛け算)。
                                      主攻撃以外も全部掛かる (下の「ボスのダウン」)
 ─ FireEnemyTrigger(OnPreReceiveDamage): 灰塵の鎧/Ethereal/各敵被ダメ軽減
+                                     〈血の楔〉【2026-11-20】: 持っていれば、 この軽減で減った量のうち 出血 ÷ (出血 + 40) を戻す (切り捨て・CombatManager.Damage.cs)。
+                                     同じ品は敵が得るシールド (vescaShield の増加) と回復 (ReduceEnemyHeal・フロアデバフ・挑戦カード〈再生〉) を 40 ÷ (出血 + 40) 倍にする (CombatContext.WedgeEnemyGain)
   → total = max(0, ctx.finalDamage)
 × 敵の防御値【2026-10-28・ADR-0013】: effDef = max(0, enemyDefense − playerArmorPen)
                        total = DefenseFormula.Apply(total, effDef)   ← ceil(total × (1 − R(effDef)))・整数演算
@@ -601,6 +606,7 @@ Passive カテゴリのシナジー武器群。4枚がインベントリに揃�
 | 出来事 (トリガー) | 出る場所 | 量 |
 |---|---|---|
 | OnRinkaiBurst | Kw.AddHeat が閾値をまたいだとき | その爆発で使った臨界 |
+| OnSuperBurst | 同じ爆発が超臨界のとき (OnRinkaiBurst の直後・2026-11-20) | その爆発のダメージ (基礎 ×1.5) |
 | OnChargeGain / OnOvercharge | CombatContext.AddCharge | 増えた分 / 上限で捨てた分 (〈雷壷〉はターン開始時に上限超過の 75% を捨てる) |
 | OnChargeSpend | CombatContext.ConsumeCharge (リロールも通る) | 使った分 |
 | OnShieldGain | consShield の setter (増えたときだけ) | 増えた分 |
@@ -992,7 +998,10 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
          meter >= rinkaiThreshold (基準50 /〈早沸かし釜〉で35) をまたいだ瞬間に爆発が決まる
            → 次の攻撃に乗る予約 (rinkaiBurstActive=true・回数 Kw.BurstCountKey)、 meter = 0、 OnRinkaiBurst を配る。
            〈帳簿外の爆薬〉(rinkaiMultiBurst): meter を閾値ぶんだけ減らし、 溜まっている限り同じ処理で何度でも爆発する。
-         爆発 flat = Kw.BurstBase (既定 30) × 回数 ＋ Kw.BurstBonusKey (今これを積む品は無い)。
+         爆発 flat = Kw.BurstBase (既定 30) × 回数 ＋ Kw.BurstBonusKey (超臨界爆発の上乗せ)。
+         **超臨界爆発 (2026-11-20・GAME.md §23-32)**: 爆発が決まった時、 閾値を引く前の meter が閾値の 2 倍以上なら超臨界。 その爆発のダメージ ×1.5 =
+           Kw.BurstBonusKey += floor(BurstBase / 2) (爆発が決まった時の BurstBase で数える)。 OnRinkaiBurst の直後に OnSuperBurst を配る。
+           出来事の間は Kw.BurstSuperKey (1/0) と Kw.BurstDamageNowKey (その爆発 1 回のダメージ) が読める。
          **2026-11-10: 爆発を主攻撃へ返す品** (爆発そのものは増やさない・与ダメージ +% = outgoingDamageMultiplier の加算プール):
            〈溢れ取りの鋳型〉: 爆発のとき、 閾値を超えた臨界 1 につき次の攻撃の与ダメージ +2% (攻撃したら使い切る・旧: 爆発 +2)。
            〈二度目の打金〉: 爆発した次のターン、 与ダメージ +30% (旧: その爆発ダメージの半分を固定ダメ枠へ)。

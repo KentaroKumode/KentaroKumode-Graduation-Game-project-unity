@@ -186,6 +186,9 @@ namespace CombatSystem
             // 端子の山札 (ADR-0014): 別枠の与ダメージの掛け算 (〈激昂〉〈共鳴〉)。 他の与ダメ% と足さずに掛ける。
             if (_termDamageMul != 1f && totalDmg > 0) totalDmg = Mathf.Max(1, Mathf.RoundToInt(totalDmg * _termDamageMul));
             totalDmg = EnemyHpLedger.ProbeMain(totalDmg);
+            // 最終与ダメージ倍率 (2026-11-20・GAME.md §23-32・〈防人の軍標〉): すべての倍率の後・敵の軽減パッシブと防御の前 (怠惰の直前)。
+            //   主攻撃以外は敵の HP を減らす口 (HpLossDiag.Lose) で掛ける
+            totalDmg = ItemSystem.PassiveSkills.Keywords.Kw.ApplyFinalDamage(ctx, totalDmg);
             // 大罪:怠惰 (挑戦カード IV・2026-11-11) /〈徒労〉の戦闘のデバフ (2026-11-14・GameHooks.ToilDamageDownPct・既定 50): 主攻撃の最終ダメージ −N%
             //   (すべての倍率の後・敵の防御の前)。 2 つが重なったら厳しい方 1 つ (BattleBoonRule.OutgoingCutPct)
             totalDmg = MetaProgression.MetaDebuffApplicator.ApplyOutgoingCut(totalDmg);   // 主攻撃以外は敵の HP を減らす口 (HpLossDiag.Lose) で掛ける
