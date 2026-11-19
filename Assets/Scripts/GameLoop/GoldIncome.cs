@@ -12,6 +12,10 @@ namespace GameLoop
     /// <para>(旧: ラストスタンドの濾過 LastStand.FilterGoldGain を通す口と通さない口の区別
     /// applyLastStandFilter があったが、 濾過は常に素通しだったので 2026-11-12 に区別ごと削除)</para>
     /// </summary>
+    /// <summary>金の出どころの種類 (2026-11-19)。 溶金の領主剣が数えるのは <see cref="Item"/>・<see cref="Die"/>・<see cref="Event"/> だけ
+    /// (作者「秘宝・賽・イベントからゴールドを得るたび」・戦闘の報酬と売却は数えない)。 出どころの名前 (source) の綴りでは判定しない。</summary>
+    public enum GoldOrigin { Other, Battle, Sale, Item, Die, Event }
+
     public static class GoldIncome
     {
         /// <summary>GOLD を獲得する。 実際に加算された額を返す。
@@ -40,7 +44,7 @@ namespace GameLoop
             RunByDepthSource[key] = rv + granted;
         }
 
-        public static int Gain(RunState run, int amount, string source)
+        public static int Gain(RunState run, int amount, string source, GoldOrigin origin = GoldOrigin.Other)
         {
             if (run == null || amount <= 0) return 0;
 
@@ -54,8 +58,19 @@ namespace GameLoop
             run.coins += granted;
             GainedTotal += granted;
             Note(run, source, granted);
+            CountWindfall(run, origin, granted);
             MetaProgression.Achievements.AchievementService.NoteCoins(run.coins);   // 実績〈懐が重い〉
             return granted;
+        }
+
+        /// <summary>溶金の領主剣 (2026-11-19・作者): 持っている間に、 秘宝・賽・イベントから得た金を積む (<see cref="RunState.swordWindfallGold"/>)。
+        /// 金を入れる口とは別に呼べる ── イベントの金は入口を通らずに足しているので、 そこからも呼ぶ (額は変えず数えるだけ)。</summary>
+        public static void CountWindfall(RunState run, GoldOrigin origin, int granted)
+        {
+            if (run == null || granted <= 0) return;
+            if (origin != GoldOrigin.Item && origin != GoldOrigin.Die && origin != GoldOrigin.Event) return;
+            if (!run.OwnsPassive(ItemIds.GoldenKingSword)) return;
+            run.swordWindfallGold += granted;
         }
 
         /// <summary>挑戦デバフの収入減を**受けない** GOLD 加算。

@@ -118,12 +118,12 @@ namespace CombatSystem
             string die = EquippedDie.IdOf(run);
             if (die == DieIds.Scavenger && Has(dice, 1))
             {
-                run.coins += ScavengerGold;
+                GoldIncome.Gain(run, ScavengerGold, "拾い物の賽", GoldOrigin.Die);
                 UnityEngine.Debug.Log($"[賽] 拾い物の賽: ①が出た → +{ScavengerGold}G");
             }
             else if (die == DieIds.OldCoin && enemyKilled && Has(dice, OldCoinFace))
             {
-                run.coins += OldCoinGold;
+                GoldIncome.Gain(run, OldCoinGold, "古銭の賽", GoldOrigin.Die);
                 UnityEngine.Debug.Log($"[賽] 古銭の賽: ⑧のターンに撃破 → +{OldCoinGold}G");
             }
         }

@@ -1556,7 +1556,7 @@ Burn（炎上）は 2026-07-16 に**全廃**（Bleed と機構重複のため）
 読み込み時に `ItemDatabase` が従来の `passiveSkills` へ展開するので、下流のコードは変わらない。
 
 **量が実行時の状態で変わる効果も `stats` で書ける（段 3・2026-11-11）。** `per` を書くと `value` は 1 単位の量になり、
-乗る量は `value × 単位数`（単位数 0 なら何もしない）。`per` は `coinsSpent` / `axis:軸名` / `enemyBleed` / `enemyPoison` /
+乗る量は `value × 単位数`（単位数 0 なら何もしない）。`per` は `coinsSpent` / `swordWindfall`（溶金の領主剣・持っている間に秘宝・賽・イベントから得た金・2026-11-19）/ `axis:軸名` / `enemyBleed` / `enemyPoison` /
 `chargeSpent` / `turnsElapsed`、`perEvery: N` で「N につき」（切り捨て）、`perMax: N` で単位数の上限、
 `on: トリガー名` でステータスの既定と違うタイミング（OnWired など）を指定する。式は `StatModifierEffect`
 （[DAMAGE_CALC_REFERENCE.md](../Assets/Scripts/CombatSystem/DAMAGE_CALC_REFERENCE.md) §2-C）。
