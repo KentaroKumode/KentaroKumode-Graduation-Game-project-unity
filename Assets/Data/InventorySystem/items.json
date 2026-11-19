@@ -1169,7 +1169,7 @@
     {
       "id": "溶金の領主剣",
       "name": "溶金の領主剣",
-      "description": "消費したゴールド累計×0.005 を与ダメージ倍率に加算（200Gで実質×2）。",
+      "description": "秘宝・賽・イベントからゴールドを得るたび、1G につき与ダメージ +2%。",
       "flavorText": "領主は貨幣を炉へ投じるたび、剣へ新しい都市名を刻ませた。最後の銘は彼自身の領地で、そこだけ金が剥がれている。",
       "category": "Passive",
       "rarity": "LEGENDARY",
@@ -1178,8 +1178,8 @@
       "stats": [
         {
           "stat": "dmgPct",
-          "value": 0.5,
-          "per": "coinsSpent",
+          "value": 2,
+          "per": "swordWindfall",
           "when": {
             "hit": true
           }

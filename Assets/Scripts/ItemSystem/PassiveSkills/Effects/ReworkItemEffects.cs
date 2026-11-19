@@ -49,7 +49,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public static void Gold(int n, string label)
         {
             var run = Run;
-            if (run != null && n > 0) GameLoop.GoldIncome.Gain(run, n, label);
+            if (run != null && n > 0) GameLoop.GoldIncome.Gain(run, n, label, GameLoop.GoldOrigin.Item);
         }
 
         /// <summary>このターン 1 回だけ (key に今のターン番号を書く)。</summary>

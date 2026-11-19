@@ -962,7 +962,7 @@ namespace AutoTest
                 void BuyPhase3Items()
                 {
                     float gate = RunPowerBudget.GateScale(PowerGap());
-                    bool gk = run.OwnsPassive(GameLoop.ItemIds.GoldenKingSword);
+                    bool gk = false;   // 2026-11-19: 溶金の領主剣は使った金では伸びなくなった (秘宝・賽・イベントの金で伸びる) ので、 買い回しを緩める特別扱いをやめた
                     bool lastShopForP3 = run.Depth >= run.normalClearFloor;   // フェーズ3 の lastShop と同じ式
                     int passiveGate = lastShopForP3 ? 0 : Mathf.RoundToInt((gk ? 15 : 25) * gate);
                     int weaponGate  = lastShopForP3 ? 0 : Mathf.RoundToInt((gk ? 25 : 40) * gate);
@@ -985,8 +985,8 @@ namespace AutoTest
                     if (run.coins < price) return;
                     int after = run.coins - price;
                     float gate = RunPowerBudget.GateScale(PowerGap());
-                    int passiveGate = Mathf.RoundToInt((run.OwnsPassive(GameLoop.ItemIds.GoldenKingSword) ? 15 : 25) * gate);
-                    int weaponGate  = Mathf.RoundToInt((run.OwnsPassive(GameLoop.ItemIds.GoldenKingSword) ? 25 : 40) * gate);
+                    int passiveGate = Mathf.RoundToInt(25 * gate);   // 溶金の特別扱いは 2026-11-19 にやめた
+                    int weaponGate  = Mathf.RoundToInt(40 * gate);
                     DiscardRolls++;
                     int nth = Mathf.Min(3, inv.rerollCount);   // 0=1回目 … 3=4回目以降
                     DiscardRollsByNth[nth]++;
@@ -1330,7 +1330,7 @@ namespace AutoTest
                 //   旧 = 余剰金保持 / 新 = **積極消費**で与ダメ倍率を伸ばす
                 //   → 通常購入閾値を緩める (=より積極的に買い回し)
                 // ============================================================
-                bool hasGoldKing = run != null && run.OwnsPassive(GameLoop.ItemIds.GoldenKingSword);
+                bool hasGoldKing = false;   // 2026-11-19: 溶金の領主剣は使った金では伸びなくなったので、 積極消費の特別扱いをやめた
                 if (lastShop)
                 {
                     // ボス直前。 **まず防御系を上限まで積む** ── 装備より先に生存資源を確保する。

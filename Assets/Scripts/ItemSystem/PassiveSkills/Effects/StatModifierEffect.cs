@@ -88,7 +88,7 @@ namespace ItemSystem.PassiveSkills.Effects
         private readonly int[] _perMax;       // 0 = 上限なし
 
         /// <summary>段 3 の単位数の出どころ。 式は旧クラスのものをそのまま写している。</summary>
-        private enum Per { None, CoinsSpent, Axis, EnemyBleed, EnemyPoison, ChargeSpent, TurnsElapsed }
+        private enum Per { None, CoinsSpent, Axis, EnemyBleed, EnemyPoison, ChargeSpent, TurnsElapsed, SwordWindfall }
 
         public StatModifierEffect(string skillId, StatJson[] stats, IPassiveSkillEffect inner = null)
         {
@@ -183,6 +183,7 @@ namespace ItemSystem.PassiveSkills.Effects
             switch (name)
             {
                 case "coinsSpent":   return Per.CoinsSpent;
+                case "swordWindfall": return Per.SwordWindfall;      // 溶金の領主剣 (RunState.swordWindfallGold)
                 case "enemyBleed":   return Per.EnemyBleed;
                 case "enemyPoison":  return Per.EnemyPoison;
                 case "chargeSpent":  return Per.ChargeSpent;
@@ -216,6 +217,7 @@ namespace ItemSystem.PassiveSkills.Effects
             switch (_per[i])
             {
                 case Per.CoinsSpent:   q = GameLoop.GameManager.Instance?.Run?.coinsSpent ?? 0; break;
+                case Per.SwordWindfall: q = GameLoop.GameManager.Instance?.Run?.swordWindfallGold ?? 0; break;
                 case Per.Axis:         q = ctx.AxisDepth(_perAxis[i]); break;
                 case Per.EnemyBleed:   q = ctx.enemyBleedStacks; break;
                 case Per.EnemyPoison:  q = ctx.EnemyPoison; break;
