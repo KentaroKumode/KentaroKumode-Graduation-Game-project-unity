@@ -262,7 +262,7 @@ namespace ItemSystem.PassiveSkills
             Register(new ReturningBloodSickle()); Register(new BloodWedge());
             Register(new CorrosionCrown()); Register(new BoneMeltOil());
             Register(new WildKilnHearth()); Register(new PillarBreakerCharge());
-            Register(new ThunderReliquary());
+            Register(new ThunderReliquary()); Register(new FourthStrikeCore());
             Register(new FallenCastleCornerstone()); Register(new BorderGuardStandard());
 
             // ============================
