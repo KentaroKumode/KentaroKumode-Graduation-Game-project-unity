@@ -229,8 +229,14 @@ namespace ItemSystem.PassiveSkills
         // 段が変わっても引き継がれる。
 
         /// <summary>[persistent] ヴェスカのシールド。 §6-3 段0 で **半減(切り捨て) → 抽選付与** の順に処理する。
-        /// 定常上限は「毎ターン収入 × 2」で自動的に決まるため別途キャップ不要。</summary>
-        public int vescaShield;
+        /// 定常上限は「毎ターン収入 × 2」で自動的に決まるため別途キャップ不要。
+        /// 挑戦カード〈敵のシールド〉もこの池。 <b>増えた分には〈血の楔〉(<see cref="WedgeEnemyGain"/>) が掛かる</b> (2026-11-20)。</summary>
+        public int vescaShield
+        {
+            get => _vescaShield;
+            set { if (value > _vescaShield) value = _vescaShield + WedgeEnemyGain(value - _vescaShield); _vescaShield = value; }
+        }
+        private int _vescaShield;
         /// <summary>[persistent] このターン、 ヴェスカのシールドが吸収したダメージ量。
         /// 返しの盾 / 不落の城盾 の反射量算出に使う。 遺物学者の OnTurnStart で 0 に戻す。</summary>
         public int vescaShieldAbsorbedThisTurn;
@@ -689,11 +695,12 @@ namespace ItemSystem.PassiveSkills
         public float lastCritAddPct;
 
 
-        /// <summary>敵(自身)の回復量に enemyHealReductionPct を適用して返す（治癒阻害用）。</summary>
+        /// <summary>敵(自身)の回復量に enemyHealReductionPct と〈血の楔〉を適用して返す（治癒阻害用）。</summary>
         public int ReduceEnemyHeal(int heal)
         {
-            if (enemyHealReductionPct <= 0f || heal <= 0) return heal;
-            return (int)(heal * (1f - enemyHealReductionPct));
+            if (heal <= 0) return heal;
+            if (enemyHealReductionPct > 0f) heal = (int)(heal * (1f - enemyHealReductionPct));
+            return WedgeEnemyGain(heal);   // 〈血の楔〉(2026-11-20)
         }
 
 
