@@ -66,9 +66,37 @@ namespace ItemSystem.PassiveSkills.Keywords
         /// <summary>臨界を n 溜める。 閾値をまたいだら爆発を決め、 出来事を配る。
         /// 爆発は次の攻撃に乗る (CombatManager が <see cref="BurstCountKey"/> を見て使う)。
         /// 〈帳簿外の爆薬〉(rinkaiMultiBurst) があれば臨界を閾値ぶんだけ減らし、 溜まっている限り何度でも爆発する。</summary>
-        public static void AddHeat(CombatContext ctx, int n)
+        /// <summary>[計装 2026-11-19] 1 回の (いちばん外側の) 足し込みで起きた爆発の回数の最大と、 その時の出どころ・量・溜まり。 BOT がランの始めに空にする。</summary>
+        public static int HeatMaxBurstsOneAdd;
+        public static string HeatMaxBurstsInfo = "";
+        private static int _heatOuter;
+
+        /// <summary>src = 出どころの名前 (null なら働いている品の名前・品の外なら「本体」)。 計装にだけ使う。</summary>
+        public static void AddHeat(CombatContext ctx, int n, string src = null)
         {
             if (ctx == null || n <= 0 || ctx.rinkaiThreshold <= 0 || ctx.heatSealed) return;   // heatSealed: 誓約で封じた
+            bool outer = _heatOuter == 0;
+            int n0 = n, meterBefore = ctx.rinkaiMeter, burstsBefore = (int)ctx.GetAccumulated(BurstTotalKey);
+            _heatOuter++;
+            try { AddHeatCore(ctx, n); }
+            finally
+            {
+                _heatOuter--;
+                if (outer)
+                {
+                    int bursts = (int)ctx.GetAccumulated(BurstTotalKey) - burstsBefore;
+                    if (bursts > HeatMaxBurstsOneAdd)
+                    {
+                        HeatMaxBurstsOneAdd = bursts;
+                        string who = src ?? (string.IsNullOrEmpty(CombatContext.CurrentSkillId) ? "本体" : CombatContext.CurrentSkillId);
+                        HeatMaxBurstsInfo = $"{who} +{n0} (溜まり {meterBefore}・閾値 {ctx.rinkaiThreshold}・帳簿外 {(ctx.rinkaiMultiBurst ? "あり" : "なし")}・ターン {ctx.currentTurn}) → 爆発 {bursts} 回";
+                    }
+                }
+            }
+        }
+
+        private static void AddHeatCore(CombatContext ctx, int n)
+        {
             n += ctx.heatGainBonus;   // 〈炉温〉の①: 臨界を得るたび +1
             float relicHeat = MetaProgression.Relics.RelicApplicator.GetHeatGainPct();   // 遺物 炉温 2 個: 臨界の獲得量 +20% (切り上げ)
             if (relicHeat > 0f) n += (int)System.Math.Ceiling(n * relicHeat);

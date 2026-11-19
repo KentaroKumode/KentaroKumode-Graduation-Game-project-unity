@@ -485,7 +485,7 @@ namespace CombatSystem
             // 挑戦カード: 毎ターン、 臨界のメーター +N (臨界の品が無い・誓約で封じられている時は AddHeat が 0 にする)
             {
                 int heat = MetaProgression.MetaBuffApplicator.GetHeatPerTurn();
-                if (heat > 0 && ctx != null) ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, heat);
+                if (heat > 0 && ctx != null) ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, heat, "挑戦カード(毎ターン)");
             }
             SyncHPFromContext(ctx);
             ApplyGuardCycle(ctx);
@@ -1622,7 +1622,7 @@ namespace CombatSystem
             //   攻撃端子の出目の合計を溜める。 閾値をまたいだ時点で爆発が決まり、 次の攻撃に乗る (Kw.AddHeat)。
             //   品が溜める分 (被弾・充電・会心など) は、 それぞれの出来事の時点で Kw.AddHeat を通る。
             if (ctx.rinkaiThreshold > 0 && attackSum > 0)
-                ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, attackSum);
+                ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, attackSum, "ターンの終わり(攻撃の端子の合計)");
 
             // --- 収支トリガー (柱2: OnRollWin/Lose の再定義 = 収支±のターン。解決後に発火) ---
             int balance = (dealtDmg + dealtFixed) - takenApplied;
