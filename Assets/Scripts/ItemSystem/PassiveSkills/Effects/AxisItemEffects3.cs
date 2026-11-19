@@ -206,4 +206,38 @@ namespace ItemSystem.PassiveSkills.Effects
             Rw.Log($"[積雷の黒舎利] 充電 {ctx.GetCharge()} → 30 を超えた分 {steps} × 最大 HP の 1% = {dmg} (軽減不可)");
         }
     }
+
+    // ============================================================
+    //  シールド
+    // ============================================================
+
+    /// <summary>落城の礎石: 毎ターンの頭にシールドが半分になる時 (OnShieldDecay・量 = 失った分)、 消える分 × (1 + 堅牢 × 20%) (切り捨て) を
+    /// 敵への軽減不可ダメージにする (Kw.DamageEnemy)。</summary>
+    public class FallenCastleCornerstone : IPassiveSkillEffect
+    {
+        public const string Id = "落城の礎石";
+        public string SkillId => Id;
+        public const int PctPerDepth = 20;
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnShieldDecay };
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
+        {
+            int lost = Kw.EventAmount(ctx);
+            if (lost <= 0) return;
+            int dmg = (int)((long)lost * (100 + PctPerDepth * ctx.AxisDepth(AxisRules.Shield)) / 100);
+            Kw.DamageEnemy(ctx, dmg);
+            Rw.Log($"[落城の礎石] シールドの半減で消えた {lost} → 敵へ {dmg} (軽減不可)");
+        }
+    }
+
+    /// <summary>防人の軍標: シールドを得るたび (OnShieldGain)、 この戦闘の最終与ダメージ倍率 +5% (ctx.finalDamagePct)。 回数で数える・上限なし (作者の決定)。</summary>
+    public class BorderGuardStandard : IPassiveSkillEffect, IRelicDisplay
+    {
+        public const string Id = "防人の軍標";
+        public string SkillId => Id;
+        public const int PctPerGain = 5;
+        /// <summary>秘宝の列の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Pct(ctx.finalDamagePct / 100f);
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnShieldGain };
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.finalDamagePct += PctPerGain;
+    }
 }
