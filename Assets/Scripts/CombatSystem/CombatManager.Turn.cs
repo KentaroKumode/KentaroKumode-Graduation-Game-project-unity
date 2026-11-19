@@ -1070,6 +1070,10 @@ namespace CombatSystem
             bool splitHits = !skipAttack && atkBase > 1
                 && GameLoop.EquippedDie.IdOf(GameLoop.GameManager.Instance?.Run) == GameLoop.DieIds.Split;
             int hitBase = splitHits ? (atkBase + 1) / 2 : atkBase;
+            // 2 打目を 1 打目と同じ条件で通すため、 1 打目の前の値を控える (2026-11-19 監査で見つけた漏れ:
+            //   ProcessDamage の OnPreDealDamage と ApplyWinDamageModifiers は与ダメの池・会心倍率・会心率を ctx の上で足すので、
+            //   戻さずに 2 打目を通すと同じ % が 2 回足され、 安全装置 ② (池は 1 回だけ) が抜けていた)
+            float splitPool = ctx.outgoingDamageMultiplier, splitCritMul = ctx.criticalMultiplier, splitCritAdd = ctx.critRatePctAdd;
             var (dealtDmg, dealtFixed, isCrit) = psm.ProcessDamage(
                 hitBase, ctx.pursuitDamage, playerCritBaseRate);
             int lbStage = GameLoop.GameManager.Instance?.Run?.limitBreakStage ?? 0;
@@ -1078,8 +1082,12 @@ namespace CombatSystem
             {
                 // 2 回目の前に固定ダメの枠を空にする ── 空にしないと 1 回目の固定ダメ (毒・爆発・品が預けた分) が 2 回目にも返って二重に入る。
                 ctx.fixedDamageToEnemy = 0;
+                float afterPool = ctx.outgoingDamageMultiplier, afterCritMul = ctx.criticalMultiplier, afterCritAdd = ctx.critRatePctAdd;
+                ctx.outgoingDamageMultiplier = splitPool; ctx.criticalMultiplier = splitCritMul; ctx.critRatePctAdd = splitCritAdd;
                 var (dmg2, fix2, crit2) = psm.ProcessDamage(hitBase, 0, playerCritBaseRate);
                 dmg2 = ApplyWinDamageModifiers(dmg2, ref fix2, ref crit2, lbStage, psm, ctx);
+                // この後の処理 (計装・画面の倍率) は 1 打目の後の値を読む前提なので、 1 打目の後の値へ戻す
+                ctx.outgoingDamageMultiplier = afterPool; ctx.criticalMultiplier = afterCritMul; ctx.critRatePctAdd = afterCritAdd;
                 dealtDmg += dmg2; dealtFixed += fix2; isCrit |= crit2;
                 Debug.Log($"[賽] 分け身の賽: 攻撃 {atkBase} → {hitBase} × 2 回 (与ダメ {dealtDmg})");
             }
