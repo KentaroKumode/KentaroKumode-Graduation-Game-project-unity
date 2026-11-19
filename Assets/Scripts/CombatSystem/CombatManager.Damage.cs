@@ -203,6 +203,13 @@ namespace CombatSystem
             int ledgerBeforeRed = totalDmg;   // [計装] 敵の軽減パッシブで削られた量
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnPreReceiveDamage);
             totalDmg = System.Math.Max(0, ctx.finalDamage);
+            // 〈血の楔〉(2026-11-20・§23-32): 敵の軽減パッシブで減った量のうち 出血 ÷ (出血 + 40) を戻す (効き目を弱める)
+            if (ctx.bleedWedge && ledgerBeforeRed > totalDmg)
+            {
+                int cut = ledgerBeforeRed - totalDmg;
+                int back = cut - ctx.WedgeEnemyGain(cut);
+                if (back > 0) { totalDmg += back; Debug.Log($"[血の楔] 敵の軽減 −{cut} のうち {back} を戻す (出血 {ctx.enemyBleedStacks}) → {totalDmg}"); }
+            }
             EnemyHpLedger.NoteMainEnemyReduction(ledgerBeforeRed, totalDmg);
             if (CombatStats.DiagWinAttack) CombatStats.Stage(8, totalDmg);   // 段 H
 

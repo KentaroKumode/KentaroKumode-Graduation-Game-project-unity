@@ -494,7 +494,7 @@ namespace CombatSystem
             var floorMod = GameLoop.GameManager.Instance?.ActiveModifier;
             if (floorMod != null && floorMod.enemyPerTurnHeal > 0 && enemyHP > 0)
             {
-                int heal = Mathf.Min(currentEnemy.maxHP - enemyHP, floorMod.enemyPerTurnHeal);
+                int heal = ctx.WedgeEnemyGain(Mathf.Min(currentEnemy.maxHP - enemyHP, floorMod.enemyPerTurnHeal));   // 〈血の楔〉(2026-11-20)
                 if (heal > 0)
                 {
                     enemyHP += heal;
@@ -511,7 +511,7 @@ namespace CombatSystem
                 float regen = MetaProgression.MetaDebuffApplicator.GetEnemyRegenPct();
                 if (regen > 0f && enemyHP < eMax)
                 {
-                    int heal = Math.Min(eMax - enemyHP, Math.Max(1, Mathf.CeilToInt(eMax * regen / 100f)));
+                    int heal = ctx.WedgeEnemyGain(Math.Min(eMax - enemyHP, Math.Max(1, Mathf.CeilToInt(eMax * regen / 100f))));   // 〈血の楔〉(2026-11-20)
                     enemyHP += heal;
                     ctx.enemyCurrentHP = enemyHP;
                     EnemyHpLedger.NoteHeal(heal); EnemyHpLedger.CtxOverwritten();   // [計装]
