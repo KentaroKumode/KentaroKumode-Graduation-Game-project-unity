@@ -485,6 +485,7 @@ namespace AutoTest
                 _cur.chainRepeats = ItemSystem.PassiveSkills.PassiveSkillManager.ChainRepeats;
                 _cur.chainGuardHits = ItemSystem.PassiveSkills.PassiveSkillManager.ChainGuardHits;
                 _cur.chainPath = ItemSystem.PassiveSkills.PassiveSkillManager.ChainDeepestPath;
+                _cur.heatBurstInfo = ItemSystem.PassiveSkills.Keywords.Kw.HeatMaxBurstsOneAdd + "|" + ItemSystem.PassiveSkills.Keywords.Kw.HeatMaxBurstsInfo;
                 _cur.goldKeys = new string[GameLoop.GoldIncome.RunByDepthSource.Count];
                 _cur.goldVals = new int[_cur.goldKeys.Length];
                 { int gi = 0; foreach (var kv in GameLoop.GoldIncome.RunByDepthSource) { _cur.goldKeys[gi] = kv.Key; _cur.goldVals[gi++] = kv.Value; } }

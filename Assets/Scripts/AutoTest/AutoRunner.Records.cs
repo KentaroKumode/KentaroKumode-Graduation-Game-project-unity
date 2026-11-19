@@ -196,7 +196,7 @@ namespace AutoTest
             public int ashBaseChoice = -1, ashBaseTurn = -1;
             /// <summary>[計装 2026-11-19] このランの連鎖の深さの最大 / 同じ品が連鎖で 2 度以上働いた回数 / 不具合の網に掛かった回数。</summary>
             public int chainMaxDepth, chainRepeats, chainGuardHits;
-            public string chainPath = "";
+            public string chainPath = "", heatBurstInfo = "";
             public bool ashBaseOpened;
             /// <summary>[計装 2026-11-14] 〈徒労〉: 掛かった通常の戦闘の勝ちの数 (今の形 = 何も得られなかった戦闘 / 別の形 = 品を落とさなかった戦闘)・
             /// 止めた品のドロップ (当たったが配らなかった数・戦闘のドロップと強奪)・開けた宝箱 (宝の点・縄張りの宝・形によらない)・そのうち〈徒労〉で空だった数。</summary>
