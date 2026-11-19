@@ -33,19 +33,14 @@ namespace ItemSystem.PassiveSkills.Keywords
         //  臨界
         // ============================================================
 
-        /// <summary>このターン、 爆発で次の攻撃に乗る回数 (アクセス用キー・[perTurn] ではなく使ったら 0)。</summary>
-        public const string BurstCountKey = "kw.burstCount";
         /// <summary>[persistent・戦闘開始で 0] この戦闘で爆発した回数の累計 (端子〈爆炎斬り〉が読む・ADR-0014)。</summary>
         public const string BurstTotalKey = "kw.burstTotal";
         /// <summary>閾値を超えて溜まっていた臨界 (〈溢れ取りの鋳型〉が読む)。</summary>
         public const string BurstExcessKey = "kw.burstExcess";
-        /// <summary>爆発に上乗せするダメージ (超臨界爆発の ×1.5 の分・品が積む。 爆発を使ったら 0)。</summary>
-        public const string BurstBonusKey = "kw.burstBonus";
-        /// <summary>この攻撃が爆発を使った (〈荒砥〉〈爆破祭の小切手〉が読む)。 毎ターン攻撃の前に書き直す。</summary>
-        public const string BurstThisAttackKey = "kw.burstThisAttack";
-        /// <summary>直近に爆発を使ったターンと、 そのダメージ (〈二度目の打金〉が読む)。</summary>
-        public const string BurstAppliedTurnKey = "kw.burstAppliedTurn";
-        public const string BurstAppliedDmgKey = "kw.burstAppliedDmg";
+        /// <summary>直近に爆発したターン (〈二度目の打金〉が読む)。</summary>
+        public const string BurstTurnKey = "kw.burstTurn";
+        /// <summary>[persistent・戦闘開始で 0] この戦闘で、 爆発のダメージそのもので敵が倒れた (1/0・〈爆破祭の小切手〉が読む)。</summary>
+        public const string BurstKilledKey = "kw.burstKilled";
         /// <summary>いま決まった爆発が超臨界か (1/0・爆発の出来事を配っている間に読む)。 超臨界爆発 = 閾値を引く前の臨界が閾値の 2 倍以上 (2026-11-20・§23-32)。</summary>
         public const string BurstSuperKey = "kw.burstSuper";
         /// <summary>いま決まった爆発 1 回のダメージ (<see cref="BurstBase"/>・超臨界なら ×1.5・爆発の出来事を配っている間に読む)。</summary>
@@ -67,8 +62,7 @@ namespace ItemSystem.PassiveSkills.Keywords
             return b + ctx.burstStackBonus;
         }
 
-        /// <summary>臨界を n 溜める。 閾値をまたいだら爆発を決め、 出来事を配る。
-        /// 爆発は次の攻撃に乗る (CombatManager が <see cref="BurstCountKey"/> を見て使う)。
+        /// <summary>臨界を n 溜める。 閾値をまたいだら爆発し、 その場でダメージを出して (ADR-0016)、 出来事を配る。
         /// 〈帳簿外の爆薬〉(rinkaiMultiBurst) があれば臨界を閾値ぶんだけ減らし、 溜まっている限り何度でも爆発する。</summary>
         /// <summary>[計装 2026-11-19] 1 回の (いちばん外側の) 足し込みで起きた爆発の回数の最大と、 その時の出どころ・量・溜まり。 BOT がランの始めに空にする。</summary>
         public static int HeatMaxBurstsOneAdd;
@@ -114,19 +108,18 @@ namespace ItemSystem.PassiveSkills.Keywords
                 bool super = ctx.rinkaiMeter >= 2 * th;
                 int excess = ctx.rinkaiMeter - th;
                 ctx.rinkaiMeter = ctx.rinkaiMultiBurst ? excess : 0;
-                ctx.rinkaiBurstActive = true;
-                ctx.accumulatedValues[BurstCountKey] = ctx.GetAccumulated(BurstCountKey) + 1;
                 ctx.accumulatedValues[BurstTotalKey] = ctx.GetAccumulated(BurstTotalKey) + 1;
                 ctx.accumulatedValues[BurstExcessKey] = ctx.rinkaiMultiBurst ? 0 : excess;
+                ctx.accumulatedValues[BurstTurnKey] = ctx.currentTurn;
                 int burstDmg = BurstBase(ctx);
-                if (super)
-                {
-                    ctx.accumulatedValues[BurstBonusKey] = ctx.GetAccumulated(BurstBonusKey) + burstDmg / 2;
-                    burstDmg += burstDmg / 2;
-                }
+                if (super) burstDmg += burstDmg / 2;
                 ctx.accumulatedValues[BurstSuperKey] = super ? 1 : 0;
                 ctx.accumulatedValues[BurstDamageNowKey] = burstDmg;
                 Debug.Log($"[臨界] 閾値{th} 到達 → {(super ? "超臨界" : "")}爆発 (超過 {excess}・残 {ctx.rinkaiMeter}・ダメージ {burstDmg})");
+                // ADR-0016: 閾値に届いたその場でダメージを出す (軽減無視・倍率は乗らない)。 旧: 次の攻撃の固定ダメの枠に乗せていた
+                var pm = PassiveSkillManager.Instance;
+                var cm = pm != null && ReferenceEquals(pm.Context, ctx) ? CombatSystem.CombatManager.Instance : null;
+                if (cm != null && cm.LandBurst(ctx, burstDmg)) ctx.accumulatedValues[BurstKilledKey] = 1;
                 Raise(ctx, PassiveSkillTrigger.OnRinkaiBurst, th);
                 if (super) Raise(ctx, PassiveSkillTrigger.OnSuperBurst, burstDmg);
                 int relicSh = MetaProgression.Relics.RelicApplicator.GetBurstShield();   // 遺物 炉温 3 個: 爆発のたびにシールド +6
