@@ -72,8 +72,6 @@ namespace CombatSystem
         const int FreeRerollPair = 2;       // 特別 2 個そろい
         /// <summary>封じ: 敵のパッシブ・ターン効果を止めるターン (BeginNewTurn で 1 ずつ減る → 2 で「このターンの残り + 次のターン」)。 旧 T4 を本体へ移した。</summary>
         const int SealPassiveTurns = 2;
-        /// <summary>連なり (連なりの賽): 次のターンの振り直しの無料 +1 回・手札 +1 枚。</summary>
-        const int StraightFreeReroll = 1, StraightExtraDraw = 1;
 
         /// <summary>役を適用する。 <paramref name="tier"/> は使わない (ADR-0015 で Tier をやめた・呼び手の互換のため残す)。</summary>
         public static void Apply(RoleKind role, DiceFaceParts.Tier tier, CombatContext ctx, ref RoleOutcome outcome)
@@ -91,11 +89,8 @@ namespace CombatSystem
         {
             if (role == RoleKind.Straight)
             {
-                // 連なり: 次のターンの流れを作る (ダメージではない)
-                ctx.nextTurnBuffs.TryGetValue(FreeRerollKey, out float fr);
-                ctx.nextTurnBuffs[FreeRerollKey] = fr + StraightFreeReroll;
-                var deck = CombatManager.Instance?.TerminalDeck;
-                if (deck?.state != null) deck.state.extraDrawNext += StraightExtraDraw;
+                // 連なり (2026-11-20): そのターン、 挿した端子がすべて倍化する。 効果は端子の解決 (TerminalCards.Resolve) が持つので、 ここでは何もしない
+                //   (旧: 次のターンの振り直し 1 回無料・手札 +1 枚)
                 return;
             }
 

@@ -852,7 +852,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
                             時間: エスカレーションの遅延 (term Coolant と同じキー) +2 / 1 段戻す /
                             封じ: enemyPassivesDisabledTurns = 2 (2 個そろいもゾロ目も・旧 T4 を本体へ)
            次ターンへ     … 封じ: currentBuffs["roleEnemyAtkCut"] (敵攻撃 −40%) / ["roleEnemyStun"] (敵が行動しない) /
-                            特別: ["roleFreeReroll"] (無料リロール 2 回) / 連なり: ["roleFreeReroll"] +1 と 手札 +1 枚 (端子の extraDrawNext)
+                            特別: ["roleFreeReroll"] (無料リロール 2 回) / 連なり: そのターン、 挿した端子がすべて倍化 (TerminalCards.Resolve・〈残響〉と同じ・2026-11-20〜)
            特別 2 個そろい … 小さな極も撃つ (面数×5%・ボス・ヴェスカは面数×2.5%・旧 T4 を本体へ)
            盤面フラグ (RoleOutcome)
                           … 極 (yachtFired + yachtChunkPct: 敵最大HP の 面数×30% (ボス・ヴェスカは ×15%) を軽減無視) /

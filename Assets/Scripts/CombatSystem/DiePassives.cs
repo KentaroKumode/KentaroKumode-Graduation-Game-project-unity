@@ -24,14 +24,16 @@ namespace CombatSystem
         public const int RustyNailMin = 5;
         /// <summary>渡し守: 振り直した後の目を攻撃に挿すと攻撃 +N。</summary>
         public const int FerryAttack = 2;
-        /// <summary>夜番: 防御に挿した目が敵の出目の最大より大きければシールド +N。</summary>
-        public const int NightWatchShield = 3;
+        /// <summary>夜番: 防御に挿した目が敵の出目の最大より大きければシールド +目 × N (2026-11-20: 旧 +3 固定)。</summary>
+        public const int NightWatchShieldPerPip = 2;
+        /// <summary>秤: 目がほかの 2 つの目の間の値なら、 挿した先に +N (2026-11-20: 旧 +1)。</summary>
+        public const int ScaleBonus = 3;
         /// <summary>残り火: 挿さずに捨てた目の何倍を次のターンの攻撃に足すか。</summary>
         public const int EmberMul = 2;
         /// <summary>拾い物: ①が出たターンの終わりにゴールド +N。</summary>
         public const int ScavengerGold = 1;
-        /// <summary>古銭: ⑧が出たターンに敵を倒すとゴールド +N。</summary>
-        public const int OldCoinGold = 3;
+        /// <summary>古銭: ⑧が出るたびゴールド +N (2026-11-20: 旧「⑧が出たターンに敵を倒すと +3」)。</summary>
+        public const int OldCoinGold = 2;
         public const int OldCoinFace = 8;
         /// <summary>呪物の賽 (ADR-0016・2026-11-20): 店とイベントで秘宝を選ぶ時の LEGENDARY の重みに掛ける数 (他のレア度の重みはそのまま)。</summary>
         public const float CursedLegendaryMul = 3f;
@@ -88,13 +90,13 @@ namespace CombatSystem
                         if (k == TerminalKind.Attack) o.attackAdd += System.Math.Max(0, (7 - val) / 2);
                         break;
                     case DieIds.Scale:
-                        if (n == 3 && Between(v, i)) AddByKind(o, k, 1);
+                        if (n == 3 && Between(v, i)) AddByKind(o, k, ScaleBonus);
                         break;
                     case DieIds.Ferry:
                         if (env.diceRerolled && k == TerminalKind.Attack) o.attackAdd += FerryAttack;
                         break;
                     case DieIds.NightWatch:
-                        if (k == TerminalKind.Block && val > env.enemyMaxDie) o.shield += NightWatchShield;
+                        if (k == TerminalKind.Block && val > env.enemyMaxDie) o.shield += val * NightWatchShieldPerPip;
                         break;
                     case DieIds.HeavyRead:
                         if (env.heavyTurn) AddByKind(o, k, val / 2);
@@ -128,7 +130,7 @@ namespace CombatSystem
             }
         }
 
-        /// <summary>ターンの終わり: 拾い物 (①が出た) と古銭 (⑧が出て敵を倒した) のゴールド。 <paramref name="dice"/> = このターンの出目。</summary>
+        /// <summary>ターンの終わり: 拾い物 (①が出た) と古銭 (⑧が出た数) のゴールド。 <paramref name="dice"/> = このターンの出目。</summary>
         public static void OnTurnEnd(RunState run, int[] dice, bool enemyKilled)
         {
             if (run == null || dice == null) return;
@@ -138,10 +140,15 @@ namespace CombatSystem
                 GoldIncome.Gain(run, ScavengerGold, "拾い物の賽", GoldOrigin.Die);
                 UnityEngine.Debug.Log($"[賽] 拾い物の賽: ①が出た → +{ScavengerGold}G");
             }
-            else if (die == DieIds.OldCoin && enemyKilled && Has(dice, OldCoinFace))
+            else if (die == DieIds.OldCoin)
             {
-                GoldIncome.Gain(run, OldCoinGold, "古銭の賽", GoldOrigin.Die);
-                UnityEngine.Debug.Log($"[賽] 古銭の賽: ⑧のターンに撃破 → +{OldCoinGold}G");
+                int eights = 0;
+                foreach (int d in dice) if (d == OldCoinFace) eights++;
+                if (eights > 0)
+                {
+                    GoldIncome.Gain(run, OldCoinGold * eights, "古銭の賽", GoldOrigin.Die);
+                    UnityEngine.Debug.Log($"[賽] 古銭の賽: ⑧ × {eights} → +{OldCoinGold * eights}G");
+                }
             }
         }
 
