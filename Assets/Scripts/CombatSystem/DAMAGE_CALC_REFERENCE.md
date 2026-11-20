@@ -151,6 +151,7 @@ return (total, fixedDamageToEnemy, isCritical)
 total = ProcessDamage結果
 (画竜点睛) total = ceil((garyoDieValue+10) × criticalMultiplier)   ※発動時上書き・会心確定
 outgoingDamageMultiplier += メタ% + 遺物% + 研磨剤1.5 + consDmgMultPct/100   （全部同じプールへ加算）
+                                     ※メタ% = 整備パネル (2026-11-20〜): 基礎整備 5 段目 +10% / 〈戦意〉勝利ごと +1.5% / 〈剛胆〉エリートに +10% + 挑戦カード
 × outgoingDamageMultiplier        ← パッシブ(OnPreDealDamage で加算済み)/メタ/遺物/研磨剤/鬼火の油 を 1 回だけ掛ける
                                      ※鬼火の油は 2026-09-19 まで倍率適用後に ×(1+X%) を別掛けしていた
 + consAtkBurst                     ← 消費:攻撃バースト(単発)
@@ -197,7 +198,7 @@ outgoingDamageMultiplier += メタ% + 遺物% + 研磨剤1.5 + consDmgMultPct/10
 total = ProcessDamage結果
 × メタデバフ天変地異(×2.0)
 − メタバフ被ダメ軽減(最大−2,最低1)
-− playerFlatDamageReduction(不屈の鎧/苦難の刻印 合算, 最低1)
+− playerFlatDamageReduction(不屈の鎧/苦難の刻印/整備パネル〈不動〉−2 合算, 最低1)
 不抜の聖紋【職業/騎士 2026-06-28】: oathArmed && !oathBroken && HP≥80% → total −= ceil(total×0.4)。
   HP80%未満 (適用前 or この被ダメで割込予定) を検知した時点で oathBroken=true＝以後永久無効
 − floorMod.defeatDamageReduction(5層 地獄門 −2)
@@ -212,7 +213,7 @@ playerDamageNegateCharges>0 → total=0(獣の絆)
 痛覚遮断剤【職業/狂戦士 2026-06-28】: painkillerArmedThisTurn && total≥playerHP → total=playerHP−1（HP=1踏みとどまり・チェーン**最後**）
 → (ダメージ適用直前) 仕込み刃【職業/暗殺者 2026-06-28・2026-09-22 に倍率 1→5】: daggerArmed && total>0 → total=0 ＋ **その 5 倍**を enemyHP へ軽減不能で返す（`CombatManager` の仕込み刃の反撃倍率）。使ったターン限りで、被弾しなくても失効
 → 古い手紙【消耗品 2026-10-31】: accumulatedValues[Consumables.OldLetterGuardKey] > 0 → total=0（反撃なし）。仕込み刃の直後・同じく使ったターン限り。1 枚で 3 回使える
-→ (〈装甲〉r10 の一撃の上限の後) 〈無害灯〉【規則】(2026-11-20): 臨界 ≥ 15 なら 1 ターン 1 回 total −= floor(total / 2)・臨界を同じ量 (足りなければあるだけ) 使う
+→ (整備パネル〈不動〉の一撃の上限 = 最大 HP の 35% の後) 〈無害灯〉【規則】(2026-11-20): 臨界 ≥ 15 なら 1 ターン 1 回 total −= floor(total / 2)・臨界を同じ量 (足りなければあるだけ) 使う
 → playerHP −= total (+ fixedDamageToPlayer)
   fixedDamageToEnemy>0 は敗北時も敵へ(反撃/Counter/Riposte) / 出血
   痛覚遮断剤 post-clamp: メイン+固定ダメ適用後も painkillerArmedThisTurn 中は playerHP≤0 → 1 に復帰
@@ -285,7 +286,7 @@ ShieldBash の空振り（盾 0）が 34.2% → 66.1%、1 機会あたりの攻�
   そのターンに入る盾（ターン頭の付与）は半減されない。ヴェスカのシールド規約（GAME.md §13-4）と同じ。
 - **T1 は半減しない**。戦闘開始時の付与（開幕シールド・持ち越し `carriedShield`・消費アイテムの持ち込み）は、最初のターンにそのまま使える。
 - 期限付きの盾（`consShieldExpireTurn`）の失効は従来どおり（ターン終了時に残ターンを減らし、0 で `consShield = 0`）。
-- 整備パネル Guard（〈剛胆〉）r10 の持ち越しは従来どおり「**勝った**戦闘の終了時の残量 × 30%（切り上げ）」（`CombatManager` の戦闘終了処理・2026-09-13 に 50% → 30%）。
+- 整備パネル〈剛胆〉（主方針の枠・2026-11-20〜。旧 Guard r10）の持ち越しは従来どおり「**勝った**戦闘の終了時の残量 × 30%（切り上げ）」（`CombatManager` の戦闘終了処理・2026-09-13 に 50% → 30%）。
 - 波及: `ShieldBash` の弾（残存量の 20〜80%）が毎ターン目減りする / `HolyShield` の「ターン終了時に 3 未満なら +4」が発動しやすくなる /
   `Lifeline` の大きな盾は翌ターンから半減する。**バランスは未測定**（2026-10-16 時点。測定は回さない判断）。
 - 2026-10-28: `ShieldBash` I〜IV・`HolyShield`（衛士の慣い）・盾解放は削除／リワーク済み。半減は盾家系の
@@ -317,7 +318,7 @@ ShieldBash の空振り（盾 0）が 34.2% → 66.1%、1 機会あたりの攻�
 | `bossDiceBonus` | 強者/玉座/刹那(現在未使用) | swapで0 |
 | `enemyDefense`【2026-10-28】 | 敵の防御値。EnemyData.defense + 精鋭+2 / 硬鱗+4 / 重甲+4 (OnBattleStart)。 戦闘中に動くもの: 割れる装甲 −4 / 積み上がる装甲 +3 (OnTurnEnd)・構え (ターンの頭・`ApplyGuardCycle`)・鎧砕き | **戦闘保持**(start/swapで設定) |
 | `enemyArmorPen`【2026-10-28】 | 敵がプレイヤーの防御を固定で削る量。EnemyData.armorPen | **戦闘保持**(start/swapで設定) |
-| `playerDefenseBase` / `playerArmorPenBase`【2026-10-28】 | プレイヤーの防御・貫通の土台 = 初期防御 2 + 武器の `defense` / `armorPen`（[無印,+]） | 戦闘保持(start で設定) |
+| `playerDefenseBase` / `playerArmorPenBase`【2026-10-28】 | プレイヤーの防御・貫通の土台 = 初期防御 **5**（2026-11-20 に 2 から）+ 武器の `defense` / `armorPen`（[無印,+]）+ 整備パネル 基礎整備 2 段目 +2 + 遺物 | 戦闘保持(start で設定) |
 | `playerDefense`【2026-10-28】 | プレイヤーの防御値。ステータス `def`・一対一 が OnPostRoll で加算。（旧〈血令〉の 0 へ換算は 2026-11-11 に外した） | BeginNewTurnで土台へ |
 | `enemyArmorPenNegate`【2026-10-28】 | 敵の固定削りを打ち消す量。剣〈間合〉（ステータス `penNeg`）が OnPostRoll で加算 | BeginNewTurnで0 |
 | `playerArmorPen`【2026-10-28】 | プレイヤーの貫通。遺物 +N (BeginNewTurn)・ステータス `pen` (OnPostRoll) (役〈攻め〉T4 の +999 は 2026-11-18 に削除) | BeginNewTurnで土台+遺物へ |
@@ -1038,7 +1039,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
            → SyncHPFromContext (2026-11-11 #104)
 
 充電     chargeSum = 端子の結果の chargeAdd      ← 個数ではない (基本の〈充電〉は出目そのまま・〈雷溜め〉出目 +2 など)
-         → ctx.AddCharge(chargeSum)  (上限 ChargeMax=**30** + メタ種火r2 で +5)
+         → ctx.AddCharge(chargeSum)  (上限 ChargeMax=**30** + 整備パネル 種火・充電で +10)
          ※ ChargeMax は ADR-0010 で 10→30。 充電が**リロールの原資**になったため
          ※ chargeDiceCount(個数) も併算されるが AddCharge には渡らない
            (2026-08-03 確認: CombatManager.cs の `if (chargeSum > 0) ctx.AddCharge(chargeSum);`)
