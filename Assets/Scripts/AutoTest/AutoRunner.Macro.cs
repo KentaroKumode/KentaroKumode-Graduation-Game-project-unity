@@ -107,6 +107,17 @@ namespace AutoTest
             for (int i = 0; i < cands.Count; i++) { candNode[i] = map.GetNode(map.NodeIdAt(cands[i])); candDist[i] = dist[cands[i]]; }
             var shopCi = new int[shops.Count];
             for (int k = 0; k < shops.Count; k++) shopCi[k] = cands.IndexOf(shops[k]);
+            // 持ち越す物資の値 (2026-11-21・段 3): 物資は層をまたいで残る (RunState.provision はランの頭でしか満たさない) ので、
+            //   出口に着いた時に残る物資 1 につき、 次の層で HP を払わずに歩ける分 (1 歩 = HP HpPerSupply・HpWalkSteps と同じ換算) を次の層の HP の重みで足す。
+            //   比べる相手 (今すぐ出口へ = 値 0) との差で足す。 最後の層 (次の層が無い) は 0。
+            //   shortcut: 近道の残り (ただで動ける回数) は持ち越さないので、 層の頭の分を全部引く (使い切っていない分の持ち越しを少なめに見る)。
+            int nextLayer = layer + 1;
+            float carryW = nextLayer < MacroHpPer10.Length && run.playerMaxHP > 0
+                ? MacroHpPer10[nextLayer] * 10f * FreeMapParams.HpPerSupply / (FreeMapParams.MoveSupply * (float)run.playerMaxHP) : 0f;
+            int freeSupply = sim != null ? sim.FreeMovesLeft * FreeMapParams.MoveSupply : 0;
+            float Carry(float supply, int exitSteps) => exitSteps == int.MaxValue ? 0f
+                : carryW * Mathf.Clamp(supply - freeSupply - exitSteps * FreeMapParams.MoveSupply, 0f, run.provisionCap);
+            float carry0 = Carry(start.supply, toGoal[at]);
 
             void Search(int from, int[] dFrom, MacroSim s, float acc, int first, int depth)
             {
@@ -157,7 +168,7 @@ namespace AutoTest
                     if (!ok) continue;
                     float total = acc + gain;
                     // 嵐の航行: 「ここで切り上げて出口へ」との差。 回った後の出口の代償が、 今すぐ出口へ向かう代償より増えた分を引く
-                    float score = storm != null ? total - (storm.ExitCost(c, ns) - exit0) : total;
+                    float score = (storm != null ? total - (storm.ExitCost(c, ns) - exit0) : total) + Carry(ns.supply, toGoal[c]) - carry0;
                     int f = first < 0 ? c : first;
                     if (score > best + 1e-6f) { best = score; bestFirst = f; }
                     if (depth + 1 < MacroDepth && ns.hp > 0f)
