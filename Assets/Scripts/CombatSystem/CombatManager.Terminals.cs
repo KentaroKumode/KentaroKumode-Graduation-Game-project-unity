@@ -85,9 +85,9 @@ namespace CombatSystem
             if (ctx == null) return;
             // 〈打ち直し〉: この戦闘中の出目 +N (自ロールの後に足す既存の口へ渡す)
             ctx.accumulatedValues[FoundryBonusKey] = _deck.state.foundryBonus;
-            // 〈柔軟な戦略〉: 基本以外の発動が累計 N 回ごとに与ダメージ +10% (山札に入っていれば効く)
-            var run = GameLoop.GameManager.Instance?.Run;
-            if (run?.terminalDeck != null && run.terminalDeck.Contains(TerminalIds.Counter))
+            // 〈柔軟な戦略〉: 基本以外の発動が累計 N 回ごとに与ダメージ +10%。 このターンに引いて場にある時だけ効く
+            //   (2026-11-20〜 説明文どおり「端子の効果」として。 旧: ランの山札に入っていれば、 引かなくても毎ターン効いた)。 累計は引いていない間も数える
+            if (_deck.board.Contains(TerminalIds.Counter))
             {
                 int stacks = _deck.state.firedTotal / TerminalCards.CounterEvery;
                 if (stacks > 0) ctx.AddOutgoingPct(TerminalCards.CounterPct * stacks);
@@ -165,7 +165,7 @@ namespace CombatSystem
             }
             if (o.poison > 0) ItemSystem.PassiveSkills.Effects.Rw.Poison(ctx, o.poison);
             if (o.heat > 0) { ItemSystem.PassiveSkills.Keywords.Kw.EnableHeat(ctx); ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, o.heat, "端子"); }
-            if (o.retreatStage) YachtRoleEffects.AddEscalationDelay(ctx, YachtRoleEffects.TurnsToRetreatOneStage(ctx));
+            for (int r = 0; r < o.retreatStage; r++) YachtRoleEffects.AddEscalationDelay(ctx, YachtRoleEffects.TurnsToRetreatOneStage(ctx));
             if (o.escalationDelay > 0)      // 時計の賽 (ADR-0015)
             {
                 YachtRoleEffects.AddEscalationDelay(ctx, o.escalationDelay);
@@ -198,8 +198,13 @@ namespace CombatSystem
         /// ターン終了時の撃破を待つ間は名前で控えておく (<see cref="_termKillPending"/>)。</summary>
         private sealed class TermKillBonus
         {
-            public bool harvester, whet, loot, stripper;
-            public bool Any => harvester || whet || loot || stripper;
+            /// <summary>配る量 (<see cref="TerminalOutcome.killMaxHp"/> などの写し・〈残響〉の 2 回目も入っている)。</summary>
+            public int maxHp, whet, gold, choices;
+            public bool harvester => maxHp > 0;
+            public bool loot => gold > 0;
+            public bool stripper => choices > 0;
+            public bool whetOn => whet > 0;
+            public bool Any => harvester || whetOn || loot || stripper;
         }
         /// <summary>このターンに発動した撃破のボーナスの端子のうち、 まだ配っていない (敵がまだ倒れていない) もの。 ターン終了時の撃破 (〈絞り出し〉〈百断〉など)
         /// を <see cref="SettleTerminalKillBonus"/> で拾う。 null = 待っていない。 ターンの終わり (FinishTurnCommon) までに必ず null へ戻る。</summary>
@@ -216,11 +221,7 @@ namespace CombatSystem
             if (_deck == null) return;
             _termKillPending = null;
             var b = _deck.board;
-            var kb = new TermKillBonus
-            {
-                harvester = o.Fired(b, TerminalIds.Harvester), whet = o.Fired(b, TerminalIds.Whet),
-                loot = o.Fired(b, TerminalIds.LootBox), stripper = o.Fired(b, TerminalIds.Stripper),
-            };
+            var kb = new TermKillBonus { maxHp = o.killMaxHp, whet = o.killWhet, gold = o.killGold, choices = o.killChoices };
             if (kb.Any)
             {
                 if (enemyHP <= 0 && o.attackDice > 0) GrantTerminalKillBonus(kb);   // 旧い条件でも入る撃破
@@ -228,7 +229,7 @@ namespace CombatSystem
                 {
                     // 攻撃の端子なしで倒れた (毒・出血・爆発・反撃・品の直接ダメージなど)。 4 種とも攻撃の種類なので、 発動していればここへは来ない
                     // (〈剥ぎ取り〉が補助だった 2026-11-13 まではここへ来た)。 守りとして残す
-                    TerminalDiag.NoteKillNewOnly(kb.harvester, kb.whet, kb.loot, kb.stripper);   // [計装]
+                    TerminalDiag.NoteKillNewOnly(kb.harvester, kb.whetOn, kb.loot, kb.stripper);   // [計装]
                     if (!GameLoop.GameHooks.TerminalKillBonusNeedsAttack) GrantTerminalKillBonus(kb);
                 }
                 else _termKillPending = kb;
@@ -270,7 +271,7 @@ namespace CombatSystem
             if (enemyHpNow <= 0)
             {
                 _termKillPending = null;
-                TerminalDiag.NoteKillNewOnly(kb.harvester, kb.whet, kb.loot, kb.stripper);   // [計装]
+                TerminalDiag.NoteKillNewOnly(kb.harvester, kb.whetOn, kb.loot, kb.stripper);   // [計装]
                 if (!GameLoop.GameHooks.TerminalKillBonusNeedsAttack) GrantTerminalKillBonus(kb);
             }
             else if (final) _termKillPending = null;
@@ -284,15 +285,15 @@ namespace CombatSystem
             if (kb.harvester)
             {
                 TerminalDiag.Note(TerminalIds.Harvester, TerminalDiag.KillBonus);   // [計装]
-                run.playerMaxHP += TerminalCards.HarvesterMaxHp; playerMaxHP += TerminalCards.HarvesterMaxHp;
+                run.playerMaxHP += kb.maxHp; playerMaxHP += kb.maxHp;
                 // ターン終了時の撃破では FinishTurnCommon の SyncHPFromContext が ctx から最大 HP を拾い直すので、 ctx にも入れる
                 var hctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
                 if (hctx != null) hctx.playerMaxHP = playerMaxHP;
-                Debug.Log($"[端子/魂狩り] 最大 HP +{TerminalCards.HarvesterMaxHp}");
+                Debug.Log($"[端子/魂狩り] 最大 HP +{kb.maxHp}");
             }
-            if (kb.whet) { TerminalDiag.Note(TerminalIds.Whet, TerminalDiag.KillBonus); run.terminalWhetBonus += TerminalCards.WhetGain; Debug.Log($"[端子/処刑の刃] 攻撃 +{TerminalCards.WhetGain} (計 {run.terminalWhetBonus})"); }
-            if (kb.loot) { TerminalDiag.Note(TerminalIds.LootBox, TerminalDiag.KillBonus); run.coins += TerminalCards.LootGold; Debug.Log($"[端子/賞金狩り] ゴールド +{TerminalCards.LootGold}"); }
-            if (kb.stripper) { TerminalDiag.Note(TerminalIds.Stripper, TerminalDiag.KillBonus); run.terminalExtraChoices += TerminalCards.StripperChoices; Debug.Log($"[端子/剥ぎ取り] 戦闘後の端子の選択肢 +{TerminalCards.StripperChoices} (計 +{run.terminalExtraChoices})"); }
+            if (kb.whetOn) { TerminalDiag.Note(TerminalIds.Whet, TerminalDiag.KillBonus); run.terminalWhetBonus += kb.whet; Debug.Log($"[端子/処刑の刃] 攻撃 +{kb.whet} (計 {run.terminalWhetBonus})"); }
+            if (kb.loot) { TerminalDiag.Note(TerminalIds.LootBox, TerminalDiag.KillBonus); run.coins += kb.gold; Debug.Log($"[端子/賞金狩り] ゴールド +{kb.gold}"); }
+            if (kb.stripper) { TerminalDiag.Note(TerminalIds.Stripper, TerminalDiag.KillBonus); run.terminalExtraChoices += kb.choices; Debug.Log($"[端子/剥ぎ取り] 戦闘後の端子の選択肢 +{kb.choices} (計 +{run.terminalExtraChoices})"); }
         }
 
         /// <summary>[測定の口の時だけ] 使うとランの山札から抜ける端子 (〈応急箱〉・<see cref="TerminalCards.LeavesRunDeck"/>・既定では抜けない = 2026-11-14〜) を、

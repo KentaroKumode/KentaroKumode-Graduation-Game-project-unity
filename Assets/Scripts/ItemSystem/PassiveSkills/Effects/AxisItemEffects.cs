@@ -30,8 +30,9 @@ namespace ItemSystem.PassiveSkills.Effects
         public static readonly System.Collections.Generic.Dictionary<string, (string axis, Kind kind)> Items
             = new System.Collections.Generic.Dictionary<string, (string, Kind)>
         {
-            ["研ぎ師の見立て書"] = (AxisRules.Crit, Kind.Count),   ["重ね斬りの型"] = (AxisRules.Crit, Kind.Rule),     [PinpointEye.Id] = (AxisRules.Crit, Kind.Rule),
-            ["血止め知らずの針箱"] = (AxisRules.Bleed, Kind.Count), ["凝血の小瓶"] = (AxisRules.Bleed, Kind.Rule),
+            ["研ぎ師の見立て書"] = (AxisRules.Crit, Kind.Count),   [PinpointEye.Id] = (AxisRules.Crit, Kind.Rule),
+            ["血止め知らずの針箱"] = (AxisRules.Bleed, Kind.Count),
+            // 〈重ね斬りの型〉〈凝血の小瓶〉は 2026-11-20 (段 1-a) に【規則】の品でなくなったので、 表から外した (軸の普通の品として買う)
             ["瘴気溜まりの壺"] = (AxisRules.Poison, Kind.Count),   ["腐れ沼の苔玉"] = (AxisRules.Poison, Kind.Rule),
             ["焚き足しの炭"] = (AxisRules.Heat, Kind.Count),         ["火花読みの眼鏡"] = (AxisRules.Heat, Kind.Rule),
             ["漏電する銅線"] = (AxisRules.Charge, Kind.Count),     ["二股の導線"] = (AxisRules.Charge, Kind.Rule),

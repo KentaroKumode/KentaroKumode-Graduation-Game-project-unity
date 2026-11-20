@@ -816,10 +816,13 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
               〈無形の構え〉の次のターンは条件を無視 (同じ目 2 個の端子も 2 個そろっていれば通る)
            3. 充電の支払い (場の順)。 足りなければその端子は不発。 〈裁きの雷〉は充電 1 以上で通り、 効果の所で全部払う (使い捨て・2026-11-19〜)
            4. 〈火葬の剣〉(2026-11-14): 外す端子の候補 (下の「対象」) が無ければ不発 (挿した出目を外す・使い捨ても消費しない)
-           5. 効果 (場の順)。 〈残響〉が発動していれば他の端子の効果を 2 回走らせる
+           5. 効果 (場の順)。 〈残響〉が発動していれば他の端子の効果を 2 回走らせる (撃破のボーナス・段階を戻す数も 2 回分)
+              〈剛腕〉(2026-11-20〜): **攻撃の種類の端子**に挿した出目の合計を、 その端子の効果に入れる前に ×2 (〈剛腕〉の効果 1 回につき ×2 ── 2 枚・〈残響〉で ×4)。
+              条件 (2.) は 2 倍にする前の目で見る。 〈反復突き〉の「同じ目」も 2 倍にする前の目。 〈剛腕〉自身に挿した出目は使わない
               端子へ入る量 (sum) = 挿した出目の合計。 ただし**防御の種類の端子**に挿した出目は 1 つずつ max(0, 出目 − TerminalEnv.blockDieCut)
               (時限デバフ〈罪悪感〉で 2・2026-11-16・〈号令の剣〉の +1 の後)。 条件 (2.) は引く前の目で見る。 攻撃・充電・補助の端子の出目は変えない
-           6. 他の端子を見る効果: 〈連係斬り〉攻撃 + RelayPerFired × (基本以外の発動数 − 1)、 〈剛腕〉攻撃 + (攻撃の種類の端子を挿した出目の合計)
+           6. 他の端子を見る効果: 〈連係斬り〉攻撃 + RelayPerFired × 基本以外の発動数 (自分も数える・2026-11-20〜 旧: −1)。
+              (旧 〈剛腕〉: 攻撃 + 攻撃の種類の端子を挿した出目の合計 ── 2026-11-20 に 5. の ×2 へ)
               溜めた攻撃 (〈力溜め〉〈後の先〉) は、 攻撃の種類の端子を 1 枚以上挿したターンに attackAdd へ足して 0 に戻す
          〈影写し〉〈火葬の剣〉〈保持器〉の対象: Resolve の wantTarget (人 = 画面で選んだ端子 / BOT = WiringPlan.targets)。
            候補 = 自分でない・常設でない・止まっていない・挿し方を直した後に出目が 1 個も無い手札の端子 (TerminalCards.IsCandidate)。 選ばない・候補でない時は左端の候補
@@ -835,7 +838,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
            shieldSpend    → ctx.consShield = max(0, consShield − 量) (〈重装突撃〉が攻撃に足した分・shield より先に引く)
            shield         → ctx.consShield += 量 (shieldGainedTotal にも足す)
            poison         → Rw.Poison(ctx, 量)       heat → Kw.EnableHeat + Kw.AddHeat(ctx, 量)
-           retreatStage   → AddEscalationDelay(TurnsToRetreatOneStage) (段階を 1 つ戻す・〈氷結瓶〉と、 溜まりが CoolantNeed に届いた〈鎮静香〉。 遅延のキーは CoolantDelayKey・役〈時間〉と共有)
+           retreatStage   → AddEscalationDelay(TurnsToRetreatOneStage) を回数分 (段階を戻す数・〈氷結瓶〉1 回ごと・〈鎮静香〉は溜まりが CoolantNeed に届いた回数・2026-11-20〜 旧: 真偽で 1 段。 遅延のキーは CoolantDelayKey・役〈時間〉と共有)
            enemyStunNext  → nextTurnBuffs[EnemyStunKey] (次のターン敵は行動しない)
            ignoreDefense  → ctx.playerArmorPen += DefenseFormula.IgnoreAll
            forceCrit      → ctx.forceCritical = true       critMultAdd → ctx.criticalMultiplier += 量 (毎ターン組み直されるのでこのターンだけ)
@@ -846,8 +849,9 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
                             → ApplyRoleGuard で takenDmg = round(takenDmg × (1 − cut/100)) (敵の直接攻撃パケットだけ・固定ダメの枠は触らない)
            bleedOnHit     → 主攻撃の dealtDmg > 0 のとき ctx.AddEnemyBleed(量) (〈鉤爪〉)
          ターンの頭 (DrawTerminalHand): 〈打ち直し〉の出目 +N を accumulatedValues[termFoundryBonus] へ置き、 自ロールの後 (大罪:怠惰の後) に全部の出目へ足す。
-           〈柔軟な戦略〉が山札に入っていれば ctx.AddOutgoingPct(CounterPct × floor(基本以外の発動の累計 ÷ CounterEvery))
-         ターンの終わり (FinishTerminalTurn): 発動した端子の撃破のボーナス
+           〈柔軟な戦略〉をこのターンに引いて場にあれば ctx.AddOutgoingPct(CounterPct × floor(基本以外の発動の累計 ÷ CounterEvery))
+           (2026-11-20〜。 旧: ランの山札に入っていれば引かなくても。 累計は引いていない間も数える)
+         ターンの終わり (FinishTerminalTurn): 発動した端子の撃破のボーナス (量は TerminalOutcome.killMaxHp / killWhet / killGold / killChoices・〈残響〉の 2 回目も足す)
            (〈魂狩り〉最大 HP + / 〈処刑の刃〉RunState.terminalWhetBonus + / 〈賞金狩り〉ゴールド + / 〈剥ぎ取り〉次の報酬の選択肢 +1)。
            撃破の経路は問わない (#117・2026-11-13)。 ここで敵 HP ≤ 0 なら配り、 まだ倒れていなければ控えておき、
            FinishTurnCommon の 2 か所 (OnTurnEnd の後・SwapEnemy の前 / SyncHPFromContext の後・TryAdvanceVescaChain の前) で敵 HP ≤ 0 なら配る

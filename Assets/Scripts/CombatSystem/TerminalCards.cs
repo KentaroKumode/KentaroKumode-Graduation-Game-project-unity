@@ -185,11 +185,16 @@ namespace CombatSystem
         /// <summary>このターンの敵の攻撃に掛ける (1 = なし)。</summary>
         public float enemyAttackMul = 1f;
         public int heal, selfDamage, shield, chargeSpend;
+        /// <summary>撃破のボーナス (このターンに敵を倒した時だけ配る・本体 CombatManager.FinishTerminalTurn)。 〈残響〉で 2 回発動すれば 2 回分 (2026-11-20〜・旧: 発動したかの真偽で 1 回分)。
+        /// 最大 HP (〈魂狩り〉) / 〈処刑の刃〉の恒久の攻撃 / ゴールド (〈賞金狩り〉) / 次の報酬の選択肢 (〈剥ぎ取り〉)。</summary>
+        public int killMaxHp, killWhet, killGold, killChoices;
         /// <summary>このターンに払うシールド (〈重装突撃〉)。 足す分 (shield) より先に引く。</summary>
         public int shieldSpend;
         public bool chargeFill;
         public int poison, heat, bleedOnHit;
-        public bool retreatStage, enemyStunNext, ignoreDefense;
+        public bool enemyStunNext, ignoreDefense;
+        /// <summary>エスカレーションの段階を戻す数 (〈氷結瓶〉・溜まりが届いた〈鎮静香〉。 〈残響〉の 2 回目・1 ターンに 2 回届いた〈鎮静香〉も数える・2026-11-20〜 旧: 真偽で 1 段だけ)。</summary>
+        public int retreatStage;
         /// <summary>時計の賽の端子: エスカレーションの次の段階を何ターン先へ送るか (挿した出目の合計)。</summary>
         public int escalationDelay;
         /// <summary>このターンに発動した端子 (場の添字)。</summary>
@@ -542,7 +547,12 @@ namespace CombatSystem
             for (int s = 0; s < m; s++) if (board[s] == TerminalIds.Doubler && Plugged(o.slotOfDie, s)) doubler = true;
             // 連なりの賽 (2026-11-20): 3 つの目が連番のターン (役〈連なり〉)、 挿した端子がすべて倍化する (〈残響〉と同じ)
             if (env.dieId == GameLoop.DieIds.Straight && YachtRoles.IsRun(v)) doubler = true;
-            int attackPips = 0;      // 攻撃の種類の端子に挿した出目 (〈剛腕〉が 2 倍にする分)
+            //   〈剛腕〉(2026-11-20・説明文どおり): 攻撃の種類の端子に挿した出目を 2 倍にしてから、 その端子の効果に入れる (倍率の端子は 2 倍の目に掛かる)。
+            //   条件 (2.) は挿した目そのもので見る。 〈剛腕〉1 枚 (効果 1 回) につき ×2 ── 〈残響〉で 2 回発動すれば ×4、 2 枚挿せば ×4。
+            //   旧: 攻撃の種類の端子に挿した出目の合計を、 攻撃にもう 1 回足していた (倍率の端子では説明より小さく、 出目を攻撃に使わない端子の分も足した)
+            int pipMul = 1;
+            for (int s = 0; s < m; s++)
+                if (board[s] == TerminalIds.Transformer && Plugged(o.slotOfDie, s)) pipMul *= doubler ? 4 : 2;
             for (int s = 0; s < m; s++)
             {
                 if (defs[s] == null || !Plugged(o.slotOfDie, s)) continue;
@@ -552,18 +562,20 @@ namespace CombatSystem
                 //   条件 (「2. 条件」) は引く前の目で見る ── 引いた目で見ると〈導火〉(3 以下) などに挿せる目が増え、 罰が得になる。
                 int cutHere = d.kind == TerminalKind.Block ? env.blockDieCut : 0;
                 for (int i = 0; i < n; i++) if (o.slotOfDie[i] == s) { sum += EventSystem.TimedEffects.TimedDebuffRule.CutBlockDie(v[i], cutHere); num++; }
+                int raw = sum;      // 〈剛腕〉で 2 倍にする前 (〈反復突き〉の「同じ目」はこれで見る)
+                if (d.kind == TerminalKind.Attack) sum *= pipMul;
                 o.fired.Add(s);
                 if (!d.basic) o.firedNonBasic++;
                 switch (d.kind)
                 {
-                    case TerminalKind.Attack: o.attackDice += num; attackPips += sum; break;
+                    case TerminalKind.Attack: o.attackDice += num; break;
                     case TerminalKind.Block: o.blockDice += num; break;
                     case TerminalKind.Charge: o.chargeDice += num; break;
                     default: o.supportDice += num; break;
                 }
                 int times = doubler && id != TerminalIds.Doubler ? 2 : 1;
                 int atkBefore = o.attackAdd, chgBefore = charge;
-                for (int t = 0; t < times; t++) Effect(id, s, sum, env, state, o, ref charge, Empty);
+                for (int t = 0; t < times; t++) Effect(id, s, sum, raw, env, state, o, ref charge, Empty);
                 if (d.kind == TerminalKind.Attack) { o.attackHits.Add(o.attackAdd - atkBefore); o.attackHitDice.Add(num); }
                 if (o.attackAdd != atkBefore) o.attackLog.Add($"{id}(目{sum}{(times > 1 ? "・倍化" : "")}{(chgBefore != charge ? "・充電" + chgBefore + "→" + charge : "")}):+{o.attackAdd - atkBefore}");
             }
@@ -573,15 +585,15 @@ namespace CombatSystem
             {
                 if (defs[s] == null || !Plugged(o.slotOfDie, s)) continue;
                 int times = doubler ? 2 : 1;
-                if (board[s] == TerminalIds.Relay) o.attackAdd += RelayPerFired * (o.firedNonBasic - 1) * times;
-                else if (board[s] == TerminalIds.Transformer) o.attackAdd += attackPips * times;
+                // 〈連係斬り〉: このターンに発動した基本以外の端子 (自分も数える・2026-11-20〜 説明文どおり。 旧: 自分を数えなかった)
+                if (board[s] == TerminalIds.Relay) o.attackAdd += RelayPerFired * o.firedNonBasic * times;
             }
             // 〈柔軟な戦略〉: 基本以外の発動の累計 (付けていなくても数える・積むのは持っている時だけ = 山札にあれば効く)
             state.firedTotal += o.firedNonBasic;
             // 次に攻撃するターンの攻撃に足す分
             int atk6 = o.attackAdd;
             if (o.attackDice > 0 && state.storedAttack > 0) { o.attackAdd += state.storedAttack; state.storedAttack = 0; }
-            if (o.attackAdd != atk6) o.attackLog.Add($"連係・変圧・溜めた攻撃:+{o.attackAdd - atk6}");
+            if (o.attackAdd != atk6) o.attackLog.Add($"連係・溜めた攻撃:+{o.attackAdd - atk6}");
 
             // ── 6b. 装備中の賽のパッシブ (ADR-0015): 挿した目ごとに効く・残り火の持ち越し ──
             int atkDie = o.attackAdd;
@@ -637,7 +649,7 @@ namespace CombatSystem
         }
 
         /// <summary>端子 1 つの効果 (sum = 挿した出目の合計)。</summary>
-        private static void Effect(string id, int slot, int sum, TerminalEnv env, TerminalBattleState st, TerminalOutcome o, ref int charge, Func<int, int> empty)
+        private static void Effect(string id, int slot, int sum, int raw, TerminalEnv env, TerminalBattleState st, TerminalOutcome o, ref int charge, Func<int, int> empty)
         {
             switch (id)
             {
@@ -647,8 +659,10 @@ namespace CombatSystem
                 //   号令の剣 = 解決の前に他の出目 +1 / 連係斬り = 下の「6. 他の端子を見る効果」/ 柔軟な戦略 = 本体 (DrawTerminalHand) /
                 //   魂狩り・賞金狩り・剥ぎ取り = 撃破した時 (CombatManager.FinishTerminalTurn)
                 case TerminalIds.Relay: case TerminalIds.Grinder: case TerminalIds.Twin: case TerminalIds.Counter:
-                case TerminalIds.Harvester: case TerminalIds.LootBox: case TerminalIds.Stripper:
                     o.attackAdd += sum; break;
+                case TerminalIds.Harvester: o.attackAdd += sum; o.killMaxHp += HarvesterMaxHp; break;
+                case TerminalIds.LootBox: o.attackAdd += sum; o.killGold += LootGold; break;
+                case TerminalIds.Stripper: o.attackAdd += sum; o.killChoices += StripperChoices; break;
                 case TerminalIds.Block: o.blockAdd += sum; break;
                 case TerminalIds.Charge: o.chargeAdd += sum; break;
                 // コモン
@@ -664,8 +678,8 @@ namespace CombatSystem
                     // 連続は 1 ターンに 1 つだけ進める (〈残響〉で効果が 2 回走っても、 2 回目は同じ連続回数で足すだけ)
                     if (!o.oscCounted)
                     {
-                        if (st.oscLast == sum) st.oscStreak++; else st.oscStreak = 0;
-                        st.oscLast = sum; o.oscCounted = true;
+                        if (st.oscLast == raw) st.oscStreak++; else st.oscStreak = 0;
+                        st.oscLast = raw; o.oscCounted = true;
                     }
                     o.attackAdd += sum + OscPerStreak * st.oscStreak; break;
                 case TerminalIds.Fuse: o.blockAdd += FuseBlock; break;
@@ -684,13 +698,13 @@ namespace CombatSystem
                 case TerminalIds.VacuumTube: o.critMultAdd += VacuumCritMult; break;
                 case TerminalIds.Resonator: o.damageMul *= ResonatorMul; break;
                 case TerminalIds.Foundry: st.foundryBonus += Gauge(st, id, sum, FoundryNeed); break;
-                case TerminalIds.Coolant: if (Gauge(st, id, sum, CoolantNeed) > 0) o.retreatStage = true; break;
+                case TerminalIds.Coolant: o.retreatStage += Gauge(st, id, sum, CoolantNeed); break;      // 1 ターンに 2 回届けば 2 段 (2026-11-20〜)
                 case TerminalIds.Clock: o.escalationDelay += sum; break;      // 時計の賽 (ADR-0015)
                 case TerminalIds.Preheater: o.blockAdd += sum; st.ignoreCondNext = true; break;
                 case TerminalIds.Mains: o.attackAdd += sum + MainsPerUse * st.mainsUses; st.mainsUses++; break;
                 case TerminalIds.TwinShot: o.attackAdd += sum * TwinShotMul; break;
-                case TerminalIds.Whet: o.attackAdd += sum + env.whetBonus; break;
-                // 剛腕 (6. で足す)・残響 (5. の頭で見る) は、 ここでは何もしない
+                case TerminalIds.Whet: o.attackAdd += sum + env.whetBonus; o.killWhet += WhetGain; break;
+                // 剛腕・残響 (5. の頭で見る) は、 ここでは何もしない
                 case TerminalIds.Retainer: o.blockAdd += sum; if (!HandCarry) o.retainTarget = empty(slot); else o.recall = true; break;   // 持ち越しの規則では捨て札から 1 枚戻す (対象は RecallPick)
                 case TerminalIds.StopSignal: o.enemyStunNext = true; break;
                 case TerminalIds.Fork: o.attackAdd += sum; o.blockAdd += sum; break;
@@ -721,7 +735,7 @@ namespace CombatSystem
                 case TerminalIds.ReliefValve: o.takenMul *= 1f - ReliefCutPct / 100f; break;
                 case TerminalIds.FirstAid: o.heal += sum * FirstAidMul; break;
                 case TerminalIds.FullCharge: o.chargeFill = true; break;
-                case TerminalIds.CoolShot: o.retreatStage = true; break;
+                case TerminalIds.CoolShot: o.retreatStage++; break;
                 case TerminalIds.Copier: o.copyTarget = empty(slot); break;
                 case TerminalIds.BurnOut: o.attackAdd += sum * BurnOutMul; o.burnTarget = empty(slot); break;   // 候補は 4. で確かめ済み (無ければ不発)
             }
@@ -891,11 +905,11 @@ namespace CombatSystem
             return want >= 0 && want < discard.Count ? discard[want] : discard[discard.Count - 1];
         }
 
-        /// <summary>〈有効活用〉の戻す 1 枚を、 残した手札へ足す (手札が <paramref name="size"/> 枚に満たない時だけ・上限を超えない)。 捨て札から 1 枚抜く。 本体の DrawTurn と BOT の先読みが同じ関数を呼ぶ。
-        /// 戻り値 = 戻したか。</summary>
+        /// <summary>〈有効活用〉の戻す 1 枚を、 残した手札へ足す。 捨て札から 1 枚抜く。 本体の DrawTurn と BOT の先読みが同じ関数を呼ぶ。
+        /// 残した手札がすでに <paramref name="size"/> 枚以上でも戻す (2026-11-20〜・説明文に無い制限だったので外した。 旧: 規定の枚数に満たない時だけ)。 戻り値 = 戻したか。</summary>
         public static bool ApplyRecall(string recall, List<string> keep, List<string> discard, int size)
         {
-            if (recall == null || keep.Count >= size || !discard.Remove(recall)) return false;
+            if (recall == null || !discard.Remove(recall)) return false;
             keep.Add(recall);
             return true;
         }
