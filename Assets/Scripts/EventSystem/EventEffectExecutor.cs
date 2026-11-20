@@ -496,7 +496,8 @@ namespace EventSystem
                                 + " / 素材+8 / ゴールド+60 / 全回復");
         }
 
-        private static string PickRandomItemId(ItemCategory category, GameLoop.RunState run = null, List<string> alsoExclude = null)
+        /// <summary>イベントの品の抽選 (秘宝は持った・見た品を除く)。 0 層の支給の秘宝 (GameManager.OpenFarmSupply) も使う。</summary>
+        internal static string PickRandomItemId(ItemCategory category, GameLoop.RunState run = null, List<string> alsoExclude = null)
         {
             var db = ItemDatabase.Instance;
             if (db == null) return null;

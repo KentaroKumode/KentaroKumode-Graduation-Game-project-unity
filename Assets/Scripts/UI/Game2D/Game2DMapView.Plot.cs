@@ -388,7 +388,7 @@ namespace UI.Game2D
         {
             int ph = sim.StormPhase, n = sim.StormTurnsToNext;
             string kind = sim.Weather == WeatherKind.None ? "" : " " + Storm.KindName(sim.Weather);
-            if (ph == 0 && sim.InstabilityMode) return "不安定 " + sim.Instability + "/" + FreeMapParams.InstabilityPhase1At + kind;
+            if (ph == 0 && sim.InstabilityMode) return "不安定 " + sim.Instability + "/" + FreeMapParams.InstabilityPhase1AtOf(sim.Floor) + kind;
             if (ph == 0) return "嵐まで " + n + kind;
             return ph >= 4 ? "嵐 フェーズ " + ph + kind : "嵐 フェーズ " + ph + "・次まで " + n + kind;
         }

@@ -159,7 +159,7 @@ namespace UI.Game2D
             }
             if (sim.TreasureAvailable && i == sim.TreasureNode) add += Instability.PointsOf(InstabilitySource.Treasure);
             if (add <= 0 && !more) return null;
-            int ph0 = Instability.PhaseOf(sim.Instability), ph1 = Instability.PhaseOf(sim.Instability + add);
+            int ph0 = Instability.PhaseOf(sim.Instability, sim.Floor), ph1 = Instability.PhaseOf(sim.Instability + add, sim.Floor);
             if (ph1 > ph0) cross = ph0 == 0 ? "崩れ始める" : "フェーズ " + ph1 + " へ";
             return "不安定 +" + add + (more ? "〜" : "");
         }

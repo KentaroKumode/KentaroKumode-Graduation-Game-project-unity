@@ -503,7 +503,7 @@ namespace UI.Game2D
                 int ph = sim.StormPhase, n = sim.StormTurnsToNext;
                 p.Text("嵐", 24, 16, Game2DKit.Dim);
                 // 二版 (不安定化の時計): 静かな間は「不安定の累計/崩れ始める境目」、 崩れ始めたら段と次の段までの不安定化ポイント
-                string v = ph == 0 ? (sim.InstabilityMode ? sim.Instability + "/" + FreeMapParams.InstabilityPhase1At : "まで" + n) : ph >= 4 ? "段4" : "段" + ph + " " + n;
+                string v = ph == 0 ? (sim.InstabilityMode ? sim.Instability + "/" + FreeMapParams.InstabilityPhase1AtOf(sim.Floor) : "まで" + n) : ph >= 4 ? "段4" : "段" + ph + " " + n;
                 p.Text(v, 40, 16, ph == 0 ? Game2DKit.Ink : Game2DKit.Amber);
             }
             else { p.Text("予報", 24, 16, Game2DKit.Dim); p.Text("???", 48, 16, Game2DKit.Faint); }       // 予報は物資の段階で精度が変わる (未接続)

@@ -79,7 +79,8 @@ namespace AutoTest
             Sim = sim; L = sim.Layout;
             Points = sim.Instability;
             _k = Instability.Schedule;
-            _stepHp = FreeMapParams.StormHp + (sim.Weather == WeatherKind.Hail ? FreeMapParams.StormHailHp : 0);
+            _stepHp = sim.Weather == WeatherKind.Hail ? Math.Max(0, FreeMapParams.StormHpAt(sim.Floor) + FreeMapParams.StormHailHp - sim.Perks.hailHpCut)
+                                                      : FreeMapParams.StormHpAt(sim.Floor);   // FreeMapSim.StormHpFor と同じ (〈油布の靴〉を含む)
             _snow = sim.Weather == WeatherKind.Snow;
             _sand = sim.Weather == WeatherKind.Sand;
             Boss = knownBoss;
@@ -99,7 +100,7 @@ namespace AutoTest
             }
             // フェーズ 2 の終わりの中心: 平均はボスの点。 画面の輪が動いていれば、 その中心から逆算する
             Vec2 c2 = b;
-            int t = Instability.TimeOf(Points), ph = Storm.PhaseOf(t, _k);
+            int t = Instability.TimeOf(Points, Sim.Floor), ph = Storm.PhaseOf(t, _k);
             if (sim.StormRing(out var cNow, out _))
             {
                 var c0 = Storm.MapCenter;
@@ -167,7 +168,7 @@ namespace AutoTest
         /// <summary>累計 <paramref name="pts"/> の時の輪 (見込み)。</summary>
         public void RingAt(int pts, out Vec2 center, out double radius)
         {
-            int t = Instability.TimeOf(pts);
+            int t = Instability.TimeOf(pts, Sim.Floor);
             if (!_ring.TryGetValue(t, out var r))
             {
                 Storm.RingAt(L, t, _k, _c2, _b, _r3, out var c, out double rad);
@@ -180,7 +181,7 @@ namespace AutoTest
         public bool InStormAt(int i, int pts)
         {
             if (i == Boss) return false;
-            int t = Instability.TimeOf(pts);
+            int t = Instability.TimeOf(pts, Sim.Floor);
             if (t < 0) return false;
             if (t >= _k.Phase4Start) return true;
             RingAt(pts, out var c, out double r);
@@ -192,7 +193,7 @@ namespace AutoTest
 
         /// <summary>累計 <paramref name="pts"/> の時に点 i へ 1 歩動いて溜まる「歩く」の分 (<see cref="FreeMapSim.InstabilityForStep"/> と同じ・近道は数えない)。</summary>
         public int StepPoints(int i, int pts)
-            => Instability.Collapsing(pts) ? Instability.PointsOf(InstabilitySource.Walk, _snow && InStormAt(i, pts) ? FreeMapParams.StormSnowTurns : 1) : 0;
+            => Instability.Collapsing(pts, Sim.Floor) ? Instability.PointsOf(InstabilitySource.Walk, _snow && InStormAt(i, pts) ? FreeMapParams.StormSnowTurns : 1) : 0;
 
         /// <summary>累計 <paramref name="pts"/> の時に点 i へ 1 歩動いて払う物資 (削る砂の嵐の中は上乗せ)。</summary>
         public int StepSupply(int i, int pts) => FreeMapParams.MoveSupply + (_sand && InStormAt(i, pts) ? FreeMapParams.StormSandSupply : 0);

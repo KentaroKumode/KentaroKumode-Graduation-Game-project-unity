@@ -719,7 +719,7 @@ ProcessDamage の中の OnPreDealDamage は「その陣営が攻撃している�
 | SkillId(表示) | Trigger | 効果 |
 |---|---|---|
 | GoblinKingsCall(号令) | OnPostRoll | 自ダイス + GoblinCall（基準 3） |
-| MiasmaCorrosion(毒の侵蝕) | OnTurnEnd | 毒stack+1(max PoisonStackCap=5)、stack分を実プレイヤーへ軽減無視ダメ |
+| MiasmaCorrosion(毒の侵蝕) | OnTurnEnd | 毒stack+1(max PoisonStackCap=5)、stack分を実プレイヤーへ軽減無視ダメ。ダウン中は鳴らず、ダウンに入った時に stack −2（2026-11-20・ボスのダウンの節） |
 | MirrorTwinsResponse(鏡映の応答) | OnPostReceiveDamage/OnTurnStart | 閾値 `Thr = max(12, ボス最大HP×4%)`。与ダメ<Thr で reflect=min(MirrorReflectCap=9, Thr−ダメ)を蓄積、次T開始で軽減無視の反射 |
 | JudgmentFlames(審判の炎) | OnTurnEnd | `dmg=min(ChipCap, 1+ceil(currentTurn/3)+罪)`、実プレイヤーへ軽減無視（罪=totalBattles/8,max2 / ChipCap 基準 10・`BossParams` の基準値）。ターン係数は 2026-07-28 に 1→1/2、2026-08-15 に 1/2→1/3 へ緩和（15T 累積 108→90・上限は T≥19 まで届かない）。**シールドは肩代わりする**（③-C） |
 | JudgmentBlaze / AshArmor / AshCarapace | — | 旧 6 層ボスの機構。**[未装備]**（6 層は下の 5 つで組み直した・数値はクラスの XML コメント）。同じ旧機構の RoyalEmber / SinChain / EternalBurning / ReturnToAshes / ImmortalEmber / EmberAura / StarfireProliferation / ScorchedEarth は 2026-11-12 に削除（GAME.md §24） |
@@ -943,7 +943,8 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
                〈逆綴じの止血帯〉(ターン終了・ctx の HP を直接減らす) = AllPassiveSkillEffects.Wringing
                品の直接 (ターンの解決の外) = Kw.DamageEnemy
            ・敵のパッシブ・エスカレーション・敵の回復は普段どおり動く (止まるのは攻撃だけ)。 例外は「ダウン中は発動しない」を名乗ったパッシブ
-             (BossDownPassives の一覧・PassiveSkillManager.FireEnemyTrigger の入口で鳴らさない・いまは空)。
+             (BossDownPassives の一覧・PassiveSkillManager.FireEnemyTrigger の入口で鳴らさない・2026-11-20〜 毒の侵蝕 / 鏡映の応答 / 審判の炎 / 灰の再生 / 遺物学者。
+             毒の侵蝕はダウンに入った時に毒stack −2 (0 未満にしない)・遺物学者はダウンのターンの頭に前のターンの vescaShieldReflectRate / vescaShieldAbsorbedThisTurn / vescaDrawnRelics を消す)。
            ・大技 (2026-11-14・作者の決定): ダウンのターンが大技のチャージのターン (大技まで 1) か大技のターン (大技まで 0) に重なった時だけ、 その大技は取り消し、
              周期は次のターンから頭に戻す (Escalation.HeavyCycleOffset = このターン)。 それ以外 (小技のターン) のダウンは、 そのターンの攻撃を潰すだけで周期は進み続ける。
              判定は起点を動かす前の周期で BossDown.CancelsCycle (CombatManager.DownCancelsCycleAt)。 構え・〈業火の予兆〉も同じ (山場か、 その 1 ターン前)。

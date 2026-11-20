@@ -99,8 +99,8 @@ static partial class T
                         int predHp = v.WalkCost(s.Me, to, s.Instability, false, out int predPts, out int k);
                         // ボスが隠れている間は、 先の輪 (フェーズ 2 の中心の行き先・フェーズ 3) が見込みになる。 一致を見るのは、 見込みの要らない範囲
                         //   (ボスが見えている / フェーズ 1 の中で終わる / フェーズ 2 の途中から始まりフェーズ 2 の中で終わる = 画面の輪から逆算できる) だけ
-                        bool exact = s.Known[s.Layout.goal] || predPts < FreeMapParams.InstabilityPhase2At
-                                     || (s.Instability > FreeMapParams.InstabilityPhase2At && predPts < FreeMapParams.InstabilityPhase3At);
+                        bool exact = s.Known[s.Layout.goal] || predPts < FreeMapParams.InstabilityPhase2At + (FreeMapParams.InstabilityPhase1AtOf(floor) - FreeMapParams.InstabilityPhase1At)
+                                     || (s.Instability > FreeMapParams.InstabilityPhase2At + (FreeMapParams.InstabilityPhase1AtOf(floor) - FreeMapParams.InstabilityPhase1At) && predPts < FreeMapParams.InstabilityPhase3At + (FreeMapParams.InstabilityPhase1AtOf(floor) - FreeMapParams.InstabilityPhase1At));   // 深さ 1 は境目が 5 遅い (2026-11-20)
                         if (!exact) continue;
                         int hp0 = s.StormHpPaid; int cur = s.Me;
                         bool viaBoss = false;
@@ -120,7 +120,7 @@ static partial class T
                 for (int salt = 1; salt <= layers / 4; salt++)
                 {
                     var s = MakeNavStorm(salt, floor);
-                    s.AddInstability(InstabilitySource.Shift, FreeMapParams.InstabilityPhase3At + (salt % 6) - s.Instability);   // フェーズ 3〜4 (ボスが見える)
+                    s.AddInstability(InstabilitySource.Shift, FreeMapParams.InstabilityPhase3At + (FreeMapParams.InstabilityPhase1AtOf(floor) - FreeMapParams.InstabilityPhase1At) + (salt % 6) - s.Instability);   // フェーズ 3〜4 (ボスが見える)
                     var v = View(s);
                     if (v.Boss != s.Layout.goal) { bad++; first ??= $"ボスが見えない 深さ{floor} 種{salt}"; continue; }
                     var hb = s.HopsFrom(s.Layout.goal);
@@ -195,7 +195,7 @@ static partial class T
                 for (int salt = 1; salt <= 20; salt++)
                 {
                     var s = MakeNavStorm(salt, floor);
-                    s.AddInstability(InstabilitySource.Shift, FreeMapParams.InstabilityPhase3At - s.Instability);
+                    s.AddInstability(InstabilitySource.Shift, FreeMapParams.InstabilityPhase3At + (FreeMapParams.InstabilityPhase1AtOf(floor) - FreeMapParams.InstabilityPhase1At) - s.Instability);
                     var v = View(s);
                     if (v.Boss >= 0 && v.Exit(s.Me, s.Instability).hpVar != 0) varBad++;
                 }

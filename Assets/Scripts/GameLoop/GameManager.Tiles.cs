@@ -81,7 +81,8 @@ namespace GameLoop
                     BeginEventEncounter();
                     break;
                 case TileType.Treasure:
-                    OpenTreasure();
+                    if (MapSystem.FreeMove.FloorPlan.IsFarm(Run.Depth)) OpenFarmSupply();
+                    else OpenTreasure();
                     break;
                 case TileType.Exchange:
                     SetPhase(GamePhase.ExchangeTile);
@@ -93,6 +94,25 @@ namespace GameLoop
                     SetPhase(GamePhase.MapNavigation);
                     break;
             }
+        }
+
+        /// <summary>0 層の秘宝の点「支給の秘宝」(2026-11-20・docs/system-overhaul-spec.md §4-4): 秘宝を 3 つ引いて 1 つ選ぶ (宝箱の中身の代わり)。
+        /// 引き方はイベントの「パッシブアイテムを3つから選ぶ」と同じ。 人は地図へ戻った時の選択画面、 BOT はその場で選ぶ (<see cref="OfferPassiveChoice"/>)。</summary>
+        public const int FarmSupplyChoices = 3;
+
+        private void OpenFarmSupply()
+        {
+            var cands = new List<string>();
+            for (int k = 0; k < FarmSupplyChoices; k++)
+            {
+                string id = EventSystem.EventEffectExecutor.PickRandomItemId(ItemSystem.ItemCategory.Passive, Run, cands);
+                if (!string.IsNullOrEmpty(id) && !cands.Contains(id)) cands.Add(id);
+            }
+            string got = OfferPassiveChoice(cands);
+            LastTreasureSummary = cands.Count == 0 ? "支給の秘宝: （なし）"
+                : got == null ? $"支給の秘宝: {cands.Count} つから 1 つ選ぶ" : $"支給の秘宝: {ItemDatabase.Instance?.GetItem(got)?.displayName ?? got}";
+            Log(LastTreasureSummary);
+            SetPhase(GamePhase.TreasureOpen);
         }
 
         // ---- 交換マス（パッシブ1つ → 上位Tierパッシブをランダム入手・任意） ----

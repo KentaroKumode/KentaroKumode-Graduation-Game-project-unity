@@ -5,13 +5,13 @@
       "displayName": "荷印の木箱",
       "description": "補給隊が浅層に置き去りにした荷箱。取りに来る者もいないのだから、割ってしまってもいいだろう。",
       "floor": 0,
-      "maxHP": 1,
+      "maxHP": 30,
       "criticalNumerator": 0,
       "threat": 0,
       "passiveSkills": [],
       "baseAttack": 0,
       "attackRollMin": 0,
-      "attackRollMax": 0,
+      "attackRollMax": 1,
       "danger": 1,
       "scale": -1
     },
@@ -20,11 +20,11 @@
       "displayName": "古い宝箱",
       "description": "百年前の大崩落で屋敷ごと地層へ落ちてきた鉄枠の長持。外から掛けられた錠前がさび付き、内側から何かが絶えず蓋を突き上げている。",
       "floor": 0,
-      "maxHP": 100,
+      "maxHP": 30,
       "criticalNumerator": 0,
       "threat": 0,
       "passiveSkills": [],
-      "baseAttack": 0,
+      "baseAttack": 2,
       "attackRollMin": 0,
       "attackRollMax": 0,
       "scale": -1
@@ -210,7 +210,7 @@
       "baseAttack": 3,
       "attackRollMin": 0,
       "attackRollMax": 3,
-      "danger": 4,
+      "danger": 5,
       "scale": 0.2
     },
     {
@@ -255,7 +255,7 @@
       "baseAttack": 3,
       "attackRollMin": 0,
       "attackRollMax": 2,
-      "danger": 3,
+      "danger": 4,
       "scale": 0.15
     },
     {
@@ -300,7 +300,7 @@
       "baseAttack": 7,
       "attackRollMin": 1,
       "attackRollMax": 7,
-      "danger": 118,
+      "danger": 88,
       "scale": 0.65
     },
     {
@@ -322,7 +322,7 @@
       "baseAttack": 7,
       "attackRollMin": 0,
       "attackRollMax": 3,
-      "danger": 35,
+      "danger": 28,
       "scale": 0.55
     },
     {
@@ -345,7 +345,7 @@
       "baseAttack": 8,
       "attackRollMin": 0,
       "attackRollMax": 3,
-      "danger": 65,
+      "danger": 39,
       "scale": 0.55
     },
     {
@@ -407,7 +407,7 @@
       "baseAttack": 7,
       "attackRollMin": 1,
       "attackRollMax": 5,
-      "danger": 25,
+      "danger": 28,
       "scale": 0.45
     },
     {
@@ -436,7 +436,7 @@
       "attackRollMin": 1,
       "attackRollMax": 6,
       "defense": 6,
-      "danger": 27,
+      "danger": 24,
       "scale": 0.5
     },
     {
@@ -471,7 +471,7 @@
       "attackRollMin": 1,
       "attackRollMax": 6,
       "defense": 6,
-      "danger": 48,
+      "danger": 37,
       "scale": 0.5
     },
     {
@@ -505,7 +505,7 @@
       "baseAttack": 9,
       "attackRollMin": 1,
       "attackRollMax": 6,
-      "danger": 102,
+      "danger": 108,
       "scale": 0.95
     },
     {
@@ -545,7 +545,7 @@
       "baseAttack": 9,
       "attackRollMin": 1,
       "attackRollMax": 6,
-      "danger": 189,
+      "danger": 259,
       "scale": 0.95
     },
     {
@@ -579,7 +579,7 @@
       "baseAttack": 10,
       "attackRollMin": 1,
       "attackRollMax": 5,
-      "danger": 113,
+      "danger": 121,
       "scale": 1.0
     },
     {
@@ -619,7 +619,7 @@
       "baseAttack": 11,
       "attackRollMin": 1,
       "attackRollMax": 6,
-      "danger": 211,
+      "danger": 169,
       "scale": 1.0
     },
     {
@@ -660,7 +660,7 @@
       "attackRollMin": 1,
       "attackRollMax": 7,
       "defense": 8,
-      "danger": 36,
+      "danger": 58,
       "scale": 0.6
     },
     {
@@ -707,7 +707,7 @@
       "attackRollMin": 1,
       "attackRollMax": 8,
       "defense": 8,
-      "danger": 70,
+      "danger": 89,
       "scale": 0.6
     },
     {
@@ -735,7 +735,7 @@
       "baseAttack": 4,
       "attackRollMin": 1,
       "attackRollMax": 4,
-      "danger": 6,
+      "danger": 9,
       "scale": 0.3
     },
     {
@@ -769,7 +769,7 @@
       "baseAttack": 4,
       "attackRollMin": 1,
       "attackRollMax": 3,
-      "danger": 7,
+      "danger": 10,
       "scale": 0.3
     },
     {
@@ -865,7 +865,7 @@
       "baseAttack": 9,
       "attackRollMin": 1,
       "attackRollMax": 4,
-      "danger": 89,
+      "danger": 138,
       "scale": 0.75
     },
     {
@@ -905,7 +905,7 @@
       "baseAttack": 8,
       "attackRollMin": 1,
       "attackRollMax": 5,
-      "danger": 170,
+      "danger": 136,
       "scale": 0.75
     },
     {
@@ -946,7 +946,7 @@
       "attackRollMin": 1,
       "attackRollMax": 5,
       "defense": 16,
-      "danger": 75,
+      "danger": 165,
       "scale": 0.85
     },
     {
@@ -993,7 +993,7 @@
       "attackRollMin": 1,
       "attackRollMax": 5,
       "defense": 16,
-      "danger": 146,
+      "danger": 224,
       "scale": 0.85
     },
     {
@@ -1015,7 +1015,7 @@
       "baseAttack": 4,
       "attackRollMin": 0,
       "attackRollMax": 10,
-      "danger": 3,
+      "danger": 10,
       "scale": 0.4
     },
     {
@@ -1043,7 +1043,7 @@
       "baseAttack": 4,
       "attackRollMin": 0,
       "attackRollMax": 10,
-      "danger": 4,
+      "danger": 11,
       "scale": 0.4
     },
     {
@@ -1105,7 +1105,7 @@
           "flavorText": "打ち直す鍛冶はもう居ない。割れたところは、割れたまま歩いている。"
         }
       ],
-      "danger": 67,
+      "danger": 56,
       "scale": 0.8
     },
     {
@@ -1134,7 +1134,7 @@
         }
       ],
       "elite": true,
-      "danger": 123,
+      "danger": 79,
       "scale": 0.8
     },
     {
@@ -1157,7 +1157,7 @@
           "flavorText": "坑夫の覚え書きの隅に「止まっている間に殻が伸びる。叩くなら動いているうちに」とある。"
         }
       ],
-      "danger": 86,
+      "danger": 73,
       "scale": 0.9
     },
     {
@@ -1186,7 +1186,7 @@
         }
       ],
       "elite": true,
-      "danger": 167,
+      "danger": 109,
       "scale": 0.9
     },
     {
@@ -1204,7 +1204,7 @@
       "guardDefense": 30,
       "guardAttackMul": 0.5,
       "passiveSkills": [],
-      "danger": 64,
+      "danger": 54,
       "scale": 0.7
     },
     {
@@ -1229,7 +1229,7 @@
           "description": "防御+2／3ターンごとに攻撃+1（累積）"
         }
       ],
-      "danger": 118,
+      "danger": 76,
       "scale": 0.7
     },
     {
@@ -1300,7 +1300,7 @@
         {
           "internalName": "MiasmaCorrosion",
           "skillName": "毒の侵蝕",
-          "description": "毎ターン終了時、毒スタック+1（上限5）、その後スタック分の固定ダメージ（軽減無視）。速攻なら軽傷、長期戦は致命",
+          "description": "毎ターン終了時、毒スタック+1（上限5）、その後スタック分の固定ダメージ（軽減無視）。速攻なら軽傷、長期戦は致命。ダウン中は発動しない。ダウンに入った時、毒が 2 減る。",
           "flavorText": "沼は急がない。急ぐ理由が、沼の側には無い。"
         }
       ],
@@ -1321,7 +1321,7 @@
         {
           "internalName": "MirrorTwinsResponse",
           "skillName": "鏡映の応答",
-          "description": "小さなダメージしか与えなかったターン、次ターン開始時に固定ダメージを反射（軽減無視・上限9）。閾値はこのボスの最大HPの4%（最低12）で、反射量は閾値と与ダメの差。高火力で殴れば反射0＝鏡を叩き割る",
+          "description": "小さなダメージしか与えなかったターン、次ターン開始時に固定ダメージを反射（軽減無視・上限9）。閾値はこのボスの最大HPの4%（最低12）で、反射量は閾値と与ダメの差。高火力で殴れば反射0＝鏡を叩き割る。ダウン中は発動しない。",
           "flavorText": "軽く叩けば軽く返る。強く叩けば——そこで唄は途切れている。"
         },
         {
@@ -1349,7 +1349,7 @@
         {
           "internalName": "JudgmentFlames",
           "skillName": "審判の炎",
-          "description": "毎ターン終了時、1+経過ターン÷3（切り上げ）+罪の確定ダメ（罪=総戦闘回数/8、上限2。1回の上限10、軽減無視）",
+          "description": "毎ターン終了時、1+経過ターン÷3（切り上げ）+罪の確定ダメ（罪=総戦闘回数/8、上限2。1回の上限10、軽減無視）。ダウン中は発動しない。",
           "flavorText": "ここまでに何度斬ったかを、向こうは正確に知っている。"
         },
         {
@@ -1417,7 +1417,7 @@
         {
           "internalName": "AshRegrowth",
           "skillName": "灰の再生",
-          "description": "HP>50%のとき毎ターン最大HPの{RegrowthRate%}%回復（Phase1: 灰をまといながら耐える）。業火のターンと、その1ターン前のチャージのターンは回復なし。",
+          "description": "HP>50%のとき毎ターン最大HPの{RegrowthRate%}%回復（Phase1: 灰をまといながら耐える）。業火のターンと、その1ターン前のチャージのターンは回復なし。ダウン中は発動しない。",
           "flavorText": "削った分が灰になり、灰がまた形を取る。順番が変わっただけだった。"
         },
         {
@@ -1467,7 +1467,7 @@
         {
           "internalName": "RelicScholar",
           "skillName": "遺物学者",
-          "description": "ターン開始時、その段の遺物プールから抽選して使用する。抽選結果は予告に『名前[遺物学者]』で開示。",
+          "description": "ターン開始時、その段の遺物プールから抽選して使用する。抽選結果は予告に『名前[遺物学者]』で開示。ダウン中は発動しない。",
           "flavorText": "「さて、今日は何が出るか」"
         },
         {
@@ -1516,7 +1516,7 @@
         {
           "internalName": "RelicScholar",
           "skillName": "遺物学者",
-          "description": "ターン開始時、その段の遺物プールから抽選して使用する。抽選結果は予告に『名前[遺物学者]』で開示。",
+          "description": "ターン開始時、その段の遺物プールから抽選して使用する。抽選結果は予告に『名前[遺物学者]』で開示。ダウン中は発動しない。",
           "flavorText": "「さて、今日は何が出るか」"
         },
         {
@@ -1565,7 +1565,7 @@
         {
           "internalName": "RelicScholar",
           "skillName": "遺物学者",
-          "description": "ターン開始時、その段の遺物プールから抽選して使用する。抽選結果は予告に『名前[遺物学者]』で開示。",
+          "description": "ターン開始時、その段の遺物プールから抽選して使用する。抽選結果は予告に『名前[遺物学者]』で開示。ダウン中は発動しない。",
           "flavorText": "「さて、今日は何が出るか」"
         },
         {
@@ -1614,7 +1614,7 @@
         {
           "internalName": "RelicScholar",
           "skillName": "遺物学者",
-          "description": "ターン開始時、その段の遺物プールから抽選して使用する。抽選結果は予告に『名前[遺物学者]』で開示。",
+          "description": "ターン開始時、その段の遺物プールから抽選して使用する。抽選結果は予告に『名前[遺物学者]』で開示。ダウン中は発動しない。",
           "flavorText": "「さて、今日は何が出るか」"
         },
         {
