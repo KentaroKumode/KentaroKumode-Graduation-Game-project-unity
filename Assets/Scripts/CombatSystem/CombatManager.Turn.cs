@@ -844,6 +844,7 @@ namespace CombatSystem
             // 既存の品が読む「特殊に挿した個数」(MutualKeys.SpecialDiceCount) = 補助の端子に挿した個数
             int specialCount = term.supportDice;
             ApplyTerminalOutcome(ctx, term, ref enemyAtkValue);
+            RaiseTerminalEvents(ctx, term);   // 端子の出来事 (使い捨て・切り直し・残した端子・補助・2026-11-20)。 OnWired の前 (〈灰払いの箒〉の「次の撃」がこのターンの撃になる)
             int _diagAtkRaw = attackSum;
             // 遺物 (§15-5) 堅牢の環: 防御の端子を挿した出目 +N% (出目の合計に掛けて切り上げ・端子調律より前)
             {

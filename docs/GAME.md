@@ -969,6 +969,11 @@ A = 崩れ始めたら終点へ / B = 輪の中で粘る（行って終点まで
   効き目は端子だけを配る ITT（並列メニュー「■ ITT 並列 (端子 57 種)」・結果は `AutoRunLogs/terminal_itt/`）で測る。
 - 端子の結果（攻撃・ブロック・充電に入る量、与ダメージの別枠の掛け算、被ダメージの率、シールド、充電の支払い、敵の攻撃の率など）は
   `TerminalCards.Resolve` の 1 か所で計算し、本体（`CombatManager.ApplyTerminalOutcome`）と BOT（`AutoRunner.Terminals`）が同じ関数を呼ぶ。
+- **端子の出来事**（2026-11-20・item-overhaul-spec §2-2・`PassiveSkillTrigger` の末尾）: `OnTerminalDispose`（使い捨てを使った・量 1・1 枚ごと）・
+  `OnDeckShuffle`（捨て札を切り直した・量 = 切り直した枚数）・`OnKeptTerminalUse`（残す印で残した端子を発動した・量 = 挿した出目の合計）・
+  `OnSupportTerminalUse`（補助の端子を発動した・基本の〈時計〉を除く・量 = 挿した出目の合計）。配るのは `CombatManager.RaiseTerminalEvents`（配線の解決の直後・OnWired の前）と
+  `RaiseDeckShuffles`（ターンの頭に引いた直後）。切り直しを数えるのは `TerminalDeckState.BeforeShuffle`（本体の引く所と BOT の先読みが同じ関数）。
+  **端子の出力を変える効果は出来事で書かない**（`Resolve` の中で効かせる・BOT と自動で一致・§8-8）。出来事で書くのは端子の解決の外の効果（敵へのダメージ・次の撃の会心率）だけ。
 
 旧い配線（攻撃・ブロック・充電の 3 端子が常設・配線は前ターンのまま残る）と、旧い特殊端子（1 つ装着の第 4 端子・層ボスの 2 択）は
 2026-11-11 に削除した（§24）。
