@@ -50,8 +50,8 @@ namespace GameLoop
             => RollTerminals(run, n, d => d.rare == boss, 1f, "terminal.reward");
 
         /// <summary>重み付きで重ならないように n 枚引く (基本と強化した端子は出さない ── 強化は休憩でだけ得る・2026-11-20)。 軸の端子は偏重で寄せる。
-        /// rareWeight = レアの重みに掛ける (報酬は rare で絞るので 1)。</summary>
-        private static List<string> RollTerminals(RunState run, int n, System.Func<TerminalDef, bool> filter, float rareWeight, string rngKey)
+        /// rareWeight = レアの重みに掛ける (報酬は rare で絞るので 1)。 focusAxis = 店の軸指定リロール (その軸の端子の重み ×<see cref="ItemSystem.Shop.ShopManager.AxisRerollWeightMul"/>・null = なし)。</summary>
+        private static List<string> RollTerminals(RunState run, int n, System.Func<TerminalDef, bool> filter, float rareWeight, string rngKey, string focusAxis = null)
         {
             var pool = new List<TerminalDef>(); var w = new List<float>();
             foreach (var d in TerminalCards.All)
@@ -64,6 +64,7 @@ namespace GameLoop
                     wt = depth <= 0 ? 0.3f : 1f + 0.5f * depth;
                 }
                 if (d.rare) wt *= rareWeight;
+                if (focusAxis != null && d.axis == focusAxis) wt *= ItemSystem.Shop.ShopManager.AxisRerollWeightMul;
                 pool.Add(d); w.Add(wt);
             }
             var res = new List<string>();
@@ -111,6 +112,26 @@ namespace GameLoop
             }
             var shelf = new List<string>(); foreach (var s in TerminalShop) shelf.Add(s.id);
             TerminalDiag.NoteShopShelf(shelf);   // [計装 #106]
+        }
+
+        /// <summary>軸指定リロール (2026-11-20・<see cref="ShopReroll"/>): 端子の棚の売れていない枠を、 focusAxis の端子を出やすくして引き直す
+        /// (棚に残る売れた端子とは重ねない・乱数は棚と同じキー "terminal.shop")。 値段の付け方は <see cref="RollTerminalShop"/> と同じ。</summary>
+        private void RerollTerminalShop(string focusAxis)
+        {
+            if (Run == null || TerminalShop.Count == 0) return;
+            var sold = new HashSet<string>(); int open = 0;
+            foreach (var s in TerminalShop) { if (s.sold) sold.Add(s.id); else open++; }
+            if (open == 0) return;
+            float mul = ItemSystem.Shop.ShopManager.Instance?.Current?.priceMultiplier ?? 1f;
+            var ids = RollTerminals(Run, open, d => !sold.Contains(d.id), TerminalShopRareWeight, "terminal.shop", focusAxis);
+            int k = 0;
+            foreach (var s in TerminalShop)
+            {
+                if (s.sold || k >= ids.Count) continue;
+                var d = TerminalCards.Get(ids[k++]);
+                s.id = d.id;
+                s.price = Mathf.Max(1, Mathf.CeilToInt((d.rare ? TerminalShopPriceRare : d.disposable ? TerminalShopPriceDisposable : TerminalShopPriceCommon) * mul));
+            }
         }
 
         /// <summary>店の端子の棚の i 枠目を買って山札に加える。</summary>

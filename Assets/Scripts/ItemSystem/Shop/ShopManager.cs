@@ -124,6 +124,15 @@ namespace ItemSystem.Shop
         /// ── 同じ店に同じ品が 2 つ並んでいた (武器を 2 本買えた)。 棚を作り始める時と、 リロールの前に詰め直す。</summary>
         private readonly HashSet<string> _shelfIds = new HashSet<string>();
 
+        /// <summary>軸指定リロール (2026-11-20・item-overhaul-spec §2-3・数値は仮): 通常のリロールの値段に足す額 (回数は通常と共有)。</summary>
+        public const int AxisRerollSurcharge = 15;
+        /// <summary>軸指定リロールで、 指定した軸の秘宝 (items.json の axis)・端子 (TerminalDef.axis) の出現の重みに掛ける倍率 (仮)。</summary>
+        public const float AxisRerollWeightMul = 6f;
+        /// <summary>軸指定リロールの値段 (今のリロールの値段 + 追加)。 店が無ければ 0。</summary>
+        public int AxisRerollPrice => Current != null ? Current.CurrentRerollPrice + AxisRerollSurcharge : 0;
+        /// <summary>いま振り直している秘宝の枠の指定の軸 (null = 指定なし)。 TryReroll の間だけ立つ。</summary>
+        private string _focusAxis;
+
         /// <summary>ショップマス入店時に在庫を生成。</summary>
         // ================================================================
         //  自由移動のマップの補給 (2026-09-28・docs/GAME.md §16-1)
@@ -563,6 +572,20 @@ namespace ItemSystem.Shop
                 for (int i = 0; i < weights.Length; i++)
                     if (weights[i].rarity == ItemRarity.LEGENDARY) weights[i].weight *= legMul;
             }
+            // 軸指定リロール: 指定の軸の品 1 つの重みを ×AxisRerollWeightMul にする。 1 品の重み = レア度の重み ÷ そのレア度の品の数 なので、
+            //   レア度の重みを (品の数 + (倍率 − 1) × 軸の品の数) ÷ 品の数 倍にしてから引き、 同じレア度の中でも軸の品を倍率で引く (PickWithSparkBias)。
+            //   乱数の引き方 (shop.rarity → shop.pickWeighted) は通常と同じ
+            if (kind == ShopSlotKind.Passive && _focusAxis != null)
+            {
+                weights = ((ItemRarity, float)[])weights.Clone();
+                for (int i = 0; i < weights.Length; i++)
+                {
+                    var r = weights[i].rarity;
+                    int nAll = 0, nAxis = 0;
+                    foreach (var it in pool) if (it.rarity == r) { nAll++; if (it.axis == _focusAxis) nAxis++; }
+                    if (nAll > 0) weights[i].weight *= (nAll + (AxisRerollWeightMul - 1f) * nAxis) / nAll;
+                }
+            }
             ItemRarity targetRarity = RollTier(pool, weights);
             var byTier = pool.FindAll(it => it.rarity == targetRarity);
 
@@ -628,6 +651,7 @@ namespace ItemSystem.Shop
                 float w = string.IsNullOrEmpty(kw)
                     ? 1.0f
                     : MetaProgression.MetaBuffApplicator.GetSparkAppearanceWeightMul(kw);
+                if (_focusAxis != null && list[i].axis == _focusAxis) w *= AxisRerollWeightMul;   // 軸指定リロール
                 weights[i] = w;
                 total += w;
             }
@@ -774,14 +798,18 @@ namespace ItemSystem.Shop
         /// <summary>
         /// 強化素材スロットを除く未売却枠を全部振り直す。
         /// コストは ShopInventory.CurrentRerollPrice。売却済み枠はそのまま（戻らない）。
+        /// <para><paramref name="focusAxis"/> (軸指定リロール・2026-11-20): <see cref="ItemSystem.PassiveSkills.AxisRules.ShopFocus"/> の軸。
+        /// 値段は <see cref="AxisRerollPrice"/> (回数は通常と共有)。 秘宝の枠の抽選で、 その軸の品の重みを <see cref="AxisRerollWeightMul"/> 倍にする
+        /// (レア度の重み・〈呪物の賽〉の LEGENDARY ×3 に掛ける)。 端子の棚の振り直しは呼び手 (GameManager.ShopReroll)。 null = 通常のリロール (乱数の引き方も今までと同じ)。</para>
         /// </summary>
-        public bool TryReroll(RunState run)
+        public bool TryReroll(RunState run, string focusAxis = null)
         {
             if (Current == null || run == null) { RerollFailNoShop++; return false; }
             // A/B: 1 店あたりの上限。 既定 -1 は無制限なのでここは素通りする。
             if (RerollHardCap >= 0 && Current.rerollCount >= RerollHardCap)
             { RerollFailCapped++; return false; }
-            int price = Current.CurrentRerollPrice;
+            if (focusAxis != null && System.Array.IndexOf(ItemSystem.PassiveSkills.AxisRules.ShopFocus, focusAxis) < 0) focusAxis = null;   // 知らない軸は指定なし
+            int price = focusAxis != null ? AxisRerollPrice : Current.CurrentRerollPrice;
 
             // 〈合札〉の初回リロール無料は 2026-10-31 に「2 品目以降 10G 引き」へ作り替えた (TryBuy)。
             if (run.coins < price) { RerollFailNoGold++; Log($"リロール: ゴールド不足 ({price}G 必要)"); return false; }
@@ -798,6 +826,8 @@ namespace ItemSystem.Shop
                 if (s != null && s.sold && !string.IsNullOrEmpty(s.itemId)) _shelfIds.Add(s.itemId);
 
             int rerolled = 0;
+            _focusAxis = focusAxis;
+            try {
             for (int i = 0; i < Current.slots.Count; i++)
             {
                 var s = Current.slots[i];
@@ -827,6 +857,7 @@ namespace ItemSystem.Shop
                 Current.slots[i] = fresh;
                 rerolled++;
             }
+            } finally { _focusAxis = null; }
 
             // **リロールは特売を消していた** (2026-09-17 発見)。 ApplySaleDiscounts は棚生成時に
             //   1 回だけ呼ばれ、 TryReroll は BuildSlot で作り直すだけなので割引が失われる。
@@ -835,7 +866,7 @@ namespace ItemSystem.Shop
             //   **塩を変える** ── 同じ塩だと毎回同じ枠に同じ割引が出る。
             if (RerollKeepsSale) ApplySaleDiscounts(Current, Current.rerollCount * 64);
 
-            Debug.Log($"[ShopManager] リロール#{Current.rerollCount}: -{price}G / {rerolled}枠更新 / 次回{Current.CurrentRerollPrice}G");
+            Debug.Log($"[ShopManager] リロール#{Current.rerollCount}{(focusAxis != null ? " (軸: " + focusAxis + ")" : "")}: -{price}G / {rerolled}枠更新 / 次回{Current.CurrentRerollPrice}G");
             OnShopUpdated?.Invoke();
             return true;
         }
