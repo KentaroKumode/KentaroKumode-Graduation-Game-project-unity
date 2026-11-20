@@ -130,9 +130,11 @@ namespace ItemSystem.Shop
         public const float AxisRerollWeightMul = 6f;
         /// <summary>〈目利きの紹介状〉: 軸指定リロールの追加から引く額 (仮)。</summary>
         public const int LetterAxisDiscount = 5;
-        /// <summary>軸指定リロールの追加 (〈目利きの紹介状〉を持っていれば −<see cref="LetterAxisDiscount"/>)。</summary>
+        /// <summary>軸指定リロールの追加 (〈目利きの紹介状〉を持っていれば −<see cref="LetterAxisDiscount"/>・整備パネルの〈軸引きの手形〉で −N・下限 0)。</summary>
         public static int AxisRerollSurchargeFor(RunState run)
-            => AxisRerollSurcharge - (run != null && run.OwnsPassive(GameLoop.ItemIds.MacroLetter) ? LetterAxisDiscount : 0);
+            => System.Math.Max(0, AxisRerollSurcharge
+                - (run != null && run.OwnsPassive(GameLoop.ItemIds.MacroLetter) ? LetterAxisDiscount : 0)
+                - MetaProgression.MetaBuffApplicator.GetAxisRerollDiscount());
         /// <summary>軸指定リロールの値段 (今のリロールの値段 + 追加)。 店が無ければ 0。</summary>
         public int AxisRerollPrice => Current != null ? Current.CurrentRerollPrice + AxisRerollSurchargeFor(GameLoop.GameManager.Instance?.Run) : 0;
         /// <summary>〈目利きの紹介状〉: この店の最初の通常リロールが無料か。</summary>

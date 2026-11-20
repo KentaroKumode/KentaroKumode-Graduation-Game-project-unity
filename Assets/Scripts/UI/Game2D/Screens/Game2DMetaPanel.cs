@@ -54,7 +54,7 @@ namespace UI.Game2D
             MetaModule.SparkRole    => ("種火・役", SparkDesc("役", "各戦闘の最初の振り直しが無料")),
             MetaModule.AttackTune   => ("攻撃端子調律", "攻撃の端子に挿した出目 1 個につき +" + MetaPanel.TerminalTunePerDie + "。"),
             MetaModule.BlockTune    => ("防御端子調律", "防御の端子に挿した出目 1 個につき +" + MetaPanel.TerminalTunePerDie + "。"),
-            MetaModule.AxisTicket   => ("軸引きの手形", "店の軸指定の振り直しの追加 −" + MetaPanel.AxisTicketDiscount + "G。 ※まだ効かない (店の側が未接続)"),
+            MetaModule.AxisTicket   => ("軸引きの手形", "店の軸指定の振り直しの追加 −" + MetaPanel.AxisTicketDiscount + "G"),
             MetaModule.TacticKnife  => ("戦術の懐刀", "ランの始めに戦術の消耗品を 1 つ持つ (どれかはランダム)。"),
             MetaModule.Compression  => ("圧縮の心得", "店で端子を山札から抜くのが、 ランで最初の 1 回だけ無料。"),
             _ => (m.ToString(), ""),
