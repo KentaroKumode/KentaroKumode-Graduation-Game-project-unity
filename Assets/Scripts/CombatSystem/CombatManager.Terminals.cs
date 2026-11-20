@@ -136,6 +136,7 @@ namespace CombatSystem
             e.bursts = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.BurstTotalKey);
             e.axCrit = ctx.AxisDepth(AxisRules.Crit); e.axBleed = ctx.AxisDepth(AxisRules.Bleed); e.axPoison = ctx.AxisDepth(AxisRules.Poison);
             e.axHeat = ctx.AxisDepth(AxisRules.Heat); e.axCharge = ctx.AxisDepth(AxisRules.Charge); e.axShield = ctx.AxisDepth(AxisRules.Shield);
+            e.axDeck = ctx.AxisDepth(AxisRules.Deck); e.axRole = ctx.AxisDepth(AxisRules.Role);
             // 賽のパッシブ (ADR-0015・DiePassives)
             e.dieId = GameLoop.EquippedDie.IdOf(run);
             e.diceRerolled = ctx.rerollsThisTurn > 0;

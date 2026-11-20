@@ -34,7 +34,7 @@ from collections import Counter, defaultdict
 CLEAR_BAND = 11
 # 深さ (Run.Depth) → 画面の層 (currentFloor)。 2026-11-17 の記録 (shownFloor) で確かめた対応。
 SHOWN = {0: 0, 1: 1, 3: 2, 5: 3, 6: 4, 7: 5}
-AXES = ['会心', '出血', '毒', '臨界', '充電', 'シールド']
+AXES = ['会心', '出血', '毒', '臨界', '充電', 'シールド', '山札', '役']   # AxisRules.Ranked の順 (2026-11-20 に 6 → 8)
 
 
 def boss_label(bk):
@@ -342,12 +342,12 @@ def ore_contents(runs, P):
         def mean_held(g):
             return sum(len([x for x in f.get('held', []) if not x.startswith('装備:')]) for _, f in g) / max(1, len(g))
         def mean_axis(g, k):
-            return sum((f.get('axisAtStart') or [0] * 6)[k] for _, f in g) / max(1, len(g))
+            return sum((list(f.get('axisAtStart') or []) + [0] * len(AXES))[k] for _, f in g) / max(1, len(g))   # 6 軸の古い記録は足りない分を 0
         P(f'平均の持ち物の数: 該当 {mean_held(hit):.1f} / 相手 {mean_held(rest):.1f}\n')
         P('| 軸 (戦闘の開始時の品の数) | ' + ' | '.join(AXES) + ' |')
-        P('|---|' + '---|' * 6)
-        P('| 該当 | ' + ' | '.join(f'{mean_axis(hit, k):.2f}' for k in range(6)) + ' |')
-        P('| 相手 | ' + ' | '.join(f'{mean_axis(rest, k):.2f}' for k in range(6)) + ' |')
+        P('|---|' + '---|' * len(AXES))
+        P('| 該当 | ' + ' | '.join(f'{mean_axis(hit, k):.2f}' for k in range(len(AXES))) + ' |')
+        P('| 相手 | ' + ' | '.join(f'{mean_axis(rest, k):.2f}' for k in range(len(AXES))) + ' |')
         P('')
         ch, cr = Counter(), Counter()
         for _, f in hit:

@@ -1362,7 +1362,7 @@ namespace AutoTest
             if (!string.IsNullOrEmpty(buyAxisFocus))
             {
                 var add = new List<string>(want);
-                foreach (var a in buyAxisFocus.Split(',', '、')) add.AddRange(PersonaTerminals(AxisPersona(a.Trim())));
+                foreach (var a in buyAxisFocus.Split(',', '、')) add.AddRange(AxisTerminals(a.Trim()));
                 want = add.ToArray();
             }
             float threshold = RewardRejectBelow + RewardThresholdPerCard * Math.Max(0, total - RewardThresholdFreeSize);
@@ -1509,6 +1509,17 @@ namespace AutoTest
                 case ItemSystem.PassiveSkills.AxisRules.Shield: return BuildPersona.Shield;
                 default: return BuildPersona.RawTier;
             }
+        }
+
+        /// <summary>軸に寄せる方策で「型に合う端子」に足す端子 (軸の名前 → 端子)。 6 軸はペルソナの表 (<see cref="PersonaTerminals"/>) を引く。
+        /// 山札 (采配・2026-11-20) はペルソナを持たないので、 使い捨ての端子をここに並べる。 役 (賽目) の端子は段 1-f で足す (今は無し)。</summary>
+        private static string[] AxisTerminals(string axis)
+        {
+            if (axis == ItemSystem.PassiveSkills.AxisRules.Deck)
+                return new[] { TerminalIds.Detonator, TerminalIds.Piercer, TerminalIds.ReliefValve, TerminalIds.FirstAid, TerminalIds.FullCharge,
+                               TerminalIds.CoolShot, TerminalIds.Copier, TerminalIds.BurnOut, TerminalIds.Switchboard, TerminalIds.Retainer };
+            if (axis == ItemSystem.PassiveSkills.AxisRules.Role) return Array.Empty<string>();
+            return PersonaTerminals(AxisPersona(axis));
         }
 
         /// <summary>ビルドの型に合う端子 (規則 2)。 軸の端子は偏重の点で別に上がるので、 ここは軸の外の相性。</summary>
