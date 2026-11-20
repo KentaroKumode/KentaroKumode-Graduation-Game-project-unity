@@ -43,6 +43,9 @@ namespace ItemSystem.PassiveSkills.Effects
             // 采配 (山札の軸・2026-11-20): ① 采配を読む・②【規則】
             [GameLoop.ItemIds.DeckBroom] = (AxisRules.Deck, Kind.Count), [GameLoop.ItemIds.DeckSeamless] = (AxisRules.Deck, Kind.Count),
             [GameLoop.ItemIds.DeckCrucible] = (AxisRules.Deck, Kind.Rule), [GameLoop.ItemIds.DeckBlueprint] = (AxisRules.Deck, Kind.Rule),
+            // 賽目 (役の軸・2026-11-21): ① 賽目を読む・②【規則】
+            [GameLoop.ItemIds.RoleNotchBoard] = (AxisRules.Role, Kind.Count), [GameLoop.ItemIds.RoleChipped] = (AxisRules.Role, Kind.Count),
+            [GameLoop.ItemIds.RoleMirror] = (AxisRules.Role, Kind.Rule), [GameLoop.ItemIds.RoleOmni] = (AxisRules.Role, Kind.Rule),
         };
     }
 

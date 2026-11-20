@@ -1782,8 +1782,7 @@ namespace AutoTest
             // E1 (SuperV3 rerollEv): 平均との比較ではなく、 配線の効用の期待値で決める
             if (v3.rerollEv)
             {
-                int freeLeftE = ctx.currentBuffs.TryGetValue(CombatSystem.YachtRoleEffects.FreeRerollKey, out float ffE) ? (int)ffE : 0;
-                int costE = CombatSystem.CombatManager.RerollCostNow(all.Count, attempt, freeLeftE > 0);
+                int costE = CombatSystem.CombatManager.RerollCostNow(ctx, all.Count, attempt);   // 無料の回数 (〈擦り切れた賽袋〉ほか) も本体と同じ関数
                 if (ctx.GetCharge() - RerollChargeReserve < costE) return null;
                 var faceVals = (faces != null && faces.Length > 0) ? faces : new[] { 1, 2, 3, 4, 5, 6 };
                 float cur = BestUtilityOf(dice, tele);
@@ -1799,17 +1798,14 @@ namespace AutoTest
             // S2: 大きい攻撃の予告なら、 止めきれない手は平均近くでも振り直し、 充電の予備も使う
             if (heavyNow && rerollSum < tele.enemyAttackValue && rerollSum < meanFace * all.Count * 1.15f)
             {
-                int freeH = ctx.currentBuffs.TryGetValue(CombatSystem.YachtRoleEffects.FreeRerollKey, out float ffH) ? (int)ffH : 0;
-                int costH = CombatSystem.CombatManager.RerollCostNow(all.Count, attempt, freeH > 0);
+                int costH = CombatSystem.CombatManager.RerollCostNow(ctx, all.Count, attempt);
                 return ctx.GetCharge() >= costH ? RerollPickForDie(dice, all) : null;
             }
 
             // ② 平均を下回る手だけ振り直す
             if (rerollSum >= meanFace * all.Count) return null;
 
-            int freeLeft = ctx.currentBuffs.TryGetValue(CombatSystem.YachtRoleEffects.FreeRerollKey, out float ff)
-                ? (int)ff : 0;
-            int cost = CombatSystem.CombatManager.RerollCostNow(all.Count, attempt, freeLeft > 0);
+            int cost = CombatSystem.CombatManager.RerollCostNow(ctx, all.Count, attempt);
             if (ctx.GetCharge() - RerollChargeReserve < cost) return null;
             return RerollPickForDie(dice, all);
         }

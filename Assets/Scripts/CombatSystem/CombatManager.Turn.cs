@@ -680,6 +680,7 @@ namespace CombatSystem
             // パターン系パッシブ (ゾロ目/階段/全相異) + 合計確定
             psm.ProcessPostRoll(playerDice, enemyDice);
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnPostRoll);
+            DecideOmniPair(ctx, playerDice);   // 〈万象のゾロ目〉(2026-11-21): 出目が決まった所で、 2 個そろいをゾロ目として扱うか (配線の前)
 
             // --- 2. 予告 (柱3: 完全情報テレグラフ) ---
             // 〈鎮静香〉(§6-5) の遅延を差し引いたターンで段階を引く。 予告にもそのまま出るので、

@@ -58,6 +58,7 @@ namespace CombatSystem
             _deck.BeginBattle(runDeck);
             // 采配の品 (2026-11-20・段 1-e): 端子の解決と山札の出し入れを変える品の旗 (本体も BOT の写しも state から読む)
             _deck.state.deckItems = TerminalCards.DeckItemsOf(run);
+            _deck.state.roleItems = TerminalCards.RoleItemsOf(run);      // 賽目の品 (2026-11-21・段 1-f)
             if (AxisRules.Owns(run, GameLoop.ItemIds.DeckSparePlug)) _deck.state.extraDrawNext += TerminalCards.SparePlugDraw;      // 〈予備の差込口〉: 1 ターン目に多く引く
             if (AxisRules.Owns(run, GameLoop.ItemIds.DeckToolbox) && runDeck.Count <= TerminalCards.ToolboxMaxDeck)
                 _deck.state.handBonus = TerminalCards.ToolboxHand;      // 〈整理された工具箱〉: 戦闘開始時の山札で決める (戦闘中に増えても変えない)
@@ -153,6 +154,8 @@ namespace CombatSystem
             e.heavyTurn = Escalation.IsHeavyTurn(currentEnemy, ctx.currentTurn);
             e.chargeCostCut = ctx.ChargeCostNow(2) < 2 ? 1 : 0;   // 〈過負荷チューナー〉: 過充電の間 1 減る (最低 1)
             e.noAttack = GameLoop.Consumables.RapierContreOn(ctx);   // 〈シュヴァリエのレイピア〉のコントラタック中は攻撃の端子に挿せない
+            e.sealedRoleMask = ctx.sealedRoleMask;                    // 立つ役 (TerminalCards.RoleOf) は ResolveRoles と同じ判定 (2026-11-21)
+            e.pairAsTriple = OmniPairNow(ctx);                        // 〈万象のゾロ目〉: このターン 2 個そろいをゾロ目として扱う (振り直しの後に決める)
             return e;
         }
 

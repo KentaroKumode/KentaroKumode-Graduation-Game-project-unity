@@ -207,6 +207,12 @@ namespace GameLoop
         public const string DeckCrucible = "再利用のるつぼ", DeckBlueprint = "無銘の設計図", DeckSeamless = "継ぎ目のない導線", DeckFolded = "折り目のついた札";
         public const string DeckBag = "解体屋の袋", DeckWorkbench = "常設の作業台", DeckAsh = "灰から組む機関", DeckEngine = "永久機関の主軸";
 
+        // === 賽目 (役の軸) の 8 品 (2026-11-21・段 1-f・item-overhaul-spec §5 / §12-2・名前は仮) ===
+        //   出来事で書く品 (欠け目の見立て・揃いの拍子木) = RoleItemEffects.cs。 見切りの木札・符丁の刻み板 = CombatSystem.TerminalCards の RoleItems の旗。
+        //   擦り切れた賽袋 = CombatManager.FreeRerollsLeft。 鏡合わせの盤・宿命の刻み目・万象のゾロ目 = CombatManager.ResolveRoles / DecideOmniPair。
+        public const string RoleBag = "擦り切れた賽袋", RoleWoodTag = "見切りの木札", RoleNotchBoard = "符丁の刻み板", RoleChipped = "欠け目の見立て";
+        public const string RoleClapper = "揃いの拍子木", RoleMirror = "鏡合わせの盤", RoleFate = "宿命の刻み目", RoleOmni = "万象のゾロ目";
+
         // === 航行マップで使う消耗品 (2026-09-28・2026-10-18 に囮と罠を統合) ===
         //   **系統で判定する** (ConsFamilyOf)。 下の id 定数は「開始時に配る」「店で買う」の
         //   跨ファイル参照のためだけにあり、 効果の分岐には使わない。

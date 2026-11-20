@@ -102,7 +102,7 @@ namespace CombatSystem
                 case 1:   // 特別: 無料の振り直し 2 回 + 小さな〈極〉(面数 × 5%) / 〈極〉
                     if (!triple)
                     {
-                        ctx.nextTurnBuffs[FreeRerollKey] = FreeRerollPair;
+                        AddNextTurn(ctx, FreeRerollKey, FreeRerollPair);   // 足し合わせる (〈鏡合わせの盤〉〈揃いの拍子木〉の +1 と重なる・2026-11-21)
                         FireYacht(ctx, ref outcome, YachtPairPctPerFaceNormal, YachtPairPctPerFaceNormal * 0.5f);
                     }
                     else FireYacht(ctx, ref outcome, YachtPctPerFaceNormal, YachtPctPerFaceBoss);
@@ -115,8 +115,9 @@ namespace CombatSystem
                     break;
 
                 case 3:   // 追撃: 与えたダメージの 50% を追加 / 150% を追加確定ダメージ
-                    outcome.extraDamageRatio = triple ? PursuitTriple : PursuitPair;
-                    outcome.extraDamageTrue = triple;
+                    //   同じターンに 2 回働けば足し合わせる (〈万象のゾロ目〉〈鏡合わせの盤〉〈宿命の刻み目〉・2026-11-21)。 ゾロ目が 1 回でも働けば確定ダメージ
+                    outcome.extraDamageRatio += triple ? PursuitTriple : PursuitPair;
+                    outcome.extraDamageTrue |= triple;
                     break;
 
                 case 4:   // 攻め: 与ダメ +40% / ×2.0 ＋会心確定
@@ -124,8 +125,8 @@ namespace CombatSystem
                     if (triple) ctx.forceCritical = true;
                     break;
 
-                case 5:   // 守り: 被ダメ −40% / −100%
-                    outcome.damageTakenCutPct = triple ? GuardTriplePct : GuardPairPct;
+                case 5:   // 守り: 被ダメ −40% / −100%。 同じターンに 2 回働けば掛け合わせる (−40% を 2 回で −64%・2026-11-21)
+                    outcome.damageTakenCutPct = 100 - (100 - outcome.damageTakenCutPct) * (100 - (triple ? GuardTriplePct : GuardPairPct)) / 100;
                     break;
 
                 case 6:   // 時間: エスカレーションの次の段階を 2 ターン先へ / 段階を 1 つ戻す
@@ -152,6 +153,10 @@ namespace CombatSystem
                 }
             }
         }
+
+        /// <summary>次のターンへ持ち越す値に足す (nextTurnBuffs・無ければ 0 から)。</summary>
+        public static void AddNextTurn(CombatContext ctx, string key, float add)
+            => ctx.nextTurnBuffs[key] = (ctx.nextTurnBuffs.TryGetValue(key, out float v) ? v : 0f) + add;
 
         /// <summary>〈極〉: 敵の最大HP の (面数 × pct)% を軽減無視で削る。 ボスは <paramref name="bossPctPerFace"/>。
         /// 即勝利は持たない ── 面が多いほど出にくく、 出れば強い (出やすさに反比例)。</summary>

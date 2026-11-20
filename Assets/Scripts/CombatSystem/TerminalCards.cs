@@ -55,6 +55,17 @@ namespace CombatSystem
         Engine = 1 << 13,      // 永久機関の主軸
     }
 
+    /// <summary>賽目 (役の軸) の品のうち、 端子の解決 (<see cref="TerminalCards.Resolve"/>) の中で効く物 (2026-11-21・段 1-f・item-overhaul-spec §5 / §12-2)。
+    /// 戦闘の始めに所持品から <see cref="TerminalBattleState.roleItems"/> へ入れる (CombatManager.BeginTerminalDeck・<see cref="TerminalCards.RoleItemsOf"/>)。
+    /// 役は振った 3 つの目で決まるので、 Resolve が同じ判定 (<see cref="TerminalCards.RoleOf"/>) で立つ役を出して効かせる (本体・画面の見込み・BOT の配線と先読みが一致する)。</summary>
+    [Flags]
+    public enum RoleItems
+    {
+        None = 0,
+        WoodTag = 1 << 0,      // 見切りの木札
+        NotchBoard = 1 << 1,   // 符丁の刻み板
+    }
+
     /// <summary>端子の名前 (id = 表示名・品と同じ規則)。 **文字列を直書きしない** ── ここを経由する。</summary>
     public static class TerminalIds
     {
@@ -172,6 +183,10 @@ namespace CombatSystem
         public List<string> ashReturned = new List<string>();
         /// <summary>この戦闘で〈巡りの鐘〉を使った回数 (切り直すたび、 次のターンに多く引く枚数・<see cref="TerminalDeckState.BeforeShuffle"/>)。</summary>
         public int bells;
+        /// <summary>賽目の品の旗 (戦闘の始めに所持品から・CombatManager.BeginTerminalDeck・2026-11-21)。</summary>
+        public RoleItems roleItems;
+        /// <summary>〈宿命の刻み目〉: このターンに立った役〈連なり〉の効果 (挿した端子がすべて 2 回働く) を次のターンにももう 1 回 (<see cref="BeginTurn"/> が <see cref="doubleAll"/> へ移す・CombatManager.ResolveRoles が立てる)。</summary>
+        public bool fateDoubleNext;
 
         /// <summary>場の s がこのターン止まっているか。</summary>
         public bool IsStopped(int s) => stopped != null && s >= 0 && s < stopped.Length && stopped[s];
@@ -195,7 +210,7 @@ namespace CombatSystem
         public int BeginTurn()
         {
             ignoreCond = ignoreCondNext; ignoreCondNext = false;
-            doubleAll = false;
+            doubleAll = fateDoubleNext; fateDoubleNext = false;      // 〈宿命の刻み目〉の連なりの分 (2026-11-21)
             shuffledNow = 0;
             storedAttack += storedAttackNext; storedAttackNext = 0;
             emberCarry = emberNext; emberNext = 0;
@@ -231,6 +246,10 @@ namespace CombatSystem
         public int chargeCostCut;
         /// <summary>攻撃の種類の端子に挿せない (〈シュヴァリエのレイピア〉のコントラタック中・2026-11-20)。 挿した出目は「0.」で外す (止まった端子と同じ)。</summary>
         public bool noAttack;
+        /// <summary>〈凶運〉で封じた役 (ctx.sealedRoleMask・立っても効かない) / このターン、 2 個そろいをゾロ目として扱う (〈万象のゾロ目〉・振り直しの後に決める・2026-11-21)。
+        /// 立つ役は <see cref="TerminalCards.RoleOf"/> (CombatManager.ResolveRoles と同じ判定)。</summary>
+        public int sealedRoleMask;
+        public bool pairAsTriple;
     }
 
     /// <summary>1 ターンの端子の結果。 本体がこれを攻撃・防御・充電・戦闘の情報へ反映する。</summary>
@@ -270,6 +289,8 @@ namespace CombatSystem
         public bool chargeFill;
         public int poison, heat, bleedOnHit;
         public bool enemyStunNext, ignoreDefense;
+        /// <summary>このターンに立つ役 (<see cref="TerminalCards.RoleOf"/>・2026-11-21): 0 = 立たない / 1 = 2 個そろい / 2 = ゾロ目か連なり。 端子〈役落とし〉と賽目の品が読む。</summary>
+        public int roleNow;
         /// <summary>エスカレーションの段階を戻す数 (〈氷結瓶〉・溜まりが届いた〈鎮静香〉。 〈残響〉の 2 回目・1 ターンに 2 回届いた〈鎮静香〉も数える・2026-11-20〜 旧: 真偽で 1 段だけ)。</summary>
         public int retreatStage;
         /// <summary>時計の賽の端子: エスカレーションの次の段階を何ターン先へ送るか (挿した出目の合計)。</summary>
@@ -366,6 +387,9 @@ namespace CombatSystem
             WorkbenchPer = 3, EngineEvery = 3, BagEvery = 3, ToolboxMaxDeck = 12, ToolboxHand = 1, SparePlugDraw = 2;
         /// <summary>〈折り目のついた札〉: 与ダメージ % の池に足す。</summary>
         public const float FoldedPct = 0.40f;
+        // ===== 賽目 (役の軸) の品の数値 (2026-11-21・段 1-f・item-overhaul-spec §5・未測定) =====
+        /// <summary>〈見切りの木札〉役が立ったターン 各撃の攻撃 +N・ブロック +N / 〈符丁の刻み板〉各撃の攻撃 + 賽目 × N (ゾロ目・連なりなら 2 倍)。</summary>
+        public const int WoodTagBonus = 4, NotchBoardPer = 2;
         // ===== 采配と共通の端子 (2026-11-20・段 1-e・未測定) =====
         /// <summary>〈焼却斬り〉出目の倍率 / 使い捨て 1 回あたりの下限 (max(2, 采配)) / 〈一刀両断〉出目の倍率 / 〈歯車の軸〉挿した目 1 つあたり / 〈崩し斬り〉最大 HP の %。 *Up = 強化した端子。</summary>
         public const int BurnSlashMul = 2, BurnSlashMulUp = 3, BurnSlashMinPer = 2, OneCutMul = 3, OneCutMulUp = 4, GearPip = 2, GearPipUp = 3, CrushPct = 5, CrushPctUp = 6;
@@ -801,6 +825,8 @@ namespace CombatSystem
             }
 
             // ── 5. 効果 ──
+            //   このターンに立つ役 (振った目で決まる・CombatManager.ResolveRoles と同じ判定)。 〈役落とし〉と賽目の品 (6d) が読む
+            { var rk = RoleOf(dice, env); o.roleNow = rk == null ? 0 : YachtRoles.IsBig(rk.Value) ? 2 : 1; }
             bool doubler = false;
             for (int s = 0; s < m; s++) if (defs[s]?.baseId == TerminalIds.Doubler && Plugged(o.slotOfDie, s)) doubler = true;
             // 連なりの賽 (2026-11-20): 3 つの目が連番のターン (役〈連なり〉)、 挿した端子がすべて倍化する (〈残響〉と同じ)
@@ -908,6 +934,9 @@ namespace CombatSystem
             // ── 6c. 采配の品 (2026-11-20・段 1-e)。 攻撃 +N は攻撃の端子の撃 1 つずつに足す (ADR-0016・品の攻撃 +N と同じく全部の撃へ・攻撃しないターンは入らない) ──
             ApplyDeckItems(board, defs, env, state, o);
 
+            // ── 6d. 賽目の品 (2026-11-21・段 1-f)。 役が立ったターン、 攻撃 +N は撃 1 つずつに (6c と同じ形) ──
+            ApplyRoleItems(env, state, o);
+
             for (int i = 0; i < n; i++)
                 o.kindOfDie[i] = o.slotOfDie[i] >= 0 ? LegacyKind(defs[o.slotOfDie[i]].kind) : DiceTerminal.None;
             return o;
@@ -950,6 +979,56 @@ namespace CombatSystem
                 foreach (int x in o.slotOfDie) if (x < 0) idle++;
                 st.extraDrawNext += Math.Min(IdleWeightDrawMax, idle);
             }
+        }
+
+        /// <summary>賽目の品のうち、 端子の解決の中で効く物 (Resolve の 6d)。 旗は <see cref="TerminalBattleState.roleItems"/>。</summary>
+        private static void ApplyRoleItems(TerminalEnv env, TerminalBattleState st, TerminalOutcome o)
+        {
+            var f = st.roleItems;
+            if (f == RoleItems.None || o.roleNow <= 0) return;
+            int each = 0;
+            if ((f & RoleItems.WoodTag) != 0) { each += WoodTagBonus; o.blockAdd += WoodTagBonus; }      // 〈見切りの木札〉
+            if ((f & RoleItems.NotchBoard) != 0) each += env.axRole * NotchBoardPer * (o.roleNow >= 2 ? 2 : 1);   // 〈符丁の刻み板〉
+            if (each > 0 && o.attackHits.Count > 0)
+            {
+                for (int h = 0; h < o.attackHits.Count; h++) o.attackHits[h] += each;
+                o.attackAdd += each * o.attackHits.Count;
+                o.attackLog.Add($"賽目の品:+{each}×{o.attackHits.Count}撃");
+            }
+        }
+
+        /// <summary>このターンに立つ役 (立たなければ null)。 CombatManager.ResolveRoles と同じ判定: 振った 3 つの目 (<see cref="YachtRoles.Evaluate"/>)・
+        /// 〈凶運〉で封じた役は立たない・〈万象のゾロ目〉で格上げした 2 個そろいはゾロ目 (<see cref="UpgradePair"/>)。 3 つの目では役は高々 1 つ。</summary>
+        public static RoleKind? RoleOf(int[] dice, in TerminalEnv env)
+        {
+            var l = _roleBuf ?? (_roleBuf = new List<RoleKind>(2));      // BOT が何度も呼ぶので使い回す
+            l.Clear();
+            YachtRoles.Evaluate(dice, null, null, l);
+            foreach (var k in l)
+            {
+                if ((env.sealedRoleMask & (1 << (int)k)) != 0) continue;
+                return UpgradePair(k, env.pairAsTriple, env.sealedRoleMask);
+            }
+            return null;
+        }
+
+        [ThreadStatic] private static List<RoleKind> _roleBuf;
+
+        /// <summary>〈万象のゾロ目〉: <paramref name="asTriple"/> なら 2 個そろいを同じ目のゾロ目にする (そのゾロ目が〈凶運〉で封じられていれば 2 個そろいのまま)。</summary>
+        public static RoleKind UpgradePair(RoleKind k, bool asTriple, int sealedMask)
+        {
+            if (!asTriple || k == RoleKind.Straight || YachtRoles.IsTriple(k)) return k;
+            var t = YachtRoles.Of(YachtRoles.FaceOf(k), true);
+            return (sealedMask & (1 << (int)t)) != 0 ? k : t;
+        }
+
+        /// <summary>所持品から賽目の品の旗を作る (戦闘の始め・CombatManager.BeginTerminalDeck)。</summary>
+        public static RoleItems RoleItemsOf(GameLoop.RunState run)
+        {
+            var f = RoleItems.None;
+            if (ItemSystem.PassiveSkills.AxisRules.Owns(run, GameLoop.ItemIds.RoleWoodTag)) f |= RoleItems.WoodTag;
+            if (ItemSystem.PassiveSkills.AxisRules.Owns(run, GameLoop.ItemIds.RoleNotchBoard)) f |= RoleItems.NotchBoard;
+            return f;
         }
 
         /// <summary>所持品から采配の品の旗を作る (戦闘の始め・CombatManager.BeginTerminalDeck)。</summary>
