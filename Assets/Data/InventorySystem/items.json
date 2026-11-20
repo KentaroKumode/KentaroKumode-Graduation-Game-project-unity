@@ -3007,6 +3007,72 @@
       "axis": "役"
     },
     {
+      "id": "劇毒の火薬庫",
+      "name": "劇毒の火薬庫",
+      "description": "瘴気 5 以上の時、臨界が爆発するたび、敵の毒 +爆発のダメージ ÷ 10、その場で毒のダメージを 1 回与える",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "劇毒の火薬庫",
+      "axis": "毒"
+    },
+    {
+      "id": "血染めの歯車",
+      "name": "血染めの歯車",
+      "description": "血晶 5 以上の時、使い捨ての端子を使うたび、敵に 出血 × 2 の軽減不可ダメージ・出血 +采配",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "血染めの歯車",
+      "axis": "出血"
+    },
+    {
+      "id": "雷鳴のゾロ目",
+      "name": "雷鳴のゾロ目",
+      "description": "電流 5 以上の時、役が成立するたび充電 +賽目 × 2。ゾロ目なら、充電を払わずに 充電 × 2 の軽減不可ダメージ",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "雷鳴のゾロ目",
+      "axis": "充電"
+    },
+    {
+      "id": "必殺の照準器",
+      "name": "必殺の照準器",
+      "description": "心眼 5 以上の時、使い捨ての端子を使ったターンの攻撃はすべて会心になり、会心倍率 +采配 × 0.15",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "LEGENDARY",
+      "basePrice": 10,
+      "skill": "必殺の照準器",
+      "axis": "会心"
+    },
+    {
+      "id": "血濡れの符丁",
+      "name": "血濡れの符丁",
+      "description": "賽目 5 以上の時、役〈追撃〉か〈攻め〉が成立したターン、敵の出血を使わずに 出血 × 2 の軽減不可ダメージ",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "LEGENDARY",
+      "basePrice": 10,
+      "skill": "血濡れの符丁",
+      "axis": "役"
+    },
+    {
+      "id": "雷毒の導管",
+      "name": "雷毒の導管",
+      "description": "瘴気 5 以上の時、充電を払うたび、払った量の半分だけ敵に毒",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "雷毒の導管",
+      "axis": "毒"
+    },
+    {
       "id": "鋲の胸当て",
       "name": "鋲の胸当て",
       "description": "ターン開始時、シールド +1",
