@@ -100,6 +100,42 @@ namespace AutoTest
             ws.shield = o.shield - o.shieldSpend; ws.heal = o.heal; ws.selfDamage = o.selfDamage;
             //   〈応急箱＋〉: 最大 HP を超えた分はシールドになる (本体 ApplyTerminalOutcome と同じ・回復する前の空きを超えた分)
             if (o.overhealToShield > 0) ws.shield += Math.Max(0, o.overhealToShield - Math.Max(0, env.maxHp - env.hp));
+            // ---- 端子の解決の外で効く品 (段 3・2026-11-21・_sight)。 量は品の定数を読む (写しを持たない) ----
+            var sg = _sight;
+            float sightFlat = 0f, sightHp = 0f;      // 与ダメ相当 (下で dw を掛ける) / HP 相当
+            if (o.disposedNow > 0)
+            {
+                // 使い捨てを使うたび (OnTerminalDispose・配線の解決の直後 = このターンの固定ダメの枠): 〈焼き入れの挟み〉〈血染めの歯車〉
+                ws.extraDmg += o.disposedNow * (sg.tongsDmg + (sg.bloodGear ? env.enemyBleed * 2 : 0));
+                if (sg.bloodGear) sightFlat += o.disposedNow * sg.axDeck * DeckBleedDmg;                 // 出血 +采配 (別枠のダメージの値付けと同じ)
+                // 〈必殺の照準器〉: このターンの攻撃は全部会心・会心倍率 +采配 × 0.15 (何枚使っても 1 回)
+                if (sg.sniperMul >= 0f && o.attackDice > 0) { ws.forceCrit = true; ws.critMultAdd += sg.sniperMul; }
+                // 〈灰払いの箒〉: 次の撃の会心率 +采配 × 5% (使った数だけ)。 1 撃ぶんの与ダメ × 上がる会心率 × (会心倍率 − 1) と見る
+                //   shortcut: 1 撃の与ダメは 1 ターンの見込み ÷ 撃の数 (攻撃しないターンは次の攻撃に乗るので同じ値)・会心率 100% で頭打ちは見ない
+                if (sg.broomPct > 0f)
+                    sightFlat += Math.Min(1f, o.disposedNow * sg.broomPct) * Math.Max(0f, s.critMulEff - 1f)
+                               * DeckPerTurnDamage(in s, k) / Math.Max(1, o.attackHits.Count);
+            }
+            // 〈破城斧〉: 最初の 1 撃の時のシールド (持ち越し + このターンの端子の分) が 10 以上なら、 撃ごとにシールド 5 を使い 攻撃 +10 (倍率の前)。
+            //   shortcut: 使ったシールドは、 半分 (毎ターン半減) を先の HP で引く。 このターンの被弾を吸えなくなる分は見ない
+            if (sg.siegeAxe && o.attackHits.Count > 0)
+            {
+                int sh = s.myShield + ws.shield;
+                if (sh >= ItemSystem.PassiveSkills.Effects.SiegeAxe.MinShield)
+                {
+                    int h = Math.Min(o.attackHits.Count, sh / ItemSystem.PassiveSkills.Effects.SiegeAxe.PerHitShield);
+                    ws.aSum += h * ItemSystem.PassiveSkills.Effects.SiegeAxe.PerHitAtk;
+                    sightHp -= 0.5f * h * ItemSystem.PassiveSkills.Effects.SiegeAxe.PerHitShield * DeckFutureHpWorth(in s);
+                }
+            }
+            // 〈無害灯〉: 敵の直接攻撃で失う HP を半分 (使う臨界は見ない)
+            if (sg.lamp) ws.takenMul *= 0.5f;
+            // 〈血濡れの符丁〉: 役〈追撃〉〈攻め〉(3・4 の 2 個そろい・ゾロ目) が立つターン、 出血 × 2 の軽減不可ダメージ (役は出目で決まる = Resolve と同じ RoleOf)
+            if (sg.bloodCode && o.roleNow > 0 && env.enemyBleed > 0)
+            {
+                var rk = TerminalCards.RoleOf(rolls, in env);
+                if (rk != null && rk.Value != RoleKind.Straight) { int f = YachtRoles.FaceOf(rk.Value); if (f == 3 || f == 4) ws.extraDmg += env.enemyBleed * 2; }
+            }
 
             // ---- 先のターンに効く分の見積もり (上の定数) ----
             float dw = DeckDamageWorth(in s), fw = DeckFutureHpWorth(in s);
@@ -186,7 +222,7 @@ namespace AutoTest
                 if (TerminalCards.LeavesRunDeck(d) && (runNow?.terminalDeck?.Count ?? 0) > TerminalCards.MinDeckSize)
                     flat -= DeckRunLeaveHpCost * hpUnit;
             }
-            ws.specFlat = flat;
+            ws.specFlat = flat + sightFlat * dw + sightHp;
 
             // ---- 撃破のボーナス (今ターン撃破した時だけ Core が足す) ----
             float kill = 0f;
@@ -393,6 +429,44 @@ namespace AutoTest
             return v;
         }
 
+        /// <summary>端子の解決の外 (出来事・撃のパッシブ) で効き、 <see cref="TerminalCards.Resolve"/> の結果に出ない品 (段 3・2026-11-21)。
+        /// <see cref="PrepareDeckEval"/> が盤面を読むたびに組み直し、 <see cref="DeckSums"/> が挿し方ごとに読む (所持の検索を挿し方ごとにしないため)。</summary>
+        private struct ItemSight
+        {
+            /// <summary>〈焼き入れの挟み〉: 使い捨て 1 枚あたりの軽減不可ダメージ (4 + 采配・持っていなければ 0)。</summary>
+            public int tongsDmg;
+            /// <summary>〈血染めの歯車〉(血晶 5 以上): 使い捨て 1 枚あたり 出血 × 2 の軽減不可ダメージ・出血 +采配。</summary>
+            public bool bloodGear;
+            /// <summary>〈灰払いの箒〉: 使い捨て 1 枚あたり、 次の撃の会心率 +采配 × 5%。</summary>
+            public float broomPct;
+            /// <summary>〈必殺の照準器〉(心眼 5 以上): 使い捨てを使ったターン、 攻撃は全部会心・会心倍率 +采配 × 0.15 (−1 = 持っていない)。</summary>
+            public float sniperMul;
+            /// <summary>〈破城斧〉: シールド 10 以上のターン、 撃ごとにシールド 5 を使い 攻撃 +10。</summary>
+            public bool siegeAxe;
+            /// <summary>〈無害灯〉: 臨界 15 以上なら、 敵の直接攻撃で失う HP を半分にする (1 ターン 1 回)。</summary>
+            public bool lamp;
+            /// <summary>〈血濡れの符丁〉(賽目 5 以上): 役〈追撃〉〈攻め〉(3・4 の 2 個そろい・ゾロ目) のターン、 出血 × 2 の軽減不可ダメージ。</summary>
+            public bool bloodCode;
+            public int axDeck;
+
+            public static ItemSight Of(RunState run, ItemSystem.PassiveSkills.CombatContext ctx)
+            {
+                var v = new ItemSight { sniperMul = -1f };
+                if (run == null || ctx == null) return v;
+                v.axDeck = ctx.AxisDepth(ItemSystem.PassiveSkills.AxisRules.Deck);
+                if (run.OwnsPassive(ItemIds.DeckTongs)) v.tongsDmg = ItemSystem.PassiveSkills.Effects.TemperTongs.Base + v.axDeck;
+                v.bloodGear = run.OwnsPassive(ItemIds.CrossBloodGear) && ItemSystem.PassiveSkills.Effects.Cross.On(ctx, ItemSystem.PassiveSkills.AxisRules.Bleed);
+                if (run.OwnsPassive(ItemIds.DeckBroom)) v.broomPct = ItemSystem.PassiveSkills.Effects.AshBroom.PctPerDepth * v.axDeck;
+                if (run.OwnsPassive(ItemIds.CrossSniper) && ItemSystem.PassiveSkills.Effects.Cross.On(ctx, ItemSystem.PassiveSkills.AxisRules.Crit))
+                    v.sniperMul = ItemSystem.PassiveSkills.Effects.FatalSight.MulPerDepth * v.axDeck;
+                v.siegeAxe = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.SiegeAxe.Id);
+                v.lamp = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.HarmlessLamp.Id) && ctx.rinkaiMeter >= ItemSystem.PassiveSkills.Effects.HarmlessLamp.MinHeat;
+                v.bloodCode = run.OwnsPassive(ItemIds.CrossBloodCode) && ItemSystem.PassiveSkills.Effects.Cross.On(ctx, ItemSystem.PassiveSkills.AxisRules.Role);
+                return v;
+            }
+        }
+        private ItemSight _sight;
+
         /// <summary>今の盤面から <see cref="DeckEval"/> を組む (読むだけ)。 山札で戦っていない時は呼ばないこと。</summary>
         private DeckEval PrepareDeckEval(int[] rolls, MutualTurnTelegraph tele)
         {
@@ -406,6 +480,7 @@ namespace AutoTest
                 st = BuildOptimalTurnState(rolls, tele),
                 counterPerFire = CounterPerFire(run),
             };
+            _sight = ItemSight.Of(run, ctx);         // 端子の解決の外で効く品 (DeckSums が読む・2026-11-21)
             _recallPrefer = RecallPreferFor(tele);   // [#141] 〈有効活用〉の当て (方策 Planned の時だけ・それ以外は null = 今までの選び方)
             // 会心の効果 (〈致命の一撃〉〈一閃〉〈弱点看破〉) を旧の式でも見積もれるよう、 会心率と倍率は常に読む (readOut の切り替えは変えない)
             if (ctx != null && !ev.st.readOut && !ev.st.traceBoth) FillReadOut(ref ev.st, cm, ctx, run, tele.playerAttackPenalty);

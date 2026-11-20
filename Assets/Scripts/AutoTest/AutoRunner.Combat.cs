@@ -834,6 +834,8 @@ namespace AutoTest
             public float takenMul;       // このターンの被ダメに掛ける (1 = なし)
             public float enemyAtkMul;    // このターンの敵の攻撃に掛ける (1 = なし)
             public int shield, heal, selfDamage;
+            /// <summary>このターンに主攻撃とは別に入る軽減不可ダメージ (端子の解決の外の品・〈焼き入れの挟み〉など・2026-11-21)。 撃破の見込みに入れ、 目盛りは割らない (ひび)。</summary>
+            public int extraDmg;
             /// <summary>今ターン撃破したときだけ足す分 (〈魂狩り〉〈処刑の刃〉〈賞金狩り〉〈剥ぎ取り〉)。</summary>
             public float killBonus;
 
@@ -986,6 +988,7 @@ namespace AutoTest
             }
 
             int mainEff = aCount > 0 ? System.Math.Max(0, effDmg) : 0;   // [2026-11-14] 目盛りを割れる主攻撃の見込み (黎明・虚空の削りは入れない)
+            if (ws.extraDmg > 0) { effDmg = System.Math.Max(0, effDmg) + ws.extraDmg; noAtkDmg += ws.extraDmg; }   // 品の軽減不可ダメージ (主攻撃ではない)
             int block = blockRaw;
             // 〈貫きの錐〉: 敵攻撃値 1 につきブロックを 2 削る (予告済み)。
             if (tele.playerBlockIgnored)
@@ -1806,12 +1809,57 @@ namespace AutoTest
                 return ctx.GetCharge() >= costH ? RerollPickForDie(dice, all) : null;
             }
 
-            // ② 平均を下回る手だけ振り直す
-            if (rerollSum >= meanFace * all.Count) return null;
+            // ② 平均を下回る手だけ振り直す。 役の品を持つ時は、 振り直して役が立つ見込みの分 (攻撃相当の量) だけ線を上げる (2026-11-21・段 3)
+            if (rerollSum >= meanFace * all.Count + RoleRerollPips(ctx, faces, k, tele)) return null;
 
             int cost = CombatSystem.CombatManager.RerollCostNow(ctx, all.Count, attempt);
             if (ctx.GetCharge() - RerollChargeReserve < cost) return null;
             return RerollPickForDie(dice, all);
+        }
+
+        /// <summary>全部振り直した後に立つ役が、 役の品 (端子の解決の外の分も含む) で生む得の期待値 (攻撃相当の量・出目の和と同じ単位)。 持っていなければ 0。
+        /// 面の出方を全部数える (<see cref="ExpectedBestUtilityAfterReroll"/> と同じ)。 役は本体と同じ関数 (<see cref="CombatSystem.TerminalCards.RoleOf"/>・封じ・格上げ込み)。
+        /// 量: 〈見切りの木札〉攻撃 +4・ブロック +4 / 〈符丁の刻み板〉賽目 × 2 (ゾロ目・連なりは 2 倍) / 〈欠け目の見立て〉1〜3 の目の役で防御を賽目 × 2 無視 (敵の防御まで) /
+        /// 〈血濡れの符丁〉(賽目 5 以上) 3・4 の役で 出血 × 2 / 〈雷鳴のゾロ目〉(電流 5 以上) ゾロ目で (充電 + 賽目 × 2) × 2。 どれも 1 撃ぶん (撃の数は見ない)。
+        /// shortcut: 瑠璃砥石 (会心率)・揃いの拍子木 (次のターン)・雷鳴の充電の分・役そのものの効果は数えない。</summary>
+        private static float RoleRerollPips(ItemSystem.PassiveSkills.CombatContext ctx, int[] faces, int k, CombatSystem.MutualTurnTelegraph tele)
+        {
+            var run = GameLoop.GameManager.Instance?.Run;
+            var cm = CombatManager.Instance;
+            if (run == null || cm == null || k <= 0) return 0f;
+            int ax = ctx.AxisDepth(ItemSystem.PassiveSkills.AxisRules.Role);
+            bool wood = run.OwnsPassive(ItemIds.RoleWoodTag), notch = run.OwnsPassive(ItemIds.RoleNotchBoard) && ax > 0, chip = run.OwnsPassive(ItemIds.RoleChipped) && ax > 0;
+            bool code = run.OwnsPassive(ItemIds.CrossBloodCode) && ItemSystem.PassiveSkills.Effects.Cross.On(ctx, ItemSystem.PassiveSkills.AxisRules.Role) && ctx.enemyBleedStacks > 0;
+            bool thunder = run.OwnsPassive(ItemIds.CrossThunderDice) && ItemSystem.PassiveSkills.Effects.Cross.On(ctx, ItemSystem.PassiveSkills.AxisRules.Charge);
+            if (!wood && !notch && !chip && !code && !thunder) return 0f;
+            var env = cm.TerminalEnvNow(ctx, tele.enemyAttackValue);
+            var fv = (faces != null && faces.Length > 0) ? faces : new[] { 1, 2, 3, 4, 5, 6 };
+            int fc = fv.Length;
+            long total = 1; for (int i = 0; i < k; i++) total *= fc;
+            var buf = new int[k];
+            double acc = 0;
+            for (long code0 = 0; code0 < total; code0++)
+            {
+                long t = code0;
+                for (int j = 0; j < k; j++) { buf[j] = fv[(int)(t % fc)]; t /= fc; }
+                var rk = CombatSystem.TerminalCards.RoleOf(buf, in env);
+                if (rk == null) continue;
+                var r = rk.Value;
+                bool big = CombatSystem.YachtRoles.IsBig(r), triple = r != CombatSystem.RoleKind.Straight && CombatSystem.YachtRoles.IsTriple(r);
+                int face = r == CombatSystem.RoleKind.Straight ? 0 : CombatSystem.YachtRoles.FaceOf(r);
+                float v = 0f;
+                if (wood) v += 2 * CombatSystem.TerminalCards.WoodTagBonus;
+                if (notch) v += ax * CombatSystem.TerminalCards.NotchBoardPer * (big ? 2 : 1);
+                if (chip)
+                {
+                    bool low = face > 0 ? face <= 3 : System.Array.Exists(buf, d => d >= 1 && d <= 3);
+                    if (low) v += System.Math.Min(ax * ItemSystem.PassiveSkills.Effects.ChippedEyeReading.PerDepth, System.Math.Max(0, ctx.enemyDefense));
+                }
+                if (code && (face == 3 || face == 4)) v += ctx.enemyBleedStacks * 2;
+                if (thunder && triple) v += (ctx.GetCharge() + ax * 2) * 2;
+                acc += v;
+            }
+            return (float)(acc / total);
         }
 
         /// <summary>振り直す目の添字。 目利きの賽 (ADR-0015) を持つ時は、 いちばん大きい目を残して残りを振る。</summary>
