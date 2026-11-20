@@ -1528,7 +1528,8 @@ namespace AutoTest
         {
             if (axis == ItemSystem.PassiveSkills.AxisRules.Deck)
                 return new[] { TerminalIds.Detonator, TerminalIds.Piercer, TerminalIds.ReliefValve, TerminalIds.FirstAid, TerminalIds.FullCharge,
-                               TerminalIds.CoolShot, TerminalIds.Copier, TerminalIds.BurnOut, TerminalIds.Switchboard, TerminalIds.Retainer };
+                               TerminalIds.CoolShot, TerminalIds.Copier, TerminalIds.BurnOut, TerminalIds.Switchboard, TerminalIds.Retainer,
+                               TerminalIds.BurnSlash, TerminalIds.Reload, TerminalIds.Bell, TerminalIds.Gear };
             if (axis == ItemSystem.PassiveSkills.AxisRules.Role) return Array.Empty<string>();
             return PersonaTerminals(AxisPersona(axis));
         }

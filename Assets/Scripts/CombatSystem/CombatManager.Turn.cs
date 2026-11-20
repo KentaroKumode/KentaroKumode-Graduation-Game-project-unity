@@ -1257,7 +1257,15 @@ namespace CombatSystem
                         Debug.Log($"[天眼の鍔] 会心のあと敵 HP {left} ≤ {line} → 倒す");
                     }
                 }
-                NoteBossDownMainHit(hitDmg, ctx.currentTurn);   // ボスのダウン (2026-11-14): 目盛りを割れるのは通常攻撃だけ (固定ダメの枠より前の HP で判定)
+                int broke = NoteBossDownMainHit(hitDmg, ctx.currentTurn);   // ボスのダウン (2026-11-14): 目盛りを割れるのは通常攻撃だけ (固定ダメの枠より前の HP で判定)
+                // 端子〈崩し斬り〉(2026-11-20): この撃 (撃 h = 攻撃の端子 h 枚目) で目盛りを割ったら、 最大 HP の 5% の軽減不可 (預かり・ターンの最後に通る。 通常攻撃ではないので次の目盛りは割らない)
+                if (broke > 0 && h < term.attackHitIds.Count && TerminalCards.BaseOf(term.attackHitIds[h]) == TerminalIds.Crush && currentEnemy != null)
+                {
+                    int pct = TerminalCards.Get(term.attackHitIds[h])?.upgraded == true ? TerminalCards.CrushPctUp : TerminalCards.CrushPct;
+                    int extra = currentEnemy.maxHP * pct / 100;
+                    ItemSystem.PassiveSkills.Keywords.Kw.DamageEnemy(ctx, extra);
+                    Debug.Log($"[崩し斬り] 目盛りを割った → 軽減不可 {extra} (最大 HP の {pct}%)");
+                }
             }
             HpLossDiag.Lose(ref enemyHP, dealtFixed, "固定ダメ");
             if (_diagKind == SkillDiag.Boss && currentEnemy != null)
