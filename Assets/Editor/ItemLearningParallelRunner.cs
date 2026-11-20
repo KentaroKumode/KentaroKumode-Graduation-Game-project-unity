@@ -478,6 +478,11 @@ namespace AutoTest.EditorTools
             Directory.CreateDirectory(dst);
             foreach (string f in Directory.GetFiles(dst)) File.Delete(f);
             if (!Directory.Exists(_st.learningRoot)) return;
+            // 回帰のキャッシュ (regression_fit.txt) を、 写す前に親で今の csv に合わせておく (2026-11-20)。
+            //   古い鍵のまま写すと、 ワーカー 22 本が起動のたびに 376 MB の csv から計算し直す (1 本約 50 秒・ラウンドの頭が遅かった原因)。
+            //   入力が変わっていなければ親の中で即座に戻る (ItemRegression.Recompute の鍵の比較)。
+            try { AutoTest.ItemRegression.Recompute(_st.learningRoot); }
+            catch (Exception ex) { Debug.LogWarning("[学習並列] 回帰のキャッシュを作れなかった (ワーカーが各自で計算する): " + ex.Message); }
             foreach (string f in Directory.GetFiles(_st.learningRoot))
                 File.Copy(f, Path.Combine(dst, Path.GetFileName(f)), true);
         }
