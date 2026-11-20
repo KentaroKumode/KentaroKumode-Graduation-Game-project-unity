@@ -516,7 +516,7 @@ namespace CombatSystem
             }
 
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnTurnStart);
-            // 挑戦カード: 毎ターン、 臨界のメーター +N (臨界の品が無い・誓約で封じられている時は AddHeat が 0 にする)
+            // 挑戦カード: 毎ターン、 臨界のメーター +N (臨界の品が無い時は AddHeat が 0 にする)
             {
                 int heat = MetaProgression.MetaBuffApplicator.GetHeatPerTurn();
                 if (heat > 0 && ctx != null) ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, heat, "挑戦カード(毎ターン)");

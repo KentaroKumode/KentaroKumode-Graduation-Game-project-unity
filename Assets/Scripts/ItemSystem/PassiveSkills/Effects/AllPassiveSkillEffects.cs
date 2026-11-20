@@ -508,7 +508,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>血の一撃 (BloodStrike) — 攻撃時、敵出血1消費で 与ダメ+スタック値×3 (消費前スタック数×3)。
+    /// <summary>血の一撃 (BloodStrike) — 攻撃時、敵出血1消費で 与ダメ+スタック値×2 (消費前スタック数×2・2026-11-20: 旧 ×3・ITT +24.7pp で 1 品で決まる強さだった)。
     /// 積んだ出血を火力に変換するバースト。スタック多いほど爆発力大。</summary>
     public class BloodStrike : IPassiveSkillEffect, IRelicDisplay
     {
@@ -521,9 +521,9 @@ namespace ItemSystem.PassiveSkills.Effects
             if (ctx.finalDamage <= 0 || ctx.enemyBleedStacks <= 0) return;
             int stacks = ctx.enemyBleedStacks; // 消費前の値で計算
             Keywords.Kw.ConsumeBleed(ctx, 1);   // 出血を使った出来事を配る (〈魂喰らいの血石〉など・2026-10-31)
-            int bonus = stacks * 3;
+            int bonus = stacks * 2;
             ctx.finalDamage += bonus;
-            UnityEngine.Debug.Log($"[血の一撃] 出血-1 (残{ctx.enemyBleedStacks}) → 与ダメ+{bonus} (基{stacks}×3)");
+            UnityEngine.Debug.Log($"[血の一撃] 出血-1 (残{ctx.enemyBleedStacks}) → 与ダメ+{bonus} (基{stacks}×2)");
         }
     }
 

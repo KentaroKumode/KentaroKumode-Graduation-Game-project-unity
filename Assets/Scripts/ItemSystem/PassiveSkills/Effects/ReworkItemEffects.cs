@@ -200,7 +200,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>恒熱の炉壁: 爆発のたび、 消えた臨界の 20% をシールドにする。</summary>
+    /// <summary>恒熱の炉壁: 爆発のたび、 消えた臨界の 10% をシールドにする (2026-11-20: 旧 20%)。</summary>
     public class HeatWall : IPassiveSkillEffect
     {
         public string SkillId => "恒熱の炉壁";
@@ -208,7 +208,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (t == PassiveSkillTrigger.OnBattleStart) { Kw.EnableHeat(ctx); return; }
-            Rw.Shield(ctx, Kw.EventAmount(ctx) * 20 / 100, SkillId);
+            Rw.Shield(ctx, Kw.EventAmount(ctx) * 10 / 100, SkillId);
         }
     }
 
@@ -226,7 +226,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>点火スパナ: 爆発のたび充電 +5。</summary>
+    /// <summary>点火スパナ: 爆発のたび充電 +3 (2026-11-20: 旧 +5)。 「攻撃が通るたび臨界 +2」は入り口 (EntryEffect.Table)。</summary>
     public class IgnitionSpanner : IPassiveSkillEffect
     {
         public string SkillId => "点火スパナ";
@@ -234,7 +234,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (t == PassiveSkillTrigger.OnBattleStart) { Kw.EnableHeat(ctx); return; }
-            ctx.AddCharge(5);
+            ctx.AddCharge(3);
         }
     }
 
@@ -278,7 +278,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>工廠の材料箱: 爆発のたび、 この戦闘中の自分の防御 +2。</summary>
+    /// <summary>工廠の材料箱: 爆発のたび、 この戦闘中の自分の防御 +1 (2026-11-20: 旧 +2)。</summary>
     public class ArsenalCrate : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "工廠の材料箱";
@@ -289,7 +289,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (t == PassiveSkillTrigger.OnBattleStart) { Kw.EnableHeat(ctx); return; }
-            if (t == PassiveSkillTrigger.OnRinkaiBurst) { Kw.Add(ctx, Key, 2); ctx.playerDefense += 2; return; }
+            if (t == PassiveSkillTrigger.OnRinkaiBurst) { Kw.Add(ctx, Key, 1); ctx.playerDefense += 1; return; }
             ctx.playerDefense += Rw.Count(ctx, Key);   // 防御は毎ターン基礎値から組み直されるので積み直す
         }
     }
@@ -373,7 +373,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>逆さ避雷針: 敵の攻撃を受けるとき、 充電を 5 使って被ダメ −5 (1 ターン 1 回)。</summary>
+    /// <summary>逆さ避雷針: 敵の攻撃を受けるとき、 充電を 5 使って被ダメ −2 (1 ターン 1 回・2026-11-20: 旧 −5)。</summary>
     public class InvertedRod : IPassiveSkillEffect
     {
         public string SkillId => "逆さ避雷針";
@@ -383,7 +383,7 @@ namespace ItemSystem.PassiveSkills.Effects
             if (ctx.playerWonRoll || ctx.finalDamage <= 0 || ctx.GetCharge() < 5) return;
             if (!Rw.OncePerTurn(ctx, "rw.rod")) return;
             if (!ctx.ConsumeCharge(5)) return;
-            ctx.finalDamage = System.Math.Max(0, ctx.finalDamage - 5);
+            ctx.finalDamage = System.Math.Max(0, ctx.finalDamage - 2);
         }
     }
 
@@ -407,13 +407,13 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>帯電の胸甲: 充電を 3 得るたびシールド +2。</summary>
+    /// <summary>帯電の胸甲: 充電を 5 得るたびシールド +1 (2026-11-20: 旧 充電 3 につき +2)。</summary>
     public class ChargedCuirass : IPassiveSkillEffect
     {
         public string SkillId => "帯電の胸甲";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnChargeGain };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-            => Rw.Shield(ctx, Kw.Tally(ctx, "rw.cuirass", Kw.EventAmount(ctx), 3) * 2, SkillId);
+            => Rw.Shield(ctx, Kw.Tally(ctx, "rw.cuirass", Kw.EventAmount(ctx), 5), SkillId);
     }
 
     /// <summary>雷鯰の棘: 充電 7 以上の間、 攻撃が通るたび敵に毒 +1。</summary>
@@ -576,12 +576,23 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>脈なしの鋼心臓【規則】: シールドがターン開始時に半減しなくなる。</summary>
-    public class PulselessHeart : IPassiveSkillEffect
+    /// <summary>脈なしの鋼心臓: 戦闘開始時、 シールド +X。 戦闘に勝利するたび X +1 (このランの間)。 X の最初の値は 10。
+    /// X は <see cref="GameLoop.RunState.pulselessHeartShield"/> (ランの始めに 10)。 勝ちを数えるのは CombatManager.FinishCombat (<see cref="NoteWin"/>)。
+    /// 2026-11-20 作り直し: 旧【規則】「シールドがターン開始時に半減しなくなる」。</summary>
+    public class PulselessHeart : IPassiveSkillEffect, IRelicDisplay
     {
-        public string SkillId => "脈なしの鋼心臓";
+        public const string Id = "脈なしの鋼心臓";
+        public const int StartShield = 10;
+        public string SkillId => Id;
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Rw.Run?.pulselessHeartShield ?? StartShield);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.shieldNoHalve = true;
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => Rw.Shield(ctx, Rw.Run?.pulselessHeartShield ?? StartShield, SkillId);
+        /// <summary>戦闘に勝った時に呼ぶ。 持っている間の勝利だけ X +1。</summary>
+        public static void NoteWin(GameLoop.RunState run)
+        {
+            if (AxisRules.Owns(run, Id)) run.pulselessHeartShield++;
+        }
     }
 
     /// <summary>燻りの革胸当て: ターン開始の減衰で失ったシールドの半分を臨界にする。
@@ -766,7 +777,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>加重の拳套: 攻撃が通るたび (1 ターンに 1 回) 刻み +1。 刻み 1 つにつき与ダメージ +3%。 戦闘が終わると刻みは 0 に戻る。
+    /// <summary>加重の拳套: 攻撃が通るたび (1 ターンに 1 回) 刻み +1。 刻み 1 つにつき与ダメージ +2% (2026-11-20: 旧 +3%)。 戦闘が終わると刻みは 0 に戻る。
     /// 2026-11-11 (#100): 毒の品から作り直した ── 拳套なのに毒で、 名前・フレーバー (「留め紐は一撃ごとに長くなる。 外すと元へ戻る」) と
     /// 効果が合っていなかった。 軸なし。 数値は仮置き (未測定)。 旧効果は「敵の毒が 5 増えるたび刻み +1・攻撃に挿したターンに使い切る」。</summary>
     public class WeightingGauntlet : IPassiveSkillEffect, IRelicDisplay
@@ -774,7 +785,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public string SkillId => "加重の拳套";
         /// <summary>秘宝の列 (#320) の見え方。</summary>
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Rw.Count(ctx, Stk));
-        public const float PctPerStack = 0.03f;
+        public const float PctPerStack = 0.02f;
         /// <summary>[persistent・戦闘開始で 0] 刻みの数。</summary>
         private const string Stk = "rw.weightStacks";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnPostDealDamage };

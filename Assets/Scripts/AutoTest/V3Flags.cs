@@ -70,11 +70,10 @@ namespace AutoTest
         public bool orderByEffOnly;
         /// <summary>A: 段階 3 (通常購入・最後の店) を値の高い順にし、 足切り (PowerCuts[3]) 未満は買わない。 旧は棚の左から値を見ずに全部。</summary>
         public bool phase3Ranked;
-        /// <summary>軸に絞る買い方 (2026-11-07・Super のとき on)。 その軸の品を十分に持っていたら、 ① 数を参照・②【規則】・誓約を
-        /// 最優先で買う (ITT は平均で測るので、 絞った構成でだけ価値が出るこれらの品を低く出す)。 誓約は、 封じる軸の品を
-        /// ほとんど持っていないときだけ買い、 足りないうちは買わない。 しきい値は下の 4 つ。</summary>
+        /// <summary>軸に絞る買い方 (2026-11-07・Super のとき on)。 その軸の品を十分に持っていたら、 ① 数を参照・②【規則】を
+        /// 最優先で買う (ITT は平均で測るので、 絞った構成でだけ価値が出るこれらの品を低く出す)。 しきい値は下の 2 つ。</summary>
         public bool axisCommitBuy;
-        public int commitCountAt = 4, commitRuleAt = 6, commitOathAt = 8, commitOathMaxSealedOwned = 2;
+        public int commitCountAt = 4, commitRuleAt = 6;
         /// <summary>[診断] 同点の割り方を ID 順にする (意味の無い順)。</summary>
         public bool tieById;
         /// <summary>同じ目の出目パーツを持っていたら、 差し替えの差分 (新しい面 − 持っている面) で評価する (2026-11-06 に全 BOT の既定へ)。

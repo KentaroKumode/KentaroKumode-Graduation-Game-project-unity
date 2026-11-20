@@ -225,8 +225,8 @@ namespace ItemSystem.PassiveSkills
         public void BeginCombat(int playerMaxHP, int enemyMaxHP = 0, int playerDiceMax = 6, int enemyDiceMax = 6, int enemyThreat = 0)
         {
             context = new CombatContext(playerMaxHP, enemyMaxHP, enemyThreat);
-            // 誓約の封じは、 戦闘開始時に入る資源 (遺物の開幕・臨界の持ち越し・品の OnBattleStart) より前に立てる (2026-11-07)。
-            Effects.OathSeals.Apply(context, GameLoop.GameManager.Instance?.Run);
+            // 〈一点読みの片眼〉の代価の印 (戦闘の情報を作った直後・品の OnBattleStart より前)
+            Effects.PinpointEye.ApplyCost(context, GameLoop.GameManager.Instance?.Run);
 
             // ダイス設定値を設定
             context.playerDiceMax = playerDiceMax;
@@ -659,8 +659,6 @@ namespace ItemSystem.PassiveSkills
             // 末那識など: 会心強制（乱数・会心率capを無視して確定）
             // **敵の攻撃には効かせない** ── forceCritical もプレイヤー側のフラグ。
             if (context.forceCritical && !attackerIsEnemy) context.isCritical = true;
-            // 誓約の封じ (〈赤錆の誓約〉): 会心確定の効果より後に落とす (2026-11-07)。
-            if (context.critSealed && !attackerIsEnemy) context.isCritical = false;
 
             if (context.isCritical && totalDamage > 0)
             {

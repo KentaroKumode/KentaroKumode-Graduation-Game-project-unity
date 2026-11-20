@@ -142,9 +142,9 @@ base: origin/main 6ea741d
 | F-E-04 | 臨界 | メーター 50 で爆発 +30・品 1 つ以上で有効 | `CombatContext`（rinkai）・`AllPassiveSkillEffects.cs:584` | ― | ロ | 仕（§7-4） | 動 |
 | F-E-05 | シールド | 毎ターン半減（T1 は無し）・半減→付与の順 | `CombatContext.BeginNewTurn` Phase C | ― | ロ | 仕（DCR ③-D） | 固 |
 | F-E-06 | キーワードの出来事 | 爆発・充電を得る/使う・過充電・シールド・毒・出血の出来事。1 連鎖で同じ品は 1 回 | `ItemSystem/.../Keywords.cs` `Kw`・`RaiseKeyword` | 出来事の種類 未確認 | ロ | 仕（§8-6） | 動 |
-| F-E-07 | 【規則】の品 | 帳簿外の爆薬・雷壷・脈なしの鋼心臓 ほか | `ReworkItemEffects.cs` | 9（§8-6 の列挙） | ロ | 仕（§8-6） | 仮 |
+| F-E-07 | 【規則】の品 | 帳簿外の爆薬・雷壷 ほか | `ReworkItemEffects.cs` | 9（§8-6 の列挙） | ロ | 仕（§8-6） | 仮 |
 | F-E-08 | 軸と偏重 | 秘宝の `axis`・偏重 6 つ（心眼・血晶・瘴気・炉温・電流・堅牢） | `items.json` `axis`・`AxisRules.cs` | 軸 7（金を含む）・軸なし 24 品 | ロ | 食（G-08） | 動 |
-| F-E-09 | 誓約の封じ | 他の軸の入口を封じる・山札の端子にも及ぶ | `AxisItemEffects.cs` | 誓約 6 | ロ | 仕（§8-7） | 仮 |
+| F-E-09 | 誓約の封じ | 2026-11-20 に削除（GAME.md §24） | ― | ― | ― | ― | 廃止 |
 | F-E-10 | 入り口の偏重の条件 | 最も大きい偏重/上位 2/絶対数 | `EntryEffect.Table` | 13 品に条件 | ロ | 未（§23-26） | 仮 |
 | F-E-11 | 発火の時点 | OnPostRoll / OnRoll / OnWired / OnCriticalCheck など | `PassiveSkillTrigger` | 種類 未確認 | ロ | 仕（§8-4） | 固 |
 

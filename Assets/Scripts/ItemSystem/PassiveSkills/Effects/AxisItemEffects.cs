@@ -7,11 +7,10 @@ namespace ItemSystem.PassiveSkills.Effects
     //
     //  再編 (2026-10-31) の品は大半が「軸 X を軸 Y に換える」変換器で、 安い変換器を全部買うと
     //  毒・出血・臨界・主攻撃が 1 つの機関に繋がった (クリアしたランの 64% が 3 経路を同時に使っていた)。
-    //  軸 (会心・出血・毒・臨界・充電・シールド) ごとに 4 種の品を置く:
+    //  軸 (会心・出血・毒・臨界・充電・シールド) ごとに 3 種の品を置く:
     //    燃料   — 配線を払って資源を得る。
     //    ① 数を参照 — その軸の品の数 (心眼 / 血晶 / 瘴気 / 炉温 / 電流 / 堅牢) に応じて資源が増える。
     //    ②【規則】— その軸の性質を変える。 強さは同じ数で決まる (① と連動して、 深く積むほど効く)。
-    //    誓約   — 【規則】自分の軸を強める代わりに、 他の軸の入口を封じる。 封じは OathSeals が戦闘の情報を作った直後に立てる。
     //  出目 (攻撃に挿した出目 +%) はどの構成にも効くので軸にしない。
     // ============================================================
 
@@ -23,58 +22,20 @@ namespace ItemSystem.PassiveSkills.Effects
         public static int DiceTotal(CombatContext ctx) => ctx.playerDice != null ? ctx.playerDice.Length : 3;
     }
 
-    /// <summary>誓約の封じ。 <b>戦闘の情報を作った直後</b>に所持品から立てる (PassiveSkillManager)。
-    /// 品の OnBattleStart で立てると、 遺物の開幕の毒・出血・充電や臨界の持ち越しがその前に入って漏れた。
-    /// 封じは「その軸の変換器の出口」を塞ぐ形で、 誓約どうしで重ならないように割り当てた。</summary>
-    public static class OathSeals
-    {
-        /// <summary>誓約 → 封じる軸。 <see cref="Apply"/> の割り当てと揃えること。</summary>
-        public static readonly System.Collections.Generic.Dictionary<string, string[]> SealsOf = new System.Collections.Generic.Dictionary<string, string[]>
-        {
-            [PinpointEye.Id] = new string[0],   // 会心は他の軸と排他にしない (2026-11-07)。 代価は非会心の与ダメ −30%
-            [RustOath.Id]    = new[] { AxisRules.Poison, AxisRules.Shield },
-            [DregsOath.Id]   = new[] { AxisRules.Bleed,  AxisRules.Heat },
-            [CoreOath.Id]    = new[] { AxisRules.Charge, AxisRules.Shield },
-            [SpriteOath.Id]  = new[] { AxisRules.Heat,   AxisRules.Shield },
-            [WardenOath.Id]  = new[] { AxisRules.Poison, AxisRules.Heat },
-        };
-
-        /// <summary>持っている誓約が封じる軸 (店で買っても働かない軸)。 BOT の購入判断が読む ── 人は封じた軸の品を買わない。</summary>
-        public static System.Collections.Generic.HashSet<string> SealedAxes(GameLoop.RunState run)
-        {
-            var s = new System.Collections.Generic.HashSet<string>();
-            if (run == null) return s;
-            foreach (var kv in SealsOf)
-                if (AxisRules.Owns(run, kv.Key)) foreach (var a in kv.Value) s.Add(a);
-            return s;
-        }
-
-        public static void Apply(CombatContext ctx, GameLoop.RunState run)
-        {
-            if (ctx == null || run == null) return;
-            if (AxisRules.Owns(run, PinpointEye.Id))  { ctx.accumulatedValues[PinpointEye.NonCritCutKey] = 1; }
-            if (AxisRules.Owns(run, RustOath.Id))     { ctx.poisonSealed = true; ctx.shieldSealed = true; ctx.bleedDoubled = true; }
-            if (AxisRules.Owns(run, DregsOath.Id))    { ctx.bleedSealed = true;  ctx.heatSealed = true; }
-            if (AxisRules.Owns(run, CoreOath.Id))     { ctx.chargeSealed = true; ctx.shieldSealed = true; ctx.burstDoubled = true; }
-            if (AxisRules.Owns(run, SpriteOath.Id))   { ctx.heatSealed = true;   ctx.shieldSealed = true; ctx.chargeDoubled = true; }
-            if (AxisRules.Owns(run, WardenOath.Id))   { ctx.poisonSealed = true; ctx.heatSealed = true; }
-        }
-    }
-
     /// <summary>軸の品の種類 (BOT の購入判断が読む・2026-11-07)。 ITT は品をランダムに配った平均で序列を作るので、
-    /// 絞った構成でだけ価値が出る ① 数を参照・②【規則】・誓約は低く出る。 Super はこの表で「軸が深ければ買う」を判断する。</summary>
+    /// 絞った構成でだけ価値が出る ① 数を参照・②【規則】は低く出る。 Super はこの表で「軸が深ければ買う」を判断する。</summary>
     public static class AxisCatalog
     {
-        public enum Kind { Count, Rule, Oath }
+        public enum Kind { Count, Rule }
         public static readonly System.Collections.Generic.Dictionary<string, (string axis, Kind kind)> Items
             = new System.Collections.Generic.Dictionary<string, (string, Kind)>
         {
-            ["研ぎ師の見立て書"] = (AxisRules.Crit, Kind.Count),   ["重ね斬りの型"] = (AxisRules.Crit, Kind.Rule),     [PinpointEye.Id] = (AxisRules.Crit, Kind.Oath),
-            ["血止め知らずの針箱"] = (AxisRules.Bleed, Kind.Count), ["凝血の小瓶"] = (AxisRules.Bleed, Kind.Rule),      [RustOath.Id] = (AxisRules.Bleed, Kind.Oath),
-            ["瘴気溜まりの壺"] = (AxisRules.Poison, Kind.Count),   ["腐れ沼の苔玉"] = (AxisRules.Poison, Kind.Rule),   [DregsOath.Id] = (AxisRules.Poison, Kind.Oath),
-            ["焚き足しの炭"] = (AxisRules.Heat, Kind.Count),         ["火花読みの眼鏡"] = (AxisRules.Heat, Kind.Rule),    [CoreOath.Id] = (AxisRules.Heat, Kind.Oath),
-            ["漏電する銅線"] = (AxisRules.Charge, Kind.Count),     ["二股の導線"] = (AxisRules.Charge, Kind.Rule),     [SpriteOath.Id] = (AxisRules.Charge, Kind.Oath),
-            ["油染みの盾革"] = (AxisRules.Shield, Kind.Count),   [ShieldPushArt.Id] = (AxisRules.Shield, Kind.Rule), [WardenOath.Id] = (AxisRules.Shield, Kind.Oath),
+            ["研ぎ師の見立て書"] = (AxisRules.Crit, Kind.Count),   ["重ね斬りの型"] = (AxisRules.Crit, Kind.Rule),     [PinpointEye.Id] = (AxisRules.Crit, Kind.Rule),
+            ["血止め知らずの針箱"] = (AxisRules.Bleed, Kind.Count), ["凝血の小瓶"] = (AxisRules.Bleed, Kind.Rule),
+            ["瘴気溜まりの壺"] = (AxisRules.Poison, Kind.Count),   ["腐れ沼の苔玉"] = (AxisRules.Poison, Kind.Rule),
+            ["焚き足しの炭"] = (AxisRules.Heat, Kind.Count),         ["火花読みの眼鏡"] = (AxisRules.Heat, Kind.Rule),
+            ["漏電する銅線"] = (AxisRules.Charge, Kind.Count),     ["二股の導線"] = (AxisRules.Charge, Kind.Rule),
+            ["油染みの盾革"] = (AxisRules.Shield, Kind.Count),   [ShieldPushArt.Id] = (AxisRules.Shield, Kind.Rule),
             // 追加 34 品のうち軸の品の数を読む品 (AxisItemEffects2.cs)
             ["千里眼の水晶"] = (AxisRules.Crit, Kind.Count), ["雷鳴の太鼓"] = (AxisRules.Charge, Kind.Count),
             ["涸れぬ血晶"] = (AxisRules.Bleed, Kind.Count), ["瘴気の外套"] = (AxisRules.Poison, Kind.Count),
@@ -187,7 +148,7 @@ namespace ItemSystem.PassiveSkills.Effects
             ("溢れ取りの鋳型", When.PlayerHit,     true, 3, Gate.Free, 0),
             ("烈刃", When.PlayerHit,     true, 3, Gate.Free, 0),
             ("二度目の打金", When.PlayerHit,     true, 3, Gate.Free, 0),
-            ("点火スパナ", When.PlayerHit,     true, 3, Gate.Free, 0),
+            ("点火スパナ", When.PlayerHit,     true, 2, Gate.Free, 0),   // 2026-11-20: 旧 +3
         };
     }
 
@@ -239,9 +200,9 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>一点読みの片眼【規則・誓約】: 会心率 +30%。 代わりに会心しなかった攻撃の与ダメ −30%。
+    /// <summary>一点読みの片眼【規則】: 会心率 +30%。 代わりに会心しなかった攻撃の与ダメ −30%。
     /// 2026-11-07: 代価を「充電・臨界を封じる」から変更 ── 会心はどの軸にも重ねて使う横断の軸で、 他の軸と排他にしない。
-    /// 代価は PassiveSkillManager の会心判定の後で掛ける (OathSeals.Apply が <see cref="NonCritCutKey"/> を立てる)。</summary>
+    /// 代価は PassiveSkillManager の会心判定の後で掛ける (<see cref="ApplyCost"/> が <see cref="NonCritCutKey"/> を立てる)。</summary>
     public class PinpointEye : IPassiveSkillEffect
     {
         public const string Id = "一点読みの片眼";
@@ -250,6 +211,11 @@ namespace ItemSystem.PassiveSkills.Effects
         public string SkillId => Id;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.critRatePctAdd += 0.30f;
+        /// <summary>代価の印を<b>戦闘の情報を作った直後</b>に所持品から立てる (PassiveSkillManager.BeginCombat)。</summary>
+        public static void ApplyCost(CombatContext ctx, GameLoop.RunState run)
+        {
+            if (ctx != null && AxisRules.Owns(run, Id)) ctx.accumulatedValues[NonCritCutKey] = 1;
+        }
     }
 
     // ============================================================
@@ -286,15 +252,6 @@ namespace ItemSystem.PassiveSkills.Effects
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
             => ctx.bleedDecayDivisorBonus += ctx.AxisDepth(AxisRules.Bleed) / 2;   // 〈止血禁じの軟膏〉の +3 と足し合わせる
-    }
-
-    /// <summary>赤錆の誓約【規則・誓約】: 敵に与える出血が 2 倍になる。 代わりに毒を与えられず、 シールドを得られない (OathSeals・2026-11-07 に「会心が出ず」から変更)。</summary>
-    public class RustOath : IPassiveSkillEffect
-    {
-        public const string Id = "赤錆の誓約";
-        public string SkillId => Id;
-        public PassiveSkillTrigger[] Triggers => new PassiveSkillTrigger[0];
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) { }
     }
 
     // ============================================================
@@ -335,17 +292,6 @@ namespace ItemSystem.PassiveSkills.Effects
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
             => ctx.poisonKeepPct = System.Math.Min(MaxKeepPct, 50 + 2 * ctx.AxisDepth(AxisRules.Poison));
-    }
-
-    /// <summary>澱の誓約【規則・誓約】: 敵の毒が 5 増えるたびシールド +2。 代わりに出血を与えられず、 臨界が溜まらない (OathSeals)。
-    /// 2026-11-07: 旧「増えた量 × 2」は毒の付与量が約 5 倍になったので、 1 ターン +40〜60 シールドになり得た。</summary>
-    public class DregsOath : IPassiveSkillEffect
-    {
-        public const string Id = "澱の誓約";
-        public string SkillId => Id;
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPoisonGain };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-            => Rw.Shield(ctx, Kw.Tally(ctx, "ax.dregs", Kw.EventAmount(ctx), 5) * 2, SkillId);
     }
 
     // ============================================================
@@ -405,15 +351,6 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>炉心の誓約【規則・誓約】: 爆発の基礎が 2 倍になる。 代わりに充電とシールドを得られない (OathSeals)。</summary>
-    public class CoreOath : IPassiveSkillEffect
-    {
-        public const string Id = "炉心の誓約";
-        public string SkillId => Id;
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => Kw.EnableHeat(ctx);
-    }
-
     // ============================================================
     //  充電 (電流)
     // ============================================================
@@ -430,13 +367,13 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>漏電する銅線 (①): ターン開始時、 充電 + 電流 (2026-11-07: 旧 電流の半分)。 上限で溢れた分は捨てるだけ (〈過充電〉の出来事を配らない)。</summary>
+    /// <summary>漏電する銅線 (①): ターン開始時、 充電 + 電流の半分 (切り捨て・2026-11-20: 旧 電流・2026-11-07: 旧 電流の半分)。 上限で溢れた分は捨てるだけ (〈過充電〉の出来事を配らない)。</summary>
     public class LeakyCopperWire : IPassiveSkillEffect
     {
         public string SkillId => "漏電する銅線";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-            => ctx.AddCharge(ctx.AxisDepth(AxisRules.Charge), raiseOverflow: false);
+            => ctx.AddCharge(ctx.AxisDepth(AxisRules.Charge) / 2, raiseOverflow: false);
     }
 
     /// <summary>二股の導線 (②【規則】): 充電の端子を挿した出目の「電流 × 12%」(最大 80%) が攻撃にも加わる (2026-11-07: 旧 ×8%) (CombatManager の配線集計)。</summary>
@@ -446,15 +383,6 @@ namespace ItemSystem.PassiveSkills.Effects
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
             => ctx.chargeToAttackPct = System.Math.Min(0.8f, 0.12f * ctx.AxisDepth(AxisRules.Charge));
-    }
-
-    /// <summary>雷精の誓約【規則・誓約】: 得る充電が 2 倍になる。 代わりに臨界が溜まらず、 シールドを得られない (OathSeals)。</summary>
-    public class SpriteOath : IPassiveSkillEffect
-    {
-        public const string Id = "雷精の誓約";
-        public string SkillId => Id;
-        public PassiveSkillTrigger[] Triggers => new PassiveSkillTrigger[0];
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) { }
     }
 
     // ============================================================
@@ -476,13 +404,13 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>油染みの盾革 (①): 堅牢 1 につき、 ターン開始の減衰で残るシールド +5% (残る割合は最大 80%・2026-11-07: 旧 +3%)。</summary>
+    /// <summary>油染みの盾革 (①): 堅牢 1 につき、 ターン開始の減衰で残るシールド +3% (残る割合は最大 80%・2026-11-20: 旧 +5%・2026-11-07: 旧 +3%)。</summary>
     public class OiledShieldLeather : IPassiveSkillEffect
     {
         public string SkillId => "油染みの盾革";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-            => ctx.shieldKeepBonusPct = System.Math.Max(ctx.shieldKeepBonusPct, 5 * ctx.AxisDepth(AxisRules.Shield));
+            => ctx.shieldKeepBonusPct = System.Math.Max(ctx.shieldKeepBonusPct, 3 * ctx.AxisDepth(AxisRules.Shield));
     }
 
     /// <summary>盾押しの心得 (②【規則】): 攻撃の端子を挿したターン、 シールドの「堅牢 × 5%」が攻撃に加わる (2026-11-11: 10% → 5%・2026-11-07: 2% → 10%)。 シールドは減らない。
@@ -499,14 +427,5 @@ namespace ItemSystem.PassiveSkills.Effects
             int add = UnityEngine.Mathf.FloorToInt(ctx.consShield * PctPerItem * ctx.AxisDepth(AxisRules.Shield));
             if (add > 0) ctx.AddPlayerAttackOrDiceBonus(add);
         }
-    }
-
-    /// <summary>城番の誓約【規則・誓約】: ターン終了時、 そのターンのブロックの半分がシールドとして残る。 代わりに毒を与えられず、 臨界が溜まらない (OathSeals)。</summary>
-    public class WardenOath : IPassiveSkillEffect
-    {
-        public const string Id = "城番の誓約";
-        public string SkillId => Id;
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => Rw.Shield(ctx, ctx.blockSumThisTurn / 2, SkillId);
     }
 }

@@ -785,7 +785,7 @@ namespace UI.Game2D
             for (int i = 0; i < n; i++) Txt(lines[i], x + 5, y + 4 + i * lh, i < head ? headCol : Bone, false);
         }
 
-        /// <summary>カードの全文 (旧画面の説明の帯と同じ中身): 名前 → 印 (種類・条件・レア・使い捨て・常設・軸) → 効果 → 止まっている / 残す / 対象 / 誓約の封じ。</summary>
+        /// <summary>カードの全文 (旧画面の説明の帯と同じ中身): 名前 → 印 (種類・条件・レア・使い捨て・常設・軸) → 効果 → 止まっている / 残す / 対象。</summary>
         private List<string> CardTipLines(int f, TerminalDef d, out int head)
         {
             int iw = BattleLcdLayout.TipMaxW - 10; var run = GameManager.Instance?.Run; var sim = _sim;
@@ -801,7 +801,6 @@ namespace UI.Game2D
             if (sim.IsTargetCandidate(f, out _)) extra.AddRange(Game2DJpFont.Lines("つかんで、 対象を取る札の上へ落とすと対象に決まる", iw));
             for (int q = 0; q < sim.board.Count && !sim.ShowingResult; q++)
                 if (q != f && sim.IsPicker(q) && sim.TargetOf(q) == f) extra.AddRange(Game2DJpFont.Lines("〈" + sim.board[q] + "〉の対象", iw));
-            if (TerminalCards.AxisSealedByRun(d, run)) extra.AddRange(Game2DJpFont.Lines("誓約で封じられている (軸の資源は増えない)", iw));
             int over = l.Count + body.Count + extra.Count - BattleLcdLayout.TipLinesMax;
             if (over > 0) body.RemoveRange(Mathf.Max(0, body.Count - over), Mathf.Min(body.Count, over));      // 収まらない時は効果の末尾を削って、 状態の行を残す
             l.AddRange(body); l.AddRange(extra);

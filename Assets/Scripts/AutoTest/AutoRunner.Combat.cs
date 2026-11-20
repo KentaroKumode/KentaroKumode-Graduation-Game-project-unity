@@ -689,7 +689,6 @@ namespace AutoTest
             float p = ItemSystem.PassiveSkills.CombatContext.ResolveCritRate(add);
             if (ctx.critSuppressed || ctx.critBecomesArmorBreak) p = 0f;
             if (ctx.forceCritical) p = 1f;
-            if (ctx.critSealed) p = 0f;
             st.critP = p;
             float cmul = ctx.criticalMultiplier;
             if (ctx.enemyCritMultReduction > 0f) cmul = System.Math.Max(1f, cmul - ctx.enemyCritMultReduction);

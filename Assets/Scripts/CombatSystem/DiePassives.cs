@@ -37,23 +37,23 @@ namespace CombatSystem
         public const int OldCoinFace = 8;
         /// <summary>呪物の賽 (ADR-0016・2026-11-20): 店とイベントで秘宝を選ぶ時の LEGENDARY の重みに掛ける数 (他のレア度の重みはそのまま)。</summary>
         public const float CursedLegendaryMul = 3f;
-        /// <summary>呪物の賽: 秘宝を手に入れるたびに減る最大 HP (このランの間・1 より下にはならない)。</summary>
-        public const int CursedMaxHpPerPassive = 3;
+        /// <summary>呪物の賽: LEGENDARY の秘宝を手に入れるたびに減る最大 HP (このランの間・1 より下にはならない・2026-11-20: 旧 秘宝なら何でも −3)。</summary>
+        public const int CursedMaxHpPerLegendary = 5;
 
         /// <summary>店とイベントで秘宝を選ぶ時の LEGENDARY の重みの倍率 (呪物の賽なら <see cref="CursedLegendaryMul"/>・それ以外 1)。 戦闘の報酬には掛けない。</summary>
         public static float LegendaryOfferMul(RunState run) => EquippedDie.IdOf(run) == DieIds.Cursed ? CursedLegendaryMul : 1f;
 
-        /// <summary>秘宝 (category Passive) を手に入れた (PassiveAddHelper.AddPassiveItem)。 呪物の賽なら最大 HP −<see cref="CursedMaxHpPerPassive"/>。</summary>
-        public static void OnPassiveAcquired(RunState run)
+        /// <summary>秘宝 (category Passive) を手に入れた (PassiveAddHelper.AddPassiveItem)。 呪物の賽で、 LEGENDARY なら最大 HP −<see cref="CursedMaxHpPerLegendary"/>。</summary>
+        public static void OnPassiveAcquired(RunState run, string itemId)
         {
             if (run == null || EquippedDie.IdOf(run) != DieIds.Cursed) return;
-            run.playerMaxHP = System.Math.Max(1, run.playerMaxHP - CursedMaxHpPerPassive);
+            if (ItemSystem.ItemDatabase.Instance?.GetItem(itemId)?.rarity != ItemSystem.ItemRarity.LEGENDARY) return;
+            run.playerMaxHP = System.Math.Max(1, run.playerMaxHP - CursedMaxHpPerLegendary);
             if (run.playerHP > run.playerMaxHP) run.playerHP = run.playerMaxHP;
-            UnityEngine.Debug.Log($"[賽] 呪物の賽: 秘宝を手に入れた → 最大 HP {run.playerMaxHP}");
+            UnityEngine.Debug.Log($"[賽] 呪物の賽: LEGENDARY の秘宝を手に入れた → 最大 HP {run.playerMaxHP}");
         }
 
-        /// <summary>端子の結果へ賽のパッシブを足す。 <paramref name="v"/> は端子に入る目 (〈号令の剣〉の +1 の後)。
-        /// 誓約の封じ (シールド) より前に呼ぶ ── 夜番のシールドも封じで落ちる。</summary>
+        /// <summary>端子の結果へ賽のパッシブを足す。 <paramref name="v"/> は端子に入る目 (〈号令の剣〉の +1 の後)。</summary>
         public static void ApplyToTerminals(TerminalEnv env, TerminalBattleState state, TerminalOutcome o, TerminalDef[] defs, int[] v)
         {
             string die = env.dieId;

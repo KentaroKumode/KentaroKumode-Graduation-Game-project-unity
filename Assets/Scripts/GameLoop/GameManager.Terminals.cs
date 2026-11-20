@@ -44,20 +44,17 @@ namespace GameLoop
 
         /// <summary>報酬の候補を重ならないように n 個引く。 boss = レアから / それ以外 = 基本でもレアでもない端子から。
         /// 軸の端子は、 その軸の品を持っているほど出やすい (持っていなければ出にくい)。</summary>
-        /// <para>誓約で封じられた軸の端子は候補に出さない (受け取っても資源が増えない)。</para>
         public static List<string> RollTerminalReward(RunState run, int n, bool boss)
             => RollTerminals(run, n, d => d.rare == boss, 1f, "terminal.reward");
 
-        /// <summary>重み付きで重ならないように n 枚引く (基本は出さない・誓約で封じられた軸は出さない)。 軸の端子は偏重で寄せる。
+        /// <summary>重み付きで重ならないように n 枚引く (基本は出さない)。 軸の端子は偏重で寄せる。
         /// rareWeight = レアの重みに掛ける (報酬は rare で絞るので 1)。</summary>
         private static List<string> RollTerminals(RunState run, int n, System.Func<TerminalDef, bool> filter, float rareWeight, string rngKey)
         {
-            var sealedAxes = ItemSystem.PassiveSkills.Effects.OathSeals.SealedAxes(run);
             var pool = new List<TerminalDef>(); var w = new List<float>();
             foreach (var d in TerminalCards.All)
             {
                 if (d.basic || !filter(d)) continue;
-                if (d.axis != null && sealedAxes.Contains(d.axis)) continue;      // 誓約の封じ (§4: 封じた軸の端子は報酬・店に出さない)
                 float wt = 1f;
                 if (d.axis != null)
                 {

@@ -535,15 +535,6 @@ namespace AutoTest
                     }
                 }
 
-                // 持っている誓約が封じた軸の品は買わない (2026-11-07)。 買っても働かず、 封じを知らない BOT は
-                //   臨界・シールドの品 (ITT の上位に多い) を買い続けて金を捨てていた ── ITT で誓約が実際より大きく負に出る。
-                bool SealedPassive(ItemSystem.Shop.ShopSlot s)
-                {
-                    if (s == null || s.kind != ShopSlotKind.Passive || string.IsNullOrEmpty(s.itemId)) return false;
-                    string ax = ItemSystem.ItemDatabase.Instance?.GetItem(s.itemId)?.axis;
-                    return !string.IsNullOrEmpty(ax) && ItemSystem.PassiveSkills.Effects.OathSeals.SealedAxes(run).Contains(ax);
-                }
-
                 bool Buy(int i)
                 {
                     var s = inv.slots[i];
@@ -554,7 +545,6 @@ namespace AutoTest
                     if (s == null || s.sold
                         || s.price > GameLoop.ProvisionPayment.PolicyAffordable(run) - _shopReserve)
                         return false;
-                    if (SealedPassive(s)) return false;   // 誓約が封じた軸の品 (価値を見ない第 3 段もここを通る)
                     int before = run.coins;
                     string id = s.itemId;
                     gm.ShopBuy(i);
@@ -880,7 +870,6 @@ namespace AutoTest
                     if (s.kind == ShopSlotKind.Weapon && !WouldBuyWeapon(run, s.itemId)) return false;
                     // 賽は買うと今の賽と入れ替わる (ADR-0015)。 今の賽より良い時だけ買う (武器の装備判定と同じ関所)。
                     if (s.kind == ShopSlotKind.Dice && !WouldBuyDie(run, s.itemId)) return false;
-                    if (SealedPassive(s)) return false;
                     float step = AutoTest.LearnedPriorityProvider.StepPerTier;
                     if (s.kind == ShopSlotKind.Dice
                         && !AutoTest.LearnedPriorityProvider.HasLearned(s.itemId))
@@ -901,24 +890,14 @@ namespace AutoTest
                         if (v3.partDelta && s.kind == ShopSlotKind.Dice)
                             pw -= AutoTest.LearnedPriorityProvider.PowerScore(GameLoop.EquippedDie.IdOf(run));
                     }
-                    // 軸に絞る買い方 (v3.axisCommitBuy・Super)。 軸が深ければ ① / ② / 誓約 を最優先、 誓約は浅いうちは買わない。
+                    // 軸に絞る買い方 (v3.axisCommitBuy・Super)。 軸が深ければ ① / ② を最優先。
                     if (v3.axisCommitBuy && s.kind == ShopSlotKind.Passive && !string.IsNullOrEmpty(s.itemId)
                         && ItemSystem.PassiveSkills.Effects.AxisCatalog.Items.TryGetValue(s.itemId, out var cat))
                     {
                         int n = ItemSystem.PassiveSkills.AxisRules.Count(run, cat.axis);
                         var K = ItemSystem.PassiveSkills.Effects.AxisCatalog.Kind.Count;
-                        int need = cat.kind == K ? v3.commitCountAt
-                                 : cat.kind == ItemSystem.PassiveSkills.Effects.AxisCatalog.Kind.Rule ? v3.commitRuleAt : v3.commitOathAt;
-                        bool committed = n >= need;
-                        if (committed && cat.kind == ItemSystem.PassiveSkills.Effects.AxisCatalog.Kind.Oath)
-                        {
-                            int sealedOwned = 0;
-                            foreach (var a in ItemSystem.PassiveSkills.Effects.OathSeals.SealsOf[s.itemId])
-                                sealedOwned += ItemSystem.PassiveSkills.AxisRules.Count(run, a);
-                            committed = sealedOwned <= v3.commitOathMaxSealedOwned;
-                        }
-                        if (committed) pw = Mathf.Max(pw, AutoTest.LearnedPriorityProvider.PowerCuts[0] + step);
-                        else if (cat.kind == ItemSystem.PassiveSkills.Effects.AxisCatalog.Kind.Oath) return false;
+                        int need = cat.kind == K ? v3.commitCountAt : v3.commitRuleAt;
+                        if (n >= need) pw = Mathf.Max(pw, AutoTest.LearnedPriorityProvider.PowerCuts[0] + step);
                     }
                     // 特売補正。 **60/40 は割引段 {15,30,50} に対する意図的な線引き**。
                     //   50/30 は全条件で悪化した (2026-09-17・安物買いになる)。 下げないこと。
