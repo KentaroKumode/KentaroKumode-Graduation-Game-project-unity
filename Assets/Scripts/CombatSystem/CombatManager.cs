@@ -921,6 +921,7 @@ namespace CombatSystem
                 ctx.enemyDiceTotalBonus = 0;
                 ctx.bossDiceBonus = 0; // swapで一旦クリア。新形態の OnBattleStart パッシブ(刹那等)が再設定する
                 ctx.enemyDefense = Math.Max(0, newEnemy.defense) + MetaProgression.MetaDebuffApplicator.GetEnemyDefenseBonus();   // 新形態の防御値を反映 (ADR-0013)・挑戦カードの防御 +N も全段に
+                ReapplyTacticAcid(ctx);   // 戦術消耗品〈鎧割りの酸瓶〉は「この戦闘中」なので後の段にも
                 ctx.enemyArmorPen = GameLoop.GameHooks.EnemyArmorPen(newEnemy.id, newEnemy.armorPen);
                 // [計装] 出ていく段の実長を締める。 currentTurn は連戦で通算なので、
                 //   開始点 (phaseStartTurn) との差でしか段の長さは出せない。

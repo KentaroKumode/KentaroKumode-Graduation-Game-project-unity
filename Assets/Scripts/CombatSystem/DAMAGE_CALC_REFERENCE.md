@@ -176,6 +176,8 @@ outgoingDamageMultiplier += メタ% + 遺物% + 研磨剤1.5 + consDmgMultPct/10
 × 敵の防御値【2026-10-28・ADR-0013】: effDef = max(0, enemyDefense − playerArmorPen)
                        total = DefenseFormula.Apply(total, effDef)   ← ceil(total × (1 − R(effDef)))・整数演算
                        ※ 短剣〈急所〉持ちの会心ならこの段を丸ごと飛ばす (VitalStrike.IgnoresDefense)
+                       ※ 戦術消耗品〈急所突きの針〉【2026-11-20】: 攻撃のある最初の撃だけ playerArmorPen += IgnoreAll (撃の後に戻す)・その撃は forceCritThisHit
+                       ※ 戦術消耗品〈鎧割りの酸瓶〉【2026-11-20】: 使った時に enemyDefense −12 (下限 0)。 形態の交代で防御を入れ直した後も、 使った数 × 12 を引き直す
                        R(D) = Rmax·D/(D+K)  (Rmax = 3/5, K = 10・仮置き)
   ※ 旧: effRate = max(0, enemyDamageReductionPct − armorPenPct) の割合軽減と、
     余剰貫通 (armorPen − 防御率) を与ダメ ×(1+余剰) へ転用する段 J。 どちらも撤去
@@ -225,6 +227,19 @@ fixedDamageToPlayer ≥ 999 → playerHP = 0（死の宣告）
 | 不抜の聖紋 | 騎士 | 上記 ③-B チェーン参照。HP80% 維持中のみ被ダメ −40%、一度割れたら戦闘中永久無効 |
 | 痛覚遮断剤 | 狂戦士 | 使用ターン致命ダメを HP=1 に clamp（2 経路）。次ターン開始時 (`CombatContext.BeginNewTurn` Phase A) HP=1 なら consDiceRoll+10 / consAtkBurst+10、そのターン終了時に死亡確定 (`ExecuteTurn` 終端) |
 | 仕込み刃 | 暗殺者 | 使ったターンの被ダメを 0 化＋**その 5 倍**を enemyHP へ直接減算（軽減不能・2026-09-22 に 1→5 倍）。このターン限りで、被弾しなくても失効 |
+
+#### 戦術消耗品・消耗品の連動品のダメージ関連効果（2026-11-20・item-overhaul-spec §7）
+
+正本は `GameLoop.Consumables`（ApplyTactic・定数）と `CombatManager.Tactics.cs`。 どれも戦闘中・判断の間（振り直し・配線）だけ使える。
+
+| 品 | 効果と適用点 |
+|---|---|
+| 急所突きの針 | `accumulatedValues["tactic.needle"]` を立てる。 ADR-0016 の撃のループで、 攻撃のある最初の撃に `forceCritThisHit = true`・`playerArmorPen += DefenseFormula.IgnoreAll`（その撃の ApplyWinDamageModifiers の後に戻す）。 攻撃しないターンは持ち越す |
+| 鎧割りの酸瓶 | `enemyDefense = max(0, enemyDefense − 12)`（`Consumables.AcidDefenseCut`）。 ヴェスカの形態の交代では `ReapplyTacticAcid` が使った数 × 12 を引き直す |
+| 目盛り削りの鑿 | 敵に 15（`ChiselDamage`）を `HpLossDiag.Lose(…, "目盛り削りの鑿")` で入れる（主攻撃以外と同じに 最終与ダメージ倍率・怠惰・ダウンの ×1.5 が掛かる・敵の防御は掛からない）。 その後 `NoteBossDownMainHit` を通す ＝ 目盛りは通常攻撃として割れる（ひびの入った目盛りも満額のダウン） |
+| 倍化の共鳴玉 | `TerminalBattleState.doubleAll = true`（このターン・BeginTurn で戻す）。 `TerminalCards.Resolve` の 5. で〈残響〉と同じ倍化 |
+| 無銘の潤滑油 | `TerminalBattleState.ignoreCond = true`（このターン・〈無形の構え〉と同じ旗） |
+| 使い切りの矜持（秘宝） | OnConsumableUse: そのターン 1 回 `AddOutgoingPct(0.25)`（与ダメ % の池・最終与ダメージ倍率ではない） |
 
 ### ③-C 「軽減無視」ダメージとシールドの関係【2026-08-15 確定】
 

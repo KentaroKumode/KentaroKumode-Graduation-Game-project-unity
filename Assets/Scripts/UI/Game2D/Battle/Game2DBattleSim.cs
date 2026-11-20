@@ -434,12 +434,12 @@ namespace UI.Game2D.Battle
 
         /// <summary>判断の間に消耗品を使う。 <b>本体の <see cref="Consumables.Use"/> をそのまま呼ぶ</b> (BOT と同じ関数・画面は値を作らない)。
         /// 使えたら HP・充電の表示を写し直す (シールド・与ダメは HUD が毎フレーム読み直す)。</summary>
-        public bool UseItem(string id)
+        public bool UseItem(string id, int target = -1)
         {
             var gm = GameManager.Instance;
             if (!CanUseItems || gm?.Run == null) return false;
             int hp0 = CombatManager.Instance.PlayerHP;
-            if (!Consumables.Use(gm.Run, id)) return false;
+            if (!Consumables.Use(gm.Run, id, target)) return false;
             AfterItem(hp0);
             return true;
         }
@@ -462,7 +462,23 @@ namespace UI.Game2D.Battle
             if (cm != null) { _hpBefore += cm.PlayerHP - hpBefore; playerHp = cm.PlayerHP; playerMax = Mathf.Max(1, cm.PlayerMaxHP); }
             var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
             if (ctx != null) charge = ctx.GetCharge();
+            // 戦術消耗品 (2026-11-20: 〈入れ替えの符〉〈複製の水銀〉・〈帯革の薬嚢〉) で場の手札が変わったら、 場を取り直す。
+            //   挿してあった出目は外す (同じ添字に別の端子が来るため・〈猫の手〉の 1 組は残す)
+            var dk = cm?.TerminalDeck;
+            if (dk != null && !SameBoard(dk.board))
+            {
+                TakeBoard(cm);
+                for (int i = 0; i < slot.Length; i++) if (!IsCatLocked(i)) slot[i] = -1;
+                RecomputePreview();
+            }
             Touch();
+        }
+
+        private bool SameBoard(System.Collections.Generic.List<string> b)
+        {
+            if (b.Count != board.Count) return false;
+            for (int i = 0; i < b.Count; i++) if (b[i] != board[i]) return false;
+            return true;
         }
 
         /// <summary>出目 i の行き先を順に変える (dir = 1 で次・−1 で前)。 場の端子 → 挿さない の順で、 挿せない端子は飛ばす。</summary>
