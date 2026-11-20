@@ -80,7 +80,7 @@ namespace UI.Game2D
             // 画面の外で所持金・HP が変わった時も描き直す (買える品の明暗・副題の数字)
             int coins = gm.Run != null ? gm.Run.coins : 0, hp = gm.Run != null ? gm.Run.playerHP : 0;
             if (coins != _lastCoins || hp != _lastHp) { _lastCoins = coins; _lastHp = hp; if (_open || Game2DEventScreen.Showing) _dirty = true; }
-            int pend = gm.PendingStartingPassiveChoices.Count + gm.PendingEventPassiveOffers.Count * 100000000 + gm.PendingEventDiceOffers.Count * 10000000 + gm.PendingChallengeTiers.Count * 100 + (gm.Run != null ? gm.Run.pendingWeaponIds.Count * 10000 + gm.Run.pendingTerminalOffer.Count * 1000000 : 0);
+            int pend = gm.PendingStartingPassiveChoices.Count + gm.PendingEventPassiveOffers.Count * 100000000 + gm.PendingEventDiceOffers.Count * 10000000 + gm.PendingEventTerminalRemovals * 1000 + gm.PendingChallengeTiers.Count * 100 + (gm.Run != null ? gm.Run.pendingWeaponIds.Count * 10000 + gm.Run.pendingTerminalOffer.Count * 1000000 : 0);
             if (pend != _lastPending) { _lastPending = pend; _dirty = true; }
             // イベントが替わった (同じフェーズのまま・QA の口 QaBattle.ShowEvent で続けて出した時など) も描き直す
             var evNow = ph == GameManager.GamePhase.EventEncounter && EventEncounter.Instance != null ? EventEncounter.Instance.Current : null;
@@ -135,6 +135,8 @@ namespace UI.Game2D
             if (ph == GameManager.GamePhase.MapNavigation && gm.PendingStartingPassiveChoices.Count > 0) return StartingPick(gm);
             if (ph == GameManager.GamePhase.MapNavigation && gm.PendingEventPassiveOffers.Count > 0) return EventPassivePick(gm);
             if (ph == GameManager.GamePhase.MapNavigation && gm.PendingEventDiceOffers.Count > 0) return EventDicePick(gm);
+            // イベントの「山札から端子を抜く」(2026-11-21): 休憩で抜く時と同じ山札の一覧
+            if (ph == GameManager.GamePhase.MapNavigation && gm.PendingEventTerminalRemovals > 0) { _termPick = TermPick.EventRemove; return TerminalDeckList(gm); }
             if (ph == GameManager.GamePhase.MapNavigation && gm.PendingChallengeTiers.Count > 0) return ChallengePick(gm);
             switch (ph)
             {
@@ -570,7 +572,8 @@ namespace UI.Game2D
             if (_termDeckView) return TerminalDeckList(gm);
             Game2DTutorial.Request(TutorialTopics.GrowDeck);      // 手引き「端子を増やす」: 初めて戦闘に勝って端子の報酬が出た (issue #86)
             var run = gm.Run; var offer = run.pendingTerminalOffer;
-            var d = New("端子の報酬", "山札 " + (run.terminalDeck != null ? run.terminalDeck.Count : 0) + " 枚", 460);
+            bool fromEvent = gm.TerminalOfferFromEvent;      // イベントの「端子をNつから選ぶ」(2026-11-21): 題を変え、 戦闘の不安定化の行は出さない
+            var d = New(fromEvent ? "端子を選ぶ" : "端子の報酬", "山札 " + (run.terminalDeck != null ? run.terminalDeck.Count : 0) + " 枚", 460);
             d.body = "1 枚を山札に加える。 加えなくてもよい。"; d.bodyLines = 1;
             foreach (var id in offer)
             {
@@ -588,7 +591,7 @@ namespace UI.Game2D
             d.footer = "受け取らないと、 候補はすべて流れる";
             // 不安定化 (2026-11-13): 戦闘に勝った後の最初の窓はこれ (通常・エリート・番人・使い魔・イベントの戦闘)。 この戦闘で溜まった分を出す。
             //   本文の 2 行目に足す。 候補が多くて (〈剥ぎ取り〉の上乗せ) 窓の高さ (ModalJpMetrics.MaxH) を超えるなら、 題の右の副題へ回す
-            AddInstabilityLine(gm, d, offer.Count);
+            if (!fromEvent) AddInstabilityLine(gm, d, offer.Count);
             d.onAction = (a, sel) =>
             {
                 switch (a)
@@ -604,9 +607,9 @@ namespace UI.Game2D
 
         /// <summary>今の山札の中身 (名前ごとの枚数)。 並びは定義の順 (基本 → コモン → レア → 軸 → 使い捨て)。</summary>
         /// <summary>山札の一覧を何のために開いているか。 View = 見るだけ (店の端子の頁から) / Shop = 店で抜く端子を選ぶ / Rest = 休憩で抜く端子を選ぶ /
-        /// RestUpgrade = 休憩で強化する端子を選ぶ (強化できる端子だけを並べ、 説明は強化後の文)。
+        /// RestUpgrade = 休憩で強化する端子を選ぶ (強化できる端子だけを並べ、 説明は強化後の文) / EventRemove = イベントの「山札から端子を抜く」で抜く端子を選ぶ (地図で)。
         /// None は報酬の窓の「山札を見る」(_termDeckView) の時。</summary>
-        private enum TermPick { None, View, Shop, Rest, RestUpgrade }
+        private enum TermPick { None, View, Shop, Rest, RestUpgrade, EventRemove }
         private TermPick _termPick;
 
         private ScreenDef TerminalDeckList(GameManager gm)
@@ -633,7 +636,8 @@ namespace UI.Game2D
                 });
             }
             if (names.Count == 0) d.body = "山札は空。";
-            bool pick = _termPick == TermPick.Shop || _termPick == TermPick.Rest || upPick;
+            bool evRemove = _termPick == TermPick.EventRemove;
+            bool pick = _termPick == TermPick.Shop || _termPick == TermPick.Rest || evRemove || upPick;
             if (upPick)
             {
                 d.title = "強化する端子を選ぶ ― 素材 " + GameManager.TerminalUpgradeCost(run);
@@ -641,17 +645,17 @@ namespace UI.Game2D
             }
             else if (pick)
             {
-                d.title = _termPick == TermPick.Shop ? "抜く端子を選ぶ ― " + gm.TerminalRemovePrice + "G" : "抜く端子を選ぶ ― 休憩";
+                d.title = _termPick == TermPick.Shop ? "抜く端子を選ぶ ― " + gm.TerminalRemovePrice + "G" : evRemove ? "抜く端子を選ぶ" : "抜く端子を選ぶ ― 休憩";
                 d.buttons.Add(B("抜く", "remove", true));
             }
             if (pages > 1) d.buttons.Add(B("次の頁 " + (_termDeckPage + 1) + "/" + pages, "page"));
-            d.buttons.Add(B("戻る", "back", !pick));
+            d.buttons.Add(B(evRemove ? "抜かない" : "戻る", "back", !pick));
             d.footer = upPick ? "強化した端子は名前に「＋」が付く。 同じ名前が 2 枚あれば 1 枚だけ強化する"
                      : pick ? "抜いた端子は、 このランの山札から消える" : "名前の色は種類 (赤 = 攻撃・青 = 防御・金 = 充電・緑 = 補助)";
             d.onAction = (a, sel) =>
             {
                 if (a == "page") _termDeckPage = (_termDeckPage + 1) % pages;
-                else if (a == "back") { _termDeckView = false; _termPick = TermPick.None; }
+                else if (a == "back") { if (evRemove) gm.ResolveEventTerminalRemoval(-1); _termDeckView = false; _termPick = TermPick.None; }
                 else if (a == "upgrade" && upPick && sel >= 0 && sel < cnt)
                 {
                     int at = deck.IndexOf(names[first + sel]);
@@ -661,7 +665,7 @@ namespace UI.Game2D
                 else if (a == "remove" && pick && sel >= 0 && sel < cnt)
                 {
                     int at = deck.IndexOf(names[first + sel]);
-                    bool ok = _termPick == TermPick.Shop ? gm.ShopRemoveTerminal(at) : gm.RestRemoveTerminal(at);
+                    bool ok = _termPick == TermPick.Shop ? gm.ShopRemoveTerminal(at) : evRemove ? gm.ResolveEventTerminalRemoval(at) : gm.RestRemoveTerminal(at);
                     if (ok) { Game2DSfx.Play("ui_confirm"); _termPick = TermPick.None; }
                     else modal.ShowError("抜けない (所持金が足りない・山札が手札の枚数を下回る)");
                 }

@@ -53,6 +53,9 @@ namespace GameLoop
         /// <summary>端子の山札 (ADR-0014): 戦闘後の報酬の端子 (2〜3 択の名前) からどれを山札に加えるか。 戻り値は添字、 負 = 受け取らない。
         /// null なら人が遊んでいる時は画面で選び、 BOT は先頭。</summary>
         public static Func<IReadOnlyList<string>, int> ChooseTerminalReward;
+        /// <summary>イベント「山札から端子を抜く」(2026-11-21): 山札 (ランの山札の名前の並び) から抜く端子の添字。 負 = 抜かない。
+        /// null なら人が遊んでいる時は地図へ戻った時の画面で選び、 BOT は抜かない。</summary>
+        public static Func<IReadOnlyList<string>, int> ChooseTerminalRemoval;
         /// <summary>[測定] 見せる層 (1..5) の入口で、 難易度の引き方の代わりに受けるカード (id の並び)。 null を返す層は何も受けない。
         /// カードを 1 枚ずつ測るための口 (AutoRunner.challengeForce)。</summary>
         public static Func<int, IReadOnlyList<string>> ForcedChallengeCards;
@@ -220,6 +223,7 @@ namespace GameLoop
             ChooseOfferedDie = null;
             ChooseChallengeCard = null;
             ChooseTerminalReward = null;
+            ChooseTerminalRemoval = null;
             ForcedChallengeCards = null;
             WeaponEvBonus = null;
             MeasureRunPower = null;

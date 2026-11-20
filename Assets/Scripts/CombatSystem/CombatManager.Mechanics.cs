@@ -178,7 +178,7 @@ namespace CombatSystem
             if (ctx == null) return 0;
             int n = ctx.currentBuffs.TryGetValue(YachtRoleEffects.FreeRerollKey, out float f) ? Mathf.Max(0, (int)f) : 0;
             if (ctx.GetAccumulated(RerolledKey) <= 0f && AxisRules.Owns(GameLoop.GameManager.Instance?.Run, GameLoop.ItemIds.RoleBag)) n++;
-            return n;
+            return n + SparkRoleFreeLeft(ctx);   // 種火・役 (2026-11-21): 各戦闘の最初の振り直しが無料 (この戦闘の残り)
         }
 
         /// <summary>今の ctx での、 次の振り直し 1 回の費用 (無料の回数を読む・2026-11-21)。 本体・画面・BOT の 1 か所。</summary>
@@ -189,10 +189,26 @@ namespace CombatSystem
         private static void NoteRerollPaid(CombatContext ctx, bool usedFree)
         {
             bool bag = ctx.GetAccumulated(RerolledKey) <= 0f && AxisRules.Owns(GameLoop.GameManager.Instance?.Run, GameLoop.ItemIds.RoleBag);
-            if (usedFree && !bag && ctx.currentBuffs.TryGetValue(YachtRoleEffects.FreeRerollKey, out float f))
-                ctx.currentBuffs[YachtRoleEffects.FreeRerollKey] = Mathf.Max(0f, f - 1f);
+            // 使う順: 〈擦り切れた賽袋〉(戦闘の最初の 1 回) → 〈特別・対〉など (ターンの終わりに消える) → 種火・役 (この戦闘の残り)
+            if (usedFree && !bag)
+            {
+                if (ctx.currentBuffs.TryGetValue(YachtRoleEffects.FreeRerollKey, out float f) && f >= 1f)
+                    ctx.currentBuffs[YachtRoleEffects.FreeRerollKey] = Mathf.Max(0f, f - 1f);
+                else if (SparkRoleFreeLeft(ctx) > 0)
+                    ctx.accumulatedValues[SparkRoleFreeUsedKey] = (ctx.accumulatedValues.TryGetValue(SparkRoleFreeUsedKey, out float u) ? u : 0f) + 1f;
+            }
             if (usedFree && bag) Debug.Log("[擦り切れた賽袋] この戦闘の最初の振り直しは無料");
             ctx.accumulatedValues[RerolledKey] = 1;
+        }
+
+        /// <summary>種火・役 (2026-11-21) の無料の振り直しのうち、 この戦闘で使った回数 (CombatContext.accumulatedValues・戦闘ごとに作り直される)。</summary>
+        public const string SparkRoleFreeUsedKey = "sparkRoleFreeUsed";
+
+        /// <summary>種火・役の無料の振り直しの、 この戦闘の残り。</summary>
+        private static int SparkRoleFreeLeft(CombatContext ctx)
+        {
+            int used = ctx.accumulatedValues.TryGetValue(SparkRoleFreeUsedKey, out float u) ? (int)u : 0;
+            return Mathf.Max(0, MetaProgression.MetaBuffApplicator.GetSparkRoleFreeRerolls() - used);
         }
 
         private IEnumerator<TurnPause> RerollPhase(CombatContext ctx, int[] playerDice, int[] enemyDice, int playerDiceMax,

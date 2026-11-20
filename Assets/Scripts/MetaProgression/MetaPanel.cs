@@ -58,7 +58,7 @@ namespace MetaProgression
         public static MetaSlot SlotOf(MetaModule m) => m switch
         {
             MetaModule.SparkCharge or MetaModule.SparkRinkai or MetaModule.SparkPoison or MetaModule.SparkBleed
-                or MetaModule.SparkShield or MetaModule.SparkCrit => MetaSlot.Spark,
+                or MetaModule.SparkShield or MetaModule.SparkCrit or MetaModule.SparkDeck or MetaModule.SparkRole => MetaSlot.Spark,
             MetaModule.AttackTune or MetaModule.BlockTune or MetaModule.AxisTicket
                 or MetaModule.TacticKnife or MetaModule.Compression => MetaSlot.Support,
             _ => MetaSlot.Main,
@@ -74,6 +74,8 @@ namespace MetaProgression
             MetaModule.SparkBleed  => "bleed",
             MetaModule.SparkShield => "shield",
             MetaModule.SparkCrit   => "crit",
+            MetaModule.SparkDeck   => "deck",
+            MetaModule.SparkRole   => "role",
             _ => null,
         };
 
@@ -125,6 +127,10 @@ namespace MetaProgression
         public const int ShieldKeepBonusPct = 10;
         /// <summary>会心 (再設計): 会心倍率 +N。</summary>
         public const float CritMulBonus = 0.5f;
+        /// <summary>山札 (采配・2026-11-21): 戦闘の 1 ターン目に多く引く端子の枚数 (TerminalBattleState.extraDrawNext に足す)。</summary>
+        public const int DeckOpeningDraw = 1;
+        /// <summary>役 (賽目・2026-11-21): 各戦闘で無料になる振り直しの回数 (戦闘の最初から数える・<c>CombatManager.FreeRerollsLeft</c>)。</summary>
+        public const int RoleFreeRerolls = 1;
 
         // ---- 補助 (戦術パーツ) ----
 
@@ -160,6 +166,8 @@ namespace MetaProgression
         TacticKnife,   // 〈戦術の懐刀〉
         Compression,   // 〈圧縮の心得〉
 
-        // (新しい 2 軸の種火 SparkDeck / SparkRole は段 1-e の後に、 ここ = 末尾へ足す)
+        // === 種火 (2026-11-21 に足した 2 軸) ===
+        SparkDeck,     // 種火・山札 (采配): 戦闘の 1 ターン目の手札 +1 枚
+        SparkRole,     // 種火・役 (賽目): 各戦闘の最初の振り直しが無料
     }
 }

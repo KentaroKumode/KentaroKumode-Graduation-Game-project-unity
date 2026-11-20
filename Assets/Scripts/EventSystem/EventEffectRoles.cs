@@ -43,6 +43,8 @@ namespace EventSystem
         public int provision;
         /// <summary>軸の秘宝の数 (偏重) を引く口 (軸の名前 → 数)。 null なら 0。</summary>
         public System.Func<string, int> axisCount;
+        /// <summary>山札から端子を抜けるか (山札が下限 <c>TerminalCards.MinDeckSize</c> より多い・2026-11-21)。 ランだけから決まる。</summary>
+        public bool canRemoveTerminal;
     }
 
     /// <summary>効果ごとの「得か代償か」と「今の状況で起きるか」を 1 か所で決める (2026-11-13・作者の決定)。
@@ -96,6 +98,8 @@ namespace EventSystem
                 case EventEffectType.NextRestBonus:
                 case EventEffectType.OfferDieSwap:
                 case EventEffectType.OfferAxisPassives:
+                case EventEffectType.OfferTerminals:
+                case EventEffectType.RemoveTerminal:
                     return EventEffectRole.Benefit;
 
                 case EventEffectType.HpSetTo:          // 「HPがNになる」は下げる代償として書かれている (BOT も致死域として値付けする)
@@ -246,6 +250,7 @@ namespace EventSystem
             {
                 case EventEffectType.TradePassive: return s.canTrade ? null : "差し出せる秘宝が無い";
                 case EventEffectType.ForgeWeapon:  return s.canForge ? null : "武器はもう鍛えられない";
+                case EventEffectType.RemoveTerminal: return s.canRemoveTerminal ? null : "山札をこれ以上減らせない";
             }
             if (!s.navKnown) return null;
             switch (e.type)
@@ -274,6 +279,9 @@ namespace EventSystem
 
         /// <summary>条件の種別: 偏重[軸,N] (その軸の秘宝が N 以上)・武器[家系] (装備中の武器の家系)・物資>=N。</summary>
         public const string ReqAxis = "偏重", ReqWeapon = "武器", ReqProvision = "物資";
+
+        /// <summary>「レアの端子をNつから選ぶ」の印 (<see cref="EventEffectType.OfferTerminals"/> の param・2026-11-21)。</summary>
+        public const string RareTerminal = "レア";
 
         /// <summary>event_list.txt の家系の書き方 (短剣 / 剣 / 盾 / 斧) → items.json の family。 知らない書き方は null。</summary>
         public static string FamilyOfWord(string word) => word switch

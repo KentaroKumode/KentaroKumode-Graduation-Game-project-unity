@@ -101,5 +101,15 @@ namespace EventSystem
         /// <summary>軸の秘宝をNつから選ぶ ── 今の偏重が一番高い軸 (同数なら AxisRules.Ranked の順) の秘宝から N 個を引いて 1 つ選ぶ。
         /// 選び方・不安定化 (+3) は「パッシブアイテムをNつから選ぶ」と同じ。</summary>
         OfferAxisPassives,
+
+        // ── 2026-11-21: 端子の山札とつながる汎用の動詞 (docs/system-overhaul-spec.md §2-2・「山札の端子を複製する」は作らない ── 休憩の複製と同じく強すぎる) ──
+
+        /// <summary>端子をNつから選ぶ / レアの端子をNつから選ぶ ── 戦闘の報酬と同じ形で端子を N 枚引いて見せ、 1 枚を山札に加える (加えなくてもよい)。
+        /// amount = N・param = <see cref="EventEffectRoles.RareTerminal"/> ならレアから / null なら基本でもレアでもない端子から (報酬の通常 / 層ボスと同じ絞り方)。
+        /// 人は戦闘の報酬と同じ画面、 BOT は GameHooks.ChooseTerminalReward (戦闘の報酬と同じ点)。 乱数は専用のキー (戦闘の報酬の列を動かさない)。</summary>
+        OfferTerminals,
+        /// <summary>山札から端子を抜く ── 休憩と同じ画面で山札から 1 枚抜く (抜かなくてもよい)。 山札が <c>TerminalCards.MinDeckSize</c> 枚以下なら起きない (選べない)。
+        /// 人は地図へ戻った時の画面、 BOT は GameHooks.ChooseTerminalRemoval (無ければ抜かない)。</summary>
+        RemoveTerminal,
     }
 }

@@ -70,6 +70,7 @@ OnTurnEnd の 4 か所。これ以外の位置で敵パッシブが ctx の HP �
   時限デバフ〈無力感〉（2026-11-16）を持っている間は毎回 **+1**（3 個なら 4・7・10）。式は `CombatManager.RerollCostNow` → `TimedDebuffRule.RerollCost` の 1 か所
   （本体の支払い・画面の費用の表示 `TurnPause.rerollCost`・BOT の `AutoRunner.MutualRerollPolicy` が同じ値を読む）。
 - 〈特別・対〉の無料分（`YachtRoleEffects.FreeRerollKey`）は費用 0 で、回目に数えない。〈無力感〉の +1 も足さない。
+- 整備パネルの種火・役（2026-11-21）: 各戦闘の最初の振り直し 1 回（`MetaPanel.RoleFreeRerolls`）も同じ無料分に足す（`CombatManager.FreeRerollsNow`）。〈特別・対〉の分と重なった時は〈特別・対〉の分（ターンの終わりで消える）から先に使い、種火の分はその戦闘の間残る（`ctx.accumulatedValues[SparkRoleFreeUsedKey]`）。
 - 振るかどうかは `RerollPolicy`（BOT / UI が差す）。人が操作するターンは `TurnPauseKind.Reroll` で止まって答えを待つ。
 - 〈過負荷チューナー〉（2026-11-20）: 過充電（充電 7 以上）の間、費用 −1（最低 1・`CombatContext.ChargeCostNow` を `RerollCostNow` が最後に通す）。
   同じ口を充電を払う端子（`TerminalEnv.chargeCostCut`・「全部払う」端子は除く）と秘宝（〈避雷の杭〉〈逆さ避雷針〉）も通す。

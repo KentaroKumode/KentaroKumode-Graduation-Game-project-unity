@@ -329,6 +329,12 @@ namespace MetaProgression
         /// <summary>種火・毒: 1 ターンに最初の 1 回だけ、 毒の付与に足すスタック。</summary>
         public static int GetPoisonApplyBonus() => Has(MetaModule.SparkPoison) ? MetaPanel.PoisonApplyBonus : 0;
 
+        /// <summary>種火・山札 (2026-11-21): 戦闘の 1 ターン目に多く引く端子の枚数 (CombatManager.BeginTerminalDeck)。</summary>
+        public static int GetSparkDeckOpeningDraw() => Has(MetaModule.SparkDeck) ? MetaPanel.DeckOpeningDraw : 0;
+
+        /// <summary>種火・役 (2026-11-21): 各戦闘で、 最初から数えて無料になる振り直しの回数 (CombatManager.FreeRerollsLeft)。</summary>
+        public static int GetSparkRoleFreeRerolls() => Has(MetaModule.SparkRole) ? MetaPanel.RoleFreeRerolls : 0;
+
         /// <summary>種火・出血: 敵の出血が閾値以上で敵攻撃値 −N。 CombatManager 予告後・敵攻撃前で減算。</summary>
         public static int GetBleedWeakenAttack(int enemyBleedStacks)
             => (Has(MetaModule.SparkBleed) && enemyBleedStacks >= MetaPanel.BleedWeakenThreshold ? MetaPanel.BleedWeakenAmount : 0)

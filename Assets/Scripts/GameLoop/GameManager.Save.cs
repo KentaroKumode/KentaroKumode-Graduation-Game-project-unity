@@ -24,7 +24,7 @@ namespace GameLoop
             if (sim.Dead || sim.InFight || sim.PendingArrival >= 0 || InMapEncounterCombat) { reason = "追跡者と接触している間は保存できない"; return false; }
             if (CombatManager.Instance != null && CombatManager.Instance.IsCombatActive) { reason = "戦闘中は保存できない"; return false; }
             if (PendingStartingPassiveChoices.Count > 0 || PendingChallengeTiers.Count > 0 || _entryHealPending
-                || HasPendingRewardChoice || Run.pendingWeaponIds.Count > 0 || Run.pendingTerminalOffer.Count > 0)
+                || HasPendingRewardChoice || Run.pendingWeaponIds.Count > 0 || Run.pendingTerminalOffer.Count > 0 || PendingEventTerminalRemovals > 0)
             { reason = "選ぶものが残っている間は保存できない"; return false; }
             return true;
         }

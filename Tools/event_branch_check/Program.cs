@@ -1166,6 +1166,32 @@ static class Program
               && extra.choices[1].effects[0].type == EventEffectType.OfferAxisPassives && extra.choices[1].effects[0].amount == 3
               && EventEffectRoles.RoleOf(extra.choices[0].effects[0]) == EventEffectRole.Benefit,
               "新しい動詞: 「賽を提示して交換」「軸の秘宝をNつから選ぶ」を読める (得の向き)");
+        // 端子の動詞 (2026-11-21): 「端子をNつから選ぶ」「レアの端子をNつから選ぶ」「山札から端子を抜く」の書式・得の向き・足した 3 件 (末尾に足す)
+        var termWant = new (string ev, string ch, string fx)[]
+        {
+            ("流れの鍛冶", "打った刃の振り方を教わる", "TurnsPass+1,OfferTerminals+3"),
+            ("亡霊との決闘", "離れて構えだけを盗む", "TurnsPass+1,OfferTerminals[" + EventEffectRoles.RareTerminal + "]+2"),
+            ("朽ちた英雄像", "折れた腕の構えをなぞる", "TurnsPass+1,RemoveTerminal"),
+        };
+        int tOk = 0;
+        foreach (var w in termWant)
+        {
+            var ev = all.Find(e => e.name == w.ev); var c = ev?.choices.Find(x => x.text == w.ch);
+            string got = c != null ? Fx(c.effects) : "(無い)";
+            if (got == w.fx && ev.choices[ev.choices.Count - 1] == c) tOk++; else Console.WriteLine($"    〈{w.ev}〉「{w.ch}」= {got} (期待 {w.fx}・末尾)");
+        }
+        Check(tOk == termWant.Length, $"端子の動詞: 足した 3 件の効果の並び・選択肢の末尾に足した ({tOk}/{termWant.Length})");
+        var tv = EventSystem.EventParser.ParseAll("試し:全:文:選ぶ-端子を3つから選ぶ-文/レア-レアの端子を2つから選ぶ-文/抜く-山札から端子を抜く-文/去る-なし-文")[0];
+        Check(tv.choices.Count == 4 && tv.choices[0].effects[0].type == EventEffectType.OfferTerminals && tv.choices[0].effects[0].amount == 3 && tv.choices[0].effects[0].param == null
+              && tv.choices[1].effects[0].param == EventEffectRoles.RareTerminal && tv.choices[1].effects[0].amount == 2
+              && tv.choices[2].effects[0].type == EventEffectType.RemoveTerminal
+              && EventEffectRoles.RoleOf(tv.choices[0].effects[0]) == EventEffectRole.Benefit && EventEffectRoles.RoleOf(tv.choices[2].effects[0]) == EventEffectRole.Benefit,
+              "端子の動詞: 書式を読める (通常 / レア・N)・得の向き");
+        var trun = new GameLoop.RunState();
+        GameLoop.GameManager.RemoveOk = false; string tr = tv.choices[2].UnavailableReason(trun); bool tSel = EventChoice.Selectable(tv.choices, 3, trun);
+        GameLoop.GameManager.RemoveOk = true;  bool tOpen = tv.choices[2].IsAvailable(trun);
+        Check(tr == "山札をこれ以上減らせない" && tSel && tOpen, $"端子の動詞: 山札が下限なら「抜く」は選べない (「{tr}」)・下限より多ければ選べる");
+
         // 賽ロールの中は見せない (確率分岐と同じ)
         var bridge = Find("崩落した橋", "強引に渡る");
         Check(bridge != null && bridge.CostChips().Count == 0 && bridge.postFlavorByBranch != null && bridge.postFlavorByBranch.Count == 2,

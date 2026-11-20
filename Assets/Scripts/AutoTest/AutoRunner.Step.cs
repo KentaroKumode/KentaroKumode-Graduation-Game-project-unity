@@ -268,6 +268,10 @@ namespace AutoTest
             GameLoop.GameManager.SelectedClass = (GameLoop.ClassType)GameLoop.GameRng.RangeAuto("AutoRunner.1", 0, 4);
             // 端子の山札 (ADR-0014): 戦闘後の端子の報酬を選ぶ (AutoRunner.Terminals)。
             GameHooks.ChooseTerminalReward = ChooseTerminalReward;
+            // イベントの「山札から端子を抜く」(2026-11-21): 店・休憩で抜く時と同じ規則 (PruneTarget・山札を変えない腕は抜かない)
+            GameHooks.ChooseTerminalRemoval = deck => terminalsLeaveDeck ? -1 : PruneTarget(GameManager.Instance?.Run);
+            // イベントの値付けが読む端子の点 (戦闘の報酬の素の点・EventChoiceScorer.TerminalPoints)
+            EventChoiceScorer.TerminalPoints = (d, r) => RewardBaseScore(d, r);
             gm.StartNewRun();
             // アイテム アブレーション: 開幕付与。 **StartNewRun の直後**でないと
             //   ownedPassiveItems がまだ存在しない。 AddPassiveItem は GameRng を
