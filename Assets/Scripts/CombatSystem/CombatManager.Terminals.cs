@@ -256,6 +256,14 @@ namespace CombatSystem
             _termRetain = _deck.FinishTurn(o);
         }
 
+        /// <summary>〈後の先〉(2026-11-20〜): 「防いだ量」= ブロックで実際に防いだ量。 Resolve が入れた見込み (<see cref="TerminalOutcome.parryStore"/>) を
+        /// 実際の量 (<paramref name="blocked"/> = 攻撃 1 回ごとの min(後の先のブロック, ブロックで止めた量) の和) へ直す。 BOT の見積もりは見込みのまま。</summary>
+        private void SettleParry(TerminalOutcome o, int blocked)
+        {
+            if (_deck == null || o == null || (o.parryBlock <= 0 && o.parryStore <= 0)) return;
+            _deck.state.storedAttackNext = Math.Max(0, _deck.state.storedAttackNext + blocked - o.parryStore);
+        }
+
         /// <summary>このターンに発動した端子の合図 (#319): 発動・使い捨て・〈火葬の剣〉が外した端子。 知らせるだけ。</summary>
         private static void CueTerminals(List<string> b, TerminalOutcome o)
         {
