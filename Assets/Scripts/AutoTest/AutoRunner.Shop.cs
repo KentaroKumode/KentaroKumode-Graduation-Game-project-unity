@@ -443,6 +443,8 @@ namespace AutoTest
 
         /// <summary>軸指定リロールを使うか (2026-11-20・item-overhaul-spec §2-3)。 false = 通常のリロールだけ (A/B の腕)。</summary>
         public bool axisFocusReroll = true;
+        /// <summary>〈相場師の算盤〉のために店の頭でリロールする時に残す所持金 (G・仮・未測定)。</summary>
+        private const int AbacusRerollReserve = 10;
         /// <summary>軸指定リロールを使う最も深い偏重 (仮)。</summary>
         public const int AxisFocusRerollMinDepth = 3;
 
@@ -461,7 +463,10 @@ namespace AutoTest
         /// <summary>軸指定リロールで指定する軸 (null = 通常のリロール)。 最も深い偏重 (同数は AxisRules.Ranked の順で先) が 3 以上・残金が need + 追加 以上。</summary>
         private string AxisRerollFocus(RunState run, int need)
         {
-            if (!axisFocusReroll || run == null || run.coins < need + ItemSystem.Shop.ShopManager.AxisRerollSurcharge) return null;
+            if (!axisFocusReroll || run == null || run.coins < need + ItemSystem.Shop.ShopManager.AxisRerollSurchargeFor(run)) return null;   // 追加は〈目利きの紹介状〉・〈軸引きの手形〉の値引きの後
+            // 〈目利きの紹介状〉: この店の最初の通常のリロールは無料 ── 軸指定にすると無料が使えないので、 先に無料の 1 回を通常で回す
+            var shop = ItemSystem.Shop.ShopManager.Instance?.Current;
+            if (shop != null && !shop.freeRerollUsed && run.OwnsPassive(ItemIds.MacroLetter)) return null;
             string best = null; int bestD = 0;
             foreach (var ax in ItemSystem.PassiveSkills.AxisRules.Ranked)
             {
@@ -526,6 +531,18 @@ namespace AutoTest
             if (inv != null && inv.slots != null)
             {
                 var run = gm.Run;
+
+                // 店の頭のリロール (2026-11-21・段 3): 〈目利きの紹介状〉の無料の 1 回 (ただ) / 〈相場師の算盤〉(店の最初のリロールで以後の戦闘の充電 +3・臨界 +5 が 1 回分積もる)。
+                //   まだ何も見ていない棚を回すので、 棚の良し悪しは期待値で変わらない (払うのは値段だけ・後のリロールの値段は 1 段上がる)。 算盤は残金が 値段 + 取り置き 以上の時だけ
+                if (!ablateShop && run != null && inv.rerollCount == 0)
+                {
+                    bool letterFree = !inv.freeRerollUsed && run.OwnsPassive(ItemIds.MacroLetter);
+                    int rp0 = inv.CurrentRerollPrice;
+                    int before0 = run.coins;
+                    bool rolled0 = letterFree ? AuditedReroll(gm, inv)
+                                 : run.OwnsPassive(ItemIds.MacroAbacus) && rp0 > 0 && run.coins >= rp0 + AbacusRerollReserve && AuditedReroll(gm, inv, rp0 + AbacusRerollReserve);
+                    if (rolled0 && _cur != null) { _cur.shopRerolls++; _cur.shopRerollCoins += before0 - run.coins; }
+                }
 
                 // L1出現lift用: このショップでの提示アイテムを記録 (購入有無を問わず)
                 if (_cur != null)
