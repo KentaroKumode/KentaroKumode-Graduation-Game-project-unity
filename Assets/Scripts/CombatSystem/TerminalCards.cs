@@ -126,6 +126,14 @@ namespace CombatSystem
         /// <see cref="TerminalDeckState.DrawTurn"/> が毎ターン作り直す。 止まった端子には挿せない (<see cref="TerminalCards.Resolve"/> が外す)。</summary>
         public bool[] stopped;
 
+        // ── 山札の数 (2026-11-20・段 1-e・采配の軸)。 BOT の写し (Clone) にも乗る ──
+        /// <summary>この戦闘で捨て札を切り直した回数 / このターンに切り直した枚数 (<see cref="BeginTurn"/> で 0)。
+        /// 数えるのは <see cref="TerminalDeckState.BeforeShuffle"/> (本体の引く所と BOT の先読みが同じ関数を呼ぶ)。</summary>
+        public int shuffles, shuffledNow;
+        /// <summary>このターン、 残す印で前のターンから残った端子の名前 (null = 無し)。 <see cref="TerminalDeckState.DrawTurn"/> が作り直す
+        /// (中は書き換えない ── 写しと共有してよい)。 〈留め金の栞〉〈折り目のついた札〉と出来事 OnKeptTerminalUse が読む。</summary>
+        public List<string> kept;
+
         /// <summary>場の s がこのターン止まっているか。</summary>
         public bool IsStopped(int s) => stopped != null && s >= 0 && s < stopped.Length && stopped[s];
 
@@ -148,6 +156,7 @@ namespace CombatSystem
         {
             ignoreCond = ignoreCondNext; ignoreCondNext = false;
             doubleAll = false;
+            shuffledNow = 0;
             storedAttack += storedAttackNext; storedAttackNext = 0;
             emberCarry = emberNext; emberNext = 0;
             int extra = extraDrawNext; extraDrawNext = 0;
@@ -227,6 +236,8 @@ namespace CombatSystem
         public int escalationDelay;
         /// <summary>このターンに発動した端子 (場の添字)。</summary>
         public readonly List<int> fired = new List<int>();
+        /// <summary>発動した端子ごとの挿した出目の合計 (<see cref="fired"/> と同じ並び・2026-11-20)。 出来事 OnKeptTerminalUse / OnSupportTerminalUse の量。</summary>
+        public readonly List<int> firedSums = new List<int>();
         /// <summary>[計装 2026-11-19] 攻撃の合計 (attackAdd) を増やした所ごとの量 (「端子名:+N」)。 判断には使わない。</summary>
         public readonly List<string> attackLog = new List<string>();
         /// <summary>攻撃の端子 1 枚ごとの攻撃の量と挿した出目の数 (場の順・ADR-0016: 攻撃は端子 1 枚につき 1 回当たる)。
@@ -744,7 +755,7 @@ namespace CombatSystem
                 //   〈裁きの雷〉: 充電をすべて払う (1 回)。 〈残響〉の 2 回目も払った量で攻撃に足す (旧: 2 回目は充電 0 で出目の分だけ)
                 int paidAll = 0;
                 if (id == TerminalIds.BigDischarge) { paidAll = charge; o.chargeSpend += charge; charge = 0; }
-                o.fired.Add(s);
+                o.fired.Add(s); o.firedSums.Add(sum);
                 if (!d.basic) o.firedNonBasic++;
                 switch (d.kind)
                 {
@@ -964,7 +975,7 @@ namespace CombatSystem
         /// <summary>戦闘の始め: ランの山札を写して切る。</summary>
         public void BeginBattle(List<string> runDeck)
         {
-            draw.Clear(); discard.Clear(); hand.Clear(); permanent.Clear(); exiled.Clear(); board.Clear(); _usedLastTurn.Clear(); recallNext = null; copyNext = null; keepNext.Clear(); LastKept.Clear();
+            draw.Clear(); discard.Clear(); hand.Clear(); permanent.Clear(); exiled.Clear(); board.Clear(); _usedLastTurn.Clear(); recallNext = null; copyNext = null; keepNext.Clear(); LastKept.Clear(); _shuffled.Clear();
             if (runDeck != null) draw.AddRange(runDeck);
             Shuffle(draw);
         }
@@ -983,11 +994,27 @@ namespace CombatSystem
             if (draw.Count == 0)
             {
                 if (discard.Count == 0) return null;
+                int n = discard.Count;
+                BeforeShuffle(discard, exiled, Remaining, state);
+                _shuffled.Add(n);
                 draw.AddRange(discard); discard.Clear(); Shuffle(draw);
             }
             var id = draw[draw.Count - 1]; draw.RemoveAt(draw.Count - 1);
             return id;
         }
+
+        /// <summary>捨て札を山へ切り直す直前の規則 (2026-11-20・段 1-e・采配の軸)。 本体の引く所 (<see cref="DrawOne"/>) と BOT の先読み
+        /// (AutoRunner.Terminals の SampleNextBoard) が同じ関数を呼ぶ。 切り直した回数と枚数を <paramref name="st"/> に数える。
+        /// <paramref name="deckTotal"/> = この戦闘の山札の枚数 (山 + 捨て札 + 手札 + 場に残る端子)。</summary>
+        public static void BeforeShuffle(List<string> discard, List<string> exiled, int deckTotal, TerminalBattleState st)
+        {
+            st.shuffles++; st.shuffledNow += discard.Count;
+        }
+
+        /// <summary>切り直した枚数のうち、 まだ出来事 (OnDeckShuffle) を配っていない分 (CombatManager が <see cref="TakeShuffled"/> で取り出して配る)。</summary>
+        private readonly List<int> _shuffled = new List<int>();
+        /// <summary>まだ配っていない切り直し (1 回ごとの枚数) を取り出して空にする。</summary>
+        public List<int> TakeShuffled() { var l = new List<int>(_shuffled); _shuffled.Clear(); return l; }
 
         /// <summary>ヴェスカ〈停滞する時間〉の乱数のキー (専用 ── 他の抽選の連番を動かさない)。</summary>
         public const string StopRngKey = "vesca.stagnant";
@@ -1009,7 +1036,8 @@ namespace CombatSystem
             var toDiscard = new List<string>();
             int heldStopped = SplitHand(hand, board, permanent.Count, state.stopped, retained, _usedLastTurn, mode, keep, toDiscard, keepNext);
             LastKept.Clear();
-            if (mode == HandCarryMode.Pick) foreach (var id in keepNext) if (keep.Contains(id)) LastKept.Add(id);   // [計装] 印で残した端子
+            if (mode == HandCarryMode.Pick) foreach (var id in keepNext) if (keep.Contains(id)) LastKept.Add(id);   // 印で残した端子 (計装・〈留め金の栞〉ほか)
+            state.kept = LastKept.Count > 0 ? new List<string>(LastKept) : null;
             keepNext.Clear();
             state.stopped = null;
             _usedLastTurn.Clear();

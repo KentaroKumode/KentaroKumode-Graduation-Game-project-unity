@@ -74,6 +74,7 @@ namespace CombatSystem
             if (ctx != null && TenyoHeavy.RingStopsAt(ctx.currentTurn)) stop = 1f;      // 天与の指輪 (2026-11-15): 大技の次のターンは、 引いた端子を全部止める
             _deck.DrawTurn(TerminalCards.HandSize + extra, _termRetain, stop);
             TerminalDiag.NoteDrawn(_deck.LastDrawnIds);   // [計装 #106] 新しく引いた端子
+            RaiseDeckShuffles(ctx);   // 引く時に切り直した (2026-11-20)
             if (TerminalCards.HandCarry && ctx != null && ctx.currentTurn > 1) BossDownDiag.NoteCarry(_deck.LastCarriedCount);   // [計装 2026-11-13] 持ち越した枚数 (戦闘の 1 ターン目は除く)
             if (stop > 0f)
             {
@@ -200,6 +201,36 @@ namespace CombatSystem
                 if (o.damageMul != 1f) sb.Append($" ×{o.damageMul:F2}");
                 Debug.Log(sb.ToString());
             }
+        }
+
+        /// <summary>配線の解決の直後 (<see cref="ApplyTerminalOutcome"/> の後・OnWired の前): 端子の出来事を配る (2026-11-20・段 1-e・item-overhaul-spec §2-2)。
+        /// 判断の間に消耗品・品で引いて切り直した分の OnDeckShuffle もここで配る。 使い捨て = 1 枚につき OnTerminalDispose (量 1)・
+        /// 補助 (基本を除く) = OnSupportTerminalUse・残す印で残した端子 = OnKeptTerminalUse (量 = 挿した出目の合計・最低 1・名前で数える)。
+        /// ここはまだターンの解決中なので、 品が入れる敵へのダメージ (Kw.DamageEnemy) はこのターンの攻撃の固定ダメの枠で通る。</summary>
+        private void RaiseTerminalEvents(CombatContext ctx, TerminalOutcome o)
+        {
+            if (_deck == null || ctx == null || o == null) return;
+            RaiseDeckShuffles(ctx);
+            var kept = _deck.state.kept != null ? new List<string>(_deck.state.kept) : null;
+            for (int i = 0; i < o.fired.Count; i++)
+            {
+                int s = o.fired[i];
+                if (s < 0 || s >= _deck.board.Count) continue;
+                string id = _deck.board[s];
+                var d = TerminalCards.Get(id);
+                if (d == null) continue;
+                int amt = Math.Max(1, i < o.firedSums.Count ? o.firedSums[i] : 0);
+                if (d.disposable) ItemSystem.PassiveSkills.Keywords.Kw.Raise(ctx, PassiveSkillTrigger.OnTerminalDispose, 1);
+                if (d.kind == TerminalKind.Support && !d.basic) ItemSystem.PassiveSkills.Keywords.Kw.Raise(ctx, PassiveSkillTrigger.OnSupportTerminalUse, amt);
+                if (kept != null && s >= _deck.permanent.Count && kept.Remove(id)) ItemSystem.PassiveSkills.Keywords.Kw.Raise(ctx, PassiveSkillTrigger.OnKeptTerminalUse, amt);
+            }
+        }
+
+        /// <summary>まだ配っていない切り直しの出来事 (OnDeckShuffle・量 = 切り直した枚数) を配る。 ctx が null なら捨てずに次へ持ち越す。</summary>
+        private void RaiseDeckShuffles(CombatContext ctx)
+        {
+            if (_deck == null || ctx == null) return;
+            foreach (int n in _deck.TakeShuffled()) ItemSystem.PassiveSkills.Keywords.Kw.Raise(ctx, PassiveSkillTrigger.OnDeckShuffle, n);
         }
 
         /// <summary>撃破のボーナスを配る端子のうち、 このターンに発動したもの。 場の添字は <see cref="TerminalDeckState.FinishTurn"/> で書き換わるので、
