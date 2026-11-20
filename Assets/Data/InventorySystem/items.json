@@ -2925,6 +2925,88 @@
       "axis": "山札"
     },
     {
+      "id": "擦り切れた賽袋",
+      "name": "擦り切れた賽袋",
+      "description": "戦闘の最初の振り直しは充電を払わない（振り直しの回数にも数えない）",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "BRONZE",
+      "basePrice": 7,
+      "axis": "役"
+    },
+    {
+      "id": "見切りの木札",
+      "name": "見切りの木札",
+      "description": "役が成立したターン、各撃の攻撃 +4・ブロック +4",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "BRONZE",
+      "basePrice": 7,
+      "axis": "役"
+    },
+    {
+      "id": "符丁の刻み板",
+      "name": "符丁の刻み板",
+      "description": "役が成立したターン、各撃の攻撃 +賽目 × 2（ゾロ目・連なりなら 2 倍）",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "axis": "役"
+    },
+    {
+      "id": "欠け目の見立て",
+      "name": "欠け目の見立て",
+      "description": "1・2・3 の目を含む役が成立したターン、敵の防御を 賽目 × 2 無視する",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "skill": "欠け目の見立て",
+      "axis": "役"
+    },
+    {
+      "id": "揃いの拍子木",
+      "name": "揃いの拍子木",
+      "description": "2 ターン続けて役が成立したとき、次のターンの手札 +1 枚・次のターンの最初の振り直しが無料",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "skill": "揃いの拍子木",
+      "axis": "役"
+    },
+    {
+      "id": "鏡合わせの盤",
+      "name": "鏡合わせの盤",
+      "description": "【規則】2 個そろいの役が成立したとき、1 つ小さい目の 2 個そろいの効果も働く（1 の 2 個そろいなら、次のターンの無料の振り直し +1）",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "axis": "役"
+    },
+    {
+      "id": "宿命の刻み目",
+      "name": "宿命の刻み目",
+      "description": "成立した役の効果が、次のターンにももう 1 回働く",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "LEGENDARY",
+      "basePrice": 10,
+      "axis": "役"
+    },
+    {
+      "id": "万象のゾロ目",
+      "name": "万象のゾロ目",
+      "description": "【規則】ゾロ目が成立したとき、その役の効果が 2 回働く。2 個そろいが成立したときも、確率 min(100%, 賽目 × 8%) でゾロ目として扱う",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "LEGENDARY",
+      "basePrice": 10,
+      "axis": "役"
+    },
+    {
       "id": "鋲の胸当て",
       "name": "鋲の胸当て",
       "description": "ターン開始時、シールド +1",

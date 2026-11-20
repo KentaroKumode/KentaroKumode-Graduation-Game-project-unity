@@ -271,6 +271,8 @@ namespace ItemSystem.PassiveSkills
             Register(new MacroBarometer()); Register(new MacroReceipt()); Register(new MacroAbacus());
             // 采配 (山札の軸) の出来事で書く 2 品 (2026-11-20・DeckItemEffects.cs・残り 16 品は TerminalCards の DeckItems の旗)
             Register(new TemperTongs()); Register(new AshBroom());
+            // 賽目 (役の軸) の出来事で書く 2 品 (2026-11-21・RoleItemEffects.cs・残り 6 品は TerminalCards の RoleItems の旗と CombatManager の役の適用)
+            Register(new ChippedEyeReading()); Register(new MatchedClappers());
 
             // ============================
             //  汎用パッシブ

@@ -167,6 +167,34 @@ namespace CombatSystem
             return ctx != null ? ctx.ChargeCostNow(cost) : cost;   // 〈過負荷チューナー〉: 過充電の間 −1 (最低 1・2026-11-20)
         }
 
+        /// <summary>この戦闘で振り直しを 1 回でもした (無料も・ctx.accumulatedValues・〈擦り切れた賽袋〉の「戦闘の最初の振り直し」)。</summary>
+        private const string RerolledKey = "role.rerolled";
+
+        /// <summary>このターン、 次の振り直しに使える無料の回数 (2026-11-21): 前のターンから持ち越した無料 (〈特別・対〉〈鏡合わせの盤〉〈揃いの拍子木〉・
+        /// currentBuffs の <see cref="YachtRoleEffects.FreeRerollKey"/>) と、 〈擦り切れた賽袋〉(この戦闘でまだ振り直していなければ 1)。
+        /// 本体の支払い (<see cref="RerollPhase"/>)・画面の費用・BOT の振り直しの方策が同じ関数を読む。</summary>
+        public static int FreeRerollsLeft(CombatContext ctx)
+        {
+            if (ctx == null) return 0;
+            int n = ctx.currentBuffs.TryGetValue(YachtRoleEffects.FreeRerollKey, out float f) ? Mathf.Max(0, (int)f) : 0;
+            if (ctx.GetAccumulated(RerolledKey) <= 0f && AxisRules.Owns(GameLoop.GameManager.Instance?.Run, GameLoop.ItemIds.RoleBag)) n++;
+            return n;
+        }
+
+        /// <summary>今の ctx での、 次の振り直し 1 回の費用 (無料の回数を読む・2026-11-21)。 本体・画面・BOT の 1 か所。</summary>
+        public static int RerollCostNow(CombatContext ctx, int diceCount, int nth)
+            => RerollCostNow(diceCount, nth, FreeRerollsLeft(ctx) > 0);
+
+        /// <summary>振り直しを 1 回払った後: 無料を使ったなら 1 つ減らす (〈擦り切れた賽袋〉の分が先 ── 戦闘の最初の振り直し)。 振り直した印を立てる。</summary>
+        private static void NoteRerollPaid(CombatContext ctx, bool usedFree)
+        {
+            bool bag = ctx.GetAccumulated(RerolledKey) <= 0f && AxisRules.Owns(GameLoop.GameManager.Instance?.Run, GameLoop.ItemIds.RoleBag);
+            if (usedFree && !bag && ctx.currentBuffs.TryGetValue(YachtRoleEffects.FreeRerollKey, out float f))
+                ctx.currentBuffs[YachtRoleEffects.FreeRerollKey] = Mathf.Max(0f, f - 1f);
+            if (usedFree && bag) Debug.Log("[擦り切れた賽袋] この戦闘の最初の振り直しは無料");
+            ctx.accumulatedValues[RerolledKey] = 1;
+        }
+
         private IEnumerator<TurnPause> RerollPhase(CombatContext ctx, int[] playerDice, int[] enemyDice, int playerDiceMax,
                                                    int[] playerFaceIdx = null)
         {
@@ -195,9 +223,7 @@ namespace CombatSystem
             //   BOT の振り直しの値付け (MutualRerollPolicy → 山札の効用) もこの予告を読むので、 ダウンのターンの攻撃 0・与ダメ ×1.5 を見る。
             FillDownTelegraph(ref tele);
 
-            // 〈特別・対〉(前ターン成立): 次のリロール N 回 (既定 2) を無料にする。
-            int freeRerolls = ctx.currentBuffs.TryGetValue(YachtRoleEffects.FreeRerollKey, out float freeFlag)
-                ? Mathf.Max(0, (int)freeFlag) : 0;
+            // 〈特別・対〉(前ターン成立): 次のリロール N 回 (既定 2) を無料にする。 数えるのは FreeRerollsLeft (〈擦り切れた賽袋〉ほか・2026-11-21)
 
             // **全部振り直し・費用は戦闘の中で上がる (2026-10-17)。**
             //   旧規則は「選んだダイスだけ・費用 = 個数 × そのターンで何回目か」で、 回目がターンごとに戻るうえ
@@ -216,7 +242,7 @@ namespace CombatSystem
                 if (_interactiveTurn)
                 {
                     _pause.Set(TurnPauseKind.Reroll, playerDice, playerFaceIdx, tele);
-                    _pause.rerollCost = RerollCostNow(playerDice.Length, nth, freeRerolls > 0);
+                    _pause.rerollCost = RerollCostNow(ctx, playerDice.Length, nth);
                     // 振り直すかを決める時も手札と場を見せる (手札は振り直しで変わらない)。 敵の攻撃は予告の近似で組む
                     if (_deck != null) { _pause.board = _deck.board; _pause.terminalEnv = TerminalEnvNow(ctx, tele.enemyAttackValue); _pause.terminalState = _deck.state; }
                     yield return _pause;
@@ -233,13 +259,13 @@ namespace CombatSystem
                     foreach (int i in pick) { if (i >= 0 && i < playerDice.Length) rerollIdx.Add(i); }
                 else for (int i = 0; i < playerDice.Length; i++) rerollIdx.Add(i);
 
-                bool usedFree = freeRerolls > 0;
-                int cost = RerollCostNow(rerollIdx.Count, nth, usedFree);   // 〈無力感〉の +1 もここ (無料の時は足さない)
+                bool usedFree = FreeRerollsLeft(ctx) > 0;
+                int cost = RerollCostNow(ctx, rerollIdx.Count, nth);   // 〈無力感〉の +1 もここ (無料の時は足さない)
                 // 賭場の賽 (ADR-0015): 充電の代わりに HP を払う。 HP が払えない (払うと 0 になる) なら振り直せない
                 bool gamble = DiePassives.FreeRerollByDie(GameLoop.GameManager.Instance?.Run);
                 if (gamble && playerHP <= DiePassives.GambleHpCost) break;
-                if (usedFree) freeRerolls--;
                 if (!ctx.ConsumeCharge(cost)) break;   // 払えなければそこで打ち切り
+                NoteRerollPaid(ctx, usedFree);
                 if (gamble)
                 {
                     playerHP -= DiePassives.GambleHpCost;
@@ -359,16 +385,43 @@ namespace CombatSystem
             _formedRoles.Clear();
             YachtRoles.Evaluate(playerDice, playerFaceIdx, ctx.equippedFaceTiers, _formedRoles);
 
+            // 賽目の締めと【規則】の品 (2026-11-21・段 1-f・item-overhaul-spec §5 / §12-1)。 所持は戦闘の始めから変わらない
+            var roleRun = GameLoop.GameManager.Instance?.Run;
+            bool omni = AxisRules.Owns(roleRun, GameLoop.ItemIds.RoleOmni), mirror = AxisRules.Owns(roleRun, GameLoop.ItemIds.RoleMirror),
+                 fate = AxisRules.Owns(roleRun, GameLoop.ItemIds.RoleFate);
+            var tier = GameLoop.DiceFaceParts.Tier.T3;   // Tier は使わない (ADR-0015)。 実績の呼び手のために渡すだけ
+            // 〈宿命の刻み目〉: 前のターンに立った役の効果が、 このターンにももう 1 回働く (役が立ったのではないので数えない・出来事も鳴らさない)。
+            //   連なりの効果 (端子がすべて 2 回働く) は端子の解決の中なので、 前のターンに TerminalBattleState.fateDoubleNext で渡してある
+            if (fate)
+            {
+                int prev = (int)ctx.GetAccumulated(FateRoleKey) - 1;
+                ctx.accumulatedValues[FateRoleKey] = 0;
+                if (prev >= 0 && (RoleKind)prev != RoleKind.Straight)
+                {
+                    YachtRoleEffects.Apply((RoleKind)prev, tier, ctx, ref outcome);
+                    Debug.Log($"[宿命の刻み目] 前のターンの役〈{YachtRoles.NameOf((RoleKind)prev)}〉の効果がもう 1 回働く");
+                }
+            }
+
             for (int i = 0; i < _formedRoles.Count; i++)
             {
                 var k = _formedRoles[i];
                 YachtRoleEffects.FormedCount[(int)k]++;
                 // T4-C〈凶運〉: このランで封印されている役は成立しても効かない。
                 if ((ctx.sealedRoleMask & (1 << (int)k)) != 0) continue;
+                // 〈万象のゾロ目〉: このターン 2 個そろいをゾロ目として扱う (振り直しの後に DecideOmniPair が決めた・端子の解決も同じ TerminalCards.UpgradePair)
+                k = TerminalCards.UpgradePair(k, OmniPairNow(ctx), ctx.sealedRoleMask);
 
-                var tier = GameLoop.DiceFaceParts.Tier.T3;   // Tier は使わない (ADR-0015)。 実績の呼び手のために渡すだけ
-
-                YachtRoleEffects.Apply(k, tier, ctx, ref outcome);
+                // 〈万象のゾロ目〉: ゾロ目の効果は 2 回働く
+                int times = omni && YachtRoles.IsTriple(k) ? 2 : 1;
+                for (int t = 0; t < times; t++) YachtRoleEffects.Apply(k, tier, ctx, ref outcome);
+                // 〈鏡合わせの盤〉: 2 個そろいなら、 1 つ小さい目の 2 個そろいの効果も働く (1 の 2 個そろいなら、 次のターンの無料の振り直し +1)
+                if (mirror && !YachtRoles.IsBig(k)) MirrorPair(k, ctx, tier, ref outcome);
+                if (fate)
+                {
+                    ctx.accumulatedValues[FateRoleKey] = (int)k + 1;
+                    if (k == RoleKind.Straight && _deck != null) _deck.state.fateDoubleNext = true;
+                }
                 ctx.firedRolesThisTurn.Add(k);
                 RaiseCue(CombatCue.Role, YachtRoles.NameOf(k));      // 合図 (#319)
                 YachtRoleEffects.FiredCount[(int)k]++;
@@ -387,6 +440,42 @@ namespace CombatSystem
                 Debug.Log($"[役] T{ctx.currentTurn} 発動: {string.Join("/", names)}");
             }
             return outcome;
+        }
+
+        /// <summary>〈宿命の刻み目〉(2026-11-21): 前のターンに立った役 ((int)RoleKind + 1・0 = なし・ctx.accumulatedValues)。</summary>
+        private const string FateRoleKey = "role.fate";
+        /// <summary>〈万象のゾロ目〉(2026-11-21): 2 個そろいをゾロ目として扱うと決めたターンの番号 (ctx.accumulatedValues) / 乱数のキー (専用) / 賽目 1 つあたりの確率。</summary>
+        private const string OmniTurnKey = "role.omniTurn";
+        public const string OmniRngKey = "role.omni";
+        public const float OmniPctPerDepth = 0.08f;
+
+        /// <summary>〈万象のゾロ目〉: このターン 2 個そろいをゾロ目として扱う (<see cref="DecideOmniPair"/> が決めた)。 端子の盤面 (TerminalEnv.pairAsTriple) と ResolveRoles が読む。</summary>
+        public static bool OmniPairNow(CombatContext ctx)
+            => ctx != null && ctx.currentTurn > 0 && (int)ctx.GetAccumulated(OmniTurnKey) == ctx.currentTurn;
+
+        /// <summary>〈万象のゾロ目〉(2026-11-21): 出目が決まった所 (振り直しと出目を書き換える効果の後・配線の前) で、 立つ役が 2 個そろいなら、
+        /// 確率 min(100%, 賽目 × 8%) でこのターンそれをゾロ目として扱う。 配線の前に決めるので、 配線の判断 (人・BOT) はその結果を見て挿せる。</summary>
+        private static void DecideOmniPair(CombatContext ctx, int[] dice)
+        {
+            if (ctx == null || !AxisRules.Owns(GameLoop.GameManager.Instance?.Run, GameLoop.ItemIds.RoleOmni)) return;
+            var k = TerminalCards.RoleOf(dice, new TerminalEnv { sealedRoleMask = ctx.sealedRoleMask });
+            if (k == null || YachtRoles.IsBig(k.Value)) return;
+            float p = Mathf.Min(1f, OmniPctPerDepth * ctx.AxisDepth(AxisRules.Role));
+            if (p <= 0f || !GameLoop.GameRng.Chance(p, OmniRngKey)) return;
+            ctx.accumulatedValues[OmniTurnKey] = ctx.currentTurn;
+            Debug.Log($"[万象のゾロ目] 〈{YachtRoles.NameOf(k.Value)}〉をゾロ目として扱う ({p * 100f:0}%)");
+        }
+
+        /// <summary>〈鏡合わせの盤〉(2026-11-21): 2 個そろい <paramref name="k"/> の、 1 つ小さい目の 2 個そろいの効果を働かせる (役が立ったのではない ── 数えない)。
+        /// 1 の 2 個そろいなら、 次のターンの無料の振り直し +1。 1 つ小さい目の役が〈凶運〉で封じられていれば働かない。</summary>
+        private static void MirrorPair(RoleKind k, CombatContext ctx, GameLoop.DiceFaceParts.Tier tier, ref RoleOutcome outcome)
+        {
+            int face = YachtRoles.FaceOf(k);
+            if (face <= 1) { YachtRoleEffects.AddNextTurn(ctx, YachtRoleEffects.FreeRerollKey, 1); Debug.Log("[鏡合わせの盤] 特別・対 → 次のターンの無料の振り直し +1"); return; }
+            var m = YachtRoles.Of(face - 1, false);
+            if ((ctx.sealedRoleMask & (1 << (int)m)) != 0) return;
+            YachtRoleEffects.Apply(m, tier, ctx, ref outcome);
+            Debug.Log($"[鏡合わせの盤] 〈{YachtRoles.NameOf(k)}〉に重ねて〈{YachtRoles.NameOf(m)}〉の効果");
         }
 
         // 端子の状態のうち、 戦闘の情報 (accumulatedValues) を通して渡すキー。 **フィールドを増やさない**

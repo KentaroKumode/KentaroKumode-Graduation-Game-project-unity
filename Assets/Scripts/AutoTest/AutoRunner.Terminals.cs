@@ -1168,6 +1168,7 @@ namespace AutoTest
             // 次のターンの端子の盤面 (充電は DeckSums と同じ順: 払う → 満たす → 足す・上限で止まる)
             var env = ev.env;
             env.hp = ns.myHp; env.shield = ns.myShield; env.enemyAttack = ns.enemyAtk;
+            env.pairAsTriple = false;      // 〈万象のゾロ目〉の格上げは今のターンの出目で決めた物 (次のターンは引いた出目で決まる・見込みは格上げなし)
             int cap = (env.chargeCap > 0 ? env.chargeCap : 9999) + o.chargeCapAdd;      // 〈大導電＋〉は満たす前に上限を足す
             int ch = Math.Max(0, env.charge - o.chargeSpend);
             if (o.chargeFill) ch = Math.Max(ch, cap);
