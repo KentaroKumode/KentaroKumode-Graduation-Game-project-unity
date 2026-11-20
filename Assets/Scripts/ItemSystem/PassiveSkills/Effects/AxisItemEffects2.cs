@@ -419,16 +419,18 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>重ね札の盾: シールドが 8 以上の間、 受けるダメージ −2 (2026-11-20: 旧 −5・2026-11-07: 旧 10 以上・−2 → −3 → −5)。</summary>
+    /// <summary>重ね札の盾: シールドが 8 以上の間、 受けるダメージ −2 (2026-11-20: 旧 −5・2026-11-07: 旧 10 以上・−2 → −3 → −5)。
+    /// 敵の攻撃を受けるその時のシールドで判定する (2026-11-20: 旧 ターンの頭に 1 回だけ判定し、 途中で 8 を切っても残っていた)。</summary>
     public class LayeredTagShield : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "重ね札の盾";
         /// <summary>秘宝の列 (#320) の見え方。</summary>
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.consShield >= 8);
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreReceiveDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (ctx.consShield >= 8) ctx.playerFlatDamageReduction += 2;
+            if (ctx.playerWonRoll || ctx.finalDamage <= 0 || ctx.consShield < 8) return;
+            ctx.finalDamage = System.Math.Max(0, ctx.finalDamage - 2);
         }
     }
 
