@@ -504,7 +504,8 @@ namespace AutoTest
                 _cur.appliedChallengeScore = CurrentChallengeScore();   // 難易度 × 5 (2026-11-10)
                 _cur.finalInventoryPower = InventoryPower.Compute(run);
                 _cur.finalMaterials = run.weaponMaterials;
-                _cur.finalUpgradeCost = GameManager.CanSpendMaterials(run)
+                //   武器の強化の値段 (2026-11-20〜 CanSpendMaterials は端子の強化でも true になるので、 武器の強化先の有無で見る)
+                _cur.finalUpgradeCost = GameManager.WeaponUpgradeCost(run) != int.MaxValue
                     ? GameManager.WeaponUpgradeCost(run) : -1;
                 _cur.finalUpgradeReady = _cur.finalUpgradeCost > 0
                     && run.weaponMaterials >= _cur.finalUpgradeCost;
@@ -611,7 +612,7 @@ namespace AutoTest
             GameLoop.GameHooks.PursuerHpAdd = 0f;
             GameLoop.GameHooks.PursuerSupplyOverride = -1;
             GameLoop.GameHooks.PursuerLeavesTerritory = false;                  // [測定 2026-11-12] 縄張りの作りを既定へ
-            GameLoop.GameHooks.TerritoryTreasure = GameLoop.TerritoryTreasureKind.Forge;
+            GameLoop.GameHooks.TerritoryTreasure = GameLoop.TerritoryTreasureKind.AxisRelic;
             GameLoop.GameHooks.TerritoryKeepBypass = true;                       // [測定 2026-11-13] 縄張りを避ける道の保証を既定へ
             GameLoop.GameHooks.AshKingBeatenEver = null;                         // [測定 2026-11-13] 灰燼の王を倒した記録の扱いを既定 (ランの外の記録を読む) へ
             GameLoop.GameHooks.ToilMode = EventSystem.TimedEffects.ToilMode.UntilKing;   // [測定 2026-11-14] 〈徒労〉の形を既定 (灰燼の王を倒すまで) へ

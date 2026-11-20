@@ -12,6 +12,8 @@ namespace GameLoop
         Forge = 1,
         /// <summary>通常の宝箱と同じ中身。</summary>
         Chest = 2,
+        /// <summary>偏重が一番高い軸の秘宝 3 択 (2026-11-20・作者承認 S4・system-overhaul-spec §4-2・既定)。 軸の秘宝を 1 つも持たなければ普通の秘宝 3 択。</summary>
+        AxisRelic = 3,
     }
 
     /// <summary>
@@ -41,6 +43,8 @@ namespace GameLoop
         /// <summary>イベント「パッシブアイテムをNつから選ぶ」の提示から 1 つ選ぶ (2026-11-12)。 戻り値は添字。
         /// null なら <see cref="ChooseStartingPassive"/> を使い、 それも null なら人が遊んでいる時は画面で選び、 BOT は先頭。</summary>
         public static Func<IReadOnlyList<string>, int> ChooseOfferedPassive;
+        /// <summary>交換マスで差し出す秘宝 (いちばん低いレア度の候補の id) から 1 つ選ぶ (2026-11-20)。 戻り値は添字。 null なら先頭 (人は画面で選ぶ)。</summary>
+        public static Func<IReadOnlyList<string>, int> ChooseTradeAway;
         /// <summary>イベント「賽を提示して交換」の 2 種の賽からどれに替えるか (2026-11-20)。 戻り値は添字、 負 = やめる (今の賽のまま)。
         /// null なら人が遊んでいる時は画面で選び、 BOT は替えない。</summary>
         public static Func<IReadOnlyList<string>, int> ChooseOfferedDie;
@@ -92,9 +96,9 @@ namespace GameLoop
         /// 既定 false = 縄張りの外へ出ない (縄張りを守る番人・GAME.md §5-9)。 層を作る時に読む (MapManager)。
         /// AutoRunner.pursuerLeavesTerritory が毎ランの始めに入れ、 ラン終了で false へ戻す。</summary>
         public static bool PursuerLeavesTerritory;
-        /// <summary>縄張りの宝の中身 (2026-11-12)。 既定 <see cref="TerritoryTreasureKind.Forge"/>。 None = 宝を置かない (旧い作り)。
+        /// <summary>縄張りの宝の中身 (2026-11-12)。 既定 <see cref="TerritoryTreasureKind.AxisRelic"/> (2026-11-20・旧既定 Forge)。 None = 宝を置かない (旧い作り)。
         /// 層を作る時 (置くか) と取った時 (中身) に読む。 AutoRunner.territoryTreasure が毎ランの始めに入れ、 ラン終了で既定へ戻す。</summary>
-        public static TerritoryTreasureKind TerritoryTreasure = TerritoryTreasureKind.Forge;
+        public static TerritoryTreasureKind TerritoryTreasure = TerritoryTreasureKind.AxisRelic;
         /// <summary>[測定 2026-11-13] true (既定) = どの層でも縄張りを踏まずに終点へ行ける道があるように、 縄張りの側を削る
         /// (<see cref="MapSystem.FreeMove.TerritoryBypass"/>・GAME.md §5-9)。 false = 削らない (2026-11-13 より前の作り)。
         /// 縄張りを出ない追跡者の時だけ効く (旧い作り <see cref="PursuerLeavesTerritory"/> では削らない)。 層を作る時に読む (MapManager)。
@@ -217,6 +221,7 @@ namespace GameLoop
             BotDriving = false;
             ChooseStartingPassive = null;
             ChooseOfferedPassive = null;
+            ChooseTradeAway = null;
             ChooseOfferedDie = null;
             ChooseChallengeCard = null;
             ChooseTerminalReward = null;

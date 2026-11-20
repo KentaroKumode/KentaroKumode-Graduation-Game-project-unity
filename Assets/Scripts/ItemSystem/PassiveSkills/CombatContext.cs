@@ -126,6 +126,19 @@ namespace ItemSystem.PassiveSkills
         /// <summary>[perTurn] 会心封印フラグ。true なら会心率を 0 にする（無心の刃など）。
         /// forceCritical より優先度が低い（強制会心が立っていれば会心する）。BeginNewTurn でリセット。</summary>
         public bool critSuppressed;
+        /// <summary>[perTurn] (撃ごとに CombatManager が 0 に戻す) この 1 撃だけ会心を確定させる (〈抜き打ちの作法〉〈シュヴァリエのレイピア〉の解除など・OnCriticalCheck で立てる)。
+        /// <see cref="forceCritical"/> はそのターンの全部の撃に効くので、 1 撃だけの確定はこちら。</summary>
+        public bool forceCritThisHit;
+        /// <summary>[perTurn] (撃ごとに CombatManager が書く) いま解決している主攻撃の撃の番号 (0 = そのターンの最初の 1 撃・ADR-0016)。 BeginNewTurn で 0。</summary>
+        public int hitIndex;
+        /// <summary>[perTurn] (撃の前に CombatManager が書く) このターンの主攻撃の撃の数 (攻撃しないターンは 0)。 BeginNewTurn で 0。
+        /// 攻撃しないターンも固定ダメの枠を取り出すために 1 回 ProcessDamage を通るので、 「撃ごと」の品は <c>hitIndex &lt; hitCount</c> で本物の撃か見る。</summary>
+        public int hitCount;
+        /// <summary>[perTurn] (撃ごとに CombatManager が 0 に戻す) この 1 撃だけの最終与ダメージ倍率の上乗せ (%)。 〈加重の拳套〉が OnPreDealDamage で書く。
+        /// 主攻撃の最終与ダメージ倍率 (<see cref="finalDamagePct"/>) に足して掛ける (CombatManager.Damage.cs)。</summary>
+        public int hitFinalDamagePct;
+        /// <summary>この撃が本物の主攻撃の撃か (攻撃しないターンの空の 1 回ではない)。</summary>
+        public bool IsRealHit => playerWonRoll && hitIndex < hitCount;
         public float criticalMultiplier; // [perTurn] (Phase B で基礎値 + メタ・遺物へ戻す) 会心倍率（既定 2.0。2026-07-26 に 3.0 へ上げ、2026-08-03 に 2.0 へ差し戻し）
         public bool damageReduced;      // [perTurn] ダメージ軽減が発生したか
 
@@ -617,8 +630,6 @@ namespace ItemSystem.PassiveSkills
         public int burstStackBonus;
         /// <summary>[persistent] ターン開始の減衰で残るシールドへの上乗せ (% ポイント)。 〈堅牢〉の①。 残る割合は最大 80%。</summary>
         public int shieldKeepBonusPct;
-        /// <summary>[persistent] 〈心眼〉の②: 会心率が 100% を超えた分の確率で会心が重なる (会心倍率 +1.0)。</summary>
-        public bool critOverflowStack;
         /// <summary>[persistent] 〈電流〉の②: 充電端子に挿した出目のこの割合が攻撃にも加わる。</summary>
         public float chargeToAttackPct;
         /// <summary>[persistent] 会心した攻撃だけに足す貫通 (〈刃毀れの見立て〉・CombatManager.Damage の防御の計算)。</summary>
@@ -652,15 +663,21 @@ namespace ItemSystem.PassiveSkills
             foreach (var a in AxisRules.Ranked) if (a != axis && AxisDepth(a) > d) above++;
             return above;
         }
-        /// <summary>[persistent] 〈寸鉄〉: 会心率が 100% を超えた分が会心ダメージの倍率になる (超えた 10% につき +0.1)。</summary>
-        public bool critOverflowToMultiplier;
-        /// <summary>[persistent] 〈銑鉄棍〉: 会心が出なくなる。 会心になるはずだった攻撃は敵の防御を無視し、
-        /// この戦闘中の敵の防御を 1 下げる。</summary>
-        public bool critBecomesArmorBreak;
-        /// <summary>[perTurn] 会心になるはずだったが〈銑鉄棍〉で止めた (この攻撃は敵の防御を無視する)。
-        /// ProcessDamage が立て、 BeginNewTurn の Phase B で戻す。</summary>
-        public bool suppressedCritProc;
-        /// <summary>[perTurn] 直近のプレイヤーの攻撃で合算した会心率 (%・100 超えもそのまま)。 〈寸鉄〉が読む。
+        /// <summary>[persistent] 〈寸鉄〉(2026-11-20 作り直し): 会心しなかった撃にも、 会心倍率の上乗せ分 × (会心率 ÷ 100) が乗る (会心率は 100% を上限に数える・PassiveSkillManager.ProcessDamage)。</summary>
+        public bool critShareOnNonCrit;
+        /// <summary>[persistent] 〈銑鉄棍〉(2026-11-20 作り直し): 会心が出なくなる (強制の会心も)。 代わりに会心率 1% につき与ダメージ +1% (100% を上限に数える・与ダメ % の池へ足す・PassiveSkillManager.ProcessDamage)。</summary>
+        public bool critToDamage;
+        /// <summary>[persistent] 〈天工開物〉: 爆発 1 回のダメージへの上乗せ (武器を強化した回数 × 5・<see cref="Keywords.Kw.BurstBase"/>)。</summary>
+        public int burstFlatBonus;
+        /// <summary>[persistent] 〈重装兵の隠し刃〉: ボスのダウン中のターンは、 ターン開始時にシールドが半減しない (BeginNewTurn)。</summary>
+        public bool shieldKeepOnBossDown;
+        /// <summary>[persistent] 〈過負荷チューナー〉: 過充電の間、 充電を払う端子・秘宝・振り直しの払う量が 1 減る (最低 1・<see cref="ChargeCostNow"/>)。</summary>
+        public bool overloadChargeCut;
+        /// <summary>[persistent] 〈血止め知らずの針箱〉: 出血のダメージに会心が乗る (会心倍率の半分・1 回のダメージごとに判定・CombatManager.Turn の出血)。</summary>
+        public bool bleedCritRule;
+        /// <summary>充電を n 払う時に実際に払う量 (〈過負荷チューナー〉: 過充電の間 1 減る・最低 1)。 品・端子・振り直しの支払いが通す。</summary>
+        public int ChargeCostNow(int n) => overloadChargeCut && n > 1 && IsOvercharged() ? n - 1 : n;
+        /// <summary>[perTurn] 直近のプレイヤーの攻撃で合算した会心率 (%・100 超えもそのまま)。 〈寸鉄〉〈銑鉄棍〉が読む。
         /// ProcessDamage が書き、 BeginNewTurn の Phase B で 0。</summary>
         public float lastCritAddPct;
 
@@ -1052,8 +1069,9 @@ namespace ItemSystem.PassiveSkills
             // 会心系
             isCritical = false;
             forceCritical = false;
+            forceCritThisHit = false;
+            hitIndex = 0; hitCount = 0; hitFinalDamagePct = 0;
             critSuppressed = false;
-            suppressedCritProc = false;
             lastCritAddPct = 0f;
             critRatePctAdd = 0f;
             // 会心倍率: 基礎 3.0 (2026-07-26 リバランス) + メタバフ。 他バフ (ProvisionSystem苦悩・パッシブ) と加算合成。
@@ -1136,11 +1154,13 @@ namespace ItemSystem.PassiveSkills
                 if (enemyBleedStacks == 0) Keywords.Kw.Raise(this, PassiveSkillTrigger.OnBleedZero, 1);
             }
             if (enemyPassivesDisabledTurns > 0) enemyPassivesDisabledTurns--; // 敵パッシブ無効化 残ターン
-            burstStackBonus -= (burstStackBonus + 3) / 4;   // 〈二度詰めの雷管〉の上乗せは毎ターン 1/4 を失う (ヴェスカ 4 段で積み上がらない・端数は切り上げて減らす = 3 からも 0 へ減る・2026-11-15 #320)
+            burstStackBonus -= (burstStackBonus + 7) / 8;   // 〈二度詰めの雷管〉の上乗せは毎ターン 1/8 を失う (2026-11-20: 旧 1/4・端数は切り上げて減らす = 7 からも 0 へ減る・2026-11-15 #320)
             // プレイヤーのシールドは毎ターン半減 (切り捨て。 1 → 0 で確実に消える)。 ヴェスカのシールド規約と同じ (GAME.md §13-4)。
             // T1 は戦闘開始時の付与 (開幕シールド等) をそのまま使うので半減しない。 そのターンの付与は OnTurnStart 以降なので「半減 → 付与」の順になる。
             // 失った分を〈半減で失った〉出来事として配る (2026-10-31)。
-            if (currentTurn > 1 && _consShield > 0)
+            // 〈重装兵の隠し刃〉(2026-11-20): このターンがボスのダウンなら半減しない (ダウンはこの後 CombatManager.BeginBossDownTurn が待ちから 1 つ使って立てる)
+            bool keepForDown = shieldKeepOnBossDown && (CombatSystem.CombatManager.Instance?.Down?.pending ?? 0) > 0;
+            if (currentTurn > 1 && _consShield > 0 && !keepForDown)
             {
                 // 〈堅牢〉の①: 残る割合 50% + 上乗せ (最大 80%・2026-11-07)
                 // 遺物 (§15-5) 堅牢 3 個: +25%。 遺物の分だけは上限 90% まで (それ以外の上乗せは 80% のまま)

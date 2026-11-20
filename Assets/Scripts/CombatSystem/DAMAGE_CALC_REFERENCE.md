@@ -71,7 +71,9 @@ OnTurnEnd の 4 か所。これ以外の位置で敵パッシブが ctx の HP �
   （本体の支払い・画面の費用の表示 `TurnPause.rerollCost`・BOT の `AutoRunner.MutualRerollPolicy` が同じ値を読む）。
 - 〈特別・対〉の無料分（`YachtRoleEffects.FreeRerollKey`）は費用 0 で、回目に数えない。〈無力感〉の +1 も足さない。
 - 振るかどうかは `RerollPolicy`（BOT / UI が差す）。人が操作するターンは `TurnPauseKind.Reroll` で止まって答えを待つ。
-- スキップ: 強制ロール状態（`player_contre`）。
+- 〈過負荷チューナー〉（2026-11-20）: 過充電（充電 7 以上）の間、費用 −1（最低 1・`CombatContext.ChargeCostNow` を `RerollCostNow` が最後に通す）。
+  同じ口を充電を払う端子（`TerminalEnv.chargeCostCut`・「全部払う」端子は除く）と秘宝（〈避雷の杭〉〈逆さ避雷針〉）も通す。
+- （旧: 〈シュヴァリエのレイピア〉のコントラタック中〔`player_contre`〕は振り直さない ── 2026-11-20 に「1d1 強制」が消えたので外した）
 - 旧規則（物資 30 を払う・毎ターン最大 1 回・期待値割れだけ振り直す自動ポリシー）は廃止。`ProvisionSystem.RerollCost` の定数は参照されていない。
 
 ### ① ダイス合計フェーズ（`PassiveSkillManager.ProcessPostRoll` L434-463）
@@ -123,7 +125,11 @@ total = final + pursuitDamage
        critRate = ResolveCritRate(critAdd)   ← 加算した分がそのまま (0〜1 クランプのみ・§2-B)
        会心成立 = !critSuppressed && Random.value < critRate
        critSuppressed(無心の刃) → 常に false / forceCritical(末那識・天極・短絡・画竜) → 常に true（最終上書き）
+         forceCritThisHit【2026-11-20】→ この 1 撃だけ確定 (〈抜き打ちの作法〉・撃ごとに CombatManager が戻す)
+       〈銑鉄棍〉【規則】(critToDamage・2026-11-20): 会心にしない (強制の会心も)。 代わりに outgoingDamageMultiplier += min(1, critAdd) (与ダメ% の池・撃ごとに戻る)
        成立かつ total>0 → FireTrigger(OnCriticalDamage); total ×= criticalMultiplier(既定2.0)
+       不成立かつ total>0 → 鈍器 ×(1 + nonCritOutgoingMultiplier) → 〈寸鉄〉【規則】(critShareOnNonCrit・2026-11-20) ×(1 + (会心倍率 − 1) × min(1, critAdd))
+                            (会心倍率は敵の会心耐性を引いた後・下限 1.0) → 〈一点読みの片眼〉の代価 ×0.7
        【狩猟旅団 (契約)】armed状態の脆弱を持つ敵への会心時、 全段に ×(1 + 0.15/0.30/0.45) 倍率を適用 → 脆弱は consumed へ
                           (詳細: docs/GAME.md §12)
 FireTrigger(OnPostDealDamage / OnPostReceiveDamage)
@@ -150,7 +156,8 @@ outgoingDamageMultiplier += メタ% + 遺物% + 研磨剤1.5 + consDmgMultPct/10
 + consAtkBurst                     ← 消費:攻撃バースト(単発)
 + メタ会心ボーナス(会心時)
 − メタデバフ向かい風(最低1)
-× (100 + finalDamagePct)/100      ← 最終与ダメージ倍率【2026-11-20・GAME.md §23-32】(Kw.ApplyFinalDamage・切り捨て・既定 0 = 素通し)。 〈防人の軍標〉がシールドを得るたび +5 (この戦闘・上限なし)。
+× (100 + finalDamagePct + hitFinalDamagePct)/100      ← 最終与ダメージ倍率【2026-11-20・GAME.md §23-32】(Kw.ApplyFinalDamage・切り捨て・既定 0 = 素通し)。 〈防人の軍標〉がシールドを得るたび +5 (この戦闘・上限なし)。
+                                     hitFinalDamagePct = 主攻撃のこの 1 撃だけの上乗せ (〈加重の拳套〉: 撃の番号 (0 から) × 15・撃ごとに 0 に戻す・主攻撃以外の口には無い)。
                                      怠惰の直前 = すべての倍率 (会心・与ダメ% の池・端子の別枠・物差し) の後・敵の軽減パッシブと防御の前。 与ダメ% の池には足さない。
                                      掛ける口は怠惰と同じ 4 つ (主攻撃 = ApplyWinDamageModifiers / HpLossDiag.Lose (channel ≠ "通常攻撃") / 〈逆綴じの止血帯〉/ Kw.DamageEnemy の直接)。 BOT の見積もりも同じ位置 (AutoRunner.ApplyFinalPct)
 × (100 − 30)/100                  ← 大罪:怠惰 (挑戦カード IV) を受けている時だけ・与えるダメージ −30%【2026-11-11】(主攻撃はすべての倍率の後・敵の防御の前・切り捨て。 毒・出血・爆発・固定ダメ・反射・品の直接は敵の HP を減らす口 HpLossDiag.Lose で同じく −30%)
@@ -169,6 +176,8 @@ outgoingDamageMultiplier += メタ% + 遺物% + 研磨剤1.5 + consDmgMultPct/10
 × 敵の防御値【2026-10-28・ADR-0013】: effDef = max(0, enemyDefense − playerArmorPen)
                        total = DefenseFormula.Apply(total, effDef)   ← ceil(total × (1 − R(effDef)))・整数演算
                        ※ 短剣〈急所〉持ちの会心ならこの段を丸ごと飛ばす (VitalStrike.IgnoresDefense)
+                       ※ 戦術消耗品〈急所突きの針〉【2026-11-20】: 攻撃のある最初の撃だけ playerArmorPen += IgnoreAll (撃の後に戻す)・その撃は forceCritThisHit
+                       ※ 戦術消耗品〈鎧割りの酸瓶〉【2026-11-20】: 使った時に enemyDefense −12 (下限 0)。 形態の交代で防御を入れ直した後も、 使った数 × 12 を引き直す
                        R(D) = Rmax·D/(D+K)  (Rmax = 3/5, K = 10・仮置き)
   ※ 旧: effRate = max(0, enemyDamageReductionPct − armorPenPct) の割合軽減と、
     余剰貫通 (armorPen − 防御率) を与ダメ ×(1+余剰) へ転用する段 J。 どちらも撤去
@@ -195,13 +204,15 @@ total = ProcessDamage結果
 + ceil(total × receivedDamageBonus)(亡者の招待 +30%)
 ÷2 halveFirstEnemyAttack(共助・T1のみ)
 playerDamageNegateCharges>0 → total=0(獣の絆)
-コントラタック(player_contre): total半減 + 軽減量×2を敵へ反射
-− consShield(消費シールド吸収。 盾は T2 以降のターン頭に半減 ── ③-D)
+− consShield(消費シールド吸収。 盾は T2 以降のターン頭に半減 ── ③-D。 〈重装兵の隠し刃〉はボスのダウン中のターンだけ半減しない・2026-11-20)
   吸収した量は ctx.shieldAbsorbedAttackThisTurn ([perTurn]・2026-11-14) にも積む ── 灰燼の王の〈烈炎〉がターン終了時に読む (敵パッシブ表の BlazeBrand)。
   ここ (主攻撃: 1 回目・〈連撃〉/2 体戦の 2 回目) の吸収だけで、 ③-C の軽減無視の肩代わりは積まない
+コントラタック(player_contre・〈シュヴァリエのレイピア〉・2026-11-20 作り直し): 2 × (ブロックで止めた量 min(敵の攻撃, ブロック) + この攻撃のシールドの吸収) を
+  enemyHP へ軽減不可で返す (HpLossDiag.Lose "反射(コントラタック)")。 発動中は攻撃の端子に挿せない (TerminalEnv.noAttack・Resolve の 0.)。 旧: total 半減 + 軽減量 ×2 を返す
 痛覚遮断剤【職業/狂戦士 2026-06-28】: painkillerArmedThisTurn && total≥playerHP → total=playerHP−1（HP=1踏みとどまり・チェーン**最後**）
 → (ダメージ適用直前) 仕込み刃【職業/暗殺者 2026-06-28・2026-09-22 に倍率 1→5】: daggerArmed && total>0 → total=0 ＋ **その 5 倍**を enemyHP へ軽減不能で返す（`CombatManager` の仕込み刃の反撃倍率）。使ったターン限りで、被弾しなくても失効
 → 古い手紙【消耗品 2026-10-31】: accumulatedValues[Consumables.OldLetterGuardKey] > 0 → total=0（反撃なし）。仕込み刃の直後・同じく使ったターン限り。1 枚で 3 回使える
+→ (〈装甲〉r10 の一撃の上限の後) 〈無害灯〉【規則】(2026-11-20): 臨界 ≥ 15 なら 1 ターン 1 回 total −= floor(total / 2)・臨界を同じ量 (足りなければあるだけ) 使う
 → playerHP −= total (+ fixedDamageToPlayer)
   fixedDamageToEnemy>0 は敗北時も敵へ(反撃/Counter/Riposte) / 出血
   痛覚遮断剤 post-clamp: メイン+固定ダメ適用後も painkillerArmedThisTurn 中は playerHP≤0 → 1 に復帰
@@ -216,6 +227,27 @@ fixedDamageToPlayer ≥ 999 → playerHP = 0（死の宣告）
 | 不抜の聖紋 | 騎士 | 上記 ③-B チェーン参照。HP80% 維持中のみ被ダメ −40%、一度割れたら戦闘中永久無効 |
 | 痛覚遮断剤 | 狂戦士 | 使用ターン致命ダメを HP=1 に clamp（2 経路）。次ターン開始時 (`CombatContext.BeginNewTurn` Phase A) HP=1 なら consDiceRoll+10 / consAtkBurst+10、そのターン終了時に死亡確定 (`ExecuteTurn` 終端) |
 | 仕込み刃 | 暗殺者 | 使ったターンの被ダメを 0 化＋**その 5 倍**を enemyHP へ直接減算（軽減不能・2026-09-22 に 1→5 倍）。このターン限りで、被弾しなくても失効 |
+
+#### 戦術消耗品・消耗品の連動品のダメージ関連効果（2026-11-20・item-overhaul-spec §7）
+
+正本は `GameLoop.Consumables`（ApplyTactic・定数）と `CombatManager.Tactics.cs`。 どれも戦闘中・判断の間（振り直し・配線）だけ使える。
+
+| 品 | 効果と適用点 |
+|---|---|
+| 急所突きの針 | `accumulatedValues["tactic.needle"]` を立てる。 ADR-0016 の撃のループで、 攻撃のある最初の撃に `forceCritThisHit = true`・`playerArmorPen += DefenseFormula.IgnoreAll`（その撃の ApplyWinDamageModifiers の後に戻す）。 攻撃しないターンは持ち越す |
+| 鎧割りの酸瓶 | `enemyDefense = max(0, enemyDefense − 12)`（`Consumables.AcidDefenseCut`）。 ヴェスカの形態の交代では `ReapplyTacticAcid` が使った数 × 12 を引き直す |
+| 目盛り削りの鑿 | 敵に 15（`ChiselDamage`）を `HpLossDiag.Lose(…, "目盛り削りの鑿")` で入れる（主攻撃以外と同じに 最終与ダメージ倍率・怠惰・ダウンの ×1.5 が掛かる・敵の防御は掛からない）。 その後 `NoteBossDownMainHit` を通す ＝ 目盛りは通常攻撃として割れる（ひびの入った目盛りも満額のダウン） |
+| 倍化の共鳴玉 | `TerminalBattleState.doubleAll = true`（このターン・BeginTurn で戻す）。 `TerminalCards.Resolve` の 5. で〈残響〉と同じ倍化 |
+| 無銘の潤滑油 | `TerminalBattleState.ignoreCond = true`（このターン・〈無形の構え〉と同じ旗） |
+| 使い切りの矜持（秘宝） | OnConsumableUse: そのターン 1 回 `AddOutgoingPct(0.25)`（与ダメ % の池・最終与ダメージ倍率ではない） |
+
+#### マクロ秘宝の与ダメに入る分（2026-11-20・item-overhaul-spec §9・`MacroItemEffects.cs`）
+
+| 品 | 効果と適用点 |
+|---|---|
+| 気圧計のペンダント | OnBattleStart: 嵐のフェーズ（`FreeMapSim.StormPhase`・開始時の値を `accumulatedValues["macro.barometer.phase"]`）× 5 をシールドへ。 OnPostRoll: 毎ターン `AddPlayerAttackOrDiceBonus(2 × フェーズ)`（攻撃 +N・ステータスの `atk` と同じ口） |
+| 研ぎ代の領収書 | OnPostRoll: 毎ターン `AddPlayerAttackOrDiceBonus(2 × RunState.receiptRemovals)` |
+| 相場師の算盤 | OnBattleStart: `AddCharge(3 × RunState.abacusStacks)`・`Kw.EnableHeat` の後 `Kw.AddHeat(5 × abacusStacks)`（閾値を越えれば開始時に爆発する・爆発のダメージは §3-H のとおり） |
 
 ### ③-C 「軽減無視」ダメージとシールドの関係【2026-08-15 確定】
 
@@ -340,7 +372,7 @@ ResolveCritRate(addTotal):
 **入力の 3 経路**（加算してから 1 度だけ `ResolveCritRate` に通す。**単位はすべて %／小数**・2026-09-19 統一）:
 1. `critBaseRate` — 武器の `critRatePct`（items.json・例 11 = 11%）＋ 層補正 `critRatePctBonus`。
    **この 2 つだけを 0〜50% にクランプ**してから渡す（層のマイナスは武器の会心率しか削れない）
-2. `ctx.critRatePctAdd` — パッシブ（心眼 +5/10/15/20% など）・消耗品・戦闘中バフ（月蝕 +15% / レイピア解除 +50%）
+2. `ctx.critRatePctAdd` — パッシブ（心眼 +5/10/15/20% など）・消耗品・戦闘中バフ（月蝕 +15%）。 〈シュヴァリエのレイピア〉の解除は 2026-11-20 から会心率 +50% ではなく次のターンの会心確定（`Consumables.ApplyRapierRelease`）
 3. メタ（`GetCritRatePctBonus` − 〈俊敏〉ペナルティ、合計は 0 下限）
 
 > メタ精密トラックは 2026-09-10 に撤去済み（`PrecisionCritRatePct` / `PrecisionOverflowMultiplier`
@@ -388,6 +420,7 @@ SwordReachII・III / BulwarkII・III。 置き換え前と同一シード 10,000
 
 **可変量 (`stats[].per`・段 3・2026-11-11)。** 量が実行時の状態で変わる効果は `per`（単位数の出どころ: `coinsSpent` / `swordWindfall` (2026-11-19・溶金の領主剣) / `axis:軸名` / `enemyBleed` / `enemyPoison` / `chargeSpent` / `turnsElapsed`）・`perEvery`（N につき・整数の割り算）・`perMax`（単位数の頭打ち）・`on`（乗せるトリガーの上書き）で書き、`StatModifierEffect.ApplyScaled` が「生成時に確定した float の量 × 単位数」を旧クラスと同じ形で足す。単位数が 0 なら何もしない。
 段 3 でステータス化済み（9 件）: 溶金の領主剣 / 研ぎ師の見立て書 / 千里眼の水晶 / 血日に澄む佩玉 / 鎧縫いの針 / 麻痺の吹き矢 / 雷神槍 / 猛りII・III。 同一シードのダイジェストは未測定。
+2026-11-20: 〈千里眼の水晶〉〈英雄の意志〉〈過負荷チューナー〉は作り直してクラスへ戻した（`AxisItemEffects2.cs`）。 〈雷神槍〉は `atk` 1 / `per: chargeSpent` / `perEvery: 5` / `on: OnWired`（使った充電 5 につき攻撃 +1・攻撃 +N は撃ごとに乗る・端子の払いも数えるため配線の後）。
 
 **条件 (`stats[].when`・段 2)。** 書いた項目はすべて AND。判定は**そのステータスのトリガーの時点**（旧クラスと同じ）。
 
@@ -416,7 +449,7 @@ SwordReachII・III / BulwarkII・III。 置き換え前と同一シード 10,000
 Execute（与ダメ%部分）/ IndomitableIII / Overload / SingleMinded / Stubbornness / VenomBlade / BloodScent /
 Hermes / Bloodlust / EvenEyes / MasterworkNotes / KaleidoDice。
 
-**アイテム側から移したもの（2026-09-19）**: 末那識 / 狂宴の仮面 / 英雄の意志 / 激情の刃。旧 ITimedEffect（OnRoll・CombatStart）
+**アイテム側から移したもの（2026-09-19）**: 末那識 / 狂宴の仮面 / 英雄の意志（2026-11-20 に作り直してクラスへ・大技の予告のターンの頭にシールド +18） / 激情の刃。旧 ITimedEffect（OnRoll・CombatStart）
 から、パッシブと**同じタイミング**で加算するステータスへ。与ダメ% はもともと同じ加算プールだったが、
 加算の時点と条件の判定時点をパッシブに揃えた。パッシブスキルとして登録されるので〈共鳴〉の数・〈迷妄〉の対象・
 同名 1 回の規則にも入る（挙動の変更＝同一シードのペア比較で確認）。
@@ -457,7 +490,7 @@ Hermes / Bloodlust / EvenEyes / MasterworkNotes / KaleidoDice。
 |---|---|---|
 | ~~パリィ / 衛士の慣い / 復讐 / 果たし合い / 蝕夜~~ | — | **2026-10-28 削除**（武器家系の整理・GAME.md §24）。後継は §3-B2 の〈堅守の構え〉〈黎明〉〈不滅の刃〉。〈切り返し〉〈血令〉〈処刑〉は同名のまま §3-B2 で中身が変わった |
 | VoidStance(虚空) | OnPostRoll | ｜playerDiceTotal−enemyDiceTotal｜≤3 → nullifyAllDamage + fixedDamageToEnemy +=3（自前で差を算出） |
-| 重装兵の隠し刃 | OnTurnStart | **2026-10-28 リワーク**: 戦闘に 1 回、ターン頭に HP < 最大の 30% なら `consShield += shieldGainedTotal × 50%`。旧「倒せる攻撃のときシールドを全部使って同じ量を攻撃に加える（盾解放）」は盾家系〈シールドバッシュ〉と重なった |
+| 重装兵の隠し刃 | OnBattleStart | **2026-11-20 作り直し**: `shieldKeepOnBossDown` を立てる。 そのターンがボスのダウンなら BeginNewTurn のシールドの半減を飛ばす（ダウンの待ちが 1 以上 = このターンはダウン）。 旧（2026-11-04〜）: 敵の HP 30% 以下のターン、シールドを最大 20 使い使った量 × 2 を攻撃に（1 戦闘 1 回） |
 | Sting(出血) | OnPostDealDamage | enemyBleedStacks++ |
 | 脆弱(契約・狩猟旅団) | OnBattleStart (Apply) + 防御後最終ダメ | armed状態で会心ダメ時 ×(1+0.15/0.30/0.45) 倍率→consumed / 非会心ロール勝利で再armed。 戦闘終了で剥がれる。 仕様: docs/GAME.md §12 |
 | ApexCrit(天極) | OnCriticalCheck | ゾロ目(全同値)なら **forceCritical=true**(会心確定)＋criticalMultiplier+1.0 |
@@ -465,7 +498,7 @@ Hermes / Bloodlust / EvenEyes / MasterworkNotes / KaleidoDice。
 | Resonance(共鳴・LEG) | OnPreDealDamage | 発動中パッシブ数 × 0.01 を outgoing 加算 (2026-09-20: 旧 over5 × 0.05) |
 | Greed(貪欲・ダイス) | OnTurnStart | lifestealPct = 0.1 |
 | Eternal(永劫・ダイス) | OnPostRoll/OnBattleEnd | playerDiceTotal += min(5, eternalStacks/10)、勝利でstack++保存(ラン跨ぎ) |
-| TenkouKaibutsu(天工開物) | (なし) | no-op(効果は GameManager.TryUpgradeWeapon の素材返還) |
+| TenkouKaibutsu(天工開物) | OnBattleStart | **2026-11-20**: `burstFlatBonus += 5 × RunState.heavenlyCraftUpgrades`（この品を持っている間に武器を強化した回数・GameManager.Rest）→ `Kw.BurstBase` に足す。 旧: 戦闘開始時の臨界 +5 × 回数 |
 | Bloodlust(背水の狂刃) | OnPreDealDamage | HP≤50% → outgoing+=0.3、≤25% → +=0.8 (2026-05-31 outgoing移行) |
 | Hermes(ヘルメスの靴) | OnPostRoll | 初回ロール `AddPlayerAttackOrDiceBonus(5)`（攻撃+5・ステータス化 §2-C） |
 | GoldKingBlade(溶金の領主剣) | OnPreDealDamage | 攻撃が通る時 outgoing += 0.02×swordWindfallGold (2026-11-19 作り直し・作者: 持っている間に秘宝・賽・イベントから得た金 1G につき +2%・戦闘の報酬と売却は数えない・上限なし。 数えるのは GoldIncome.CountWindfall と出どころの種類 GoldOrigin。 旧: 0.005×coinsSpent = ラン全体で使った金) |
@@ -557,11 +590,13 @@ Passive カテゴリのシナジー武器群。4枚がインベントリに揃�
 
 | SkillId(表示) | レア | Trigger | 効果(ctx操作) |
 |---|---|---|---|
-| SaberWaltz(サーベル・ワルツ) | B | OnBattleStart / OnPostRoll | playerDiceTotal +1。他の[剣の舞]がインベントリにも昇華にも無い時、開戦時に playerCurrentHP を半減。ショップ出現率上昇は ShopManager フック |
-| EspadaPasodoble(エスパーダ・パソドブレ) | S | OnPostRoll / OnPreReceiveDamage | outgoing +=0.4（2026-11-10・旧 出目 +50% と outgoing +0.2）／被弾時 finalDamage ×1.2（被ダメ+20%） |
-| FleuretBallet(フルーレ・バレエ) | B | OnPostRoll | outgoing +=0.25（2026-11-10・旧 出目 +30%）。敗北時の自壊+最大HP1生還は `LastStand.TryConsumeRevival`（灯火→ラストスタンド→フルーレ の順） |
-| FalconTango(ファコン・タンゴ) | L | OnPostRoll | outgoing +=0.2（2026-11-10・旧 出目 +20%・[剣の舞]。4 枚揃うと〈無銘の剣舞譜〉へ変化） |
+| SaberWaltz(サーベル・ワルツ) | L | OnPostRoll | outgoing +=0.1 × s。 [剣の舞]を 1 枚以上持っていると LEGENDARY の枠がまれに[剣の舞]に差し替わる（店 = ShopManager の LEGENDARY 帯・交換マス・宝箱 = `SwordDanceSet.MaybeSwapToDance`・確率はどれも `SaberWaltzShopBias`・2026-11-20 に交換マス・宝箱を足した） |
+| EspadaPasodoble(エスパーダ・パソドブレ) | L | OnPostRoll / OnPreReceiveDamage | outgoing +=0.4 × s（2026-11-10・旧 出目 +50% と outgoing +0.2）／被弾時 finalDamage ×1.2（被ダメ+20%・s は掛けない） |
+| FleuretBallet(フルーレ・バレエ) | L | OnPostRoll | outgoing +=0.25 × s（2026-11-10・旧 出目 +30%）。敗北時の自壊+最大HP1生還は `LastStand.TryConsumeRevival`（灯火→ラストスタンド→フルーレ の順） |
+| FalconTango(ファコン・タンゴ) | L | OnPostRoll | outgoing +=0.2 × s（2026-11-10・旧 出目 +20%・[剣の舞]。4 枚揃うと〈無銘の剣舞譜〉へ変化） |
 | BladeDance(無銘の剣舞譜) | L(特殊) | OnBattleStart / OnPostRoll / OnPostDealDamage / OnPostReceiveDamage | 開戦毎に剣先スタック+1(最大99・ラン中持続/IRunResettable)。playerDiceTotal +剣先／与ダメ時 剣先分HP回復／被ダメ時 fixedDamageToEnemy +剣先 |
+
+s = `SwordDanceSet.SoloScale`（2026-11-20）: 持っている[剣の舞]（昇華を含む `OwnedCount`）が 1 枚で 1・2 枚で 1.5・3 枚で 2。 伸ばすのは与ダメージの分だけ。
 
 > 条件の差（仕様厳守）: サーベルの孤剣判定＝`OwnsPassive`（昇華込み）/ 4枚変化判定＝`ownedPassiveItems`のみ（昇華除外）。
 > 無銘の剣舞譜は `EventOnlyItemFilter` 除外でショップ・ランダム配布に出ない（変化でのみ入手）。
@@ -614,15 +649,21 @@ Passive カテゴリのシナジー武器群。4枚がインベントリに揃�
 | OnShieldDecay | BeginNewTurn Phase C の半減 | 失った分 |
 | OnPoisonGain / OnPoisonCap | CombatContext.AddStatus (敵の毒) | 増えた分 / 上限到達 |
 | OnPoisonTick | TickStatuses と〈廃庭の霧吹き〉(敵の攻撃のたび・TickPoisonOnce) | 毒のダメージ = `floor(毒 × enemyMaxHP × 10 / 10000)` (**2026-11-20: 1 スタック = 最大 HP の 0.1%**・旧 0.05%〔2026-11-10 に 0.1% から〕)・下限 1・`fixedDamageToEnemy` 経由 (両経路とも `CombatContext.DotDamage`)。 **2026-11-07: 1 スタック = 敵の最大 HP の 0.1% (旧 0.5%)・上限 99 (旧 10)**。 同日に一度「現在 HP」基準にしたが、 毒を積んでも与ダメの 13% しか出ず最大 HP に戻した。 ダメージを出すたびに、 残っているスタックを `poisonKeepPct`% に減らす (切り捨て・基準 50 = 半減・〈腐れ沼の苔玉〉で最大 70) |
-| OnBleedDecay / OnBleedConsume / OnBleedZero | Phase C の自然減 / Kw.ConsumeBleed / 0 到達 | 減った分 / 使った分 / 1。 **自然減は 2026-11-07〜 比例減衰** `1 + 出血 / (10 + bleedDecayDivisorBonus)` (`AxisRules.BleedDecay`・〈凝血の小瓶〉で割る数が増える) |
+| OnBleedDecay / OnBleedConsume / OnBleedZero | Phase C の自然減 / Kw.ConsumeBleed / 0 到達 | 減った分 / 使った分 / 1。 **自然減は 2026-11-07〜 比例減衰** `1 + 出血 / (10 + bleedDecayDivisorBonus)` (`AxisRules.BleedDecay`・〈止血禁じの軟膏〉で割る数 +10〔2026-11-20〕。 〈凝血の小瓶〉の 血晶/2 は 2026-11-20 に外した) |
 
 **敵への軽減不可ダメージ (Kw.DamageEnemy)。** ターンの解決中 (`ExecuteTurnMutual` の頭〜最後の HP 同期) は
 CombatManager に預け、 プレイヤーの攻撃の直前に固定ダメ枠へ、 攻撃の後の分はターン最後の HP 同期 (踏みとどまりの clamp より前) で通す。
 
 **会心の規則。**
-- 〈寸鉄〉: 会心ダメージ時、 会心率の加算合計が 100% を超えた分 /100 を倍率に足す (`lastCritAddPct`)。
-- 〈銑鉄棍〉: 会心の判定は通常どおり行い、 会心になった攻撃は会心にせず `suppressedCritProc` を立てて
-  敵の防御を無視 (§③-A の防御の前) し、 敵の防御を 1 下げる (戦闘中)。
+- 〈寸鉄〉【規則】(2026-11-20 作り直し): 会心しなかった撃に `×(1 + (会心倍率 − 1) × min(1, 会心率の加算合計))` (`critShareOnNonCrit`・`lastCritAddPct`)。
+  旧: 会心ダメージ時、 会心率の加算合計が 100% を超えた分 /100 を倍率に足す。
+- 〈銑鉄棍〉【規則】(2026-11-20 作り直し): 会心の判定 (乱数) は通常どおり引くが、 会心にしない (強制の会心・爆発・出血・役の追撃の会心も止める)。
+  代わりに `outgoingDamageMultiplier += min(1, 会心率の加算合計)` (`critToDamage`)。 旧: 会心になった攻撃は敵の防御を無視し、 敵の防御を 1 下げる。
+- 撃ごとの会心 (2026-11-20・ADR-0016 の撃ごとの処理): `ctx.hitIndex` (0 = そのターンの最初の 1 撃)・`ctx.hitCount` (攻撃しないターンは 0)・
+  `ctx.forceCritThisHit` (この撃だけ確定)。 会心率・会心倍率・与ダメの池は撃ごとに 1 撃目の前の値へ戻すので、 OnCriticalCheck で足した分はその撃だけに乗る。
+  〈抜き打ちの作法〉(戦闘の 1〜2 ターン目の最初の 1 撃を確定)・〈千里眼の水晶〉(会心した次のターンの最初の 1 撃に 心眼 × 5%・手札 +1)・
+  〈測量師の片眼鏡〉(戦闘で最初に当てる撃に 歩数 × 5%)・〈重ね斬りの型〉(同じターンに直前 2 撃が会心なら会心倍率 +1.0)・
+  〈鷹匠の革手袋〉(攻撃の端子の目の最大が 4 以上のターン 会心率 +20%・撃ごとに会心倍率 +0.30)。
 - 会心の回数は `Kw.CritCountKey` に積む (〈戦果の天秤〉)。
 
 **個々の品の数値は `ReworkItemEffects.cs` の XML コメントが正本** (再記述しない)。
@@ -634,11 +675,11 @@ CombatManager に預け、 プレイヤーの攻撃の直前に固定ダメ枠�
 
 | 計算の位置 | 式 |
 |---|---|
-| 爆発 1 回の基礎 (`Kw.BurstBase`) | `burstCritRule ? 15 + 炉温 / 2 : rinkaiBurstDamage (既定 30)` → `+ burstStackBonus` (〈二度詰めの雷管〉が爆発のたび +5 (2026-11-10: 旧 +6)・ターン開始時に 1/4 を失う)。 2026-11-07: 既定 50 → 30 |
+| 爆発 1 回の基礎 (`Kw.BurstBase`) | `burstCritRule ? 15 + 炉温 / 2 : rinkaiBurstDamage (既定 30)` → `+ burstStackBonus` (〈二度詰めの雷管〉が爆発のたび +8 (2026-11-20: 旧 +5・2026-11-10: 旧 +6)・ターン開始時に 1/8 を失う (切り上げで減らす・旧 1/4)) `+ burstFlatBonus` (〈天工開物〉5 × 武器を強化した回数・2026-11-20)。 2026-11-07: 既定 50 → 30 |
 | 爆発に会心 (〈火花読みの眼鏡〉) | 爆発のたびに会心の判定をし (CombatManager.LandBurst・2026-11-20)、 会心なら `+ floor(爆発 × max(0, criticalMultiplier / 2 − 1))` (2026-11-10: 会心倍率の半分で乗る・旧 `criticalMultiplier − 1`。 2026-11-20 まで主攻撃の会心に合わせて乗った) |
 | 臨界を得る (`Kw.AddHeat`) | `n + heatGainBonus` (〈焚き足しの炭〉で +1)。 閾値は 50 固定 (〈早沸かし釜〉は −15) |
-| 重ね会心 (〈重ね斬りの型〉) | 会心時、 会心率の加算合計 > 100% なら `(合計 − 100) / 100` の確率で会心倍率 +1.0 (`PassiveSkillManager`) |
-| 出血のダメージ | `ApplyBleedModifiers`: `floor(出血 × (1 + bleedDamagePct))` (〈血止め知らずの針箱〉が 血晶 × 3%) |
+| 重ね会心 (〈重ね斬りの型〉) | 2026-11-20 作り直し: 同じターンに直前の 2 撃が会心なら、 次の撃の OnCriticalCheck で会心倍率 +1.0 (その撃だけ)。 旧: 会心率の加算合計 > 100% の超過分の確率で会心倍率 +1.0 |
+| 出血のダメージ | `ApplyBleedModifiers`: `floor(出血 × (1 + bleedDamagePct))` (bleedDamagePct の書き手は 2026-11-20 から無い)。 〈血止め知らずの針箱〉(血晶 5 以上・`bleedCritRule`・2026-11-20): その後、 1 回の出血のダメージごとに会心の判定 (CritRateOf・封印で外れ・forceCritical で確定・〈銑鉄棍〉で止まる・鍵 combat.bleedCrit) をし、 会心なら `+ floor(出血のダメージ × max(0, criticalMultiplier / 2 − 1))` |
 | シールドの減衰 | 残る割合 `min(80, 50 + shieldKeepBonusPct)`% (〈油染みの盾革〉が 堅牢 × 3・2026-11-20 に × 5 から) |
 | 充電端子 → 攻撃 (〈二股の導線〉) | 配線集計で `attackSum += floor(充電端子の出目の合計 × chargeToAttackPct)` (上乗せ率の前・電流 × 12%・最大 80%) |
 | 盾押し (〈盾押しの心得〉) | OnWired・攻撃の端子を挿したターン: 攻撃 + `floor(シールド × 堅牢 × 5%)`（2026-11-11 に 10% から） |
@@ -790,6 +831,10 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
 
 配線 (端子の山札・ADR-0014・2026-11-11〜 これだけ)
          式の正本は TerminalCards.Resolve (盤面を書き換えない純粋な計算・BOT も同じ関数を写しの状態で呼ぶ)。
+         強化した端子 (名前の後ろに「＋」・2026-11-20) は基の端子と同じ枝を通り、 量だけ *Up の定数に替わる (TerminalCards.Effect の up)。
+           式が素の端子と違う所: 〈号令の剣＋〉は 1. で挿した出目も +1 / 〈剛腕＋〉は挿した出目も攻撃に足す / 〈処刑の刃＋〉は敵の HP が半分以下 (解く時の HP) なら攻撃 +4 /
+           〈諸刃の剣＋〉は撃破した時に払った HP が戻る (回復ではない・TerminalOutcome.killRefundHp) / 〈応急箱＋〉は回復する前の空きを超えた分をシールドへ (overhealToShield) /
+           〈大導電＋〉は満たす前にこの戦闘の充電の上限 +5 (ctx.chargeCapBonus・chargeCapAdd)
          数値は TerminalCards の定数、 端子の一覧は TerminalCards.Build()。 ここには「どの値がどこへ入るか」だけを書く。
          Resolve の順:
            0. 止まった端子 (ヴェスカ〈停滞する時間〉・state.stopped) を挿した出目と、 挿せる数 (capacity・既定 1) を超えた出目を外す
@@ -797,12 +842,20 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
            2. 条件 (3 以下 / 5 以上 / 6 以上 / 偶数 / 奇数 / 同じ目が他の端子に / 同じ目 2 個)。 合わない出目は外す。
               〈無形の構え〉の次のターンは条件を無視 (同じ目 2 個の端子も 2 個そろっていれば通る)
            3. 充電の支払い (場の順)。 足りなければその端子は不発。 〈裁きの雷〉は充電 1 以上で通り、 効果の所で全部払う (使い捨て・2026-11-19〜)
-           4. 〈火葬の剣〉(2026-11-14): 外す端子の候補 (下の「対象」) が無ければ不発 (挿した出目を外す・使い捨ても消費しない)
-           5. 効果 (場の順)。 〈残響〉が発動していれば他の端子の効果を 2 回走らせる
+           4. 〈火葬の剣〉(2026-11-14)・〈影写し〉(2026-11-20〜): 対象の候補 (下の「対象」) が無ければ不発 (挿した出目を外す・使い捨ても消費しない)
+           5. 効果 (場の順)。 〈残響〉が発動していれば他の端子の効果を 2 回走らせる (撃破のボーナス・段階を戻す数も 2 回分)。
+              払う物は 1 回だけ (2026-11-20〜): 充電は 3. で 1 回・〈諸刃の剣〉の HP = ceil(sum/2) は 5. の頭で 1 回 (払うと HP が 0 になるなら不発・旧: HP−1 までに切って攻撃は全部入った)・
+              〈裁きの雷〉は今の充電をすべて 1 回払い、 2 回目も払った量で攻撃に足す (旧: 2 回目は充電 0)
+              〈打ち直し〉(2026-11-20〜): 溜まりが届いたら、 場の順で後ろの (まだ効果を出していない) 端子の出目 1 個ずつ +届いた回数 (sum に入る量だけ・条件は変えない)
+              〈剛腕〉(2026-11-20〜): **攻撃の種類の端子**に挿した出目の合計を、 その端子の効果に入れる前に ×2 (〈剛腕〉の効果 1 回につき ×2 ── 2 枚・〈残響〉で ×4)。
+              条件 (2.) は 2 倍にする前の目で見る。 〈反復突き〉の「同じ目」も 2 倍にする前の目。 〈剛腕〉自身に挿した出目は使わない
               端子へ入る量 (sum) = 挿した出目の合計。 ただし**防御の種類の端子**に挿した出目は 1 つずつ max(0, 出目 − TerminalEnv.blockDieCut)
               (時限デバフ〈罪悪感〉で 2・2026-11-16・〈号令の剣〉の +1 の後)。 条件 (2.) は引く前の目で見る。 攻撃・充電・補助の端子の出目は変えない
-           6. 他の端子を見る効果: 〈連係斬り〉攻撃 + RelayPerFired × (基本以外の発動数 − 1)、 〈剛腕〉攻撃 + (攻撃の種類の端子を挿した出目の合計)
+           6. 他の端子を見る効果: 〈連係斬り〉攻撃 + RelayPerFired × 基本以外の発動数 (自分も数える・2026-11-20〜 旧: −1)。
+              (旧 〈剛腕〉: 攻撃 + 攻撃の種類の端子を挿した出目の合計 ── 2026-11-20 に 5. の ×2 へ)
               溜めた攻撃 (〈力溜め〉〈後の先〉) は、 攻撃の種類の端子を 1 枚以上挿したターンに attackAdd へ足して 0 に戻す
+              〈後の先〉の溜める量 (2026-11-20〜) = ブロックで防いだ量。 Resolve は見込み min(後の先のブロック, TerminalEnv.enemyAttack) を storedAttackNext に入れ (parryStore)、
+              本体が敵の攻撃の後 (CombatManager.SettleParry) に Σ_攻撃 1 回ごと min(後の先のブロック, min(敵の攻撃, blockSum)) へ直す (攻撃しなかったターンは 0)。 BOT は見込みで値付けする
          〈影写し〉〈火葬の剣〉〈保持器〉の対象: Resolve の wantTarget (人 = 画面で選んだ端子 / BOT = WiringPlan.targets)。
            候補 = 自分でない・常設でない・止まっていない・挿し方を直した後に出目が 1 個も無い手札の端子 (TerminalCards.IsCandidate)。 選ばない・候補でない時は左端の候補
          結果 (TerminalOutcome) の行き先:
@@ -813,11 +866,11 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
          ApplyTerminalOutcome (配線の時点・堅牢の環/傲慢/端子調律より前) が戦闘へ配る:
            damageMul      → _termDamageMul (主攻撃の別枠の掛け算・下の自攻撃を参照)。 毎ターン 1 に戻す
            chargeSpend    → ctx.ConsumeCharge(min(払う量, 今の充電))     chargeFill → ctx.AddCharge(ChargeCap)
-           heal           → HealPlayer        selfDamage → playerHP = max(1, playerHP − 量)  (〈諸刃の剣〉は Resolve の時点で HP−1 までに切る)
+           heal           → HealPlayer        selfDamage → playerHP = max(1, playerHP − 量)  (〈諸刃の剣〉は払えなければ Resolve が不発にする)
            shieldSpend    → ctx.consShield = max(0, consShield − 量) (〈重装突撃〉が攻撃に足した分・shield より先に引く)
            shield         → ctx.consShield += 量 (shieldGainedTotal にも足す)
            poison         → Rw.Poison(ctx, 量)       heat → Kw.EnableHeat + Kw.AddHeat(ctx, 量)
-           retreatStage   → AddEscalationDelay(TurnsToRetreatOneStage) (段階を 1 つ戻す・〈氷結瓶〉と、 溜まりが CoolantNeed に届いた〈鎮静香〉。 遅延のキーは CoolantDelayKey・役〈時間〉と共有)
+           retreatStage   → AddEscalationDelay(TurnsToRetreatOneStage) を回数分 (段階を戻す数・〈氷結瓶〉1 回ごと・〈鎮静香〉は溜まりが CoolantNeed に届いた回数・2026-11-20〜 旧: 真偽で 1 段。 遅延のキーは CoolantDelayKey・役〈時間〉と共有)
            enemyStunNext  → nextTurnBuffs[EnemyStunKey] (次のターン敵は行動しない)
            ignoreDefense  → ctx.playerArmorPen += DefenseFormula.IgnoreAll
            forceCrit      → ctx.forceCritical = true       critMultAdd → ctx.criticalMultiplier += 量 (毎ターン組み直されるのでこのターンだけ)
@@ -828,8 +881,9 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
                             → ApplyRoleGuard で takenDmg = round(takenDmg × (1 − cut/100)) (敵の直接攻撃パケットだけ・固定ダメの枠は触らない)
            bleedOnHit     → 主攻撃の dealtDmg > 0 のとき ctx.AddEnemyBleed(量) (〈鉤爪〉)
          ターンの頭 (DrawTerminalHand): 〈打ち直し〉の出目 +N を accumulatedValues[termFoundryBonus] へ置き、 自ロールの後 (大罪:怠惰の後) に全部の出目へ足す。
-           〈柔軟な戦略〉が山札に入っていれば ctx.AddOutgoingPct(CounterPct × floor(基本以外の発動の累計 ÷ CounterEvery))
-         ターンの終わり (FinishTerminalTurn): 発動した端子の撃破のボーナス
+           〈柔軟な戦略〉をこのターンに引いて場にあれば ctx.AddOutgoingPct(CounterPct × floor(基本以外の発動の累計 ÷ CounterEvery))
+           (2026-11-20〜。 旧: ランの山札に入っていれば引かなくても。 累計は引いていない間も数える)
+         ターンの終わり (FinishTerminalTurn): 発動した端子の撃破のボーナス (量は TerminalOutcome.killMaxHp / killWhet / killGold / killChoices・〈残響〉の 2 回目も足す)
            (〈魂狩り〉最大 HP + / 〈処刑の刃〉RunState.terminalWhetBonus + / 〈賞金狩り〉ゴールド + / 〈剥ぎ取り〉次の報酬の選択肢 +1)。
            撃破の経路は問わない (#117・2026-11-13)。 ここで敵 HP ≤ 0 なら配り、 まだ倒れていなければ控えておき、
            FinishTurnCommon の 2 か所 (OnTurnEnd の後・SwapEnemy の前 / SyncHPFromContext の後・TryAdvanceVescaChain の前) で敵 HP ≤ 0 なら配る
@@ -999,7 +1053,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
            → **その場でダメージを出す (ADR-0016・2026-11-20・CombatManager.LandBurst)**、 meter = 0、 OnRinkaiBurst を配る。
              旧: 次の攻撃の固定ダメの枠に乗せる予約 (rinkaiBurstActive・BurstCountKey) ── 2026-08-03 の修正の名残で理由は残っていなかった。
            〈帳簿外の爆薬〉(rinkaiMultiBurst): meter を閾値ぶんだけ減らし、 溜まっている限り同じ処理で何度でも爆発する (1 回ごとにその場で入る)。
-         爆発 1 回の量 = Kw.BurstBase (既定 30・その時の〈二度詰めの雷管〉の上乗せ込み)、 超臨界なら + floor(BurstBase / 2)。
+         爆発 1 回の量 = Kw.BurstBase (既定 30・その時の〈二度詰めの雷管〉〈天工開物〉の上乗せ込み)、 超臨界なら + floor(BurstBase / 2)。
            **軽減無視・倍率は乗らない** (会心・与ダメの池・敵の防御を通さない)。 最終与ダメージ倍率・大罪:怠惰・ダウンの ×1.5 は HpLossDiag.Lose (channel "臨界の爆発") が掛ける。
            〈火花読みの眼鏡〉(burstCritRule): 爆発のたびに会心の判定 (CritRateOf・封印で外れ・forceCritical で確定) をし、 会心なら
              + floor(爆発 × max(0, criticalMultiplier / 2 − 1)) (会心倍率の半分が乗る)。

@@ -58,7 +58,7 @@ namespace ItemSystem.PassiveSkills.Keywords
         public static int BurstBase(CombatContext ctx)
         {
             int b = ctx.burstCritRule ? 15 + ctx.AxisDepth(AxisRules.Heat) / 2 : ctx.rinkaiBurstDamage;
-            return b + ctx.burstStackBonus;
+            return b + ctx.burstStackBonus + ctx.burstFlatBonus;   // 〈天工開物〉の上乗せ (2026-11-20)
         }
 
         /// <summary>臨界を n 溜める。 閾値をまたいだら爆発し、 その場でダメージを出して (ADR-0016)、 出来事を配る。
@@ -198,8 +198,11 @@ namespace ItemSystem.PassiveSkills.Keywords
         /// <summary>最終与ダメージ倍率 (2026-11-20・GAME.md §23-32)。 すべての倍率の後・敵の軽減パッシブと防御の前に掛ける (切り捨て)。
         /// 掛ける口は大罪:怠惰 (<see cref="MetaProgression.MetaDebuffApplicator.ApplyOutgoingCut"/>) と同じ所: 主攻撃 = CombatManager.Damage.cs・
         /// 主攻撃以外 = HpLossDiag.Lose・<see cref="DamageEnemy"/> の直接の口・〈逆綴じの止血帯〉。 BOT の見積もり (AutoRunner.Combat.cs) も同じ位置。</summary>
-        public static int ApplyFinalDamage(CombatContext ctx, int dmg)
-            => ctx != null && dmg > 0 && ctx.finalDamagePct != 0 ? (int)((long)dmg * (100 + ctx.finalDamagePct) / 100) : dmg;
+        public static int ApplyFinalDamage(CombatContext ctx, int dmg, int extraPct = 0)
+        {
+            int pct = ctx != null ? ctx.finalDamagePct + extraPct : 0;   // extraPct = 主攻撃のこの 1 撃だけの上乗せ (ctx.hitFinalDamagePct・〈加重の拳套〉)
+            return dmg > 0 && pct != 0 ? (int)((long)dmg * (100 + pct) / 100) : dmg;
+        }
 
         /// <summary>今の戦闘の ctx で <see cref="ApplyFinalDamage"/> (戦闘の外では素通し)。</summary>
         public static int ApplyFinalDamageNow(int dmg) => ApplyFinalDamage(PassiveSkillManager.Instance?.Context, dmg);

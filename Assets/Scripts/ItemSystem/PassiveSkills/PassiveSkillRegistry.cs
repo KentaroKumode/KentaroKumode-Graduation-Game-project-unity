@@ -240,7 +240,7 @@ namespace ItemSystem.PassiveSkills
             // ============================
             //  軸の品 (2026-11-07・AxisItemEffects.cs)。 各軸に 燃料 / ① 数を参照 / ②【規則】
             // ============================
-            // 研ぎ師の見立て書 / 千里眼の水晶 / 麻痺の吹き矢 はステータス化 (段 3・2026-11-11)
+            // 研ぎ師の見立て書 / 麻痺の吹き矢 はステータス化 (段 3・2026-11-11)。 千里眼の水晶・英雄の意志・過負荷チューナーは 2026-11-20 にクラスへ戻した (下の追加 34 品の並び)
             Register(new FalconerGlove());                                       Register(new LayeredCutForm());     Register(new LayeredScabbard()); Register(new PinpointEye());
             Register(new ReturnEdgeClasp());  Register(new UnstanchedNeedles()); Register(new ClotVial());
             Register(new TasterSpoon());      Register(new MiasmaJar());         Register(new RotMossBall());
@@ -252,6 +252,7 @@ namespace ItemSystem.PassiveSkills
             Register(new NickAppraisal()); Register(new LosingStreakDie()); Register(new ChainedFlash()); Register(new QuickDrawArt());
             Register(new SpareBattery()); Register(new StaticBlanket()); Register(new FlintNeedle()); Register(new StorageGauntlet());
             Register(new RerollHammer()); Register(new InsulatedCloak()); Register(new LightningStake()); Register(new ThunderDrum());
+            Register(new ClairvoyantCrystal()); Register(new OverloadTuner()); Register(new HeroWill());   // 2026-11-20 作り直し (旧 items.json の stats)
             Register(new ChippedKnife()); Register(new ThornGlove()); Register(new RiftWedge()); Register(new DrippingEdge());
             Register(new NoClotSalve()); Register(new CrimsonPress()); Register(new EndlessSpringCrystal());
             Register(new AcidVial()); Register(new NeedleRing()); Register(new LeafMoldBag());
@@ -264,6 +265,10 @@ namespace ItemSystem.PassiveSkills
             Register(new WildKilnHearth()); Register(new PillarBreakerCharge());
             Register(new ThunderReliquary()); Register(new FourthStrikeCore());
             Register(new FallenCastleCornerstone()); Register(new BorderGuardStandard());
+            // 消耗品の連動品 (2026-11-20・ConsumableLinkEffects.cs・item-overhaul-spec §7-2)
+            Register(new BeltPouch()); Register(new SpentPride()); Register(new BottomlessVial()); Register(new SampleBox());
+            // 嵐・店・金のマクロ秘宝の戦闘の側 (2026-11-20・MacroItemEffects.cs・item-overhaul-spec §9)
+            Register(new MacroBarometer()); Register(new MacroReceipt()); Register(new MacroAbacus());
 
             // ============================
             //  汎用パッシブ

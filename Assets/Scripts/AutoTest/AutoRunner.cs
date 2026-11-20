@@ -181,7 +181,7 @@ namespace AutoTest
         /// pursuerLeavesTerritory = true で旧い作り (追跡者は縄張りの外まで追う)。 territoryTreasure = None で宝を置かない。
         /// 両方を旧い側 (True / None) にした腕は、 縄張りの作り直し (2026-11-12) より前と同じ動きになる。</summary>
         public bool pursuerLeavesTerritory = false;
-        public GameLoop.TerritoryTreasureKind territoryTreasure = GameLoop.TerritoryTreasureKind.Forge;
+        public GameLoop.TerritoryTreasureKind territoryTreasure = GameLoop.TerritoryTreasureKind.AxisRelic;   // 2026-11-20: 既定を軸の秘宝 3 択へ (旧 Forge / Chest は残す)
         /// <summary>[測定 2026-11-13] 縄張りを避ける道の保証。 本体の GameHooks.TerritoryKeepBypass へ流す (ラン終了で true へ)。
         /// true (既定) = どの層でも縄張りを踏まずに終点へ行ける道があるように縄張りを削る。 false = 削らない (2026-11-13 より前の作り・main と全件一致のはず)。
         /// 旧い作り (pursuerLeavesTerritory = true) では値によらず削らない。</summary>

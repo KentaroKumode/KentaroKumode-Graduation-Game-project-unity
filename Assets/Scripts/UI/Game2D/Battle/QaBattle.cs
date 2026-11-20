@@ -86,6 +86,35 @@ namespace UI.Game2D.Battle
         /// <summary>今の戦闘の背景 (Resources/Game2DBackdrops の名前・"-" = 仮の背景) と、 ヴェスカ 4 段への移行で替える予定の背景。 例: "bg_vesca (次 bg_vesca_p4)"。</summary>
         public static string Backdrop() { var f = Fx; if (f == null) return "(戦闘の画面が無い)"; return (f.BackdropName ?? "-") + (f.PendingBackdropName != null ? " (次 " + f.PendingBackdropName + ")" : ""); }
 
+        // ── 読みやすさの見比べ (2026-11-16・BattleReadability) ──
+        //   見比べ用の口: 作者が A / B のどちらか (か両方) に決めたら、 それを BattleReadability の既定 (常に掛ける) にして、 SetReadability・SetBackdropDim と
+        //   Status() の read= は消す。
+
+        /// <summary>戦闘の画面の読みやすさの直し方を替える (すぐ効く・戦闘中でも可)。 0 = 無し / 1 = A (字と頭上の印の 2 ドットの縁取り・床の出目の縁) /
+        /// 2 = B (背景を暗く・<see cref="SetBackdropDim"/>) / 3 = A+B。 範囲外は 0。 例: <c>UI.Game2D.Battle.QaBattle.SetReadability(3)</c></summary>
+        public static string SetReadability(int mode)
+        {
+            BattleReadability.Current = mode >= 0 && mode <= 3 ? (BattleReadability.Mode)mode : BattleReadability.Mode.None;
+            Debug.Log("[QaBattle] 読みやすさ " + Readability());
+            return Readability();
+        }
+
+        /// <summary>B の明るさ (背景の画素に掛ける倍率・0.1〜1・既定 0.7)。 B が切の間は効かない (設定だけ残る)。 例: <c>UI.Game2D.Battle.QaBattle.SetBackdropDim(0.6f)</c></summary>
+        public static string SetBackdropDim(float k)
+        {
+            BattleReadability.Dim = k;
+            Debug.Log("[QaBattle] 読みやすさ " + Readability());
+            return Readability();
+        }
+
+        /// <summary>今の読みやすさの設定。 例: "2(B) dim=0.70"。</summary>
+        public static string Readability()
+        {
+            var m = BattleReadability.Current;
+            string n = m == BattleReadability.Mode.None ? "無し" : m == BattleReadability.Mode.Outline ? "A" : m == BattleReadability.Mode.DimBackdrop ? "B" : "A+B";
+            return (int)m + "(" + n + ") dim=" + BattleReadability.Dim.ToString("0.00");
+        }
+
         /// <summary>手引きを全部「見た」にする (手元だけ・SaveGuard で書かない)。 戦闘の画面の上に手引きの窓が出て止まらないように。</summary>
         private static void MarkAllTutorialsSeen()
         {
@@ -223,7 +252,7 @@ namespace UI.Game2D.Battle
         public static string Status()
         {
             var gm = GameManager.Instance; var s = Sim; var f = Fx; var cm = CombatManager.Instance;
-            return $"phase={gm?.CurrentPhase} floor={gm?.Run?.currentFloor} bg={Backdrop()} enemy={cm?.CurrentEnemy?.id} turn={cm?.CurrentCombatTurn} sim={s?.phase} heavyIn={s?.heavyIn} charging={s?.charging} down={s?.down} " +
+            return $"phase={gm?.CurrentPhase} floor={gm?.Run?.currentFloor} bg={Backdrop()} read={Readability()} enemy={cm?.CurrentEnemy?.id} turn={cm?.CurrentCombatTurn} sim={s?.phase} heavyIn={s?.heavyIn} charging={s?.charging} down={s?.down} " +
                    $"hp={s?.playerHp}/{s?.playerMax} vescaShield={ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context?.vescaShield} fxIdle={f?.IsIdle} bossIdling={f?.BossIdling} go={Runner.State} loading={Game2DLoadingScreen.Blocking} ending={Game2DEndingScreen.Blocking} modal={Game2DModal.Active} saveSuppressed={SaveGuard.Suppressed} " +
                    $"stow=[{(f != null && f.GuiStowed ? "格納" : "出")} hud={StowNow()} force={Game2DBattleFx.QaStow}] gui=[on={Game2DGuiRt.FxOn} weight={Game2DGuiRt.FxWeightReady} dark={Game2DGuiRt.FxDark:0.00} red={Game2DGuiRt.FxRed:0.00} white={Game2DGuiRt.FxWhite:0.00} shake={Game2DGuiRt.FxShake}]";
         }

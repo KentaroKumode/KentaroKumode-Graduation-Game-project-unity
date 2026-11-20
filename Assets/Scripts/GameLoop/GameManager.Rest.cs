@@ -124,7 +124,7 @@ namespace GameLoop
             return int.MaxValue;
         }
 
-        /// <summary>素材を消費できる先 (武器強化) が残っているか。
+        /// <summary>素材を消費できる先 (武器強化・端子の強化) が残っているか。
         ///
         /// **業物廃止 (2026-08-10) で必要になった判定。** T4+ 到達後の進行武器は素材を
         /// 受け付けなくなったので、 素材は完全な死に資源になる。
@@ -133,7 +133,42 @@ namespace GameLoop
         public static bool CanSpendMaterials(RunState run)
         {
             if (run == null) return false;
-            return WeaponUpgradeCost(run) != int.MaxValue;
+            return WeaponUpgradeCost(run) != int.MaxValue || HasUpgradableTerminal(run);   // 2026-11-20: 休憩の「端子を強化する」も素材の使い道
+        }
+
+        // ===== 休憩: 端子を強化する (2026-11-20・作者承認・数値は仮) =====
+        //   素材を払って、 山札の端子 1 枚 (強化できる端子) を強化した端子 (名前の後ろに「＋」・TerminalIds.Upgraded) に差し替える。
+        //   値段は 1 回目 4・以後 1 回ごとに +2 (このランの間・RunState.terminalUpgrades)。 休憩の行動を使う (回復・鍛える・抜く・強化から 1 つ)。
+
+        /// <summary>端子の強化の 1 回目の値段 (素材) / 1 回ごとに上がる量。</summary>
+        public const int TerminalUpgradeBaseCost = 4, TerminalUpgradeCostStep = 2;
+
+        /// <summary>次に端子を強化する値段 (素材)。</summary>
+        public static int TerminalUpgradeCost(RunState run)
+            => TerminalUpgradeBaseCost + TerminalUpgradeCostStep * (run != null ? run.terminalUpgrades : 0);
+
+        /// <summary>山札に強化できる端子があるか。</summary>
+        public static bool HasUpgradableTerminal(RunState run)
+        {
+            if (run?.terminalDeck == null) return false;
+            foreach (var id in run.terminalDeck) if (TerminalCards.CanUpgrade(id)) return true;
+            return false;
+        }
+
+        /// <summary>休憩: 素材を払って、 山札の deckIndex 枚目を強化した端子に差し替える (休憩の行動を使う)。 強化できない・素材が足りなければ false (休憩は続く)。</summary>
+        public bool RestUpgradeTerminal(int deckIndex)
+        {
+            if (CurrentPhase != GamePhase.RestStop || Run?.terminalDeck == null || deckIndex < 0 || deckIndex >= Run.terminalDeck.Count) return false;
+            string id = Run.terminalDeck[deckIndex];
+            int cost = TerminalUpgradeCost(Run);
+            if (!TerminalCards.CanUpgrade(id) || Run.weaponMaterials < cost) return false;
+            string up = TerminalIds.Upgraded(id);
+            Run.terminalDeck[deckIndex] = up;
+            Run.weaponMaterials -= cost;
+            Run.terminalUpgrades++;
+            Log($"端子を強化した (休憩): {id} → {up} (素材 -{cost}・残 {Run.weaponMaterials}・{Run.terminalUpgrades} 回目)");
+            ReturnToMapOrClearFloor();
+            return true;
         }
 
         /// <summary>武器強化で Tier が進んだ際に通知される (旧ID, 新ID)。
@@ -192,11 +227,11 @@ namespace GameLoop
                     apex ? RunChronicle.ForgeApex : RunChronicle.ForgeUpgrade,
                     run.equippedWeaponId, cost);
             }
-            // 天工開物 (2026-10-31): 武器を強化するたび、 以後の戦闘の開始時の臨界 +5
+            // 天工開物 (2026-11-20 作り直し): 武器を強化するたび、 以後の爆発のダメージ +5 (累積・このランの間・旧 以後の戦闘の開始時の臨界 +5)
             if (run != null && run.OwnsPassive(ItemIds.HeavenlyCraft))
             {
                 run.heavenlyCraftUpgrades++;
-                Debug.Log($"[天工開物] 武器強化 → 以後の戦闘の開始時 臨界 +{5 * run.heavenlyCraftUpgrades}");
+                Debug.Log($"[天工開物] 武器強化 → 以後の爆発のダメージ +{ItemSystem.PassiveSkills.Effects.TenkouKaibutsu.PerUpgrade * run.heavenlyCraftUpgrades}");
             }
             return true;
         }

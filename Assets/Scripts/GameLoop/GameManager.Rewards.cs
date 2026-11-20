@@ -175,7 +175,7 @@ namespace GameLoop
                         Log($"〈{EventSystem.TimedEffects.BattleBoonRule.ToilName}〉が晴れた (灰燼の王を倒した)");
                 }
 
-                // 5層裏ボス撃破フラグ: 以降のレイピア解除に会心+9 が付くようになる
+                // 5層裏ボス撃破フラグ: 以降のレイピア解除に会心倍率 +1.0 が付くようになる (2026-11-20・旧 会心+9)
                 if (CurrentEnemy != null && CurrentEnemy.id == BossIds.Layer5Hidden)
                 {
                     Run.defeatedSaintGeorges = true;
@@ -609,6 +609,8 @@ namespace GameLoop
             {
                 picked = ItemSystem.RarityWeightedPicker.Pick(pool);
             }
+            // 〈サーベル・ワルツ〉: [剣の舞] を持っていれば、 LEGENDARY の枠がまれに [剣の舞] に差し替わる (店と同じ・2026-11-20)
+            picked = SwordDanceSet.MaybeSwapToDance(Run, picked, pool, "treasure.dance");
             return picked?.internalName;
         }
 
