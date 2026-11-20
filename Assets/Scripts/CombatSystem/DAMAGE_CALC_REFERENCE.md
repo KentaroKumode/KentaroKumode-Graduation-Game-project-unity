@@ -70,7 +70,11 @@ OnTurnEnd の 4 か所。これ以外の位置で敵パッシブが ctx の HP �
   時限デバフ〈無力感〉（2026-11-16）を持っている間は毎回 **+1**（3 個なら 4・7・10）。式は `CombatManager.RerollCostNow` → `TimedDebuffRule.RerollCost` の 1 か所
   （本体の支払い・画面の費用の表示 `TurnPause.rerollCost`・BOT の `AutoRunner.MutualRerollPolicy` が同じ値を読む）。
 - 〈特別・対〉の無料分（`YachtRoleEffects.FreeRerollKey`）は費用 0 で、回目に数えない。〈無力感〉の +1 も足さない。
-- 整備パネルの種火・役（2026-11-21）: 各戦闘の最初の振り直し 1 回（`MetaPanel.RoleFreeRerolls`）も同じ無料分に足す（`CombatManager.FreeRerollsNow`）。〈特別・対〉の分と重なった時は〈特別・対〉の分（ターンの終わりで消える）から先に使い、種火の分はその戦闘の間残る（`ctx.accumulatedValues[SparkRoleFreeUsedKey]`）。
+- 整備パネルの種火・役（2026-11-21）: 各戦闘の最初の振り直し 1 回（`MetaPanel.RoleFreeRerolls`）も同じ無料分に足す（`CombatManager.FreeRerollsLeft`）。〈特別・対〉の分と重なった時は〈特別・対〉の分（ターンの終わりで消える）から先に使い、種火の分はその戦闘の間残る（`ctx.accumulatedValues[SparkRoleFreeUsedKey]`）。
+- 無料の回数は `CombatManager.FreeRerollsLeft` の 1 か所（2026-11-21・段 1-f）= currentBuffs `roleFreeReroll`（〈特別・対〉+2・〈鏡合わせの盤〉の 1 の 2 個そろい +1・〈揃いの拍子木〉+1 ── 次のターンへ足し合わせる `YachtRoleEffects.AddNextTurn`）
+  + 〈擦り切れた賽袋〉（この戦闘でまだ 1 回も振り直していなければ 1・`role.rerolled`）+ 種火・役の残り。 使う順は 賽袋 → currentBuffs → 種火（`NoteRerollPaid`・currentBuffs から減らす）。
+- 〈賽振り台〉（端子・2026-11-21）: 挿した次のターンの最初の振り直し（`rerollsThisTurn = 0`）の費用 −min(6, 賽目)（強化 8・下限 0・複数挿せば足す）。
+  `TerminalOutcome.rerollDiscountNext` → nextTurnBuffs `roleRerollDiscount` → `RerollCostNow(ctx, 個数, 回目)` が引く（本体・画面・BOT の同じ関数・〈過負荷チューナー〉の −1 の後）。
 - 振るかどうかは `RerollPolicy`（BOT / UI が差す）。人が操作するターンは `TurnPauseKind.Reroll` で止まって答えを待つ。
 - 〈過負荷チューナー〉（2026-11-20）: 過充電（充電 7 以上）の間、費用 −1（最低 1・`CombatContext.ChargeCostNow` を `RerollCostNow` が最後に通す）。
   同じ口を充電を払う端子（`TerminalEnv.chargeCostCut`・「全部払う」端子は除く）と秘宝（〈避雷の杭〉〈逆さ避雷針〉）も通す。
@@ -648,6 +652,9 @@ s = `SwordDanceSet.SoloScale`（2026-11-20）: 持っている[剣の舞]（昇�
 | OnDeckShuffle | 端子の捨て札を切り直したとき (ターンの頭に引く所 = `DrawTerminalHand` の直後 / 判断の間に消耗品・品で引いた分は `RaiseTerminalEvents` の頭) | 切り直した枚数 |
 | OnKeptTerminalUse | 残す印で前のターンから残した端子を発動したとき (`RaiseTerminalEvents`・名前で数える) | 挿した出目の合計 (最低 1) |
 | OnSupportTerminalUse | 補助の端子 (基本の〈時計〉を除く) を発動したとき (`RaiseTerminalEvents`・〈残響〉で 2 回働いても 1 回) | 挿した出目の合計 (最低 1) |
+| OnRoleFired | 役が立ったとき (2026-11-21・`CombatManager.ResolveRoles`・配線の解決の後・OnWired の前・〈鏡合わせの盤〉の重ねた効果・〈宿命の刻み目〉のもう 1 回では鳴らない) | 強さ (2 個そろい 1 / ゾロ目・連なり 2) |
+| OnBossDown | ボスの目盛りを割ってダウンが決まったとき (2026-11-21)。 通常攻撃 = `NoteBossDownMainHit` (撃の輪の中・〈目盛り削りの鑿〉も)・旧い判定 AnyDamage のターンの終わり / ひび = `NoteBossDownTurnEnd`。 `Kw.BossDownCrackKey` (1 = ひび) で分ける | 割った目盛りの数 |
+| OnHeavyCanceled | 大技を取り消したとき (2026-11-21): ダウンがチャージか大技のターンに重なった (`BeginBossDownTurnCore`・ターンの頭) / 大技のターンに〈封じ・揃〉か端子の行動不能で敵が行動しなかった (敵の攻撃の解決) | 1 |
 | OnChargeGain / OnOvercharge | CombatContext.AddCharge | 増えた分 / 上限で捨てた分 (〈雷壷〉はターン開始時に上限超過の 75% を捨てる) |
 | OnChargeSpend | CombatContext.ConsumeCharge (リロールも通る) | 使った分 |
 | OnShieldGain | consShield の setter (増えたときだけ) | 増えた分 |
@@ -659,6 +666,16 @@ s = `SwordDanceSet.SoloScale`（2026-11-20）: 持っている[剣の舞]（昇�
 
 端子の 4 つの出来事は OnWired の前に配るので、 ここで品が足す「攻撃 +N」は撃ごとの口 (ADR-0016) に乗るが、 BOT の配線の判断からは見えない。
 端子の出力を変える品 (采配の軸の多く) は出来事でなく `TerminalCards.Resolve` の中で効かせる (`TerminalBattleState.deckItems`・BOT と自動で一致・下の「配線」)。
+
+**段 1-f の品 (2026-11-21・数値は仮・XML コメントが正本)。** 賽目の品のうち端子の解決の外の 2 品 (`RoleItemEffects.cs`):
+〈欠け目の見立て〉OnRoleFired で 1〜3 の目を含む役なら `playerArmorPen += 賽目 × 2` / 〈揃いの拍子木〉役が 2 ターン続けて立つたび 次のターン 手札 +1・無料の振り直し +1。
+クロス軸 (`CrossItemEffects.cs`・品の軸の偏重 5 以上): 〈劇毒の火薬庫〉OnRinkaiBurst で 毒 + 爆発のダメージ ÷ 10・`TickPoisonOnce` の量を `Kw.DamageEnemy` /
+〈血染めの歯車〉OnTerminalDispose で `Kw.DamageEnemy(出血 × 2)`・出血 +采配 / 〈雷鳴のゾロ目〉OnRoleFired で 充電 +賽目 × 2・ゾロ目なら `Kw.DamageEnemy(充電 × 2)` (払わない) /
+〈必殺の照準器〉OnTerminalDispose (ターン 1 回) で forceCritical・`criticalMultiplier += 采配 × 0.15` / 〈血濡れの符丁〉OnRoleFired の追撃・攻めで `Kw.DamageEnemy(出血 × 2)` (使わない) /
+〈雷毒の導管〉OnChargeSpend で 毒 + 払った量 ÷ 2。
+戦術 (`TacticItemEffects.cs`): 〈渾身の柄頭〉hitCount = 1 の撃で `hitFinalDamagePct += 25`・`playerArmorPen += 8` / 〈静寂の構え〉攻撃に挿さなかったターンの次のターンの hitIndex 0 の撃で `hitFinalDamagePct += 50` /
+〈隙衝きの短槍〉OnWired で敵がチャージ中かダウン中 (`CombatManager.EnemyChargingOrDownNow`) なら `AddOutgoingPct(0.40)` / 〈崩しの一手〉OnBossDown (ターン 1 回) で 次のターン 手札 +2・充電 +10 /
+〈大技殺しの楔〉OnHeavyCanceled で `Kw.DamageEnemy(最大 HP × 10%)`・シールド +15 / 〈逆境の砂時計〉段階 (`CombatManager.EscalationStageNow`) 2 以上で OnTurnStart にシールド +4・OnWired に `AddOutgoingPct(0.25)`。
 
 **敵への軽減不可ダメージ (Kw.DamageEnemy)。** ターンの解決中 (`ExecuteTurnMutual` の頭〜最後の HP 同期) は
 CombatManager に預け、 プレイヤーの攻撃の直前に固定ダメ枠へ、 攻撃の後の分はターン最後の HP 同期 (踏みとどまりの clamp より前) で通す。
@@ -837,6 +854,9 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
          (回目はターンでは戻らず戦闘の中で上がる)。 振るかどうかは RerollPolicy が決める (null なら振り直さない)。
          予告は素の敵ダイス合計から仮組みして渡すので、 **完全情報のまま**判断できる (ADR-0009 柱3)。
          〈特別・対〉が前ターンに成立していれば次の N 回 (既定 2) が無料 (currentBuffs["roleFreeReroll"] = 回数)。
+         無料の回数と費用は CombatManager.FreeRerollsLeft / RerollCostNow(ctx, 個数, 回目) の 1 か所 (〈擦り切れた賽袋〉〈賽振り台〉・上の ⓪)。
+         〈万象のゾロ目〉(2026-11-21): 出目が決まった所 (OnPostRoll の後・配線の前・CombatManager.DecideOmniPair) で、 立つ役が 2 個そろいなら
+           確率 min(100%, 賽目 × 8%) (GameRng "role.omni") でこのターンそれをゾロ目として扱う (TerminalEnv.pairAsTriple・ResolveRoles の TerminalCards.UpgradePair)。
 
 配線 (端子の山札・ADR-0014・2026-11-11〜 これだけ)
          式の正本は TerminalCards.Resolve (盤面を書き換えない純粋な計算・BOT も同じ関数を写しの状態で呼ぶ)。
@@ -892,6 +912,12 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
                  〈常設の作業台〉山の常設を全部場へ (MovePermanentsToBoard)
               出来事で書く 2 品 (DeckItemEffects.cs): 〈焼き入れの挟み〉OnTerminalDispose で Kw.DamageEnemy(4 + 采配) /
                  〈灰払いの箒〉OnTerminalDispose で「次の撃の会心率」+= 采配 × 5% を積み、 OnCriticalCheck の本物の撃 (IsRealHit) で critRatePctAdd へ足して 0 に戻す (撃ごとに戻るのでその 1 撃だけ)
+           立つ役 (2026-11-21・段 1-f): 5. の頭で o.roleNow = TerminalCards.RoleOf(振った目, env) (0 = 立たない / 1 = 2 個そろい / 2 = ゾロ目か連なり)。
+              判定は ResolveRoles と同じ (YachtRoles.Evaluate・〈凶運〉で封じた役は立たない env.sealedRoleMask・〈万象のゾロ目〉の格上げ env.pairAsTriple)。
+              BOT の先読みの次のターンは引いた出目で決まる (格上げは見込まない)。
+              〈役落とし〉: 出目 + (役が立てば 賽目 × 3 (強化 × 4)・ゾロ目か連なりなら 2 倍) を攻撃に / 〈賽振り台〉: 充電 +出目・rerollDiscountNext += min(6 (強化 8), 賽目)
+           6d. 賽目の品 (旗は TerminalBattleState.roleItems・役が立ったターンだけ・攻撃 +N は 6c と同じく撃 1 つずつ):
+              〈見切りの木札〉各撃 +4・blockAdd += 4 / 〈符丁の刻み板〉各撃 + 賽目 × 2 (ゾロ目か連なりなら 2 倍)
          〈影写し〉〈火葬の剣〉〈保持器〉の対象: Resolve の wantTarget (人 = 画面で選んだ端子 / BOT = WiringPlan.targets)。
            候補 = 自分でない・常設でない・止まっていない・挿し方を直した後に出目が 1 個も無い手札の端子 (TerminalCards.IsCandidate)。 選ばない・候補でない時は左端の候補
          結果 (TerminalOutcome) の行き先:
@@ -946,6 +972,14 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
                             癒し (healAmount 2 / 6)
            富             … RunState.roleGoldBonusPct (+5% / +30%) を勝利報酬の割合先に掛ける (9 の面を持つ賽は今は無い)
          旧 T4 の固有効果のうち、 攻め=防御無視・守り=軽減分をシールド・時間=段階を攻撃・充電=超過を攻撃・癒し=超過をシールド・富=所持金を攻撃 は 2026-11-18 に無くなった。
+         同じターンに役の効果が 2 回働く時 (2026-11-21): 追撃は割合を足す (確定はどちらかがゾロ目なら)・守りは掛け合わせる (−40% を 2 回で −64%)・
+           特別・対の無料の振り直しは足す。 ほかはもともと足し算 (攻め・極・癒し・富・時間) か、 2 回でも同じ (封じ・充電のゾロ目)。
+         賽目の【規則】と締め (2026-11-21・段 1-f・所持は AxisRules.Owns):
+           〈万象のゾロ目〉: ゾロ目 (格上げも) の効果を 2 回 Apply
+           〈鏡合わせの盤〉: 2 個そろい (目 f) なら Pair(f − 1) の効果も Apply (役は立っていない ── firedRolesThisTurn・OnRoleFired・計装に数えない)。 f = 1 なら次のターンの無料の振り直し +1
+           〈宿命の刻み目〉: 立った役を ctx.accumulatedValues["role.fate"] に控え、 次のターンの ResolveRoles の頭でその効果を 1 回 Apply (数えない・万象の 2 回・鏡は掛けない)。
+              連なりは端子の解決の中の効果なので TerminalBattleState.fateDoubleNext → 次のターンの BeginTurn で doubleAll
+         役を適用した直後に出来事 OnRoleFired (量 = YachtRoles.Strength・2 個そろい 1 / ゾロ目・連なり 2)。 OnWired の前 = 品の攻撃 +N (mutualAttackBonus) と貫通は撃ごとに乗る。
 
 攻撃しないターン (攻撃端子 0 本 / 逃げる・2026-11-04 修正)
          atkBase = 0・追撃 0 に加えて、 ApplyWinDamageModifiers の後で **主攻撃 dealtDmg = 0・会心なし**。
