@@ -117,5 +117,16 @@ namespace ItemSystem.PassiveSkills
         OnKeptTerminalUse,
         /// <summary>補助の端子 (基本の〈時計〉を除く) を発動した (量 = 挿した出目の合計・最低 1)。 〈残響〉で 2 回働いても 1 回。</summary>
         OnSupportTerminalUse,
+        // ── 役とボスの出来事 (2026-11-21・段 1-f・item-overhaul-spec §2-2)。 どれも Kw.Raise で配る。
+        /// <summary>役が立った直後 (CombatManager.ResolveRoles・配線の解決の後・OnWired の前・量 = 強さ: 2 個そろい 1 / ゾロ目 2 / 連なり 2)。
+        /// 立った役は <see cref="CombatContext.firedRolesThisTurn"/> の最後。 〈鏡合わせの盤〉の重ねた効果・〈宿命の刻み目〉のもう 1 回では鳴らない (役が立ったのではない)。
+        /// ここで足す攻撃 +N (ctx.mutualAttackBonus) は撃ごとに乗る。</summary>
+        OnRoleFired,
+        /// <summary>ボスの目盛りを割ってダウンが決まった (量 = 割った目盛りの数)。 通常攻撃で割った (主攻撃・〈目盛り削りの鑿〉) か、 ひびの猶予が切れて割れたかは
+        /// <see cref="Keywords.Kw.BossDownCrackKey"/> (1 = ひび) で分ける。 通常攻撃の割れは撃の輪の中、 ひびの割れはターンの終わりに鳴る。</summary>
+        OnBossDown,
+        /// <summary>敵の大技を取り消した (量 = 1): ダウンがチャージか大技のターンに重なった (ターンの頭・CombatManager.BeginBossDownTurnCore) か、
+        /// 大技のターンに〈封じ・揃〉(端子の行動不能も) で敵が行動しなかった (敵の攻撃の解決)。</summary>
+        OnHeavyCanceled,
     }
 }
