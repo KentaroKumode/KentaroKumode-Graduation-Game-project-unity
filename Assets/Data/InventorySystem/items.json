@@ -3007,6 +3007,134 @@
       "axis": "役"
     },
     {
+      "id": "劇毒の火薬庫",
+      "name": "劇毒の火薬庫",
+      "description": "瘴気 5 以上の時、臨界が爆発するたび、敵の毒 +爆発のダメージ ÷ 10、その場で毒のダメージを 1 回与える",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "劇毒の火薬庫",
+      "axis": "毒"
+    },
+    {
+      "id": "血染めの歯車",
+      "name": "血染めの歯車",
+      "description": "血晶 5 以上の時、使い捨ての端子を使うたび、敵に 出血 × 2 の軽減不可ダメージ・出血 +采配",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "血染めの歯車",
+      "axis": "出血"
+    },
+    {
+      "id": "雷鳴のゾロ目",
+      "name": "雷鳴のゾロ目",
+      "description": "電流 5 以上の時、役が成立するたび充電 +賽目 × 2。ゾロ目なら、充電を払わずに 充電 × 2 の軽減不可ダメージ",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "雷鳴のゾロ目",
+      "axis": "充電"
+    },
+    {
+      "id": "必殺の照準器",
+      "name": "必殺の照準器",
+      "description": "心眼 5 以上の時、使い捨ての端子を使ったターンの攻撃はすべて会心になり、会心倍率 +采配 × 0.15",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "LEGENDARY",
+      "basePrice": 10,
+      "skill": "必殺の照準器",
+      "axis": "会心"
+    },
+    {
+      "id": "血濡れの符丁",
+      "name": "血濡れの符丁",
+      "description": "賽目 5 以上の時、役〈追撃〉か〈攻め〉が成立したターン、敵の出血を使わずに 出血 × 2 の軽減不可ダメージ",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "LEGENDARY",
+      "basePrice": 10,
+      "skill": "血濡れの符丁",
+      "axis": "役"
+    },
+    {
+      "id": "雷毒の導管",
+      "name": "雷毒の導管",
+      "description": "瘴気 5 以上の時、充電を払うたび、払った量の半分だけ敵に毒",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "雷毒の導管",
+      "axis": "毒"
+    },
+    {
+      "id": "渾身の柄頭",
+      "name": "渾身の柄頭",
+      "description": "攻撃の端子を 1 枚だけ挿したターン、その 1 撃の最終与ダメージ +25%・敵の防御を 8 無視する",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "skill": "渾身の柄頭",
+      "axis": "会心"
+    },
+    {
+      "id": "静寂の構え",
+      "name": "静寂の構え",
+      "description": "攻撃の端子に 1 つも挿さなかったターンの次のターン、最初の 1 撃の最終与ダメージ +50%",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "静寂の構え",
+      "axis": "シールド"
+    },
+    {
+      "id": "隙衝きの短槍",
+      "name": "隙衝きの短槍",
+      "description": "敵がチャージ中かダウン中のターン、与ダメージ +40%",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "BRONZE",
+      "basePrice": 7,
+      "skill": "隙衝きの短槍"
+    },
+    {
+      "id": "崩しの一手",
+      "name": "崩しの一手",
+      "description": "ボスの目盛りを割ってダウンさせたターン、次のターンの手札 +2 枚・充電 +10",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "skill": "崩しの一手"
+    },
+    {
+      "id": "大技殺しの楔",
+      "name": "大技殺しの楔",
+      "description": "ダウンか〈封じ〉で敵の大技を取り消したとき、敵に最大 HP の 10% の軽減不可ダメージ・シールド +15",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "大技殺しの楔"
+    },
+    {
+      "id": "逆境の砂時計",
+      "name": "逆境の砂時計",
+      "description": "エスカレーションの段階が 2 以上の間、ターン開始時にシールド +4・与ダメージ +25%",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "skill": "逆境の砂時計"
+    },
+    {
       "id": "鋲の胸当て",
       "name": "鋲の胸当て",
       "description": "ターン開始時、シールド +1",

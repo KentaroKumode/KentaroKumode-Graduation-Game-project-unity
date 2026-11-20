@@ -88,6 +88,14 @@ namespace CombatSystem
             return Escalation.IsHeavyTurn(currentEnemy, turn) || Escalation.IsChargeTurn(currentEnemy, turn);
         }
 
+        /// <summary>このターン敵がチャージ中 (大技の前で攻撃しない・天与の盾と指輪も) かダウン中か (〈隙衝きの短槍〉が配線の後に読む・2026-11-21)。
+        /// 予告の「チャージ」の印 (<see cref="FillDownTelegraph"/>)・敵の攻撃の解決の「攻撃しない」の枝と同じ判定。</summary>
+        public bool EnemyChargingOrDownNow(int turn)
+        {
+            if (currentEnemy == null || enemyHP <= 0) return false;
+            return _down.downNow || Escalation.IsChargeNoAttack(currentEnemy, turn) || TenyoHeavy.NoAttackAt(currentEnemy, turn);
+        }
+
         /// <summary>〈柱折りの発破筒〉(2026-11-20): 次に割る目盛りを <paramref name="add"/> (HP) だけ上げる。 今の HP より上へは行かない (今の HP の 1 下まで ── 割るには通常攻撃が要る)。
         /// 目盛りの無い敵では何もしない。 ターンの解決中は CombatManager の手元の HP、 それ以外は ctx の HP の低い方を今の HP とみなす。</summary>
         public void RaiseBossNextNotch(int add)
