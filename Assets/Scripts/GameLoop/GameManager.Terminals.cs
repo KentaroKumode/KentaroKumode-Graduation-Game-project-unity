@@ -17,7 +17,9 @@ namespace GameLoop
         {
             if (Run == null) return;
             if (boss && Run.currentFloor > TerminalBossRewardLastFloor) return;
-            int n = (boss ? TerminalChoicesBoss : elite ? TerminalChoicesElite : TerminalChoicesNormal) + Run.terminalExtraChoices;
+            // 0 層の試練の木箱 (2026-11-20・docs/system-overhaul-spec.md §4-4) は 3 択 (エリートと同じ数)
+            bool farm = Run.Depth == MapSystem.FreeMove.FloorPlan.FarmFloor;
+            int n = (boss ? TerminalChoicesBoss : elite || farm ? TerminalChoicesElite : TerminalChoicesNormal) + Run.terminalExtraChoices;
             Run.terminalExtraChoices = 0;
             var offer = RollTerminalReward(Run, n, boss);
             if (offer.Count == 0) return;

@@ -109,15 +109,14 @@ namespace MapSystem.FreeMove
             return L;
         }
 
-        /// <summary>0 層 (ファーム層・2026-11-05) の直線のマップ。 乱数を使わない固定の 1 本道:
-        /// 前哨基地 → 秘宝 → 戦闘 → 戦闘 → 戦闘 → ショップ → ボス。 点の添字は始点 = 0・終点 = 1 の約束 (0, 2, 3, 4, 5, 6, 1)。
-        /// 山岳・追跡者・天候・〈門〉は無い。</summary>
+        /// <summary>0 層 (ファーム層・2026-11-05) の直線のマップ。 乱数を使わない固定の 1 本道 (2026-11-20 に 5 つの点へ・docs/system-overhaul-spec.md §4-4):
+        /// 前哨基地 → 試練の木箱 (戦闘) → 支給の秘宝 (秘宝 3 択) → 倉庫の仕入れ (店) → 試運転のボス。 点の添字は始点 = 0・終点 = 1 の約束 (0, 2, 3, 4, 1)。
+        /// 旧: 前哨基地 → 秘宝 → 戦闘 ×3 → ショップ → ボス (HP 100)。 山岳・追跡者・天候・〈門〉は無い。</summary>
         private static FreeMapLayout GenerateFarm(int floor)
         {
             const double W = FreeMapParams.Width, H = FreeMapParams.Height;
-            var order = new[] { 0, 2, 3, 4, 5, 6, 1 };
-            var types = new[] { TileType.Outpost, TileType.Treasure, TileType.Battle, TileType.Battle,
-                                TileType.Battle, TileType.Shop, FloorPlan.GoalType(floor) };
+            var order = new[] { 0, 2, 3, 4, 1 };
+            var types = new[] { TileType.Outpost, TileType.Battle, TileType.Treasure, TileType.Shop, FloorPlan.GoalType(floor) };
             int n = order.Length;
             var L = new FreeMapLayout { floor = floor, start = 0, goal = 1, pos = new Vec2[n], types = new TileType[n], adj = new List<int>[n] };
             for (int i = 0; i < n; i++) L.adj[i] = new List<int>();

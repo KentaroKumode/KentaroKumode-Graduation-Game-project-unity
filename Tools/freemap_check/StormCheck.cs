@@ -225,7 +225,7 @@ static partial class T
         // ── 1. 口を閉じた形 (storm = false) は main の生成器と 1 点も変わらない・乱数の引く回数も同じ ──
         {
             int layers = 0, diff = 0, drawDiff = 0; string firstDiff = null;
-            foreach (int floor in new[] { 0, 1, 3, 5, 6, 7 })
+            foreach (int floor in new[] { 1, 3, 5, 6, 7 })   // 深さ 0 は 2026-11-20 に 5 つの点へ作り直した (参照の版とは違って当然)
                 for (int salt = 1; salt <= N(5000, 1500); salt++)
                 {
                     // 深さ 6 は 2 つの形: ふだん (固定の点なし・main とは隣の点の種別だけ違ってよい) と、 イベントなしの測定 (固定の点・main と 1 点も変わらない)
@@ -419,6 +419,14 @@ static partial class T
                 ok &= q;
             }
             Check(ok, $"嵐: 深さ 0/7 に嵐も天候も無い (始点は左端・ボスは見える)・深さ 6 は手番 0 からフェーズ 1・深さ 1/3/5 は {FreeMapParams.StormQuietTurns} 手番の静かな時間のあとフェーズ 1 (段の変わり目を知らせる)");
+            // 0 層 (2026-11-20): 前哨基地 → 戦闘 → 秘宝 → 店 → ボスの 1 本道
+            {
+                var Lf = FreeMapGenerator.Generate(0, false, true);
+                var want = new[] { TileType.Outpost, TileType.Battle, TileType.Treasure, TileType.Shop, TileType.Boss };
+                var got = new List<TileType>(); int cur = Lf.start, prev = -1;
+                for (int g = 0; g < 10; g++) { got.Add(Lf.types[cur]); int nx = -1; foreach (int v in Lf.adj[cur]) if (v != prev) { nx = v; break; } if (nx < 0) break; prev = cur; cur = nx; }
+                Check(Lf.Count == 5 && cur == Lf.goal && got.SequenceEqual(want), $"0 層: 5 つの点の 1 本道 ({string.Join(" → ", got)})");
+            }
         }
 
         // ── 6. 嵐の HP・種類 (雹・砂・雪)・近道・待つ ──

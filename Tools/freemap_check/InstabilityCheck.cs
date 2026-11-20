@@ -140,7 +140,7 @@ static partial class T
         // ── 1. 手番の時計は storm-boss と 1 点も変わらない: 嵐の層の生成・乱数の引く回数 ──
         {
             int layers = 0, diff = 0, drawDiff = 0; string firstDiff = null;
-            foreach (int floor in new[] { 0, 1, 3, 5, 6, 7 })
+            foreach (int floor in new[] { 1, 3, 5, 6, 7 })   // 深さ 0 は 2026-11-20 に 5 つの点へ作り直した (参照の版とは違って当然)
                 for (int salt = 1; salt <= N(3000, 1000); salt++)
                 {
                     GameLoop.GameRng.Salt = (ulong)salt * 7919; GameLoop.GameRng.Draws.Clear();
