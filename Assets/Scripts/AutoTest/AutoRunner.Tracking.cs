@@ -504,7 +504,8 @@ namespace AutoTest
                 _cur.appliedChallengeScore = CurrentChallengeScore();   // 難易度 × 5 (2026-11-10)
                 _cur.finalInventoryPower = InventoryPower.Compute(run);
                 _cur.finalMaterials = run.weaponMaterials;
-                _cur.finalUpgradeCost = GameManager.CanSpendMaterials(run)
+                //   武器の強化の値段 (2026-11-20〜 CanSpendMaterials は端子の強化でも true になるので、 武器の強化先の有無で見る)
+                _cur.finalUpgradeCost = GameManager.WeaponUpgradeCost(run) != int.MaxValue
                     ? GameManager.WeaponUpgradeCost(run) : -1;
                 _cur.finalUpgradeReady = _cur.finalUpgradeCost > 0
                     && run.weaponMaterials >= _cur.finalUpgradeCost;

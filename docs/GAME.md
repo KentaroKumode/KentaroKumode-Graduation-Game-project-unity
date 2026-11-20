@@ -909,6 +909,11 @@ A = 崩れ始めたら終点へ / B = 輪の中で粘る（行って終点まで
 - **報酬**: 勝った戦闘の後に、通常戦 2 択・エリート 3 択・層ボスはレア 3 択（1〜4 層のボスだけ）から 1 枚を山札に加えるか、受け取らない
   （`GameManager.OfferTerminalReward`）。軸の端子はその軸の品を持っているほど出やすい。
 - **店と休憩**: 店に端子の棚（3 枚・レアも混ざる）と「山札から 1 枚抜く」（店で抜くたびに値段が上がる）。休憩は回復の代わりに 1 枚抜ける。
+  休憩の**「端子を強化する」**（2026-11-20・数値は仮）: 素材を払って、山札の端子 1 枚（強化できる端子）を強化した端子（下の「＋」）に差し替える。
+  値段は 1 回目 4・以後 1 回ごとに +2（このランの間・`GameManager.TerminalUpgradeCost` / `RunState.terminalUpgrades`）。休憩の行動は 1 マス 1 回（回復・鍛える・抜く・強化から 1 つ）。
+  素材の使い道に数える（`GameManager.CanSpendMaterials` = 武器を強化できる、または強化できる端子が山札にある）。
+  BOT（最小限の規則・`AutoRunner.Step` の休憩）: 武器の強化の判断を先に通し、武器を強化できない時に、HP が十分（HP の理由で回復を選んでいない）で素材が足りれば、
+  山札の強化できる端子のうち報酬の点（`RewardBaseScore`）が最も高い 1 枚を強化する（`TryRestUpgradeTerminal`）。
   山札が手札の枚数を下回る抜き方はできない（`GameManager.Terminals`・数値は仮）。
 - **強化した端子（＋）**（2026-11-20・作者承認・数値は未測定）: 名前の後ろに全角の「＋」が付いた**別の端子**（例: 〈攻撃＋〉・id = 表示名）。
   基の端子の定義を写して、表の分だけ変えて作る（`TerminalCards.MakeUpgraded`・強化後の説明文は `TerminalCards.UpgradedText`・数値は `*Up` の定数）。
@@ -3770,7 +3775,7 @@ OfferPassives / TradePassive / ForgeWeapon / NextShopDiscount / NextRestBonus /
 | `パッシブを差し出して替える` | 交換マスと同じ取り替え（いちばん段の低いパッシブ → 上の段のパッシブ） | `GameManager.TradeLowestPassive`（交換マスもここを通す） |
 | `武器を鍛える` | 休憩の「鍛える」と同じ 1 段の強化。**素材は通常どおり払う**（ダイス強化への切り替えはしない） | `GameManager.TryUpgradeWeapon` |
 | `次の店の値段-N%` | 次に入る店の全価格に (1 − N/100) を掛ける。重ねたら掛け合わせ（上限で止めない形） | `RunState.nextShopPriceMul` → `ShopManager.Generate` |
-| `次の休憩の回復+N%` | 次に休憩で**回復する**時、回復量に最大 HP の N% を足す（鍛える・面を外す・山札から抜くを選んだ休憩では残る）。重ねたら足し合わせ | `RunState.nextRestHealBonusPct` → `GameManager.TakeRestHealBonus` |
+| `次の休憩の回復+N%` | 次に休憩で**回復する**時、回復量に最大 HP の N% を足す（鍛える・面を外す・山札から抜く・端子を強化するを選んだ休憩では残る）。重ねたら足し合わせ | `RunState.nextRestHealBonusPct` → `GameManager.TakeRestHealBonus` |
 
 - **航行の効果はターン+N と同じ口**: 選んだ瞬間ではなく、イベントを閉じて地図へ戻った時に `GameManager.PassEventTurns` が
   **航行の効果 → ターンの順**で適用する（「ターン+1,追跡者を撒く」は撒いてから時間が過ぎる）。航行マップの無い層・戦闘になった選択肢では捨てる。
