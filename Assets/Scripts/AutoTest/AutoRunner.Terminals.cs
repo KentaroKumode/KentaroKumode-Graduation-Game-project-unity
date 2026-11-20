@@ -77,7 +77,7 @@ namespace AutoTest
 
         /// <summary>端子の結果を、 効用の入力 (端子ごとの合計と個数 + 追加の効果 + 先の得) へ詰め直す。 盤面は読まない。</summary>
         private WiredSums DeckSums(in OptimalTurnState s, int[] rolls, List<string> board, TerminalOutcome o,
-                                   TerminalBattleState before, TerminalBattleState after, in TerminalEnv env, bool deckHasCounter)
+                                   TerminalBattleState before, TerminalBattleState after, in TerminalEnv env, float counterPerFire)
         {
             int k = rolls.Length;
             var ws = WiredSums.None();
@@ -124,7 +124,7 @@ namespace AutoTest
             // 〈打ち直し〉が発動した: この戦闘中の出目 +1 (個数 × 残りターン・攻撃に挿す割合を 7 割と見る)
             flat += (after.foundryBonus - before.foundryBonus) * k * turns * DeckFutureAttackShare * dw;
             // エスカレーションの段階を戻す (〈氷結瓶〉・溜まり切った〈鎮静香〉)
-            if (o.retreatStage) flat += DeckRetreatTurns * escDelayWorth;
+            flat += o.retreatStage * DeckRetreatTurns * escDelayWorth;
             // 次のターンの補助
             if (after.ignoreCondNext && !before.ignoreCondNext) flat += DeckPreheatDmg * dw;
             flat += Math.Max(0, after.extraDrawNext - before.extraDrawNext) * DeckDrawDmg * dw;
@@ -134,9 +134,9 @@ namespace AutoTest
             // 別枠のダメージ
             flat += (o.poison * DeckPoisonDmg + o.heat * DeckHeatDmg) * dw;
             if (o.attackDice > 0) flat += o.bleedOnHit * DeckBleedDmg * dw;
-            // 〈柔軟な戦略〉: 基本以外の発動 1 回 = 与ダメ +(10% ÷ 10 回) を残りターンずっと (山札に入っている時だけ効く・本体 DrawTerminalHand)
-            if (deckHasCounter)
-                flat += o.firedNonBasic * (TerminalCards.CounterPct / TerminalCards.CounterEvery) * DeckPerTurnDamage(in s, k) * turns * dw;
+            // 〈柔軟な戦略〉: 基本以外の発動 1 回 = 与ダメ +(10% ÷ 10 回) を、 残りターンのうち〈柔軟な戦略〉を引いたターンだけ (本体 DrawTerminalHand・2026-11-20〜 引いた時だけ効く)
+            if (counterPerFire > 0f)
+                flat += o.firedNonBasic * counterPerFire * DeckPerTurnDamage(in s, k) * turns * dw;
             // 手札の操作 (対象は ChooseDeckTargets が選んだ端子・選ばなければ左端の候補)。 2026-11-12: この戦闘で山札を引く回数から値付けする。
             //   旧: 定数 (影写し 6 / 火葬の剣 6 × 未来の与ダメの価値) で、 使い捨ての費用 (HP 3) をほぼ超えず、 発動率が 0.1〜0.2% だった。
             //   引く回数 = 残りターン × 手札 ÷ 山札の残り (この戦闘で同じ 1 枚をあと何回引くか・残りターンで頭打ち)。
@@ -185,10 +185,8 @@ namespace AutoTest
 
             // ---- 撃破のボーナス (今ターン撃破した時だけ Core が足す) ----
             float kill = 0f;
-            if (o.Fired(board, TerminalIds.Harvester)) kill += TerminalCards.HarvesterMaxHp * DeckKillMaxHpWorth;
-            if (o.Fired(board, TerminalIds.Whet))      kill += TerminalCards.WhetGain * DeckKillWhetWorth;
-            if (o.Fired(board, TerminalIds.LootBox))   kill += TerminalCards.LootGold * DeckKillGoldWorth;
-            if (o.Fired(board, TerminalIds.Stripper))  kill += TerminalCards.StripperChoices * DeckKillExtraChoiceWorth;
+            //   量は端子の結果が持つ (〈残響〉の 2 回目も入る・本体の FinishTerminalTurn と同じ値)
+            kill += o.killMaxHp * DeckKillMaxHpWorth + o.killWhet * DeckKillWhetWorth + o.killGold * DeckKillGoldWorth + o.killChoices * DeckKillExtraChoiceWorth;
             ws.killBonus = kill * hpUnit;
             return ws;
         }
@@ -371,7 +369,19 @@ namespace AutoTest
             public List<string> board;
             public TerminalDeckState deck;
             public RunState run;
-            public bool deckHasCounter;
+            /// <summary>〈柔軟な戦略〉: 基本以外の発動 1 回が先のターンの与ダメ% に足す見込み (<see cref="CounterPerFire"/>)。 0 = 山札に無い。</summary>
+            public float counterPerFire;
+        }
+
+        /// <summary>〈柔軟な戦略〉: 基本以外の発動 1 回あたり、 先の 1 ターンの与ダメ% に足す見込み = (% ÷ 回数) × 引く見込み。
+        /// 〈柔軟な戦略〉は引いたターンだけ効く (本体 DrawTerminalHand・2026-11-20〜)。
+        /// shortcut: 引く見込みは 手札 ÷ 山札の枚数 (1 枚あたり・上限 1) の粗い近似。 見積もりの精度が要るなら山・捨て札の残りから数える。</summary>
+        private static float CounterPerFire(RunState run)
+        {
+            var deck = run?.terminalDeck;
+            if (deck == null || deck.Count == 0) return 0f;
+            float share = Math.Min(1f, TerminalCards.HandSize / (float)deck.Count);
+            return deck.Contains(TerminalIds.Counter) ? TerminalCards.CounterPct / TerminalCards.CounterEvery * share : 0f;
         }
 
         /// <summary>今の盤面から <see cref="DeckEval"/> を組む (読むだけ)。 山札で戦っていない時は呼ばないこと。</summary>
@@ -385,7 +395,7 @@ namespace AutoTest
                 deck = cm.TerminalDeck, board = cm.TerminalDeck.board, run = run,
                 env = cm.TerminalEnvNow(ctx, tele.enemyAttackValue),
                 st = BuildOptimalTurnState(rolls, tele),
-                deckHasCounter = run?.terminalDeck != null && run.terminalDeck.Contains(TerminalIds.Counter),
+                counterPerFire = CounterPerFire(run),
             };
             _recallPrefer = RecallPreferFor(tele);   // [#141] 〈有効活用〉の当て (方策 Planned の時だけ・それ以外は null = 今までの選び方)
             // 会心の効果 (〈致命の一撃〉〈一閃〉〈弱点看破〉) を旧の式でも見積もれるよう、 会心率と倍率は常に読む (readOut の切り替えは変えない)
@@ -410,7 +420,7 @@ namespace AutoTest
                 after = ev.deck.state.Clone();
                 o = TerminalCards.Resolve(ev.board, cand, rolls, ev.env, after, tgts);
             }
-            var ws = DeckSums(in ev.st, rolls, ev.board, o, ev.deck.state, after, in ev.env, ev.deckHasCounter);
+            var ws = DeckSums(in ev.st, rolls, ev.board, o, ev.deck.state, after, in ev.env, ev.counterPerFire);
             return OptimalUtilityCore(in ev.st, rolls.Length, in ws, out outc);
         }
 
@@ -1013,7 +1023,7 @@ namespace AutoTest
         private float EvalWithGold(in DeckEval ev, int[] rolls, TerminalOutcome o, TerminalBattleState after, int gold, out OptimalTurnOutcome outc)
         {
             var st = GoldPunchState(in ev.st, gold);
-            var ws = DeckSums(in st, rolls, ev.board, o, ev.deck.state, after, in ev.env, ev.deckHasCounter);
+            var ws = DeckSums(in st, rolls, ev.board, o, ev.deck.state, after, in ev.env, ev.counterPerFire);
             return OptimalUtilityCore(in st, rolls.Length, in ws, out outc);
         }
 
@@ -1283,7 +1293,7 @@ namespace AutoTest
                 var o = TerminalCards.Resolve(board, w, dice, env, after);
                 var tg = ChooseDeckTargets(board, o, ev.run, _recallPrefer);
                 if (tg != null) { after = state.Clone(); o = TerminalCards.Resolve(board, w, dice, env, after, tg); }
-                var ws = DeckSums(in ns, dice, board, o, state, after, in env, ev.deckHasCounter);
+                var ws = DeckSums(in ns, dice, board, o, state, after, in env, ev.counterPerFire);
                 if (ws.aCount > 0) anyAttack = true;
                 sums.Add(ws);
                 float u = OptimalUtilityCore(in ns, k, in ws, out _);
