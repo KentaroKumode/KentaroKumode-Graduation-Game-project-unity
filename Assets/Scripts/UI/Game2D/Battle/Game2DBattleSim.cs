@@ -544,12 +544,16 @@ namespace UI.Game2D.Battle
             for (int j = 0; j < slot.Length; j++) if (j != i && slot[j] == s) used++;
             if (used >= d.capacity) return false;
             if (d.chargeCost > 0 && env.charge < d.chargeCost) return false;
-            if (board[s] == TerminalIds.BigDischarge && env.charge <= 0) return false;
+            if (d.baseId == TerminalIds.BigDischarge && env.charge <= 0) return false;
             if (st.ignoreCond) return true;
-            // 〈号令の剣〉: 他の出目が号令の剣に挿さっていれば、 その数だけ +1
+            // 〈号令の剣〉: 他の出目が号令の剣に挿さっていれば、 その数だけ +1 (強化した〈号令の剣＋〉は挿した出目も +1・TerminalCards.Resolve の 1.)
             int v = dice[i];
             for (int j = 0; j < slot.Length && j < dice.Length; j++)
-                if (j != i && slot[j] >= 0 && slot[j] < board.Count && board[slot[j]] == TerminalIds.Grinder) v++;
+            {
+                var gj = slot[j] >= 0 && slot[j] < board.Count ? TerminalCards.Get(board[slot[j]]) : null;
+                if (gj != null && gj.baseId == TerminalIds.Grinder && j != i) v++;
+            }
+            if (d.baseId == TerminalIds.Grinder && d.upgraded) v++;
             switch (d.cond)
             {
                 case TerminalCond.SameElsewhere:

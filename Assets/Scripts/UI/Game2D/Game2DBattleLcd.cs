@@ -597,7 +597,9 @@ namespace UI.Game2D
         /// まだ絵は 1 枚も取り込んでいない (見本の「諸刃の剣」は Captures の中だけ)。 無ければ null = 端子のマークを窓の中央に置く。</summary>
         public static Color32[] CardArt(string id)
         {
-            if (string.IsNullOrEmpty(id) || _noArt.Contains(id)) return null;
+            if (string.IsNullOrEmpty(id)) return null;
+            id = TerminalCards.BaseOf(id);      // 強化した端子は基の端子と同じ絵 (2026-11-20)
+            if (_noArt.Contains(id)) return null;
             if (_art.TryGetValue(id, out var a)) return a;
             var t = Resources.Load<Texture2D>("Game2DCardArt/" + id);
             var src = t != null ? KitSrc.From(t.isReadable ? t : null) : null;
