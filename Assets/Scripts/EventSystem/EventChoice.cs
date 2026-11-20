@@ -249,6 +249,7 @@ namespace EventSystem
                 weaponFamily = run != null ? GameLoop.GameManager.WeaponFamilyOf(run) : null,
                 provision = run != null ? run.provision : 0,
                 axisCount = run != null ? (axis => GameLoop.GameManager.AxisCountOf(run, axis)) : (System.Func<string, int>)null,
+                canRemoveTerminal = run != null && GameLoop.GameManager.CanRemoveTerminalOf(run),
             };
             var gm = GameLoop.GameManager.Instance;
             if (run == null || gm == null || !ReferenceEquals(gm.Run, run)) return s;

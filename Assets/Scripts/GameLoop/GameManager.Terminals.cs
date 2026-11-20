@@ -25,7 +25,10 @@ namespace GameLoop
             Run.terminalExtraChoices = 0;
             var offer = RollTerminalReward(Run, n, boss);
             if (offer.Count == 0) return;
+            // イベントの「端子をNつから選ぶ」を人が選ぶ前に戦闘になった (「…, 戦闘に突入」) なら、 その提示は戦闘の報酬の後へ回す (消さない)
+            if (Run.pendingTerminalOffer.Count > 0) PendingEventTerminalOffers.Insert(0, Run.pendingTerminalOffer);
             Run.pendingTerminalOffer = offer;
+            TerminalOfferFromEvent = false;
             TerminalDiag.NoteOffer(boss ? TerminalDiag.SceneBoss : elite ? TerminalDiag.SceneElite : TerminalDiag.SceneNormal, offer);   // [計装 #106]
             if (GameHooks.ChooseTerminalReward == null && Loadout.HumanPlaying) return;      // 人: 画面が出す
             ResolveTerminalReward(GameHooks.ChooseTerminalReward?.Invoke(offer) ?? 0);
@@ -44,7 +47,86 @@ namespace GameLoop
                 Log($"端子を山札に加えた: {id} (山札 {Run.terminalDeck.Count} 枚)");
             }
             Run.pendingTerminalOffer.Clear();
+            TerminalOfferFromEvent = false;
+            // 預かっているイベントの提示があれば、 次はそれを出す
+            if (PendingEventTerminalOffers.Count > 0)
+            {
+                Run.pendingTerminalOffer = PendingEventTerminalOffers[0];
+                PendingEventTerminalOffers.RemoveAt(0);
+                TerminalOfferFromEvent = true;
+            }
         }
+
+        // =====================================================================
+        //  イベントの「端子をNつから選ぶ」「山札から端子を抜く」(2026-11-21・docs/system-overhaul-spec.md §2-2)
+        // =====================================================================
+
+        /// <summary>今の提示 (<see cref="RunState.pendingTerminalOffer"/>) がイベントから来たか (画面の題と、 戦闘の不安定化の行を出さないため)。</summary>
+        public bool TerminalOfferFromEvent { get; private set; }
+
+        /// <summary>人が選ぶ前に別の提示が出ていたイベントの提示 (先頭から順に <see cref="RunState.pendingTerminalOffer"/> へ移す)。</summary>
+        public readonly List<List<string>> PendingEventTerminalOffers = new List<List<string>>();
+
+        /// <summary>人が地図へ戻ってから抜く端子を選ぶ、 イベントの「山札から端子を抜く」の数。</summary>
+        public int PendingEventTerminalRemovals { get; private set; }
+
+        /// <summary>イベントの提示の候補を n 枚引く。 rare = レアから / それ以外 = 基本でもレアでもない端子から (戦闘の報酬の通常 / 層ボスと同じ絞り方・軸の寄せ方も同じ)。
+        /// 乱数は専用のキー "event.terminal" (戦闘の報酬の "terminal.reward" の列を動かさない)。</summary>
+        public static List<string> RollEventTerminals(RunState run, int n, bool rare)
+            => RollTerminals(run, n, d => d.rare == rare, 1f, "event.terminal");
+
+        /// <summary>イベントの端子の提示を受ける。 BOT (<see cref="GameHooks.ChooseTerminalReward"/>・戦闘の報酬と同じ点・負 = 受け取らない) はこの場で決め、
+        /// 加えた端子の名前 (加えなければ "") を返す。 人は戦闘の報酬と同じ画面へ預けて null を返す。</summary>
+        public string OfferEventTerminals(List<string> offer)
+        {
+            if (Run == null || offer == null || offer.Count == 0) return "";
+            if (GameHooks.ChooseTerminalReward == null && Loadout.HumanPlaying)
+            {
+                if (Run.pendingTerminalOffer.Count > 0) PendingEventTerminalOffers.Add(offer);
+                else { Run.pendingTerminalOffer = offer; TerminalOfferFromEvent = true; }
+                return null;
+            }
+            int pick = GameHooks.ChooseTerminalReward?.Invoke(offer) ?? 0;
+            if (pick < 0 || pick >= offer.Count) { Log("イベント: 端子は山札に加えなかった"); return ""; }
+            Run.terminalDeck.Add(offer[pick]);
+            MetaProgression.Achievements.AchievementService.NoteTerminalDeck(Run);   // 実績〈紙の城〉
+            Log($"イベント: 端子を山札に加えた: {offer[pick]} (山札 {Run.terminalDeck.Count} 枚)");
+            return offer[pick];
+        }
+
+        /// <summary>イベントの「山札から端子を抜く」を受ける。 BOT (<see cref="GameHooks.ChooseTerminalRemoval"/>・負 = 抜かない・無ければ抜かない) はこの場で抜き、
+        /// 抜いた端子の名前 (抜かなければ "") を返す。 人は地図へ戻った時の画面へ預けて null を返す。 抜けない (山札が下限) なら "" (呼ぶ側が先に確かめる)。</summary>
+        public string OfferEventTerminalRemoval()
+        {
+            if (!CanRemoveTerminal) return "";
+            if (GameHooks.ChooseTerminalRemoval == null && Loadout.HumanPlaying) { PendingEventTerminalRemovals++; return null; }
+            int at = GameHooks.ChooseTerminalRemoval?.Invoke(Run.terminalDeck) ?? -1;
+            return RemoveTerminalForEvent(at) ?? "";
+        }
+
+        /// <summary>預かっている「山札から端子を抜く」を 1 つ閉じる (地図の画面から呼ぶ)。 deckIndex が負 = 抜かない。 抜けない添字なら false (預かりは残る)。</summary>
+        public bool ResolveEventTerminalRemoval(int deckIndex)
+        {
+            if (Run == null || PendingEventTerminalRemovals <= 0) return false;
+            if (deckIndex >= 0 && RemoveTerminalForEvent(deckIndex) == null) return false;
+            if (deckIndex < 0) Log("イベント: 山札から端子は抜かなかった");
+            PendingEventTerminalRemovals--;
+            return true;
+        }
+
+        /// <summary>イベントで山札の deckIndex 枚目を抜く (下限は休憩・店と同じ)。 抜いた端子の名前・抜けなければ null。
+        /// 〈研ぎ代の領収書〉(店・休憩で抜くたび) には数えない。</summary>
+        private string RemoveTerminalForEvent(int deckIndex)
+        {
+            if (!CanRemoveTerminal || deckIndex < 0 || deckIndex >= Run.terminalDeck.Count) return null;
+            string id = Run.terminalDeck[deckIndex];
+            Run.terminalDeck.RemoveAt(deckIndex);
+            Log($"イベント: 山札から抜いた: {id} (山札 {Run.terminalDeck.Count} 枚)");
+            return id;
+        }
+
+        /// <summary>イベントの預かり (提示・抜く) を空にする (ランの始め)。</summary>
+        private void ClearEventTerminalPending() { PendingEventTerminalOffers.Clear(); PendingEventTerminalRemovals = 0; TerminalOfferFromEvent = false; }
 
         /// <summary>報酬の候補を重ならないように n 個引く。 boss = レアから / それ以外 = 基本でもレアでもない端子から。
         /// 軸の端子は、 その軸の品を持っているほど出やすい (持っていなければ出にくい)。</summary>
@@ -153,7 +235,10 @@ namespace GameLoop
         }
 
         /// <summary>山札から抜ける (抜いても手札の枚数を下回らない)。</summary>
-        public bool CanRemoveTerminal => Run?.terminalDeck != null && Run.terminalDeck.Count > TerminalCards.MinDeckSize;
+        public bool CanRemoveTerminal => CanRemoveTerminalOf(Run);
+
+        /// <summary>同上 (ランを渡す版・イベントの「山札から端子を抜く」が選べるかの判定も読む)。</summary>
+        public static bool CanRemoveTerminalOf(RunState run) => run?.terminalDeck != null && run.terminalDeck.Count > TerminalCards.MinDeckSize;
 
         /// <summary>店で山札から 1 枚抜く値段 (店で抜くたびに上がる)。 整備パネル〈圧縮の心得〉ならランで最初の 1 回は 0 (2 回目からは今までどおり 2 回目の値段)。</summary>
         public int TerminalRemovePrice

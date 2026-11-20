@@ -3840,7 +3840,8 @@ ObservatoryTakeCopy / **TurnsPass（ターン+N）** / Probability（確率分�
 （2026-11-12 追加）RevealMap / RevealEncounters / RevealSupplies / ShakeOffPursuer / PushPursuer / PullPursuer / Shortcut / ShiftFront /
 OfferPassives / TradePassive / ForgeWeapon / NextShopDiscount / NextRestBonus /
 （2026-11-13 追加）VescaClockTake（`止まらない時計を預かる`・〈さびれた観測所・再訪・写し〉専用・下の「さびれた観測所」）/
-（2026-11-20 追加）DieRoll / Requirement / OfferDieSwap / OfferAxisPassives（下の「装備・偏重とつながる効果」）
+（2026-11-20 追加）DieRoll / Requirement / OfferDieSwap / OfferAxisPassives（下の「装備・偏重とつながる効果」）/
+（2026-11-21 追加）OfferTerminals / RemoveTerminal（下の「端子の山札とつながる効果」）
 
 - 確率分岐（「N%でA、N%でB」）の**前に書いた効果は全分岐に共通**（例 `ターン+1,50%でA、50%でB`）。2026-11-11 まではここが黙って捨てられていた。
 
@@ -3860,6 +3861,18 @@ OfferPassives / TradePassive / ForgeWeapon / NextShopDiscount / NextRestBonus /
 - **12 件の振り分け**（item-overhaul-spec.md §12-3・作者承認）: 賽ロール = 崩落した橋「強引に渡る」4・水底の鐘「水底へ潜って取る」4・放棄された補給基地「奥の倉庫をこじ開ける」4・毒見の依頼「受ける」5（50% の 2 つの結果を成功・失敗に当てた）。
   確定の道（元の選択肢は残す）= 死人の宴「毒に馴染んだ舌で平らげる」（`条件[偏重[毒,3]]`・物資 +4 だけ）・理不尽な落石「盾で受け止める」（`条件[武器[盾]]`・素材 +1）・埋蔵金の手がかり「斧で土を割って掘る」（`条件[武器[斧]]`・ターン +1 で同じ 3 つの結果）。
   博打のまま = 陥没・熱泉・呪われた泉。変えない = 帰郷・幸運な落とし物。
+
+#### 端子の山札とつながる効果（2026-11-21・docs/system-overhaul-spec.md §2-2・未測定）
+
+| 書き方 | 効果 | 実装 |
+|---|---|---|
+| `端子をNつから選ぶ` / `レアの端子をNつから選ぶ` | 戦闘の報酬と同じ形で端子を N 枚引いて見せ、1 枚を山札に加える（加えなくてもよい）。通常 = 基本でもレアでもない端子から・レア = レアから（報酬の通常 / 層ボスと同じ絞り方・軸の端子は偏重で寄せる）。乱数のキーは `event.terminal`（戦闘の報酬の列を動かさない）。人は戦闘の報酬と同じ画面（題は「端子を選ぶ」・戦闘の不安定化の行は出さない）、BOT は `GameHooks.ChooseTerminalReward`（戦闘の報酬と同じ点・足切り）。人が選ぶ前に戦闘になったら、その提示は戦闘の報酬の後に出す。不安定化は秘宝でない持ち物の +1 | `GameManager.RollEventTerminals` → `OfferEventTerminals` |
+| `山札から端子を抜く` | 休憩と同じ山札の一覧で 1 枚抜く（抜かなくてもよい）。山札が `TerminalCards.MinDeckSize` 枚以下なら選べない（理由「山札をこれ以上減らせない」）。人は地図へ戻った時の画面、BOT は `GameHooks.ChooseTerminalRemoval`（店・休憩で抜く時と同じ規則 `PruneTarget`・抜く端子が無ければ抜かない）。〈研ぎ代の領収書〉（店・休憩で抜くたび）には数えない。不安定化は数えない | `GameManager.OfferEventTerminalRemoval` |
+
+- **`山札の端子を複製する` は作らない**（作者が休憩の複製を「強すぎる」として退けたのと同じ理由・2026-11-21）。
+- **BOT の値付け**（`EventChoiceScorer`）: 端子をNつから選ぶ = その絞り方の端子全部の素の点（`AutoRunner` の端子の報酬の素の点・`EventChoiceScorer.TerminalPoints`）の平均 × 点 1 の値段（店の端子の棚のコモンの値段 16G ÷ コモンの素の点 2 = 8G）× 物価、N つから選べる分は秘宝の N 択と同じ上乗せ（1 つ増えるごとに +15%）。
+  山札から端子を抜く = BOT が抜く端子を持つ時だけ、店で 1 枚抜く素の値段（15G）・持たなければ 0。
+- **使っている所**（選択肢の末尾に足した）: 流れの鍛冶「打った刃の振り方を教わる」（ターン +1・端子を 3 つから）・亡霊との決闘「離れて構えだけを盗む」（ターン +1・レアの端子を 2 つから）・朽ちた英雄像「折れた腕の構えをなぞる」（ターン +1・山札から端子を抜く）。
 
 #### 報酬を多様にする効果（2026-11-12）
 

@@ -445,6 +445,7 @@ namespace EventSystem
         private static readonly Regex nextShop     = new Regex(@"^次の店の値段-(\d+)%$");
         private static readonly Regex nextRest     = new Regex(@"^次の休憩の回復\+(\d+)%$");
         private static readonly Regex offerAxis    = new Regex(@"^軸の秘宝を(\d+)つから選ぶ$");
+        private static readonly Regex offerTerm    = new Regex(@"^(レアの)?端子を(\d+)つから選ぶ$");
 
         /// <summary>1 つの効果を読む。 頭の印 〔見せる〕/〔伏せる〕(2026-11-16・代償を見せるかの例外・EventEffectRoles.ShowMark) を外して
         /// <see cref="EventEffect.costMark"/> に写す。 印は「勝利後」より前に書く。</summary>
@@ -515,6 +516,8 @@ namespace EventSystem
             if (t == "武器を鍛える")       return Eff(EventEffectType.ForgeWeapon, postCombat: postCombat);
             if (t == "賽を提示して交換")   return Eff(EventEffectType.OfferDieSwap, postCombat: postCombat);
             m = offerAxis.Match(t);    if (m.Success) return Eff(EventEffectType.OfferAxisPassives, amount: int.Parse(m.Groups[1].Value), postCombat: postCombat);
+            if (t == "山札から端子を抜く") return Eff(EventEffectType.RemoveTerminal, postCombat: postCombat);
+            m = offerTerm.Match(t);    if (m.Success) return Eff(EventEffectType.OfferTerminals, param: m.Groups[1].Success ? EventEffectRoles.RareTerminal : null, amount: int.Parse(m.Groups[2].Value), postCombat: postCombat);
             m = revealMap.Match(t);    if (m.Success) return Eff(EventEffectType.RevealMap, amount: int.Parse(m.Groups[1].Value), postCombat: postCombat);
             m = revealEnc.Match(t);    if (m.Success) return Eff(EventEffectType.RevealEncounters, amount: int.Parse(m.Groups[1].Value), postCombat: postCombat);
             m = pushFoe.Match(t);      if (m.Success) return Eff(EventEffectType.PushPursuer, amount: int.Parse(m.Groups[1].Value), postCombat: postCombat);
