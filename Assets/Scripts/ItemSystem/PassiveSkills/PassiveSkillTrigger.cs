@@ -106,5 +106,16 @@ namespace ItemSystem.PassiveSkills
         OnSuperBurst,
         /// <summary>戦闘中に消耗品を使った (2026-11-20・item-overhaul-spec §2-2・量 = 消耗品の Tier・Tier の無い品 (戦術消耗品ほか) は 1)。 GameLoop.Consumables.Use が配る。</summary>
         OnConsumableUse,
+        // ── 端子の山札の出来事 (2026-11-20・段 1-e・item-overhaul-spec §2-2)。 どれも Kw.Raise で配る (量 0 以下は鳴らない)。
+        //   配る所は CombatManager.Terminals.cs の RaiseTerminalEvents (配線の解決 ApplyTerminalOutcome の直後・OnWired の前) と RaiseDeckShuffles。
+        //   端子の出力を変える効果はこの出来事で書かない (Resolve の中で効かせる・BOT と自動で一致する)。 ここで書くのは端子の解決の外の効果だけ。
+        /// <summary>使い捨ての端子を使った (発動した・この戦闘から外れる・量 = 1)。 1 枚につき 1 回。 戻る使い捨て (〈灰から組む機関〉〈緊急再装填〉) も使えば鳴る。</summary>
+        OnTerminalDispose,
+        /// <summary>端子の捨て札を切り直して山にした (量 = 切り直した枚数)。 ターンの頭に引く時のほか、 判断の間に引く消耗品・品で切り直した時も (OnWired の前にまとめて配る)。</summary>
+        OnDeckShuffle,
+        /// <summary>前のターンから残す印で残した端子を発動した (量 = 挿した出目の合計・最低 1)。 名前で数える (同じ名前の 2 枚目は区別しない)。</summary>
+        OnKeptTerminalUse,
+        /// <summary>補助の端子 (基本の〈時計〉を除く) を発動した (量 = 挿した出目の合計・最低 1)。 〈残響〉で 2 回働いても 1 回。</summary>
+        OnSupportTerminalUse,
     }
 }

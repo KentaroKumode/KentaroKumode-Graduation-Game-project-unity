@@ -31,6 +31,30 @@ namespace CombatSystem
         PairSame,       // 同じ目 2 個を挿す (capacity 2・2 個そろって初めて発動)
     }
 
+    /// <summary>采配 (山札の軸) の品のうち、 端子の解決・山札の出し入れを変える品 (2026-11-20・段 1-e・item-overhaul-spec §4 / §12-4)。
+    /// 戦闘の始めに所持品から <see cref="TerminalBattleState.deckItems"/> へ入れる (CombatManager.BeginTerminalDeck・<see cref="TerminalCards.DeckItemsOf"/>)。
+    /// 効くのは <see cref="TerminalCards.Resolve"/> と山札の出し入れ (<see cref="TerminalDeckState.BeforeShuffle"/> / <see cref="TerminalDeckState.DisposeFired"/>) の中だけ ──
+    /// 本体も BOT の写し (Clone) も同じ旗を読むので、 見積もりと動きが自動で一致する。</summary>
+    [Flags]
+    public enum DeckItems
+    {
+        None = 0,
+        Clasp = 1 << 0,        // 留め金の栞
+        AuxGear = 1 << 1,      // 補助歯車
+        IdleWeight = 1 << 2,   // 空回りの錘
+        Rewind = 1 << 3,       // 早回しのゼンマイ
+        Switchboard = 1 << 4,  // 仕込みの配電盤
+        Mold = 1 << 5,         // 型抜きの金型
+        Crucible = 1 << 6,     // 再利用のるつぼ
+        Blueprint = 1 << 7,    // 無銘の設計図
+        Seamless = 1 << 8,     // 継ぎ目のない導線
+        Folded = 1 << 9,       // 折り目のついた札
+        Bag = 1 << 10,         // 解体屋の袋
+        Workbench = 1 << 11,   // 常設の作業台
+        Ash = 1 << 12,         // 灰から組む機関
+        Engine = 1 << 13,      // 永久機関の主軸
+    }
+
     /// <summary>端子の名前 (id = 表示名・品と同じ規則)。 **文字列を直書きしない** ── ここを経由する。</summary>
     public static class TerminalIds
     {
@@ -54,6 +78,9 @@ namespace CombatSystem
         // 使い捨て
         public const string Detonator = "火薬樽", Piercer = "貫通弾", ReliefValve = "身代わり札", FirstAid = "応急箱", FullCharge = "大導電",
             CoolShot = "氷結瓶", Copier = "影写し", BurnOut = "火葬の剣";
+        // 采配と共通の端子 (2026-11-20・段 1-e・item-overhaul-spec §8 / §12-4・名前は仮)。 〈焼却斬り〉だけ山札の軸の端子
+        public const string BurnSlash = "焼却斬り", Reload = "緊急再装填", OneCut = "一刀両断", Gear = "歯車の軸", Bell = "巡りの鐘" /* 設計書の〈残響の鐘〉(〈残響〉と紛れるので仮に改名) */,
+            Mikiri = "見切りの構え", Crush = "崩し斬り";
 
         /// <summary>強化した端子の名前の印 (全角の「＋」・2026-11-20)。</summary>
         public const string UpgradeMark = "＋";
@@ -126,6 +153,26 @@ namespace CombatSystem
         /// <see cref="TerminalDeckState.DrawTurn"/> が毎ターン作り直す。 止まった端子には挿せない (<see cref="TerminalCards.Resolve"/> が外す)。</summary>
         public bool[] stopped;
 
+        // ── 山札の数 (2026-11-20・段 1-e・采配の軸)。 BOT の写し (Clone) にも乗る ──
+        /// <summary>この戦闘で捨て札を切り直した回数 / このターンに切り直した枚数 (<see cref="BeginTurn"/> で 0)。
+        /// 数えるのは <see cref="TerminalDeckState.BeforeShuffle"/> (本体の引く所と BOT の先読みが同じ関数を呼ぶ)。</summary>
+        public int shuffles, shuffledNow;
+        /// <summary>このターン、 残す印で前のターンから残った端子の名前 (null = 無し)。 <see cref="TerminalDeckState.DrawTurn"/> が作り直す
+        /// (中は書き換えない ── 写しと共有してよい)。 〈留め金の栞〉〈折り目のついた札〉と出来事 OnKeptTerminalUse が読む。</summary>
+        public List<string> kept;
+        /// <summary>采配の品の旗 (戦闘の始めに所持品から・CombatManager.BeginTerminalDeck)。</summary>
+        public DeckItems deckItems;
+        /// <summary>この戦闘で使い捨ての端子を使った回数 (<see cref="TerminalCards.Resolve"/> が数える・減らない)。 〈再利用のるつぼ〉〈解体屋の袋〉が読む。</summary>
+        public int disposedTotal;
+        /// <summary>毎ターンの手札 +N (〈整理された工具箱〉・戦闘の始めに決める)。</summary>
+        public int handBonus;
+        /// <summary>残す印で残した端子を発動したターンが続いた数 (〈折り目のついた札〉・<see cref="TerminalCards.Resolve"/> が数える)。</summary>
+        public int keptStreak;
+        /// <summary>〈灰から組む機関〉で一度戻った使い捨ての名前 (多重集合・もう一度使えば外れる・<see cref="TerminalDeckState.DisposeFired"/>)。</summary>
+        public List<string> ashReturned = new List<string>();
+        /// <summary>この戦闘で〈巡りの鐘〉を使った回数 (切り直すたび、 次のターンに多く引く枚数・<see cref="TerminalDeckState.BeforeShuffle"/>)。</summary>
+        public int bells;
+
         /// <summary>場の s がこのターン止まっているか。</summary>
         public bool IsStopped(int s) => stopped != null && s >= 0 && s < stopped.Length && stopped[s];
 
@@ -140,6 +187,7 @@ namespace CombatSystem
             var c = (TerminalBattleState)MemberwiseClone();
             c.gauge = new Dictionary<string, int>(gauge);
             c.stopped = stopped != null ? (bool[])stopped.Clone() : null;
+            c.ashReturned = new List<string>(ashReturned);
             return c;
         }
 
@@ -148,6 +196,7 @@ namespace CombatSystem
         {
             ignoreCond = ignoreCondNext; ignoreCondNext = false;
             doubleAll = false;
+            shuffledNow = 0;
             storedAttack += storedAttackNext; storedAttackNext = 0;
             emberCarry = emberNext; emberNext = 0;
             int extra = extraDrawNext; extraDrawNext = 0;
@@ -160,8 +209,8 @@ namespace CombatSystem
     {
         public int charge, chargeCap, hp, maxHp, shield;
         public int enemyAttack, enemyPoison, enemyBleed, bursts;
-        /// <summary>偏重 (軸の品の数): 心眼・血晶・瘴気・炉温・電流・堅牢。</summary>
-        public int axCrit, axBleed, axPoison, axHeat, axCharge, axShield;
+        /// <summary>偏重 (軸の品の数): 心眼・血晶・瘴気・炉温・電流・堅牢・采配 (山札)・賽目 (役)。</summary>
+        public int axCrit, axBleed, axPoison, axHeat, axCharge, axShield, axDeck, axRole;
         /// <summary>〈処刑の刃〉の恒久の攻撃 (ラン単位)。</summary>
         public int whetBonus;
         /// <summary>敵の今の HP / 最大 HP (〈処刑の刃＋〉の「敵の HP が半分以下なら」・2026-11-20)。 最大 HP 0 = 読まない。</summary>
@@ -227,11 +276,19 @@ namespace CombatSystem
         public int escalationDelay;
         /// <summary>このターンに発動した端子 (場の添字)。</summary>
         public readonly List<int> fired = new List<int>();
+        /// <summary>発動した端子ごとの挿した出目の合計 (<see cref="fired"/> と同じ並び・2026-11-20)。 出来事 OnKeptTerminalUse / OnSupportTerminalUse の量。</summary>
+        public readonly List<int> firedSums = new List<int>();
+        /// <summary>このターンに使った使い捨ての枚数 (2026-11-20)。</summary>
+        public int disposedNow;
+        /// <summary>〈緊急再装填〉が次のターンの手札に戻す使い捨て (場の添字・<see cref="TerminalDeckState.DisposeFired"/> が読む)。</summary>
+        public readonly List<int> reloadTargets = new List<int>();
         /// <summary>[計装 2026-11-19] 攻撃の合計 (attackAdd) を増やした所ごとの量 (「端子名:+N」)。 判断には使わない。</summary>
         public readonly List<string> attackLog = new List<string>();
         /// <summary>攻撃の端子 1 枚ごとの攻撃の量と挿した出目の数 (場の順・ADR-0016: 攻撃は端子 1 枚につき 1 回当たる)。
         /// attackAdd のうちここに入らない分 (連係・変圧・溜めた攻撃・賽の加算) は、 本体が最初の 1 撃に入れる。</summary>
         public readonly List<int> attackHits = new List<int>(), attackHitDice = new List<int>();
+        /// <summary>攻撃の端子 1 枚ごとの名前 (<see cref="attackHits"/> と同じ並び・2026-11-20)。 本体の撃の輪が「この撃が〈崩し斬り〉か」を読む。</summary>
+        public readonly List<string> attackHitIds = new List<string>();
         /// <summary>このターンに発動した基本以外の端子の数。</summary>
         public int firedNonBasic;
         /// <summary>〈有効活用〉〈影写し〉〈火葬の剣〉の対象 (場の添字・−1 = なし)。 選んだ対象 (Resolve の wantTarget) が候補なら それ、
@@ -301,6 +358,17 @@ namespace CombatSystem
         //   使い捨ての決まりは disposable だけ。 旧い決まりへ戻す測定の口は GameHooks.TerminalFirstAidLeavesRunDeck (AutoRunner.terminalFirstAidLeavesRunDeck)。
         /// <summary>〈千刃〉: この戦闘で使うたび、 以後のこの端子の攻撃 +N。 / 〈先読み〉: 次のターンに多く引く枚数。</summary>
         public const int MainsPerUse = 1, SwitchboardDraw = 2;
+
+        // ===== 采配 (山札の軸) の品の数値 (2026-11-20・段 1-e・item-overhaul-spec §4 / §12-4・未測定) =====
+        /// <summary>〈留め金の栞〉各撃 +N / 〈補助歯車〉シールド / 〈空回りの錘〉多く引く上限 / 〈仕込みの配電盤〉要る枚数・多く引く枚数 / 〈型抜きの金型〉出力・補助のシールド /
+        /// 〈常設の作業台〉常設 1 枚あたり / 〈永久機関の主軸〉倍化の間隔 / 〈解体屋の袋〉間隔 / 〈整理された工具箱〉山札の枚数・手札 / 〈予備の差込口〉1 ターン目に多く引く枚数。</summary>
+        public const int ClaspAttack = 5, AuxGearShield = 4, IdleWeightDrawMax = 2, SwitchboardNeed = 3, SwitchboardItemDraw = 2, MoldBonus = 3, MoldSupportShield = 4,
+            WorkbenchPer = 3, EngineEvery = 3, BagEvery = 3, ToolboxMaxDeck = 12, ToolboxHand = 1, SparePlugDraw = 2;
+        /// <summary>〈折り目のついた札〉: 与ダメージ % の池に足す。</summary>
+        public const float FoldedPct = 0.40f;
+        // ===== 采配と共通の端子 (2026-11-20・段 1-e・未測定) =====
+        /// <summary>〈焼却斬り〉出目の倍率 / 使い捨て 1 回あたりの下限 (max(2, 采配)) / 〈一刀両断〉出目の倍率 / 〈歯車の軸〉挿した目 1 つあたり / 〈崩し斬り〉最大 HP の %。 *Up = 強化した端子。</summary>
+        public const int BurnSlashMul = 2, BurnSlashMulUp = 3, BurnSlashMinPer = 2, OneCutMul = 3, OneCutMulUp = 4, GearPip = 2, GearPipUp = 3, CrushPct = 5, CrushPctUp = 6;
 
         // ===== 強化した端子 (＋) の数値 (2026-11-20・作者承認の表 Captures/overhaul/work/terminal_upgrades_draft.md・未測定) =====
         //   強化した端子は基の端子の定義を写して、 表の分だけ変えた別の端子 (TerminalIds.Upgraded)。 効果の式は Effect の up の枝。
@@ -379,6 +447,14 @@ namespace CombatSystem
             [TerminalIds.CoolShot] = "エスカレーションの段階を 1 つ戻す。出目をブロックに。",
             [TerminalIds.Copier] = "挿さずに空けた手札の端子を 1 枚、この戦闘中だけ複製して、次のターンの手札に加える。出目を充電に。空けた端子が無ければ発動しない。",
             [TerminalIds.BurnOut] = "出目 ×" + BurnOutMulUp + " を攻撃に。挿さずに空けた手札の端子を 1 枚、この戦闘から外す。空けた端子が無ければ発動しない。",
+            // 采配と共通の端子 (2026-11-20)。 使い捨ては回数・枚数を増やさない (段 1-b の方針・terminal_upgrades_draft.md)
+            [TerminalIds.BurnSlash] = "出目 ×" + BurnSlashMulUp + " を攻撃に。これまでにこの戦闘で使い捨てを使った回数 × max(" + BurnSlashMinPer + ", 采配) を攻撃に足す。",
+            [TerminalIds.Reload] = "このターンに使った他の使い捨てを 1 枚 (場の右から)、次のターンの手札に戻す。出目を充電に。",
+            [TerminalIds.OneCut] = "出目 ×" + OneCutMulUp + " を攻撃に。この撃は敵の防御を無視。挿した攻撃の端子がこれ 1 枚だけのターンにだけ発動する。",
+            [TerminalIds.Gear] = "出目は挿せない。場にあれば、毎ターン最初に発動した基本以外の端子 (場の左から) の挿した目 1 つにつき +" + GearPipUp + "。一度引くとこの戦闘中ずっと場に残る。",
+            [TerminalIds.Bell] = "この戦闘の残りの間、山札を切り直すたび、次のターンに端子を 1 枚多く引く。出目を充電に。",
+            [TerminalIds.Mikiri] = "出目をブロックに。敵が大技を予告したターンなら 2 倍。",
+            [TerminalIds.Crush] = "出目 +" + UpPip + " を攻撃に。この撃でボスの目盛りを割ったら、敵に最大 HP の " + CrushPctUp + "% の軽減不可ダメージ。",
         };
 
         /// <summary>基の端子の定義を写して、 強化した端子を作る (名前・説明文と、 表で変える条件・払う充電だけ変える)。</summary>
@@ -389,7 +465,7 @@ namespace CombatSystem
             u.description = UpgradedText[b.id];
             switch (b.id)
             {
-                case TerminalIds.Igniter: case TerminalIds.BloodTap: u.cond = TerminalCond.AtMost4; break;
+                case TerminalIds.Igniter: case TerminalIds.BloodTap: case TerminalIds.Mikiri: u.cond = TerminalCond.AtMost4; break;
                 case TerminalIds.DischargeTube: u.chargeCost = DischargeCostUp; break;
                 case TerminalIds.Breaker: u.chargeCost = BreakerCostUp; break;
             }
@@ -443,6 +519,7 @@ namespace CombatSystem
         private static TerminalDef Cost(TerminalDef d, int n) { d.chargeCost = n; return d; }
         private static TerminalDef Cap(TerminalDef d, int n) { d.capacity = n; return d; }
         private static TerminalDef ClockDef(TerminalDef d) { d.basic = true; d.permanent = true; return d; }
+        private static TerminalDef Perm(TerminalDef d) { d.permanent = true; return d; }
 
         /// <summary>全部の端子 (素の端子の後ろに強化した端子)。 抽選 (店・報酬・付与) は <see cref="TerminalDef.upgraded"/> を外して使う。</summary>
         public static readonly List<TerminalDef> All = Build();
@@ -540,6 +617,16 @@ namespace CombatSystem
                 // 〈火葬の剣〉: 2026-11-14 に作り直し (作者の決定)。 旧: 補助で「空けた端子を 1 枚この戦闘から外す」だけ (測定で発動 1.7%・GAME.md §24)。
                 //   外す端子が無いターン (候補 0) は挿しても不発 (Resolve の 4.)・使い捨ても消費しない
                 Once(D(TerminalIds.BurnOut, A, "出目 ×" + BurnOutMul + " を攻撃に。挿さずに空けた手札の端子を 1 枚、この戦闘から外す。空けた端子が無ければ発動しない。")),
+                // ── 采配と共通の端子 (2026-11-20・段 1-e・item-overhaul-spec §8 / §12-4) ──
+                Once(D(TerminalIds.BurnSlash, A, "出目 ×" + BurnSlashMul + " を攻撃に。これまでにこの戦闘で使い捨てを使った回数 × max(" + BurnSlashMinPer + ", 采配) を攻撃に足す。", TerminalCond.None, ItemSystem.PassiveSkills.AxisRules.Deck)),
+                //   〈緊急再装填〉: 自分は戻せない (他の〈緊急再装填〉は戻せる・作者 2026-11-20「戻し合っても意味がない」)。 戻す 1 枚は場の右から (Resolve の 5b)
+                Once(D(TerminalIds.Reload, S, "このターンに使った他の使い捨てを 1 枚 (場の右から)、次のターンの手札に戻す。")),
+                Once(D(TerminalIds.OneCut, A, "出目 ×" + OneCutMul + " を攻撃に。この撃は敵の防御を無視。挿した攻撃の端子がこれ 1 枚だけのターンにだけ発動する。")),
+                //   〈歯車の軸〉: 挿せない常設 (capacity 0)。 場にあれば効く (Resolve の 5.)。 2 枚あれば 2 枚分
+                Cap(Perm(D(TerminalIds.Gear, S, "出目は挿せない。場にあれば、毎ターン最初に発動した基本以外の端子 (場の左から) の挿した目 1 つにつき +" + GearPip + "。一度引くとこの戦闘中ずっと場に残る。")), 0),
+                Rare(Once(D(TerminalIds.Bell, S, "この戦闘の残りの間、山札を切り直すたび、次のターンに端子を 1 枚多く引く。"))),
+                D(TerminalIds.Mikiri, B, "出目をブロックに。敵が大技を予告したターンなら 2 倍。", TerminalCond.AtMost3),
+                D(TerminalIds.Crush, A, "出目を攻撃に。この撃でボスの目盛りを割ったら、敵に最大 HP の " + CrushPct + "% の軽減不可ダメージ。", TerminalCond.AtLeast5),
             };
         }
 
@@ -705,6 +792,13 @@ namespace CombatSystem
             //   旧い規則の〈有効活用〉は今までどおり、 対象が無くても発動する (効果が無いだけ)。 旧: 〈影写し〉も対象なしで発動して消費した
             for (int s = 0; s < m; s++)
                 if ((defs[s]?.baseId == TerminalIds.BurnOut || defs[s]?.baseId == TerminalIds.Copier) && Plugged(o.slotOfDie, s) && Empty(s) < 0) Unplug(o.slotOfDie, s);
+            //   〈一刀両断〉(2026-11-20): 挿した攻撃の種類の端子がこれ 1 枚だけのターンにだけ発動する (2 枚以上なら不発・使い捨ても消費しない)
+            {
+                int atkPlugged = 0;
+                for (int s = 0; s < m; s++) if (defs[s] != null && defs[s].kind == TerminalKind.Attack && Plugged(o.slotOfDie, s)) atkPlugged++;
+                if (atkPlugged > 1)
+                    for (int s = 0; s < m; s++) if (defs[s]?.baseId == TerminalIds.OneCut && Plugged(o.slotOfDie, s)) Unplug(o.slotOfDie, s);
+            }
 
             // ── 5. 効果 ──
             bool doubler = false;
@@ -721,6 +815,9 @@ namespace CombatSystem
             //   〈打ち直し〉(2026-11-20〜 説明文どおり): 溜まりが届いたターンは、 まだ効果を出していない (場の順で後ろの) 端子の出目も 1 個ずつ +1。
             //   条件 (2.) は挿した目そのもので見る。 次のターンからは振った出目に足す (本体 DrawTerminalHand → FoundryBonusKey)
             int foundryNow = 0;
+            //   〈歯車の軸〉(2026-11-20): 場にあれば (止まっていない)、 このターン最初に発動した基本以外の端子 (場の順) の挿した目 1 つにつき +2 (強化 +3・何枚でも足す)
+            int gearPip = 0; bool gearUsed = false;
+            for (int s = 0; s < m; s++) if (defs[s]?.baseId == TerminalIds.Gear && !state.IsStopped(s)) gearPip += defs[s].upgraded ? GearPipUp : GearPip;
             for (int s = 0; s < m; s++)
             {
                 if (defs[s] == null || !Plugged(o.slotOfDie, s)) continue;
@@ -730,6 +827,8 @@ namespace CombatSystem
                 //   条件 (「2. 条件」) は引く前の目で見る ── 引いた目で見ると〈導火〉(3 以下) などに挿せる目が増え、 罰が得になる。
                 int cutHere = d.kind == TerminalKind.Block ? env.blockDieCut : 0;
                 for (int i = 0; i < n; i++) if (o.slotOfDie[i] == s) { sum += EventSystem.TimedEffects.TimedDebuffRule.CutBlockDie(v[i] + foundryNow, cutHere); num++; }
+                bool gearHere = gearPip > 0 && !gearUsed && !d.basic;
+                if (gearHere) sum += gearPip * num;
                 int raw = sum;      // 〈剛腕〉で 2 倍にする前 (〈反復突き〉の「同じ目」はこれで見る)
                 if (d.kind == TerminalKind.Attack) sum *= pipMul;
                 //   払う物 (充電・HP) は 1 回だけ、 効果は〈残響〉で 2 回 (2026-11-20〜・充電は 3. で 1 回払っている)。
@@ -744,7 +843,8 @@ namespace CombatSystem
                 //   〈裁きの雷〉: 充電をすべて払う (1 回)。 〈残響〉の 2 回目も払った量で攻撃に足す (旧: 2 回目は充電 0 で出目の分だけ)
                 int paidAll = 0;
                 if (id == TerminalIds.BigDischarge) { paidAll = charge; o.chargeSpend += charge; charge = 0; }
-                o.fired.Add(s);
+                o.fired.Add(s); o.firedSums.Add(sum);
+                if (gearHere) gearUsed = true;      // 不発 (〈諸刃の剣〉の HP 不足) なら次の端子へ回る
                 if (!d.basic) o.firedNonBasic++;
                 switch (d.kind)
                 {
@@ -757,9 +857,28 @@ namespace CombatSystem
                 int atkBefore = o.attackAdd, chgBefore = charge;
                 int fBefore = state.foundryBonus;
                 for (int t = 0; t < times; t++) Effect(id, d.upgraded, board[s], s, sum, raw, num, paidAll, env, state, o, ref charge, Empty);
+                //   采配の品 (2026-11-20): 端子 1 枚の発動につき 1 回 (〈残響〉で効果が 2 回走っても 1 回)
+                if (d.disposable) o.disposedNow++;
+                if ((state.deckItems & DeckItems.Mold) != 0 && d.cond != TerminalCond.None)      // 〈型抜きの金型〉: 条件のある端子の出力 +3・補助はシールド +4 (条件を無視したターンも条件のある端子に数える)
+                    switch (d.kind)
+                    {
+                        case TerminalKind.Attack: o.attackAdd += MoldBonus; break;      // この端子の撃に入る (下の attackHits)
+                        case TerminalKind.Block: o.blockAdd += MoldBonus; break;
+                        case TerminalKind.Charge: o.chargeAdd += MoldBonus; break;
+                        default: o.shield += MoldSupportShield; break;
+                    }
+                if ((state.deckItems & DeckItems.AuxGear) != 0 && d.kind == TerminalKind.Support && !d.basic) o.shield += AuxGearShield;   // 〈補助歯車〉 (基本の〈時計〉は数えない)
                 foundryNow += state.foundryBonus - fBefore;
-                if (d.kind == TerminalKind.Attack) { o.attackHits.Add(o.attackAdd - atkBefore); o.attackHitDice.Add(num); }
+                if (d.kind == TerminalKind.Attack) { o.attackHits.Add(o.attackAdd - atkBefore); o.attackHitDice.Add(num); o.attackHitIds.Add(board[s]); }
                 if (o.attackAdd != atkBefore) o.attackLog.Add($"{board[s]}(目{sum}{(times > 1 ? "・倍化" : "")}{(chgBefore != charge ? "・充電" + chgBefore + "→" + charge : "")}):+{o.attackAdd - atkBefore}");
+            }
+
+            // ── 5b. 〈緊急再装填〉(2026-11-20): このターンに使った他の使い捨てを 1 枚ずつ (場の右から・自分は除く・他の〈緊急再装填〉は戻せる)。 〈残響〉で 2 回働いても 1 枚 ──
+            for (int s = 0; s < m; s++)
+            {
+                if (defs[s]?.baseId != TerminalIds.Reload || !o.fired.Contains(s)) continue;
+                for (int t = m - 1; t >= 0; t--)
+                    if (t != s && defs[t] != null && defs[t].disposable && o.fired.Contains(t) && !o.reloadTargets.Contains(t)) { o.reloadTargets.Add(t); break; }
             }
 
             // ── 6. 他の端子を見る効果 (全部の発動が決まった後) ──
@@ -772,6 +891,10 @@ namespace CombatSystem
             }
             // 〈柔軟な戦略〉: 基本以外の発動の累計 (付けていなくても数える・効くのは引いて場にあるターンだけ = 本体 DrawTerminalHand)
             state.firedTotal += o.firedNonBasic;
+            // 使い捨ての数 (この戦闘・2026-11-20)。 〈再利用のるつぼ〉: 使い捨てを使ったターン、 この戦闘で使った回数 × 采配 を次の攻撃に
+            //   (〈力溜め〉と同じ口 ── 攻撃するならこのターンの攻撃に入る・しなければ次に攻撃するターン)
+            state.disposedTotal += o.disposedNow;
+            if ((state.deckItems & DeckItems.Crucible) != 0 && o.disposedNow > 0) state.storedAttack += state.disposedTotal * env.axDeck;
             // 次に攻撃するターンの攻撃に足す分
             int atk6 = o.attackAdd;
             if (o.attackDice > 0 && state.storedAttack > 0) { o.attackAdd += state.storedAttack; state.storedAttack = 0; }
@@ -782,10 +905,68 @@ namespace CombatSystem
             DiePassives.ApplyToTerminals(env, state, o, defs, v);
             if (o.attackAdd != atkDie) o.attackLog.Add($"賽:+{o.attackAdd - atkDie}");
 
+            // ── 6c. 采配の品 (2026-11-20・段 1-e)。 攻撃 +N は攻撃の端子の撃 1 つずつに足す (ADR-0016・品の攻撃 +N と同じく全部の撃へ・攻撃しないターンは入らない) ──
+            ApplyDeckItems(board, defs, env, state, o);
+
             for (int i = 0; i < n; i++)
                 o.kindOfDie[i] = o.slotOfDie[i] >= 0 ? LegacyKind(defs[o.slotOfDie[i]].kind) : DiceTerminal.None;
             return o;
         }
+
+        /// <summary>采配の品のうち、 全部の発動が決まった後に効く物 (Resolve の 6c)。 旗は <see cref="TerminalBattleState.deckItems"/>。</summary>
+        private static void ApplyDeckItems(List<string> board, TerminalDef[] defs, TerminalEnv env, TerminalBattleState st, TerminalOutcome o)
+        {
+            var f = st.deckItems;
+            // 残す印で残した端子を、 このターンに発動したか (名前で数える ── 同じ名前の 2 枚目は区別しない・常設は残せない)。 続いた数は品が無くても数える
+            int keptUsed = 0;
+            if (st.kept != null)
+            {
+                var left = new List<string>(st.kept);
+                foreach (int s in o.fired) if (defs[s] != null && !defs[s].permanent && left.Remove(board[s])) keptUsed++;
+            }
+            st.keptStreak = keptUsed > 0 ? st.keptStreak + 1 : 0;
+            if (f == DeckItems.None) return;
+            bool support = false;
+            foreach (int s in o.fired) if (defs[s] != null && defs[s].kind == TerminalKind.Support && !defs[s].basic) support = true;
+            int perms = 0;      // 〈常設の作業台〉: 場の常設の端子 (止まっていない・基本の〈時計〉を除く)
+            if ((f & DeckItems.Workbench) != 0)
+                for (int s = 0; s < defs.Length; s++) if (defs[s] != null && defs[s].permanent && !defs[s].basic && !st.IsStopped(s)) perms++;
+            int each = 0;
+            if ((f & DeckItems.Clasp) != 0 && keptUsed > 0) each += ClaspAttack;            // 〈留め金の栞〉
+            if ((f & DeckItems.Rewind) != 0) each += st.shuffledNow;                          // 〈早回しのゼンマイ〉: このターンに切り直した枚数
+            if ((f & DeckItems.Seamless) != 0 && support) each += env.axDeck;                 // 〈継ぎ目のない導線〉
+            if (perms > 0) { each += WorkbenchPer * perms; o.blockAdd += WorkbenchPer * perms; }
+            if (each > 0 && o.attackHits.Count > 0)
+            {
+                for (int h = 0; h < o.attackHits.Count; h++) o.attackHits[h] += each;
+                o.attackAdd += each * o.attackHits.Count;
+                o.attackLog.Add($"采配の品:+{each}×{o.attackHits.Count}撃");
+            }
+            if ((f & DeckItems.Folded) != 0 && st.keptStreak >= 2) o.outgoingPctAdd += FoldedPct;                     // 〈折り目のついた札〉
+            if ((f & DeckItems.Switchboard) != 0 && o.firedNonBasic >= SwitchboardNeed) st.extraDrawNext += SwitchboardItemDraw;   // 〈仕込みの配電盤〉
+            if ((f & DeckItems.IdleWeight) != 0)                                                // 〈空回りの錘〉: どの端子にも挿さなかった出目 (条件に合わず外れた目も)
+            {
+                int idle = 0;
+                foreach (int x in o.slotOfDie) if (x < 0) idle++;
+                st.extraDrawNext += Math.Min(IdleWeightDrawMax, idle);
+            }
+        }
+
+        /// <summary>所持品から采配の品の旗を作る (戦闘の始め・CombatManager.BeginTerminalDeck)。</summary>
+        public static DeckItems DeckItemsOf(GameLoop.RunState run)
+        {
+            var f = DeckItems.None;
+            foreach (var (id, flag) in DeckItemTable) if (ItemSystem.PassiveSkills.AxisRules.Owns(run, id)) f |= flag;
+            return f;
+        }
+        private static readonly (string id, DeckItems flag)[] DeckItemTable =
+        {
+            (GameLoop.ItemIds.DeckClasp, DeckItems.Clasp), (GameLoop.ItemIds.DeckAuxGear, DeckItems.AuxGear), (GameLoop.ItemIds.DeckIdleWeight, DeckItems.IdleWeight),
+            (GameLoop.ItemIds.DeckRewind, DeckItems.Rewind), (GameLoop.ItemIds.DeckSwitchboard, DeckItems.Switchboard), (GameLoop.ItemIds.DeckMold, DeckItems.Mold),
+            (GameLoop.ItemIds.DeckCrucible, DeckItems.Crucible), (GameLoop.ItemIds.DeckBlueprint, DeckItems.Blueprint), (GameLoop.ItemIds.DeckSeamless, DeckItems.Seamless),
+            (GameLoop.ItemIds.DeckFolded, DeckItems.Folded), (GameLoop.ItemIds.DeckBag, DeckItems.Bag), (GameLoop.ItemIds.DeckWorkbench, DeckItems.Workbench),
+            (GameLoop.ItemIds.DeckAsh, DeckItems.Ash), (GameLoop.ItemIds.DeckEngine, DeckItems.Engine),
+        };
 
         /// <summary>捨て札の 1 枚を対象に取る端子 (手札の持ち越しの規則の〈有効活用〉・強化した端子も)。 対象 (挿し方の targets の値) は捨て札の添字。</summary>
         public static bool PicksDiscard(string id) => BaseOf(id) == TerminalIds.Retainer && HandCarry;
@@ -940,6 +1121,13 @@ namespace CombatSystem
                 case TerminalIds.CoolShot: o.retreatStage++; if (up) o.blockAdd += sum; break;
                 case TerminalIds.Copier: o.copyTarget = empty(slot); if (up) o.chargeAdd += sum; break;
                 case TerminalIds.BurnOut: o.attackAdd += sum * (up ? BurnOutMulUp : BurnOutMul); o.burnTarget = empty(slot); break;   // 候補は 4. で確かめ済み (無ければ不発)
+                // 采配と共通の端子 (2026-11-20)
+                case TerminalIds.BurnSlash: o.attackAdd += sum * (up ? BurnSlashMulUp : BurnSlashMul) + st.disposedTotal * Math.Max(BurnSlashMinPer, env.axDeck); break;   // 回数はこのターンより前の分
+                case TerminalIds.Reload: if (up) o.chargeAdd += sum; break;      // 戻す 1 枚は 5b
+                case TerminalIds.OneCut: o.attackAdd += sum * (up ? OneCutMulUp : OneCutMul); o.ignoreDefense = true; break;      // 攻撃の端子は 1 枚だけ (4.) なので撃は 1 つ
+                case TerminalIds.Bell: st.bells++; if (up) o.chargeAdd += sum; break;
+                case TerminalIds.Mikiri: o.blockAdd += sum * (env.heavyTurn ? 2 : 1); break;      // 強化は条件 (4 以下) だけ
+                case TerminalIds.Crush: o.attackAdd += sum + p1; break;      // 目盛りを割った時の追加は本体の撃の輪 (attackHitIds)
             }
         }
     }
@@ -964,7 +1152,7 @@ namespace CombatSystem
         /// <summary>戦闘の始め: ランの山札を写して切る。</summary>
         public void BeginBattle(List<string> runDeck)
         {
-            draw.Clear(); discard.Clear(); hand.Clear(); permanent.Clear(); exiled.Clear(); board.Clear(); _usedLastTurn.Clear(); recallNext = null; copyNext = null; keepNext.Clear(); LastKept.Clear();
+            draw.Clear(); discard.Clear(); hand.Clear(); permanent.Clear(); exiled.Clear(); board.Clear(); _usedLastTurn.Clear(); recallNext = null; copyNext = null; keepNext.Clear(); LastKept.Clear(); _shuffled.Clear(); returnNext.Clear();
             if (runDeck != null) draw.AddRange(runDeck);
             Shuffle(draw);
         }
@@ -978,16 +1166,55 @@ namespace CombatSystem
             }
         }
 
-        private string DrawOne()
+        /// <summary>〈常設の作業台〉(2026-11-20): 山の常設の端子をすべて場へ出す (戦闘の始め・最初に引くより前)。</summary>
+        public void MovePermanentsToBoard()
         {
+            for (int i = draw.Count - 1; i >= 0; i--)
+                if (TerminalCards.Get(draw[i])?.permanent == true) { permanent.Add(draw[i]); draw.RemoveAt(i); }
+        }
+
+        /// <summary>1 枚引く。 山が尽きていれば捨て札を切り直す。 <paramref name="more"/> = 切り直しで追加に引く枚数 (〈永久機関の主軸〉)。</summary>
+        private string DrawOne(out int more)
+        {
+            more = 0;
             if (draw.Count == 0)
             {
                 if (discard.Count == 0) return null;
+                int n = discard.Count;
+                more = BeforeShuffle(discard, exiled, Remaining, state);
+                _shuffled.Add(n);
                 draw.AddRange(discard); discard.Clear(); Shuffle(draw);
+                if (draw.Count == 0) return null;      // 〈無銘の設計図〉が最後の 1 枚を外した
             }
             var id = draw[draw.Count - 1]; draw.RemoveAt(draw.Count - 1);
             return id;
         }
+
+        /// <summary>捨て札を山へ切り直す直前の規則 (2026-11-20・段 1-e・采配の軸)。 本体の引く所 (<see cref="DrawOne"/>) と BOT の先読み
+        /// (AutoRunner.Terminals の SampleNextBoard) が同じ関数を呼ぶ。 切り直した回数と枚数を <paramref name="st"/> に数える。
+        /// <paramref name="deckTotal"/> = この戦闘の山札の枚数 (山 + 捨て札 + 手札 + 場に残る端子)。
+        /// 戻り値 = この切り直しで追加に引く枚数 (〈永久機関の主軸〉)。</summary>
+        public static int BeforeShuffle(List<string> discard, List<string> exiled, int deckTotal, TerminalBattleState st)
+        {
+            st.shuffles++; st.shuffledNow += discard.Count;
+            st.extraDrawNext += st.bells;      // 〈巡りの鐘〉: 次のターンに多く引く (このターンの分は BeginTurn で取り出し済み)
+            // 〈無銘の設計図〉: 捨て札の基本の端子 (攻撃・防御・充電) を 1 枚この戦闘から外す (山札が 3 枚以下なら外さない)。 先に捨てた方から
+            if ((st.deckItems & DeckItems.Blueprint) != 0 && deckTotal > TerminalCards.MinDeckSize)
+                for (int i = 0; i < discard.Count; i++)
+                    if (TerminalCards.Get(discard[i])?.basic == true) { exiled?.Add(discard[i]); discard.RemoveAt(i); break; }
+            // 〈永久機関の主軸〉: 切り直すたび 1 枚多く引く・この戦闘の切り直しが 3 の倍数になるたび、 このターン挿した端子がすべて 2 回働く (〈残響〉と同じ倍化)
+            if ((st.deckItems & DeckItems.Engine) != 0)
+            {
+                if (st.shuffles % TerminalCards.EngineEvery == 0) st.doubleAll = true;
+                return 1;
+            }
+            return 0;
+        }
+
+        /// <summary>切り直した枚数のうち、 まだ出来事 (OnDeckShuffle) を配っていない分 (CombatManager が <see cref="TakeShuffled"/> で取り出して配る)。</summary>
+        private readonly List<int> _shuffled = new List<int>();
+        /// <summary>まだ配っていない切り直し (1 回ごとの枚数) を取り出して空にする。</summary>
+        public List<int> TakeShuffled() { var l = new List<int>(_shuffled); _shuffled.Clear(); return l; }
 
         /// <summary>ヴェスカ〈停滞する時間〉の乱数のキー (専用 ── 他の抽選の連番を動かさない)。</summary>
         public const string StopRngKey = "vesca.stagnant";
@@ -1009,7 +1236,8 @@ namespace CombatSystem
             var toDiscard = new List<string>();
             int heldStopped = SplitHand(hand, board, permanent.Count, state.stopped, retained, _usedLastTurn, mode, keep, toDiscard, keepNext);
             LastKept.Clear();
-            if (mode == HandCarryMode.Pick) foreach (var id in keepNext) if (keep.Contains(id)) LastKept.Add(id);   // [計装] 印で残した端子
+            if (mode == HandCarryMode.Pick) foreach (var id in keepNext) if (keep.Contains(id)) LastKept.Add(id);   // 印で残した端子 (計装・〈留め金の栞〉ほか)
+            state.kept = LastKept.Count > 0 ? new List<string>(LastKept) : null;
             keepNext.Clear();
             state.stopped = null;
             _usedLastTurn.Clear();
@@ -1028,8 +1256,9 @@ namespace CombatSystem
             LastDrawnIds.Clear();
             while (hand.Count < size && guard++ < 64)
             {
-                var id = DrawOne();
+                var id = DrawOne(out int more);
                 if (id == null) break;
+                size += more;
                 drawn++;
                 LastDrawnIds.Add(id);   // [計装 #106]
                 bool stop = stopChance > 0f && GameLoop.GameRng.Chance(stopChance, StopRngKey);
@@ -1041,6 +1270,8 @@ namespace CombatSystem
             // 〈影写し〉の写し (2026-11-14): 引く枚数とは別に、 手札の最後へ 1 枚足す (引く枚数を減らさない・止まる対象でもない)。
             //   使わなければほかの手札と同じに次のターンの頭で捨て札へ行き、 この戦闘の山札を回る (戦闘が終われば消える = BeginBattle で作り直す)
             if (copyNext != null) { hand.Add(copyNext); copyNext = null; }
+            // 戻る使い捨て (〈灰から組む機関〉〈緊急再装填〉〈解体屋の袋〉・2026-11-20): 写しと同じく、 引く枚数とは別に手札の最後へ
+            if (returnNext.Count > 0) { hand.AddRange(returnNext); returnNext.Clear(); }
             board.Clear(); board.AddRange(permanent); board.AddRange(hand);
             if (stoppedPerm.Count + stoppedHand.Count > 0)
             {
@@ -1069,6 +1300,10 @@ namespace CombatSystem
         /// <summary>〈影写し〉が次のターンの手札に足す写し (null = 無し)。 <see cref="FinishTurn"/> が入れ、 次の <see cref="DrawTurn"/> が
         /// 引き終えた手札の最後へ足して空にする (引く枚数とは別 ── 次のターンは手札が 1 枚多い)。 2026-11-14〜 (旧: 捨て札へ入れた)。</summary>
         public string copyNext;
+
+        /// <summary>次のターンの手札に戻す使い捨て (〈灰から組む機関〉〈緊急再装填〉〈解体屋の袋〉・2026-11-20)。 <see cref="FinishTurn"/> が <see cref="DisposeFired"/> で入れ、
+        /// 次の <see cref="DrawTurn"/> が〈影写し〉の写しと同じく引き終えた手札の最後へ足して空にする (引く枚数とは別)。</summary>
+        public readonly List<string> returnNext = new List<string>();
 
         /// <summary>残す印 (手札の規則 Pick): 次のターンも手札に残す端子の名前 (このターンに挿さなかった手札の端子だけ)。 配線の後に CombatManager が
         /// <see cref="KeepFromMarks"/> で入れ、 次の <see cref="DrawTurn"/> が読んで空にする。</summary>
@@ -1197,14 +1432,40 @@ namespace CombatSystem
             // 〈影写し〉: 写しは次のターンの手札に入る (DrawTurn が引いた後に足す・2026-11-14。 旧: 捨て札へ入れたので、 山札を一巡しないと引けなかった)
             copyNext = o.copyTarget >= 0 && o.copyTarget < board.Count ? board[o.copyTarget] : null;
             string burn = o.burnTarget >= 0 && o.burnTarget < board.Count ? board[o.burnTarget] : null;
-            // 使った使い捨てを手札から外す (この戦闘には戻らない)
-            foreach (int s in o.fired)
-            {
-                var d = TerminalCards.Get(board[s]);
-                if (d != null && d.disposable && hand.Remove(board[s])) exiled.Add(board[s]);
-            }
+            // 使った使い捨てを手札から外す (この戦闘には戻らない・戻る物は次のターンの手札へ)
+            DisposeFired(board, o, hand, exiled, returnNext, state);
             if (burn != null && hand.Remove(burn)) exiled.Add(burn);
             return retain;
+        }
+
+        /// <summary>使った使い捨てを手札から外す (この戦闘から外す・2026-11-20 に共通化)。 本体の <see cref="FinishTurn"/> と BOT の先読み (SampleNextBoard) が同じ関数を呼ぶ。
+        /// 戻る使い捨ては <paramref name="returnNext"/> (次のターンの手札) へ:
+        /// 〈緊急再装填〉の対象 (<see cref="TerminalOutcome.reloadTargets"/>)・〈灰から組む機関〉(1 ターンに 1 枚・場の左から・使い捨て 1 枚につきこの戦闘で 1 回 ──
+        /// 一度戻った名前は <see cref="TerminalBattleState.ashReturned"/> に控え、 次に使えば外れる)・〈解体屋の袋〉(この戦闘の使い捨ての回数が 3 の倍数をまたぐたび、 最後に外れた使い捨てを 1 枚)。</summary>
+        public static void DisposeFired(List<string> board, TerminalOutcome o, List<string> hand, List<string> exiled, List<string> returnNext, TerminalBattleState st)
+        {
+            bool ash = (st.deckItems & DeckItems.Ash) != 0, ashDone = false;
+            foreach (int s in o.fired)
+            {
+                if (s < 0 || s >= board.Count) continue;
+                string id = board[s];
+                var d = TerminalCards.Get(id);
+                if (d == null || !d.disposable || !hand.Remove(id)) continue;
+                if (o.reloadTargets.Contains(s)) { returnNext.Add(id); continue; }
+                // 〈灰から組む機関〉: 一度戻った名前なら外す (控えを 1 つ消す)。 まだならこのターンの 1 枚目を戻す
+                if (ash && !st.ashReturned.Remove(id) && !ashDone) { ashDone = true; st.ashReturned.Add(id); returnNext.Add(id); continue; }
+                exiled.Add(id);
+            }
+            if ((st.deckItems & DeckItems.Bag) != 0 && o.disposedNow > 0)
+            {
+                int n = st.disposedTotal / TerminalCards.BagEvery - (st.disposedTotal - o.disposedNow) / TerminalCards.BagEvery;
+                for (int k = 0; k < n; k++)
+                {
+                    int j = exiled.FindLastIndex(x => TerminalCards.Get(x)?.disposable == true);
+                    if (j < 0) break;
+                    returnNext.Add(exiled[j]); exiled.RemoveAt(j);
+                }
+            }
         }
 
         // ── 判断の間に手札を動かす (戦術消耗品・2026-11-20) ──
@@ -1247,8 +1508,9 @@ namespace CombatSystem
             int got = 0, guard = 0, want = hand.Count + n;
             while (hand.Count < want && guard++ < 64)
             {
-                var id = DrawOne();
+                var id = DrawOne(out int more);
                 if (id == null) break;
+                want += more;
                 got++;
                 var d = TerminalCards.Get(id);
                 if (d != null && d.permanent) { permanent.Add(id); continue; }

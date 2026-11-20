@@ -643,6 +643,10 @@ s = `SwordDanceSet.SoloScale`（2026-11-20）: 持っている[剣の舞]（昇�
 |---|---|---|
 | OnRinkaiBurst | Kw.AddHeat が閾値をまたいだとき | その爆発で使った臨界 |
 | OnSuperBurst | 同じ爆発が超臨界のとき (OnRinkaiBurst の直後・2026-11-20) | その爆発のダメージ (基礎 ×1.5) |
+| OnTerminalDispose | 使い捨ての端子を使ったとき (2026-11-20・`CombatManager.RaiseTerminalEvents`・配線の解決 `ApplyTerminalOutcome` の直後・OnWired の前・1 枚につき 1 回) | 1 |
+| OnDeckShuffle | 端子の捨て札を切り直したとき (ターンの頭に引く所 = `DrawTerminalHand` の直後 / 判断の間に消耗品・品で引いた分は `RaiseTerminalEvents` の頭) | 切り直した枚数 |
+| OnKeptTerminalUse | 残す印で前のターンから残した端子を発動したとき (`RaiseTerminalEvents`・名前で数える) | 挿した出目の合計 (最低 1) |
+| OnSupportTerminalUse | 補助の端子 (基本の〈時計〉を除く) を発動したとき (`RaiseTerminalEvents`・〈残響〉で 2 回働いても 1 回) | 挿した出目の合計 (最低 1) |
 | OnChargeGain / OnOvercharge | CombatContext.AddCharge | 増えた分 / 上限で捨てた分 (〈雷壷〉はターン開始時に上限超過の 75% を捨てる) |
 | OnChargeSpend | CombatContext.ConsumeCharge (リロールも通る) | 使った分 |
 | OnShieldGain | consShield の setter (増えたときだけ) | 増えた分 |
@@ -651,6 +655,9 @@ s = `SwordDanceSet.SoloScale`（2026-11-20）: 持っている[剣の舞]（昇�
 | OnPoisonGain / OnPoisonCap | CombatContext.AddStatus (敵の毒) | 増えた分 / 上限到達 |
 | OnPoisonTick | TickStatuses と〈廃庭の霧吹き〉(敵の攻撃のたび・TickPoisonOnce) | 毒のダメージ = `floor(毒 × enemyMaxHP × 10 / 10000)` (**2026-11-20: 1 スタック = 最大 HP の 0.1%**・旧 0.05%〔2026-11-10 に 0.1% から〕)・下限 1・`fixedDamageToEnemy` 経由 (両経路とも `CombatContext.DotDamage`)。 **2026-11-07: 1 スタック = 敵の最大 HP の 0.1% (旧 0.5%)・上限 99 (旧 10)**。 同日に一度「現在 HP」基準にしたが、 毒を積んでも与ダメの 13% しか出ず最大 HP に戻した。 ダメージを出すたびに、 残っているスタックを `poisonKeepPct`% に減らす (切り捨て・基準 50 = 半減・〈腐れ沼の苔玉〉で最大 70) |
 | OnBleedDecay / OnBleedConsume / OnBleedZero | Phase C の自然減 / Kw.ConsumeBleed / 0 到達 | 減った分 / 使った分 / 1。 **自然減は 2026-11-07〜 比例減衰** `1 + 出血 / (10 + bleedDecayDivisorBonus)` (`AxisRules.BleedDecay`・〈止血禁じの軟膏〉で割る数 +10〔2026-11-20〕。 〈凝血の小瓶〉の 血晶/2 は 2026-11-20 に外した) |
+
+端子の 4 つの出来事は OnWired の前に配るので、 ここで品が足す「攻撃 +N」は撃ごとの口 (ADR-0016) に乗るが、 BOT の配線の判断からは見えない。
+端子の出力を変える品 (采配の軸の多く) は出来事でなく `TerminalCards.Resolve` の中で効かせる (`TerminalBattleState.deckItems`・BOT と自動で一致・下の「配線」)。
 
 **敵への軽減不可ダメージ (Kw.DamageEnemy)。** ターンの解決中 (`ExecuteTurnMutual` の頭〜最後の HP 同期) は
 CombatManager に預け、 プレイヤーの攻撃の直前に固定ダメ枠へ、 攻撃の後の分はターン最後の HP 同期 (踏みとどまりの clamp より前) で通す。
@@ -844,19 +851,46 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
               〈無形の構え〉の次のターンは条件を無視 (同じ目 2 個の端子も 2 個そろっていれば通る)
            3. 充電の支払い (場の順)。 足りなければその端子は不発。 〈裁きの雷〉は充電 1 以上で通り、 効果の所で全部払う (使い捨て・2026-11-19〜)
            4. 〈火葬の剣〉(2026-11-14)・〈影写し〉(2026-11-20〜): 対象の候補 (下の「対象」) が無ければ不発 (挿した出目を外す・使い捨ても消費しない)
+              〈一刀両断〉(2026-11-20): 挿した攻撃の種類の端子が 2 枚以上なら不発 (同じ扱い)
            5. 効果 (場の順)。 〈残響〉が発動していれば他の端子の効果を 2 回走らせる (撃破のボーナス・段階を戻す数も 2 回分)。
               払う物は 1 回だけ (2026-11-20〜): 充電は 3. で 1 回・〈諸刃の剣〉の HP = ceil(sum/2) は 5. の頭で 1 回 (払うと HP が 0 になるなら不発・旧: HP−1 までに切って攻撃は全部入った)・
               〈裁きの雷〉は今の充電をすべて 1 回払い、 2 回目も払った量で攻撃に足す (旧: 2 回目は充電 0)
               〈打ち直し〉(2026-11-20〜): 溜まりが届いたら、 場の順で後ろの (まだ効果を出していない) 端子の出目 1 個ずつ +届いた回数 (sum に入る量だけ・条件は変えない)
               〈剛腕〉(2026-11-20〜): **攻撃の種類の端子**に挿した出目の合計を、 その端子の効果に入れる前に ×2 (〈剛腕〉の効果 1 回につき ×2 ── 2 枚・〈残響〉で ×4)。
               条件 (2.) は 2 倍にする前の目で見る。 〈反復突き〉の「同じ目」も 2 倍にする前の目。 〈剛腕〉自身に挿した出目は使わない
+              〈歯車の軸〉(2026-11-20・挿せない常設 capacity 0): 場にあれば (止まっていない)、 場の順で最初に発動した基本以外の端子の sum += (2 または強化 3) × 挿した出目の数 (何枚でも足す・
+              〈諸刃の剣〉の HP 不足で不発なら次の端子へ)。 条件 (2.) は足す前の目で見る
               端子へ入る量 (sum) = 挿した出目の合計。 ただし**防御の種類の端子**に挿した出目は 1 つずつ max(0, 出目 − TerminalEnv.blockDieCut)
               (時限デバフ〈罪悪感〉で 2・2026-11-16・〈号令の剣〉の +1 の後)。 条件 (2.) は引く前の目で見る。 攻撃・充電・補助の端子の出目は変えない
+           5b. 〈緊急再装填〉(2026-11-20): 発動した〈緊急再装填〉1 枚ごとに、 このターンに使った他の使い捨てを 1 枚 (場の右から・自分は除く) reloadTargets へ
+              (FinishTurn の DisposeFired が次のターンの手札 returnNext へ。 〈残響〉で 2 回働いても 1 枚)
+           采配と共通の端子の効果 (5.): 〈焼却斬り〉攻撃 += sum × 2 (強化 3) + disposedTotal (このターンより前) × max(2, 采配) /
+              〈一刀両断〉攻撃 += sum × 3 (強化 4)・ignoreDefense (攻撃の端子は 1 枚だけなので、 この撃だけ) / 〈巡りの鐘〉bells +1 (切り直すたび extraDrawNext += bells) /
+              〈見切りの構え〉ブロック += sum × (大技の予告のターン TerminalEnv.heavyTurn なら 2) / 〈崩し斬り〉攻撃 += sum (強化 +1)
            6. 他の端子を見る効果: 〈連係斬り〉攻撃 + RelayPerFired × 基本以外の発動数 (自分も数える・2026-11-20〜 旧: −1)。
               (旧 〈剛腕〉: 攻撃 + 攻撃の種類の端子を挿した出目の合計 ── 2026-11-20 に 5. の ×2 へ)
               溜めた攻撃 (〈力溜め〉〈後の先〉) は、 攻撃の種類の端子を 1 枚以上挿したターンに attackAdd へ足して 0 に戻す
               〈後の先〉の溜める量 (2026-11-20〜) = ブロックで防いだ量。 Resolve は見込み min(後の先のブロック, TerminalEnv.enemyAttack) を storedAttackNext に入れ (parryStore)、
               本体が敵の攻撃の後 (CombatManager.SettleParry) に Σ_攻撃 1 回ごと min(後の先のブロック, min(敵の攻撃, blockSum)) へ直す (攻撃しなかったターンは 0)。 BOT は見込みで値付けする
+           采配 (山札の軸) の品 (2026-11-20・段 1-e・旗は TerminalBattleState.deckItems = 戦闘の始めの所持品・BOT の写しも同じ旗):
+              5. の端子 1 枚ごと (〈残響〉で効果が 2 回走っても 1 回): 〈型抜きの金型〉条件のある端子の出力 +3 (攻撃はその端子の撃に・補助はシールド +4) /
+                 〈補助歯車〉補助 (基本を除く) 1 枚ごとにシールド +4 / 使い捨てなら disposedNow +1
+              6. の後: disposedTotal += disposedNow (この戦闘で使い捨てを使った回数)。 〈再利用のるつぼ〉使い捨てを使ったターン storedAttack += disposedTotal × 采配 (〈力溜め〉と同じ口)
+              6c. 撃ごとの攻撃 +N (攻撃の端子の撃 attackHits の 1 つずつに足し、 attackAdd にも 撃の数 × N を足す ── 1 撃目だけに足すのではない・攻撃しないターンは入らない):
+                 〈留め金の栞〉残す印で残した端子 (TerminalBattleState.kept・名前で数える) を発動したターン +5 / 〈早回しのゼンマイ〉+このターンに切り直した枚数 (shuffledNow) /
+                 〈継ぎ目のない導線〉補助 (基本を除く) を発動したターン +采配 / 〈常設の作業台〉場の常設 (基本を除く・止まっていない) 1 枚につき +3 (ブロックも +3)
+                 〈折り目のついた札〉残した端子を発動したターンが 2 ターン以上続いたら outgoingPctAdd += 0.40 (keptStreak・品が無くても数える)
+                 〈仕込みの配電盤〉firedNonBasic ≥ 3 なら extraDrawNext += 2 / 〈空回りの錘〉挿さなかった出目 (slotOfDie = −1) の数 (最大 2) を extraDrawNext へ
+           山札の出し入れ (采配の品):
+              切り直しの直前 (TerminalDeckState.BeforeShuffle・本体の DrawOne と BOT の SampleNextBoard が同じ関数): shuffles +1・shuffledNow += 捨て札の枚数 →
+                 〈無銘の設計図〉山札 (山 + 捨て札 + 手札 + 場) が 3 枚を超えていれば捨て札の基本の端子を 1 枚 exiled へ (先に捨てた方) →
+                 〈永久機関の主軸〉このターン 1 枚多く引く・shuffles が 3 の倍数なら doubleAll = true (〈残響〉と同じ倍化・このターン)
+              使い捨ての外し方 (TerminalDeckState.DisposeFired・本体の FinishTurn と BOT の先読みが同じ関数): 〈灰から組む機関〉1 ターンに 1 枚 (場の左から) を returnNext
+                 (次のターンの手札) へ・一度戻った名前は ashReturned に控えて次に使えば外す / 〈解体屋の袋〉disposedTotal が 3 の倍数をまたぐたび、 exiled の最後の使い捨てを returnNext へ
+              戦闘の始め (CombatManager.BeginTerminalDeck): 〈予備の差込口〉extraDrawNext += 2 / 〈整理された工具箱〉ランの山札 ≤ 12 枚なら handBonus = 1 (毎ターン 手札 5 + 1) /
+                 〈常設の作業台〉山の常設を全部場へ (MovePermanentsToBoard)
+              出来事で書く 2 品 (DeckItemEffects.cs): 〈焼き入れの挟み〉OnTerminalDispose で Kw.DamageEnemy(4 + 采配) /
+                 〈灰払いの箒〉OnTerminalDispose で「次の撃の会心率」+= 采配 × 5% を積み、 OnCriticalCheck の本物の撃 (IsRealHit) で critRatePctAdd へ足して 0 に戻す (撃ごとに戻るのでその 1 撃だけ)
          〈影写し〉〈火葬の剣〉〈保持器〉の対象: Resolve の wantTarget (人 = 画面で選んだ端子 / BOT = WiringPlan.targets)。
            候補 = 自分でない・常設でない・止まっていない・挿し方を直した後に出目が 1 個も無い手札の端子 (TerminalCards.IsCandidate)。 選ばない・候補でない時は左端の候補
          結果 (TerminalOutcome) の行き先:
@@ -939,6 +973,8 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
          → 物資の疲労（15% で**最終ダメージ半減**。 isCrit は落とさない）
          → 敵HP -= 撃ごとの dealtDmg (1 撃ずつ HP へ入れ、 〈天眼の鍔〉の首落とし・ボスの目盛りを割る判定も 1 撃ごと。
               合計が役〈追撃〉・ヴェスカの守りで変わった分は配り直す: 減った分は後ろの撃から、 増えた分は最後の撃へ) → 敵HP -= dealtFixed
+              端子〈崩し斬り〉(2026-11-20): 撃 h (= 攻撃の端子の h 枚目・TerminalOutcome.attackHitIds[h]) が NoteBossDownMainHit で目盛りを 1 つ以上割ったら、
+              Kw.DamageEnemy(floor(敵の最大 HP × 5% (強化 6%))) (預かり・ターンの最後の HP 同期で通る・通常攻撃ではないので目盛りは割らない)
          → 鋼の皮膚
          → **役の追撃**: ApplyWinDamageModifiers の直後に ApplyRoleExtraDamage (与ダメ内訳の算出後)。
            敵の〈飛翔〉〈不動〉が ProcessDamage の中で nullifyPursuitDamage を立てていれば入れない (2026-11-11 #104)

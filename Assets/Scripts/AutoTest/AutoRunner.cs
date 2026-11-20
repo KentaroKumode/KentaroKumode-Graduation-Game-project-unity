@@ -365,7 +365,7 @@ namespace AutoTest
         private float _probeMainApplied = 1f, _probePassiveApplied = 1f;
         private static float ProbeMultClamp(float v) => float.IsNaN(v) || v < 0f ? 1f : v;
 
-        /// <summary>[2026-11-10] 軸に寄せる方策 (品は配らない)。 軸の名前 (毒/出血/臨界/充電/シールド/会心 = items.json の axis)。 空 = 無効。
+        /// <summary>[2026-11-10] 軸に寄せる方策 (品は配らない)。 軸の名前 (毒/出血/臨界/充電/シールド/会心/山札/役 = items.json の axis)。 空 = 無効。
         /// 店 (<see cref="PersonaBonus"/> を通る 3 か所)・戦闘後の 2 択・開幕の品の選択・挑戦カードで、 この軸の品を優先する。</summary>
         public string buyAxisFocus = "";
         /// <summary>軸に寄せる加点 (序列の段の数・店では × StepPerTier の準パワー)。 1 = 「同じ値段帯なら軸の品を先に取る」程度。</summary>

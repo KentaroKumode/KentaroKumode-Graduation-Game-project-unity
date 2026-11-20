@@ -269,6 +269,8 @@ namespace ItemSystem.PassiveSkills
             Register(new BeltPouch()); Register(new SpentPride()); Register(new BottomlessVial()); Register(new SampleBox());
             // 嵐・店・金のマクロ秘宝の戦闘の側 (2026-11-20・MacroItemEffects.cs・item-overhaul-spec §9)
             Register(new MacroBarometer()); Register(new MacroReceipt()); Register(new MacroAbacus());
+            // 采配 (山札の軸) の出来事で書く 2 品 (2026-11-20・DeckItemEffects.cs・残り 16 品は TerminalCards の DeckItems の旗)
+            Register(new TemperTongs()); Register(new AshBroom());
 
             // ============================
             //  汎用パッシブ
