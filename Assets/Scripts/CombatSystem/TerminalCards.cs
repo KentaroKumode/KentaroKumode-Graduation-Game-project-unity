@@ -544,6 +544,8 @@ namespace CombatSystem
             // ── 5. 効果 ──
             bool doubler = false;
             for (int s = 0; s < m; s++) if (board[s] == TerminalIds.Doubler && Plugged(o.slotOfDie, s)) doubler = true;
+            // 連なりの賽 (2026-11-20): 3 つの目が連番のターン (役〈連なり〉)、 挿した端子がすべて倍化する (〈残響〉と同じ)
+            if (env.dieId == GameLoop.DieIds.Straight && YachtRoles.IsRun(v)) doubler = true;
             int attackPips = 0;      // 攻撃の種類の端子に挿した出目 (〈剛腕〉が 2 倍にする分)
             for (int s = 0; s < m; s++)
             {

@@ -2846,7 +2846,7 @@
     {
       "id": "夜番の賽",
       "name": "夜番の賽",
-      "description": "防御に挿した目が、敵の出目の最大より大きければ、シールド +3。",
+      "description": "防御に挿した目が、敵の出目の最大より大きければ、シールド +目 × 2。",
       "flavorText": "",
       "category": "Dice",
       "rarity": "SILVER",
@@ -2856,7 +2856,7 @@
     {
       "id": "秤の賽",
       "name": "秤の賽",
-      "description": "目がほかの 2 つの目の間の値なら、どこに挿しても +1。",
+      "description": "目がほかの 2 つの目の間の値なら、どこに挿しても +3。",
       "flavorText": "",
       "category": "Dice",
       "rarity": "SILVER",
@@ -2876,7 +2876,7 @@
     {
       "id": "古銭の賽",
       "name": "古銭の賽",
-      "description": "⑧が出たターンに敵を倒すと、ゴールド +3。",
+      "description": "⑧が出るたび、ゴールド +2。",
       "flavorText": "",
       "category": "Dice",
       "rarity": "GOLD",
@@ -2956,7 +2956,7 @@
     {
       "id": "連なりの賽",
       "name": "連なりの賽",
-      "description": "このランでは「3 つの連番」も役になる。〈連なり〉: 次のターン、振り直しが 1 回無料になり、手札を 1 枚多く引く。",
+      "description": "このランでは「3 つの連番」も役になる。〈連なり〉: そのターン、挿した端子がすべて 2 回働く。",
       "flavorText": "",
       "category": "Dice",
       "rarity": "LEGENDARY",
