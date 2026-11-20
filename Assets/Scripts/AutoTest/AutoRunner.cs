@@ -945,7 +945,8 @@ namespace AutoTest
                  + (NoAttackChoiceLine().Length > 0 ? System.Environment.NewLine + NoAttackChoiceLine() : "")
                  + (DownAimLine().Length > 0 ? System.Environment.NewLine + DownAimLine() : "")                 // [#141]
                  + (DownBreakDiagLine().Length > 0 ? System.Environment.NewLine + DownBreakDiagLine() : "")     // [診断 2026-11-14] 目盛りの割り時
-                 + (HandKeepPlanLine().Length > 0 ? System.Environment.NewLine + HandKeepPlanLine() : "");      // [#141]
+                 + (HandKeepPlanLine().Length > 0 ? System.Environment.NewLine + HandKeepPlanLine() : "")       // [#141]
+                 + (TacticUsesLine().Length > 0 ? System.Environment.NewLine + TacticUsesLine() : "");          // [2026-11-21] 戦術消耗品
         }
 
         /// <summary>次のボスに対する戦力ギャップ。 **天井 (Super) のときだけ効く** ──

@@ -95,6 +95,8 @@ namespace AutoTest
             // ---- 今ターンの追加の効果 (効用の Core が本体の位置で掛ける) ----
             ws.damageMul = o.damageMul; ws.outPctAdd = o.outgoingPctAdd; ws.critMultAdd = o.critMultAdd; ws.forceCrit = o.forceCrit;
             ws.ignoreDefense = o.ignoreDefense; ws.takenMul = o.takenMul; ws.enemyAtkMul = o.enemyAttackMul;
+            //   〈急所突きの針〉: 新しい式 (readOut) は最初の 1 撃だけで見る (ReadOutOneHit)。 旧の式は撃を分けないので、 攻撃するターン全体を会心・防御無視と見る (多段では過大)
+            if (s.needleFirst && !s.readOut && o.attackDice > 0) { ws.forceCrit = true; ws.ignoreDefense = true; }
             ws.shield = o.shield - o.shieldSpend; ws.heal = o.heal; ws.selfDamage = o.selfDamage;
             //   〈応急箱＋〉: 最大 HP を超えた分はシールドになる (本体 ApplyTerminalOutcome と同じ・回復する前の空きを超えた分)
             if (o.overhealToShield > 0) ws.shield += Math.Max(0, o.overhealToShield - Math.Max(0, env.maxHp - env.hp));
@@ -909,6 +911,7 @@ namespace AutoTest
         {
             RefreshMainCorr();   // [V3 mainCorr]
             PrepareSuperTurn(rolls, tele);
+            UseTacticsThisTurn(rolls, ref tele);   // 戦術消耗品 (2026-11-21・§12-6)。 盤面を変えるので配線の判断の前
             int hpNow = CombatManager.Instance != null ? CombatManager.Instance.PlayerHP : -1;
             if (_fbPrevHp >= 0 && hpNow >= 0 && _fbPrevHp - hpNow > _fbPrevExpTaken) _fbUnavoidSeen = true;
             _lastFreeBlock = _lastKillsNow = false;
