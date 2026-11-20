@@ -2743,6 +2743,188 @@
       "basePrice": 9
     },
     {
+      "id": "焼き入れの挟み",
+      "name": "焼き入れの挟み",
+      "description": "使い捨ての端子を使うたび、敵に 4 + 采配 の軽減不可ダメージ",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "BRONZE",
+      "basePrice": 7,
+      "skill": "焼き入れの挟み",
+      "axis": "山札"
+    },
+    {
+      "id": "予備の差込口",
+      "name": "予備の差込口",
+      "description": "戦闘の 1 ターン目、端子を 2 枚多く引く",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "BRONZE",
+      "basePrice": 7,
+      "axis": "山札"
+    },
+    {
+      "id": "留め金の栞",
+      "name": "留め金の栞",
+      "description": "前のターンから残す印で残した端子を発動したターン、各撃の攻撃 +5",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "BRONZE",
+      "basePrice": 7,
+      "axis": "山札"
+    },
+    {
+      "id": "補助歯車",
+      "name": "補助歯車",
+      "description": "補助の端子を発動するたび、シールド +4",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "BRONZE",
+      "basePrice": 7,
+      "axis": "山札"
+    },
+    {
+      "id": "空回りの錘",
+      "name": "空回りの錘",
+      "description": "どの端子にも挿さなかった出目 1 個につき、次のターンに端子を 1 枚多く引く（1 ターンに最大 2 枚）",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "BRONZE",
+      "basePrice": 7,
+      "axis": "山札"
+    },
+    {
+      "id": "灰払いの箒",
+      "name": "灰払いの箒",
+      "description": "使い捨ての端子を使うたび、次の撃の会心率 +采配 × 5%",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "skill": "灰払いの箒",
+      "axis": "山札"
+    },
+    {
+      "id": "早回しのゼンマイ",
+      "name": "早回しのゼンマイ",
+      "description": "山札を切り直したターン、切り直した端子 1 枚につき各撃の攻撃 +1",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "axis": "山札"
+    },
+    {
+      "id": "仕込みの配電盤",
+      "name": "仕込みの配電盤",
+      "description": "基本以外の端子を 3 枚発動したターン、次のターンに端子を 2 枚多く引く",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "axis": "山札"
+    },
+    {
+      "id": "型抜きの金型",
+      "name": "型抜きの金型",
+      "description": "条件のある端子（奇数・3 以下など）を発動するたび、その端子の攻撃・ブロック・充電 +3（補助の端子ならシールド +4）",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "axis": "山札"
+    },
+    {
+      "id": "整理された工具箱",
+      "name": "整理された工具箱",
+      "description": "戦闘開始時に山札が 12 枚以下なら、この戦闘の毎ターン、端子を 1 枚多く引く",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "axis": "山札"
+    },
+    {
+      "id": "再利用のるつぼ",
+      "name": "再利用のるつぼ",
+      "description": "【規則】使い捨ての端子を使ったターン、この戦闘で使い捨てを使った回数 × 采配 を次の攻撃に足す",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "axis": "山札"
+    },
+    {
+      "id": "無銘の設計図",
+      "name": "無銘の設計図",
+      "description": "【規則】山札を切り直すたび、捨て札の基本の端子（攻撃・防御・充電）を 1 枚この戦闘から外す（山札が 3 枚以下なら外さない）",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "axis": "山札"
+    },
+    {
+      "id": "継ぎ目のない導線",
+      "name": "継ぎ目のない導線",
+      "description": "補助の端子を発動したターン、各撃の攻撃 +采配",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "axis": "山札"
+    },
+    {
+      "id": "折り目のついた札",
+      "name": "折り目のついた札",
+      "description": "残す印で残した端子を発動したターンが 2 ターン続くと、そのターンの与ダメージ +40%（続く間は毎ターン）",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "axis": "山札"
+    },
+    {
+      "id": "解体屋の袋",
+      "name": "解体屋の袋",
+      "description": "この戦闘で使い捨ての端子を 3 回使うたび、この戦闘から外れた使い捨てを 1 枚（最後に外れた物）次のターンの手札に戻す",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "LEGENDARY",
+      "basePrice": 10,
+      "axis": "山札"
+    },
+    {
+      "id": "常設の作業台",
+      "name": "常設の作業台",
+      "description": "【規則】戦闘開始時、山札の常設の端子をすべて場に出す。場の常設の端子 1 枚につき、毎ターン各撃の攻撃 +3・ブロック +3",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "LEGENDARY",
+      "basePrice": 10,
+      "axis": "山札"
+    },
+    {
+      "id": "灰から組む機関",
+      "name": "灰から組む機関",
+      "description": "使い捨ての端子を使ったターン、その使い捨ては戦闘から外れず、次のターンの手札に戻る（1 ターンに 1 枚・使い捨て 1 枚につきこの戦闘で 1 回だけ戻る）",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "LEGENDARY",
+      "basePrice": 10,
+      "axis": "山札"
+    },
+    {
+      "id": "永久機関の主軸",
+      "name": "永久機関の主軸",
+      "description": "【規則】山札を切り直すたび、端子を 1 枚多く引く。この戦闘で切り直した回数が 3 の倍数になるたび、そのターン挿した端子がすべて 2 回働く",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "LEGENDARY",
+      "basePrice": 10,
+      "axis": "山札"
+    },
+    {
       "id": "鋲の胸当て",
       "name": "鋲の胸当て",
       "description": "ターン開始時、シールド +1",

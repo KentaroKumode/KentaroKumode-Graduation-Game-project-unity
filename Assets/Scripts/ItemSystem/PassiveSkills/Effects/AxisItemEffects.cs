@@ -40,6 +40,9 @@ namespace ItemSystem.PassiveSkills.Effects
             // 追加 34 品のうち軸の品の数を読む品 (AxisItemEffects2.cs)
             ["千里眼の水晶"] = (AxisRules.Crit, Kind.Count), ["雷鳴の太鼓"] = (AxisRules.Charge, Kind.Count),
             ["涸れぬ血晶"] = (AxisRules.Bleed, Kind.Count), ["瘴気の外套"] = (AxisRules.Poison, Kind.Count),
+            // 采配 (山札の軸・2026-11-20): ① 采配を読む・②【規則】
+            [GameLoop.ItemIds.DeckBroom] = (AxisRules.Deck, Kind.Count), [GameLoop.ItemIds.DeckSeamless] = (AxisRules.Deck, Kind.Count),
+            [GameLoop.ItemIds.DeckCrucible] = (AxisRules.Deck, Kind.Rule), [GameLoop.ItemIds.DeckBlueprint] = (AxisRules.Deck, Kind.Rule),
         };
     }
 

@@ -863,6 +863,25 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
               溜めた攻撃 (〈力溜め〉〈後の先〉) は、 攻撃の種類の端子を 1 枚以上挿したターンに attackAdd へ足して 0 に戻す
               〈後の先〉の溜める量 (2026-11-20〜) = ブロックで防いだ量。 Resolve は見込み min(後の先のブロック, TerminalEnv.enemyAttack) を storedAttackNext に入れ (parryStore)、
               本体が敵の攻撃の後 (CombatManager.SettleParry) に Σ_攻撃 1 回ごと min(後の先のブロック, min(敵の攻撃, blockSum)) へ直す (攻撃しなかったターンは 0)。 BOT は見込みで値付けする
+           采配 (山札の軸) の品 (2026-11-20・段 1-e・旗は TerminalBattleState.deckItems = 戦闘の始めの所持品・BOT の写しも同じ旗):
+              5. の端子 1 枚ごと (〈残響〉で効果が 2 回走っても 1 回): 〈型抜きの金型〉条件のある端子の出力 +3 (攻撃はその端子の撃に・補助はシールド +4) /
+                 〈補助歯車〉補助 (基本を除く) 1 枚ごとにシールド +4 / 使い捨てなら disposedNow +1
+              6. の後: disposedTotal += disposedNow (この戦闘で使い捨てを使った回数)。 〈再利用のるつぼ〉使い捨てを使ったターン storedAttack += disposedTotal × 采配 (〈力溜め〉と同じ口)
+              6c. 撃ごとの攻撃 +N (攻撃の端子の撃 attackHits の 1 つずつに足し、 attackAdd にも 撃の数 × N を足す ── 1 撃目だけに足すのではない・攻撃しないターンは入らない):
+                 〈留め金の栞〉残す印で残した端子 (TerminalBattleState.kept・名前で数える) を発動したターン +5 / 〈早回しのゼンマイ〉+このターンに切り直した枚数 (shuffledNow) /
+                 〈継ぎ目のない導線〉補助 (基本を除く) を発動したターン +采配 / 〈常設の作業台〉場の常設 (基本を除く・止まっていない) 1 枚につき +3 (ブロックも +3)
+                 〈折り目のついた札〉残した端子を発動したターンが 2 ターン以上続いたら outgoingPctAdd += 0.40 (keptStreak・品が無くても数える)
+                 〈仕込みの配電盤〉firedNonBasic ≥ 3 なら extraDrawNext += 2 / 〈空回りの錘〉挿さなかった出目 (slotOfDie = −1) の数 (最大 2) を extraDrawNext へ
+           山札の出し入れ (采配の品):
+              切り直しの直前 (TerminalDeckState.BeforeShuffle・本体の DrawOne と BOT の SampleNextBoard が同じ関数): shuffles +1・shuffledNow += 捨て札の枚数 →
+                 〈無銘の設計図〉山札 (山 + 捨て札 + 手札 + 場) が 3 枚を超えていれば捨て札の基本の端子を 1 枚 exiled へ (先に捨てた方) →
+                 〈永久機関の主軸〉このターン 1 枚多く引く・shuffles が 3 の倍数なら doubleAll = true (〈残響〉と同じ倍化・このターン)
+              使い捨ての外し方 (TerminalDeckState.DisposeFired・本体の FinishTurn と BOT の先読みが同じ関数): 〈灰から組む機関〉1 ターンに 1 枚 (場の左から) を returnNext
+                 (次のターンの手札) へ・一度戻った名前は ashReturned に控えて次に使えば外す / 〈解体屋の袋〉disposedTotal が 3 の倍数をまたぐたび、 exiled の最後の使い捨てを returnNext へ
+              戦闘の始め (CombatManager.BeginTerminalDeck): 〈予備の差込口〉extraDrawNext += 2 / 〈整理された工具箱〉ランの山札 ≤ 12 枚なら handBonus = 1 (毎ターン 手札 5 + 1) /
+                 〈常設の作業台〉山の常設を全部場へ (MovePermanentsToBoard)
+              出来事で書く 2 品 (DeckItemEffects.cs): 〈焼き入れの挟み〉OnTerminalDispose で Kw.DamageEnemy(4 + 采配) /
+                 〈灰払いの箒〉OnTerminalDispose で「次の撃の会心率」+= 采配 × 5% を積み、 OnCriticalCheck の本物の撃 (IsRealHit) で critRatePctAdd へ足して 0 に戻す (撃ごとに戻るのでその 1 撃だけ)
          〈影写し〉〈火葬の剣〉〈保持器〉の対象: Resolve の wantTarget (人 = 画面で選んだ端子 / BOT = WiringPlan.targets)。
            候補 = 自分でない・常設でない・止まっていない・挿し方を直した後に出目が 1 個も無い手札の端子 (TerminalCards.IsCandidate)。 選ばない・候補でない時は左端の候補
          結果 (TerminalOutcome) の行き先:

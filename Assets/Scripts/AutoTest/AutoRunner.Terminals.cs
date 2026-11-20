@@ -1188,7 +1188,7 @@ namespace AutoTest
                 var rng = new System.Random(unchecked(la.seed + j * 7919));
                 var nst = after.Clone();
                 int extra = nst.BeginTurn();
-                var nb = SampleNextBoard(ev.deck, ev.board, o, TerminalCards.HandSize + extra, la.stopChance, rng, out var stopped, keep, _recallPrefer);
+                var nb = SampleNextBoard(ev.deck, ev.board, o, TerminalCards.HandSize + extra + nst.handBonus, la.stopChance, rng, out var stopped, keep, _recallPrefer, nst);
                 nst.stopped = stopped;
                 // 〈打ち直し〉の出目 +N は振った後に足される (本体 DrawTerminalHand → FoundryBonusKey)
                 var dice = new int[k];
@@ -1214,7 +1214,8 @@ namespace AutoTest
             foreach (int s in o.fired) { var d = TerminalCards.Get(board[s]); if (d != null && d.disposable) sb.Append(board[s]).Append(','); }
             sb.Append('|').Append(after.oscLast).Append(',').Append(after.oscStreak).Append(',').Append(after.oscLastUp).Append(',').Append(after.oscStreakUp).Append(',').Append(after.firedTotal).Append(',')
               .Append(after.ignoreCondNext ? 1 : 0).Append(',').Append(after.storedAttack).Append(',').Append(after.storedAttackNext).Append(',')
-              .Append(after.extraDrawNext).Append(',').Append(after.foundryBonus).Append(',').Append(after.mainsUses).Append('|');
+              .Append(after.extraDrawNext).Append(',').Append(after.foundryBonus).Append(',').Append(after.mainsUses).Append(',')
+              .Append(after.disposedTotal).Append(',').Append(after.keptStreak).Append(',').Append(after.storedAttack).Append('|');      // 采配の品 (2026-11-20)
             if (after.gauge.Count > 0)
             {
                 var keys = new List<string>(after.gauge.Keys); keys.Sort(StringComparer.Ordinal);
@@ -1225,22 +1226,24 @@ namespace AutoTest
 
         /// <summary>次のターンの場 (常設 + 手札) を 1 つ引く (写しで回す・本体の山札は書き換えない・専用の乱数)。
         /// 本体の <see cref="TerminalDeckState.FinishTurn"/> → <see cref="TerminalDeckState.DrawTurn"/> と同じ順。 違いは、 山の並びを読まずに中身から一様に引くことだけ。
-        /// <paramref name="stopped"/> = ヴェスカ〈停滞する時間〉で止まった場の端子 (null = なし)。</summary>
+        /// <paramref name="stopped"/> = ヴェスカ〈停滞する時間〉で止まった場の端子 (null = なし)。
+        /// <paramref name="st"/> = 次のターンの端子の状態 (BeginTurn を掛けた写し・null 可)。 采配の品 (2026-11-20) の山札の規則
+        /// (使い捨ての戻り・切り直しの数え・〈無銘の設計図〉・〈永久機関の主軸〉・残した端子の名前) を、 本体と同じ関数でこの写しに掛ける。</summary>
         private static List<string> SampleNextBoard(TerminalDeckState dk, List<string> board, TerminalOutcome o, int size, float stopChance,
-                                                    System.Random rng, out bool[] stopped, List<string> keep = null, TerminalKind? recallPrefer = null)
+                                                    System.Random rng, out bool[] stopped, List<string> keep = null, TerminalKind? recallPrefer = null,
+                                                    TerminalBattleState st = null)
         {
             var draw = new List<string>(dk.draw);
             var discard = new List<string>(dk.discard);
             var hand = new List<string>(dk.hand);
             var perm = new List<string>(dk.permanent);
+            var exiled = new List<string>(dk.exiled);
+            var ret = new List<string>(dk.returnNext);
+            if (st == null) st = dk.state.Clone();      // 旗だけ読む写し (書き換えは捨てる)
             // ---- FinishTurn: 残す 1 枚・影写し (次のターンの手札へ・引いた後に足す)・使い捨てと火葬の剣 (この戦闘から外す) ----
             string retain = o.retainTarget >= 0 && o.retainTarget < board.Count ? board[o.retainTarget] : null;
             string copy = o.copyTarget >= 0 && o.copyTarget < board.Count ? board[o.copyTarget] : null;
-            foreach (int s in o.fired)
-            {
-                var d = TerminalCards.Get(board[s]);
-                if (d != null && d.disposable) hand.Remove(board[s]);
-            }
+            TerminalDeckState.DisposeFired(board, o, hand, exiled, ret, st);      // 本体の FinishTurn と同じ関数 (戻る使い捨ては ret へ)
             if (o.burnTarget >= 0 && o.burnTarget < board.Count) hand.Remove(board[o.burnTarget]);
             // ---- DrawTurn: 本体と同じ関数 (TerminalDeckState.SplitHand) で、 残す端子と捨て札へ送る端子に分ける ----
             //   Pick (既定): 旧い規則 + 残す印 (keep) の付いた端子 / All: 今ターンに挿した端子だけを捨て札へ / Off: 止まっていた手札と旧い〈保持器〉の 1 枚だけ残す。
@@ -1251,6 +1254,11 @@ namespace AutoTest
             if (o.recall && TerminalCards.HandCarry)
                 TerminalDeckState.ApplyRecall(TerminalDeckState.RecallPick(dk.discard, RecallBest(dk.discard, GameManager.Instance?.Run, recallPrefer)), kept, discard, size);
             hand.Clear(); hand.AddRange(kept);
+            {      // 残す印で残った端子の名前 (本体の DrawTurn の LastKept と同じ: Pick の印のうち残った物)
+                var lk = new List<string>();
+                if (TerminalCards.CarryMode == HandCarryMode.Pick && keep != null) foreach (var id in keep) if (kept.Contains(id)) lk.Add(id);
+                st.kept = lk.Count > 0 ? lk : null;
+            }
             // ---- 引く (山が尽きたら捨て札を混ぜて続ける・常設は場へ出して引き直す・引いた物だけが止まる対象) ----
             var stopPerm = new List<int>(); var stopHand = new List<int>();
             int guard = 0;
@@ -1259,7 +1267,9 @@ namespace AutoTest
                 if (draw.Count == 0)
                 {
                     if (discard.Count == 0) break;
+                    size += TerminalDeckState.BeforeShuffle(discard, exiled, draw.Count + discard.Count + hand.Count + perm.Count, st);      // 本体の DrawOne と同じ関数
                     draw.AddRange(discard); discard.Clear();
+                    if (draw.Count == 0) continue;
                 }
                 int j = rng.Next(draw.Count);
                 var id = draw[j]; draw[j] = draw[draw.Count - 1]; draw.RemoveAt(draw.Count - 1);
@@ -1270,6 +1280,7 @@ namespace AutoTest
                 hand.Add(id);
             }
             if (copy != null) hand.Add(copy);      // 〈影写し〉の写し: 本体の DrawTurn と同じく、 引く枚数とは別に手札の最後へ
+            hand.AddRange(ret);                    // 戻る使い捨て (〈灰から組む機関〉〈緊急再装填〉〈解体屋の袋〉): 本体の DrawTurn と同じく写しの後ろへ
             var nb = new List<string>(perm.Count + hand.Count);
             nb.AddRange(perm); nb.AddRange(hand);
             stopped = null;
