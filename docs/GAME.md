@@ -406,7 +406,7 @@ lore 的には「ギルド管轄も 5 層まで」「5 層を抜けた時点で�
 | Battle | 戦闘 | 29 |
 | Event | イベント | 25 |
 | EliteBattle | エリート（**精鋭の敵 1 体**・報酬ゴールド ×2.0） | 14 |
-| Exchange | 交換（パッシブ 1 つ→上位 Tier ランダム） | 7 |
+| Exchange | 交換（いちばん低いレア度の秘宝から 1 つ選んで差し出す → 上のレア度の 2 択から 1 つ・2026-11-20・§16-10） | 7 |
 | Shop | ショップ | 7 |
 | Treasure | 秘宝 | 3 |
 | Rest | 休憩（HP 回復 or 強化） | 3（2026-09-28 に 2 → 3・試作の値） |
@@ -3622,7 +3622,12 @@ id は `ItemIds.Macro*`。戦闘の側は `MacroItemEffects.cs`（気圧計・�
 | 黄金の通行手形 | LEGENDARY | 金 | 店で 100G 使うたび（店を出る時に、その店で使った額を端数ごと足す）、次の店 1 軒の秘宝の棚（5 枠とそのリロール）が、引いたレア度の 1 段上で並ぶ（LEGENDARY はそのまま・その段の品が出せなければ引いた段）。200G なら 2 軒。乱数は引き足さない。最終倍率・最大 HP は無し（§12-1） | `ShopManager.Close` / `Generate` / `PickItemByKind` |
 | 目利きの紹介状 | BRONZE | 金 | 店に入るたび、最初の 1 回の通常リロールが無料（回数は数える = 次の値段は上がる）。軸指定リロールの追加 15G → 10G | `ShopManager.TryReroll` / `AxisRerollSurchargeFor` / `RerollPrice` |
 | 二股の鑑定書 | SILVER | — | 戦闘後の端子の報酬 +1 枚（通常 2→3・エリートと 0 層 3→4・ボス 3→4） | `GameManager.OfferTerminalReward` |
+| 古物商の交換帳 | GOLD | — | 交換マスの 2 択を、今の偏重の一番高い軸（`EventEffectExecutor.TopAxis`・軸の品が 1 つも無ければ寄せない）に寄せる: その軸の品 1 つの重みをレア度の中で ×6（軸指定リロールと同じ `AxisRerollWeightMul`・レア度の出方は変えない） | `GameManager.PickHigherTierPassives` |
 
+- **交換マス**（`TileType.Exchange`・`GameManager.DoExchangeTile`・system-overhaul-spec §4-2）: 差し出せるのは手放せる秘宝のうち、いちばん低いレア度のもの全部（`ExchangeGiveCandidates`）。
+  1 つ選んで差し出すと、上のレア度（差し出した品が LEGENDARY なら LEGENDARY）の秘宝を重ねずに 2 つ引き（`ExchangeChoices`・引き方は旧と同じレア度の重み・〈サーベル・ワルツ〉の差し替えも 1 つずつ）、1 つ選んで受け取る（`OfferPassiveChoice`・人は地図へ戻ってからの「品を選ぶ」）。
+  BOT: 差し出すのは買いの点（ITT の序列・`LearnedPriorityProvider.BuyScore`）が一番低い物（`GameHooks.ChooseTradeAway`）、受け取るのは点の高い方（`ChooseOfferedPassive`）。
+  イベントの「パッシブを差し出して替える」（`TradeLowestPassive`）は 1 対 1 のまま（先頭の品 → ランダム 1 つ）。
 - 画面の通常リロールの値段は `ShopManager.RerollPrice`（紹介状の無料なら 0G）。BOT の「まだ回せる」の判定は 0 にならない `ShopInventory.CurrentRerollPrice` のまま。
 - BOT はどれも「持っていても壊れない」だけ（活かす判断は段 3）。
 
@@ -3858,7 +3863,7 @@ OfferPassives / TradePassive / ForgeWeapon / NextShopDiscount / NextRestBonus /
 | `近道+N` | **この後の移動 N 回ぶん、物資を使わずターンも進まない**（2026-11-12 のユーザーの決定で作り替え）。自動では動かない ── どこへ動くかは遊ぶ人が選ぶ。待つ・偵察・〈補給線〉には効かない。重ねたら足し合わせ。層を出たら残りは消える。**見せ方は時限バフ「近道」（残り N 回）に統一**（2026-11-13・作者の決定）: イベントの結果の行は時限バフと同じ「時限バフ獲得: 近道 (N回)」、地図の上の帯（経過ターンの帯の右）は「近道 N回」、ログは「時限バフ「近道」」。残りは中断セーブに写す（`SavedState.freeMovesLeft`）。ただの 1 歩の扱いは下の表 | `FreeMapSim.GrantFreeMoves` → `FreeMapSim.MoveTo` |
 | `前線を遠ざける+N` / `前線を近づける+N` | **嵐の層・不安定化の時計（2026-11-13 二版・既定・§5-12）: 不安定化ポイントを −N / +N**（0 未満にはしない・境目を下回れば「崩れ始める前」へ戻る・手番は進まない）。結果の行は「嵐が遠のく（不安定 -N）/ 嵐が迫る（不安定 +N）」。遠ざけるは「何かを得た +1」に数えない。**手番の時計（`stormClock=Turns`）: 嵐の時計を N 手番遅らせる / 進める**（静かな時間が残っていれば延びる / 縮む・嵐が来ていれば輪が N 手番ぶん戻る / 進む・手番は進まない）。結果の行は「嵐が N 手番ぶん遠のく / 迫る」。旧い作り（`stormEnabled=False`）: 天候の前線を N 段（1 段 = 2.4 = 5 ターンぶん）戻す / 進める。近づけると崩れる地平・沈む湖面がその回数働く。天候の無い層・前線が来ていない時に遠ざけるのは何も起きない | `FreeMapSim.ShiftFront` → `ShiftStorm` |
 | `パッシブアイテムをNつから選ぶ` | N 個を引いて 1 つ選ぶ（同じ提示に同じ品は並べない・ラン重複は除く）。人は地図へ戻った時の選択画面（開幕パッシブの選択と同じ形）、BOT は `GameHooks.ChooseOfferedPassive`。提示の抽選は選ぶ前に済むので乱数の消費は人と BOT で同じ | `GameManager.OfferPassiveChoice` |
-| `パッシブを差し出して替える` | 交換マスと同じ取り替え（いちばん段の低いパッシブ → 上の段のパッシブ） | `GameManager.TradeLowestPassive`（交換マスもここを通す） |
+| `パッシブを差し出して替える` | 取り替え（いちばん段の低いパッシブ → 上の段のパッシブ 1 つ・ランダム） | `GameManager.TradeLowestPassive`（2026-11-20 から交換マスは別の口 `DoExchangeTile` の 2 択・イベントは 1 対 1 のまま） |
 | `武器を鍛える` | 休憩の「鍛える」と同じ 1 段の強化。**素材は通常どおり払う**（ダイス強化への切り替えはしない） | `GameManager.TryUpgradeWeapon` |
 | `次の店の値段-N%` | 次に入る店の全価格に (1 − N/100) を掛ける。重ねたら掛け合わせ（上限で止めない形） | `RunState.nextShopPriceMul` → `ShopManager.Generate` |
 | `次の休憩の回復+N%` | 次に休憩で**回復する**時、回復量に最大 HP の N% を足す（鍛える・面を外す・山札から抜く・端子を強化するを選んだ休憩では残る）。重ねたら足し合わせ | `RunState.nextRestHealBonusPct` → `GameManager.TakeRestHealBonus` |

@@ -158,11 +158,18 @@ namespace UI.Game2D
                 }
                 case GameManager.GamePhase.ExchangeTile:
                 {
-                    var d = New("交換"); bool can = gm.CanExchangeTile;
-                    d.body = can ? "いちばん段の低い秘宝を 1 つ渡し、 上の段のものを 1 つ受け取る。" : "渡せる秘宝が無い。";
-                    if (can) d.buttons.Add(B("交換する", "swap", true));
+                    // 2026-11-20 (system-overhaul-spec §4-2): いちばん低いレア度の秘宝から差し出す 1 つを選び、 受け取る秘宝は地図へ戻ってから 2 択で選ぶ
+                    var give = gm.ExchangeGiveCandidates(); bool can = give.Count > 0;
+                    var d = New("交換", null, can ? 420 : 360);
+                    d.body = can ? "差し出す秘宝を 1 つ選ぶ。 上のレア度の秘宝 " + GameManager.ExchangeChoices + " つから 1 つ受け取る。" : "渡せる秘宝が無い。";
+                    foreach (int i in give)
+                    {
+                        string id = run.ownedPassiveItems[i]; var data = ItemDatabase.Instance?.GetItem(id);
+                        d.Items.Add(new ModalItem { name = ItemDatabase.DisplayNameOf(data, id), desc = data?.description });
+                    }
+                    if (can) d.buttons.Add(B("差し出す", "swap", true));
                     d.buttons.Add(B("通り過ぎる", "skip", !can));
-                    d.onAction = (a, _) => { if (a == "swap") gm.DoExchangeTile(); else gm.SkipExchangeTile(); Refresh(); };
+                    d.onAction = (a, sel) => { if (a == "swap") gm.DoExchangeTile(Mathf.Clamp(sel, 0, give.Count - 1)); else gm.SkipExchangeTile(); Refresh(); };
                     return d;
                 }
                 case GameManager.GamePhase.FloorClear:

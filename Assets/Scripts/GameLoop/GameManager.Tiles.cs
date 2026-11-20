@@ -115,7 +115,8 @@ namespace GameLoop
             SetPhase(GamePhase.TreasureOpen);
         }
 
-        // ---- 交換マス（パッシブ1つ → 上位Tierパッシブをランダム入手・任意） ----
+        // ---- 交換マス（いちばん低いレア度の秘宝から 1 つ → 上位のレア度の 2 択・任意・2026-11-20） ----
+        //   イベントの「パッシブを差し出して替える」(TradeLowestPassive) は今までどおり 1 対 1 (先頭の品 → ランダム 1 つ)。
 
         /// <summary>交換可能か（渡せるパッシブを所持しているか）。</summary>
         public bool CanExchangeTile
@@ -170,21 +171,62 @@ namespace GameLoop
             return bestIdx;
         }
 
-        /// <summary>交換実行: 最低Tierの所持パッシブを渡し、上位Tierのパッシブをランダム入手。</summary>
-        public void DoExchangeTile()
+        /// <summary>交換マスで受け取る秘宝の択の数 (2026-11-20・docs/system-overhaul-spec.md §4-2)。</summary>
+        public const int ExchangeChoices = 2;
+
+        /// <summary>交換マスで差し出せる秘宝 (所持の添字): 手放せる秘宝のうち、 いちばん低いレア度のもの全部 (所持の順)。 無ければ空。</summary>
+        public List<int> ExchangeGiveCandidates()
+        {
+            var res = new List<int>();
+            int low = FindLowestTierOwnedPassiveIndex();
+            if (low < 0) return res;
+            var db = ItemDatabase.Instance;
+            var r = db.GetItem(Run.ownedPassiveItems[low]).rarity;
+            for (int i = 0; i < Run.ownedPassiveItems.Count; i++)
+            {
+                var it = db.GetItem(Run.ownedPassiveItems[i]);
+                if (it != null && it.category == ItemCategory.Passive && it.rarity == r && ItemIds.CanTradeAway(Run.ownedPassiveItems[i])) res.Add(i);
+            }
+            return res;
+        }
+
+        /// <summary>交換実行 (2026-11-20・system-overhaul-spec §4-2): いちばん低いレア度の秘宝から 1 つを差し出し、 上のレア度の秘宝 <see cref="ExchangeChoices"/> 択から 1 つ受け取る。
+        /// <paramref name="pick"/> = <see cref="ExchangeGiveCandidates"/> の何番目を差し出すか (人の画面)。 負なら BOT の口 (<see cref="GameHooks.ChooseTradeAway"/>・無ければ先頭)。
+        /// 受け取りは <see cref="OfferPassiveChoice"/> (BOT はその場・人は地図へ戻ってからの選択画面)。 〈古物商の交換帳〉は択を今の偏重の一番高い軸に寄せる。</summary>
+        public void DoExchangeTile(int pick = -1)
         {
             if (CurrentPhase != GamePhase.ExchangeTile) return;
             var db = ItemDatabase.Instance;
-            if (!TradeLowestPassiveCore(out string givenId, out string resultId))
+            var cands = ExchangeGiveCandidates();
+            if (cands.Count == 0) { SetPhase(GamePhase.MapNavigation); return; }
+            if (pick < 0 || pick >= cands.Count)
             {
-                if (givenId != null) Log("交換: 上位Tierの秘宝が無く成立せず");
+                var ids = new List<string>(); foreach (int i in cands) ids.Add(Run.ownedPassiveItems[i]);
+                pick = GameHooks.ChooseTradeAway?.Invoke(ids) ?? 0;
+                if (pick < 0 || pick >= cands.Count) pick = 0;
+            }
+            int idx = cands[pick];
+            string givenId = Run.ownedPassiveItems[idx];
+            var given = db?.GetItem(givenId);
+            var offer = PickHigherTierPassives(given.rarity, ExchangeChoices, ExchangeLedgerAxis());
+            if (offer.Count == 0)
+            {
+                Log("交換: 上位Tierの秘宝が無く成立せず");
                 SetPhase(GamePhase.MapNavigation);
                 return;
             }
-            var given = db?.GetItem(givenId);
-            var rd = db?.GetItem(resultId);
-            Log($"交換マス: 「{(given != null ? given.displayName : givenId)}」を渡し「{(rd != null ? rd.displayName : resultId)}」を入手");
+            ItemSystem.Helpers.PassiveAddHelper.RemoveAt(Run, idx);
+            Log($"交換マス: 「{(given != null ? given.displayName : givenId)}」を渡し、 {offer.Count} 択から受け取る");
+            OfferPassiveChoice(offer);
             SetPhase(GamePhase.MapNavigation);
+        }
+
+        /// <summary>〈古物商の交換帳〉: 交換マスの択を寄せる軸 (今の偏重の一番高い軸・軸の秘宝が 1 つも無ければ null)。 持っていなければ null。</summary>
+        private string ExchangeLedgerAxis()
+        {
+            if (!Run.OwnsPassive(ItemIds.MacroLedger)) return null;
+            string axis = EventSystem.EventEffectExecutor.TopAxis(Run);
+            return AxisCountOf(Run, axis) > 0 ? axis : null;
         }
 
         /// <summary>交換せずに通過。</summary>
@@ -197,6 +239,40 @@ namespace GameLoop
         /// <summary>given より高Tier（上限LEGENDARY、given が LEGENDARY なら据え置き）のパッシブを
         /// 重複排除の上でレア度重み抽選。未所持が枯渇したら重複許可で再抽選（上位からを許可）。</summary>
         private string PickHigherTierPassive(ItemRarity givenRarity)
+        {
+            var pool = HigherTierPassivePool(givenRarity);
+            if (pool == null) return null;
+            // 〈サーベル・ワルツ〉: [剣の舞] を持っていれば、 LEGENDARY の枠がまれに [剣の舞] に差し替わる (店と同じ・2026-11-20)
+            return SwordDanceSet.MaybeSwapToDance(Run, ItemSystem.RarityWeightedPicker.Pick(pool), pool, "exchange.dance")?.internalName;
+        }
+
+        /// <summary>交換マスの択: 上のレア度の秘宝を重ねずに <paramref name="n"/> 個 (引き方は <see cref="PickHigherTierPassive"/> と同じ)。
+        /// <paramref name="biasAxis"/> (〈古物商の交換帳〉) = その軸の品 1 つの重みを、 レア度の中で ×<see cref="ItemSystem.Shop.ShopManager.AxisRerollWeightMul"/> にする
+        /// (軸指定リロールと同じ倍率・プールにその数だけ並べる = レア度の出方は変えない)。</summary>
+        private List<string> PickHigherTierPassives(ItemRarity givenRarity, int n, string biasAxis)
+        {
+            var res = new List<string>();
+            var pool = HigherTierPassivePool(givenRarity);
+            if (pool == null) return res;
+            if (biasAxis != null)
+            {
+                int extra = (int)ItemSystem.Shop.ShopManager.AxisRerollWeightMul - 1;
+                var biased = new List<CompleteItemData>(pool);
+                foreach (var it in pool) if (it.axis == biasAxis) for (int k = 0; k < extra; k++) biased.Add(it);
+                pool = biased;
+            }
+            while (res.Count < n && pool.Count > 0)
+            {
+                var got = SwordDanceSet.MaybeSwapToDance(Run, ItemSystem.RarityWeightedPicker.Pick(pool), pool, "exchange.dance");
+                if (got == null) break;
+                res.Add(got.internalName);
+                pool = pool.FindAll(it => it.internalName != got.internalName);
+            }
+            return res;
+        }
+
+        /// <summary>given より上のレア度 (given が LEGENDARY なら LEGENDARY) の秘宝のプール。 未所持が枯渇したら重複許可。 無ければ null。</summary>
+        private List<CompleteItemData> HigherTierPassivePool(ItemRarity givenRarity)
         {
             var db = ItemDatabase.Instance;
             var all = db?.GetAllItems();
@@ -227,9 +303,7 @@ namespace GameLoop
                     pool.Add(it);
                 }
             }
-            if (pool.Count == 0) return null;
-            // 〈サーベル・ワルツ〉: [剣の舞] を持っていれば、 LEGENDARY の枠がまれに [剣の舞] に差し替わる (店と同じ・2026-11-20)
-            return SwordDanceSet.MaybeSwapToDance(Run, ItemSystem.RarityWeightedPicker.Pick(pool), pool, "exchange.dance")?.internalName;
+            return pool.Count == 0 ? null : pool;
         }
 
         /// <summary>所持パッシブからランダムに1つ除去（刻印も同期）。除去した index を返す。無ければ -1。</summary>

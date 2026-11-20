@@ -589,7 +589,8 @@ namespace AutoTest
                     return false;
 
                 case GameManager.GamePhase.ExchangeTile:
-                    // 交換は最低Tierパッシブ→上位ランダムの厳密アップグレード。所持があれば必ず交換。
+                    // 交換は最低Tierパッシブ→上位の 2 択の厳密アップグレード。所持があれば必ず交換。
+                    //   差し出す品は BotHooks.ChooseLowestBuyScore (買いの点が一番低い物)、 受け取る品は ChooseByBuyScore (点の高い方・2026-11-20)。
                     if (gm.CanExchangeTile) gm.DoExchangeTile();
                     else gm.SkipExchangeTile();
                     return false;
