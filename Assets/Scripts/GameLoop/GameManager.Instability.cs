@@ -47,7 +47,7 @@ namespace GameLoop
         {
             var sim = FreeMap;
             if (sim == null || !sim.InstabilityMode) return 0;
-            var ev = sim.AddInstability(src, n, out int delta);
+            var ev = sim.AddInstability(src, n, out int delta, TentCut(src, n));
             if (delta == 0) return 0;
             InstabilityTotals[(int)src] += delta;
             LastInstabilityGain = delta;
@@ -117,9 +117,36 @@ namespace GameLoop
             InstabilityFromEscalationThisCombat += d;
         }
 
-        /// <summary>戦闘に勝った時の不安定化 (ボス以外)。 elite = エリートの点の戦闘、 pursuer = 番人。 動いた量を返す。</summary>
+        /// <summary>戦闘に勝った時の不安定化 (ボス以外)。 elite = エリートの点の戦闘、 pursuer = 番人。 動いた量を返す。
+        /// 〈嵐読みの風見鶏〉: 嵐の中の点での勝ちなら、 ゴールド +<see cref="VaneGold"/>・不安定 −<see cref="VaneCalm"/> (勝ちの分を足した後)。</summary>
         private int AddBattleWinInstability(bool elite, bool pursuer)
-            => AddInstability(pursuer ? InstabilitySource.Pursuer : elite ? InstabilitySource.Elite : InstabilitySource.Battle);
+        {
+            int d = AddInstability(pursuer ? InstabilitySource.Pursuer : elite ? InstabilitySource.Elite : InstabilitySource.Battle);
+            var sim = FreeMap;
+            if (Run != null && sim != null && sim.InStorm(sim.Me) && Run.OwnsPassive(ItemIds.MacroVane))
+            {
+                GoldIncome.Gain(Run, VaneGold, ItemIds.MacroVane, GoldOrigin.Item);
+                d += AddInstability(InstabilitySource.Shift, -VaneCalm, ItemIds.MacroVane);
+            }
+            return d;
+        }
+
+        /// <summary>〈嵐読みの風見鶏〉の量 (仮)。</summary>
+        public const int VaneGold = 8, VaneCalm = 3;
+        /// <summary>〈避雷の天幕〉: 層ごとに半分にする回数 (仮)。</summary>
+        public const int TentActions = 3;
+
+        /// <summary>〈避雷の天幕〉: 層に入ってから最初の <see cref="TentActions"/> 回の「取る」(宝・秘宝・戦闘の勝ち・イベントの得) で溜まる量を半分 (切り捨て) にする、 引く分。
+        /// 歩く・イベントのターン・嵐を動かす・エスカレーションは行動ではないので数えない。 不安定化の時計が動いている時だけ呼ばれる。</summary>
+        private int TentCut(InstabilitySource src, int n)
+        {
+            if (Run == null || n <= 0 || Instability.PartOf(src) != Instability.PartTake || !Run.OwnsPassive(ItemIds.MacroTent)) return 0;
+            if (Run.tentDepth != Run.Depth) { Run.tentDepth = Run.Depth; Run.tentUses = 0; }
+            if (Run.tentUses >= TentActions) return 0;
+            Run.tentUses++;
+            int p = Instability.PointsOf(src, n);
+            return p - p / 2;
+        }
 
         /// <summary>報酬・宝で得た品が秘宝なら +3 (秘宝 = パッシブの品・items.json の category で判定)。 進行の資格の品 (確信の 3 品・ItemIds.QualificationItems) は数えない。</summary>
         private int AddRelicInstabilityIfPassive(string itemId)

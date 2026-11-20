@@ -19,7 +19,9 @@ namespace GameLoop
             if (boss && Run.currentFloor > TerminalBossRewardLastFloor) return;
             // 0 層の試練の木箱 (2026-11-20・docs/system-overhaul-spec.md §4-4) は 3 択 (エリートと同じ数)
             bool farm = Run.Depth == MapSystem.FreeMove.FloorPlan.FarmFloor;
-            int n = (boss ? TerminalChoicesBoss : elite || farm ? TerminalChoicesElite : TerminalChoicesNormal) + Run.terminalExtraChoices;
+            // 〈二股の鑑定書〉: どの戦闘の報酬も 1 枚多い (通常 2 → 3・エリートと 0 層 3 → 4・ボス 3 → 4)
+            int n = (boss ? TerminalChoicesBoss : elite || farm ? TerminalChoicesElite : TerminalChoicesNormal) + Run.terminalExtraChoices
+                  + (Run.OwnsPassive(ItemIds.MacroAppraisal) ? 1 : 0);
             Run.terminalExtraChoices = 0;
             var offer = RollTerminalReward(Run, n, boss);
             if (offer.Count == 0) return;
@@ -165,9 +167,18 @@ namespace GameLoop
             string id = Run.terminalDeck[deckIndex];
             Run.terminalDeck.RemoveAt(deckIndex);
             Run.terminalShopRemovals++;
+            NoteReceiptRemoval();
             TerminalDiag.NoteRemoved(id, TerminalDiag.RemovedShop);   // [計装 #106]
             Log($"山札から抜いた (店): {id} (-{price}G・店で {Run.terminalShopRemovals} 回目・山札 {Run.terminalDeck.Count} 枚)");
             return true;
+        }
+
+        /// <summary>〈研ぎ代の領収書〉: 店・休憩で抜くたび、 ランの間ずっと攻撃 +2 (持っている間に抜いた回数・効果は MacroItemEffects)。</summary>
+        private void NoteReceiptRemoval()
+        {
+            if (!Run.OwnsPassive(ItemIds.MacroReceipt)) return;
+            Run.receiptRemovals++;
+            Log($"〈{ItemIds.MacroReceipt}〉: 攻撃 +{ItemSystem.PassiveSkills.Effects.MacroReceipt.PerRemoval * Run.receiptRemovals}");
         }
 
         /// <summary>休憩: 回復の代わりに、 山札の deckIndex 枚目を抜く (無料・休憩の行動を使う)。 抜けなければ false (休憩は続く)。</summary>
@@ -177,6 +188,7 @@ namespace GameLoop
             string id = Run.terminalDeck[deckIndex];
             Run.terminalDeck.RemoveAt(deckIndex);
             TerminalDiag.NoteRemoved(id, TerminalDiag.RemovedRest);   // [計装 #106]
+            NoteReceiptRemoval();
             Log($"山札から抜いた (休憩): {id} (山札 {Run.terminalDeck.Count} 枚)");
             ReturnToMapOrClearFloor();
             return true;

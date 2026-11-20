@@ -472,6 +472,18 @@ namespace GameLoop
         /// <summary>〈脈なしの鋼心臓〉の X: 戦闘開始時のシールド。 ランの始めに 10、 持っている間に戦闘に勝つたび +1 (2026-11-20)。</summary>
         public int  pulselessHeartShield = ItemSystem.PassiveSkills.Effects.PulselessHeart.StartShield;
 
+        // === マクロ秘宝 (2026-11-20・item-overhaul-spec §9)。 どれも持っている間の出来事だけ数える ===
+        /// <summary>〈研ぎ代の領収書〉: 店・休憩で山札から端子を抜いた回数 (攻撃 +2 × 回数)。</summary>
+        public int  receiptRemovals;
+        /// <summary>〈相場師の算盤〉: 店に入って最初のリロールをした回数 (戦闘開始時の充電 +3・臨界 +5 × 回数)。</summary>
+        public int  abacusStacks;
+        /// <summary>〈黄金の通行手形〉: 店で使ったゴールドの 100G に満たない端数 (店を出る時に足す)。</summary>
+        public int  passShopSpent;
+        /// <summary>〈黄金の通行手形〉: 秘宝の棚が 1 段上のレア度で並ぶ店の残り軒数 (店に入るたび 1 つ使う)。</summary>
+        public int  passShopsUp;
+        /// <summary>〈避雷の天幕〉: 数えている層の深さ (違う層に入ったら数え直す) と、 その層で半分にした回数。</summary>
+        public int  tentDepth = -1, tentUses;
+
         /// <summary>次戦闘持ち越しバフをすべて消去（戦闘開始時にコピー後 or リセット時）。</summary>
         public void ClearPendingCombatConsumables()
         {

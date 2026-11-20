@@ -2653,6 +2653,85 @@
       "axis": "金"
     },
     {
+      "id": "嵐読みの風見鶏",
+      "name": "嵐読みの風見鶏",
+      "description": "嵐の中の点での戦闘に勝つたび、ゴールド +8・不安定 −3",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "BRONZE",
+      "basePrice": 7
+    },
+    {
+      "id": "気圧計のペンダント",
+      "name": "気圧計のペンダント",
+      "description": "戦闘開始時、嵐のフェーズ 1 につきシールド +5・この戦闘の攻撃 +2（フェーズ 3 ならシールド +15・攻撃 +6）",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "skill": "気圧計のペンダント"
+    },
+    {
+      "id": "避雷の天幕",
+      "name": "避雷の天幕",
+      "description": "層に入るたび、その層で最初の 3 回の「取る」行動（宝・秘宝・戦闘の勝ち・イベントの得）で溜まる不安定を半分（切り捨て）にする",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9
+    },
+    {
+      "id": "研ぎ代の領収書",
+      "name": "研ぎ代の領収書",
+      "description": "店または休憩で山札から端子を 1 枚抜くたび、ランの間ずっと攻撃 +2（累積）",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "skill": "研ぎ代の領収書",
+      "axis": "金"
+    },
+    {
+      "id": "相場師の算盤",
+      "name": "相場師の算盤",
+      "description": "店に入って最初のリロール（軸指定を含む）をするたび、以後の戦闘開始時に充電 +3・臨界 +5（累積・このランの間）",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "相場師の算盤",
+      "axis": "金"
+    },
+    {
+      "id": "黄金の通行手形",
+      "name": "黄金の通行手形",
+      "description": "店で 100G 使うたび、次の店 1 軒の秘宝の棚が全部 1 段上のレア度で並ぶ（LEGENDARY はそのまま）",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "LEGENDARY",
+      "basePrice": 10,
+      "axis": "金"
+    },
+    {
+      "id": "目利きの紹介状",
+      "name": "目利きの紹介状",
+      "description": "店に入るたび、最初の 1 回の通常リロールが無料。軸指定リロールの追加 −5G",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "BRONZE",
+      "basePrice": 7,
+      "axis": "金"
+    },
+    {
+      "id": "二股の鑑定書",
+      "name": "二股の鑑定書",
+      "description": "戦闘後の端子の報酬の選択肢 +1（通常 2→3・エリート 3→4）",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8
+    },
+    {
       "id": "鋲の胸当て",
       "name": "鋲の胸当て",
       "description": "ターン開始時、シールド +1",

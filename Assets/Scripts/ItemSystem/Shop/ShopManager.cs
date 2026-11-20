@@ -128,8 +128,25 @@ namespace ItemSystem.Shop
         public const int AxisRerollSurcharge = 15;
         /// <summary>軸指定リロールで、 指定した軸の秘宝 (items.json の axis)・端子 (TerminalDef.axis) の出現の重みに掛ける倍率 (仮)。</summary>
         public const float AxisRerollWeightMul = 6f;
+        /// <summary>〈目利きの紹介状〉: 軸指定リロールの追加から引く額 (仮)。</summary>
+        public const int LetterAxisDiscount = 5;
+        /// <summary>軸指定リロールの追加 (〈目利きの紹介状〉を持っていれば −<see cref="LetterAxisDiscount"/>)。</summary>
+        public static int AxisRerollSurchargeFor(RunState run)
+            => AxisRerollSurcharge - (run != null && run.OwnsPassive(GameLoop.ItemIds.MacroLetter) ? LetterAxisDiscount : 0);
         /// <summary>軸指定リロールの値段 (今のリロールの値段 + 追加)。 店が無ければ 0。</summary>
-        public int AxisRerollPrice => Current != null ? Current.CurrentRerollPrice + AxisRerollSurcharge : 0;
+        public int AxisRerollPrice => Current != null ? Current.CurrentRerollPrice + AxisRerollSurchargeFor(GameLoop.GameManager.Instance?.Run) : 0;
+        /// <summary>〈目利きの紹介状〉: この店の最初の通常リロールが無料か。</summary>
+        private bool LetterFreeReroll(RunState run)
+            => Current != null && !Current.freeRerollUsed && run != null && run.OwnsPassive(GameLoop.ItemIds.MacroLetter);
+        /// <summary>通常のリロールで払う額 (画面の表示用・〈目利きの紹介状〉の無料なら 0)。 BOT の「まだ回せる」の判定は 0 にならない <see cref="ShopInventory.CurrentRerollPrice"/> を読む。</summary>
+        public int RerollPrice => Current == null ? 0 : LetterFreeReroll(GameLoop.GameManager.Instance?.Run) ? 0 : Current.CurrentRerollPrice;
+
+        /// <summary>〈黄金の通行手形〉: 使ったゴールド 100G ごとに、 次の店 1 軒の秘宝の棚が 1 段上のレア度で並ぶ (仮)。</summary>
+        public const int PassSpendStep = 100;
+        /// <summary>この店の秘宝の棚を 1 段上のレア度で並べるか (入店で決める・リロールにも効く)。</summary>
+        private bool _passRarityUp;
+        /// <summary>入店した時の run.coinsSpent (店を出る時に、 この店で使った額を出す)。</summary>
+        private int _spentAtOpen;
         /// <summary>いま振り直している秘宝の枠の指定の軸 (null = 指定なし)。 TryReroll の間だけ立つ。</summary>
         private string _focusAxis;
 
@@ -260,6 +277,15 @@ namespace ItemSystem.Shop
                 inv.priceMultiplier *= rsCons.nextShopPriceMul;
                 Debug.Log($"[ShopManager] イベントの値引き: 全価格 ×{rsCons.nextShopPriceMul:F2}");
                 rsCons.nextShopPriceMul = 1f;
+            }
+            // 〈黄金の通行手形〉: 前の店までに使った 100G ごとに 1 軒、 秘宝の棚が 1 段上のレア度で並ぶ
+            _passRarityUp = false;
+            _spentAtOpen = rsCons != null ? rsCons.coinsSpent : 0;
+            if (rsCons != null && rsCons.passShopsUp > 0)
+            {
+                rsCons.passShopsUp--;
+                _passRarityUp = true;
+                Debug.Log($"[ShopManager] {GameLoop.ItemIds.MacroPass}: 秘宝の棚が 1 段上のレア度 (残り {rsCons.passShopsUp} 軒)");
             }
             _apprMinRarity = null;
             if (rsCons != null && rsCons.nextLootMinRarity >= 0)
@@ -606,6 +632,12 @@ namespace ItemSystem.Shop
                 }
             }
             ItemRarity targetRarity = RollTier(pool, weights);
+            // 〈黄金の通行手形〉: 引いたレア度の 1 段上 (LEGENDARY は据え置き・その段の品が棚に出せなければ引いた段のまま)。 乱数は引き足さない
+            if (kind == ShopSlotKind.Passive && _passRarityUp && targetRarity < ItemRarity.LEGENDARY)
+            {
+                var up = targetRarity + 1;
+                if (pool.Exists(it => it.rarity == up)) targetRarity = up;
+            }
             var byTier = pool.FindAll(it => it.rarity == targetRarity);
 
             // サーベル・ワルツ([剣の舞]): 所持(昇華含む)時、 <b>LEGENDARY 帯に限って</b>
@@ -828,7 +860,8 @@ namespace ItemSystem.Shop
             if (RerollHardCap >= 0 && Current.rerollCount >= RerollHardCap)
             { RerollFailCapped++; return false; }
             if (focusAxis != null && System.Array.IndexOf(ItemSystem.PassiveSkills.AxisRules.ShopFocus, focusAxis) < 0) focusAxis = null;   // 知らない軸は指定なし
-            int price = focusAxis != null ? AxisRerollPrice : Current.CurrentRerollPrice;
+            bool letterFree = focusAxis == null && LetterFreeReroll(run);   // 〈目利きの紹介状〉: 店の最初の通常リロールは無料
+            int price = focusAxis != null ? AxisRerollPrice : letterFree ? 0 : Current.CurrentRerollPrice;
 
             // 〈合札〉の初回リロール無料は 2026-10-31 に「2 品目以降 10G 引き」へ作り替えた (TryBuy)。
             if (run.coins < price) { RerollFailNoGold++; Log($"リロール: ゴールド不足 ({price}G 必要)"); return false; }
@@ -837,6 +870,13 @@ namespace ItemSystem.Shop
             run.coinsSpent += price;
             MetaProgression.Achievements.AchievementService.NoteShopReroll();
             GameLoop.RunChronicle.Reroll(run, price);
+            if (letterFree) { Current.freeRerollUsed = true; Log($"〈{GameLoop.ItemIds.MacroLetter}〉: 最初のリロールは無料"); }
+            // 〈相場師の算盤〉: 店に入って最初のリロール (軸指定も) をした時だけ、 以後の戦闘開始時の充電 +3・臨界 +5 が 1 回分積もる (店の数で止まる)
+            if (Current.rerollCount == 0 && run.OwnsPassive(GameLoop.ItemIds.MacroAbacus))
+            {
+                run.abacusStacks++;
+                Log($"〈{GameLoop.ItemIds.MacroAbacus}〉: {run.abacusStacks} 回分");
+            }
             Current.rerollCount++;
 
             // 振り直さない枠 (売却済み) の品は棚に残る。 振り直す枠の品は棚から外す (同じ品が引き直されてよい)。
@@ -1083,6 +1123,16 @@ namespace ItemSystem.Shop
 
         public void Close()
         {
+            // 〈黄金の通行手形〉: この店で使った額を足し、 100G ごとに次の店 1 軒 (持っている時に出た店だけ)
+            var run = GameLoop.GameManager.Instance?.Run;
+            if (Current != null && run != null && run.OwnsPassive(GameLoop.ItemIds.MacroPass))
+            {
+                run.passShopSpent += System.Math.Max(0, run.coinsSpent - _spentAtOpen);
+                int add = run.passShopSpent / PassSpendStep;
+                run.passShopSpent -= add * PassSpendStep;
+                run.passShopsUp += add;
+                if (add > 0) Log($"〈{GameLoop.ItemIds.MacroPass}〉: 次の店から {run.passShopsUp} 軒、 秘宝の棚が 1 段上");
+            }
             Current = null;
             OnShopClosed?.Invoke();
         }

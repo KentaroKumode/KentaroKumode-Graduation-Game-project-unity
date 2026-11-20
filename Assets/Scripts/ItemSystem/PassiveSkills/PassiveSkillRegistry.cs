@@ -267,6 +267,8 @@ namespace ItemSystem.PassiveSkills
             Register(new FallenCastleCornerstone()); Register(new BorderGuardStandard());
             // 消耗品の連動品 (2026-11-20・ConsumableLinkEffects.cs・item-overhaul-spec §7-2)
             Register(new BeltPouch()); Register(new SpentPride()); Register(new BottomlessVial()); Register(new SampleBox());
+            // 嵐・店・金のマクロ秘宝の戦闘の側 (2026-11-20・MacroItemEffects.cs・item-overhaul-spec §9)
+            Register(new MacroBarometer()); Register(new MacroReceipt()); Register(new MacroAbacus());
 
             // ============================
             //  汎用パッシブ

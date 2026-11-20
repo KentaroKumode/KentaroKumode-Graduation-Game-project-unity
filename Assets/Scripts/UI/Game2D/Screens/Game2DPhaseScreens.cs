@@ -373,7 +373,7 @@ namespace UI.Game2D
                 d.Items.Add(new ModalItem
                 {
                     name = ax, value = (string.IsNullOrEmpty(word) ? "秘宝 " : word + " ") + ItemSystem.PassiveSkills.AxisRules.Count(run, ax),
-                    desc = ax + "の秘宝" + (ax == ItemSystem.PassiveSkills.AxisRules.Gold ? "" : "と端子") + "が出やすくなる。 値段は振り直し " + (inv != null ? inv.CurrentRerollPrice : 0) + "G + " + ShopManager.AxisRerollSurcharge + "G。",
+                    desc = ax + "の秘宝" + (ax == ItemSystem.PassiveSkills.AxisRules.Gold ? "" : "と端子") + "が出やすくなる。 値段は振り直し " + (inv != null ? inv.CurrentRerollPrice : 0) + "G + " + ShopManager.AxisRerollSurchargeFor(run) + "G。",
                     disabled = inv == null || price > run.coins,
                 });
             }
@@ -489,7 +489,7 @@ namespace UI.Game2D
 
             bool robOk = sm != null && !run.shopRobberyDone && MetaProgression.MetaBuffApplicator.IsShopRobberyUnlocked();
             d.buttons.Add(B("買う", "buy", true));
-            if (inv != null && !_shopSupply) d.buttons.Add(B("振り直す " + inv.CurrentRerollPrice + "G", "reroll"));
+            if (inv != null && !_shopSupply) d.buttons.Add(B("振り直す " + sm.RerollPrice + "G", "reroll"));
             if (inv != null && !_shopSupply) d.buttons.Add(B("軸で振り直す " + sm.AxisRerollPrice + "G", "axis"));
             d.buttons.Add(B(_shopSupply ? "棚へ" : "補給 (物資)", "supply"));
             d.buttons.Add(B("端子", "term"));

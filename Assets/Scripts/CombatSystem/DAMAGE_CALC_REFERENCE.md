@@ -241,6 +241,14 @@ fixedDamageToPlayer ≥ 999 → playerHP = 0（死の宣告）
 | 無銘の潤滑油 | `TerminalBattleState.ignoreCond = true`（このターン・〈無形の構え〉と同じ旗） |
 | 使い切りの矜持（秘宝） | OnConsumableUse: そのターン 1 回 `AddOutgoingPct(0.25)`（与ダメ % の池・最終与ダメージ倍率ではない） |
 
+#### マクロ秘宝の与ダメに入る分（2026-11-20・item-overhaul-spec §9・`MacroItemEffects.cs`）
+
+| 品 | 効果と適用点 |
+|---|---|
+| 気圧計のペンダント | OnBattleStart: 嵐のフェーズ（`FreeMapSim.StormPhase`・開始時の値を `accumulatedValues["macro.barometer.phase"]`）× 5 をシールドへ。 OnPostRoll: 毎ターン `AddPlayerAttackOrDiceBonus(2 × フェーズ)`（攻撃 +N・ステータスの `atk` と同じ口） |
+| 研ぎ代の領収書 | OnPostRoll: 毎ターン `AddPlayerAttackOrDiceBonus(2 × RunState.receiptRemovals)` |
+| 相場師の算盤 | OnBattleStart: `AddCharge(3 × RunState.abacusStacks)`・`Kw.EnableHeat` の後 `Kw.AddHeat(5 × abacusStacks)`（閾値を越えれば開始時に爆発する・爆発のダメージは §3-H のとおり） |
+
 ### ③-C 「軽減無視」ダメージとシールドの関係【2026-08-15 確定】
 
 **軽減無視はシールドを貫かない。** 軽減 (%カット・定数カット・基礎防御・スタンス) を無視するだけで、

@@ -192,6 +192,13 @@ namespace GameLoop
         // === 消耗品の連動品 (2026-11-20・item-overhaul-spec §7-2・名前は仮) ===
         public const string LinkPouch = "帯革の薬嚢", LinkPride = "使い切りの矜持", LinkBottomless = "底抜けの小瓶", LinkSampleBox = "行商人の見本箱";
 
+        // === 嵐・店・金のマクロ秘宝 (2026-11-20・item-overhaul-spec §9・名前は仮) ===
+        //   嵐: 風見鶏・天幕 = GameManager.Instability / 気圧計 = MacroItemEffects。 店: 算盤・手形・紹介状 = ShopManager / 研ぎ代 = GameManager.Terminals + MacroItemEffects。
+        //   報酬: 鑑定書 = GameManager.OfferTerminalReward / 交換帳 = GameManager.Tiles (交換マス)。
+        public const string MacroVane = "嵐読みの風見鶏", MacroBarometer = "気圧計のペンダント", MacroTent = "避雷の天幕";
+        public const string MacroReceipt = "研ぎ代の領収書", MacroAbacus = "相場師の算盤", MacroPass = "黄金の通行手形";
+        public const string MacroLetter = "目利きの紹介状", MacroAppraisal = "二股の鑑定書", MacroLedger = "古物商の交換帳";
+
         // === 航行マップで使う消耗品 (2026-09-28・2026-10-18 に囮と罠を統合) ===
         //   **系統で判定する** (ConsFamilyOf)。 下の id 定数は「開始時に配る」「店で買う」の
         //   跨ファイル参照のためだけにあり、 効果の分岐には使わない。
