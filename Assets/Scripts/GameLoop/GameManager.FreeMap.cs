@@ -275,6 +275,7 @@ namespace GameLoop
         public string TerritoryTreasureNote { get; private set; } = "";
 
         /// <summary>着いた点が縄張りの宝なら取る (1 層 1 回・点の起動の前)。 中身は <see cref="GameHooks.TerritoryTreasure"/>:
+        /// 軸の秘宝 (既定・2026-11-20) = 偏重が一番高い軸の秘宝 3 択 (<see cref="OfferTerritoryRelics"/>・引けなければ宝箱の中身) /
         /// 鍛える = 武器を 1 段 (休憩の「鍛える」と同じ強化・素材は取らない。 鍛えられない武器なら宝箱の中身) / 宝箱 = 通常の宝箱と同じ中身。
         /// 画面は変えない (点の起動がそのまま続く)。 追跡者の動きは変えない。</summary>
         private void TakeTerritoryTreasure()
@@ -287,6 +288,11 @@ namespace GameLoop
                 TerritoryTreasureNote = "宝: 空だった〈" + EventSystem.TimedEffects.BattleBoonRule.ToilName + "〉";
                 Log("縄張りの宝: " + ToilEmptyChestLine);
             }
+            else if (GameHooks.TerritoryTreasure == TerritoryTreasureKind.AxisRelic && OfferTerritoryRelics(out string note))
+            {
+                TerritoryTreasureNote = note;
+                Log("縄張りの宝: " + note);
+            }
             else if (GameHooks.TerritoryTreasure == TerritoryTreasureKind.Forge && TryUpgradeWeapon(Run, free: true))
             {
                 TerritoryTreasureNote = "宝: 武器を鍛えた";
@@ -297,6 +303,30 @@ namespace GameLoop
                 TerritoryTreasureNote = "宝: 宝箱を開けた";
                 Log("縄張りの宝: " + GrantTreasureChestContents());
             }
+        }
+
+        /// <summary>縄張りの宝の秘宝の択の数。</summary>
+        public const int TerritoryRelicChoices = 3;
+
+        /// <summary>縄張りの宝 (既定・2026-11-20・作者承認 S4): 偏重が一番高い軸 (<see cref="EventSystem.EventEffectExecutor.TopAxis"/>) の秘宝を 3 つ引いて 1 つ選ぶ
+        /// (引き方はイベントの「軸の秘宝をNつから選ぶ」と同じ)。 軸の秘宝を 1 つも持っていなければ普通の秘宝 3 択 (〈支給の秘宝〉と同じ)。
+        /// 人は地図へ戻ってからの選択画面、 BOT はその場で選ぶ (<see cref="OfferPassiveChoice"/>)。 不安定化は宝の +3 だけ (中身の秘宝では重ねない)。 1 つも引けなければ false。</summary>
+        private bool OfferTerritoryRelics(out string note)
+        {
+            string axis = EventSystem.EventEffectExecutor.TopAxis(Run);
+            if (AxisCountOf(Run, axis) <= 0) axis = null;
+            var cands = new System.Collections.Generic.List<string>();
+            for (int k = 0; k < TerritoryRelicChoices; k++)
+            {
+                string id = EventSystem.EventEffectExecutor.PickRandomItemId(ItemSystem.ItemCategory.Passive, Run, cands, axis);
+                if (!string.IsNullOrEmpty(id) && !cands.Contains(id)) cands.Add(id);
+            }
+            note = null;
+            if (cands.Count == 0) return false;
+            string got = OfferPassiveChoice(cands);
+            string what = axis != null ? axis + "の秘宝" : "秘宝";
+            note = got == null ? $"宝: {what}を {cands.Count} つから選ぶ" : $"宝: {ItemSystem.ItemDatabase.Instance?.GetItem(got)?.displayName ?? got}";
+            return true;
         }
 
         /// <summary>点に着いたターンに捕まっていたら、 戦闘が終わった今その点を発動させる。
