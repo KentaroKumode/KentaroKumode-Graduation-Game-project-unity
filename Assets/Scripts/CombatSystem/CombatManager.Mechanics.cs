@@ -376,6 +376,8 @@ namespace CombatSystem
                 //   (役の発動地点から GameManager.Instance を引かないため)。
                 YachtRoleEffects.FiredThisCombat[(int)k]++;
                 MetaProgression.Achievements.AchievementService.NoteRoleFired(k, tier);
+                // 役が立った (2026-11-21・段 1-f): 量 = 強さ (2 個そろい 1 / ゾロ目・連なり 2)。 OnWired の前なので、 品の攻撃 +N は撃ごとに乗る
+                ItemSystem.PassiveSkills.Keywords.Kw.Raise(ctx, PassiveSkillTrigger.OnRoleFired, YachtRoles.Strength(k));
             }
 
             if (ctx.firedRolesThisTurn.Count > 0)

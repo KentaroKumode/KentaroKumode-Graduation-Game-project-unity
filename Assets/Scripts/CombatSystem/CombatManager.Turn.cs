@@ -1420,6 +1420,9 @@ namespace CombatSystem
             bool downThisTurn = _down.downNow;
             if (enemyHP > 0 && !enemyStunnedThisTurn && !downThisTurn && currentEnemy != null && Escalation.IsHeavyTurn(currentEnemy, ctx.currentTurn))
                 BossDownDiag.NoteHeavyTaken();   // [計装] 大技を受けた
+            // 〈封じ・揃〉(端子の行動不能も) で大技のターンに行動しなかった = 大技を取り消した (2026-11-21・OnHeavyCanceled・ダウンのターンはダウンの側で鳴らす)
+            if (enemyHP > 0 && enemyStunnedThisTurn && !downThisTurn && currentEnemy != null && Escalation.IsHeavyTurn(currentEnemy, ctx.currentTurn))
+                ItemSystem.PassiveSkills.Keywords.Kw.Raise(ctx, PassiveSkillTrigger.OnHeavyCanceled, 1);
             // [診断 2026-11-14] このターンの敵の行動 (大技 0 / チャージ 1 / 小技 2・ダウンと〈封じ・揃〉と大技なしは −1)。 ターンの被ダメ (takenApplied) と合わせて下で数える
             int diagHeavyKind = enemyHP <= 0 || enemyStunnedThisTurn || downThisTurn || currentEnemy == null || currentEnemy.heavyPeriod <= 0 ? -1
                               : Escalation.IsHeavyTurn(currentEnemy, ctx.currentTurn) ? 0

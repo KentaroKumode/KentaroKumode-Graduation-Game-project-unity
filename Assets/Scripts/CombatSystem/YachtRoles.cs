@@ -49,6 +49,12 @@ namespace CombatSystem
 
         public static bool IsTriple(RoleKind k) => ((int)k & 1) == 1;
 
+        /// <summary>役の強さ (出来事 OnRoleFired の量・2026-11-21): 2 個そろい 1 / ゾロ目 2 / 連なり 2。</summary>
+        public static int Strength(RoleKind k) => k == RoleKind.Straight || IsTriple(k) ? 2 : 1;
+
+        /// <summary>大きい役 (ゾロ目か連なり・品の「ゾロ目・連なりなら 2 倍」が読む)。</summary>
+        public static bool IsBig(RoleKind k) => k == RoleKind.Straight || IsTriple(k);
+
         /// <summary>目ごとのテーマ名。</summary>
         public static string ThemeOf(int face)
         {
