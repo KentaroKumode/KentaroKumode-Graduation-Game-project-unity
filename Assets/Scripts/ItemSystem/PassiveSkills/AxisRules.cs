@@ -40,7 +40,7 @@ namespace ItemSystem.PassiveSkills
             return n;
         }
 
-        /// <summary>所持しているか (誓約の封じを戦闘の情報を作る時点で決めるため)。</summary>
+        /// <summary>所持しているか (戦闘の情報を作る時点で所持品から決める品のため)。</summary>
         public static bool Owns(GameLoop.RunState run, string id)
             => run?.ownedPassiveItems != null && run.ownedPassiveItems.Contains(id);
     }

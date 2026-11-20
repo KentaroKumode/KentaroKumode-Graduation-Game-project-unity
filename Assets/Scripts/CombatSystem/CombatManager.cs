@@ -766,7 +766,7 @@ namespace CombatSystem
                 var runR = GameLoop.GameManager.Instance?.Run;
                 if (runR != null && runR.pendingRinkaiCarryover > 0)
                 {
-                    if (!ctx.heatSealed) ctx.rinkaiMeter += runR.pendingRinkaiCarryover;   // 誓約で臨界を封じていたら持ち越さない
+                    ctx.rinkaiMeter += runR.pendingRinkaiCarryover;
                     Debug.Log($"[MetaBuff] 臨界持ち越し: メーター +{runR.pendingRinkaiCarryover}");
                     runR.pendingRinkaiCarryover = 0;
                 }
@@ -786,7 +786,7 @@ namespace CombatSystem
             // 魔王の威圧 等の戦闘開始時スキル処理
             psm.FireTrigger(PassiveSkillTrigger.OnBattleStart);
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnBattleStart);
-            // 充電の種火 r2: 戦闘開始時の充電 (2026-11-07・誓約で充電が封じられていれば AddCharge が止める)
+            // 充電の種火 r2: 戦闘開始時の充電 (2026-11-07)
             if (combatCtx != null && MetaProgression.MetaBuffApplicator.GetChargeOpening() > 0)
                 combatCtx.AddCharge(MetaProgression.MetaBuffApplicator.GetChargeOpening());
 

@@ -52,8 +52,7 @@ namespace CombatSystem
             UnityEngine.Debug.Log($"[賽] 呪物の賽: 秘宝を手に入れた → 最大 HP {run.playerMaxHP}");
         }
 
-        /// <summary>端子の結果へ賽のパッシブを足す。 <paramref name="v"/> は端子に入る目 (〈号令の剣〉の +1 の後)。
-        /// 誓約の封じ (シールド) より前に呼ぶ ── 夜番のシールドも封じで落ちる。</summary>
+        /// <summary>端子の結果へ賽のパッシブを足す。 <paramref name="v"/> は端子に入る目 (〈号令の剣〉の +1 の後)。</summary>
         public static void ApplyToTerminals(TerminalEnv env, TerminalBattleState state, TerminalOutcome o, TerminalDef[] defs, int[] v)
         {
             string die = env.dieId;

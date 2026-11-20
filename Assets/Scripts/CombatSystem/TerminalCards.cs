@@ -147,10 +147,6 @@ namespace CombatSystem
         public int axCrit, axBleed, axPoison, axHeat, axCharge, axShield;
         /// <summary>〈処刑の刃〉の恒久の攻撃 (ラン単位)。</summary>
         public int whetBonus;
-        /// <summary>誓約の封じ (CombatContext の poisonSealed などの写し)。 本体では封じは資源の付与の口 (AddStatus の毒・AddEnemyBleed・
-        /// Kw.AddHeat・AddCharge・consShield・会心の判定) で止まる。 <see cref="TerminalCards.Resolve"/> は同じ物を結果から落とし、
-        /// 見込み (画面・BOT) が本体と食い違わないようにする。</summary>
-        public bool sealPoison, sealBleed, sealHeat, sealCharge, sealShield, sealCrit;
         /// <summary>防御の種類の端子に挿した出目 1 つから引く量 (下限 0)。 時限デバフ〈罪悪感〉(2026-11-16・EventSystem.TimedEffects.TimedDebuffRule) が 2。 0 = なし。
         /// <see cref="TerminalCards.Resolve"/> の「5. 効果」で、 端子へ入る出目の合計を作る所だけで引く (端子の条件は挿した目そのもので見る)。
         /// 本体・画面の見込み・BOT の配線の評価はどれも CombatManager.TerminalEnvNow の盤面を Resolve に渡すので、 同じ値を読む。</summary>
@@ -420,10 +416,6 @@ namespace CombatSystem
         public static int DropUnknownIds(List<string> ids)
             => ids == null ? 0 : ids.RemoveAll(id => id == null || !_byId.ContainsKey(id));
 
-        /// <summary>ランの持ち物 (誓約) で、 この端子の軸が封じられているか (戦闘の外 ── 報酬・店・山札の一覧)。 軸の無い端子は false。</summary>
-        public static bool AxisSealedByRun(TerminalDef d, GameLoop.RunState run)
-            => d?.axis != null && run != null && ItemSystem.PassiveSkills.Effects.OathSeals.SealedAxes(run).Contains(d.axis);
-
         /// <summary>開始の山札: 攻撃 2・防御 2・充電 1。</summary>
         public static List<string> StartingDeck()
             => new List<string> { TerminalIds.Attack, TerminalIds.Attack, TerminalIds.Block, TerminalIds.Block, TerminalIds.Charge };
@@ -587,21 +579,10 @@ namespace CombatSystem
             if (o.attackDice > 0 && state.storedAttack > 0) { o.attackAdd += state.storedAttack; state.storedAttack = 0; }
             if (o.attackAdd != atk6) o.attackLog.Add($"連係・変圧・溜めた攻撃:+{o.attackAdd - atk6}");
 
-            // ── 6b. 装備中の賽のパッシブ (ADR-0015): 挿した目ごとに効く・残り火の持ち越し。 封じ (7) より前 ──
+            // ── 6b. 装備中の賽のパッシブ (ADR-0015): 挿した目ごとに効く・残り火の持ち越し ──
             int atkDie = o.attackAdd;
             DiePassives.ApplyToTerminals(env, state, o, defs, v);
             if (o.attackAdd != atkDie) o.attackLog.Add($"賽:+{o.attackAdd - atkDie}");
-
-            // ── 7. 誓約の封じ: 封じた軸の資源を足す分だけを落とす (攻撃・ブロックへ入る出目は残す) ──
-            //   本体の口 (AddStatus の毒・AddEnemyBleed・Kw.AddHeat・AddCharge・consShield・会心の判定) と同じ物を落とす。
-            //   軸の端子 (〈毒霧〉〈鉤爪〉〈火種〉〈招雷〉〈装甲板〉〈弱点看破〉〈一閃〉) も品と同じくここで止まり、
-            //   軸の外の端子 (〈二重障壁〉〈雷溜め〉・基本の充電) も品と同じく口で止まる。 本体で二度落としても結果は同じ。
-            if (env.sealPoison) o.poison = 0;
-            if (env.sealBleed) o.bleedOnHit = 0;
-            if (env.sealHeat) o.heat = 0;
-            if (env.sealCharge) { o.chargeAdd = 0; o.chargeFill = false; }
-            if (env.sealShield) o.shield = 0;
-            if (env.sealCrit) { o.forceCrit = false; o.critMultAdd = 0f; }
 
             for (int i = 0; i < n; i++)
                 o.kindOfDie[i] = o.slotOfDie[i] >= 0 ? LegacyKind(defs[o.slotOfDie[i]].kind) : DiceTerminal.None;

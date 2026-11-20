@@ -53,12 +53,11 @@ namespace ItemSystem.PassiveSkills.Keywords
             if (ctx.rinkaiBurstDamage <= 0) ctx.rinkaiBurstDamage = Effects.RinkaiInit.DefaultBurstDamage;
         }
 
-        /// <summary>爆発 1 回の基礎 (2026-11-07)。 〈炉温〉の②なら 15 + 炉温 / 2、 なければ 30。 〈炉心の誓約〉で 2 倍、
+        /// <summary>爆発 1 回の基礎 (2026-11-07)。 〈炉温〉の②なら 15 + 炉温 / 2、 なければ 30。
         /// 〈二度詰めの雷管〉の上乗せを足す。 品は ctx.rinkaiBurstDamage を直接書かない ── 書く品どうしの順番で値が変わったため。</summary>
         public static int BurstBase(CombatContext ctx)
         {
             int b = ctx.burstCritRule ? 15 + ctx.AxisDepth(AxisRules.Heat) / 2 : ctx.rinkaiBurstDamage;
-            if (ctx.burstDoubled) b *= 2;
             return b + ctx.burstStackBonus;
         }
 
@@ -72,7 +71,7 @@ namespace ItemSystem.PassiveSkills.Keywords
         /// <summary>src = 出どころの名前 (null なら働いている品の名前・品の外なら「本体」)。 計装にだけ使う。</summary>
         public static void AddHeat(CombatContext ctx, int n, string src = null)
         {
-            if (ctx == null || n <= 0 || ctx.rinkaiThreshold <= 0 || ctx.heatSealed) return;   // heatSealed: 誓約で封じた
+            if (ctx == null || n <= 0 || ctx.rinkaiThreshold <= 0) return;
             bool outer = _heatOuter == 0;
             int n0 = n, meterBefore = ctx.rinkaiMeter, burstsBefore = (int)ctx.GetAccumulated(BurstTotalKey);
             _heatOuter++;

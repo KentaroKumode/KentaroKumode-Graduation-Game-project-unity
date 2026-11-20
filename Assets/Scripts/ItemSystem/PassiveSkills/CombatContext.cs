@@ -601,27 +601,6 @@ namespace ItemSystem.PassiveSkills
         public int WedgeEnemyGain(int n)
             => bleedWedge && n > 0 && enemyBleedStacks > 0 ? (int)((long)n * BleedWedgeK / (enemyBleedStacks + BleedWedgeK)) : n;
 
-        // ---- 誓約の封じ (2026-11-06 軸の品)。 [persistent] ----
-        //   **戦闘の情報を作った直後に、 所持品から立てる** (OathSeals.Apply)。 品の OnBattleStart で立てると、
-        //   遺物の開幕の毒・出血・充電と臨界の持ち越し (OnBattleStart より前) が漏れた (2026-11-07)。
-        //   封じは付与の入口 (AddStatus の毒 / AddEnemyBleed / Kw.AddHeat / AddCharge / consShield の setter / 会心の判定) だけで止める。
-        /// <summary>[persistent] 敵に毒を与えられない (AddStatus で捨てる)。</summary>
-        public bool poisonSealed;
-        /// <summary>[persistent] 敵に出血を与えられない (AddEnemyBleed で捨てる)。</summary>
-        public bool bleedSealed;
-        /// <summary>[persistent] 臨界が溜まらない (Kw.AddHeat で捨てる)。</summary>
-        public bool heatSealed;
-        /// <summary>[persistent] 充電を得られない (AddCharge で捨てる)。</summary>
-        public bool chargeSealed;
-        /// <summary>[persistent] シールドを得られない (consShield の setter で増加を捨てる)。</summary>
-        public bool shieldSealed;
-        /// <summary>[persistent] 会心が出ない (会心の判定の最後で落とす ── 会心確定の効果より後)。</summary>
-        public bool critSealed;
-        /// <summary>[persistent] 〈赤錆の誓約〉: 敵に与える出血が 2 倍。</summary>
-        public bool bleedDoubled;
-        /// <summary>[persistent] 〈雷精の誓約〉: 得る充電が 2 倍。</summary>
-        public bool chargeDoubled;
-
         // ---- 軸の ① 数を参照・②【規則】の品が立てる値 (2026-11-07)。 どれも戦闘開始時に品が書く [persistent] ----
         /// <summary>[persistent] 毒がダメージを出したあとに残る割合 (%)。 基準 50 (半減)。 〈瘴気〉の②で上がる。</summary>
         public int poisonKeepPct = 50;
@@ -636,8 +615,6 @@ namespace ItemSystem.PassiveSkills
         public int heatGainBonus;
         /// <summary>[persistent] 〈炉温〉の②: 爆発のたびに会心の判定をし、 会心なら会心倍率の半分が乗る (CombatManager.LandBurst)。 代わりに爆発の基礎が 15 + 炉温 / 2。</summary>
         public bool burstCritRule;
-        /// <summary>[persistent] 〈炉心の誓約〉: 爆発の基礎が 2 倍。</summary>
-        public bool burstDoubled;
         /// <summary>[decay] 爆発への上乗せ (〈二度詰めの雷管〉が爆発のたびに積み、 ターン開始時に 1/4 を失う)。</summary>
         public int burstStackBonus;
         /// <summary>[persistent] ターン開始の減衰で残るシールドへの上乗せ (% ポイント)。 〈堅牢〉の①。 残る割合は最大 80%。</summary>
@@ -742,7 +719,6 @@ namespace ItemSystem.PassiveSkills
             get => _consShield;
             set
             {
-                if (shieldSealed && value > _consShield) value = _consShield;   // 誓約で封じた: 増加を捨てる
                 // 遺物 (§15-5): シールドの獲得量 +N% (堅牢の符・堅牢 2 個)。 増えた分にだけ掛ける (切り捨て)
                 if (value > _consShield)
                 {
@@ -753,7 +729,7 @@ namespace ItemSystem.PassiveSkills
                     if (MetaProgression.MetaDebuffApplicator.GetSinBlockCutPct() > 0f)
                         value = _consShield + (int)((value - _consShield) * (1f - MetaProgression.ChallengeCards.SinPrideShieldCutPct / 100f));
                     // [計装 2026-11-12・#95] 呼び出し側は頼んだ量だけを shieldGainedTotal へ足すので、 遺物の上乗せと傲慢の削りの差をここで足す
-                    //   (遺物なし・傲慢なしでは 0 ── 学習の条件では記録が変わらない)。 誓約の封じ (上の行) の分は従来どおり数えたまま。
+                    //   (遺物なし・傲慢なしでは 0 ── 学習の条件では記録が変わらない)。
                     shieldGainedTotal += value - asked;
                 }
                 int gained = value - _consShield;
@@ -852,7 +828,6 @@ namespace ItemSystem.PassiveSkills
         public void AddStatus(StatusTarget target, string id, int stacks)
         {
             if (stacks == 0 || string.IsNullOrEmpty(id)) return;
-            if (stacks > 0 && poisonSealed && target == StatusTarget.Enemy && id == "poison") return;   // 誓約で封じた
             // 2026-08-16: 〈回帰性真理〉のデバフ**付与拒否**は撤去した。
             //   毒/出血ビルドが最終ボスに参加できない状態になっていたため。
             //   累積の抑制は RecurrentTruth 側の「毎ターン半減」が担う。
@@ -909,8 +884,7 @@ namespace ItemSystem.PassiveSkills
         /// 2026-08-16: 〈回帰性真理〉の付与拒否を撤去（累積抑制は毎ターン半減へ移行）。</summary>
         public void AddEnemyBleed(int stacks)
         {
-            if (stacks <= 0 || bleedSealed) return;   // 誓約で封じた
-            if (bleedDoubled) stacks *= 2;
+            if (stacks <= 0) return;
             enemyBleedStacks += stacks;
             if (enemyBleedStacks > GetAccumulated(Keywords.Kw.BleedMaxKey))
                 accumulatedValues[Keywords.Kw.BleedMaxKey] = enemyBleedStacks;   // 〈血車〉が読む
@@ -1325,8 +1299,7 @@ namespace ItemSystem.PassiveSkills
         /// (〈電流〉の① の毎ターンの分。 配ると〈十五年目の計測器〉が溢れを攻撃に換え、 余った資源で強さを買える穴になる)。</para>
         public void AddCharge(int n, bool raiseOverflow = true)
         {
-            if (n <= 0 || chargeSealed) return;   // 誓約で封じた
-            if (chargeDoubled) n *= 2;
+            if (n <= 0) return;
             int cur = GetCharge();
             // 〈雷壷〉は上限を外す (超えた分はターン開始時に 75% 捨てる・BeginNewTurn の Phase C)。
             int cap = chargeCapRemoved ? int.MaxValue : ChargeCap;

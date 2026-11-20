@@ -38,5 +38,4 @@ namespace ItemSystem.PassiveSkills
 }
 namespace ItemSystem.PassiveSkills.Effects
 {
-    public static class OathSeals { public static HashSet<string> SealedAxes(GameLoop.RunState run) => new HashSet<string>(); }
 }

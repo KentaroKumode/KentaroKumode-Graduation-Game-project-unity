@@ -71,7 +71,7 @@ namespace ItemSystem.PassiveSkills.Effects
     // ============================================================
 
     /// <summary>戻り血の古鎌: 秘宝が敵の出血を使うたび (<see cref="Kw.ConsumeBleed"/> の出来事 OnBleedConsume)、 使った量の半分 (切り捨て) が
-    /// 次のターンの頭に出血として戻る。 自然に減る分 (OnBleedDecay) は戻らない。 戻す出血は AddEnemyBleed を通す (誓約の封じ・〈赤錆の誓約〉の 2 倍も効く)。</summary>
+    /// 次のターンの頭に出血として戻る。 自然に減る分 (OnBleedDecay) は戻らない。 戻す出血は AddEnemyBleed を通す。</summary>
     public class ReturningBloodSickle : IPassiveSkillEffect, IRelicDisplay
     {
         public const string Id = "戻り血の古鎌";
