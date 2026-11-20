@@ -201,7 +201,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>絶縁の外套: 過充電の間、 ターンの始めにシールド +4 (2026-11-10・#40: 旧「受けるダメージ −3」。 充電軸に被ダメ −N が寄りすぎていた)。</summary>
+    /// <summary>絶縁の外套: 過充電の間、 ターンの始めにシールド +2 (2026-11-20: 旧 +4・2026-11-10・#40: 旧「受けるダメージ −3」。 充電軸に被ダメ −N が寄りすぎていた)。</summary>
     public class InsulatedCloak : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "絶縁の外套";
@@ -210,7 +210,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (ctx.IsOvercharged()) Rw.Shield(ctx, 4, "絶縁の外套");
+            if (ctx.IsOvercharged()) Rw.Shield(ctx, 2, "絶縁の外套");
         }
     }
 
@@ -400,26 +400,26 @@ namespace ItemSystem.PassiveSkills.Effects
     //  シールド (4)
     // ============================================================
 
-    /// <summary>鋲の胸当て: ターン開始時シールド +6 (2026-11-07: 旧 +2)。</summary>
+    /// <summary>鋲の胸当て: ターン開始時シールド +1 (2026-11-20: 旧 +6・2026-11-07: 旧 +2)。</summary>
     public class RivetPlate : IPassiveSkillEffect
     {
         public string SkillId => "鋲の胸当て";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => Rw.Shield(ctx, 6, SkillId);
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => Rw.Shield(ctx, 1, SkillId);
     }
 
-    /// <summary>受け太刀の籠手: ブロックで敵の攻撃を受けきったターン、 シールド +10 (2026-11-07: 旧 +4)。</summary>
+    /// <summary>受け太刀の籠手: ブロックで敵の攻撃を受けきったターン、 シールド +3 (2026-11-20: 旧 +10・2026-11-07: 旧 +4)。</summary>
     public class CatchBracer : IPassiveSkillEffect
     {
         public string SkillId => "受け太刀の籠手";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (Ax2.BlockedAll(ctx)) Rw.Shield(ctx, 10, SkillId);
+            if (Ax2.BlockedAll(ctx)) Rw.Shield(ctx, 3, SkillId);
         }
     }
 
-    /// <summary>重ね札の盾: シールドが 8 以上の間、 受けるダメージ −5 (2026-11-07: 旧 10 以上・−2 → −3 → −5)。</summary>
+    /// <summary>重ね札の盾: シールドが 8 以上の間、 受けるダメージ −2 (2026-11-20: 旧 −5・2026-11-07: 旧 10 以上・−2 → −3 → −5)。</summary>
     public class LayeredTagShield : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "重ね札の盾";
@@ -428,7 +428,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (ctx.consShield >= 8) ctx.playerFlatDamageReduction += 5;
+            if (ctx.consShield >= 8) ctx.playerFlatDamageReduction += 2;
         }
     }
 

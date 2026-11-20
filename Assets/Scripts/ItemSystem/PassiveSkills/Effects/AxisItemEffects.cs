@@ -148,7 +148,7 @@ namespace ItemSystem.PassiveSkills.Effects
             ("溢れ取りの鋳型", When.PlayerHit,     true, 3, Gate.Free, 0),
             ("烈刃", When.PlayerHit,     true, 3, Gate.Free, 0),
             ("二度目の打金", When.PlayerHit,     true, 3, Gate.Free, 0),
-            ("点火スパナ", When.PlayerHit,     true, 3, Gate.Free, 0),
+            ("点火スパナ", When.PlayerHit,     true, 2, Gate.Free, 0),   // 2026-11-20: 旧 +3
         };
     }
 
@@ -367,13 +367,13 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>漏電する銅線 (①): ターン開始時、 充電 + 電流 (2026-11-07: 旧 電流の半分)。 上限で溢れた分は捨てるだけ (〈過充電〉の出来事を配らない)。</summary>
+    /// <summary>漏電する銅線 (①): ターン開始時、 充電 + 電流の半分 (切り捨て・2026-11-20: 旧 電流・2026-11-07: 旧 電流の半分)。 上限で溢れた分は捨てるだけ (〈過充電〉の出来事を配らない)。</summary>
     public class LeakyCopperWire : IPassiveSkillEffect
     {
         public string SkillId => "漏電する銅線";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-            => ctx.AddCharge(ctx.AxisDepth(AxisRules.Charge), raiseOverflow: false);
+            => ctx.AddCharge(ctx.AxisDepth(AxisRules.Charge) / 2, raiseOverflow: false);
     }
 
     /// <summary>二股の導線 (②【規則】): 充電の端子を挿した出目の「電流 × 12%」(最大 80%) が攻撃にも加わる (2026-11-07: 旧 ×8%) (CombatManager の配線集計)。</summary>
@@ -404,13 +404,13 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>油染みの盾革 (①): 堅牢 1 につき、 ターン開始の減衰で残るシールド +5% (残る割合は最大 80%・2026-11-07: 旧 +3%)。</summary>
+    /// <summary>油染みの盾革 (①): 堅牢 1 につき、 ターン開始の減衰で残るシールド +3% (残る割合は最大 80%・2026-11-20: 旧 +5%・2026-11-07: 旧 +3%)。</summary>
     public class OiledShieldLeather : IPassiveSkillEffect
     {
         public string SkillId => "油染みの盾革";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-            => ctx.shieldKeepBonusPct = System.Math.Max(ctx.shieldKeepBonusPct, 5 * ctx.AxisDepth(AxisRules.Shield));
+            => ctx.shieldKeepBonusPct = System.Math.Max(ctx.shieldKeepBonusPct, 3 * ctx.AxisDepth(AxisRules.Shield));
     }
 
     /// <summary>盾押しの心得 (②【規則】): 攻撃の端子を挿したターン、 シールドの「堅牢 × 5%」が攻撃に加わる (2026-11-11: 10% → 5%・2026-11-07: 2% → 10%)。 シールドは減らない。
