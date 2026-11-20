@@ -686,9 +686,19 @@ namespace ItemSystem.PassiveSkills.Effects
     /// T1:1 T2:2 … T5:5 で頭打ち。累計はT5までで15＝速攻なら軽傷、長引けば致命。</summary>
     public class MiasmaCorrosion : IPassiveSkillEffect
     {
-        public string SkillId => "MiasmaCorrosion";
+        public const string Id = "MiasmaCorrosion";
+        public string SkillId => Id;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
         private const string Key = "miasma_poison_stack";
+
+        /// <summary>ダウンに入った時 (2026-11-20・docs/system-overhaul-spec.md §3-1): この侵蝕の毒スタック −2 (0 未満にしない)。
+        /// 呼ぶのは <c>CombatManager.BeginBossDownTurn</c> だけ (ダウン中はこのパッシブ自体が鳴らない・<see cref="CombatSystem.BossDownPassives"/>)。</summary>
+        public static void OnDownStart(CombatContext ctx)
+        {
+            if (ctx == null || !ctx.accumulatedValues.TryGetValue(Key, out var stack) || stack <= 0f) return;
+            ctx.accumulatedValues[Key] = System.Math.Max(0, (int)stack - 2);
+            UnityEngine.Debug.Log($"[毒の侵蝕] ダウン: 毒 {(int)stack} → {(int)ctx.accumulatedValues[Key]}");
+        }
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
             // ボスの数値 (BossParams): 毒スタック上限を直接調整 (低い=DOT緩和)。 基準5

@@ -59,6 +59,14 @@ namespace CombatSystem
         {
             bool was = BossDown.ActiveNow;
             BeginBossDownTurnCore(ctx);
+            // 「ダウン中は発動しない」パッシブの後始末 (2026-11-20・BossDownPassives): 毒沼の主はダウンに入った時に毒 −2、 ヴェスカは前のターンの遺物を消す
+            if (BossDown.ActiveNow)
+            {
+                if (!was && BossDownPassives.SkipsDuringDown(ItemSystem.PassiveSkills.Effects.MiasmaCorrosion.Id))
+                    ItemSystem.PassiveSkills.Effects.MiasmaCorrosion.OnDownStart(ctx);
+                if (BossDownPassives.SkipsDuringDown(ItemSystem.PassiveSkills.Effects.RelicScholar.Id))
+                    ItemSystem.PassiveSkills.Effects.RelicScholar.ClearForDownTurn(ctx);
+            }
             if (!was && BossDown.ActiveNow) RaiseCue(CombatCue.BossDownStart);
             else if (was && !BossDown.ActiveNow)
             {
