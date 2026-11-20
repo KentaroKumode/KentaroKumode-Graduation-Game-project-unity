@@ -29,10 +29,19 @@ namespace GameLoop
             return PassiveSkillManager.Instance?.Context;
         }
 
-        /// <summary>シュヴァリエのレイピア: 戦闘中に使用するとコントラタックを切替（消費されない）。
-        /// 1回目: プレイヤー 1d1 強制 + 被ダメ50%軽減 + 軽減x2 反射（永続トグル）。
-        /// 2回目: 解除 → 次ターン ダイス+1 / クリティカル補正+9 (1ターン限定)。
-        /// パッシブアイテム所持(`chevalier_rapier`)が条件。</summary>
+        /// <summary>〈シュヴァリエのレイピア〉のコントラタックが立っている (ctx の印・1/0)。</summary>
+        public const string ContreKey = "player_contre";
+        /// <summary>コントラタックを解いた次のターンの番号 (そのターンの攻撃は会心確定・剣聖撃破済みなら会心倍率 +1.0)。</summary>
+        public const string RapierReleaseTurnKey = "rapier_release_turn";
+        /// <summary>解いた次のターンの会心倍率の上乗せ (剣聖〈サン=ジョリオラ〉撃破済みのランだけ)。 / 手札の上乗せ。</summary>
+        public const float RapierReleaseCritMul = 1.0f;
+        public const int RapierReleaseDraw = 2;
+
+        /// <summary>シュヴァリエのレイピア: 戦闘中に使用するとコントラタックを切替（消費されない）。2026-11-20 作り直し。
+        /// 発動中: 攻撃の端子に挿せない (TerminalEnv.noAttack) 代わり、 ブロックとシールドで防いだダメージの 2 倍を敵へ軽減不可で返す (CombatManager.ApplyLossDamageModifiers)。
+        /// 解除: 次のターン 手札 +2 枚・そのターンの攻撃は会心確定 (剣聖撃破済みなら会心倍率 +1.0・<see cref="ApplyRapierRelease"/>)。
+        /// 旧: 発動中 1d1 強制 (実装は振り直しを止めるだけ)・被ダメ 50% 軽減・軽減 ×2 反射 / 解除 次のターン ダイス +1 (未実装)・剣聖撃破済みなら会心率 +50%。
+        /// パッシブアイテム所持が条件。</summary>
         public static bool TryUseRapier(RunState run)
         {
             if (run == null || run.ownedPassiveItems == null
@@ -42,27 +51,30 @@ namespace GameLoop
             if (ctx.consumablesLocked) { Debug.Log("[レイピア] 死翔により使用不可"); return false; }
 
 
-            if (ctx.GetAccumulated("player_contre") <= 0)
+            if (ctx.GetAccumulated(ContreKey) <= 0)
             {
-                ctx.accumulatedValues["player_contre"] = 1;
-                Debug.Log("[レイピア] コントラタック発動: 1d1強制 / 被ダメ-50% / 軽減x2反射");
+                ctx.accumulatedValues[ContreKey] = 1;
+                Debug.Log("[レイピア] コントラタック発動: 攻撃の端子に挿せない / ブロックとシールドで防いだダメージ ×2 を返す");
             }
             else
             {
-                ctx.accumulatedValues["player_contre"] = 0;
-                ctx.accumulatedValues["rapier_release_pending"] = 1;
-                // 会心+9 補正は サン=ジョリオラ撃破済みのランでのみ付与
-                if (run.defeatedSaintGeorges)
-                {
-                    ctx.nextTurnBuffs[ItemSystem.PassiveSkills.CombatContext.CritRateBuffKey] = 0.50f;
-                    Debug.Log("[レイピア] コントラタック解除: 次T ダイス+1 / 会心率+50% (真の決闘術)");
-                }
-                else
-                {
-                    Debug.Log("[レイピア] コントラタック解除: 次T ダイス+1 (剣聖未撃破のため会心補正なし)");
-                }
+                ctx.accumulatedValues[ContreKey] = 0;
+                ctx.accumulatedValues[RapierReleaseTurnKey] = ctx.currentTurn + 1;
+                var deck = CombatManager.Instance?.TerminalDeck;
+                if (deck != null) deck.state.extraDrawNext += RapierReleaseDraw;
+                Debug.Log($"[レイピア] コントラタック解除: 次のターン 手札 +{RapierReleaseDraw}・攻撃は会心確定"
+                        + (run.defeatedSaintGeorges ? $"・会心倍率 +{RapierReleaseCritMul:0.0} (真の決闘術)" : ""));
             }
             return true;
+        }
+
+        /// <summary>ターンの頭 (BeginNewTurn の後) に呼ぶ: コントラタックを解いた次のターンなら、 そのターンの攻撃を会心確定にし、
+        /// 剣聖撃破済みのランなら会心倍率 +1.0 (どちらも BeginNewTurn が毎ターン戻す値なので、 次のターンには残らない)。</summary>
+        public static void ApplyRapierRelease(CombatContext ctx)
+        {
+            if (ctx == null || (int)ctx.GetAccumulated(RapierReleaseTurnKey) != ctx.currentTurn || ctx.currentTurn <= 0) return;
+            ctx.forceCritical = true;
+            if (GameManager.Instance?.Run?.defeatedSaintGeorges ?? false) ctx.criticalMultiplier += RapierReleaseCritMul;
         }
 
         /// <summary>[計装 2026-09-14] ヴェスカ連戦の<b>段別</b>消耗品使用数
@@ -179,11 +191,10 @@ namespace GameLoop
         }
 
         /// <summary>〈シュヴァリエのレイピア〉のコントラタックが立っているか (戦闘中だけ意味がある)。</summary>
-        public static bool RapierContreOn()
-        {
-            var ctx = ActiveCtx();
-            return ctx != null && ctx.GetAccumulated("player_contre") > 0;
-        }
+        public static bool RapierContreOn() => RapierContreOn(ActiveCtx());
+
+        /// <summary>この ctx でコントラタックが立っているか。</summary>
+        public static bool RapierContreOn(CombatContext ctx) => ctx != null && ctx.GetAccumulated(ContreKey) > 0;
 
         /// <summary>効果適用本体（リスト削除はしない）。</summary>
         private static bool Apply(RunState run, string id)

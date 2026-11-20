@@ -159,17 +159,19 @@ namespace CombatSystem
         /// 無料の振り直し (〈特別・対〉) は 0 で、 上乗せも足さない。 本体の支払い・画面の費用の表示 (<see cref="TurnPause.rerollCost"/>)・
         /// BOT の振り直しの方策 (AutoRunner.MutualRerollPolicy) がここを読む。 式の正本は <see cref="EventSystem.TimedEffects.TimedDebuffRule.RerollCost"/>。</summary>
         public static int RerollCostNow(int diceCount, int nth, bool free)
-            => DiePassives.FreeRerollByDie(GameLoop.GameManager.Instance?.Run) ? 0      // 賭場の賽 (ADR-0015): 充電は払わない (代わりに HP を払う・RerollPhase)
-             : EventSystem.TimedEffects.TimedDebuffRule.RerollCost(diceCount, nth, free,
+        {
+            if (DiePassives.FreeRerollByDie(GameLoop.GameManager.Instance?.Run)) return 0;      // 賭場の賽 (ADR-0015): 充電は払わない (代わりに HP を払う・RerollPhase)
+            int cost = EventSystem.TimedEffects.TimedDebuffRule.RerollCost(diceCount, nth, free,
                 EventSystem.TimedEffects.TimedDebuffRule.RerollSurcharge(GameLoop.GameManager.Instance?.Run?.timedDebuffs));
+            var ctx = PassiveSkillManager.Instance?.Context;
+            return ctx != null ? ctx.ChargeCostNow(cost) : cost;   // 〈過負荷チューナー〉: 過充電の間 −1 (最低 1・2026-11-20)
+        }
 
         private IEnumerator<TurnPause> RerollPhase(CombatContext ctx, int[] playerDice, int[] enemyDice, int playerDiceMax,
                                                    int[] playerFaceIdx = null)
         {
             if (ctx == null || playerDice == null || playerDice.Length == 0) yield break;
             if (RerollPolicy == null && !_interactiveTurn) yield break;
-            // 強制ロール中は対象外 (出た目が仕様で固定されているため)
-            if (ctx.GetAccumulated("player_contre") > 0) yield break;
 
             // 予告を仮組みする。 敵ダイスはこの後変わらないので素の合計で作れる。
             int rawEnemyTotal = 0;
@@ -467,8 +469,8 @@ namespace CombatSystem
             {
                 float rate = CritRateOf(ctx, pendingBuff: false);
                 // 本判定と同じ優先順: 封印 (無心の刃) で外れ、 forceCritical が最後に確定で上書きする。
-                crit = (!ctx.critSuppressed && GameLoop.GameRng.Chance(rate, "combat.roleExtraCrit", RngIdx(3)))
-                    || ctx.forceCritical;
+                crit = ((!ctx.critSuppressed && GameLoop.GameRng.Chance(rate, "combat.roleExtraCrit", RngIdx(3)))
+                    || ctx.forceCritical) && !ctx.critToDamage;   // 〈銑鉄棍〉の【規則】: 会心が出なくなる
                 if (crit) extra *= ctx.criticalMultiplier;
             }
             int add = Mathf.Max(1, Mathf.RoundToInt(extra));

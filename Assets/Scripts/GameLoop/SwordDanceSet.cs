@@ -41,6 +41,30 @@ namespace GameLoop
         /// <summary>id が [剣の舞] セットメンバーか（Finale は含まない）。</summary>
         public static bool IsDance(string id) => id != null && System.Array.IndexOf(All, id) >= 0;
 
+        /// <summary>[剣の舞] の品の単体効果に掛ける倍率 (2026-11-20): 持っている [剣の舞] が 2 枚で 1.5 倍・3 枚で 2 倍 (1 枚は 1 倍・4 枚揃うと〈無銘の剣舞譜〉へ変わる)。
+        /// 枚数は <see cref="OwnedCount"/> (昇華も含む)。 伸びるのは与ダメージの分だけ (〈エスパーダ・パソドブレ〉の受けるダメージ・〈フルーレ・バレエ〉の生還は伸ばさない)。</summary>
+        public static float SoloScale(RunState run)
+        {
+            int n = OwnedCount(run);
+            return n >= 3 ? 2f : n == 2 ? 1.5f : 1f;
+        }
+
+        /// <summary>LEGENDARY の秘宝を選んだ枠を、 まれに [剣の舞] へ差し替える (〈サーベル・ワルツ〉の文・[剣の舞] を 1 枚以上持っている時だけ)。
+        /// 店 (ShopManager.PickItemByKind・LEGENDARY の帯の中で絞る) と同じ確率 <see cref="ItemSystem.Shop.ShopManager.SaberWaltzShopBias"/> を、
+        /// 交換マス・宝箱 (秘宝のマス) にも掛ける (2026-11-20)。 picked が LEGENDARY の秘宝でなければ、 または候補に [剣の舞] が無ければ、 乱数を引かずにそのまま返す
+        /// (乱数は場所ごとの鍵 <paramref name="rngKey"/> なので、 他の抽選の列は動かない)。</summary>
+        public static ItemSystem.CompleteItemData MaybeSwapToDance(RunState run, ItemSystem.CompleteItemData picked,
+                                                                   System.Collections.Generic.List<ItemSystem.CompleteItemData> pool, string rngKey)
+        {
+            if (picked == null || pool == null || picked.rarity != ItemSystem.ItemRarity.LEGENDARY || picked.category != ItemSystem.ItemCategory.Passive) return picked;
+            if (run == null || OwnedCount(run) <= 0) return picked;
+            var dance = pool.FindAll(it => it != null && it.rarity == ItemSystem.ItemRarity.LEGENDARY && IsDance(it.internalName));
+            if (dance.Count == 0 || !GameRng.Chance(ItemSystem.Shop.ShopManager.SaberWaltzShopBias, rngKey)) return picked;
+            var d = dance[GameRng.RangeAuto(rngKey + ".pick", 0, dance.Count)];
+            UnityEngine.Debug.Log($"[剣の舞] LEGENDARY の枠を差し替え: {picked.internalName} → {d.internalName} ({rngKey})");
+            return d;
+        }
+
         /// <summary>所持している剣の舞の種類数（昇華済みも含む＝OwnsPassive）。</summary>
         public static int OwnedCount(RunState run)
         {

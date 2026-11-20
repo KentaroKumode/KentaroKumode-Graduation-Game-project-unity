@@ -27,14 +27,14 @@ namespace ItemSystem.PassiveSkills.Effects
     //  会心 (9)
     // ============================================================
 
-    /// <summary>狙い目の刻み: 攻撃の端子を挿した出目に 6 があるターン、 会心率 +15%。</summary>
+    /// <summary>狙い目の刻み: 攻撃の端子を挿した出目に 6 があるターン、 会心率 +40% (2026-11-20: 旧 +25%)。</summary>
     public class AimNotch : IPassiveSkillEffect
     {
         public string SkillId => "狙い目の刻み";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (Ax2.Count(ctx, MutualKeys.AttackDiceMax) >= 6) ctx.critRatePctAdd += 0.25f;
+            if (Ax2.Count(ctx, MutualKeys.AttackDiceMax) >= 6) ctx.critRatePctAdd += 0.40f;
         }
     }
 
@@ -124,24 +124,56 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>抜き打ちの作法: 戦闘の最初の 2 回の攻撃は必ず会心 (2026-11-07: 旧 1 回)。</summary>
+    /// <summary>抜き打ちの作法 (2026-11-20 作り直し): 戦闘の最初の 2 ターン、 そのターンの最初の 1 撃は必ず会心 (ctx.forceCritThisHit)。
+    /// 旧: 戦闘の最初の 2 回の攻撃 (OnWired で forceCritical = そのターンの全部の撃) ── 多段攻撃で 1 ターン目に尽きた。</summary>
     public class QuickDrawArt : IPassiveSkillEffect, IRelicDisplay
     {
-        public string SkillId => "抜き打ちの作法";
+        public const string Id = "抜き打ちの作法";
+        public string SkillId => Id;
         /// <summary>秘宝の列 (#320) の見え方。</summary>
-        public RelicView View(CombatContext ctx, RelicEnv env) => new RelicView { known = true, lit = Times - Ax2.Count(ctx, Key) > 0, count = System.Math.Max(0, Times - Ax2.Count(ctx, Key)), spent = Times - Ax2.Count(ctx, Key) <= 0 };
-        public const int Times = 2;
-        private const string Key = "ax2.quickDraw";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
+        public RelicView View(CombatContext ctx, RelicEnv env) => new RelicView { known = true, lit = ctx.currentTurn <= Turns, count = System.Math.Max(0, Turns + 1 - System.Math.Max(1, ctx.currentTurn)), spent = ctx.currentTurn > Turns };
+        public const int Turns = 2;
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalCheck };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (Ax2.Count(ctx, Key) >= Times || Ax2.Count(ctx, MutualKeys.AttackDiceCount) <= 0) return;
-            ctx.accumulatedValues[Key] = Ax2.Count(ctx, Key) + 1;
-            ctx.forceCritical = true;
+            if (FirstHitForced(ctx)) ctx.forceCritThisHit = true;
         }
+
+        /// <summary>このターンの最初の 1 撃が必ず会心になるターンか (撃の中では今の撃が最初の 1 撃か)。 BOT の見積もりも読む。</summary>
+        public static bool FirstHitForced(CombatContext ctx)
+            => ctx != null && ctx.currentTurn >= 1 && ctx.currentTurn <= Turns && ctx.hitIndex == 0;
     }
 
-    // 〈千里眼の水晶〉(心眼 1 につき会心倍率 +0.15) は 2026-11-11 に items.json の stats へ移した (段 3・per=axis:会心)。
+    /// <summary>千里眼の水晶 (2026-11-20 作り直し): 会心が出たターン、 次のターンの手札 +1 枚 (そのターンに何度会心しても 1 枚)・
+    /// 次のターンの最初の 1 撃の会心率 + 心眼 × 5%。 旧: 心眼 1 につき会心倍率 +0.15 (items.json の stats・〈研ぎ師の見立て書〉と同じ効果だった)。</summary>
+    public class ClairvoyantCrystal : IPassiveSkillEffect, IRelicDisplay
+    {
+        public const string Id = "千里眼の水晶";
+        public string SkillId => Id;
+        public const float CritPerDepth = 0.05f;
+        public const int Draw = 1;
+        /// <summary>[persistent] 会心が出た直近のターンの番号。</summary>
+        private const string Key = "ax2.clairvoyant";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(Ax2.LastTurn(ctx, Key));
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalDamage, PassiveSkillTrigger.OnCriticalCheck };
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
+        {
+            if (t == PassiveSkillTrigger.OnCriticalDamage)
+            {
+                if (Ax2.Count(ctx, Key) == ctx.currentTurn) return;   // このターンはもう数えた
+                ctx.accumulatedValues[Key] = ctx.currentTurn;
+                Rw.DrawNext(Draw);
+                return;
+            }
+            // OnCriticalCheck: 前のターンに会心が出ていたら、 このターンの最初の 1 撃だけ会心率を足す (会心率は撃ごとに戻る)
+            if (FirstHitBonus(ctx) > 0f) ctx.critRatePctAdd += FirstHitBonus(ctx);
+        }
+
+        /// <summary>このターンの最初の 1 撃に足す会心率 (前のターンに会心が出ていなければ 0)。 撃の中では今の撃が最初の 1 撃の時だけ。 BOT の見積もりも読む。</summary>
+        public static float FirstHitBonus(CombatContext ctx)
+            => ctx != null && ctx.hitIndex == 0 && Ax2.LastTurn(ctx, Key) ? CritPerDepth * ctx.AxisDepth(AxisRules.Crit) : 0f;
+    }
 
     // ============================================================
     //  充電 (8)
@@ -155,15 +187,16 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.AddCharge(10);
     }
 
-    /// <summary>静電気の毛布: 防御の端子を挿したダイス 1 個につき充電 +1。</summary>
+    /// <summary>静電気の毛布: 防御の端子を挿したダイス 1 個につき充電 +2 (2026-11-20: 旧 +1)。</summary>
     public class StaticBlanket : IPassiveSkillEffect
     {
         public string SkillId => "静電気の毛布";
+        public const int PerDie = 2;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             int n = Ax2.Count(ctx, MutualKeys.BlockDiceCount);
-            if (n > 0) ctx.AddCharge(n);
+            if (n > 0) ctx.AddCharge(PerDie * n);
         }
     }
 
@@ -190,15 +223,29 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>引き直しの撃鉄: リロールしたターン、 与ダメージ +15% (2026-11-10: 旧 出目 +25%)。</summary>
+    /// <summary>引き直しの撃鉄 (2026-11-20 作り直し): 振り直すたび、 そのターンの攻撃の撃ごとに攻撃 +2 (攻撃 +N は撃ごとに乗る・ADR-0016)。
+    /// 振り直しは OnPostRoll より前に済む。 旧: リロールしたターン、 与ダメージ +15%。</summary>
     public class RerollHammer : IPassiveSkillEffect
     {
         public string SkillId => "引き直しの撃鉄";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
+        public const int AtkPerReroll = 2;
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (ctx.rerollsThisTurn > 0) ctx.AddOutgoingPct(0.15f);
+            if (ctx.rerollsThisTurn > 0) ctx.AddPlayerAttackOrDiceBonus(AtkPerReroll * ctx.rerollsThisTurn);
         }
+    }
+
+    /// <summary>過負荷チューナー (2026-11-20 作り直し): 過充電 (充電 7 以上) の間、 充電を払う端子・秘宝の払う量が 1 減る (最低 1)。 振り直しの充電の費用も 1 減る (最低 1)。
+    /// 減らすのは <see cref="CombatContext.ChargeCostNow"/> を通す所 (端子 = TerminalEnv.chargeCostCut・秘宝・振り直し = CombatManager.RerollCostNow)。
+    /// 旧: 過充電の間、 与ダメージ +30% (items.json の stats)。</summary>
+    public class OverloadTuner : IPassiveSkillEffect, IRelicDisplay
+    {
+        public string SkillId => "過負荷チューナー";
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.IsOvercharged());
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.overloadChargeCut = true;
     }
 
     /// <summary>絶縁の外套: 過充電の間、 ターンの始めにシールド +2 (2026-11-20: 旧 +4・2026-11-10・#40: 旧「受けるダメージ −3」。 充電軸に被ダメ −N が寄りすぎていた)。</summary>
@@ -223,7 +270,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (ctx.GetCharge() < MinCharge) return;
-            if (ctx.ConsumeCharge(5)) ctx.AddOutgoingPct(0.20f);
+            if (ctx.ConsumeCharge(ctx.ChargeCostNow(5))) ctx.AddOutgoingPct(0.20f);   // 〈過負荷チューナー〉: 過充電の間 1 減る
         }
     }
 
@@ -277,33 +324,35 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>血の滴る刃先: 敵の出血が 10 以上の間、 与ダメージ +10% (2026-11-10: 旧 出目 +10%)。</summary>
+    /// <summary>血の滴る刃先 (2026-11-20 作り直し): 敵の出血が 10 以上の間、 攻撃が通るたび HP +2 (撃ごと)。 旧: 与ダメージ +10%。</summary>
     public class DrippingEdge : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "血の滴る刃先";
+        public const int MinBleed = 10, Heal = 2;
         /// <summary>秘宝の列 (#320) の見え方。</summary>
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.enemyBleedStacks >= 10);
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll };
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.enemyBleedStacks >= MinBleed);
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (ctx.enemyBleedStacks >= 10) ctx.AddOutgoingPct(0.10f);
+            if (Rw.PlayerHit(ctx) && ctx.IsRealHit && ctx.enemyBleedStacks >= MinBleed) Rw.Heal(ctx, Heal);
         }
     }
 
-    /// <summary>止血禁じの軟膏: 出血の比例減衰の割る数 +6 (2026-11-07: 旧 +3)。</summary>
+    /// <summary>止血禁じの軟膏: 出血の比例減衰の割る数 +10 (2026-11-20: 旧 +6・2026-11-07: 旧 +3)。</summary>
     public class NoClotSalve : IPassiveSkillEffect
     {
         public string SkillId => "止血禁じの軟膏";
+        public const int DivisorBonus = 10;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.bleedDecayDivisorBonus += 6;
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.bleedDecayDivisorBonus += DivisorBonus;
     }
 
-    /// <summary>紅の搾り具: 出血が 15 以上の敵に攻撃が通ると、 出血の 1/3 を使い、 使った量 × 5 の軽減不可ダメージ (1 ターン 1 回)。
-    /// 2026-11-07: 旧 30 以上・×3 は ITT が −0.7 (出血を使う分だけ毎ターンの出血のダメージが減り、 差し引きで損だった)。</summary>
+    /// <summary>紅の搾り具: 出血が 10 以上の敵に攻撃が通ると、 出血の 1/3 を使い、 使った量 × 8 の軽減不可ダメージ (1 ターン 1 回)。
+    /// 2026-11-20: 旧 15 以上・×5 (ITT が 0 前後)。 2026-11-07: 旧 30 以上・×3 は ITT が −0.7 (出血を使う分だけ毎ターンの出血のダメージが減り、 差し引きで損だった)。</summary>
     public class CrimsonPress : IPassiveSkillEffect
     {
         public string SkillId => "紅の搾り具";
-        public const int Threshold = 15, Mul = 5;
+        public const int Threshold = 10, Mul = 8;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -337,14 +386,14 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>毒針の指輪: 攻撃が通ると、 攻撃の端子を挿したダイス 1 個につき毒 +1。</summary>
+    /// <summary>毒針の指輪 (2026-11-20): 攻撃が通るたび (撃ごと)、 敵に毒 +1。 旧: 攻撃が通ると、 攻撃の端子を挿したダイス 1 個につき毒 +1 ── 撃ごとに数えるので多段攻撃で 1 ターン +9 になっていた。</summary>
     public class NeedleRing : IPassiveSkillEffect
     {
         public string SkillId => "毒針の指輪";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (Rw.PlayerHit(ctx)) Rw.Poison(ctx, Ax2.Count(ctx, MutualKeys.AttackDiceCount));
+            if (Rw.PlayerHit(ctx) && ctx.IsRealHit) Rw.Poison(ctx, 1);
         }
     }
 
@@ -399,6 +448,23 @@ namespace ItemSystem.PassiveSkills.Effects
     // ============================================================
     //  シールド (4)
     // ============================================================
+
+    /// <summary>英雄の意志 (2026-11-20 作り直し): エリート戦・ボス戦で、 敵が大技の予告 (またはチャージ) を出しているターン、 ターン開始時にシールド +18。
+    /// 予告の判定は CombatManager.EnemyHeavyOrChargeNow (このターンがダウンなら出さない)。 旧: エリート戦・ボス戦の開始時シールド +6 (items.json の stats)。</summary>
+    public class HeroWill : IPassiveSkillEffect, IRelicDisplay
+    {
+        public string SkillId => "英雄の意志";
+        public const int Shield = 18;
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(Rw.StrongFoe() && (CombatSystem.CombatManager.Instance?.EnemyHeavyOrChargeNow(ctx.currentTurn) ?? false));
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
+        {
+            if (!Rw.StrongFoe() || !(CombatSystem.CombatManager.Instance?.EnemyHeavyOrChargeNow(ctx.currentTurn) ?? false)) return;
+            Rw.Shield(ctx, Shield, SkillId);
+            Rw.Log($"[英雄の意志] 敵の大技の予告 → シールド +{Shield}");
+        }
+    }
 
     /// <summary>鋲の胸当て: ターン開始時シールド +1 (2026-11-20: 旧 +6・2026-11-07: 旧 +2)。</summary>
     public class RivetPlate : IPassiveSkillEffect

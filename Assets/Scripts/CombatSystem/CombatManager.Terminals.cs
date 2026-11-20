@@ -140,6 +140,8 @@ namespace CombatSystem
             if (_enemyDiceNow != null) foreach (int d in _enemyDiceNow) if (d > emax) emax = d;
             e.enemyMaxDie = emax;
             e.heavyTurn = Escalation.IsHeavyTurn(currentEnemy, ctx.currentTurn);
+            e.chargeCostCut = ctx.ChargeCostNow(2) < 2 ? 1 : 0;   // 〈過負荷チューナー〉: 過充電の間 1 減る (最低 1)
+            e.noAttack = GameLoop.Consumables.RapierContreOn(ctx);   // 〈シュヴァリエのレイピア〉のコントラタック中は攻撃の端子に挿せない
             return e;
         }
 
