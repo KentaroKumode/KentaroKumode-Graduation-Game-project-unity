@@ -167,6 +167,25 @@ namespace CombatSystem
             return ctx != null ? ctx.ChargeCostNow(cost) : cost;   // 〈過負荷チューナー〉: 過充電の間 −1 (最低 1・2026-11-20)
         }
 
+        /// <summary>種火・役 (2026-11-21) の無料の振り直しのうち、 この戦闘で使った回数 (CombatContext.accumulatedValues・戦闘ごとに作り直される)。</summary>
+        public const string SparkRoleFreeUsedKey = "sparkRoleFreeUsed";
+
+        /// <summary>今使える無料の振り直しの回数 = 〈特別・対〉(このターン・<see cref="YachtRoleEffects.FreeRerollKey"/>) + 種火・役のこの戦闘の残り。
+        /// 本体の振り直し (<see cref="RerollPhase"/>) と BOT の振り直しの方策が読む。</summary>
+        public static int FreeRerollsNow(CombatContext ctx)
+        {
+            if (ctx == null) return 0;
+            int pair = ctx.currentBuffs.TryGetValue(YachtRoleEffects.FreeRerollKey, out float f) ? Mathf.Max(0, (int)f) : 0;
+            return pair + SparkRoleFreeLeft(ctx);
+        }
+
+        /// <summary>種火・役の無料の振り直しの、 この戦闘の残り。</summary>
+        private static int SparkRoleFreeLeft(CombatContext ctx)
+        {
+            int used = ctx.accumulatedValues.TryGetValue(SparkRoleFreeUsedKey, out float u) ? (int)u : 0;
+            return Mathf.Max(0, MetaProgression.MetaBuffApplicator.GetSparkRoleFreeRerolls() - used);
+        }
+
         private IEnumerator<TurnPause> RerollPhase(CombatContext ctx, int[] playerDice, int[] enemyDice, int playerDiceMax,
                                                    int[] playerFaceIdx = null)
         {
@@ -195,9 +214,8 @@ namespace CombatSystem
             //   BOT の振り直しの値付け (MutualRerollPolicy → 山札の効用) もこの予告を読むので、 ダウンのターンの攻撃 0・与ダメ ×1.5 を見る。
             FillDownTelegraph(ref tele);
 
-            // 〈特別・対〉(前ターン成立): 次のリロール N 回 (既定 2) を無料にする。
-            int freeRerolls = ctx.currentBuffs.TryGetValue(YachtRoleEffects.FreeRerollKey, out float freeFlag)
-                ? Mathf.Max(0, (int)freeFlag) : 0;
+            // 〈特別・対〉(前ターン成立): 次のリロール N 回 (既定 2) を無料にする。 種火・役 (2026-11-21): 各戦闘の最初の 1 回も無料 (FreeRerollsNow)
+            int freeRerolls = FreeRerollsNow(ctx);
 
             // **全部振り直し・費用は戦闘の中で上がる (2026-10-17)。**
             //   旧規則は「選んだダイスだけ・費用 = 個数 × そのターンで何回目か」で、 回目がターンごとに戻るうえ
@@ -238,7 +256,13 @@ namespace CombatSystem
                 // 賭場の賽 (ADR-0015): 充電の代わりに HP を払う。 HP が払えない (払うと 0 になる) なら振り直せない
                 bool gamble = DiePassives.FreeRerollByDie(GameLoop.GameManager.Instance?.Run);
                 if (gamble && playerHP <= DiePassives.GambleHpCost) break;
-                if (usedFree) freeRerolls--;
+                if (usedFree)
+                {
+                    freeRerolls--;
+                    // 種火・役の分は最後に使う (〈特別・対〉の分はターンの終わりで消えるので先に使う)
+                    if (freeRerolls < SparkRoleFreeLeft(ctx))
+                        ctx.accumulatedValues[SparkRoleFreeUsedKey] = (ctx.accumulatedValues.TryGetValue(SparkRoleFreeUsedKey, out float u) ? u : 0f) + 1f;
+                }
                 if (!ctx.ConsumeCharge(cost)) break;   // 払えなければそこで打ち切り
                 if (gamble)
                 {

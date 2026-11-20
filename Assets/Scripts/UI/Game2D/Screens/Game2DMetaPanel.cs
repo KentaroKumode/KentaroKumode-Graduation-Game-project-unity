@@ -50,6 +50,8 @@ namespace UI.Game2D
             MetaModule.SparkBleed   => ("種火・出血", SparkDesc("出血", "出血 " + MetaPanel.BleedWeakenThreshold + " 以上の敵の攻撃値 −" + MetaPanel.BleedWeakenAmount)),
             MetaModule.SparkShield  => ("種火・シールド", SparkDesc("シールド", "ターン開始の減衰で残るシールド +" + MetaPanel.ShieldKeepBonusPct + "%")),
             MetaModule.SparkCrit    => ("種火・会心", SparkDesc("会心", "会心倍率 +" + N(MetaPanel.CritMulBonus))),
+            MetaModule.SparkDeck    => ("種火・山札", SparkDesc("山札", "戦闘の 1 ターン目の手札 +" + MetaPanel.DeckOpeningDraw + " 枚")),
+            MetaModule.SparkRole    => ("種火・役", SparkDesc("役", "各戦闘の最初の振り直しが無料")),
             MetaModule.AttackTune   => ("攻撃端子調律", "攻撃の端子に挿した出目 1 個につき +" + MetaPanel.TerminalTunePerDie + "。"),
             MetaModule.BlockTune    => ("防御端子調律", "防御の端子に挿した出目 1 個につき +" + MetaPanel.TerminalTunePerDie + "。"),
             MetaModule.AxisTicket   => ("軸引きの手形", "店の軸指定の振り直しの追加 −" + MetaPanel.AxisTicketDiscount + "G。 ※まだ効かない (店の側が未接続)"),

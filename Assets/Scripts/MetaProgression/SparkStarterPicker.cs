@@ -22,7 +22,8 @@ namespace MetaProgression
             ["bleed"]  = ItemSystem.PassiveSkills.AxisRules.Bleed,
             ["crit"]   = ItemSystem.PassiveSkills.AxisRules.Crit,
             ["shield"] = ItemSystem.PassiveSkills.AxisRules.Shield,
-            // 新しい軸の種火 (山札・役) はここにキーワード → 軸を足す (MetaPanel.SparkKeyword と同じ綴り)
+            ["deck"]   = ItemSystem.PassiveSkills.AxisRules.Deck,   // 2026-11-21
+            ["role"]   = ItemSystem.PassiveSkills.AxisRules.Role,
         };
 
         /// <summary>与えられたパッシブアイテムが keyword に該当するか (品の軸で判定)。</summary>
