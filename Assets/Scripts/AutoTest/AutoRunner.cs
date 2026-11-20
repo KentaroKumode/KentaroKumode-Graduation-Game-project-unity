@@ -1401,7 +1401,7 @@ namespace AutoTest
         /// 2026-11-20〜 今の構造の書き方: <c>"stage:none"</c> (未解禁) / <c>"stage:mid"</c> (途中・基礎 3・枠 2) / <c>"stage:full"</c> (完成・基礎 6・枠 3)、
         /// 主方針を 1 つずつ: <c>"stage:full,main:Valor"</c>、 細かく: <c>"base:6,slots:3,main:LastStand,support:Compression,spark:bleed"</c>
         /// (書き方の正本は <see cref="MetaAllocationPresets.ParseSpec"/>)。 旧い <c>"Shell:10,Output:3"</c> は今の構造へ読み替える (表は GAME.md §15-1)。
-        /// 解釈できない指定はランを止める。 実効値は <see cref="MetaLoadoutApplied"/> (並列の実効状態) と runs の metaRanks。</summary>
+        /// 解釈できない指定は、 並列は起動で止め、 逐次は赤いログを出して未解禁で走る。 実効値は <see cref="MetaLoadoutApplied"/> (並列の実効状態) と runs の metaRanks。</summary>
         public string metaRankSpec = "";
         /// <summary>今の整備パネルの構成 (並列の実効状態・<see cref="RankMarginWorkerConfig.DescribeEffective"/> が読む)。</summary>
         public string MetaLoadoutApplied => MetaProgression.MetaBuffApplicator.Describe();
