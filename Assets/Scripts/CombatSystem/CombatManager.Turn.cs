@@ -1396,6 +1396,7 @@ namespace CombatSystem
 
             int takenApplied = 0;
             bool primaryAttacked = false, secondaryAttacked = false;   // 盾〈黎明〉の「敵が放った攻撃」
+            int parryBlocked = 0;   // 〈後の先〉がブロックで防いだ量 (攻撃 1 回ごとに min(後の先のブロック, ブロックで止めた量))
 
             // 〈封じ・揃〉(前ターン成立) — このターン敵は攻撃しない。 予告は既に出ているので
             // 「見えている一撃を丸ごと踏み倒す」形になり、 予告の価値を壊さない。
@@ -1474,6 +1475,7 @@ namespace CombatSystem
                 var (takenDmg, counterFixed, _) =
                     psm.ProcessDamage(lossBase, 0, 0f, attackerIsEnemy: true, fireEnemyDealTriggers: true);
                 takenDmg = ApplyLossDamageModifiers(takenDmg, floorMod, ctx, Math.Min(enemyAtkValue, blockSum));
+                parryBlocked += Math.Min(term.parryBlock, Math.Min(enemyAtkValue, blockSum));
                 if (ctx.nullifyAllDamage) takenDmg = 0; // 虚空 等: 双方ダメ0化
 
                 // 役 (ADR-0010) の被ダメ側。 〈虚空〉と**同じ位置・同じ対象**（敵の直接攻撃パケット）に置く。
@@ -1620,6 +1622,7 @@ namespace CombatSystem
                     var (secTaken, _, _) =
                         psm.ProcessDamage(secLossBase, 0, 0, attackerIsEnemy: true);
                     secTaken = ApplyLossDamageModifiers(secTaken, floorMod, ctx, Math.Min(secAtkValue, blockSum));
+                    parryBlocked += Math.Min(term.parryBlock, Math.Min(secAtkValue, blockSum));
                     if (ctx.nullifyAllDamage) secTaken = 0;
 
                     // 役の被ダメ側は 1 体目と**同じ扱い**にする。 片方にしか効かないと
@@ -1722,6 +1725,8 @@ namespace CombatSystem
                 psm.FireEnemyTrigger(PassiveSkillTrigger.OnRollDraw);
             SyncHPFromContext(ctx);
 
+            // 〈後の先〉: Resolve が入れた見込みを、 ブロックで実際に防いだ量へ直す (敵が攻撃しなかったターンは 0)
+            SettleParry(term, parryBlocked);
             // 端子の山札: 撃破のボーナスと、 使い捨て・影写し・火葬の剣・保持の反映
             FinishTerminalTurn(term);
 
