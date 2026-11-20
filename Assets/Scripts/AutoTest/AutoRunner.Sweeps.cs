@@ -281,7 +281,7 @@ namespace AutoTest
             foreach (var f in focus)
             {
                 var d = new Dictionary<MetaProgression.MetaPanelKind, int> { { f, 10 } };
-                int left = MetaProgression.MetaPanel.MaxPoints - 10;
+                int left = MetaAllocationPresets.LegacyMaxPoints - 10;
                 foreach (var k in focus)
                 {
                     if (k == f || left <= 0) continue;
@@ -296,7 +296,7 @@ namespace AutoTest
             var sb = new StringBuilder();
             sb.AppendLine("=== 極点 (r10) 比較 ===");
             sb.AppendLine($"日時    : {DateTime.Now:yyyy-MM-dd HH:mm:ss} / 1 アーム {runs} ラン / シードは全アーム共通");
-            sb.AppendLine($"各アーム = [焦点トラック r10 = 10pt] + [共通順序で残り {MetaProgression.MetaPanel.MaxPoints - 10}pt]");
+            sb.AppendLine($"各アーム = [焦点トラック r10 = 10pt] + [共通順序で残り {MetaAllocationPresets.LegacyMaxPoints - 10}pt]");
             sb.AppendLine("比較対象 = Balanced (どの極点にも届かない標準配分)");
             sb.AppendLine();
             sb.AppendLine("アーム                  |  クリア率 |  Balanced比 | 平均到達段 | 極点の内容");
@@ -318,7 +318,7 @@ namespace AutoTest
             {
                 var (label, spec) = arms[ai];
                 curArmLabel = label; curArmIndex = ai + 1; curArmCount = arms.Count; curRunsPerArm = runs;
-                _metaAblationSpec = spec;
+                _metaAblationSpec = MetaLoadout.FromLegacy(spec);   // 旧い配点 → 今の構造 (GAME.md §15-1 の読み替え)
 
                 int clears = 0, valid = 0; double stageSum = 0;
                 for (int i = 0; i < runs; i++)
@@ -472,7 +472,7 @@ namespace AutoTest
             var sb = new StringBuilder();
             sb.AppendLine("=== 全軸 r9 / r10 (Balanced 同梱) ===");
             sb.AppendLine($"日時    : {DateTime.Now:yyyy-MM-dd HH:mm:ss} / 1 アーム {runs} ラン / シードは全アーム共通");
-            sb.AppendLine($"予算 {MetaProgression.MetaPanel.MaxPoints}pt / "
+            sb.AppendLine($"予算 {MetaAllocationPresets.LegacyMaxPoints}pt / "
                         + "各アーム = [焦点トラック r9 or r10] + [他の数値系 7 本を 2pt ずつ]");
             sb.AppendLine("  r10 = 10+14 = 24pt ちょうど / r9 = 9+14 = 23pt (余り 1pt は**使わない**)");
             sb.AppendLine("  → r10 と r9 の違いは焦点トラックの 1 段だけ。 埋め草は完全に同一");
@@ -488,7 +488,7 @@ namespace AutoTest
                 curArmLabel = label; curArmIndex = ai + 1; curArmCount = arms.Count; curRunsPerArm = runs;
 
                 var tally = new RankMarginArmTally();
-                yield return RunRankMarginArm(spec, runs, RankMarginSeedBase, tally);
+                yield return RunRankMarginArm(MetaLoadout.FromLegacy(spec), runs, RankMarginSeedBase, tally);
                 double clear = tally.ClearPct;
                 double stage = tally.MeanStage;
                 clearOf[label] = clear;
@@ -549,7 +549,7 @@ namespace AutoTest
             MetaProgression.MetaPanelKind focus, int rank)
         {
             var d = new Dictionary<MetaProgression.MetaPanelKind, int> { { focus, rank } };
-            int left = MetaProgression.MetaPanel.MaxPoints - rank;   // 数値系は 1pt/段
+            int left = MetaAllocationPresets.LegacyMaxPoints - rank;   // 数値系は 1pt/段
             foreach (MetaProgression.MetaPanelKind k in Enum.GetValues(typeof(MetaProgression.MetaPanelKind)))
             {
                 if (MetaProgression.MetaPanelKindExt.MaxRank(k) != 10) continue;
@@ -620,7 +620,7 @@ namespace AutoTest
         /// <para><c>seedStart</c> でシード区間を切り出せるのは、 ラン i の結果が
         /// <c>runIdx</c> だけの関数だから (digest_cmp.py で 1,000/1,000 一致を確認済)。
         /// この前提が崩れたら並列化そのものが無効になる。</para></summary>
-        private IEnumerator RunRankMarginArm(Dictionary<MetaProgression.MetaPanelKind, int> spec,
+        private IEnumerator RunRankMarginArm(MetaLoadout spec,
             int runs, int seedStart, RankMarginArmTally tally)
         {
             _metaAblationSpec = spec;
@@ -716,7 +716,7 @@ namespace AutoTest
             {
                 var (label, spec, dropped) = arms[ai];
                 curArmLabel = label; curArmIndex = ai + 1; curArmCount = arms.Count; curRunsPerArm = runs;
-                _metaAblationSpec = spec;
+                _metaAblationSpec = MetaLoadout.FromLegacy(spec);   // 旧い配点 → 今の構造
 
                 int clears = 0; double stageSum = 0; int valid = 0;
                 for (int i = 0; i < runs; i++)

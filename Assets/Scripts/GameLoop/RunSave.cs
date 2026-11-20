@@ -538,13 +538,13 @@ namespace GameLoop
         //  メタの指紋
         // ============================================================
 
-        /// <summary>整備パネルの配点・装備中の遺物・難易度の指紋。 中断中に変えると再開したランの効き方が変わるので、 再開時に知らせるために持つ。</summary>
+        /// <summary>整備パネルの構成 (基礎整備・枠・挿したモジュール)・装備中の遺物・難易度の指紋。 中断中に変えると再開したランの効き方が変わるので、 再開時に知らせるために持つ。</summary>
         public static string MetaFingerprint()
         {
             var st = MetaProgression.MetaProgressManager.Instance?.State;
             if (st == null) return "";
             var sb = new System.Text.StringBuilder();
-            if (st.panelRanks != null) foreach (int r in st.panelRanks) sb.Append(r).Append(',');
+            sb.Append(st.DescribePanel());
             sb.Append('|').Append(st.challengeDifficulty).Append('|');
             var relics = st.EquippedRelics();
             if (relics != null) foreach (var r in relics) sb.Append(r != null ? JsonUtility.ToJson(r) : "-").Append(';');

@@ -5,9 +5,7 @@ namespace MetaProgression
     /// <summary>
     /// メタ進行のシングルトン。State の保持・購入処理・保存/ロードを担当。
     ///
-    /// 2026-07-25 v6 移行:
-    ///   ・購入モデル = 整備パネル (MetaPanel)。
-    ///   ・トークン → ポイント購入 → トラックへランク配点。 ポイント上限 36。
+    /// 整備パネル (2026-11-20 刷新・MetaPanel): トークンで基礎整備の段・作戦の枠・モジュールを買い切り、 モジュールは無料で挿し替える。
     ///   ・旧 58 段トラックの API (TryPurchase / NextLevel ほか) は 2026-11-13 に削除 (#132・読んでいたのは旧 SkillTreeView だけ)。
     /// </summary>
     public class MetaProgressManager : MonoBehaviour
@@ -120,9 +118,9 @@ namespace MetaProgression
             if (src == BackedPrefs.LoadSource.Backup) Debug.LogWarning($"[MetaProgress] {note}");
             else if (src == BackedPrefs.LoadSource.CorruptReset) Debug.LogError($"[MetaProgress] {note}");
             if (src == BackedPrefs.LoadSource.Backup || src == BackedPrefs.LoadSource.CorruptReset) GameLoop.SaveGuard.Save();   // 退避した値をディスクへ (SaveGuard の間は書かない)
-            State.EnsurePanelInitialized();
             State.MigrateFromLegacyTrackIfNeeded();
-            State.ClampRanksToMax();   // #113: 枠から外したトラックの段が古いセーブから残って効くのを防ぐ
+            State.MigrateFromPointPanelIfNeeded();   // 旧い 24 点の整備パネルの分を全額返す (2026-11-20)
+            State.EnsurePanelInitialized();
 #endif
         }
 
@@ -147,71 +145,62 @@ namespace MetaProgression
         }
 
         // ============================================================
-        //  ポイント購入 (整備パネル v6)
+        //  整備パネル (2026-11-20 刷新・docs/GAME.md §15-1)
         // ============================================================
 
-        public int NextPointCost => State?.NextPointCost() ?? int.MaxValue;
-        public bool IsPointCapReached => (State?.panelPointsPurchased ?? 0) >= MetaPanel.MaxPoints;
+        /// <summary>次に買う基礎整備の段のトークン。 全部買っていれば int.MaxValue。</summary>
+        public int NextBaseTierCost
+            => State == null || State.baseTier >= MetaPanel.BaseTierCount ? int.MaxValue : MetaPanel.BaseTierCost[State.baseTier];
 
-        public bool CanPurchasePoint()
+        /// <summary>次の作戦の枠を開くトークン。 全部開いていれば int.MaxValue。</summary>
+        public int NextSlotCost
+            => State == null || State.slotsOpen >= MetaPanel.SlotOpenCost.Length ? int.MaxValue : MetaPanel.SlotOpenCost[State.slotsOpen];
+
+        /// <summary>基礎整備の次の段を買う (段は順に買う)。</summary>
+        public bool TryBuyBaseTier() => TrySpend(NextBaseTierCost, () => State.baseTier++, "基礎整備の段");
+
+        /// <summary>作戦の次の枠を開く (開く順は MetaSlot の並び)。</summary>
+        public bool TryOpenSlot() => TrySpend(NextSlotCost, () => State.slotsOpen++, "作戦の枠");
+
+        /// <summary>モジュールを解禁する (買い切り)。</summary>
+        public bool TryUnlockModule(MetaModule m)
         {
-            if (State == null || IsPointCapReached) return false;
-            return State.tokens >= NextPointCost;
+            if (State == null || State.IsUnlocked(m)) return false;
+            return TrySpend(MetaPanel.ModuleCost(m), () => State.unlockedModules.Add((int)m), "モジュール " + m);
         }
 
-        /// <summary>ポイントを 1 個購入 (未配分残に加算)。 割り振りは AssignPoint。</summary>
-        public bool TryPurchasePoint()
+        /// <summary>解禁済みのモジュールを、 その枠へ挿す (同じ物を押すと外す・無料)。 枠が閉じている・未解禁なら false。</summary>
+        public bool TryToggleEquip(MetaModule m)
         {
-            if (!CanPurchasePoint()) return false;
-            int cost = NextPointCost;
-            State.tokens -= cost;
-            State.panelPointsPurchased++;
-            OnStateChanged?.Invoke();
-            Save();
-            Debug.Log($"[MetaProgress] ポイント購入: {State.panelPointsPurchased}/{MetaPanel.MaxPoints} (-{cost})");
+            if (State == null || !State.IsUnlocked(m)) return false;
+            var slot = MetaPanel.SlotOf(m);
+            if (!State.IsSlotOpen(slot)) return false;
+            if (State.Equipped(slot) == m) State.Unequip(slot); else State.ForceEquip(m);
+            Changed();
             return true;
         }
 
-        // ============================================================
-        //  配点 (拠点でいつでも無料・無制限)
-        // ============================================================
-
-        /// <summary>指定トラックに 1 ランク配点 (未配分ポイントが必要)。 max 到達で false。</summary>
-        public bool TryAssignRank(MetaPanelKind kind)
-        {
-            if (State == null) return false;
-            // 2026-09-10: 宣言系は 3pt/段 なので、 残 pt が単価に足りるかで判定する。
-            if (State.UnassignedPoints() < MetaPanel.RankCost(kind)) return false;
-            int cur = State.GetRank(kind);
-            if (cur >= kind.MaxRank()) return false;
-            State.SetRank(kind, cur + 1);
-            OnStateChanged?.Invoke();
-            Save();
-            Achievements.AchievementService.NotePanelAssigned(State);   // 実績〈整備完了〉
-            return true;
-        }
-
-        /// <summary>指定トラックから 1 ランク払い戻し (未配分残に戻る・拠点無料)。</summary>
-        public bool TryRefundRank(MetaPanelKind kind)
-        {
-            if (State == null) return false;
-            int cur = State.GetRank(kind);
-            if (cur <= 0) return false;
-            State.SetRank(kind, cur - 1);
-            OnStateChanged?.Invoke();
-            Save();
-            return true;
-        }
-
-        /// <summary>全トラックのランクを 0 に戻し、ポイントを未配分に返す (拠点リスペック)。</summary>
-        public void RespecAllRanks()
+        /// <summary>「基礎整備を切る」(縛り) を切り替える。 買った段は残る。</summary>
+        public void ToggleBaseDisabled()
         {
             if (State == null) return;
-            foreach (MetaPanelKind k in System.Enum.GetValues(typeof(MetaPanelKind)))
-                State.SetRank(k, 0);
-            OnStateChanged?.Invoke();
-            Save();
+            State.baseDisabled = !State.baseDisabled;
+            Changed();
         }
+
+        private bool TrySpend(int cost, System.Action apply, string what)
+        {
+            if (State == null || cost == int.MaxValue || State.tokens < cost) return false;
+            State.tokens -= cost;
+            apply();
+            State.EnsurePanelInitialized();
+            Changed();
+            Achievements.AchievementService.NotePanelAssigned(State);   // 実績〈整備完了〉
+            Debug.Log($"[MetaProgress] {what} を買った (-{cost}): {State.DescribePanel()}");
+            return true;
+        }
+
+        private void Changed() { OnStateChanged?.Invoke(); Save(); }
 
         // ============================================================
         //  挑戦 (docs/GAME.md §23-25)

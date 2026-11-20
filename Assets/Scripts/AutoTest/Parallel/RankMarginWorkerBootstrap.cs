@@ -70,7 +70,7 @@ namespace AutoTest.ParallelSweep
                     || string.IsNullOrWhiteSpace(_job.outputRoot))
                     throw new InvalidDataException("worker paths missing");
 
-                Dictionary<MetaProgression.MetaPanelKind, int> spec = BuildSpec(_job);
+                MetaLoadout spec = BuildSpec(_job);
 
                 Directory.CreateDirectory(Path.GetDirectoryName(
                     Path.GetFullPath(_job.responsePath)) ?? ".");
@@ -98,9 +98,9 @@ namespace AutoTest.ParallelSweep
                     if (!string.IsNullOrWhiteSpace(runner.metaRankSpec))
                     {
                         spec = MetaAllocationPresets.ParseSpec(runner.metaRankSpec);
-                        if (spec.Count == 0) throw new InvalidDataException("metaRankSpec を解釈できない: " + runner.metaRankSpec);
+                        if (spec == null) throw new InvalidDataException("metaRankSpec を解釈できない: " + runner.metaRankSpec);
                     }
-                    else spec = MetaAllocationPresets.Ranks(runner.metaAllocation);
+                    else spec = MetaLoadout.FromLegacy(MetaAllocationPresets.Ranks(runner.metaAllocation));
                 }
                 // **本体ループは空にする。** 逐次版と同じく、 アームは RunBatch 後段の
                 //   分岐から回す。 ここで runCount を立てると素の N ラン が余計に走る。
@@ -218,25 +218,24 @@ namespace AutoTest.ParallelSweep
             }
         }
 
-        /// <summary>配点を組む。 <b>逐次版と同じ関数を呼ぶ</b> ── 写すと必ずずれる。</summary>
-        private static Dictionary<MetaProgression.MetaPanelKind, int> BuildSpec(
+        /// <summary>整備パネルの構成を組む。 <b>逐次版と同じ関数を呼ぶ</b> ── 写すと必ずずれる。 旧い配点の指定は今の構造へ読み替わる (MetaLoadout.FromLegacy)。</summary>
+        private static MetaLoadout BuildSpec(
             RankMarginWorkerJob job)
         {
-            // **配分の直接指定が最優先。** 焦点 1 本の形では書けない配分 (Balanced から
-            //   1 軸だけ −1 等) を測るための注入口。
+            // **構成の直接指定が最優先** (今の構造の "stage:mid,main:Valor" も、 旧い "Shell:10,..." も)。
             if (!string.IsNullOrWhiteSpace(job.rankSpec))
             {
                 var parsed = MetaAllocationPresets.ParseSpec(job.rankSpec);
-                if (parsed.Count == 0)
+                if (parsed == null)
                     throw new InvalidDataException("rankSpec を解釈できない: " + job.rankSpec);
                 return parsed;
             }
             if (string.IsNullOrEmpty(job.focusTrack))
-                return MetaAllocationPresets.Ranks(MetaAllocationPresets.Preset.Balanced);
+                return MetaLoadout.FromLegacy(MetaAllocationPresets.Ranks(MetaAllocationPresets.Preset.Balanced));
             if (!Enum.TryParse(job.focusTrack, true,
                 out MetaProgression.MetaPanelKind focus))
                 throw new InvalidDataException("unknown track: " + job.focusTrack);
-            return AutoRunner.BuildRankMarginArmSpec(focus, job.focusRank);
+            return MetaLoadout.FromLegacy(AutoRunner.BuildRankMarginArmSpec(focus, job.focusRank));
         }
 
         private string _effectiveState = "";
