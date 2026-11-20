@@ -23,8 +23,8 @@ namespace CombatSystem
         /// <summary>軽減率が Rmax の半分に届く防御値 (仮置き 10)。</summary>
         public const int K = 10;
 
-        /// <summary>プレイヤーの初期防御 (仮置き 2)。 武器・アイテムの防御はこの上に足す。</summary>
-        public const int PlayerBaseDefense = 2;
+        /// <summary>プレイヤーの初期防御 (仮置き 5・2026-11-20 に 2 から・整備パネル刷新で旧〈装甲〉の一部をラン本体へ)。 武器・アイテムの防御はこの上に足す。</summary>
+        public const int PlayerBaseDefense = 5;
 
         /// <summary>防御を丸ごと無視する貫通 (役〈攻め〉T4)。 どんな防御値もこれより小さい。</summary>
         public const int IgnoreAll = 999;

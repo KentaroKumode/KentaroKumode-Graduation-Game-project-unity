@@ -141,8 +141,9 @@ namespace GameLoop
         /// 経緯: 通常戦を 1T → 3〜4T にして敵がターンを得るようになり、 1 ランの総被ダメが
         /// 約 3 倍 (~101) に増えたため 30 → 100 とした。 その後 2026-08-04 の消費アイテム再編で
         /// 回復/シールドが常にショップに並ぶようになり、 **耐久の一部を消費アイテム側へ移した**ので
-        /// 75 へ引き下げている ── 「回復を買うか強化を買うか」がショップの選択として立つようにするため。</summary>
-        public const int BaseStartingHP = 75;
+        /// 75 へ引き下げている ── 「回復を買うか強化を買うか」がショップの選択として立つようにするため。
+        /// <para>2026-11-20: 75 → 85 (整備パネル刷新・system-overhaul-spec §1-2 A の「開始の最大 HP +10」。 設計書は今の値を 30 と書いていたが、 コードは 75 だったので差の分だけ動かした)。</para></summary>
+        public const int BaseStartingHP = 85;
 
         [Header("デバッグ")]
         [SerializeField] private bool autoStartRun = false;

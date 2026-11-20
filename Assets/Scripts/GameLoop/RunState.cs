@@ -501,6 +501,9 @@ namespace GameLoop
         /// テスト等のためだけに残している。 2026-07-28 に「30 → 50」としたつもりの変更は
         /// ここだけを直したため**一度も効いていなかった** (2026-08-03 に発覚。
         /// それまでの全バランス調整は実効 30 の上で行われていた)。値を変えるときは必ず GameManager 側で。</param>
+        /// <summary>ラン開始時の所持金 (2026-11-20 に 0 → 10・整備パネル刷新 system-overhaul-spec §1-2 A・仮)。</summary>
+        public const int StartingCoins = 10;
+
         public void Initialize(int startHP = GameManager.BaseStartingHP)
         {
             currentFloor = MapSystem.FreeMove.FloorPlan.FarmFloor;
@@ -513,7 +516,7 @@ namespace GameLoop
             totalBattles = 0;
             totalWins = 0;
             totalTurns = 0;
-            coins = 0;
+            coins = StartingCoins;
             isRunActive = true;
             gateFlaws = GateFlaw.None;
 
