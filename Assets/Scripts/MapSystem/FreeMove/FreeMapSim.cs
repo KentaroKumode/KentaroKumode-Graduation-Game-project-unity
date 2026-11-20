@@ -299,12 +299,13 @@ namespace MapSystem.FreeMove
         /// <summary>不安定化ポイントを足す (2026-11-13・<see cref="Instability.PointsOf"/> の表)。 理由 <paramref name="src"/> を <paramref name="n"/> 回ぶん
         /// (歩く・イベントのターン・嵐を動かす は n が量)。 累計は 0 未満にしない。 段が変わったら <see cref="FreeMapEvent.StormAdvanced"/>
         /// (フェーズ 3 に入ったらボスの点の種別が見える)。 実際に動いた量を <paramref name="delta"/> に返す。
-        /// 不安定化の時計でない (嵐の無い層・手番の時計) なら何もしない (delta = 0)。 戦闘の途中でも呼べる (段は地図へ戻った時に効く)。</summary>
-        public FreeMapEvent AddInstability(InstabilitySource src, int n, out int delta)
+        /// 不安定化の時計でない (嵐の無い層・手番の時計) なら何もしない (delta = 0)。 戦闘の途中でも呼べる (段は地図へ戻った時に効く)。
+        /// <paramref name="cut"/> = 表の量から引く分 (〈避雷の天幕〉の半分・GameManager.AddInstability が決める)。</summary>
+        public FreeMapEvent AddInstability(InstabilitySource src, int n, out int delta, int cut = 0)
         {
             delta = 0;
             if (!InstabilityMode || Dead) return FreeMapEvent.None;
-            int add = MapSystem.FreeMove.Instability.PointsOf(src, n);
+            int add = MapSystem.FreeMove.Instability.PointsOf(src, n) - cut;
             if (add == 0) return FreeMapEvent.None;
             int before = Instability, phase = StormPhase;
             Instability = Math.Max(0, Instability + add);

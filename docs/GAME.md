@@ -702,6 +702,8 @@ lore 的には「ギルド管轄も 5 層まで」「5 層を抜けた時点で�
   **数えない得**（物が増えない）: HP の回復 / 全回復・最大 HP の増加・時限バフ・航行の効果（明かす・撒く・追跡者を遠ざける・近道）・次の店の値引き・次の休憩の上乗せ・観測所の写し。
   **得として渡さない**: 嵐を遠ざける（それ自体が −N）・秘宝を差し出して替える（交換）・武器を鍛える（自分の素材を払う・休憩の鍛えると同じ）。
 - 宝の点が空になることは無い（素材 +1 が必ず入る）ので、開けたら必ず +3。N つから選ぶ秘宝は、人が後で選ぶ時も提示した時点で +3。
+- 秘宝で変わる所（2026-11-20・§16-10）: 〈避雷の天幕〉= 層に入ってから最初の 3 回の「取る」（宝・秘宝・戦闘の勝ち・イベントの得 = `Instability.PartTake` の行）を半分（切り捨て・`GameManager.TentCut` → `FreeMapSim.AddInstability` の `cut`）。
+  エスカレーション・歩く・イベントのターン・嵐を動かすは行動ではないので数えない。〈嵐読みの風見鶏〉= 嵐の中の点での勝ち（ボス以外・`AddBattleWinInstability`）のあと −3（「嵐を動かす」の行に積む）。
 - 何で何ポイント溜まったかは、本体のログ（「不安定 +3（宝の点・累計 12）」）と、理由ごとの通算（`GameManager.InstabilityTotals`）・中断セーブの内訳（取る / 激化 / 歩く / イベントのターン / 嵐を動かす）に残す。
 
 **フェーズの境目**（累計 → 段 → 輪は、累計と層の定数だけで決まる純粋な関数・`Storm.RingAt(L, 累計 − 15, Instability.Schedule)`・境目は `FreeMapParams.InstabilityPhase1At`〜`4At`・段の途中は線形に補間）
@@ -3605,6 +3607,24 @@ items.json の `consFamily: "tactic"`・`tier: 1`（id は `ItemIds.Tactic*`）�
 | 行商人の見本箱 | GOLD | 金 | 店の戦術消耗品の値段 −50%。戦闘の始めに消耗品を 1 つも持っていなければ、BRONZE か SILVER の戦術消耗品を 1 つ得る（その戦闘の間だけ・キー `link.sampleBox`） |
 
 設計書の軸（矜持 = 山札・小瓶 = 役）は、その軸を足す段 1-e で付ける（今は軸なし）。
+
+### 16-10. 嵐・店・金のマクロ秘宝（2026-11-20・item-overhaul-spec §9・名前と数値は仮）
+
+id は `ItemIds.Macro*`。戦闘の側は `MacroItemEffects.cs`（気圧計・研ぎ代・算盤）、ほかは所持を見る本体の所に書く。数える物は持っている間の出来事だけ（`RunState` の `receiptRemovals` / `abacusStacks` / `passShopSpent` / `passShopsUp` / `tentDepth`・`tentUses`）。
+
+| 品 | レア | 軸 | 効果 | 書いてある所 |
+|---|---|---|---|---|
+| 嵐読みの風見鶏 | BRONZE | — | 嵐の中の点（`FreeMapSim.InStorm(Me)`）での戦闘に勝つたび（ボス以外）、ゴールド +8・不安定 −3 | `GameManager.AddBattleWinInstability` |
+| 気圧計のペンダント | SILVER | — | 戦闘開始時の嵐のフェーズ 1 につき、シールド +5・この戦闘の攻撃 +2（フェーズは開始時に読む）。設計書の「臨界（または軸なし）」は軸なし（臨界にすると臨界の偏重を水増しする） | `MacroBarometer` |
+| 避雷の天幕 | GOLD | — | 層に入るたび、最初の 3 回の「取る」で溜まる不安定を半分（切り捨て・§5-12） | `GameManager.TentCut` |
+| 研ぎ代の領収書 | SILVER | 金 | 店（`ShopRemoveTerminal`）または休憩（`RestRemoveTerminal`）で端子を 1 枚抜くたび、ランの間ずっと攻撃 +2（累積） | `MacroReceipt` |
+| 相場師の算盤 | GOLD | 金 | 店に入って**最初の**リロール（軸指定・〈目利きの紹介状〉の無料も含む）をした時だけ、以後の戦闘開始時に充電 +3・臨界 +5（累積）。設計書の「上限 10 回分」は、店の数で止まる形に変えた（§12 合意 7） | `ShopManager.TryReroll` / `MacroAbacus` |
+| 黄金の通行手形 | LEGENDARY | 金 | 店で 100G 使うたび（店を出る時に、その店で使った額を端数ごと足す）、次の店 1 軒の秘宝の棚（5 枠とそのリロール）が、引いたレア度の 1 段上で並ぶ（LEGENDARY はそのまま・その段の品が出せなければ引いた段）。200G なら 2 軒。乱数は引き足さない。最終倍率・最大 HP は無し（§12-1） | `ShopManager.Close` / `Generate` / `PickItemByKind` |
+| 目利きの紹介状 | BRONZE | 金 | 店に入るたび、最初の 1 回の通常リロールが無料（回数は数える = 次の値段は上がる）。軸指定リロールの追加 15G → 10G | `ShopManager.TryReroll` / `AxisRerollSurchargeFor` / `RerollPrice` |
+| 二股の鑑定書 | SILVER | — | 戦闘後の端子の報酬 +1 枚（通常 2→3・エリートと 0 層 3→4・ボス 3→4） | `GameManager.OfferTerminalReward` |
+
+- 画面の通常リロールの値段は `ShopManager.RerollPrice`（紹介状の無料なら 0G）。BOT の「まだ回せる」の判定は 0 にならない `ShopInventory.CurrentRerollPrice` のまま。
+- BOT はどれも「持っていても壊れない」だけ（活かす判断は段 3）。
 
 ---
 

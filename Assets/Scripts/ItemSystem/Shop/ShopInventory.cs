@@ -31,6 +31,9 @@ namespace ItemSystem.Shop
         /// <summary>このショップで実施したリロール回数。</summary>
         public int rerollCount;
 
+        /// <summary>〈目利きの紹介状〉の無料の通常リロールをこの店で使ったか (2026-11-20)。</summary>
+        public bool freeRerollUsed;
+
         /// <summary>
         /// 次のリロール価格。 <b>5, 10, 20, 30, 40, 50, ... G の線形</b> (2026-09-12)。
         ///
