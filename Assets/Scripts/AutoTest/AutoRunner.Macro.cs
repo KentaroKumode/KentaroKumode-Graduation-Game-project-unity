@@ -340,7 +340,7 @@ namespace AutoTest
             if (!n.revealed)
             {
                 // 種別が見えていない点: 通常の戦闘相当として見積もる
-                return MacroFight(layer, 'N', null, wHp, wGold, 0f, ref s) * MacroUnknownWeight;
+                return MacroFight(layer, 'N', null, wHp, wGold, 0f, ref s) * MacroUnknownWeight + VaneWin(run, wGold, MacroUnknownWeight, ref s);
             }
             switch (n.EffectiveType)
             {
@@ -350,12 +350,12 @@ namespace AutoTest
                     // 〈徒労〉(2026-11-14): 報酬が止まっていれば報酬のゴールドの見込みを 0 にする (被ダメ・死の見込みは残す = 正味で損)
                     bool noReward = s.toil > 0;
                     if (noReward) s.toil = ToilNavRule.AfterNormalWin(s.toil, GameHooks.ToilMode);
-                    return MacroFight(layer, 'N', key, wHp, wGold, 0f, ref s, noReward);
+                    return MacroFight(layer, 'N', key, wHp, wGold, 0f, ref s, noReward) + VaneWin(run, wGold, 1f, ref s);
                 }
                 case TileType.EliteBattle:
                 {
                     string key = n.encounterRevealed ? EncounterDangerStats.KeyOf(n, run.Depth) : null;
-                    return MacroFight(layer, 'E', key, wHp, wGold, CombatRewards.EliteDropRate * wItem, ref s);
+                    return MacroFight(layer, 'E', key, wHp, wGold, CombatRewards.EliteDropRate * wItem, ref s) + VaneWin(run, wGold, 1f, ref s);
                 }
                 case TileType.Rest:
                 {
@@ -383,6 +383,18 @@ namespace AutoTest
                 case TileType.SupplyDepot: return 0.02f;
                 default: return 0f;
             }
+        }
+
+        /// <summary>〈嵐読みの風見鶏〉(2026-11-21・段 3): 嵐の中の点の戦闘に勝つと ゴールド +8・不安定 −3 (本体 GameManager.AddBattleWinInstability と同じ量)。
+        /// 嵐の中かは計画の印 (<see cref="StormCostCtx.MarkFight"/> が立てた stormMul / stormAdd) で読む = 嵐の航行 (口 navStormAware) の時だけ。
+        /// ゴールドは戦闘の報酬と同じく 所持金に足して値も返す (店で品に換える時に差し引かれる)・不安定は累計の見込みから引く (出口の代償が読む)。 <paramref name="w"/> = 見えていない点の重み。</summary>
+        private static float VaneWin(RunState run, float wGold, float w, ref MacroSim s)
+        {
+            if ((s.stormMul <= 0f && s.stormAdd <= 0f) || run == null || !run.OwnsPassive(ItemIds.MacroVane)) return 0f;
+            float g = GameManager.VaneGold * w;
+            s.coins += g;
+            s.pts = Mathf.Max(0f, s.pts - GameManager.VaneCalm * w);
+            return g * wGold;
         }
 
         /// <summary><paramref name="noReward"/> = 報酬が出ない戦闘 (〈徒労〉の通常の戦闘): 報酬のゴールドを 0 と見る (被ダメ・死の項はそのまま)。</summary>
