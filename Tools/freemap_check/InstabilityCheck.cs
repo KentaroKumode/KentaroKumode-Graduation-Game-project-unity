@@ -140,7 +140,7 @@ static partial class T
         // ── 1. 手番の時計は storm-boss と 1 点も変わらない: 嵐の層の生成・乱数の引く回数 ──
         {
             int layers = 0, diff = 0, drawDiff = 0; string firstDiff = null;
-            foreach (int floor in new[] { 0, 1, 3, 5, 6, 7 })
+            foreach (int floor in new[] { 1, 3, 5, 6, 7 })   // 深さ 0 は 2026-11-20 に 5 つの点へ作り直した (参照の版とは違って当然)
                 for (int salt = 1; salt <= N(3000, 1000); salt++)
                 {
                     GameLoop.GameRng.Salt = (ulong)salt * 7919; GameLoop.GameRng.Draws.Clear();
@@ -158,7 +158,7 @@ static partial class T
         // ── 2. 手番の時計の中身は storm-boss と同じ動き (同じ操作列・1 手ごと) ──
         {
             int runs = 0, bad = 0, drawBad = 0; string first = null;
-            foreach (int floor in StormDepths)
+            foreach (int floor in StormDepths.Where(f => f != 1))   // 深さ 1 は嵐の HP を 3 → 2 にした (2026-11-20) ので storm-boss とは違って当然
                 for (int salt = 1; salt <= N(1000, 400); salt++)
                 {
                     bad += ReplayTurns(salt, floor, 200, out string f);
@@ -211,7 +211,9 @@ static partial class T
         {
             const int P1 = FreeMapParams.InstabilityPhase1At, P2 = FreeMapParams.InstabilityPhase2At, P3 = FreeMapParams.InstabilityPhase3At, P4 = FreeMapParams.InstabilityPhase4At;
             bool ph = P1 == 15 && P2 == 30 && P3 == 45 && P4 == 50   // 2026-11-13 の 2 度目の置き値 (変えたらここも直す)
-                   && new[] { (0, 0), (P1 - 1, 0), (P1, 1), (P2 - 1, 1), (P2, 2), (P3 - 1, 2), (P3, 3), (P4 - 1, 3), (P4, 4), (P4 + 25, 4) }.All(p => Instability.PhaseOf(p.Item1) == p.Item2);
+                   && new[] { (0, 0), (P1 - 1, 0), (P1, 1), (P2 - 1, 1), (P2, 2), (P3 - 1, 2), (P3, 3), (P4 - 1, 3), (P4, 4), (P4 + 25, 4) }.All(p => Instability.PhaseOf(p.Item1, 3) == p.Item2)
+                   // 深さ 1 だけ境目 20 (2026-11-20)・段の長さは同じなので後の境目も 5 遅れる
+                   && Instability.PhaseOf(19, 1) == 0 && Instability.PhaseOf(20, 1) == 1 && Instability.PhaseOf(35, 1) == 2 && Instability.PhaseOf(55, 1) == 4;
             int layers = 0, bad = 0; string first = null;
             foreach (int floor in StormDepths)
                 for (int salt = 1; salt <= 1000; salt++)
@@ -219,12 +221,13 @@ static partial class T
                     var s = MakeInst(salt, floor); var L = s.Layout; layers++;
                     double r0 = Storm.FullRadius(L);
                     var K = Instability.Schedule;
+                    int off = FreeMapParams.InstabilityPhase1AtOf(floor) - P1;   // 深さ 1 は境目が 5 遅い (2026-11-20)
                     // 段の長さは偶数でなくてよいので、 「途中」は実数の補間で見る (段の真ん中は (始まり + 終わり) / 2 の累計で、 長さが奇数なら半分の位置の値)
-                    Storm.RingAt(L, Instability.TimeOf(P1), K, out var c10, out double r10);
-                    Storm.RingAt(L, Instability.TimeOf(P1 + (P2 - P1) / 2), K, out var c15, out double r15);
-                    Storm.RingAt(L, Instability.TimeOf(P2), K, out var c20, out double r20);
-                    Storm.RingAt(L, Instability.TimeOf(P2 + (P3 - P2) / 2), K, out var c25, out double r25);
-                    Storm.RingAt(L, Instability.TimeOf(P3), K, out var c30, out double r30);
+                    Storm.RingAt(L, Instability.TimeOf(P1 + off, floor), K, out var c10, out double r10);
+                    Storm.RingAt(L, Instability.TimeOf(P1 + (P2 - P1) / 2 + off, floor), K, out var c15, out double r15);
+                    Storm.RingAt(L, Instability.TimeOf(P2 + off, floor), K, out var c20, out double r20);
+                    Storm.RingAt(L, Instability.TimeOf(P2 + (P3 - P2) / 2 + off, floor), K, out var c25, out double r25);
+                    Storm.RingAt(L, Instability.TimeOf(P3 + off, floor), K, out var c30, out double r30);
                     double f1 = (double)((P2 - P1) / 2) / (P2 - P1), f2 = (double)((P3 - P2) / 2) / (P3 - P2);
                     string e = null;
                     if (Math.Abs(r10 - r0) > 1e-9 || Vec2.Dist(c10, Storm.MapCenter) > 1e-9) e = P1 + "";
@@ -232,15 +235,15 @@ static partial class T
                     else if (Math.Abs(r20 - r0 * FreeMapParams.StormPhase1EndRadius) > 1e-9 || Vec2.Dist(c20, Storm.MapCenter) > 1e-9) e = P2 + "";
                     else if (Vec2.Dist(c25, Vec2.Lerp(Storm.MapCenter, Storm.Phase2Center(L), f2)) > 1e-9) e = "フェーズ 2 の途中 (中心が寄る)";
                     else if (Math.Abs(r30 - r0 * FreeMapParams.StormPhase2EndRadius) > 1e-9 || Vec2.Dist(c30, Storm.Phase2Center(L)) > 1e-9) e = P3 + "";
-                    else if (Enumerable.Range(0, L.Count).Any(i => Storm.InStorm(L, i, Instability.TimeOf(P1 - 1), K))) e = (P1 - 1) + " で嵐";
-                    else if (Enumerable.Range(0, L.Count).Any(i => Storm.InStorm(L, i, Instability.TimeOf(P4), K) != (i != L.goal))) e = P4 + " (フェーズ 4)";
-                    else if (Enumerable.Range(0, P4 + 25).Any(p => Storm.InStorm(L, L.goal, Instability.TimeOf(p), K))) e = "ボスの点が嵐の中";
+                    else if (Enumerable.Range(0, L.Count).Any(i => Storm.InStorm(L, i, Instability.TimeOf(P1 - 1 + off, floor), K))) e = (P1 - 1) + " で嵐";
+                    else if (Enumerable.Range(0, L.Count).Any(i => Storm.InStorm(L, i, Instability.TimeOf(P4 + off, floor), K) != (i != L.goal))) e = P4 + " (フェーズ 4)";
+                    else if (Enumerable.Range(0, P4 + 25).Any(p => Storm.InStorm(L, L.goal, Instability.TimeOf(p + off, floor), K))) e = "ボスの点が嵐の中";
                     // 中身の読み取りが同じ関数を通る (累計を足して段・輪・嵐の中が揃う)
                     if (e == null)
                     {
                         s.AddInstability(InstabilitySource.Treasure, 9);   // 27 (深さ 6 は 42)
-                        int p = s.Instability, t = Instability.TimeOf(p);
-                        if (s.StormPhase != Instability.PhaseOf(p) || s.StormTime != t || s.StormTurnsToNext != Storm.TurnsToNext(t, K)
+                        int p = s.Instability, t = Instability.TimeOf(p, floor);
+                        if (s.StormPhase != Instability.PhaseOf(p, floor) || s.StormTime != t || s.StormTurnsToNext != Storm.TurnsToNext(t, K)
                             || Enumerable.Range(0, L.Count).Any(i => s.InStorm(i) != Storm.InStorm(L, i, t, K))) e = "中身";
                     }
                     if (e != null) { bad++; first ??= $"深さ{floor} 種{salt} {e}"; }
@@ -266,7 +269,7 @@ static partial class T
                     quiet &= s.Instability == 0 && s.InstabilityParts.All(x => x == 0);
                     ext &= s.PassTurnsExternal(2) >= 0 && s.Instability == 0;                                // 休憩の「多めに回復」は 0
                     if (s.InFight) continue;
-                    s.AddInstability(InstabilitySource.Treasure, 5);                                          // 15 (崩れ始めた)
+                    s.AddInstability(InstabilitySource.Treasure, (FreeMapParams.InstabilityPhase1AtOf(floor) + 2) / 3);   // 15 (深さ 1 は 21・崩れ始めた)
                     int p0 = s.Instability;
                     var cand = s.Neighbors(s.Me).Where(v => v != s.Layout.goal).ToList();
                     if (cand.Count == 0) continue;
@@ -439,8 +442,8 @@ static partial class T
         {
             int nx = NextStep(s, cur, d);
             if (nx == cur) return false;
-            if (Storm.InStorm(L, nx, Instability.TimeOf(ptsEnd), K)) return false;
-            if (Instability.Collapsing(ptsEnd)) ptsEnd += Instability.PointsOf(InstabilitySource.Walk);
+            if (Storm.InStorm(L, nx, Instability.TimeOf(ptsEnd, s.Floor), K)) return false;
+            if (Instability.Collapsing(ptsEnd, s.Floor)) ptsEnd += Instability.PointsOf(InstabilitySource.Walk);
             if (!seen.Contains(nx) && passed.Add(nx)) ptsEnd += ArrivalGuess(s, nx, k);
             cur = nx;
         }
@@ -531,7 +534,7 @@ static partial class T
                         var s = MakeStorm(salt, floor, w, null, clock);
                         var r = WalkI(s, w, mode, k);
                         if (r.reached) reached++;
-                        if (s.StormPhase >= 1 || (clock == StormClock.Instability && Instability.Collapsing(s.Instability))) collapsed++;
+                        if (s.StormPhase >= 1 || (clock == StormClock.Instability && Instability.Collapsing(s.Instability, floor))) collapsed++;
                         before.Add(r.visitedBeforeCollapse); vis.Add(r.visited); hp.Add(r.stormHp); ss.Add(r.stormSteps); turns.Add(r.turns);
                         for (int q = 0; q < kinds.Length; q++) kinds[q] += r.kinds[q];
                         for (int q = 0; q < parts.Length; q++) parts[q] += r.parts[q];

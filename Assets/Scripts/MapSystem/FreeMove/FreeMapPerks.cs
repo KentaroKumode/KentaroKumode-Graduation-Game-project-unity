@@ -26,6 +26,8 @@ namespace MapSystem.FreeMove
         public bool goalwardHalf;
         /// <summary>削る砂の前線の追加の物資 (+1) を受けない (〈油布の靴〉)。</summary>
         public bool ignoreSand;
+        /// <summary>雹の中の 1 歩で払う HP を減らす分 (〈油布の靴〉で 1・2026-11-20)。 嵐の層の雹の嵐 (嵐の HP + 雹の上乗せ) と、 嵐の無い層の雹の点の 1 歩に効く (最低 0)。 待つ・偵察には効かない。</summary>
+        public int hailHpCut;
         /// <summary>前哨の旗の拠点から常に公開する歩数。</summary>
         public int beaconRange = BeaconRangeDefault;
 

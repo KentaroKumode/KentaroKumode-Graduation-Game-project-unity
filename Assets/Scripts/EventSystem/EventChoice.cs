@@ -191,12 +191,26 @@ namespace EventSystem
         /// HP が満ちている時の HP+N は選べる。 理由の文は <see cref="UnavailableReason"/>。</para></summary>
         public bool IsAvailable(GameLoop.RunState run) => UnavailableReason(run) == null;
 
+        /// <summary>選択肢の並び <paramref name="choices"/> の index を選べるか (中身は <c>EventEncounter.IsChoiceSelectable</c>・検算 Tools/event_branch_check も同じ物を読む)。
+        /// <b>全部が選べない時は全部を選べる扱いにする</b> (詰み防止)。 ただし条件 (「条件[種別]:効果」・2026-11-20) を満たさない道は、 その時も開かない。</summary>
+        public static bool Selectable(List<EventChoice> choices, int index, GameLoop.RunState run)
+        {
+            if (choices == null || index < 0 || index >= choices.Count) return false;
+            if (choices[index] == null || choices[index].IsAvailable(run)) return true;
+            if (choices[index].RequirementReason(run) != null) return false;
+            foreach (var c in choices) if (c != null && c.IsAvailable(run)) return false;
+            return true;
+        }
+
         /// <summary>選べない理由 (画面に出す短い文)。 選べるなら null。
         /// 判定の順は (a) ゴールド → 物資 → 素材 (鍛える素材を含む)、 (b) 得になる効果が何ひとつ起きない (最初に書かれた得の効果の理由)。
         /// (a) に数えるのは見せる支払いだけ (2026-11-16・<see cref="EventEffectRoles.BlocksWhenShort"/>・切り替えは <see cref="EventEffectRoles.HiddenPaymentMayFallShort"/>)。</summary>
         public string UnavailableReason(GameLoop.RunState run)
         {
             if (run == null) return null;
+            // 条件 (2026-11-20・「条件[種別]:効果」): 満たさない選択肢は、 払えるかより先に理由を出す
+            string req = RequirementReason(run);
+            if (req != null) return req;
             // 支払いは見せる物だけ (2026-11-16・EventEffectRoles.BlocksWhenShort)。 伏せた支払いは足りなくても選べて、 ある分だけ失う
             int g = BlockingPayment(EventEffectType.GoldDelta);
             if (run.coins < g) return $"ゴールドが足りない（{g}G）";
@@ -212,6 +226,14 @@ namespace EventSystem
             return EventEffectRoles.NothingGainedReason(effects, Situation(run, Has(EventEffectType.TradePassive), Has(EventEffectType.ForgeWeapon)));
         }
 
+        /// <summary>条件 (「条件[種別]:効果」・2026-11-20) を満たさない理由。 条件が無い・満たすなら null。
+        /// 全部が選べない時の安全弁 (<c>EventEncounter.IsChoiceSelectable</c>) でも、 これが null でない選択肢は開かない。</summary>
+        public string RequirementReason(GameLoop.RunState run)
+        {
+            if (run == null || !Has(EventEffectType.Requirement)) return null;
+            return EventEffectRoles.RequirementReason(effects, Situation(run, false, false));
+        }
+
         /// <summary>効果が起きるかを決める今の状況 (2026-11-13)。 航行の効果は地図へ戻った時に適用するが (<c>GameManager.PassEventTurns</c>)、
         /// イベントの間に追跡者・前線・地図の有無は変わらないので、 選ぶ時の状態で決める。
         /// 航行は本体の今の航行マップ (<c>GameManager.FreeMap</c>) を読む ── run が本体のランでなければ航行は判定しない (起きるとみなす)。
@@ -222,6 +244,12 @@ namespace EventSystem
             {
                 canTrade = trade && run != null && GameLoop.GameManager.CanTradePassive(run),
                 canForge = forge && run != null && GameLoop.GameManager.WeaponUpgradeCost(run) != int.MaxValue,
+                // 条件 (2026-11-20): 武器の家系・物資・偏重はランだけから決まる (航行と違い、 本体の今のランでなくても読める)
+                reqKnown = run != null,
+                weaponFamily = run != null ? GameLoop.GameManager.WeaponFamilyOf(run) : null,
+                provision = run != null ? run.provision : 0,
+                axisCount = run != null ? (axis => GameLoop.GameManager.AxisCountOf(run, axis)) : (System.Func<string, int>)null,
+                canRemoveTerminal = run != null && GameLoop.GameManager.CanRemoveTerminalOf(run),
             };
             var gm = GameLoop.GameManager.Instance;
             if (run == null || gm == null || !ReferenceEquals(gm.Run, run)) return s;

@@ -175,7 +175,7 @@ namespace GameLoop
                         Log($"〈{EventSystem.TimedEffects.BattleBoonRule.ToilName}〉が晴れた (灰燼の王を倒した)");
                 }
 
-                // 5層裏ボス撃破フラグ: 以降のレイピア解除に会心+9 が付くようになる
+                // 5層裏ボス撃破フラグ: 以降のレイピア解除に会心倍率 +1.0 が付くようになる (2026-11-20・旧 会心+9)
                 if (CurrentEnemy != null && CurrentEnemy.id == BossIds.Layer5Hidden)
                 {
                     Run.defeatedSaintGeorges = true;
@@ -384,7 +384,7 @@ namespace GameLoop
 
         /// <summary>ボス撃破ボーナス用のパッシブ抽選。wantRare=true で GOLD 以上のみ、レア度重み付き。</summary>
         /// <summary>開幕パッシブ専用の抽選 (2026-09-13)。 宝物庫の段に応じて
-        /// レア度の重みを上位へ寄せる (<see cref="MetaProgression.MetaPanel.SupplyRarityBias"/>)。
+        /// レア度の重みを上位へ寄せる (<see cref="MetaProgression.MetaBuffApplicator.GetStartingPassiveRarityBias"/>・今の整備パネルでは常に 0)。
         /// 本数だけ増やしても弱かったのは、 配られるのがカタログ平均の品で
         /// BOT が自分で買う「学習序列の上位」に質で負けていたため。</summary>
         /// <summary>選ぶのを預かっている開幕パッシブの提示 (〈宝物庫〉r10 の 2〜3 択・人が遊んでいる時だけ)。 先頭から順に選ぶ。</summary>
@@ -609,6 +609,8 @@ namespace GameLoop
             {
                 picked = ItemSystem.RarityWeightedPicker.Pick(pool);
             }
+            // 〈サーベル・ワルツ〉: [剣の舞] を持っていれば、 LEGENDARY の枠がまれに [剣の舞] に差し替わる (店と同じ・2026-11-20)
+            picked = SwordDanceSet.MaybeSwapToDance(Run, picked, pool, "treasure.dance");
             return picked?.internalName;
         }
 

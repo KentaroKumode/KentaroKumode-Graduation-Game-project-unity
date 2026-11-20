@@ -11,11 +11,13 @@ namespace ItemSystem.PassiveSkills
     public static class AxisRules
     {
         public const string Crit = "会心", Bleed = "出血", Poison = "毒", Heat = "臨界", Charge = "充電", Shield = "シールド", Gold = "金";
+        /// <summary>2026-11-20 (段 1-e・item-overhaul-spec §2-1) に足した 2 軸: 山札 (偏重の呼び名 采配)・役 (偏重の呼び名 賽目)。</summary>
+        public const string Deck = "山札", Role = "役";
 
         /// <summary>軸の品の数の呼び名 (説明文・画面に出す)。</summary>
         public static string WordOf(string axis) => axis switch
         {
-            Crit => "心眼", Bleed => "血晶", Poison => "瘴気", Heat => "炉温", Charge => "電流", Shield => "堅牢", _ => "",
+            Crit => "心眼", Bleed => "血晶", Poison => "瘴気", Heat => "炉温", Charge => "電流", Shield => "堅牢", Deck => "采配", Role => "賽目", _ => "",
         };
 
         /// <summary>出血の自然減衰 (2026-11-07): 毎ターン 1 + 出血 / (10 + 品の上乗せ)。 上限ではなく、
@@ -24,9 +26,13 @@ namespace ItemSystem.PassiveSkills
         public static int BleedDecay(int stacks, int divisorBonus)
             => stacks <= 0 ? 0 : System.Math.Min(stacks, 1 + stacks / (BleedDecayDivisor + System.Math.Max(0, divisorBonus)));
 
-        /// <summary><b>偏重 (2026-11-10)。</b> 軸の品を持っている数 (心眼 / 血晶 / 瘴気 / 炉温 / 電流 / 堅牢) をまとめて呼ぶ語。
-        /// 順位を比べるのはこの 6 つ (金は入れない)。</summary>
-        public static readonly string[] Ranked = { Crit, Bleed, Poison, Heat, Charge, Shield };
+        /// <summary><b>偏重 (2026-11-10)。</b> 軸の品を持っている数 (心眼 / 血晶 / 瘴気 / 炉温 / 電流 / 堅牢 / 采配 / 賽目) をまとめて呼ぶ語。
+        /// 順位を比べるのはこの 8 つ (金は入れない・2026-11-20 に 6 → 8)。</summary>
+        public static readonly string[] Ranked = { Crit, Bleed, Poison, Heat, Charge, Shield, Deck, Role };
+
+        /// <summary>店の軸指定リロール (2026-11-20・item-overhaul-spec §2-3) で指定できる軸: 偏重の軸 (<see cref="Ranked"/>) と金。
+        /// 偏重の軸を足せばここにも並ぶ (2026-11-20 の 采配・賽目も)。</summary>
+        public static readonly string[] ShopFocus = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Append(Ranked, Gold));
 
         /// <summary>軸の品の数を数える (所持パッシブの axis)。 戦闘中は CombatContext.AxisDepth がこれを 1 度だけ呼ぶ。</summary>
         public static int Count(GameLoop.RunState run, string axis)

@@ -441,14 +441,39 @@ namespace AutoTest
             return r < 0 ? 0 : r > 3 ? 3 : r;
         }
 
-        /// <summary>リロールの直前に、 棚に残っているパッシブ (捨てられる枠) を数えてからリロールする。</summary>
-        private bool AuditedReroll(GameManager gm, ItemSystem.Shop.ShopInventory inv)
+        /// <summary>軸指定リロールを使うか (2026-11-20・item-overhaul-spec §2-3)。 false = 通常のリロールだけ (A/B の腕)。</summary>
+        public bool axisFocusReroll = true;
+        /// <summary>〈相場師の算盤〉のために店の頭でリロールする時に残す所持金 (G・仮・未測定)。</summary>
+        private const int AbacusRerollReserve = 10;
+        /// <summary>軸指定リロールを使う最も深い偏重 (仮)。</summary>
+        public const int AxisFocusRerollMinDepth = 3;
+
+        /// <summary>リロールの直前に、 棚に残っているパッシブ (捨てられる枠) を数えてからリロールする。
+        /// <paramref name="need"/> = 呼び手がリロールを決めたしきい値 (残金がこれ以上なら回す・−1 = 軸指定を考えない)。
+        /// 最も深い偏重が <see cref="AxisFocusRerollMinDepth"/> 以上で、 残金が need + 追加 (<see cref="ItemSystem.Shop.ShopManager.AxisRerollSurcharge"/>) 以上なら、 その軸を指定する (最小限の方策)。</summary>
+        private bool AuditedReroll(GameManager gm, ItemSystem.Shop.ShopInventory inv, int need = -1)
         {
             if (shopPassiveAudit && inv?.slots != null)
                 foreach (var s in inv.slots)
                     if (s != null && !s.sold && s.kind == ItemSystem.Shop.ShopSlotKind.Passive && !string.IsNullOrEmpty(s.itemId))
                         _auDiscard[AuditRarity(s.itemId)]++;
-            return gm.ShopReroll();
+            return gm.ShopReroll(need >= 0 ? AxisRerollFocus(gm.Run, need) : null);
+        }
+
+        /// <summary>軸指定リロールで指定する軸 (null = 通常のリロール)。 最も深い偏重 (同数は AxisRules.Ranked の順で先) が 3 以上・残金が need + 追加 以上。</summary>
+        private string AxisRerollFocus(RunState run, int need)
+        {
+            if (!axisFocusReroll || run == null || run.coins < need + ItemSystem.Shop.ShopManager.AxisRerollSurchargeFor(run)) return null;   // 追加は〈目利きの紹介状〉・〈軸引きの手形〉の値引きの後
+            // 〈目利きの紹介状〉: この店の最初の通常のリロールは無料 ── 軸指定にすると無料が使えないので、 先に無料の 1 回を通常で回す
+            var shop = ItemSystem.Shop.ShopManager.Instance?.Current;
+            if (shop != null && !shop.freeRerollUsed && run.OwnsPassive(ItemIds.MacroLetter)) return null;
+            string best = null; int bestD = 0;
+            foreach (var ax in ItemSystem.PassiveSkills.AxisRules.Ranked)
+            {
+                int d = ItemSystem.PassiveSkills.AxisRules.Count(run, ax);
+                if (d > bestD) { bestD = d; best = ax; }
+            }
+            return bestD >= AxisFocusRerollMinDepth ? best : null;
         }
 
         /// <summary>店を出る直前: 売れ残ったパッシブを「買えた / 買えなかった」に分け、 店の 1 行を書いて数を戻す。</summary>
@@ -506,6 +531,18 @@ namespace AutoTest
             if (inv != null && inv.slots != null)
             {
                 var run = gm.Run;
+
+                // 店の頭のリロール (2026-11-21・段 3): 〈目利きの紹介状〉の無料の 1 回 (ただ) / 〈相場師の算盤〉(店の最初のリロールで以後の戦闘の充電 +3・臨界 +5 が 1 回分積もる)。
+                //   まだ何も見ていない棚を回すので、 棚の良し悪しは期待値で変わらない (払うのは値段だけ・後のリロールの値段は 1 段上がる)。 算盤は残金が 値段 + 取り置き 以上の時だけ
+                if (!ablateShop && run != null && inv.rerollCount == 0)
+                {
+                    bool letterFree = !inv.freeRerollUsed && run.OwnsPassive(ItemIds.MacroLetter);
+                    int rp0 = inv.CurrentRerollPrice;
+                    int before0 = run.coins;
+                    bool rolled0 = letterFree ? AuditedReroll(gm, inv)
+                                 : run.OwnsPassive(ItemIds.MacroAbacus) && rp0 > 0 && run.coins >= rp0 + AbacusRerollReserve && AuditedReroll(gm, inv, rp0 + AbacusRerollReserve);
+                    if (rolled0 && _cur != null) { _cur.shopRerolls++; _cur.shopRerollCoins += before0 - run.coins; }
+                }
 
                 // L1出現lift用: このショップでの提示アイテムを記録 (購入有無を問わず)
                 if (_cur != null)
@@ -716,7 +753,7 @@ namespace AutoTest
                         if (Phase3BeforeReroll) BuyPhase3Items();   // A/B: 捨てる前に買い切る
                         int before = run.coins;
                         NoteShelfDiscard();   // [計装] 捨てる棚を数える
-                        AuditedReroll(gm, inv);
+                        AuditedReroll(gm, inv, rp + 8);
                         if (run.coins >= before) break;
                         _cur.shopRerolls++;
                         _cur.shopRerollCoins += before - run.coins;
@@ -1197,7 +1234,7 @@ namespace AutoTest
                         if (Phase3BeforeReroll) BuyPhase3Items();   // A/B: 捨てる前に買い切る
                         int beforeR = run.coins;
                         NoteShelfDiscard();   // [計装] 捨てる棚を数える
-                        bool rolled = AuditedReroll(gm, inv);
+                        bool rolled = AuditedReroll(gm, inv, price + RerollBuyFloor);
                         if (_shopReserve > 0) _shopReserve = inv.CurrentRerollPrice;
                         if (!rolled) { exitWhy = 2; break; }
                         _cur.shopRerolls++;
@@ -1244,7 +1281,7 @@ namespace AutoTest
                     // **戻り値で判定する。** コインの増減で見ると〈合札〉の無料リロールを
                     //   失敗と誤認する (2026-09-17)。
                     NoteShelfDiscard();   // [計装] 捨てる棚を数える
-                    bool rolled = AuditedReroll(gm, inv);
+                    bool rolled = AuditedReroll(gm, inv, price + (lastShop ? 0 : residualG));
                     // 取り置きを現在価格へ更新。 リロール価格は 5→10→20→30 と逓増するので、
                     //   店に入った時点の額のままだと強盗直前に足りなくなる。
                     if (_shopReserve > 0) _shopReserve = inv.CurrentRerollPrice;
@@ -1283,7 +1320,7 @@ namespace AutoTest
                         if (Phase3BeforeReroll) BuyPhase3Items();   // A/B: 捨てる前に買い切る
                         int beforeR = run.coins;
                         NoteShelfDiscard();   // [計装] 捨てる棚を数える
-                        bool rolled = AuditedReroll(gm, inv);
+                        bool rolled = AuditedReroll(gm, inv, price + SurplusBuyReserve);
                         // 取り置きを現在価格へ更新。 リロール価格は 5→10→20→30 と逓増するので、
                         //   店に入った時点の額のままだと強盗直前に足りなくなる。
                         if (_shopReserve > 0) _shopReserve = inv.CurrentRerollPrice;
@@ -1480,7 +1517,7 @@ namespace AutoTest
                         if (Phase3BeforeReroll) BuyPhase3Items();   // A/B: 捨てる前に買い切る
                         int before = run.coins;
                         NoteShelfDiscard();   // [計装] 捨てる棚を数える
-                        AuditedReroll(gm, inv);
+                        AuditedReroll(gm, inv, price + cheapest);
                         // 取り置きを現在価格へ更新。 リロール価格は 5→10→20→30 と逓増するので、
                         //   店に入った時点の額のままだと強盗直前に足りなくなる。
                         if (_shopReserve > 0) _shopReserve = inv.CurrentRerollPrice;
@@ -1524,7 +1561,7 @@ namespace AutoTest
                         if (Phase3BeforeReroll) BuyPhase3Items();   // A/B: 捨てる前に買い切る
                         int before = run.coins;
                         NoteShelfDiscard();   // [計装] 捨てる棚を数える
-                        AuditedReroll(gm, inv);   // [経路3] Super 全賭け
+                        AuditedReroll(gm, inv, price + 4);   // [経路3] Super 全賭け
                         // 取り置きを現在価格へ更新。 リロール価格は 5→10→20→30 と逓増するので、
                         //   店に入った時点の額のままだと強盗直前に足りなくなる。
                         if (_shopReserve > 0) _shopReserve = inv.CurrentRerollPrice;

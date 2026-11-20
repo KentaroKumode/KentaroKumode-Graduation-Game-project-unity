@@ -173,11 +173,16 @@ namespace AutoTest
                     hp = UnityEngine.Mathf.Min(hp, maxHp);
                     break;
                 case EventEffectType.Probability:
+                case EventEffectType.DieRoll:
                 {
                     if (e.branches == null || e.branches.Count == 0) return;
+                    // 賽ロール (2026-11-20): 起こり得ない側 (装備の賽で確率 0) は最悪に数えない
+                    float pSuccess = e.type == EventEffectType.DieRoll ? DieRollChance(e) : -1f;
                     int worst = int.MaxValue, worstMax = maxHp, worstProv = prov;
-                    foreach (var br in e.branches)
+                    for (int bi = 0; bi < e.branches.Count; bi++)
                     {
+                        var br = e.branches[bi];
+                        if (pSuccess >= 0f && (bi == 0 ? pSuccess <= 0f : pSuccess >= 1f)) continue;
                         int h = hp, m = maxHp, p = prov;
                         foreach (var c in br) ApplyWorst(c, ref h, ref m, ref p);
                         if (h < worst) { worst = h; worstMax = m; worstProv = p; }
@@ -206,6 +211,17 @@ namespace AutoTest
                     exp += sub * w;
                 }
                 return wsum > 0f ? exp / wsum : 0f;
+            }
+
+            // 賽ロール (2026-11-20): 成功の確率 (装備の賽の面のうち目標値以上の割合) × 成功の値 + 失敗の確率 × 失敗の値
+            if (e.type == EventEffectType.DieRoll)
+            {
+                if (e.branches == null || e.branches.Count == 0) return 0f;
+                float p = DieRollChance(e);
+                float win = 0f, lose = 0f;
+                foreach (var c in e.branches[0]) win += ScoreEffect(c, run);
+                if (e.branches.Count > 1) foreach (var c in e.branches[1]) lose += ScoreEffect(c, run);
+                return p * win + (1f - p) * lose;
             }
 
             int hp     = run != null ? run.playerHP : 30;
@@ -395,8 +411,11 @@ namespace AutoTest
                 case EventEffectType.ShiftFront:       return ScoreFront(e.amount, run);
 
                 case EventEffectType.OfferPassives:
+                case EventEffectType.OfferAxisPassives:   // 軸の秘宝 (2026-11-20): 値は同じに置く (軸に寄るほど強いかは学習のリフトに任せる)
                     // N つから選べる分の上乗せ: 3 つなら ×1.3 (BOT は開幕の品と同じ買いの点で選ぶ)
                     return PassivePrice(run) * (1f + V_OFFER_PER_EXTRA * UnityEngine.Mathf.Max(0, e.amount - 1));
+                case EventEffectType.OfferTerminals:   return ScoreOfferTerminals(e, run);
+                case EventEffectType.RemoveTerminal:   return ScoreRemoveTerminal(run);
                 case EventEffectType.TradePassive:
                     return GameManager.CanTradePassive(run) ? V_TRADE * PassivePrice(run) : 0f;
                 case EventEffectType.ForgeWeapon:
@@ -442,6 +461,36 @@ namespace AutoTest
         const float V_SHOP_INCOME_AHEAD = 15f;
         /// <summary>次の休憩の回復の上乗せのうち、 実際に効く割合。</summary>
         const float V_REST_BONUS_USE = 0.6f;
+
+        // ===== 2026-11-21: 端子の山札とつながる汎用の動詞 =====
+        /// <summary>端子の報酬の点 (AutoRunner の端子の報酬の素の点・足切りの前) を引く口。 AutoRunner がラン開始時に差し込む。
+        /// null なら素の点の既定 (レア 3・コモン 2) で数える。</summary>
+        public static System.Func<CombatSystem.TerminalDef, RunState, float> TerminalPoints;
+        /// <summary>端子の点 1 の値段 (ゴールド・物価 ×1)。 店の端子の棚のコモン 1 枚の値段 ÷ コモンの素の点 2。</summary>
+        static float TerminalPointPrice => GameManager.TerminalShopPriceCommon / 2f;
+
+        /// <summary>端子をNつから選ぶ: 候補の素の点の平均 (同じ絞り方の端子の全部・軸の寄せは数えない) × 点の値段 × 物価、 N つから選べる分は秘宝の N 択と同じ上乗せ。</summary>
+        static float ScoreOfferTerminals(EventEffect e, RunState run)
+        {
+            bool rare = e.param == EventEffectRoles.RareTerminal;
+            float sum = 0f; int n = 0;
+            foreach (var d in CombatSystem.TerminalCards.All)
+            {
+                if (d.basic || d.upgraded || d.rare != rare) continue;
+                sum += TerminalPoints != null ? TerminalPoints(d, run) : d.rare ? 3f : 2f;
+                n++;
+            }
+            if (n == 0) return 0f;
+            return sum / n * TerminalPointPrice * Prog(run) * (1f + V_OFFER_PER_EXTRA * UnityEngine.Mathf.Max(0, e.amount - 1));
+        }
+
+        /// <summary>山札から端子を抜く: BOT が抜く端子を持つ (<see cref="GameHooks.ChooseTerminalRemoval"/> が 0 以上) 時だけ、 店で 1 枚抜く素の値段。 抜かないなら 0。</summary>
+        static float ScoreRemoveTerminal(RunState run)
+        {
+            if (run?.terminalDeck == null || !GameManager.CanRemoveTerminalOf(run)) return 0f;
+            int at = GameHooks.ChooseTerminalRemoval?.Invoke(run.terminalDeck) ?? -1;
+            return at >= 0 ? GameManager.TerminalRemoveBasePrice : 0f;
+        }
 
         /// <summary>この選択肢に「追跡者を撒く」があるか / 「遠ざける」の合計 (ターンの値段をその後の見込みで付けるため)。 Score の間だけ立つ。</summary>
         [System.ThreadStatic] static bool _turnShaken;
@@ -561,6 +610,13 @@ namespace AutoTest
             }
             // 縄張りの外に居れば、 巡回の番人は通りかからない ── 追跡者なしと同じ値 (2026-11-13・縄張りの番人)
             return (sim.FoeAlive && !sim.OutsideFoeReach ? V_TURN_FOE_PATROL : V_TURN_NO_FOE) * turns;
+        }
+
+        /// <summary>賽ロールの成功の確率 (今の装備の賽・本体の判定と同じ EventEffectRoles.DieRollChance)。</summary>
+        static float DieRollChance(EventEffect e)
+        {
+            var run = GameManager.Instance?.Run;
+            return EventEffectRoles.DieRollChance(EquippedDie.FacesOf(EquippedDie.IdOf(run)), e.amount);
         }
 
         /// <summary>L1.5 学習リフトの加算重み。 観測 lift1点 ≈ 数値スコア何点ぶんに相当させるか。</summary>

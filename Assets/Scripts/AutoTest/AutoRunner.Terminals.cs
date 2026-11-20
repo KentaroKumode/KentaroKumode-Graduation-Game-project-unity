@@ -77,7 +77,7 @@ namespace AutoTest
 
         /// <summary>端子の結果を、 効用の入力 (端子ごとの合計と個数 + 追加の効果 + 先の得) へ詰め直す。 盤面は読まない。</summary>
         private WiredSums DeckSums(in OptimalTurnState s, int[] rolls, List<string> board, TerminalOutcome o,
-                                   TerminalBattleState before, TerminalBattleState after, in TerminalEnv env, bool deckHasCounter)
+                                   TerminalBattleState before, TerminalBattleState after, in TerminalEnv env, float counterPerFire)
         {
             int k = rolls.Length;
             var ws = WiredSums.None();
@@ -87,7 +87,7 @@ namespace AutoTest
             for (int i = 0; i < k && i < o.kindOfDie.Length; i++)
                 if (o.kindOfDie[i] == DiceTerminal.Block && rolls[i] > ws.maxBlockDie) ws.maxBlockDie = rolls[i];
             // 充電: 本体の順 (払う → 満たす → 足す・上限で止まる) で、 実際に増える量を出目の平均で割って「本数」に換える
-            int cap = env.chargeCap > 0 ? env.chargeCap : 9999;
+            int cap = (env.chargeCap > 0 ? env.chargeCap : 9999) + o.chargeCapAdd;      // 〈大導電＋〉は満たす前に上限を足す
             int ch = Math.Max(0, env.charge - o.chargeSpend);
             if (o.chargeFill) ch = Math.Max(ch, cap);
             ch = Math.Min(cap, ch + o.chargeAdd);
@@ -95,7 +95,47 @@ namespace AutoTest
             // ---- 今ターンの追加の効果 (効用の Core が本体の位置で掛ける) ----
             ws.damageMul = o.damageMul; ws.outPctAdd = o.outgoingPctAdd; ws.critMultAdd = o.critMultAdd; ws.forceCrit = o.forceCrit;
             ws.ignoreDefense = o.ignoreDefense; ws.takenMul = o.takenMul; ws.enemyAtkMul = o.enemyAttackMul;
+            //   〈急所突きの針〉: 新しい式 (readOut) は最初の 1 撃だけで見る (ReadOutOneHit)。 旧の式は撃を分けないので、 攻撃するターン全体を会心・防御無視と見る (多段では過大)
+            if (s.needleFirst && !s.readOut && o.attackDice > 0) { ws.forceCrit = true; ws.ignoreDefense = true; }
             ws.shield = o.shield - o.shieldSpend; ws.heal = o.heal; ws.selfDamage = o.selfDamage;
+            //   〈応急箱＋〉: 最大 HP を超えた分はシールドになる (本体 ApplyTerminalOutcome と同じ・回復する前の空きを超えた分)
+            if (o.overhealToShield > 0) ws.shield += Math.Max(0, o.overhealToShield - Math.Max(0, env.maxHp - env.hp));
+            // ---- 端子の解決の外で効く品 (段 3・2026-11-21・_sight)。 量は品の定数を読む (写しを持たない) ----
+            var sg = _sight;
+            float sightFlat = 0f, sightHp = 0f;      // 与ダメ相当 (下で dw を掛ける) / HP 相当
+            if (o.disposedNow > 0)
+            {
+                // 使い捨てを使うたび (OnTerminalDispose・配線の解決の直後 = このターンの固定ダメの枠): 〈焼き入れの挟み〉〈血染めの歯車〉
+                ws.extraDmg += o.disposedNow * (sg.tongsDmg + (sg.bloodGear ? env.enemyBleed * 2 : 0));
+                if (sg.bloodGear) sightFlat += o.disposedNow * sg.axDeck * DeckBleedDmg;                 // 出血 +采配 (別枠のダメージの値付けと同じ)
+                // 〈必殺の照準器〉: このターンの攻撃は全部会心・会心倍率 +采配 × 0.15 (何枚使っても 1 回)
+                if (sg.sniperMul >= 0f && o.attackDice > 0) { ws.forceCrit = true; ws.critMultAdd += sg.sniperMul; }
+                // 〈灰払いの箒〉: 次の撃の会心率 +采配 × 5% (使った数だけ)。 1 撃ぶんの与ダメ × 上がる会心率 × (会心倍率 − 1) と見る
+                //   shortcut: 1 撃の与ダメは 1 ターンの見込み ÷ 撃の数 (攻撃しないターンは次の攻撃に乗るので同じ値)・会心率 100% で頭打ちは見ない
+                if (sg.broomPct > 0f)
+                    sightFlat += Math.Min(1f, o.disposedNow * sg.broomPct) * Math.Max(0f, s.critMulEff - 1f)
+                               * DeckPerTurnDamage(in s, k) / Math.Max(1, o.attackHits.Count);
+            }
+            // 〈破城斧〉: 最初の 1 撃の時のシールド (持ち越し + このターンの端子の分) が 10 以上なら、 撃ごとにシールド 5 を使い 攻撃 +10 (倍率の前)。
+            //   shortcut: 使ったシールドは、 半分 (毎ターン半減) を先の HP で引く。 このターンの被弾を吸えなくなる分は見ない
+            if (sg.siegeAxe && o.attackHits.Count > 0)
+            {
+                int sh = s.myShield + ws.shield;
+                if (sh >= ItemSystem.PassiveSkills.Effects.SiegeAxe.MinShield)
+                {
+                    int h = Math.Min(o.attackHits.Count, sh / ItemSystem.PassiveSkills.Effects.SiegeAxe.PerHitShield);
+                    ws.aSum += h * ItemSystem.PassiveSkills.Effects.SiegeAxe.PerHitAtk;
+                    sightHp -= 0.5f * h * ItemSystem.PassiveSkills.Effects.SiegeAxe.PerHitShield * DeckFutureHpWorth(in s);
+                }
+            }
+            // 〈無害灯〉: 敵の直接攻撃で失う HP を半分 (使う臨界は見ない)
+            if (sg.lamp) ws.takenMul *= 0.5f;
+            // 〈血濡れの符丁〉: 役〈追撃〉〈攻め〉(3・4 の 2 個そろい・ゾロ目) が立つターン、 出血 × 2 の軽減不可ダメージ (役は出目で決まる = Resolve と同じ RoleOf)
+            if (sg.bloodCode && o.roleNow > 0 && env.enemyBleed > 0)
+            {
+                var rk = TerminalCards.RoleOf(rolls, in env);
+                if (rk != null && rk.Value != RoleKind.Straight) { int f = YachtRoles.FaceOf(rk.Value); if (f == 3 || f == 4) ws.extraDmg += env.enemyBleed * 2; }
+            }
 
             // ---- 先のターンに効く分の見積もり (上の定数) ----
             float dw = DeckDamageWorth(in s), fw = DeckFutureHpWorth(in s);
@@ -112,19 +152,20 @@ namespace AutoTest
                 int d = kv.Value - g0;
                 if (d == 0) continue;
                 float perPip = 0f;
-                switch (kv.Key)
+                int need = Math.Max(1, TerminalCards.GaugeNeed(kv.Key));      // 溜まりは名前ごと (強化した端子は必要量が違う)
+                switch (TerminalCards.BaseOf(kv.Key))
                 {
-                    case TerminalIds.Capacitor: perPip = TerminalCards.CapacitorAttack / (float)TerminalCards.CapacitorNeed * DeckFutureAttackShare * dw; break;
-                    case TerminalIds.Arrester:  perPip = 0.5f * Math.Max(0, s.enemyAtk) / TerminalCards.ArresterNeedNow * fw; break;
-                    case TerminalIds.Foundry:   perPip = k * turns / (float)TerminalCards.FoundryNeed * DeckFutureAttackShare * dw; break;
-                    case TerminalIds.Coolant:   perPip = DeckRetreatTurns * escDelayWorth / TerminalCards.CoolantNeed; break;
+                    case TerminalIds.Capacitor: perPip = TerminalCards.CapacitorAttack / (float)need * DeckFutureAttackShare * dw; break;
+                    case TerminalIds.Arrester:  perPip = 0.5f * Math.Max(0, s.enemyAtk) / need * fw; break;
+                    case TerminalIds.Foundry:   perPip = k * turns / (float)need * DeckFutureAttackShare * dw; break;
+                    case TerminalIds.Coolant:   perPip = DeckRetreatTurns * escDelayWorth / need; break;
                 }
                 flat += d * perPip * DeckGaugeShare;
             }
             // 〈打ち直し〉が発動した: この戦闘中の出目 +1 (個数 × 残りターン・攻撃に挿す割合を 7 割と見る)
             flat += (after.foundryBonus - before.foundryBonus) * k * turns * DeckFutureAttackShare * dw;
             // エスカレーションの段階を戻す (〈氷結瓶〉・溜まり切った〈鎮静香〉)
-            if (o.retreatStage) flat += DeckRetreatTurns * escDelayWorth;
+            flat += o.retreatStage * DeckRetreatTurns * escDelayWorth;
             // 次のターンの補助
             if (after.ignoreCondNext && !before.ignoreCondNext) flat += DeckPreheatDmg * dw;
             flat += Math.Max(0, after.extraDrawNext - before.extraDrawNext) * DeckDrawDmg * dw;
@@ -134,9 +175,9 @@ namespace AutoTest
             // 別枠のダメージ
             flat += (o.poison * DeckPoisonDmg + o.heat * DeckHeatDmg) * dw;
             if (o.attackDice > 0) flat += o.bleedOnHit * DeckBleedDmg * dw;
-            // 〈柔軟な戦略〉: 基本以外の発動 1 回 = 与ダメ +(10% ÷ 10 回) を残りターンずっと (山札に入っている時だけ効く・本体 DrawTerminalHand)
-            if (deckHasCounter)
-                flat += o.firedNonBasic * (TerminalCards.CounterPct / TerminalCards.CounterEvery) * DeckPerTurnDamage(in s, k) * turns * dw;
+            // 〈柔軟な戦略〉: 基本以外の発動 1 回 = 与ダメ +(10% ÷ 10 回) を、 残りターンのうち〈柔軟な戦略〉を引いたターンだけ (本体 DrawTerminalHand・2026-11-20〜 引いた時だけ効く)
+            if (counterPerFire > 0f)
+                flat += o.firedNonBasic * counterPerFire * DeckPerTurnDamage(in s, k) * turns * dw;
             // 手札の操作 (対象は ChooseDeckTargets が選んだ端子・選ばなければ左端の候補)。 2026-11-12: この戦闘で山札を引く回数から値付けする。
             //   旧: 定数 (影写し 6 / 火葬の剣 6 × 未来の与ダメの価値) で、 使い捨ての費用 (HP 3) をほぼ超えず、 発動率が 0.1〜0.2% だった。
             //   引く回数 = 残りターン × 手札 ÷ 山札の残り (この戦闘で同じ 1 枚をあと何回引くか・残りターンで頭打ち)。
@@ -181,14 +222,13 @@ namespace AutoTest
                 if (TerminalCards.LeavesRunDeck(d) && (runNow?.terminalDeck?.Count ?? 0) > TerminalCards.MinDeckSize)
                     flat -= DeckRunLeaveHpCost * hpUnit;
             }
-            ws.specFlat = flat;
+            ws.specFlat = flat + sightFlat * dw + sightHp;
 
             // ---- 撃破のボーナス (今ターン撃破した時だけ Core が足す) ----
             float kill = 0f;
-            if (o.Fired(board, TerminalIds.Harvester)) kill += TerminalCards.HarvesterMaxHp * DeckKillMaxHpWorth;
-            if (o.Fired(board, TerminalIds.Whet))      kill += TerminalCards.WhetGain * DeckKillWhetWorth;
-            if (o.Fired(board, TerminalIds.LootBox))   kill += TerminalCards.LootGold * DeckKillGoldWorth;
-            if (o.Fired(board, TerminalIds.Stripper))  kill += TerminalCards.StripperChoices * DeckKillExtraChoiceWorth;
+            //   量は端子の結果が持つ (〈残響〉の 2 回目も入る・本体の FinishTerminalTurn と同じ値)
+            kill += o.killMaxHp * DeckKillMaxHpWorth + o.killWhet * DeckKillWhetWorth + o.killGold * DeckKillGoldWorth + o.killChoices * DeckKillExtraChoiceWorth
+                  + o.killRefundHp;      // 〈諸刃の剣＋〉: 戻る HP (HP の単位)
             ws.killBonus = kill * hpUnit;
             return ws;
         }
@@ -344,7 +384,8 @@ namespace AutoTest
                     if (!o.fired.Contains(s)) continue;
                     if (needTarget)
                     {
-                        int t = id == TerminalIds.Copier ? o.copyTarget : id == TerminalIds.BurnOut ? o.burnTarget : o.retainTarget;
+                        string bid = TerminalCards.BaseOf(id);
+                        int t = bid == TerminalIds.Copier ? o.copyTarget : bid == TerminalIds.BurnOut ? o.burnTarget : o.retainTarget;
                         if (t < 0) { firesNoTarget = true; continue; }
                     }
                     if (!any || us[i] > bestWith) { bestWith = us[i]; any = true; }
@@ -371,8 +412,60 @@ namespace AutoTest
             public List<string> board;
             public TerminalDeckState deck;
             public RunState run;
-            public bool deckHasCounter;
+            /// <summary>〈柔軟な戦略〉: 基本以外の発動 1 回が先のターンの与ダメ% に足す見込み (<see cref="CounterPerFire"/>)。 0 = 山札に無い。</summary>
+            public float counterPerFire;
         }
+
+        /// <summary>〈柔軟な戦略〉: 基本以外の発動 1 回あたり、 先の 1 ターンの与ダメ% に足す見込み = (% ÷ 回数) × 引く見込み。
+        /// 〈柔軟な戦略〉は引いたターンだけ効く (本体 DrawTerminalHand・2026-11-20〜)。
+        /// shortcut: 引く見込みは 手札 ÷ 山札の枚数 (1 枚あたり・上限 1) の粗い近似。 見積もりの精度が要るなら山・捨て札の残りから数える。</summary>
+        private static float CounterPerFire(RunState run)
+        {
+            var deck = run?.terminalDeck;
+            if (deck == null || deck.Count == 0) return 0f;
+            float share = Math.Min(1f, TerminalCards.HandSize / (float)deck.Count), v = 0f;
+            if (deck.Contains(TerminalIds.Counter)) v += TerminalCards.CounterPct / TerminalCards.CounterEvery * share;
+            if (deck.Contains(TerminalIds.Upgraded(TerminalIds.Counter))) v += TerminalCards.CounterPct / TerminalCards.CounterEveryUp * share;
+            return v;
+        }
+
+        /// <summary>端子の解決の外 (出来事・撃のパッシブ) で効き、 <see cref="TerminalCards.Resolve"/> の結果に出ない品 (段 3・2026-11-21)。
+        /// <see cref="PrepareDeckEval"/> が盤面を読むたびに組み直し、 <see cref="DeckSums"/> が挿し方ごとに読む (所持の検索を挿し方ごとにしないため)。</summary>
+        private struct ItemSight
+        {
+            /// <summary>〈焼き入れの挟み〉: 使い捨て 1 枚あたりの軽減不可ダメージ (4 + 采配・持っていなければ 0)。</summary>
+            public int tongsDmg;
+            /// <summary>〈血染めの歯車〉(血晶 5 以上): 使い捨て 1 枚あたり 出血 × 2 の軽減不可ダメージ・出血 +采配。</summary>
+            public bool bloodGear;
+            /// <summary>〈灰払いの箒〉: 使い捨て 1 枚あたり、 次の撃の会心率 +采配 × 5%。</summary>
+            public float broomPct;
+            /// <summary>〈必殺の照準器〉(心眼 5 以上): 使い捨てを使ったターン、 攻撃は全部会心・会心倍率 +采配 × 0.15 (−1 = 持っていない)。</summary>
+            public float sniperMul;
+            /// <summary>〈破城斧〉: シールド 10 以上のターン、 撃ごとにシールド 5 を使い 攻撃 +10。</summary>
+            public bool siegeAxe;
+            /// <summary>〈無害灯〉: 臨界 15 以上なら、 敵の直接攻撃で失う HP を半分にする (1 ターン 1 回)。</summary>
+            public bool lamp;
+            /// <summary>〈血濡れの符丁〉(賽目 5 以上): 役〈追撃〉〈攻め〉(3・4 の 2 個そろい・ゾロ目) のターン、 出血 × 2 の軽減不可ダメージ。</summary>
+            public bool bloodCode;
+            public int axDeck;
+
+            public static ItemSight Of(RunState run, ItemSystem.PassiveSkills.CombatContext ctx)
+            {
+                var v = new ItemSight { sniperMul = -1f };
+                if (run == null || ctx == null) return v;
+                v.axDeck = ctx.AxisDepth(ItemSystem.PassiveSkills.AxisRules.Deck);
+                if (run.OwnsPassive(ItemIds.DeckTongs)) v.tongsDmg = ItemSystem.PassiveSkills.Effects.TemperTongs.Base + v.axDeck;
+                v.bloodGear = run.OwnsPassive(ItemIds.CrossBloodGear) && ItemSystem.PassiveSkills.Effects.Cross.On(ctx, ItemSystem.PassiveSkills.AxisRules.Bleed);
+                if (run.OwnsPassive(ItemIds.DeckBroom)) v.broomPct = ItemSystem.PassiveSkills.Effects.AshBroom.PctPerDepth * v.axDeck;
+                if (run.OwnsPassive(ItemIds.CrossSniper) && ItemSystem.PassiveSkills.Effects.Cross.On(ctx, ItemSystem.PassiveSkills.AxisRules.Crit))
+                    v.sniperMul = ItemSystem.PassiveSkills.Effects.FatalSight.MulPerDepth * v.axDeck;
+                v.siegeAxe = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.SiegeAxe.Id);
+                v.lamp = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.HarmlessLamp.Id) && ctx.rinkaiMeter >= ItemSystem.PassiveSkills.Effects.HarmlessLamp.MinHeat;
+                v.bloodCode = run.OwnsPassive(ItemIds.CrossBloodCode) && ItemSystem.PassiveSkills.Effects.Cross.On(ctx, ItemSystem.PassiveSkills.AxisRules.Role);
+                return v;
+            }
+        }
+        private ItemSight _sight;
 
         /// <summary>今の盤面から <see cref="DeckEval"/> を組む (読むだけ)。 山札で戦っていない時は呼ばないこと。</summary>
         private DeckEval PrepareDeckEval(int[] rolls, MutualTurnTelegraph tele)
@@ -385,8 +478,9 @@ namespace AutoTest
                 deck = cm.TerminalDeck, board = cm.TerminalDeck.board, run = run,
                 env = cm.TerminalEnvNow(ctx, tele.enemyAttackValue),
                 st = BuildOptimalTurnState(rolls, tele),
-                deckHasCounter = run?.terminalDeck != null && run.terminalDeck.Contains(TerminalIds.Counter),
+                counterPerFire = CounterPerFire(run),
             };
+            _sight = ItemSight.Of(run, ctx);         // 端子の解決の外で効く品 (DeckSums が読む・2026-11-21)
             _recallPrefer = RecallPreferFor(tele);   // [#141] 〈有効活用〉の当て (方策 Planned の時だけ・それ以外は null = 今までの選び方)
             // 会心の効果 (〈致命の一撃〉〈一閃〉〈弱点看破〉) を旧の式でも見積もれるよう、 会心率と倍率は常に読む (readOut の切り替えは変えない)
             if (ctx != null && !ev.st.readOut && !ev.st.traceBoth) FillReadOut(ref ev.st, cm, ctx, run, tele.playerAttackPenalty);
@@ -410,7 +504,7 @@ namespace AutoTest
                 after = ev.deck.state.Clone();
                 o = TerminalCards.Resolve(ev.board, cand, rolls, ev.env, after, tgts);
             }
-            var ws = DeckSums(in ev.st, rolls, ev.board, o, ev.deck.state, after, in ev.env, ev.deckHasCounter);
+            var ws = DeckSums(in ev.st, rolls, ev.board, o, ev.deck.state, after, in ev.env, ev.counterPerFire);
             return OptimalUtilityCore(in ev.st, rolls.Length, in ws, out outc);
         }
 
@@ -442,7 +536,7 @@ namespace AutoTest
                 int pick = RecallBest(disc, run, recallPrefer);
                 if (pick >= 0)
                     for (int p = 0; p < board.Count; p++)
-                        if (board[p] == TerminalIds.Retainer && o.fired.Contains(p))
+                        if (TerminalCards.BaseOf(board[p]) == TerminalIds.Retainer && o.fired.Contains(p))
                         {
                             if (res == null) { res = new int[board.Count]; for (int q = 0; q < res.Length; q++) res[q] = -1; }
                             res[p] = pick;
@@ -453,7 +547,7 @@ namespace AutoTest
                 if (!TerminalCards.PicksTarget(board[p]) || !o.fired.Contains(p)) continue;
                 var cand = TerminalCards.TargetCandidates(board, o, p);
                 if (cand.Count == 0) continue;
-                bool wantLow = board[p] == TerminalIds.BurnOut;
+                bool wantLow = TerminalCards.BaseOf(board[p]) == TerminalIds.BurnOut;
                 int pick = -1; float bestSc = 0f;
                 foreach (int s in cand)
                 {
@@ -892,6 +986,7 @@ namespace AutoTest
         {
             RefreshMainCorr();   // [V3 mainCorr]
             PrepareSuperTurn(rolls, tele);
+            UseTacticsThisTurn(rolls, ref tele);   // 戦術消耗品 (2026-11-21・§12-6)。 盤面を変えるので配線の判断の前
             int hpNow = CombatManager.Instance != null ? CombatManager.Instance.PlayerHP : -1;
             if (_fbPrevHp >= 0 && hpNow >= 0 && _fbPrevHp - hpNow > _fbPrevExpTaken) _fbUnavoidSeen = true;
             _lastFreeBlock = _lastKillsNow = false;
@@ -1013,7 +1108,7 @@ namespace AutoTest
         private float EvalWithGold(in DeckEval ev, int[] rolls, TerminalOutcome o, TerminalBattleState after, int gold, out OptimalTurnOutcome outc)
         {
             var st = GoldPunchState(in ev.st, gold);
-            var ws = DeckSums(in st, rolls, ev.board, o, ev.deck.state, after, in ev.env, ev.deckHasCounter);
+            var ws = DeckSums(in st, rolls, ev.board, o, ev.deck.state, after, in ev.env, ev.counterPerFire);
             return OptimalUtilityCore(in st, rolls.Length, in ws, out outc);
         }
 
@@ -1151,10 +1246,12 @@ namespace AutoTest
             // 次のターンの端子の盤面 (充電は DeckSums と同じ順: 払う → 満たす → 足す・上限で止まる)
             var env = ev.env;
             env.hp = ns.myHp; env.shield = ns.myShield; env.enemyAttack = ns.enemyAtk;
-            int cap = env.chargeCap > 0 ? env.chargeCap : 9999;
+            env.pairAsTriple = false;      // 〈万象のゾロ目〉の格上げは今のターンの出目で決めた物 (次のターンは引いた出目で決まる・見込みは格上げなし)
+            int cap = (env.chargeCap > 0 ? env.chargeCap : 9999) + o.chargeCapAdd;      // 〈大導電＋〉は満たす前に上限を足す
             int ch = Math.Max(0, env.charge - o.chargeSpend);
             if (o.chargeFill) ch = Math.Max(ch, cap);
             env.charge = Math.Min(cap, ch + o.chargeAdd);
+            if (env.chargeCap > 0) env.chargeCap += o.chargeCapAdd;      // 〈大導電＋〉の上限はこの戦闘の間ずっと
             env.enemyPoison += o.poison;                       // 毒の減衰は見ない (控えめな近似)
             if (o.attackDice > 0) env.enemyBleed += o.bleedOnHit;
 
@@ -1170,7 +1267,7 @@ namespace AutoTest
                 var rng = new System.Random(unchecked(la.seed + j * 7919));
                 var nst = after.Clone();
                 int extra = nst.BeginTurn();
-                var nb = SampleNextBoard(ev.deck, ev.board, o, TerminalCards.HandSize + extra, la.stopChance, rng, out var stopped, keep, _recallPrefer);
+                var nb = SampleNextBoard(ev.deck, ev.board, o, TerminalCards.HandSize + extra + nst.handBonus, la.stopChance, rng, out var stopped, keep, _recallPrefer, nst);
                 nst.stopped = stopped;
                 // 〈打ち直し〉の出目 +N は振った後に足される (本体 DrawTerminalHand → FoundryBonusKey)
                 var dice = new int[k];
@@ -1194,9 +1291,10 @@ namespace AutoTest
             string At(int s) => s >= 0 && s < board.Count ? board[s] : "-";
             sb.Append(At(o.retainTarget)).Append(',').Append(At(o.copyTarget)).Append(',').Append(At(o.burnTarget)).Append(o.recall ? ",R" : "").Append('|');
             foreach (int s in o.fired) { var d = TerminalCards.Get(board[s]); if (d != null && d.disposable) sb.Append(board[s]).Append(','); }
-            sb.Append('|').Append(after.oscLast).Append(',').Append(after.oscStreak).Append(',').Append(after.firedTotal).Append(',')
+            sb.Append('|').Append(after.oscLast).Append(',').Append(after.oscStreak).Append(',').Append(after.oscLastUp).Append(',').Append(after.oscStreakUp).Append(',').Append(after.firedTotal).Append(',')
               .Append(after.ignoreCondNext ? 1 : 0).Append(',').Append(after.storedAttack).Append(',').Append(after.storedAttackNext).Append(',')
-              .Append(after.extraDrawNext).Append(',').Append(after.foundryBonus).Append(',').Append(after.mainsUses).Append('|');
+              .Append(after.extraDrawNext).Append(',').Append(after.foundryBonus).Append(',').Append(after.mainsUses).Append(',')
+              .Append(after.disposedTotal).Append(',').Append(after.keptStreak).Append(',').Append(after.storedAttack).Append('|');      // 采配の品 (2026-11-20)
             if (after.gauge.Count > 0)
             {
                 var keys = new List<string>(after.gauge.Keys); keys.Sort(StringComparer.Ordinal);
@@ -1207,22 +1305,24 @@ namespace AutoTest
 
         /// <summary>次のターンの場 (常設 + 手札) を 1 つ引く (写しで回す・本体の山札は書き換えない・専用の乱数)。
         /// 本体の <see cref="TerminalDeckState.FinishTurn"/> → <see cref="TerminalDeckState.DrawTurn"/> と同じ順。 違いは、 山の並びを読まずに中身から一様に引くことだけ。
-        /// <paramref name="stopped"/> = ヴェスカ〈停滞する時間〉で止まった場の端子 (null = なし)。</summary>
+        /// <paramref name="stopped"/> = ヴェスカ〈停滞する時間〉で止まった場の端子 (null = なし)。
+        /// <paramref name="st"/> = 次のターンの端子の状態 (BeginTurn を掛けた写し・null 可)。 采配の品 (2026-11-20) の山札の規則
+        /// (使い捨ての戻り・切り直しの数え・〈無銘の設計図〉・〈永久機関の主軸〉・残した端子の名前) を、 本体と同じ関数でこの写しに掛ける。</summary>
         private static List<string> SampleNextBoard(TerminalDeckState dk, List<string> board, TerminalOutcome o, int size, float stopChance,
-                                                    System.Random rng, out bool[] stopped, List<string> keep = null, TerminalKind? recallPrefer = null)
+                                                    System.Random rng, out bool[] stopped, List<string> keep = null, TerminalKind? recallPrefer = null,
+                                                    TerminalBattleState st = null)
         {
             var draw = new List<string>(dk.draw);
             var discard = new List<string>(dk.discard);
             var hand = new List<string>(dk.hand);
             var perm = new List<string>(dk.permanent);
+            var exiled = new List<string>(dk.exiled);
+            var ret = new List<string>(dk.returnNext);
+            if (st == null) st = dk.state.Clone();      // 旗だけ読む写し (書き換えは捨てる)
             // ---- FinishTurn: 残す 1 枚・影写し (次のターンの手札へ・引いた後に足す)・使い捨てと火葬の剣 (この戦闘から外す) ----
             string retain = o.retainTarget >= 0 && o.retainTarget < board.Count ? board[o.retainTarget] : null;
             string copy = o.copyTarget >= 0 && o.copyTarget < board.Count ? board[o.copyTarget] : null;
-            foreach (int s in o.fired)
-            {
-                var d = TerminalCards.Get(board[s]);
-                if (d != null && d.disposable) hand.Remove(board[s]);
-            }
+            TerminalDeckState.DisposeFired(board, o, hand, exiled, ret, st);      // 本体の FinishTurn と同じ関数 (戻る使い捨ては ret へ)
             if (o.burnTarget >= 0 && o.burnTarget < board.Count) hand.Remove(board[o.burnTarget]);
             // ---- DrawTurn: 本体と同じ関数 (TerminalDeckState.SplitHand) で、 残す端子と捨て札へ送る端子に分ける ----
             //   Pick (既定): 旧い規則 + 残す印 (keep) の付いた端子 / All: 今ターンに挿した端子だけを捨て札へ / Off: 止まっていた手札と旧い〈保持器〉の 1 枚だけ残す。
@@ -1233,6 +1333,11 @@ namespace AutoTest
             if (o.recall && TerminalCards.HandCarry)
                 TerminalDeckState.ApplyRecall(TerminalDeckState.RecallPick(dk.discard, RecallBest(dk.discard, GameManager.Instance?.Run, recallPrefer)), kept, discard, size);
             hand.Clear(); hand.AddRange(kept);
+            {      // 残す印で残った端子の名前 (本体の DrawTurn の LastKept と同じ: Pick の印のうち残った物)
+                var lk = new List<string>();
+                if (TerminalCards.CarryMode == HandCarryMode.Pick && keep != null) foreach (var id in keep) if (kept.Contains(id)) lk.Add(id);
+                st.kept = lk.Count > 0 ? lk : null;
+            }
             // ---- 引く (山が尽きたら捨て札を混ぜて続ける・常設は場へ出して引き直す・引いた物だけが止まる対象) ----
             var stopPerm = new List<int>(); var stopHand = new List<int>();
             int guard = 0;
@@ -1241,7 +1346,9 @@ namespace AutoTest
                 if (draw.Count == 0)
                 {
                     if (discard.Count == 0) break;
+                    size += TerminalDeckState.BeforeShuffle(discard, exiled, draw.Count + discard.Count + hand.Count + perm.Count, st);      // 本体の DrawOne と同じ関数
                     draw.AddRange(discard); discard.Clear();
+                    if (draw.Count == 0) continue;
                 }
                 int j = rng.Next(draw.Count);
                 var id = draw[j]; draw[j] = draw[draw.Count - 1]; draw.RemoveAt(draw.Count - 1);
@@ -1252,6 +1359,7 @@ namespace AutoTest
                 hand.Add(id);
             }
             if (copy != null) hand.Add(copy);      // 〈影写し〉の写し: 本体の DrawTurn と同じく、 引く枚数とは別に手札の最後へ
+            hand.AddRange(ret);                    // 戻る使い捨て (〈灰から組む機関〉〈緊急再装填〉〈解体屋の袋〉): 本体の DrawTurn と同じく写しの後ろへ
             var nb = new List<string>(perm.Count + hand.Count);
             nb.AddRange(perm); nb.AddRange(hand);
             stopped = null;
@@ -1283,7 +1391,7 @@ namespace AutoTest
                 var o = TerminalCards.Resolve(board, w, dice, env, after);
                 var tg = ChooseDeckTargets(board, o, ev.run, _recallPrefer);
                 if (tg != null) { after = state.Clone(); o = TerminalCards.Resolve(board, w, dice, env, after, tg); }
-                var ws = DeckSums(in ns, dice, board, o, state, after, in env, ev.deckHasCounter);
+                var ws = DeckSums(in ns, dice, board, o, state, after, in env, ev.counterPerFire);
                 if (ws.aCount > 0) anyAttack = true;
                 sums.Add(ws);
                 float u = OptimalUtilityCore(in ns, k, in ws, out _);
@@ -1344,7 +1452,7 @@ namespace AutoTest
             if (!string.IsNullOrEmpty(buyAxisFocus))
             {
                 var add = new List<string>(want);
-                foreach (var a in buyAxisFocus.Split(',', '、')) add.AddRange(PersonaTerminals(AxisPersona(a.Trim())));
+                foreach (var a in buyAxisFocus.Split(',', '、')) add.AddRange(AxisTerminals(a.Trim()));
                 want = add.ToArray();
             }
             float threshold = RewardRejectBelow + RewardThresholdPerCard * Math.Max(0, total - RewardThresholdFreeSize);
@@ -1357,7 +1465,7 @@ namespace AutoTest
                 var d = TerminalCards.Get(offer[i]);
                 if (d == null) continue;
                 float sc = RewardBaseScore(d, run);
-                if (Array.IndexOf(want, d.id) >= 0) sc += RewardPersonaBonus;
+                if (Array.IndexOf(want, d.baseId) >= 0) sc += RewardPersonaBonus;
                 bool isAtk = d.kind == TerminalKind.Attack;
                 if (shareNow < RewardMinAttackShare && isAtk) sc += RewardAttackNeedBonus;
                 if (!isAtk && (atk / (float)(total + 1)) < RewardMinAttackShare) sc -= RewardDilutePenalty;
@@ -1383,7 +1491,7 @@ namespace AutoTest
                 int depth = ItemSystem.PassiveSkills.AxisRules.Count(run, d.axis);
                 return depth <= 0 ? 0.3f : Math.Min(5f, 1.5f + 0.75f * depth);
             }
-            switch (d.id)
+            switch (d.baseId)      // 強化した端子は基の端子と同じ点 (2026-11-20・強化は休憩でだけ得るので、 報酬・店の候補には出ない)
             {
                 // 〈剥ぎ取り〉: 2026-11-13 に攻撃の端子になったので、 ほかの撃破のボーナスの端子 (魂狩り・処刑の刃・賞金狩り) と同じくレアの 3 (下の既定)。
                 //   撃破のボーナスの価値は挿す時の値付け (DeckSums の DeckKillExtraChoiceWorth) で見る。 旧: 補助で 1.5 (1.0 では一度も取られなかった)
@@ -1438,6 +1546,22 @@ namespace AutoTest
             return at >= 0 && gm.RestRemoveTerminal(at);
         }
 
+        /// <summary>休憩: 素材が足りれば、 山札の強化できる端子のうち報酬の点 (<see cref="RewardBaseScore"/>) が最も高い 1 枚を強化する (休憩の行動を使う)。
+        /// 同点は山札の前の方。 強化したら true。 呼ぶ側 (休憩の判断) が「武器を強化できない・HP が十分」を確かめる。</summary>
+        private bool TryRestUpgradeTerminal(GameManager gm)
+        {
+            var run = gm?.Run; if (run?.terminalDeck == null || terminalsLeaveDeck) return false;
+            if (run.weaponMaterials < GameManager.TerminalUpgradeCost(run)) return false;
+            int at = -1; float best = float.NegativeInfinity;
+            for (int i = 0; i < run.terminalDeck.Count; i++)
+            {
+                if (!TerminalCards.CanUpgrade(run.terminalDeck[i])) continue;
+                float sc = RewardBaseScore(TerminalCards.Get(run.terminalDeck[i]), run);
+                if (sc > best) { best = sc; at = i; }
+            }
+            return at >= 0 && gm.RestUpgradeTerminal(at);
+        }
+
         /// <summary>抜く端子 (山札の添字・−1 = 抜かない)。 規則は上の注記。</summary>
         private static int PruneTarget(RunState run)
         {
@@ -1475,6 +1599,18 @@ namespace AutoTest
                 case ItemSystem.PassiveSkills.AxisRules.Shield: return BuildPersona.Shield;
                 default: return BuildPersona.RawTier;
             }
+        }
+
+        /// <summary>軸に寄せる方策で「型に合う端子」に足す端子 (軸の名前 → 端子)。 6 軸はペルソナの表 (<see cref="PersonaTerminals"/>) を引く。
+        /// 山札 (采配・2026-11-20) はペルソナを持たないので、 使い捨ての端子をここに並べる。 役 (賽目) の端子は段 1-f で足す (今は無し)。</summary>
+        private static string[] AxisTerminals(string axis)
+        {
+            if (axis == ItemSystem.PassiveSkills.AxisRules.Deck)
+                return new[] { TerminalIds.Detonator, TerminalIds.Piercer, TerminalIds.ReliefValve, TerminalIds.FirstAid, TerminalIds.FullCharge,
+                               TerminalIds.CoolShot, TerminalIds.Copier, TerminalIds.BurnOut, TerminalIds.Switchboard, TerminalIds.Retainer,
+                               TerminalIds.BurnSlash, TerminalIds.Reload, TerminalIds.Bell, TerminalIds.Gear };
+            if (axis == ItemSystem.PassiveSkills.AxisRules.Role) return new[] { TerminalIds.DiceTable, TerminalIds.RoleDrop };      // 役の軸の端子 (2026-11-21)
+            return PersonaTerminals(AxisPersona(axis));
         }
 
         /// <summary>ビルドの型に合う端子 (規則 2)。 軸の端子は偏重の点で別に上がるので、 ここは軸の外の相性。</summary>

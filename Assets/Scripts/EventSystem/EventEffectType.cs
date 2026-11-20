@@ -83,5 +83,33 @@ namespace EventSystem
         /// (<c>layer7Unlocked</c>) を立てる (<see cref="GameLoop.ConvictionSystem.RevealTruthInLayer6"/>)。 選択肢の並びや名前でなく、 この効果で判定する。
         /// 〈真理〉はランをまたいで残らない。 結果の行は「〈決意〉が〈真理〉に変わった」。</summary>
         GainTruth,
+
+        // ── 2026-11-20: 装備・偏重とつながる汎用の動詞 (docs/system-overhaul-spec.md §2-2・docs/GAME.md §17) ──
+
+        /// <summary>賽ロール[N]:成功の効果|失敗の効果 ── 装備中の賽 (<c>GameLoop.EquippedDie</c>) を 1 回振り、 出目が N 以上なら成功。
+        /// amount = 目標値・branches[0] = 成功・branches[1] = 失敗 (branchWeights は持たない)。 乱数は GameRng の専用のキー。
+        /// 選んだ後の文・記録の文は確率分岐と同じく「||」で成功・失敗に分けられる (並びは 成功 → 失敗)。
+        /// 確率分岐と同じく、 中に航行の効果・ターン・印〔見せる〕〔伏せる〕は置かない (読まれない・見せない)。</summary>
+        DieRoll,
+        /// <summary>条件[種別]:効果 ── 条件を満たす時だけ選べる選択肢の印 (それ自体は何もしない)。 結果の欄の頭にだけ置ける。
+        /// param = 種別 (<see cref="EventEffectRoles.ReqAxis"/> / <see cref="EventEffectRoles.ReqWeapon"/> / <see cref="EventEffectRoles.ReqProvision"/>)・
+        /// arg = 軸の名前 / 武器の家系 (短剣・剣・盾・斧)・amount = N。 満たさない時は選べない (理由を出す・全部が選べない時の安全弁でも開かない)。</summary>
+        Requirement,
+        /// <summary>賽を提示して交換 ── 賽を 2 種引いて面を見せ、 今の賽と入れ替えるか「やめる」を選ばせる (強制の没収・見えない交換は入れない)。
+        /// 人は地図へ戻った時の選択画面、 BOT は GameHooks.ChooseOfferedDie (無ければ替えない)。</summary>
+        OfferDieSwap,
+        /// <summary>軸の秘宝をNつから選ぶ ── 今の偏重が一番高い軸 (同数なら AxisRules.Ranked の順) の秘宝から N 個を引いて 1 つ選ぶ。
+        /// 選び方・不安定化 (+3) は「パッシブアイテムをNつから選ぶ」と同じ。</summary>
+        OfferAxisPassives,
+
+        // ── 2026-11-21: 端子の山札とつながる汎用の動詞 (docs/system-overhaul-spec.md §2-2・「山札の端子を複製する」は作らない ── 休憩の複製と同じく強すぎる) ──
+
+        /// <summary>端子をNつから選ぶ / レアの端子をNつから選ぶ ── 戦闘の報酬と同じ形で端子を N 枚引いて見せ、 1 枚を山札に加える (加えなくてもよい)。
+        /// amount = N・param = <see cref="EventEffectRoles.RareTerminal"/> ならレアから / null なら基本でもレアでもない端子から (報酬の通常 / 層ボスと同じ絞り方)。
+        /// 人は戦闘の報酬と同じ画面、 BOT は GameHooks.ChooseTerminalReward (戦闘の報酬と同じ点)。 乱数は専用のキー (戦闘の報酬の列を動かさない)。</summary>
+        OfferTerminals,
+        /// <summary>山札から端子を抜く ── 休憩と同じ画面で山札から 1 枚抜く (抜かなくてもよい)。 山札が <c>TerminalCards.MinDeckSize</c> 枚以下なら起きない (選べない)。
+        /// 人は地図へ戻った時の画面、 BOT は GameHooks.ChooseTerminalRemoval (無ければ抜かない)。</summary>
+        RemoveTerminal,
     }
 }

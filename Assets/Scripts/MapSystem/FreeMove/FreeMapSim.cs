@@ -243,7 +243,7 @@ namespace MapSystem.FreeMove
         /// <summary>累計の内訳 (<see cref="Instability.PartTake"/> ほか・この層で溜まった分。 深さ 6 の始まりの分は入らない)。 中断セーブに写す。</summary>
         public int[] InstabilityParts { get; } = new int[MapSystem.FreeMove.Instability.Parts];
         /// <summary>崩れ始めたか (不安定化の累計が最初の境目以上)。 ここから先は 1 歩・待つ・偵察でも溜まる。 不安定化の時計でなければ false。</summary>
-        public bool Collapsing => InstabilityMode && MapSystem.FreeMove.Instability.Collapsing(Instability);
+        public bool Collapsing => InstabilityMode && MapSystem.FreeMove.Instability.Collapsing(Instability, Floor);
         /// <summary>[計装 2026-11-13] 崩れ始めた手番 (<see cref="Turn"/>・まだなら -1・深さ 6 は 2026-11-18 より前は 0)。 数えるだけで動きに使わない。 中断セーブには写さない (戻した時は今の状態から数え直す)。</summary>
         public int CollapseTurn { get; private set; } = -1;
         /// <summary>[計装 2026-11-13] この層で嵐の中の点へ動いた歩数 (1 歩・〈補給線〉) と、 嵐で払った HP (歩く・待つ・偵察・〈補給線〉)。 数えるだけ・中断セーブには写さない。</summary>
@@ -257,7 +257,7 @@ namespace MapSystem.FreeMove
         private Storm.Schedule StormSched => InstabilityMode ? MapSystem.FreeMove.Instability.Schedule : Storm.TurnSchedule;
         /// <summary>嵐の時計 (負 = 静か・崩れ始めるまでの残り)。 不安定化の時計 = 累計 − 崩れ始める境目 (FreeMapParams.InstabilityPhase1At)。 手番の時計 = 手番 + ずらし − 静かな時間。 嵐の層でなければ int.MinValue。</summary>
         public int StormTime => !StormMode ? int.MinValue
-            : InstabilityMode ? MapSystem.FreeMove.Instability.TimeOf(Instability)
+            : InstabilityMode ? MapSystem.FreeMove.Instability.TimeOf(Instability, Floor)
             : Turn + StormShift - Storm.QuietTurns(Floor);
         /// <summary>嵐の段 (0 = 静か / 1〜4)。 嵐の層でなければ 0。</summary>
         public int StormPhase => StormMode ? Storm.PhaseOf(StormTime, StormSched) : 0;
@@ -280,7 +280,7 @@ namespace MapSystem.FreeMove
         {
             center = default; radius = 0;
             if (!InstabilityMode) return false;
-            int t = MapSystem.FreeMove.Instability.TimeOf(points), ph = Storm.PhaseOf(t, StormSched);
+            int t = MapSystem.FreeMove.Instability.TimeOf(points, Floor), ph = Storm.PhaseOf(t, StormSched);
             if (ph < 1 || ph > 3) return false;
             Storm.RingAt(Layout, t, StormSched, out center, out radius);
             return true;
@@ -299,12 +299,13 @@ namespace MapSystem.FreeMove
         /// <summary>不安定化ポイントを足す (2026-11-13・<see cref="Instability.PointsOf"/> の表)。 理由 <paramref name="src"/> を <paramref name="n"/> 回ぶん
         /// (歩く・イベントのターン・嵐を動かす は n が量)。 累計は 0 未満にしない。 段が変わったら <see cref="FreeMapEvent.StormAdvanced"/>
         /// (フェーズ 3 に入ったらボスの点の種別が見える)。 実際に動いた量を <paramref name="delta"/> に返す。
-        /// 不安定化の時計でない (嵐の無い層・手番の時計) なら何もしない (delta = 0)。 戦闘の途中でも呼べる (段は地図へ戻った時に効く)。</summary>
-        public FreeMapEvent AddInstability(InstabilitySource src, int n, out int delta)
+        /// 不安定化の時計でない (嵐の無い層・手番の時計) なら何もしない (delta = 0)。 戦闘の途中でも呼べる (段は地図へ戻った時に効く)。
+        /// <paramref name="cut"/> = 表の量から引く分 (〈避雷の天幕〉の半分・GameManager.AddInstability が決める)。</summary>
+        public FreeMapEvent AddInstability(InstabilitySource src, int n, out int delta, int cut = 0)
         {
             delta = 0;
             if (!InstabilityMode || Dead) return FreeMapEvent.None;
-            int add = MapSystem.FreeMove.Instability.PointsOf(src, n);
+            int add = MapSystem.FreeMove.Instability.PointsOf(src, n) - cut;
             if (add == 0) return FreeMapEvent.None;
             int before = Instability, phase = StormPhase;
             Instability = Math.Max(0, Instability + add);
@@ -327,9 +328,10 @@ namespace MapSystem.FreeMove
         public int InstabilityForWait => Collapsing ? MapSystem.FreeMove.Instability.PointsOf(InstabilitySource.Walk, 1) : 0;
         /// <summary>点 j へ 1 歩動いた時に払う嵐の HP (嵐の中の点へなら <see cref="FreeMapParams.StormHp"/>、 雹の嵐はさらに <see cref="FreeMapParams.StormHailHp"/>)。
         /// 近道の残りがある間も払う (近道が消すのは手番と物資だけ)。 嵐の層でなければ 0。</summary>
-        public int StormHpFor(int j) => !InStorm(j) ? 0 : FreeMapParams.StormHp + (Weather == WeatherKind.Hail ? FreeMapParams.StormHailHp : 0);
+        public int StormHpFor(int j) => !InStorm(j) ? 0 : Weather != WeatherKind.Hail ? FreeMapParams.StormHpAt(Floor)
+            : Math.Max(0, FreeMapParams.StormHpAt(Floor) + FreeMapParams.StormHailHp - Perks.hailHpCut);   // 〈油布の靴〉は雹の嵐の 1 歩を −1 (2026-11-20)
         /// <summary>その場で 1 手番を過ごす (待つ・偵察) 時に払う嵐の HP (今いる点が嵐の中なら <see cref="FreeMapParams.StormHp"/>)。</summary>
-        public int StormWaitHp => InStorm(Me) ? FreeMapParams.StormHp : 0;
+        public int StormWaitHp => InStorm(Me) ? FreeMapParams.StormHpAt(Floor) : 0;
 
         // ── 航行アイテムの係数 (2026-11-11・nav-items.md) ──
         /// <summary>いま掛かっている係数。 本体が操作のたびに <see cref="SetPerks"/> で差し替える (層の途中で品を得た時も効くように)。</summary>
@@ -744,7 +746,7 @@ namespace MapSystem.FreeMove
 
         /// <summary>点 j へ 1 歩動いた時の HP の損 (雹の前線の内側)。 近道の残りがある間の 1 歩は 0 (2026-11-13・作者の決定「ただで動いた時は払わない」)。</summary>
         /// <remarks>嵐の層 (2026-11-13) では嵐の HP (<see cref="StormHpFor"/>) ── 近道の残りがある間も払う。</remarks>
-        public int HpLossFor(int j) => StormMode ? StormHpFor(j) : FreeMovesLeft > 0 ? 0 : WeatherAt(j, WeatherKind.Hail) ? 1 : 0;
+        public int HpLossFor(int j) => StormMode ? StormHpFor(j) : FreeMovesLeft > 0 ? 0 : WeatherAt(j, WeatherKind.Hail) ? Math.Max(0, 1 - Perks.hailHpCut) : 0;
 
         /// <summary>追跡者がいま捕捉に使う歩数 (性質と照明で変わる)。 表示 (気配の輪) もこれを読む。</summary>
         public int DetectHops

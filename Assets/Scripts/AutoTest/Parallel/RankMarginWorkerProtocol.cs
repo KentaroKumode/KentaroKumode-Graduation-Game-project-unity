@@ -487,7 +487,7 @@ namespace AutoTest.ParallelSweep
                 //   監視リストに無い項目は<b>食い違っても画面に出ない</b> ──
                 //   運ぶ可能性のあるフィールドは全部ここに並べること。
                 "useIttBeta", "lockWeaponFamily", "metaBuildAxis", "sweepAllMetaAxes",
-                "challengeSpec", "metaRankSpec",
+                "challengeSpec", "metaRankSpec", "MetaLoadoutApplied",
                 "robberySurcharge", "robberyFinalShopOnly", "robberyProvisionCost", "bossTraceFloor",
                 // 〈門〉の 3 工程 (2026-09-14)。 アームごとに切り替えるので**必ず印字する**
                 //   ── 送ったつもりの値ではなく、 入っていた値を読む。
@@ -544,7 +544,7 @@ namespace AutoTest.ParallelSweep
                 "relicLoadoutSpec", "relicStatOff", "RelicStatOffMaskApplied", "relicSetBonusOff", "RelicSetBonusOffMaskApplied",
                 "enemyArmorPenSpec", "EnemyArmorPenOverrideApplied",
                 "challengeCardPickByAxis",
-                "terminalsLeaveDeck", "randomGrantTerminals", "armorDefPerRank", "armorFlatEvery",
+                "terminalsLeaveDeck", "randomGrantTerminals",
                 // 2026-11-12 (#102 第 2 弾): 端子の調整を元の値へ戻す腕 (0 / False = 今の値)
                 "terminalHealMul", "terminalArresterNeed", "terminalFirstAidLeavesRunDeck",
                 // 2026-11-13 (#117): 端子の撃破のボーナスを旧い条件 (攻撃したターンの主攻撃までの撃破だけ) へ戻す腕 (False = 今の作り)

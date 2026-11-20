@@ -47,7 +47,7 @@ namespace AutoTest
             // [2026-11-12] 端子の ITT: プールは基本以外の端子だけ (品は配らない)。
             if (randomGrantTerminals)
             {
-                foreach (var d in CombatSystem.TerminalCards.All) if (d != null && !d.basic) pool.Add(d.id);
+                foreach (var d in CombatSystem.TerminalCards.All) if (d != null && !d.basic && !d.upgraded) pool.Add(d.id);      // 強化した端子は休憩でだけ得る
                 all = new List<ItemSystem.CompleteItemData>();   // 下の品の列挙を飛ばす
             }
             foreach (var it in all)
@@ -118,7 +118,7 @@ namespace AutoTest
         /// たまたま 0 だったということ ── 割り当ては割り当てなので ITT は偏らない。
         /// ここで配り直すと処置確率が状態に依存してランダム化が壊れる。</para></summary>
         /// <summary>[診断] 軸の品を開幕にまとめて配る (2026-11-07・<see cref="axisPackageAxis"/>)。
-        /// 軸名 (会心/出血/毒/臨界/充電/シールド) ならその軸の品から、 "*" なら軸を問わず (金・軸なしを除く) <see cref="axisPackageCount"/> 品。
+        /// 軸名 (会心/出血/毒/臨界/充電/シールド/山札/役) ならその軸の品から、 "*" なら軸を問わず (金・軸なしを除く) <see cref="axisPackageCount"/> 品。
         /// <b>GameRng を使わない</b> ── ラン番号だけで決まる乱数なので、 配る腕と配らない腕が同じシードで並ぶ。</summary>
         private void GrantAxisPackage(int runIndex, GameLoop.RunState run)
         {

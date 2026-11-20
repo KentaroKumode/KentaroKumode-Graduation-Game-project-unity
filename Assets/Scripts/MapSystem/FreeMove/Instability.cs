@@ -171,13 +171,13 @@ namespace MapSystem.FreeMove
             FreeMapParams.InstabilityPhase4At - FreeMapParams.InstabilityPhase3At);
 
         /// <summary>累計 → 嵐の時計 (崩れ始めてからのポイント・負 = 崩れ始めるまでの残り)。</summary>
-        public static int TimeOf(int points) => points - FreeMapParams.InstabilityPhase1At;
+        public static int TimeOf(int points, int depth) => points - FreeMapParams.InstabilityPhase1AtOf(depth);
 
         /// <summary>累計 → 段 (0 = 静か / 1〜4)。</summary>
-        public static int PhaseOf(int points) => Storm.PhaseOf(TimeOf(points), Schedule);
+        public static int PhaseOf(int points, int depth) => Storm.PhaseOf(TimeOf(points, depth), Schedule);
 
         /// <summary>崩れ始めたか (累計が最初の境目以上)。 ここから先は歩くだけでも溜まる。</summary>
-        public static bool Collapsing(int points) => points >= FreeMapParams.InstabilityPhase1At;
+        public static bool Collapsing(int points, int depth) => points >= FreeMapParams.InstabilityPhase1AtOf(depth);
 
         /// <summary>着いた点の種別で溜まるポイントの見積もり (地図の見積もり用)。 <paramref name="atLeast"/> = それより多くなり得る
         /// (戦闘のエスカレーション・報酬の秘宝・イベントの選び方)。 店・休憩・始点・ボス・交換 は 0。</summary>

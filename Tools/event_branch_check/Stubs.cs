@@ -118,6 +118,14 @@ namespace GameLoop
         public static bool SuppressEvents;
         public static bool CanTradePassive(RunState run) => TradeOk;
         public static int WeaponUpgradeCost(RunState run) => ForgeCost;
+        /// <summary>検算が場面ごとに決める: 装備中の武器の家系・軸の秘宝の数 (イベントの条件「武器[家系]」「偏重[軸,N]」・2026-11-20)。</summary>
+        public static string WeaponFamily;
+        public static System.Collections.Generic.Dictionary<string, int> AxisCounts = new System.Collections.Generic.Dictionary<string, int>();
+        public static string WeaponFamilyOf(RunState run) => WeaponFamily;
+        public static int AxisCountOf(RunState run, string axis) => axis != null && AxisCounts.TryGetValue(axis, out int n) ? n : 0;
+        /// <summary>検算が場面ごとに決める: 山札から端子を抜けるか (イベントの「山札から端子を抜く」・2026-11-21)。</summary>
+        public static bool RemoveOk = true;
+        public static bool CanRemoveTerminalOf(RunState run) => RemoveOk;
     }
 
 }

@@ -621,7 +621,7 @@ namespace ItemSystem.PassiveSkills
             context.critRatePctAdd += dsBuffCrit;
             if (dsBuffCrit > 0f) CombatSystem.DmgSourceDiag.Note("会心率バフ(月蝕/レイピア)", CombatSystem.DmgSourceDiag.CritRate, dsBuffCrit);
 
-            if (context.critSuppressed && !context.critBecomesArmorBreak)
+            if (context.critSuppressed && !context.critToDamage)
             {
                 context.isCritical = false;   // 無心の刃など: 会心そのものを封印
             }
@@ -645,20 +645,20 @@ namespace ItemSystem.PassiveSkills
                 context.isCritical = critRate > 0f && GameLoop.GameRng.Value("PassiveSkillManager.2") < critRate;
                 context.lastCritAddPct = critAdd;
 
-                // 〈銑鉄棍〉: 会心は出ない。 会心になるはずだった攻撃は敵の防御を無視し、 敵の防御を 1 下げる。
-                if (context.critBecomesArmorBreak && context.isCritical)
+                // 〈銑鉄棍〉【規則】(2026-11-20): 会心は出ない。 代わりに会心率 1% につき与ダメージ +1% (100% を上限に数える・与ダメ % の池へ足す。
+                //   池は撃ごとに戻すので同じ % が重ならない)。 旧: 会心になるはずだった攻撃は敵の防御を無視し、 敵の防御を 1 下げる
+                if (context.critToDamage)
                 {
                     context.isCritical = false;
-                    context.suppressedCritProc = true;
-                    context.enemyDefense = System.Math.Max(0, context.enemyDefense - 1);
-                    Debug.Log($"[銑鉄棍] 会心の代わりに防御を砕く (敵の防御 → {context.enemyDefense})");
+                    float add = System.Math.Min(1f, critAdd);
+                    if (add > 0f) context.AddOutgoingPct(add);
                 }
             }
             }   // ← if (attackerIsEnemy) の else 閉じ
 
-            // 末那識など: 会心強制（乱数・会心率capを無視して確定）
-            // **敵の攻撃には効かせない** ── forceCritical もプレイヤー側のフラグ。
-            if (context.forceCritical && !attackerIsEnemy) context.isCritical = true;
+            // 末那識など: 会心強制（乱数・会心率capを無視して確定）。 forceCritThisHit はこの 1 撃だけ (〈抜き打ちの作法〉など)。
+            // **敵の攻撃には効かせない** ── forceCritical もプレイヤー側のフラグ。 〈銑鉄棍〉の【規則】(会心が出なくなる) は強制の会心も止める。
+            if ((context.forceCritical || context.forceCritThisHit) && !attackerIsEnemy && !context.critToDamage) context.isCritical = true;
 
             if (context.isCritical && totalDamage > 0)
             {
@@ -672,13 +672,6 @@ namespace ItemSystem.PassiveSkills
                 float effCritMul = context.criticalMultiplier;
                 if (!attackerIsEnemy && context.enemyCritMultReduction > 0f)
                     effCritMul = UnityEngine.Mathf.Max(1f, effCritMul - context.enemyCritMultReduction);
-                // 〈寸鉄〉: 会心率の 100% を超えた分が倍率になる (超えた 10% につき +0.1)。
-                if (!attackerIsEnemy && context.critOverflowToMultiplier && context.lastCritAddPct > 1f)
-                    effCritMul += context.lastCritAddPct - 1f;   // lastCritAddPct は小数 (1.0 = 100%)
-                // 〈心眼〉の②: 会心率が 100% を超えた分の確率で、 会心がもう一度重なる (倍率 +1.0・2026-11-07)。
-                if (!attackerIsEnemy && context.critOverflowStack && context.lastCritAddPct > 1f
-                    && GameLoop.GameRng.Value("PassiveSkillManager.critStack") < context.lastCritAddPct - 1f)
-                    effCritMul += 1f;
                 totalDamage = (int)(totalDamage * effCritMul);
                 if (!attackerIsEnemy) context.accumulatedValues[Keywords.Kw.LastCritMulKey] = effCritMul;   // 〈天眼の鍔〉が読む (2026-11-20)
                 // [診断] 会心倍率は 3.0 固定ではない (メタ精密 r10 の逓減還元・一点集中 等)。
@@ -708,6 +701,15 @@ namespace ItemSystem.PassiveSkills
                 //   相互攻撃モデルが既定になった 2026-07-27 に生まれたはず (両側が毎ターン攻撃するため)。
                 totalDamage = (int)(totalDamage * (1f + context.nonCritOutgoingMultiplier));
                 if (diag) CombatSystem.CombatStats.Stage(18, 1);
+            }
+            // 〈寸鉄〉【規則】(2026-11-20): 会心しなかった撃にも、 会心倍率の上乗せ分 × (会心率 ÷ 100) が乗る (会心率は 100% を上限に数える)。
+            //   上乗せ分は会心した時に掛かる倍率と同じく敵の会心耐性を引いた後 (下限 1.0)。 旧: 会心率の 100% を超えた分が会心の倍率になる
+            if (!context.isCritical && totalDamage > 0 && !attackerIsEnemy && context.critShareOnNonCrit && context.lastCritAddPct > 0f)
+            {
+                float mul = context.criticalMultiplier;
+                if (context.enemyCritMultReduction > 0f) mul = UnityEngine.Mathf.Max(1f, mul - context.enemyCritMultReduction);
+                float share = (mul - 1f) * System.Math.Min(1f, context.lastCritAddPct);
+                if (share > 0f) totalDamage = (int)(totalDamage * (1f + share));
             }
             // 〈一点読みの片眼〉の代価: 会心しなかった攻撃の与ダメ −30% (2026-11-07)。
             if (!context.isCritical && totalDamage > 0 && !attackerIsEnemy

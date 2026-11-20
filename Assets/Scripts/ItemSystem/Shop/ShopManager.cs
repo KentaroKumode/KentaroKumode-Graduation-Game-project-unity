@@ -124,6 +124,34 @@ namespace ItemSystem.Shop
         /// ── 同じ店に同じ品が 2 つ並んでいた (武器を 2 本買えた)。 棚を作り始める時と、 リロールの前に詰め直す。</summary>
         private readonly HashSet<string> _shelfIds = new HashSet<string>();
 
+        /// <summary>軸指定リロール (2026-11-20・item-overhaul-spec §2-3・数値は仮): 通常のリロールの値段に足す額 (回数は通常と共有)。</summary>
+        public const int AxisRerollSurcharge = 15;
+        /// <summary>軸指定リロールで、 指定した軸の秘宝 (items.json の axis)・端子 (TerminalDef.axis) の出現の重みに掛ける倍率 (仮)。</summary>
+        public const float AxisRerollWeightMul = 6f;
+        /// <summary>〈目利きの紹介状〉: 軸指定リロールの追加から引く額 (仮)。</summary>
+        public const int LetterAxisDiscount = 5;
+        /// <summary>軸指定リロールの追加 (〈目利きの紹介状〉を持っていれば −<see cref="LetterAxisDiscount"/>・整備パネルの〈軸引きの手形〉で −N・下限 0)。</summary>
+        public static int AxisRerollSurchargeFor(RunState run)
+            => System.Math.Max(0, AxisRerollSurcharge
+                - (run != null && run.OwnsPassive(GameLoop.ItemIds.MacroLetter) ? LetterAxisDiscount : 0)
+                - MetaProgression.MetaBuffApplicator.GetAxisRerollDiscount());
+        /// <summary>軸指定リロールの値段 (今のリロールの値段 + 追加)。 店が無ければ 0。</summary>
+        public int AxisRerollPrice => Current != null ? Current.CurrentRerollPrice + AxisRerollSurchargeFor(GameLoop.GameManager.Instance?.Run) : 0;
+        /// <summary>〈目利きの紹介状〉: この店の最初の通常リロールが無料か。</summary>
+        private bool LetterFreeReroll(RunState run)
+            => Current != null && !Current.freeRerollUsed && run != null && run.OwnsPassive(GameLoop.ItemIds.MacroLetter);
+        /// <summary>通常のリロールで払う額 (画面の表示用・〈目利きの紹介状〉の無料なら 0)。 BOT の「まだ回せる」の判定は 0 にならない <see cref="ShopInventory.CurrentRerollPrice"/> を読む。</summary>
+        public int RerollPrice => Current == null ? 0 : LetterFreeReroll(GameLoop.GameManager.Instance?.Run) ? 0 : Current.CurrentRerollPrice;
+
+        /// <summary>〈黄金の通行手形〉: 使ったゴールド 100G ごとに、 次の店 1 軒の秘宝の棚が 1 段上のレア度で並ぶ (仮)。</summary>
+        public const int PassSpendStep = 100;
+        /// <summary>この店の秘宝の棚を 1 段上のレア度で並べるか (入店で決める・リロールにも効く)。</summary>
+        private bool _passRarityUp;
+        /// <summary>入店した時の run.coinsSpent (店を出る時に、 この店で使った額を出す)。</summary>
+        private int _spentAtOpen;
+        /// <summary>いま振り直している秘宝の枠の指定の軸 (null = 指定なし)。 TryReroll の間だけ立つ。</summary>
+        private string _focusAxis;
+
         /// <summary>ショップマス入店時に在庫を生成。</summary>
         // ================================================================
         //  自由移動のマップの補給 (2026-09-28・docs/GAME.md §16-1)
@@ -252,6 +280,15 @@ namespace ItemSystem.Shop
                 Debug.Log($"[ShopManager] イベントの値引き: 全価格 ×{rsCons.nextShopPriceMul:F2}");
                 rsCons.nextShopPriceMul = 1f;
             }
+            // 〈黄金の通行手形〉: 前の店までに使った 100G ごとに 1 軒、 秘宝の棚が 1 段上のレア度で並ぶ
+            _passRarityUp = false;
+            _spentAtOpen = rsCons != null ? rsCons.coinsSpent : 0;
+            if (rsCons != null && rsCons.passShopsUp > 0)
+            {
+                rsCons.passShopsUp--;
+                _passRarityUp = true;
+                Debug.Log($"[ShopManager] {GameLoop.ItemIds.MacroPass}: 秘宝の棚が 1 段上のレア度 (残り {rsCons.passShopsUp} 軒)");
+            }
             _apprMinRarity = null;
             if (rsCons != null && rsCons.nextLootMinRarity >= 0)
             {
@@ -271,32 +308,16 @@ namespace ItemSystem.Shop
             for (int i = 0; i < 5; i++)
                 inv.slots.Add(BuildSlot(ShopSlotKind.Passive, inv.priceMultiplier));
 
-            // 消費 ×3 ── **回復は固定、 残り 2 枠はシールドと攻撃強化** (2026-08-05・2026-10-31 に物資回復の系統を廃止)。
-            //   回復が並ばない店があると消費で耐久を賄う設計が成立しないので 1 枠目は固定。
-            //   Tier は T1〜4 から一様。 物資は棚ではなく「物資の包」で買う。
+            // 消費 ×3 (2026-11-20・item-overhaul-spec §2-4): 枠 0 = 回復 (固定) / 枠 1 = シールドか攻撃強化から 1 系統を抽選 / 枠 2 = 戦術消耗品から 1 種。
+            //   回復が並ばない店があると消費で耐久を賄う設計が成立しないので 1 枠目は固定。 Tier は T1〜4 から一様。 物資は棚ではなく「物資の包」で買う。
+            //   旧 (2026-08-05〜11-20): 枠 1・2 にシールドと攻撃強化を両方並べた。
             {
                 int tier0 = GameLoop.GameRng.Range(1, GameLoop.ItemIds.ConsumableMaxTier + 1, "shop.consTier");
                 inv.slots.Add(BuildConsumableSlot(
                     GameLoop.ItemIds.ConsId(GameLoop.ItemIds.ConsumableFixedFamily, tier0), inv.priceMultiplier));
-
-                // Fisher-Yates で 3 系統を並べ替え、 先頭 2 つを採用 (重複なし)。
-                var pool = (string[])GameLoop.ItemIds.ConsumableRandomFamilies.Clone();
-                for (int i = pool.Length - 1; i > 0; i--)
-                {
-                    int j = GameLoop.GameRng.Range(0, i + 1, "shop.consFamily");
-                    var tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
-                }
-                for (int i = 0; i < 2 && i < pool.Length; i++)
-                {
-                    int tier = GameLoop.GameRng.Range(1, GameLoop.ItemIds.ConsumableMaxTier + 1, "shop.consTier");
-                    string consId = GameLoop.ItemIds.ConsId(pool[i], tier);
-                    // 古い手紙 (2026-10-31): シールド枠で LEGENDARY を引いたとき、 OldLetterShopChance で〈惜別の護符〉と入れ替わる。
-                    //   系統を持たない単品なので、 抽選に入る道はここだけ。 乱数は専用キー (他の抽選の並びを動かさない)。
-                    if (pool[i] == GameLoop.ItemIds.ConsShieldFamily && tier == GameLoop.ItemIds.ConsumableMaxTier
-                        && GameLoop.GameRng.Range(0, 100, "shop.oldLetter") < OldLetterShopChancePct)
-                        consId = GameLoop.ItemIds.OldLetter;
-                    inv.slots.Add(BuildConsumableSlot(consId, inv.priceMultiplier));
-                }
+                inv.slots.Add(BuildConsumableSlot(RollGuardOrPowerId(), inv.priceMultiplier));
+                string tactic = RollTacticId();
+                if (tactic != null) inv.slots.Add(BuildConsumableSlot(tactic, inv.priceMultiplier));
             }
 
             // 武器 ×1 (2026-09-03: 2 → 1)
@@ -452,6 +473,36 @@ namespace ItemSystem.Shop
             return Mathf.CeilToInt(basePrice * ItemPriceScale * RarityPriceMul(item.rarity) * prog) + ItemPriceAdd;
         }
 
+        /// <summary>消費の枠 1: シールドか攻撃強化 (<see cref="GameLoop.ItemIds.ConsumableRandomFamilies"/>) から 1 系統 ("shop.consFamily")、 Tier は一様 ("shop.consTier")。
+        /// 古い手紙 (2026-10-31): シールドで LEGENDARY を引いたとき、 OldLetterShopChance で〈惜別の護符〉と入れ替わる
+        /// (系統を持たない単品なので、 抽選に入る道はここだけ・乱数は専用キー "shop.oldLetter")。</summary>
+        private static string RollGuardOrPowerId()
+        {
+            var fams = GameLoop.ItemIds.ConsumableRandomFamilies;
+            string fam = fams[GameLoop.GameRng.Range(0, fams.Length, "shop.consFamily")];
+            int tier = GameLoop.GameRng.Range(1, GameLoop.ItemIds.ConsumableMaxTier + 1, "shop.consTier");
+            string consId = GameLoop.ItemIds.ConsId(fam, tier);
+            if (fam == GameLoop.ItemIds.ConsShieldFamily && tier == GameLoop.ItemIds.ConsumableMaxTier
+                && GameLoop.GameRng.Range(0, 100, "shop.oldLetter") < OldLetterShopChancePct)
+                consId = GameLoop.ItemIds.OldLetter;
+            return consId;
+        }
+
+        /// <summary>消費の枠 2: 戦術消耗品から 1 種 (2026-11-20・乱数キー "shop.consTactic")。 1 品の重み = レア度の重み (<see cref="TierOfferWeight"/>) ÷ そのレア度の品の数
+        /// (レア度の出方は秘宝の枠と同じ 45 / 32 / 18 / 5%)。 戦術消耗品が無ければ null (枠を並べない)。</summary>
+        private static string RollTacticId()
+        {
+            var pool = GameLoop.Consumables.TacticPool();
+            if (pool.Count == 0) return null;
+            var n = new Dictionary<ItemRarity, int>();
+            foreach (var it in pool) { n.TryGetValue(it.rarity, out int c); n[it.rarity] = c + 1; }
+            float total = 0f; var w = new float[pool.Count];
+            for (int i = 0; i < pool.Count; i++) { w[i] = TierOfferWeight(pool[i].rarity) / n[pool[i].rarity]; total += w[i]; }
+            float r = GameLoop.GameRng.Value("shop.consTactic") * total;
+            for (int i = 0; i < pool.Count; i++) { r -= w[i]; if (r <= 0f) return pool[i].id; }
+            return pool[pool.Count - 1].id;
+        }
+
         /// <summary>消費枠を id 直指定で組む (2026-08-04)。 系統ごとに 1 枠を保証するため、
         /// レア重み抽選 (PickItemByKind) を通さず、 呼び出し側が決めた id をそのまま並べる。
         /// 価格は items.json の basePrice を採用 ── Tier に比例 (5/12/25/45G)。</summary>
@@ -461,11 +512,16 @@ namespace ItemSystem.Shop
             int basePrice = 10;
             if (item?.buyPrice != null && item.buyPrice.max >= item.buyPrice.min)
                 basePrice = GameLoop.GameRng.Range(item.buyPrice.min, item.buyPrice.max + 1, "shop.price");
+            int price = Mathf.CeilToInt(basePrice * ItemPriceScale * (item != null ? RarityPriceMul(item.rarity) : 1f) * priceMultiplier) + ItemPriceAdd;
+            // 〈行商人の見本箱〉(2026-11-20): 戦術消耗品の値段 −50% (切り上げ・下限 1G)
+            if (item != null && item.consFamily == GameLoop.ItemIds.ConsTacticFamily
+                && ItemSystem.PassiveSkills.AxisRules.Owns(GameLoop.GameManager.Instance?.Run, GameLoop.ItemIds.LinkSampleBox))
+                price = Mathf.Max(1, Mathf.CeilToInt(price * ItemSystem.PassiveSkills.Effects.SampleBox.PriceMul));
             return new ShopSlot
             {
                 kind = ShopSlotKind.Consumable,
                 itemId = item != null ? id : null,
-                price = Mathf.CeilToInt(basePrice * ItemPriceScale * (item != null ? RarityPriceMul(item.rarity) : 1f) * priceMultiplier) + ItemPriceAdd,
+                price = price,
                 sold = false,
             };
         }
@@ -563,7 +619,27 @@ namespace ItemSystem.Shop
                 for (int i = 0; i < weights.Length; i++)
                     if (weights[i].rarity == ItemRarity.LEGENDARY) weights[i].weight *= legMul;
             }
+            // 軸指定リロール: 指定の軸の品 1 つの重みを ×AxisRerollWeightMul にする。 1 品の重み = レア度の重み ÷ そのレア度の品の数 なので、
+            //   レア度の重みを (品の数 + (倍率 − 1) × 軸の品の数) ÷ 品の数 倍にしてから引き、 同じレア度の中でも軸の品を倍率で引く (PickWithSparkBias)。
+            //   乱数の引き方 (shop.rarity → shop.pickWeighted) は通常と同じ
+            if (kind == ShopSlotKind.Passive && _focusAxis != null)
+            {
+                weights = ((ItemRarity, float)[])weights.Clone();
+                for (int i = 0; i < weights.Length; i++)
+                {
+                    var r = weights[i].rarity;
+                    int nAll = 0, nAxis = 0;
+                    foreach (var it in pool) if (it.rarity == r) { nAll++; if (it.axis == _focusAxis) nAxis++; }
+                    if (nAll > 0) weights[i].weight *= (nAll + (AxisRerollWeightMul - 1f) * nAxis) / nAll;
+                }
+            }
             ItemRarity targetRarity = RollTier(pool, weights);
+            // 〈黄金の通行手形〉: 引いたレア度の 1 段上 (LEGENDARY は据え置き・その段の品が棚に出せなければ引いた段のまま)。 乱数は引き足さない
+            if (kind == ShopSlotKind.Passive && _passRarityUp && targetRarity < ItemRarity.LEGENDARY)
+            {
+                var up = targetRarity + 1;
+                if (pool.Exists(it => it.rarity == up)) targetRarity = up;
+            }
             var byTier = pool.FindAll(it => it.rarity == targetRarity);
 
             // サーベル・ワルツ([剣の舞]): 所持(昇華含む)時、 <b>LEGENDARY 帯に限って</b>
@@ -628,6 +704,7 @@ namespace ItemSystem.Shop
                 float w = string.IsNullOrEmpty(kw)
                     ? 1.0f
                     : MetaProgression.MetaBuffApplicator.GetSparkAppearanceWeightMul(kw);
+                if (_focusAxis != null && list[i].axis == _focusAxis) w *= AxisRerollWeightMul;   // 軸指定リロール
                 weights[i] = w;
                 total += w;
             }
@@ -774,14 +851,19 @@ namespace ItemSystem.Shop
         /// <summary>
         /// 強化素材スロットを除く未売却枠を全部振り直す。
         /// コストは ShopInventory.CurrentRerollPrice。売却済み枠はそのまま（戻らない）。
+        /// <para><paramref name="focusAxis"/> (軸指定リロール・2026-11-20): <see cref="ItemSystem.PassiveSkills.AxisRules.ShopFocus"/> の軸。
+        /// 値段は <see cref="AxisRerollPrice"/> (回数は通常と共有)。 秘宝の枠の抽選で、 その軸の品の重みを <see cref="AxisRerollWeightMul"/> 倍にする
+        /// (レア度の重み・〈呪物の賽〉の LEGENDARY ×3 に掛ける)。 端子の棚の振り直しは呼び手 (GameManager.ShopReroll)。 null = 通常のリロール (乱数の引き方も今までと同じ)。</para>
         /// </summary>
-        public bool TryReroll(RunState run)
+        public bool TryReroll(RunState run, string focusAxis = null)
         {
             if (Current == null || run == null) { RerollFailNoShop++; return false; }
             // A/B: 1 店あたりの上限。 既定 -1 は無制限なのでここは素通りする。
             if (RerollHardCap >= 0 && Current.rerollCount >= RerollHardCap)
             { RerollFailCapped++; return false; }
-            int price = Current.CurrentRerollPrice;
+            if (focusAxis != null && System.Array.IndexOf(ItemSystem.PassiveSkills.AxisRules.ShopFocus, focusAxis) < 0) focusAxis = null;   // 知らない軸は指定なし
+            bool letterFree = focusAxis == null && LetterFreeReroll(run);   // 〈目利きの紹介状〉: 店の最初の通常リロールは無料
+            int price = focusAxis != null ? AxisRerollPrice : letterFree ? 0 : Current.CurrentRerollPrice;
 
             // 〈合札〉の初回リロール無料は 2026-10-31 に「2 品目以降 10G 引き」へ作り替えた (TryBuy)。
             if (run.coins < price) { RerollFailNoGold++; Log($"リロール: ゴールド不足 ({price}G 必要)"); return false; }
@@ -790,6 +872,13 @@ namespace ItemSystem.Shop
             run.coinsSpent += price;
             MetaProgression.Achievements.AchievementService.NoteShopReroll();
             GameLoop.RunChronicle.Reroll(run, price);
+            if (letterFree) { Current.freeRerollUsed = true; Log($"〈{GameLoop.ItemIds.MacroLetter}〉: 最初のリロールは無料"); }
+            // 〈相場師の算盤〉: 店に入って最初のリロール (軸指定も) をした時だけ、 以後の戦闘開始時の充電 +3・臨界 +5 が 1 回分積もる (店の数で止まる)
+            if (Current.rerollCount == 0 && run.OwnsPassive(GameLoop.ItemIds.MacroAbacus))
+            {
+                run.abacusStacks++;
+                Log($"〈{GameLoop.ItemIds.MacroAbacus}〉: {run.abacusStacks} 回分");
+            }
             Current.rerollCount++;
 
             // 振り直さない枠 (売却済み) の品は棚に残る。 振り直す枠の品は棚から外す (同じ品が引き直されてよい)。
@@ -798,6 +887,8 @@ namespace ItemSystem.Shop
                 if (s != null && s.sold && !string.IsNullOrEmpty(s.itemId)) _shelfIds.Add(s.itemId);
 
             int rerolled = 0;
+            _focusAxis = focusAxis;
+            try {
             for (int i = 0; i < Current.slots.Count; i++)
             {
                 var s = Current.slots[i];
@@ -807,16 +898,17 @@ namespace ItemSystem.Shop
                 ShopSlot fresh;
                 switch (s.kind)
                 {
-                    // 消費は系統ごとに 1 枠 (回復固定 + 残り 2 系統) の並びを保つ。 振り直すのは Tier だけ。
+                    // 消費は 3 枠の形 (回復 / シールドか攻撃強化 / 戦術消耗品・2026-11-20) を保つ。
+                    //   回復は Tier だけ・枠 1 は系統から引き直す・枠 2 は戦術消耗品から引き直す (Generate と同じ関数)。
                     //   以前は全消費アイテムから引き直しており、 回復が消えたり同じ系統が 2 枠並んだりした。
                     case ShopSlotKind.Consumable:
                     {
                         string fam = GameLoop.ItemIds.ConsFamilyOf(s.itemId) ?? GameLoop.ItemIds.ConsShieldFamily;   // 惜別の護符はシールド枠の差し替え
-                        int tier = GameLoop.GameRng.Range(1, GameLoop.ItemIds.ConsumableMaxTier + 1, "shop.consTier");
-                        string consId = GameLoop.ItemIds.ConsId(fam, tier);
-                        if (fam == GameLoop.ItemIds.ConsShieldFamily && tier == GameLoop.ItemIds.ConsumableMaxTier
-                            && GameLoop.GameRng.Range(0, 100, "shop.oldLetter") < OldLetterShopChancePct)
-                            consId = GameLoop.ItemIds.OldLetter;
+                        string consId;
+                        if (fam == GameLoop.ItemIds.ConsTacticFamily) consId = RollTacticId();
+                        else if (fam == GameLoop.ItemIds.ConsumableFixedFamily)
+                            consId = GameLoop.ItemIds.ConsId(fam, GameLoop.GameRng.Range(1, GameLoop.ItemIds.ConsumableMaxTier + 1, "shop.consTier"));
+                        else consId = RollGuardOrPowerId();
                         fresh = consId != null ? BuildConsumableSlot(consId, Current.priceMultiplier) : s;
                         break;
                     }
@@ -827,6 +919,7 @@ namespace ItemSystem.Shop
                 Current.slots[i] = fresh;
                 rerolled++;
             }
+            } finally { _focusAxis = null; }
 
             // **リロールは特売を消していた** (2026-09-17 発見)。 ApplySaleDiscounts は棚生成時に
             //   1 回だけ呼ばれ、 TryReroll は BuildSlot で作り直すだけなので割引が失われる。
@@ -835,7 +928,7 @@ namespace ItemSystem.Shop
             //   **塩を変える** ── 同じ塩だと毎回同じ枠に同じ割引が出る。
             if (RerollKeepsSale) ApplySaleDiscounts(Current, Current.rerollCount * 64);
 
-            Debug.Log($"[ShopManager] リロール#{Current.rerollCount}: -{price}G / {rerolled}枠更新 / 次回{Current.CurrentRerollPrice}G");
+            Debug.Log($"[ShopManager] リロール#{Current.rerollCount}{(focusAxis != null ? " (軸: " + focusAxis + ")" : "")}: -{price}G / {rerolled}枠更新 / 次回{Current.CurrentRerollPrice}G");
             OnShopUpdated?.Invoke();
             return true;
         }
@@ -1032,6 +1125,16 @@ namespace ItemSystem.Shop
 
         public void Close()
         {
+            // 〈黄金の通行手形〉: この店で使った額を足し、 100G ごとに次の店 1 軒 (持っている時に出た店だけ)
+            var run = GameLoop.GameManager.Instance?.Run;
+            if (Current != null && run != null && run.OwnsPassive(GameLoop.ItemIds.MacroPass))
+            {
+                run.passShopSpent += System.Math.Max(0, run.coinsSpent - _spentAtOpen);
+                int add = run.passShopSpent / PassSpendStep;
+                run.passShopSpent -= add * PassSpendStep;
+                run.passShopsUp += add;
+                if (add > 0) Log($"〈{GameLoop.ItemIds.MacroPass}〉: 次の店から {run.passShopsUp} 軒、 秘宝の棚が 1 段上");
+            }
             Current = null;
             OnShopClosed?.Invoke();
         }

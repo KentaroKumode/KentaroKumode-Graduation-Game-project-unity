@@ -230,7 +230,19 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 画面の側はこの欄を読んでいない (enemies.json の「予告に開示」はまだ表示されない)。</summary>
     public class RelicScholar : IPassiveSkillEffect
     {
-        public string SkillId => "RelicScholar";
+        public const string Id = "RelicScholar";
+        public string SkillId => Id;
+
+        /// <summary>ダウンのターンの頭 (2026-11-20・docs/system-overhaul-spec.md §3-1): ダウン中はこのパッシブが鳴らない (遺物を引かない・<see cref="CombatSystem.BossDownPassives"/>) ので、
+        /// 前のターンに引いた遺物の「このターン」の効果 (シールドの反射・引いた遺物の名前・肩代わりの数え) を消す (前の遺物がダウンのターンに残らないように)。
+        /// シールドの半減・〈大出血〉・持続の数えは止まる側 (触らない)。 呼ぶのは <c>CombatManager.BeginBossDownTurn</c> だけ。</summary>
+        public static void ClearForDownTurn(CombatContext ctx)
+        {
+            if (ctx == null) return;
+            ctx.vescaShieldAbsorbedThisTurn = 0;
+            ctx.vescaShieldReflectRate = 0f;
+            ctx.vescaDrawnRelics = new List<string>();
+        }
         // 2026-08-01: 〈大出血〉の tick を **OnTurnEnd** へ移した (旧: OnTurnStart)。
         //   ターン頭だとパリィ入力より前に解決してしまい、 そのターンの判定結果を適用できない。
         //   ターン末なら PERFECT の軽減と生存保証が効く ── 「読み切ったターンは血も止まる」。

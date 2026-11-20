@@ -141,8 +141,9 @@ namespace GameLoop
         /// 経緯: 通常戦を 1T → 3〜4T にして敵がターンを得るようになり、 1 ランの総被ダメが
         /// 約 3 倍 (~101) に増えたため 30 → 100 とした。 その後 2026-08-04 の消費アイテム再編で
         /// 回復/シールドが常にショップに並ぶようになり、 **耐久の一部を消費アイテム側へ移した**ので
-        /// 75 へ引き下げている ── 「回復を買うか強化を買うか」がショップの選択として立つようにするため。</summary>
-        public const int BaseStartingHP = 75;
+        /// 75 へ引き下げている ── 「回復を買うか強化を買うか」がショップの選択として立つようにするため。
+        /// <para>2026-11-20: 75 → 85 (整備パネル刷新・system-overhaul-spec §1-2 A の「開始の最大 HP +10」。 設計書は今の値を 30 と書いていたが、 コードは 75 だったので差の分だけ動かした)。</para></summary>
+        public const int BaseStartingHP = 85;
 
         [Header("デバッグ")]
         [SerializeField] private bool autoStartRun = false;
@@ -289,6 +290,8 @@ namespace GameLoop
             {
                 PendingStartingPassiveChoices.Clear();
                 PendingEventPassiveOffers.Clear();
+                PendingEventDiceOffers.Clear();
+                ClearEventTerminalPending();
                 int startPassives = MetaProgression.MetaBuffApplicator.GetStartingPassiveCount();
                 for (int sp = 0; sp < startPassives; sp++)
                 {
@@ -325,18 +328,15 @@ namespace GameLoop
                 }
             }
 
-            // 2026-07-25 v6: 種火 r3 (充電/臨界/毒/出血) - キーワード BRONZE を 1 本ずつ開幕所持
-            foreach (var kw in new[] { "charge", "rinkai", "poison", "bleed", "shield" })
+            // 整備パネル〈戦術の懐刀〉(補助の枠・2026-11-20): ランダムな戦術消耗品を 1 個 (1 品の重みは同じ・乱数は専用のキーなので他の抽選は変わらない)。
+            //   (旧: 種火 r3 の開幕の品 2 つは、 種火が枠のモジュールになった時に外した・docs/GAME.md §15-1)
+            if (MetaProgression.MetaBuffApplicator.HasTacticKnife())
             {
-                if (!MetaProgression.MetaBuffApplicator.IsSparkStartingItemUnlocked(kw)) continue;
-                for (int k = 0; k < MetaProgression.MetaPanel.SparkStartingItemCount; k++)
+                var tactics = Consumables.TacticPool();
+                if (tactics.Count > 0)
                 {
-                    string id = MetaProgression.SparkStarterPicker.PickStarterFor(kw, Run);
-                    if (string.IsNullOrEmpty(id)) break;
-                    if (Run.ownedPassiveItems == null)
-                        Run.ownedPassiveItems = new System.Collections.Generic.List<string>();
-                    ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, id);
-                    Log($"メタ報酬: 種火 [{kw}] 開幕の秘宝「{id}」を獲得 ({k + 1}/{MetaProgression.MetaPanel.SparkStartingItemCount})");
+                    string tid = tactics[GameRng.Range(0, tactics.Count, "meta.tacticKnife")].id;
+                    if (Run.TryAddConsumable(tid)) Log($"メタ報酬:〈戦術の懐刀〉戦術消耗品「{tid}」を獲得");
                 }
             }
 

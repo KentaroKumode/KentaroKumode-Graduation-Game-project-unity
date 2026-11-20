@@ -608,7 +608,7 @@ namespace AutoTest.EditorTools
             sb.AppendLine("=== 全軸 r9 / r10 (プロセス並列・Balanced 同梱) ===");
             sb.AppendLine($"日時    : {DateTime.Now:yyyy-MM-dd HH:mm:ss} / {note} / 実時間 {minutes:F1} 分");
             sb.AppendLine($"build   : {_buildFingerprint}");
-            sb.AppendLine($"予算 {MetaProgression.MetaPanel.MaxPoints}pt / "
+            sb.AppendLine($"予算 {MetaAllocationPresets.LegacyMaxPoints}pt / "
                         + "各アーム = [焦点トラック r9 or r10] + [他の数値系 7 本を 2pt ずつ]");
             sb.AppendLine("判定基準: r10 は Balanced ±3pt");
 

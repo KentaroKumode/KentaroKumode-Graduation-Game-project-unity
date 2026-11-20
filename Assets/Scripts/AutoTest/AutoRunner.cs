@@ -181,7 +181,7 @@ namespace AutoTest
         /// pursuerLeavesTerritory = true で旧い作り (追跡者は縄張りの外まで追う)。 territoryTreasure = None で宝を置かない。
         /// 両方を旧い側 (True / None) にした腕は、 縄張りの作り直し (2026-11-12) より前と同じ動きになる。</summary>
         public bool pursuerLeavesTerritory = false;
-        public GameLoop.TerritoryTreasureKind territoryTreasure = GameLoop.TerritoryTreasureKind.Forge;
+        public GameLoop.TerritoryTreasureKind territoryTreasure = GameLoop.TerritoryTreasureKind.AxisRelic;   // 2026-11-20: 既定を軸の秘宝 3 択へ (旧 Forge / Chest は残す)
         /// <summary>[測定 2026-11-13] 縄張りを避ける道の保証。 本体の GameHooks.TerritoryKeepBypass へ流す (ラン終了で true へ)。
         /// true (既定) = どの層でも縄張りを踏まずに終点へ行ける道があるように縄張りを削る。 false = 削らない (2026-11-13 より前の作り・main と全件一致のはず)。
         /// 旧い作り (pursuerLeavesTerritory = true) では値によらず削らない。</summary>
@@ -365,7 +365,7 @@ namespace AutoTest
         private float _probeMainApplied = 1f, _probePassiveApplied = 1f;
         private static float ProbeMultClamp(float v) => float.IsNaN(v) || v < 0f ? 1f : v;
 
-        /// <summary>[2026-11-10] 軸に寄せる方策 (品は配らない)。 軸の名前 (毒/出血/臨界/充電/シールド/会心 = items.json の axis)。 空 = 無効。
+        /// <summary>[2026-11-10] 軸に寄せる方策 (品は配らない)。 軸の名前 (毒/出血/臨界/充電/シールド/会心/山札/役 = items.json の axis)。 空 = 無効。
         /// 店 (<see cref="PersonaBonus"/> を通る 3 か所)・戦闘後の 2 択・開幕の品の選択・挑戦カードで、 この軸の品を優先する。</summary>
         public string buyAxisFocus = "";
         /// <summary>軸に寄せる加点 (序列の段の数・店では × StepPerTier の準パワー)。 1 = 「同じ値段帯なら軸の品を先に取る」程度。</summary>
@@ -900,7 +900,7 @@ namespace AutoTest
                  + $"{(LearnedPriorityProvider.UsingFallback ? " **手書きの序列 (学習データなし)**" : "")} "
                  + $"/ 山札の先読み {(deckLookahead && EffectiveWiringSkill != WiringSkill.Naive ? "ON" : "OFF")} (deckLookahead={deckLookahead}) "
                  + $"/ 遺物 持ち込み {relicCount}個 計{relicPts}段 "
-                 + $"/ メタ 攻撃端子+{MetaProgression.MetaBuffApplicator.GetAttackTerminalPerDice()} "
+                 + $"/ メタ {MetaProgression.MetaBuffApplicator.Describe()} 攻撃端子+{MetaProgression.MetaBuffApplicator.GetAttackTerminalPerDice()} "
                  + $"/ 追跡者 縄張りの外へ{(pursuerLeavesTerritory ? "出る (旧い作り)" : "出ない")} "
                  + $"/ 縄張りを避ける道の保証 {(pursuerLeavesTerritory ? "効かない (旧い作り)" : territoryKeepBypass ? "あり (縄張りを削る)" : "なし (削らない・旧い作り)")} (territoryKeepBypass={territoryKeepBypass}) "
                  + $"/ 灰燼の王を倒した記録 {(ashKingBeatenEver ? "あり (深さ 6 の基地は再訪の版・手記を開いて深さ 7 へ)" : "なし (基地は〈徒労〉の 1 択・第 4 層のクリアで終わる)")} (ashKingBeatenEver={ashKingBeatenEver}) "
@@ -945,7 +945,8 @@ namespace AutoTest
                  + (NoAttackChoiceLine().Length > 0 ? System.Environment.NewLine + NoAttackChoiceLine() : "")
                  + (DownAimLine().Length > 0 ? System.Environment.NewLine + DownAimLine() : "")                 // [#141]
                  + (DownBreakDiagLine().Length > 0 ? System.Environment.NewLine + DownBreakDiagLine() : "")     // [診断 2026-11-14] 目盛りの割り時
-                 + (HandKeepPlanLine().Length > 0 ? System.Environment.NewLine + HandKeepPlanLine() : "");      // [#141]
+                 + (HandKeepPlanLine().Length > 0 ? System.Environment.NewLine + HandKeepPlanLine() : "")       // [#141]
+                 + (TacticUsesLine().Length > 0 ? System.Environment.NewLine + TacticUsesLine() : "");          // [2026-11-21] 戦術消耗品
         }
 
         /// <summary>次のボスに対する戦力ギャップ。 **天井 (Super) のときだけ効く** ──
@@ -1397,14 +1398,14 @@ namespace AutoTest
             return gaps;
         }
 
-        /// <summary><b>整備パネルの配分を直接指定する (2026-09-10)。</b> 空なら
-        /// <see cref="metaAllocation"/> のプリセット。 形式は <c>"Shell:6,Output:6,Guard:5"</c>。
-        /// 未記載の軸は 0 ＝ drop-one アブレーションが書ける。
-        /// 実効値は <c>[実効状態]</c> 行ではなくコンソールの
-        /// <c>[MetaAllocationPresets] spec:… を適用</c> で確認すること。</summary>
+        /// <summary><b>整備パネルの構成を直接指定する。</b> 空なら <see cref="metaAllocation"/> のプリセット。
+        /// 2026-11-20〜 今の構造の書き方: <c>"stage:none"</c> (未解禁) / <c>"stage:mid"</c> (途中・基礎 3・枠 2) / <c>"stage:full"</c> (完成・基礎 6・枠 3)、
+        /// 主方針を 1 つずつ: <c>"stage:full,main:Valor"</c>、 細かく: <c>"base:6,slots:3,main:LastStand,support:Compression,spark:bleed"</c>
+        /// (書き方の正本は <see cref="MetaAllocationPresets.ParseSpec"/>)。 旧い <c>"Shell:10,Output:3"</c> は今の構造へ読み替える (表は GAME.md §15-1)。
+        /// 解釈できない指定は、 並列は起動で止め、 逐次は赤いログを出して未解禁で走る。 実効値は <see cref="MetaLoadoutApplied"/> (並列の実効状態) と runs の metaRanks。</summary>
         public string metaRankSpec = "";
-        /// <summary>[測定専用] metaRankSpec が予算 (24 点) を超えても切り詰めずに当てる (2026-11-07・MetaAllocationPresets.AllowOverBudget)。</summary>
-        public bool metaAllowOverBudget = false;
+        /// <summary>今の整備パネルの構成 (並列の実効状態・<see cref="RankMarginWorkerConfig.DescribeEffective"/> が読む)。</summary>
+        public string MetaLoadoutApplied => MetaProgression.MetaBuffApplicator.Describe();
 
         [Header("整備パネル drop-one アブレーション (2026-09-10)")]
         /// <summary>Balanced から 1 軸ずつ抜いて限界寄与を測る。</summary>
@@ -1436,7 +1437,7 @@ namespace AutoTest
         public string rankMarginRanks = "9,10";
         /// <summary>1 アームあたりのラン数。 11 アーム 走るので総数はこの 11 倍。</summary>
         public int metaAblationRuns = 3000;
-        private Dictionary<MetaProgression.MetaPanelKind, int> _metaAblationSpec;
+        private MetaLoadout _metaAblationSpec;
         private string _metaAblationReport = "";
 
         [Header("ITT 優先度 (2026-09-09)")]
@@ -1524,10 +1525,6 @@ namespace AutoTest
         public int challengeCardDifficulty = 0;
         /// <summary>[測定] 物資の素の上限を差し替える。 0 = 差し替えない (2026-11-09・上限を振る測定の口)。</summary>
         public int provisionMaxOverride = 0;
-        /// <summary>[測定] 〈装甲〉の 1 段あたりの防御 / 開幕シールド。 負 = 差し替えない (2026-11-10)。</summary>
-        public int armorDefPerRank = -1, armorShieldPerRank = -1;
-        /// <summary>[測定] 〈装甲〉の被ダメージ軽減を何段ごとに −1 にするか (0 = 既定)。</summary>
-        public int armorFlatEvery = 0;
         /// <summary>[測定] 遺物の持ち込みを固定する (2026-11-10)。 "プリセット:セット" (例 "TheoreticalBest:Kessho")。 空 = 触らない (セーブ・スイープの遺物を使う)。</summary>
         public string relicLoadoutSpec = "";
         /// <summary>[測定] 挑戦カードを 1 枚ずつ測る: "層:カードの id" を ; で並べる (例 "1:D:狂暴化:1" / "3:B:Plunder.gold:3")。
@@ -1821,7 +1818,7 @@ namespace AutoTest
         /// このフラグで RunBatch 後段の分岐へ入る。</para></summary>
         [NonSerialized] public bool rankMarginWorkerMode;
         [NonSerialized] public string rankMarginWorkerLabel = "";
-        [NonSerialized] public Dictionary<MetaProgression.MetaPanelKind, int> rankMarginWorkerSpec;
+        [NonSerialized] public MetaLoadout rankMarginWorkerSpec;
         [NonSerialized] public int rankMarginWorkerRuns;
         [NonSerialized] public int rankMarginWorkerSeedStart = RankMarginSeedBase;
         /// <summary>バッチ (RunBatch) が全工程を終えた合図。 引数はログ出力先。

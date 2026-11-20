@@ -163,7 +163,7 @@ static class Program
 
     static int BranchCount(EventChoice c)
     {
-        foreach (var e in c.effects) if (e.type == EventEffectType.Probability && e.branches != null && e.branches.Count >= 2) return e.branches.Count;
+        foreach (var e in c.effects) if ((e.type == EventEffectType.Probability || e.type == EventEffectType.DieRoll) && e.branches != null && e.branches.Count >= 2) return e.branches.Count;
         return 0;
     }
 
@@ -174,13 +174,13 @@ static class Program
         var list = new List<string>();
         void Add(EventEffect e)
         {
-            if (e.type == EventEffectType.Probability)
+            if (e.type == EventEffectType.Probability || e.type == EventEffectType.DieRoll)
             {
-                list.Add("確率分岐: 50% 抽選");
+                list.Add(e.type == EventEffectType.DieRoll ? "〈長めの賽の名前〉を振った: 6（6 以上で成功）→ 成功" : "確率分岐: 50% 抽選");
                 if (e.branches != null && e.branches.Count > 0) foreach (var x in e.branches[Math.Max(0, Math.Min(branch, e.branches.Count - 1))]) Add(x);
                 return;
             }
-            if (e.type == EventEffectType.None) return;
+            if (e.type == EventEffectType.None || e.type == EventEffectType.Requirement) return;   // 条件は結果の行を出さない
             list.Add(e.type + ": 〈長めの品名の代表〉 (現在 999/999)");
         }
         foreach (var e in c.effects) Add(e);

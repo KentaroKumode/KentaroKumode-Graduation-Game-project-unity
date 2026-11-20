@@ -98,6 +98,7 @@ static class Program
                     string after = s.Substring(b + 1).Trim();
                     int n = prob.Matches(result).Count;
                     if (n < 2) n = 0; else probChoices++;
+                    if (n == 0 && result.Contains("賽ロール[")) { n = 2; probChoices++; }   // 賽ロール (2026-11-20): 成功・失敗の 2 つ (EventParser.CountBranches と同じ)
                     string f, p;
                     var x = EventBranchText.Split(after, n, out f, out p);
                     var y = EventBranchText.Split(digest, n, out f, out string q);
@@ -297,7 +298,7 @@ static class Program
                 {
                     if (e == null) continue;
                     if (EventEffectRoles.IsShownCost(e)) shown.Add(Spell(e));
-                    if (e.type == EventEffectType.Probability && e.branches != null)
+                    if ((e.type == EventEffectType.Probability || e.type == EventEffectType.DieRoll) && e.branches != null)
                         foreach (var br in e.branches) foreach (var c in br) if (c != null && c.costMark != 0) marksInBranch++;
                 }
                 string got = string.Join("|", shown);
@@ -319,7 +320,7 @@ static class Program
                         {
                             if (e == null) continue;
                             if (!prob && Spell(e) == t && !EventEffectRoles.IsShownCost(e)) found = true;
-                            if (prob && e.type == EventEffectType.Probability && e.branches != null)
+                            if (prob && (e.type == EventEffectType.Probability || e.type == EventEffectType.DieRoll) && e.branches != null)   // 賽ロール (2026-11-20) の成功・失敗も「確率:」で書く
                                 foreach (var br in e.branches) foreach (var c in br) if (c != null && Spell(c) == t) found = true;
                         }
                         if (found) hiddenOk++; else bad.Add($"〈{ev.name}〉「{ch.text}」 見せない「{h}」が見つからない (見せている・綴りが違う)");
@@ -334,7 +335,7 @@ static class Program
         // 伏せた支払いは足りなくても選べる (ある分だけ失う)・見せる支払いは選べない
         EventChoice Find(string ev, string ch) => all.Find(e => e.name == ev)?.choices.Find(c => c.text == ch);
         var broke = new GameLoop.RunState { coins = 999, provision = 0, weaponMaterials = 0 };
-        var hourglass = Find("凍結した時計塔", "砂時計を持ち帰る");          // 〔伏せる〕武器強化素材-2
+        var hourglass = Find("凍結した時計塔", "塔の奥を漁る");          // 〔伏せる〕武器強化素材-2
         var strip = Find("ボロボロの盗賊", "身ぐるみを剥がす");            // 物資-2 (既定で見せない)
         var food = Find("迷子の子供", "食料を分ける");                    // 〔見せる〕物資-3
         var fix = Find("凍結した時計塔", "時計を直そうとする");            // 武器強化素材-3 (既定で見せる)
@@ -1096,6 +1097,107 @@ static class Program
         Check(direct.Count == 0, "売値の幅を直接読む所が SellRange の外に無い" + (direct.Count > 0 ? " ── " + string.Join(" / ", direct) : ""));
     }
 
+    /// <summary>装備・偏重とつながる汎用の動詞 (2026-11-20・docs/system-overhaul-spec.md §2-2・item-overhaul-spec.md §12-3):
+    /// 賽ロール 4 件・確定の道 3 件の効果の並び・条件の判定 (武器の家系・偏重・物資)・条件を満たさない道は安全弁でも開かない・
+    /// 賽ロールの成功の確率 (面の割合)・新しい動詞の書式を読めるか。</summary>
+    static void NewVerbs(string dir)
+    {
+        var all = new List<EventDefinition>();
+        foreach (var f in Directory.GetFiles(dir, "*.txt")) all.AddRange(EventSystem.EventParser.ParseAll(File.ReadAllText(f)));
+        EventChoice Find(string ev, string ch) => all.Find(e => e.name == ev)?.choices.Find(c => c.text == ch);
+        string Fx(List<EventEffect> l) => string.Join(",", l.ConvertAll(e =>
+            e.type == EventEffectType.DieRoll ? $"DieRoll{e.amount}[{Fx(e.branches[0])}|{Fx(e.branches[1])}]"
+          : e.type == EventEffectType.Requirement ? $"Req[{e.param}:{e.arg}:{e.amount}]"
+          : e.type == EventEffectType.Probability ? $"Prob{e.branches.Count}"
+          : e.type + (string.IsNullOrEmpty(e.param) ? "" : "[" + e.param + "]") + (e.amount != 0 ? e.amount.ToString("+0;-0") : "")));
+        var want = new (string ev, string ch, string fx)[]
+        {
+            ("崩落した橋", "強引に渡る", "DieRoll4[MaterialDelta+1|HpDelta-12]"),
+            ("水底の鐘", "水底へ潜って取る", "TurnsPass+1,DieRoll4[GainPassiveItem|HpDelta-5,ProvisionDelta-1]"),
+            ("放棄された補給基地", "奥の倉庫をこじ開ける", "DieRoll4[GainPassiveItem|HpDelta-12,ProvisionDelta-2]"),
+            ("毒見の依頼", "受ける", "DieRoll5[GoldDelta+30|HpDelta-10,TimedDebuff[中毒]]"),
+            ("死人の宴", "毒に馴染んだ舌で平らげる", "Req[偏重:毒:3],ProvisionDelta+4"),
+            ("理不尽な落石", "盾で受け止める", "Req[武器:盾:0],MaterialDelta+1"),
+            ("埋蔵金の手がかり", "斧で土を割って掘る", "Req[武器:斧:0],TurnsPass+1,Prob3"),
+        };
+        int ok = 0; var bad = new List<string>();
+        foreach (var w in want)
+        {
+            var c = Find(w.ev, w.ch);
+            string got = c != null ? Fx(c.effects) : "(無い)";
+            if (got == w.fx) ok++; else bad.Add($"〈{w.ev}〉「{w.ch}」= {got} (期待 {w.fx})");
+        }
+        foreach (var l in bad) Console.WriteLine("    " + l);
+        Check(ok == want.Length, $"新しい動詞: 賽ロール 4 件・確定の道 3 件の効果が §12-3 のとおり ({ok}/{want.Length})");
+        // 元の選択肢は残す (確定の道は足すだけ)
+        Check(Find("死人の宴", "食べる") != null && Find("理不尽な落石", "全力で身を躱す") != null && Find("埋蔵金の手がかり", "足元の土を掘り返す") != null,
+              "新しい動詞: 確定の道を足したイベントは元の選択肢を残している");
+
+        // 条件の判定
+        var gm = new GameLoop.GameManager { Run = new GameLoop.RunState { provision = 5 } };
+        GameLoop.GameManager.Instance = gm;
+        var run = gm.Run;
+        var shield = Find("理不尽な落石", "盾で受け止める"); var axe = Find("埋蔵金の手がかり", "斧で土を割って掘る"); var feast = Find("死人の宴", "毒に馴染んだ舌で平らげる");
+        GameLoop.GameManager.WeaponFamily = null; GameLoop.GameManager.AxisCounts.Clear();
+        string r0 = shield?.UnavailableReason(run), r1 = feast?.UnavailableReason(run);
+        GameLoop.GameManager.WeaponFamily = GameLoop.ItemIds.FamilyShield; GameLoop.GameManager.AxisCounts["毒"] = 2;
+        bool s1 = shield != null && shield.IsAvailable(run), a1 = axe != null && axe.IsAvailable(run), f2 = feast != null && feast.IsAvailable(run);
+        GameLoop.GameManager.WeaponFamily = GameLoop.ItemIds.FamilyAxe; GameLoop.GameManager.AxisCounts["毒"] = 3;
+        bool s3 = shield != null && shield.IsAvailable(run), a3 = axe != null && axe.IsAvailable(run), f3 = feast != null && feast.IsAvailable(run);
+        Check(r0 == "盾の武器が要る" && r1 == "毒の秘宝が 3 つ要る（0）" && s1 && !a1 && !f2 && !s3 && a3 && f3,
+              $"条件: 武器[盾]/[斧] は装備の家系で・偏重[毒,3] は毒の秘宝 3 つ以上で開く (理由「{r0}」「{r1}」)");
+        var provReq = EventSystem.EventParser.ParseAll("試し:全:文:待つ-条件[物資>=3]:HP+5-文")[0].choices[0];
+        run.provision = 2; string rp = provReq.UnavailableReason(run); run.provision = 3; bool pOk = provReq.IsAvailable(run);
+        Check(rp == "物資が 3 要る（2）" && pOk, $"条件: 物資>=N は物資が N 以上で開く (「{rp}」)");
+        // 安全弁: 全部が選べなくても、 条件を満たさない道は開かない
+        var valve = EventSystem.EventParser.ParseAll("試し:全:文:払う-ゴールド-50,HP+5-文/盾-条件[武器[盾]]:HP+5-文")[0];
+        GameLoop.GameManager.WeaponFamily = null; run.coins = 0;
+        Check(EventChoice.Selectable(valve.choices, 0, run) && !EventChoice.Selectable(valve.choices, 1, run),
+              "条件: 全部が選べない時の安全弁でも、 条件を満たさない道は開かない (払えない方は開く)");
+        GameLoop.GameManager.Instance = null; GameLoop.GameManager.WeaponFamily = null; GameLoop.GameManager.AxisCounts.Clear();
+
+        // 賽ロールの成功の確率 (面の割合)
+        Check(Math.Abs(EventEffectRoles.DieRollChance(new[] { 2, 3, 4, 5 }, 4) - 0.5f) < 1e-6 && Math.Abs(EventEffectRoles.DieRollChance(new[] { 2, 3, 4, 5 }, 5) - 0.25f) < 1e-6
+              && EventEffectRoles.DieRollChance(new[] { 6, 6 }, 4) == 1f && EventEffectRoles.DieRollChance(null, 4) == 0f,
+              "賽ロール: 成功の確率 = 目標値以上の面の割合 (最初の賽 2〜5 で 4 以上 50%・5 以上 25%)");
+        // 新しい動詞の書式 (data にはまだ無い 2 つも読めるか)
+        var extra = EventSystem.EventParser.ParseAll("試し:全:文:替える-賽を提示して交換-文/選ぶ-軸の秘宝を3つから選ぶ-文")[0];
+        Check(extra.choices.Count == 2 && extra.choices[0].effects[0].type == EventEffectType.OfferDieSwap
+              && extra.choices[1].effects[0].type == EventEffectType.OfferAxisPassives && extra.choices[1].effects[0].amount == 3
+              && EventEffectRoles.RoleOf(extra.choices[0].effects[0]) == EventEffectRole.Benefit,
+              "新しい動詞: 「賽を提示して交換」「軸の秘宝をNつから選ぶ」を読める (得の向き)");
+        // 端子の動詞 (2026-11-21): 「端子をNつから選ぶ」「レアの端子をNつから選ぶ」「山札から端子を抜く」の書式・得の向き・足した 3 件 (末尾に足す)
+        var termWant = new (string ev, string ch, string fx)[]
+        {
+            ("流れの鍛冶", "打った刃の振り方を教わる", "TurnsPass+1,OfferTerminals+3"),
+            ("亡霊との決闘", "離れて構えだけを盗む", "TurnsPass+1,OfferTerminals[" + EventEffectRoles.RareTerminal + "]+2"),
+            ("朽ちた英雄像", "折れた腕の構えをなぞる", "TurnsPass+1,RemoveTerminal"),
+        };
+        int tOk = 0;
+        foreach (var w in termWant)
+        {
+            var ev = all.Find(e => e.name == w.ev); var c = ev?.choices.Find(x => x.text == w.ch);
+            string got = c != null ? Fx(c.effects) : "(無い)";
+            if (got == w.fx && ev.choices[ev.choices.Count - 1] == c) tOk++; else Console.WriteLine($"    〈{w.ev}〉「{w.ch}」= {got} (期待 {w.fx}・末尾)");
+        }
+        Check(tOk == termWant.Length, $"端子の動詞: 足した 3 件の効果の並び・選択肢の末尾に足した ({tOk}/{termWant.Length})");
+        var tv = EventSystem.EventParser.ParseAll("試し:全:文:選ぶ-端子を3つから選ぶ-文/レア-レアの端子を2つから選ぶ-文/抜く-山札から端子を抜く-文/去る-なし-文")[0];
+        Check(tv.choices.Count == 4 && tv.choices[0].effects[0].type == EventEffectType.OfferTerminals && tv.choices[0].effects[0].amount == 3 && tv.choices[0].effects[0].param == null
+              && tv.choices[1].effects[0].param == EventEffectRoles.RareTerminal && tv.choices[1].effects[0].amount == 2
+              && tv.choices[2].effects[0].type == EventEffectType.RemoveTerminal
+              && EventEffectRoles.RoleOf(tv.choices[0].effects[0]) == EventEffectRole.Benefit && EventEffectRoles.RoleOf(tv.choices[2].effects[0]) == EventEffectRole.Benefit,
+              "端子の動詞: 書式を読める (通常 / レア・N)・得の向き");
+        var trun = new GameLoop.RunState();
+        GameLoop.GameManager.RemoveOk = false; string tr = tv.choices[2].UnavailableReason(trun); bool tSel = EventChoice.Selectable(tv.choices, 3, trun);
+        GameLoop.GameManager.RemoveOk = true;  bool tOpen = tv.choices[2].IsAvailable(trun);
+        Check(tr == "山札をこれ以上減らせない" && tSel && tOpen, $"端子の動詞: 山札が下限なら「抜く」は選べない (「{tr}」)・下限より多ければ選べる");
+
+        // 賽ロールの中は見せない (確率分岐と同じ)
+        var bridge = Find("崩落した橋", "強引に渡る");
+        Check(bridge != null && bridge.CostChips().Count == 0 && bridge.postFlavorByBranch != null && bridge.postFlavorByBranch.Count == 2,
+              "賽ロール: 中の代償は見せない・選んだ後の文は成功・失敗の 2 つに分かれる");
+    }
+
     static int Main(string[] args)
     {
         Console.OutputEncoding = new System.Text.UTF8Encoding(false);
@@ -1113,6 +1215,7 @@ static class Program
         ClockRelic(Path.GetFullPath(Path.Combine(dir, "../../..")));   // dir = <root>/Assets/Resources/Events
         KeepConviction(Path.GetFullPath(Path.Combine(dir, "../../..")));
         ZeroSellPrice(Path.GetFullPath(Path.Combine(dir, "../../..")));
+        NewVerbs(dir);
         Console.WriteLine(fails == 0 ? "ALL OK" : $"{fails} 件 NG");
         return fails == 0 ? 0 : 1;
     }

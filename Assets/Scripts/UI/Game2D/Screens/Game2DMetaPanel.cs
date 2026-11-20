@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Globalization;
 using MetaProgression;
 using UnityEngine;
@@ -6,58 +5,59 @@ using UnityEngine;
 namespace UI.Game2D
 {
     /// <summary>
-    /// 整備パネル (docs/GAME.md §15-1) の窓 (<b>仮置き</b>・2026-11-04)。 タイトルの「SKILL TREE」から開く。
-    /// トークンでポイントを買い、 トラックへ 1 段ずつ配る (拠点では無料で戻せる・全部戻せる)。 ゲームの処理は <see cref="MetaProgressManager"/> の既存の口だけ。
-    /// 頁: 数値系 8 本 (max 10・1 段 1 点) / 宣言系 7 本 (種火 5 本・1 段 2 点 + 端子 2 本・1 段 3 点・どれも max 3)。 費用の正本は <see cref="MetaPanel.RankCost"/>。 挑戦 (§15-2) は「挑戦」ボタンの窓 (<see cref="Game2DChallengePanel"/>) で選ぶ。
-    /// <para>旧スキルツリーの BUFF 側は 2026-07-25 に廃止した 58 段の一直線トラックのままで、 今の配点はどこからもできなかった。</para>
+    /// 整備パネル (docs/GAME.md §15-1・2026-11-20 刷新) の窓 (<b>仮置き</b>)。 タイトルの「SKILL TREE」から開く。
+    /// 頁: 基礎整備 (6 段・トークンで順に買い切る・「基礎整備を切る」の縛り) / 主方針 / 補助 / 種火 (作戦の枠ごとのモジュールの一覧)。
+    /// 枠はトークンで 主方針 → 補助 → 種火 の順に開き、 モジュールはトークンで解禁して、 枠へ無料で挿し替える。
+    /// ゲームの処理は <see cref="MetaProgressManager"/> の口だけ。 <b>説明文の数字は <see cref="MetaPanel"/> の定数から組む</b> (手書きの数字は調整のたびに古くなる・#125)。
+    /// 挑戦 (§23-25) は「挑戦」ボタンの窓 (<see cref="Game2DChallengePanel"/>)、 遺物は「遺物」ボタンの窓。
     /// </summary>
     public static class Game2DMetaPanel
     {
-        private struct Track { public MetaPanelKind kind; public string name, desc; }
-
-        // **説明文の数字は MetaPanel の式・定数から組む** (2026-11-12・#125)。 手書きの数字は調整のたびに古くなり、
-        //   種火 r1 (+60% のまま・実際は +100%)・毒/出血 r2・r3 の品の数・金庫 r10 が画面とコードで食い違っていた。
         private static string N(float v) => v.ToString("0.#", CultureInfo.InvariantCulture);
-        /// <summary>1 段ごとの増分 (r1 の値)。</summary>
-        private static string Per(System.Func<int, float> f) => N(f(1));
 
-        /// <summary>宝物庫で開幕パッシブが 1 本増える段 (例 "r3/6/9")。</summary>
-        private static string SupplySteps()
+        private static readonly string[] PageNames = { "基礎整備", "主方針", "補助", "種火" };
+        private static readonly MetaSlot[] PageSlot = { MetaSlot.Main, MetaSlot.Main, MetaSlot.Support, MetaSlot.Spark };   // 頁 1〜3 の枠 (頁 0 は使わない)
+
+        /// <summary>基礎整備の n 段目 (1 起点) の効果。</summary>
+        private static string TierDesc(int n) => n switch
         {
-            var steps = new List<string>();
-            for (int r = 1; r <= 10; r++)
-                if (MetaPanel.SupplyStartingPassives(r) > MetaPanel.SupplyStartingPassives(r - 1)) steps.Add(r.ToString());
-            return "r" + string.Join("/", steps);
-        }
-
-        private static string SaleTiers(int rank) => string.Join("/", MetaPanel.TradeSaleTiers(rank));
-
-        /// <summary>種火 r1・r3 の共通の文。 r2 は呼ぶ側が渡す。</summary>
-        private static string SparkDesc(string kw, string r2)
-            => "r1: " + kw + "の品が出やすい (+" + N((MetaPanel.SparkAppearanceWeightMul(1) - 1f) * 100f) + "%)。 r2: " + r2
-             + "。 r3: " + kw + "の品を " + MetaPanel.SparkStartingItemCount + " つ開幕で持つ。";
-
-        private static readonly Track[] Numeric =
-        {
-            new Track { kind = MetaPanelKind.Shell,   name = "外殻", desc = "最大 HP +" + MetaPanel.ShellHp(1) + "/段 (r10 は +" + (MetaPanel.ShellHp(10) - MetaPanel.ShellHp(9)) + ")。 r10: ラストスタンド (その場で蘇生・最大 HP 半減の代償つき)。" },
-            new Track { kind = MetaPanelKind.Output,  name = "出力", desc = "与ダメ +" + MetaPanel.OutputPct(1) + "%/段。 r10〈戦意〉: 戦闘に勝つたび与ダメ +" + N(MetaPanel.BattleSpiritPctPerWin) + "% (そのラン中)。" },
-            new Track { kind = MetaPanelKind.Guard,   name = "剛胆", desc = "エリートが増える +" + Per(MetaPanel.ValorEliteUpgradePct) + "%/段・エリートの報酬ゴールド +" + Per(MetaPanel.ValorEliteGoldPct) + "%/段。 r10: エリートへの与ダメ +" + MetaPanel.ValorEliteSlayerPct + "%・残りシールドの " + N(MetaPanel.GuardShieldCarryRatio * 100f) + "% を次戦へ。" },
-            new Track { kind = MetaPanelKind.Vault,   name = "金庫", desc = "開幕ゴールド +" + MetaPanel.VaultGold(1) + "/段。 r10: 宝箱のゴールドが復活・層を越えるたびに所持金が " + N(VaultBank.Multiplier) + " 倍 (" + VaultBank.Cap + "G までの分)。" },
-            new Track { kind = MetaPanelKind.Plunder, name = "強奪", desc = "ボス撃破の追加ゴールド +" + MetaPanel.PlunderBossGold(1) + "/段・通常の敵の秘宝ドロップ +" + Per(MetaPanel.PlunderPassiveDropPct) + "%/段。 r10: ショップ強盗を解禁。" },
-            new Track { kind = MetaPanelKind.Trade,   name = "商才", desc = "ショップの特売枠 +" + MetaPanel.TradeSaleSlots(1) + "/段 (" + SaleTiers(1) + "% 引き)。 r10: " + MetaPanel.TradeSaleTiers(10)[MetaPanel.TradeSaleTiers(10).Length - 1] + "% 引きの枠が出る。" },
-            new Track { kind = MetaPanelKind.Supply,  name = "宝物庫", desc = SupplySteps() + " で開幕の秘宝 +1 個・段が上がるほどレア度が上寄り。 r10: 開幕の秘宝が選択式。" },
-            new Track { kind = MetaPanelKind.Armor,   name = "装甲", desc = "防御 +" + MetaPanel.ArmorDefense(1) + "/段・被ダメージ −1/" + MetaPanel.ArmorFlatEvery + " 段。 r10〈不動〉: 1 回の攻撃で受けるダメージは最大 HP の " + N(MetaPanel.ArmorHitCapPct * 100f) + "% まで。 防御は割合の軽減 (積むほど伸びは鈍る)、 被ダメージ −N は防御の後に引く。" },
+            1 => "最大 HP +" + MetaPanel.BaseTier1Hp,
+            2 => "防御 +" + MetaPanel.BaseTier2Defense,
+            3 => "開幕ゴールド +" + MetaPanel.BaseTier3Gold + "・特売の枠 +1",
+            4 => "最大 HP +" + MetaPanel.BaseTier4Hp,
+            5 => "与ダメ +" + MetaPanel.BaseTier5DamagePct + "%",
+            _ => "特売の枠 +1",
         };
 
-        private static readonly Track[] Declare =
+        private static string SparkDesc(string axis, string own)
+            => axis + "の秘宝が店に出やすい (+" + N((MetaPanel.SparkAppearanceWeightMul - 1f) * 100f) + "%)。 " + own + "。";
+
+        /// <summary>モジュールの名前と説明。 新しいモジュール (種火の 2 軸など) はここにも足す。</summary>
+        private static (string name, string desc) Info(MetaModule m) => m switch
         {
-            new Track { kind = MetaPanelKind.SparkCharge, name = "種火・充電", desc = SparkDesc("充電", "充電の上限 +" + MetaPanel.ChargeCapBonus(2) + "・戦闘開始時の充電 +" + MetaPanel.ChargeOpening(2)) },
-            new Track { kind = MetaPanelKind.SparkRinkai, name = "種火・臨界", desc = SparkDesc("臨界", "戦闘の終わりの臨界の " + N(MetaPanel.RinkaiCarryoverRatio(2) * 100f) + "% を次の戦闘へ") },
-            new Track { kind = MetaPanelKind.SparkPoison, name = "種火・毒",   desc = SparkDesc("毒", "毎ターン最初に与える毒 +" + MetaPanel.PoisonApplyBonus(2)) },
-            new Track { kind = MetaPanelKind.SparkBleed,  name = "種火・出血", desc = SparkDesc("出血", "出血 " + MetaPanel.BleedWeakenThreshold + " 以上の敵の攻撃値 −" + MetaPanel.BleedWeakenAmount) },
-            new Track { kind = MetaPanelKind.SparkShield, name = "種火・シールド", desc = SparkDesc("シールド", "ターン開始の減衰で残るシールド +" + MetaPanel.ShieldKeepBonusPct(2) + "%") },
-            new Track { kind = MetaPanelKind.AttackTerm,  name = "攻撃端子",   desc = "攻撃の端子を挿したダイス 1 個ごとに、 攻撃端子の配線合計 +" + MetaPanel.AttackTerminalPerDice(1) + "/段。" },
-            new Track { kind = MetaPanelKind.BlockTerm,   name = "防御端子",   desc = "防御の端子を挿したダイス 1 個ごとに、 防御端子の配線合計 +" + MetaPanel.BlockTerminalPerDice(1) + "/段。" },
+            MetaModule.LastStand    => ("ラストスタンド", "戦闘で倒れた時、 1 度だけその場で立ち上がる (ボス戦でも)。 代償に最大 HP が半分になる。"),
+            MetaModule.BattleSpirit => ("戦意", "戦闘に勝つたび与ダメ +" + N(MetaPanel.BattleSpiritPctPerWin) + "% (そのラン中)。"),
+            MetaModule.Valor        => ("剛胆", "戦闘の点が " + N(MetaPanel.ValorEliteUpgradePct) + "% でエリートになる・エリートの報酬ゴールド +" + N(MetaPanel.ValorEliteGoldPct)
+                                                 + "%・エリートへの与ダメ +" + MetaPanel.ValorEliteSlayerPct + "%・勝った戦闘の残りシールドの " + N(MetaPanel.GuardShieldCarryRatio * 100f) + "% を次の戦闘へ。"),
+            MetaModule.VaultBank    => ("貸金庫", "層を越えるたびに所持金が " + N(VaultBank.Multiplier) + " 倍 (" + VaultBank.Cap + "G までの分)・宝箱からゴールドも出る。"),
+            MetaModule.Robbery      => ("ショップ強盗", "店で値下げ交渉 (強盗) ができる・通常の敵が秘宝を落とす率 +" + N(MetaPanel.RobberyPassiveDropPct) + "%。"),
+            MetaModule.Sale99       => ("99% 特売", "特売の枠 +" + MetaPanel.Sale99SlotBonus + "・" + MetaPanel.SaleTiers(true)[MetaPanel.SaleTiers(true).Length - 1] + "% 引きの枠が出る。"),
+            MetaModule.StartPick    => ("開幕厳選", "秘宝を " + MetaPanel.StartPickCount + " つ持って始める (1 つ目は " + MetaPanel.StartPickOffers(0) + " 択・2 つ目は " + MetaPanel.StartPickOffers(1) + " 択)。"),
+            MetaModule.Immovable    => ("不動", "1 回の攻撃で受けるダメージは最大 HP の " + N(MetaPanel.ArmorHitCapPct * 100f) + "% まで・被ダメージ −" + MetaPanel.ImmovableFlatReduction + " (防御の後に引く)。"),
+            MetaModule.SparkCharge  => ("種火・充電", SparkDesc("充電", "充電の上限 +" + MetaPanel.ChargeCapBonus + "・戦闘開始時の充電 +" + MetaPanel.ChargeOpening)),
+            MetaModule.SparkRinkai  => ("種火・臨界", SparkDesc("臨界", "戦闘の終わりの臨界の " + N(MetaPanel.RinkaiCarryoverRatio * 100f) + "% を次の戦闘へ")),
+            MetaModule.SparkPoison  => ("種火・毒", SparkDesc("毒", "毎ターン最初に与える毒 +" + MetaPanel.PoisonApplyBonus)),
+            MetaModule.SparkBleed   => ("種火・出血", SparkDesc("出血", "出血 " + MetaPanel.BleedWeakenThreshold + " 以上の敵の攻撃値 −" + MetaPanel.BleedWeakenAmount)),
+            MetaModule.SparkShield  => ("種火・シールド", SparkDesc("シールド", "ターン開始の減衰で残るシールド +" + MetaPanel.ShieldKeepBonusPct + "%")),
+            MetaModule.SparkCrit    => ("種火・会心", SparkDesc("会心", "会心倍率 +" + N(MetaPanel.CritMulBonus))),
+            MetaModule.SparkDeck    => ("種火・山札", SparkDesc("山札", "戦闘の 1 ターン目の手札 +" + MetaPanel.DeckOpeningDraw + " 枚")),
+            MetaModule.SparkRole    => ("種火・役", SparkDesc("役", "各戦闘の最初の振り直しが無料")),
+            MetaModule.AttackTune   => ("攻撃端子調律", "攻撃の端子に挿した出目 1 個につき +" + MetaPanel.TerminalTunePerDie + "。"),
+            MetaModule.BlockTune    => ("防御端子調律", "防御の端子に挿した出目 1 個につき +" + MetaPanel.TerminalTunePerDie + "。"),
+            MetaModule.AxisTicket   => ("軸引きの手形", "店の軸指定の振り直しの追加 −" + MetaPanel.AxisTicketDiscount + "G"),
+            MetaModule.TacticKnife  => ("戦術の懐刀", "ランの始めに戦術の消耗品を 1 つ持つ (どれかはランダム)。"),
+            MetaModule.Compression  => ("圧縮の心得", "店で端子を山札から抜くのが、 ランで最初の 1 回だけ無料。"),
+            _ => (m.ToString(), ""),
         };
 
         private static int _page;
@@ -84,106 +84,97 @@ namespace UI.Game2D
             _modal.Close();
         }
 
-        /// <summary>今の段の効果 (短く)。 数字は MetaPanel の式から取る (説明文の写しから書かない)。</summary>
-        private static string Effect(MetaPanelKind k, int r)
+        /// <summary>その頁 (枠) のモジュール (enum の並び)。</summary>
+        private static System.Collections.Generic.List<MetaModule> ModulesOf(MetaSlot slot)
         {
-            if (r <= 0) return "なし";
-            string ex = r >= 10 ? "・極点" : "";
-            switch (k)
-            {
-                case MetaPanelKind.Shell:   return "最大 HP +" + MetaPanel.ShellHp(r) + (r >= 10 ? "・ラストスタンド" : "");
-                case MetaPanelKind.Output:  return "与ダメ +" + MetaPanel.OutputPct(r) + "%" + (r >= 10 ? "・戦意" : "");
-                case MetaPanelKind.Guard:   return "エリート化 " + MetaPanel.ValorEliteUpgradePct(r).ToString("0") + "%・報酬 +" + MetaPanel.ValorEliteGoldPct(r).ToString("0") + "%" + ex;
-                case MetaPanelKind.Vault:   return "開幕 +" + MetaPanel.VaultGold(r) + "G" + (r >= 10 ? "・貸金庫" : "");
-                case MetaPanelKind.Plunder: return "ボス +" + MetaPanel.PlunderBossGold(r) + "G・ドロップ +" + MetaPanel.PlunderPassiveDropPct(r).ToString("0") + "%" + (r >= 10 ? "・強盗" : "");
-                case MetaPanelKind.Trade:   return "特売の枠 " + MetaPanel.TradeSaleSlots(r) + (r >= 10 ? "・99% 引き" : "");
-                case MetaPanelKind.Supply:  return "開幕の秘宝 " + MetaPanel.SupplyStartingPassives(r) + " 個" + (r >= 10 ? "・選べる" : "");
-                case MetaPanelKind.Armor:   return "防御 +" + MetaPanel.ArmorDefense(r) + "・被ダメ −" + MetaPanel.ArmorFlatReduction(r) + (r >= 10 ? "・不動" : "");
-                case MetaPanelKind.AttackTerm: return "挿した 1 個ごと +" + MetaPanel.AttackTerminalPerDice(r);
-                case MetaPanelKind.BlockTerm:  return "挿した 1 個ごと +" + MetaPanel.BlockTerminalPerDice(r);
-            }
-            // 種火 6 本: r1 出やすい / r2 固有 / r3 開幕に 1 つ
-            string r2 = k == MetaPanelKind.SparkCharge ? "上限 +" + MetaPanel.ChargeCapBonus(r)
-                      : k == MetaPanelKind.SparkRinkai ? "持ち越し " + (MetaPanel.RinkaiCarryoverRatio(r) * 100f).ToString("0") + "%"
-                      : k == MetaPanelKind.SparkPoison ? "毎ターン最初の付与 +" + MetaPanel.PoisonApplyBonus(r)
-                      : k == MetaPanelKind.SparkShield ? "残るシールド +" + MetaPanel.ShieldKeepBonusPct(r) + "%"
-                      : "攻撃 −" + MetaPanel.BleedWeakenAmount;
-            return "出やすい" + (r >= 2 ? "・" + r2 : "") + (MetaPanel.SparkStartingItemUnlocked(r) ? $"・開幕に {MetaPanel.SparkStartingItemCount} つ" : "");
-        }
-
-        /// <summary>頁の 1 段あたりの費用の一文。 費用は <see cref="MetaPanel.RankCost"/> から取る (写しを持たない)。
-        /// 頁の中で費用が揃っていれば「1 段 N 点。」、 割れていれば「1 段: 種火 2 点・攻撃端子/防御端子 3 点。」。</summary>
-        private static string CostLine(Track[] tracks)
-        {
-            var groups = new List<(int cost, List<string> names)>();
-            foreach (var t in tracks)
-            {
-                int c = MetaPanel.RankCost(t.kind);
-                string label = MetaPanel.IsSpark(t.kind) ? "種火" : t.name;
-                var g = groups.Find(x => x.cost == c);
-                if (g.names == null) { g = (c, new List<string>()); groups.Add(g); }
-                if (!g.names.Contains(label)) g.names.Add(label);
-            }
-            if (groups.Count == 1) return "1 段 " + groups[0].cost + " 点。 ";
-            var parts = new List<string>();
-            foreach (var g in groups) parts.Add(string.Join("/", g.names) + " " + g.cost + " 点");
-            return "1 段: " + string.Join("・", parts) + "。 ";
+            var l = new System.Collections.Generic.List<MetaModule>();
+            foreach (MetaModule m in System.Enum.GetValues(typeof(MetaModule))) if (MetaPanel.SlotOf(m) == slot) l.Add(m);
+            return l;
         }
 
         private static ScreenDef Build()
         {
             var mpm = MetaProgressManager.Instance; var st = mpm.State;
-            var tracks = _page == 0 ? Numeric : Declare;
-            int unassigned = st.UnassignedPoints(), cost = mpm.NextPointCost;
-            var d = new ScreenDef
+            int slotCost = mpm.NextSlotCost;
+            var d = new ScreenDef { id = "meta_panel", jp = true, w = 472, cols = 1, rowH = 15, title = "整備パネル ― " + PageNames[_page] };
+            var mods = _page == 0 ? null : ModulesOf(PageSlot[_page]);
+            if (_page == 0)
             {
-                id = "meta_panel", jp = true, w = 472, cols = 1, rowH = 15, sliders = true, sliderNameW = 74,
-                title = _page == 0 ? "整備パネル ― 数値" : "整備パネル ― 宣言",
-                sub = "トークン " + st.tokens + "  未配分 " + unassigned + "pt  (" + st.panelPointsPurchased + "/" + MetaPanel.MaxPoints + ")",
-            };
-            foreach (var t in tracks)
-            {
-                int rank = st.GetRank(t.kind);
-                d.Items.Add(new ModalItem { name = t.name, count = rank, max = t.kind.MaxRank(), desc = t.desc, effect = Effect(t.kind, rank) });
+                int cost = mpm.NextBaseTierCost;
+                d.sub = "トークン " + st.tokens + "  基礎整備 " + st.baseTier + "/" + MetaPanel.BaseTierCount + (st.baseDisabled ? "  (切っている)" : "");
+                for (int n = 1; n <= MetaPanel.BaseTierCount; n++)
+                {
+                    bool got = st.baseTier >= n, next = st.baseTier == n - 1;
+                    d.Items.Add(new ModalItem
+                    {
+                        name = n + " 段目", disabled = !got || st.baseDisabled,
+                        value = got ? (st.baseDisabled ? "切" : "済") : next ? MetaPanel.BaseTierCost[n - 1] + "" : "―",
+                        desc = TierDesc(n) + "。" + (got ? "" : " トークン " + MetaPanel.BaseTierCost[n - 1] + " で買う (段は順に買う)。"),
+                    });
+                }
+                d.buttons.Add(new ModalBtn { label = cost == int.MaxValue ? "全部買った" : "段を買う " + cost, action = "buyTier", primary = true });
+                d.buttons.Add(new ModalBtn { label = st.baseDisabled ? "基礎整備を戻す" : "基礎整備を切る", action = "toggleBase" });
+                d.footer = "段は買い切り。 「切る」と買った段の効果が止まる (縛り・いつでも戻せる)";
             }
-            d.buttons.Add(new ModalBtn { label = mpm.IsPointCapReached ? "pt 上限" : "pt を買う " + cost, action = "buy", primary = true });
-            d.buttons.Add(new ModalBtn { label = _page == 0 ? "宣言へ" : "数値へ", action = "page" });
-            d.buttons.Add(new ModalBtn { label = "全戻し", action = "respec" });
+            else
+            {
+                var slot = PageSlot[_page];
+                bool open = st.IsSlotOpen(slot);
+                var eq = st.Equipped(slot);
+                d.sub = "トークン " + st.tokens + "  枠 " + st.slotsOpen + "/" + MetaPanel.SlotOpenCost.Length + "  "
+                      + (open ? "挿している: " + (eq.HasValue ? Info(eq.Value).name : "なし") : "この枠は閉じている");
+                foreach (var m in mods)
+                {
+                    var (name, desc) = Info(m);
+                    bool unlocked = st.IsUnlocked(m), on = eq == m;
+                    d.Items.Add(new ModalItem
+                    {
+                        name = name, disabled = !unlocked,
+                        value = on ? "使用中" : unlocked ? "解禁済" : MetaPanel.ModuleCost(m) + "",
+                        desc = desc + (unlocked ? "" : " 解禁はトークン " + MetaPanel.ModuleCost(m) + "。"),
+                    });
+                }
+                d.buttons.Add(new ModalBtn { label = "解禁・挿す", action = "use", primary = true });
+                d.buttons.Add(new ModalBtn { label = slotCost == int.MaxValue ? "枠は全部開いた" : "枠を開く " + slotCost, action = "openSlot" });
+                d.footer = "解禁は買い切り・挿し替えは無料 (もう一度押すと外す)。 枠は 主方針 → 補助 → 種火 の順に開く";
+            }
+            d.buttons.Add(new ModalBtn { label = "次へ (" + PageNames[(_page + 1) % PageNames.Length] + ")", action = "page" });
             d.buttons.Add(new ModalBtn { label = "挑戦", action = "challenge" });
             d.buttons.Add(new ModalBtn { label = "遺物", action = "relic" });
             d.buttons.Add(new ModalBtn { label = "閉じる", action = "close" });
-            d.footer = CostLine(tracks) + "バーを押す・引いて段を決める (戻すのは無料)" + (mpm.IsPointCapReached ? "" : "。 1 点はトークン " + cost + " で買える");
             d.onAction = (a, sel) =>
             {
-                var kind = sel >= 0 && sel < tracks.Length ? tracks[sel].kind : (MetaPanelKind?)null;
                 switch (a)
                 {
                     case "close": Close(); return;
                     case "challenge": Game2DChallengePanel.Show(_modal); return;
                     case "relic": Game2DRelicPanel.Show(_modal); return;
-                    case "inc":
-                        if (kind == null) break;
-                        if (mpm.TryAssignRank(kind.Value)) Game2DSfx.Play("ui_confirm");
-                        else _modal.ShowError(st.GetRank(kind.Value) >= kind.Value.MaxRank() ? "これ以上は上げられない" : "未配分のポイントが足りない");
+                    case "page": _page = (_page + 1) % PageNames.Length; break;
+                    case "buyTier":
+                        if (mpm.TryBuyBaseTier()) Game2DSfx.Play("ui_confirm");
+                        else _modal.ShowError(st.baseTier >= MetaPanel.BaseTierCount ? "全部の段を買った" : "トークンが足りない (次 " + mpm.NextBaseTierCost + ")");
                         break;
-                    case "dec": if (kind != null && !mpm.TryRefundRank(kind.Value)) _modal.ShowError("これ以上は下げられない"); break;
-                    case "slide":
+                    case "toggleBase":
+                        mpm.ToggleBaseDisabled();
+                        _modal.ShowToast(st.baseDisabled ? "基礎整備を切った" : "基礎整備を戻した");
+                        break;
+                    case "openSlot":
+                        if (mpm.TryOpenSlot()) Game2DSfx.Play("ui_confirm");
+                        else _modal.ShowError(st.slotsOpen >= MetaPanel.SlotOpenCost.Length ? "枠は全部開いている" : "トークンが足りない (次 " + mpm.NextSlotCost + ")");
+                        break;
+                    case "use":
                     {
-                        if (kind == null) break;
-                        int goal = Game2DModal.SlideTarget, guard = 0;
-                        while (st.GetRank(kind.Value) > goal && guard++ < 16) if (!mpm.TryRefundRank(kind.Value)) break;
-                        bool short_ = false;
-                        while (st.GetRank(kind.Value) < goal && guard++ < 32) if (!mpm.TryAssignRank(kind.Value)) { short_ = true; break; }
-                        if (short_) _modal.ShowError("未配分の pt が足りない (「pt を買う」で増やす)");
-                        else Game2DSfx.Play("ui_click");
+                        if (mods == null || sel < 0 || sel >= mods.Count) break;
+                        var m = mods[sel];
+                        if (!st.IsUnlocked(m))
+                        {
+                            if (mpm.TryUnlockModule(m)) Game2DSfx.Play("ui_confirm");
+                            else _modal.ShowError("トークンが足りない (解禁 " + MetaPanel.ModuleCost(m) + ")");
+                        }
+                        else if (mpm.TryToggleEquip(m)) Game2DSfx.Play("ui_click");
+                        else _modal.ShowError("この枠はまだ閉じている (「枠を開く」で開く)");
                         break;
                     }
-                    case "buy":
-                        if (mpm.TryPurchasePoint()) Game2DSfx.Play("ui_confirm");
-                        else _modal.ShowError(mpm.IsPointCapReached ? "ポイントは上限" : "トークンが足りない (次 " + cost + ")");
-                        break;
-                    case "page": _page = 1 - _page; break;
-                    case "respec": mpm.RespecAllRanks(); _modal.ShowToast("全部の段を戻した"); break;
                 }
                 _modal.Replace(Build());
             };

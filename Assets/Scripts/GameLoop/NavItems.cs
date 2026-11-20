@@ -73,6 +73,7 @@ namespace GameLoop
                 goalwardHalf  = (mask & 1 << 6) != 0,
                 beaconCharges = (mask & 1 << 7) != 0 ? 1 : 0,
                 ignoreSand    = (mask & 1 << 8) != 0,
+                hailHpCut     = (mask & 1 << 8) != 0 ? 1 : 0,   // 〈油布の靴〉: 雹の中の 1 歩の HP −1 (2026-11-20)
             };
             _cacheMask = mask; _cache = p;
             return p;

@@ -5,13 +5,9 @@ namespace MetaProgression
     /// <summary>
     /// プレイヤーのメタ進行状態。PlayerPrefs に JSON で保存される。
     ///
-    /// 2026-07-25 v6 移行:
-    ///   ・整備パネル (docs/GAME.md §15-1) へ全面移行
-    ///   ・購入モデル: ポイント (Max=36) → トラック (MetaPanelKind) にランク配点
-    ///   ・旧 currentLevel (0-58 一直線トラック) は Migrate() で全額返却
-    ///
-    /// 集計値 (hpBonus/goldBonus 等) は Applicator が直接 MetaPanel.*(rank) で再計算するため、
-    /// State には rank 配列 (panelRanks) のみを持つ (Recalculate は撤廃)。
+    /// 整備パネル (docs/GAME.md §15-1・2026-11-20 刷新): 基礎整備の段・開いた枠・解禁したモジュール・挿しているモジュールを持つ。
+    /// 効果の数値は持たない (MetaBuffApplicator が MetaPanel の値から都度出す)。
+    /// 旧いセーブ: 58 段トラック (currentLevel) と 24 点の配点式 (panelPointsPurchased) は、 払ったトークンを全額返す。
     /// </summary>
     [System.Serializable]
     public class MetaProgressState
@@ -192,12 +188,22 @@ namespace MetaProgression
         /// <summary>旧 currentLevel。> 0 なら未マイグレーション状態 → Migrate() でトークン返却して 0 化。</summary>
         public int currentLevel;
 
-        // === 整備パネル v6: ポイント + 配点 ===
-        /// <summary>購入済みポイント数 (0..MetaPanel.MaxPoints=36)。</summary>
-        public int panelPointsPurchased;
+        // === 整備パネル (2026-11-20 刷新・docs/GAME.md §15-1): 基礎整備 + 作戦の枠 ===
+        /// <summary>買った基礎整備の段 (0..<see cref="MetaPanel.BaseTierCount"/>)。 順に買う。</summary>
+        public int baseTier;
+        /// <summary>「基礎整備を切る」(縛り)。 立っている間は基礎整備の段の効果が 0 (買った段は残る)。</summary>
+        public bool baseDisabled;
+        /// <summary>開いた作戦の枠の数 (0..3)。 開く順は <see cref="MetaSlot"/> の並び。</summary>
+        public int slotsOpen;
+        /// <summary>解禁したモジュール (<see cref="MetaModule"/> の int)。</summary>
+        public List<int> unlockedModules = new List<int>();
+        /// <summary>枠ごとに挿しているモジュール (index = <see cref="MetaSlot"/>・-1 = 空き)。</summary>
+        public int[] equippedModules = { -1, -1, -1 };
 
-        /// <summary>各トラックの現在ランク。 index = (int)MetaPanelKind。配列長 = enum 数。
-        /// JsonUtility は enum-key Dictionary 非対応のため int[] で保持。</summary>
+        // === 旧い整備パネル (24 点の配点式・2026-11-20 撤去)。 旧いセーブを読んで返金するためだけに残す ===
+        /// <summary>[旧] 買った点の数。 > 0 なら <see cref="MigrateFromPointPanelIfNeeded"/> が全額返して 0 にする。</summary>
+        public int panelPointsPurchased;
+        /// <summary>[旧] トラックごとの段。 返金は点の数だけで決まるので読まない (移行で消す)。</summary>
         public int[] panelRanks;
 
         public MetaProgressState()
@@ -205,67 +211,83 @@ namespace MetaProgression
             EnsurePanelInitialized();
         }
 
-        /// <summary>panelRanks を必要に応じて初期化 (JsonUtility 復元後の欠損対応も兼ねる)。</summary>
+        /// <summary>整備パネルの欄を必要に応じて初期化・丸める (JsonUtility 復元後の欠損・範囲外の値の対応も兼ねる)。 冪等。</summary>
         public void EnsurePanelInitialized()
         {
-            int n = System.Enum.GetValues(typeof(MetaPanelKind)).Length;
-            if (panelRanks == null || panelRanks.Length != n)
+            if (unlockedModules == null) unlockedModules = new List<int>();
+            int slots = System.Enum.GetValues(typeof(MetaSlot)).Length;
+            if (equippedModules == null || equippedModules.Length != slots)
             {
-                var old = panelRanks;
-                panelRanks = new int[n];
-                if (old != null)
-                    for (int i = 0; i < System.Math.Min(old.Length, n); i++) panelRanks[i] = old[i];
+                var old = equippedModules;
+                equippedModules = new int[slots];
+                for (int i = 0; i < slots; i++) equippedModules[i] = old != null && i < old.Length ? old[i] : -1;
+            }
+            baseTier = UnityEngine.Mathf.Clamp(baseTier, 0, MetaPanel.BaseTierCount);
+            slotsOpen = UnityEngine.Mathf.Clamp(slotsOpen, 0, slots);
+            // 挿してよいのは: 解禁済み・その枠のモジュール。 それ以外 (壊れた値・旧い番号) は外す
+            for (int i = 0; i < slots; i++)
+            {
+                int m = equippedModules[i];
+                if (m < 0) continue;
+                if (!System.Enum.IsDefined(typeof(MetaModule), m) || !unlockedModules.Contains(m) || (int)MetaPanel.SlotOf((MetaModule)m) != i)
+                    equippedModules[i] = -1;
             }
         }
-
-        // ============================================================
-        //  (挑戦の配点の解決は 2026-11-10 に撤去・難易度は challengeDifficulty)
-        // ============================================================
 
         // ============================================================
         //  パネル API
         // ============================================================
 
-        public int GetRank(MetaPanelKind kind)
+        public bool IsUnlocked(MetaModule m) => unlockedModules != null && unlockedModules.Contains((int)m);
+
+        public bool IsSlotOpen(MetaSlot slot) => (int)slot < slotsOpen;
+
+        /// <summary>枠に挿しているモジュール (枠が閉じていれば null)。</summary>
+        public MetaModule? Equipped(MetaSlot slot)
         {
-            EnsurePanelInitialized();
-            int i = (int)kind;
-            return (i >= 0 && i < panelRanks.Length) ? panelRanks[i] : 0;
+            // 戦闘中に何度も呼ばれる getter の下なので、 丸め (EnsurePanelInitialized) は通さない (読み込み・書き込みの側で済ませている)
+            if (equippedModules == null || (int)slot >= equippedModules.Length) return null;
+            int m = equippedModules[(int)slot];
+            return IsSlotOpen(slot) && m >= 0 ? (MetaModule)m : (MetaModule?)null;
         }
 
-        public void SetRank(MetaPanelKind kind, int rank)
+        /// <summary>そのモジュールが効いているか (開いた枠に挿している)。</summary>
+        public bool IsActive(MetaModule m) => Equipped(MetaPanel.SlotOf(m)) == m;
+
+        /// <summary>効いている基礎整備の段 (「基礎整備を切る」の間は 0)。</summary>
+        public int EffectiveBaseTier => baseDisabled ? 0 : UnityEngine.Mathf.Clamp(baseTier, 0, MetaPanel.BaseTierCount);
+
+        /// <summary>モジュールを解禁済みにして挿す (測定・移行用・トークンは払わない)。 枠は開いていなくても挿しておく (開いた時に効く)。</summary>
+        public void ForceEquip(MetaModule m)
         {
             EnsurePanelInitialized();
-            int i = (int)kind;
-            if (i < 0 || i >= panelRanks.Length) return;
-            panelRanks[i] = UnityEngine.Mathf.Clamp(rank, 0, kind.MaxRank());
+            if (!IsUnlocked(m)) unlockedModules.Add((int)m);
+            equippedModules[(int)MetaPanel.SlotOf(m)] = (int)m;
         }
 
-        /// <summary>現在の総配点 <b>pt</b>。 2026-09-10: 段数合計ではなく
-        /// <see cref="MetaPanel.RankCost"/> による<b>重み付き</b>合計
-        /// (宣言系 = 3pt/段)。 段数が欲しい場合は panelRanks を直接見ること。</summary>
-        public int TotalAssignedPoints()
+        /// <summary>枠の中身を外す。</summary>
+        public void Unequip(MetaSlot slot) { EnsurePanelInitialized(); equippedModules[(int)slot] = -1; }
+
+        /// <summary>今の作戦の構成の短い文 (ログ・実効状態・セーブの指紋)。 例 "基礎3/6 枠2 主方針=LastStand 補助=AttackTune 種火=-"。</summary>
+        public string DescribePanel()
         {
             EnsurePanelInitialized();
-            var kinds = (MetaPanelKind[])System.Enum.GetValues(typeof(MetaPanelKind));
-            int sum = 0;
-            for (int i = 0; i < panelRanks.Length && i < kinds.Length; i++)
-                sum += panelRanks[i] * MetaPanel.RankCost(kinds[i]);
-            return sum;
+            var sb = new System.Text.StringBuilder();
+            sb.Append("基礎").Append(baseTier).Append('/').Append(MetaPanel.BaseTierCount).Append(baseDisabled ? "(切)" : "").Append(" 枠").Append(slotsOpen);
+            foreach (MetaSlot sl in System.Enum.GetValues(typeof(MetaSlot)))
+            {
+                int m = equippedModules[(int)sl];
+                sb.Append(' ').Append(sl).Append('=').Append(m >= 0 ? ((MetaModule)m).ToString() : "-");
+                if (m >= 0 && !IsSlotOpen(sl)) sb.Append("(閉)");
+            }
+            return sb.ToString();
         }
-
-        /// <summary>未配分ポイント数 (purchased - assigned)。</summary>
-        public int UnassignedPoints() => System.Math.Max(0, panelPointsPurchased - TotalAssignedPoints());
-
-        /// <summary>次に買う (n+1 個目) のコスト。上限到達なら int.MaxValue。</summary>
-        public int NextPointCost()
-            => panelPointsPurchased >= MetaPanel.MaxPoints ? int.MaxValue : MetaPanel.PointCost(panelPointsPurchased + 1);
 
         // ============================================================
         //  マイグレーション (旧 58 段 → 配点方式)
         // ============================================================
 
-        /// <summary>旧 currentLevel > 0 のセーブを検出したら、消費トークンを全額返却して panel を初期状態に。
+        /// <summary>旧 currentLevel > 0 のセーブを検出したら、消費トークンを全額返却して 0 にする。
         /// 呼び出しは Manager.Load 直後 (一度だけ)。 冪等。</summary>
         public void MigrateFromLegacyTrackIfNeeded()
         {
@@ -275,34 +297,27 @@ namespace MetaProgression
                 refund += LegacyTrackStepCost(lv);
             tokens += refund;
             currentLevel = 0;
-            panelPointsPurchased = 0;
-            EnsurePanelInitialized();
-            for (int i = 0; i < panelRanks.Length; i++) panelRanks[i] = 0;
-            UnityEngine.Debug.Log($"[MetaMigrate] 旧 58 段トラックから配点方式へ移行: {refund} トークン返却");
+            UnityEngine.Debug.Log($"[MetaMigrate] 旧 58 段トラックの分を返却: {refund} トークン");
         }
 
         /// <summary>旧 58 段トラックの lv 段目の購入コスト (トークン)。 返金の計算にだけ使う。
         /// 旧 MetaBuffTrack.CalcCost の式 (2026-11-13 にトラックの定義ごと削除・#132)。</summary>
         private static int LegacyTrackStepCost(int lv) => 30 + lv * 2;
 
-        /// <summary>保存済みの段を 0〜<see cref="MetaPanelKindExt.MaxRank"/> に丸める (#113)。
-        /// 枠から外したトラック (MaxRank 0 = 精密・会心の種火・兵站) は 0 になり、 その分の点は未配分へ戻る
-        /// (<see cref="UnassignedPoints"/> は購入済み − 配点なので、 段を消せば点が戻る)。
-        /// <see cref="SetRank"/> を通らない JsonUtility の復元で古い段が残るのを防ぐ。 呼び出しは Manager.Load 直後。 冪等。</summary>
-        public void ClampRanksToMax()
+        /// <summary>旧い整備パネル (24 点の配点式) で点を買っていたセーブなら、 点に払ったトークンを全額返して旧い欄を消す (2026-11-20・§1-3)。
+        /// <see cref="MigrateFromLegacyTrackIfNeeded"/> と同じ形 (返して 0 にする・冪等)。 呼び出しは Manager.Load 直後。</summary>
+        public void MigrateFromPointPanelIfNeeded()
         {
-            EnsurePanelInitialized();
-            var kinds = (MetaPanelKind[])System.Enum.GetValues(typeof(MetaPanelKind));
-            int freed = 0;
-            for (int i = 0; i < panelRanks.Length && i < kinds.Length; i++)
-            {
-                int clamped = UnityEngine.Mathf.Clamp(panelRanks[i], 0, kinds[i].MaxRank());
-                if (clamped == panelRanks[i]) continue;
-                freed += (panelRanks[i] - clamped) * MetaPanel.RankCost(kinds[i]);
-                panelRanks[i] = clamped;
-            }
-            if (freed != 0)
-                UnityEngine.Debug.Log($"[MetaMigrate] 上限を超える段・枠から外したトラックの段を丸めた: {freed}pt を未配分へ戻した");
+            if (panelPointsPurchased <= 0) { panelRanks = null; return; }
+            int refund = 0;
+            for (int n = 1; n <= panelPointsPurchased; n++) refund += LegacyPointCost(n);
+            tokens += refund;
+            UnityEngine.Debug.Log($"[MetaMigrate] 旧い 24 点の整備パネルから移行: {panelPointsPurchased} 点の {refund} トークンを返却");
+            panelPointsPurchased = 0;
+            panelRanks = null;
         }
+
+        /// <summary>旧い整備パネルの n 個目の点のトークン (旧 MetaPanel.PointCost = 8 × n)。 返金の計算にだけ使う。</summary>
+        private static int LegacyPointCost(int n) => 8 * n;
     }
 }

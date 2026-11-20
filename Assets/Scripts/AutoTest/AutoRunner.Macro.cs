@@ -107,6 +107,17 @@ namespace AutoTest
             for (int i = 0; i < cands.Count; i++) { candNode[i] = map.GetNode(map.NodeIdAt(cands[i])); candDist[i] = dist[cands[i]]; }
             var shopCi = new int[shops.Count];
             for (int k = 0; k < shops.Count; k++) shopCi[k] = cands.IndexOf(shops[k]);
+            // 持ち越す物資の値 (2026-11-21・段 3): 物資は層をまたいで残る (RunState.provision はランの頭でしか満たさない) ので、
+            //   出口に着いた時に残る物資 1 につき、 次の層で HP を払わずに歩ける分 (1 歩 = HP HpPerSupply・HpWalkSteps と同じ換算) を次の層の HP の重みで足す。
+            //   比べる相手 (今すぐ出口へ = 値 0) との差で足す。 最後の層 (次の層が無い) は 0。
+            //   shortcut: 近道の残り (ただで動ける回数) は持ち越さないので、 層の頭の分を全部引く (使い切っていない分の持ち越しを少なめに見る)。
+            int nextLayer = layer + 1;
+            float carryW = nextLayer < MacroHpPer10.Length && run.playerMaxHP > 0
+                ? MacroHpPer10[nextLayer] * 10f * FreeMapParams.HpPerSupply / (FreeMapParams.MoveSupply * (float)run.playerMaxHP) : 0f;
+            int freeSupply = sim != null ? sim.FreeMovesLeft * FreeMapParams.MoveSupply : 0;
+            float Carry(float supply, int exitSteps) => exitSteps == int.MaxValue ? 0f
+                : carryW * Mathf.Clamp(supply - freeSupply - exitSteps * FreeMapParams.MoveSupply, 0f, run.provisionCap);
+            float carry0 = Carry(start.supply, toGoal[at]);
 
             void Search(int from, int[] dFrom, MacroSim s, float acc, int first, int depth)
             {
@@ -157,7 +168,7 @@ namespace AutoTest
                     if (!ok) continue;
                     float total = acc + gain;
                     // 嵐の航行: 「ここで切り上げて出口へ」との差。 回った後の出口の代償が、 今すぐ出口へ向かう代償より増えた分を引く
-                    float score = storm != null ? total - (storm.ExitCost(c, ns) - exit0) : total;
+                    float score = (storm != null ? total - (storm.ExitCost(c, ns) - exit0) : total) + Carry(ns.supply, toGoal[c]) - carry0;
                     int f = first < 0 ? c : first;
                     if (score > best + 1e-6f) { best = score; bestFirst = f; }
                     if (depth + 1 < MacroDepth && ns.hp > 0f)
@@ -329,7 +340,7 @@ namespace AutoTest
             if (!n.revealed)
             {
                 // 種別が見えていない点: 通常の戦闘相当として見積もる
-                return MacroFight(layer, 'N', null, wHp, wGold, 0f, ref s) * MacroUnknownWeight;
+                return MacroFight(layer, 'N', null, wHp, wGold, 0f, ref s) * MacroUnknownWeight + VaneWin(run, wGold, MacroUnknownWeight, ref s);
             }
             switch (n.EffectiveType)
             {
@@ -339,12 +350,12 @@ namespace AutoTest
                     // 〈徒労〉(2026-11-14): 報酬が止まっていれば報酬のゴールドの見込みを 0 にする (被ダメ・死の見込みは残す = 正味で損)
                     bool noReward = s.toil > 0;
                     if (noReward) s.toil = ToilNavRule.AfterNormalWin(s.toil, GameHooks.ToilMode);
-                    return MacroFight(layer, 'N', key, wHp, wGold, 0f, ref s, noReward);
+                    return MacroFight(layer, 'N', key, wHp, wGold, 0f, ref s, noReward) + VaneWin(run, wGold, 1f, ref s);
                 }
                 case TileType.EliteBattle:
                 {
                     string key = n.encounterRevealed ? EncounterDangerStats.KeyOf(n, run.Depth) : null;
-                    return MacroFight(layer, 'E', key, wHp, wGold, CombatRewards.EliteDropRate * wItem, ref s);
+                    return MacroFight(layer, 'E', key, wHp, wGold, CombatRewards.EliteDropRate * wItem, ref s) + VaneWin(run, wGold, 1f, ref s);
                 }
                 case TileType.Rest:
                 {
@@ -372,6 +383,18 @@ namespace AutoTest
                 case TileType.SupplyDepot: return 0.02f;
                 default: return 0f;
             }
+        }
+
+        /// <summary>〈嵐読みの風見鶏〉(2026-11-21・段 3): 嵐の中の点の戦闘に勝つと ゴールド +8・不安定 −3 (本体 GameManager.AddBattleWinInstability と同じ量)。
+        /// 嵐の中かは計画の印 (<see cref="StormCostCtx.MarkFight"/> が立てた stormMul / stormAdd) で読む = 嵐の航行 (口 navStormAware) の時だけ。
+        /// ゴールドは戦闘の報酬と同じく 所持金に足して値も返す (店で品に換える時に差し引かれる)・不安定は累計の見込みから引く (出口の代償が読む)。 <paramref name="w"/> = 見えていない点の重み。</summary>
+        private static float VaneWin(RunState run, float wGold, float w, ref MacroSim s)
+        {
+            if ((s.stormMul <= 0f && s.stormAdd <= 0f) || run == null || !run.OwnsPassive(ItemIds.MacroVane)) return 0f;
+            float g = GameManager.VaneGold * w;
+            s.coins += g;
+            s.pts = Mathf.Max(0f, s.pts - GameManager.VaneCalm * w);
+            return g * wGold;
         }
 
         /// <summary><paramref name="noReward"/> = 報酬が出ない戦闘 (〈徒労〉の通常の戦闘): 報酬のゴールドを 0 と見る (被ダメ・死の項はそのまま)。</summary>

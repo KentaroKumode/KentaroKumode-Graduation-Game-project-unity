@@ -250,6 +250,12 @@ namespace UI.Game2D.Battle
         private string _bgName;
         /// <summary>ヴェスカ 4 段への形態移行で、 信号が切れた所 (画面が黒い間) で替える背景 (null = 無し)。</summary>
         private string _bgAfterOff;
+        /// <summary>今の戦闘ごとの背景の画素 (絵のまま・<see cref="BattleBackdrops.Load"/> のキャッシュ・null = 仮の背景)。 下地 <see cref="_base"/> はここから作る。</summary>
+        private uint[] _bgSrc;
+        /// <summary>読みやすさの B (<see cref="BattleReadability.DimBackdrop"/>) で暗くした下地の置き場 (1 度だけ取る)。</summary>
+        private uint[] _bgDimBuf;
+        /// <summary>今の下地に掛けてある倍率 (1 = 絵のまま)。 <see cref="BattleReadability.BackdropMul"/> と違えば作り直す。</summary>
+        private float _bgMulApplied = 1f;
         private Texture2D _tex; private Color32[] _out;
         private float[] _trb;
         private readonly Dictionary<int, List<Vector2Int>> _pix = new Dictionary<int, List<Vector2Int>>();
@@ -289,8 +295,35 @@ namespace UI.Game2D.Battle
         {
             Init(); _bgAfterOff = null;
             var px = BattleBackdrops.Load(name);
-            if (px == null) { _bgName = null; _base = _baseDefault; return; }
-            _bgName = name; _base = px;
+            if (px == null) { _bgName = null; _bgSrc = null; _base = _baseDefault; return; }
+            _bgName = name; _bgSrc = px; ApplyBackdropDim();
+        }
+
+        /// <summary>下地 <see cref="_base"/> を、 今の背景の絵 × 読みやすさの B の倍率 (<see cref="BattleReadability.BackdropMul"/>) で作る (2026-11-16・見比べ用)。
+        /// 絵のファイル・キャッシュ (<see cref="BattleBackdrops"/>) は変えず、 別の置き場に写す。 画素ごとに同じ倍率なので、 4 色の絵は暗い 4 色になる (混色・ディザは足さない)。
+        /// <para>演出との整合: 下地を読む所は全部 <see cref="_base"/> を通るので、 暗くした下地がそのまま効く ── 撃破で溶ける所 (網点で <see cref="_base"/> へ抜く)・
+        /// 大技の暗幕 (<see cref="BossFx.PreDark"/>・作図面に掛ける倍率なので、 暗くした下地の上にさらに掛かる)・ヴェスカの凍った画面と帯のずれ (作図面を写す)。
+        /// GUI へ渡す白飛び・暗転の測り (<see cref="PushGuiFx"/>) は作図面の画素の明るさで数えるので、 暗くした画素が「真っ黒」(赤緑青とも 12 以下) に落ちないよう、
+        /// 元が真っ黒でない画素は一番明るい成分を 13 に留める (既定 0.7 では 10 枚とも当たらない・明るさを下げた時の守り)。
+        /// 白飛びの測り (赤 230・緑 220・青 200 以上) には暗くした背景は入らない (B が切なら bg_vesca_p4 の白 (244,238,240) が大技の間に数えられる)。
+        /// 仮の背景 (<see cref="_baseDefault"/>) は作った時から暗くしてあるので掛けない。</para></summary>
+        private void ApplyBackdropDim()
+        {
+            float k = BattleReadability.BackdropMul; _bgMulApplied = k;
+            if (_bgSrc == null) { _base = _baseDefault; return; }
+            if (k >= 0.999f) { _base = _bgSrc; return; }
+            if (_bgDimBuf == null) _bgDimBuf = new uint[W * H];
+            for (int i = 0; i < _bgDimBuf.Length && i < _bgSrc.Length; i++)
+            {
+                uint v = _bgSrc[i]; int r = (int)(v & 255), g = (int)((v >> 8) & 255), b = (int)((v >> 16) & 255);
+                int r2 = Mathf.RoundToInt(r * k), g2 = Mathf.RoundToInt(g * k), b2 = Mathf.RoundToInt(b * k);
+                if ((r > 12 || g > 12 || b > 12) && r2 <= 12 && g2 <= 12 && b2 <= 12)
+                {
+                    if (r >= g && r >= b) r2 = 13; else if (g >= b) g2 = 13; else b2 = 13;      // 真っ黒と数えられない (暗転の測り)
+                }
+                _bgDimBuf[i] = BattleCanvas.Pack(r2, g2, b2);
+            }
+            _base = _bgDimBuf;
         }
 
         /// <summary>敵の HP を本物の値に合わせる (実戦闘につないだ時)。 攻撃の演出はここから dealt ぶん減らす。</summary>
@@ -472,6 +505,7 @@ namespace UI.Game2D.Battle
             float dt = rawDt * (_phase == Phase.PAttack ? _timeScale : 1f);
             _clockU += rawDt; _boss.Tick(rawDt);      // ボスの絵はヒットストップ・攻撃の速さ (T) に左右されない
             if (_bgAfterOff != null && (_boss.SignalOff || !_boss.Active)) { var next = _bgAfterOff; SetBackdrop(next); }      // ヴェスカ 4 段の背景: 信号が切れて黒い間に替える
+            if (_bgSrc != null && !Mathf.Approximately(_bgMulApplied, BattleReadability.BackdropMul)) ApplyBackdropDim();      // 読みやすさの B を切り替えた (見比べ用の口)
             Tick(dt);
             Frame();
             PushGuiFx();
@@ -1013,6 +1047,7 @@ namespace UI.Game2D.Battle
             if (m.intent > 0)
             {
                 string v = m.atk.ToString(); int tw = Game2DJpFont.Width(v), w = 12 + 3 + tw, x = x0 - w / 2, y = fe - 120 - 18;
+                if (BattleReadability.Outline) { StampRim(Icon(m.intent == 2 ? "heavy" : "attack"), x, y); TextRim(v, x + 15, y); }
                 Stamp(Icon(m.intent == 2 ? "heavy" : "attack"), x, y);
                 Text35(v, x + 15, y, 1, m.intent == 2 ? MarkHeavy : MarkAtk, 0);
             }
@@ -1020,15 +1055,29 @@ namespace UI.Game2D.Battle
             int dy = fe - 50, dx = x0 + 60;      // デバフ: 体の右下
             if (m.poison > 0) { MarkItem("poison", m.poison, dx, dy, MarkPoison); dy -= 14; }
             if (m.bleed > 0) { MarkItem("bleed", m.bleed, dx, dy, MarkBleed); dy -= 14; }
-            if (m.guard) { const string g = "構え"; int gw = Game2DJpFont.Width(g); Text35(g, x0 - 54 - gw, fe - 50, 1, MarkBuff, 0); }      // バフ: 体の左下 (構えは絵が無いので字)
+            if (m.guard) { const string g = "構え"; int gw = Game2DJpFont.Width(g); if (BattleReadability.Outline) TextRim(g, x0 - 54 - gw, fe - 50); Text35(g, x0 - 54 - gw, fe - 50, 1, MarkBuff, 0); }      // バフ: 体の左下 (構えは絵が無いので字)
         }
+
+        // ── 読みやすさの A (2026-11-16・見比べ用・BattleReadability.Outline): 頭上の印の後ろに、 形に沿った 2 ドットの暗い縁 ──
+        //   液晶の中の戦闘の画面 (Game2DBattleLcd.Txt) の字の縁取りと同じ形と色 (半径 2・四隅を落とす・#0a080a)。 混色・半透明は使わない
+        private static readonly Col RimCol = new Col(10, 8, 10);
+        private void RimAt(int px, int py) { for (int dy = -2; dy <= 2; dy++) for (int dx = -2; dx <= 2; dx++) if (BattleReadability.InRim2(dx, dy)) _c.Put(px + dx, py + dy, RimCol); }
+        private void StampRim(BSprite s, int x, int y)
+        {
+            if (s == null) return;
+            for (int j = 0; j < s.h; j++) for (int i = 0; i < s.w; i++) if (s.d[(j * s.w + i) * 4 + 3] >= 128) RimAt(x + i, y + j);
+        }
+        /// <summary><see cref="Text35"/> (scale 1・左寄せ・斜体なし) の字の縁。 影 (右下 1 ドット) も縁の内側に入る。</summary>
+        private void TextRim(string s, int x, int y) => Game2DJpFont.Draw((px, py) => RimAt(px, py), s, x, y);
 
         // ── 敵の HP の棒は、 液晶の中の戦闘の画面 (Game2DBattleLcd.DrawFoot) が描く (2026-11-16〜・旧 DrawEnemyHp は旧い戦闘の HUD と一緒に削除) ──
 
         private int MarkItem(string icon, int n, int x, int y, Col col)
         {
+            string s = n.ToString();
+            if (BattleReadability.Outline) { StampRim(Icon(icon), x, y); TextRim(s, x + 14, y); }
             Stamp(Icon(icon), x, y);
-            string s = n.ToString(); Text35(s, x + 14, y, 1, col, 0);
+            Text35(s, x + 14, y, 1, col, 0);
             return x + 14 + Game2DJpFont.Width(s) + MarkGap;
         }
 

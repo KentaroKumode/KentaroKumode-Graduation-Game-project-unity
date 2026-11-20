@@ -188,13 +188,7 @@ namespace EventSystem
         public List<EventEffect> TakePendingNav() { var l = new List<EventEffect>(PendingNav); PendingNav.Clear(); return l; }
 
         /// <summary>選択肢 index を選べるか。 **全部が選べない時は全部を選べる扱いにする** (詰み防止)。</summary>
-        public static bool IsChoiceSelectable(EventDefinition ev, int index, RunState run)
-        {
-            if (ev?.choices == null || index < 0 || index >= ev.choices.Count) return false;
-            if (ev.choices[index] == null || ev.choices[index].IsAvailable(run)) return true;
-            foreach (var c in ev.choices) if (c != null && c.IsAvailable(run)) return false;
-            return true;
-        }
+        public static bool IsChoiceSelectable(EventDefinition ev, int index, RunState run) => EventChoice.Selectable(ev?.choices, index, run);
 
         /// <summary>いま追跡者・猟犬・使い魔に捕捉されているなら「最短で何ターンで捕まるか」(こちらが留まった場合)。
         /// 捕捉されていない・航行マップの外なら <see cref="MapSystem.FreeMove.CatchEta.None"/>。

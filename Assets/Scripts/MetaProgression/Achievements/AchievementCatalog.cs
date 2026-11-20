@@ -64,7 +64,8 @@ namespace MetaProgression.Achievements
         /// <summary>毒の上限 (StatusEffectSystem の毒の maxStacks = 99) と同じ値。</summary>
         public const int PoisonGoal = 99;
         public const int BleedGoal = 50, ChargeGoal = 30, BurstGoal = 5, CritGoal = 100, OverkillGoal = 100;
-        public const int DeckBigGoal = 30, CrateSlowTurns = 30, ThirteenTurn = 13, ThirteenDamage = 13;
+        // CrateSlowTurns: 0 層の古い宝箱が攻撃 2 になった (2026-11-20) ので 30 → 10。 30 ターンでは開始 HP 30 が持たない (守りに挿せば 10 ターンは耐えられる)
+        public const int DeckBigGoal = 30, CrateSlowTurns = 10, ThirteenTurn = 13, ThirteenDamage = 13;
         public const int CalmDownTurns = 3, PerpetualHealTimes = 3, TheseusTimes = 10, StubbornCount = 3;
         // [2026-11-18] TopFaceTier (出目パーツの最上段 T4) は削除。 ADR-0015 で段が無くなり、 「奥の手」は LEGENDARY の賽で役を出すことにした (仮・作者の確認待ち)。
 
@@ -205,7 +206,7 @@ namespace MetaProgression.Achievements
             D(RelicAllMax, C.RelicPanel, 5, "完全無欠", "★4で、サブステータス3つがすべて最大の遺物を作る"),
             D(CursedRelicClear7, C.RelicPanel, 3, "揃いの至宝", "同じセットの遺物を3個持ち込んで、3層のボスを倒す"),
             D(RelicSetsAll, C.RelicPanel, 3, "六つの棚", $"{Relics.RelicCatalog.SetCount}つのセットの遺物を、すべて持つ"),
-            D(PanelFull, C.RelicPanel, 2, "整備完了", $"整備パネルの点を、{MetaPanel.MaxPoints}点すべて振る"),
+            D(PanelFull, C.RelicPanel, 2, "整備完了", $"整備パネルの基礎整備を{MetaPanel.BaseTierCount}段すべて買い、 作戦の枠を3つとも開く"),
 
             // ── 記録とイベント ──
             D(Events50, C.RecordEvent, 2, "寄り道の常連", $"イベントを通算{EventsGoal}回終える"),

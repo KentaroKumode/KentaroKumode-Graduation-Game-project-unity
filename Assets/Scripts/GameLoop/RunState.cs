@@ -274,7 +274,7 @@ namespace GameLoop
         public bool lastStandActive;
 
         /// <summary>5層裏ボス（シュヴァリエ・サン=ジョリオラ）撃破済みフラグ。
-        /// 立っている場合、シュヴァリエのレイピア解除時に会心+9 補正が付与される。</summary>
+        /// 立っている場合、シュヴァリエのレイピア解除の次のターン、 会心倍率 +1.0 が付く (2026-11-20・旧 会心+9)。</summary>
         public bool defeatedSaintGeorges;
 
         /// <summary>ヴェスカ (8 層 Null Point・id は boss_layer7 のまま) の戦闘に敗北したか。
@@ -316,6 +316,8 @@ namespace GameLoop
         public int terminalExtraChoices;
         /// <summary>店のサービスで山札から端子を抜いた回数 (抜く値段が上がる・ラン単位・上限なし)。 休憩で抜いた分は数えない。</summary>
         public int terminalShopRemovals;
+        /// <summary>休憩で端子を強化した回数 (強化の値段が上がる・ラン単位・<see cref="GameManager.TerminalUpgradeCost"/>・2026-11-20)。</summary>
+        public int terminalUpgrades;
 
         /// <summary>装備中の賽の id (ADR-0015・2026-11-18)。 持つ賽は 1 個で、 これを毎ターン 3 回振る。
         /// 空なら最初の賽 (<see cref="ItemIds.StartingDie"/>)。 読むのは <see cref="EquippedDie"/> を通す。 [persistent]</summary>
@@ -470,6 +472,18 @@ namespace GameLoop
         /// <summary>〈脈なしの鋼心臓〉の X: 戦闘開始時のシールド。 ランの始めに 10、 持っている間に戦闘に勝つたび +1 (2026-11-20)。</summary>
         public int  pulselessHeartShield = ItemSystem.PassiveSkills.Effects.PulselessHeart.StartShield;
 
+        // === マクロ秘宝 (2026-11-20・item-overhaul-spec §9)。 どれも持っている間の出来事だけ数える ===
+        /// <summary>〈研ぎ代の領収書〉: 店・休憩で山札から端子を抜いた回数 (攻撃 +2 × 回数)。</summary>
+        public int  receiptRemovals;
+        /// <summary>〈相場師の算盤〉: 店に入って最初のリロールをした回数 (戦闘開始時の充電 +3・臨界 +5 × 回数)。</summary>
+        public int  abacusStacks;
+        /// <summary>〈黄金の通行手形〉: 店で使ったゴールドの 100G に満たない端数 (店を出る時に足す)。</summary>
+        public int  passShopSpent;
+        /// <summary>〈黄金の通行手形〉: 秘宝の棚が 1 段上のレア度で並ぶ店の残り軒数 (店に入るたび 1 つ使う)。</summary>
+        public int  passShopsUp;
+        /// <summary>〈避雷の天幕〉: 数えている層の深さ (違う層に入ったら数え直す) と、 その層で半分にした回数。</summary>
+        public int  tentDepth = -1, tentUses;
+
         /// <summary>次戦闘持ち越しバフをすべて消去（戦闘開始時にコピー後 or リセット時）。</summary>
         public void ClearPendingCombatConsumables()
         {
@@ -487,6 +501,9 @@ namespace GameLoop
         /// テスト等のためだけに残している。 2026-07-28 に「30 → 50」としたつもりの変更は
         /// ここだけを直したため**一度も効いていなかった** (2026-08-03 に発覚。
         /// それまでの全バランス調整は実効 30 の上で行われていた)。値を変えるときは必ず GameManager 側で。</param>
+        /// <summary>ラン開始時の所持金 (2026-11-20 に 0 → 10・整備パネル刷新 system-overhaul-spec §1-2 A・仮)。</summary>
+        public const int StartingCoins = 10;
+
         public void Initialize(int startHP = GameManager.BaseStartingHP)
         {
             currentFloor = MapSystem.FreeMove.FloorPlan.FarmFloor;
@@ -499,7 +516,7 @@ namespace GameLoop
             totalBattles = 0;
             totalWins = 0;
             totalTurns = 0;
-            coins = 0;
+            coins = StartingCoins;
             isRunActive = true;
             gateFlaws = GateFlaw.None;
 
@@ -549,6 +566,7 @@ namespace GameLoop
             terminalWhetBonus = 0;
             terminalExtraChoices = 0;
             terminalShopRemovals = 0;
+            terminalUpgrades = 0;
             // 兵站: 物資上限 +1/段 (2026-11-09)
             int provisionCapBonus = MetaProgression.MetaBuffApplicator.GetProvisionCapBonus();
             provisionCap = UnityEngine.Mathf.Max(1, GameHooks.ProvisionBaseMax + provisionCapBonus);

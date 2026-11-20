@@ -56,6 +56,14 @@ namespace CombatSystem
             else runDeck = TerminalCards.StartingDeck();
             _deck = new TerminalDeckState();
             _deck.BeginBattle(runDeck);
+            // 采配の品 (2026-11-20・段 1-e): 端子の解決と山札の出し入れを変える品の旗 (本体も BOT の写しも state から読む)
+            _deck.state.deckItems = TerminalCards.DeckItemsOf(run);
+            _deck.state.roleItems = TerminalCards.RoleItemsOf(run);      // 賽目の品 (2026-11-21・段 1-f)
+            if (AxisRules.Owns(run, GameLoop.ItemIds.DeckSparePlug)) _deck.state.extraDrawNext += TerminalCards.SparePlugDraw;      // 〈予備の差込口〉: 1 ターン目に多く引く
+            _deck.state.extraDrawNext += MetaProgression.MetaBuffApplicator.GetSparkDeckOpeningDraw();      // 種火・山札 (2026-11-21): 1 ターン目の手札 +1
+            if (AxisRules.Owns(run, GameLoop.ItemIds.DeckToolbox) && runDeck.Count <= TerminalCards.ToolboxMaxDeck)
+                _deck.state.handBonus = TerminalCards.ToolboxHand;      // 〈整理された工具箱〉: 戦闘開始時の山札で決める (戦闘中に増えても変えない)
+            if ((_deck.state.deckItems & DeckItems.Workbench) != 0) _deck.MovePermanentsToBoard();      // 〈常設の作業台〉: 山の常設を全部場へ
             // 時計の賽 (ADR-0015): 〈時計〉の端子を常設として場に置く (山札には入れない・戦闘の間ずっと場にある)
             if (GameLoop.EquippedDie.IdOf(run) == GameLoop.DieIds.Clock) _deck.permanent.Add(TerminalIds.Clock);
             TerminalDiag.NoteBattle(runDeck);   // [計装 2026-11-12]
@@ -72,8 +80,9 @@ namespace CombatSystem
             // ヴェスカ〈停滞する時間〉: 引いた端子 1 枚ごとに確率で止める (持たない敵は 0)
             float stop = ItemSystem.PassiveSkills.Effects.StagnantTime.StopChance(currentEnemy);
             if (ctx != null && TenyoHeavy.RingStopsAt(ctx.currentTurn)) stop = 1f;      // 天与の指輪 (2026-11-15): 大技の次のターンは、 引いた端子を全部止める
-            _deck.DrawTurn(TerminalCards.HandSize + extra, _termRetain, stop);
+            _deck.DrawTurn(TerminalCards.HandSize + extra + _deck.state.handBonus, _termRetain, stop);      // handBonus = 〈整理された工具箱〉
             TerminalDiag.NoteDrawn(_deck.LastDrawnIds);   // [計装 #106] 新しく引いた端子
+            RaiseDeckShuffles(ctx);   // 引く時に切り直した (2026-11-20)
             if (TerminalCards.HandCarry && ctx != null && ctx.currentTurn > 1) BossDownDiag.NoteCarry(_deck.LastCarriedCount);   // [計装 2026-11-13] 持ち越した枚数 (戦闘の 1 ターン目は除く)
             if (stop > 0f)
             {
@@ -85,11 +94,13 @@ namespace CombatSystem
             if (ctx == null) return;
             // 〈打ち直し〉: この戦闘中の出目 +N (自ロールの後に足す既存の口へ渡す)
             ctx.accumulatedValues[FoundryBonusKey] = _deck.state.foundryBonus;
-            // 〈柔軟な戦略〉: 基本以外の発動が累計 N 回ごとに与ダメージ +10% (山札に入っていれば効く)
-            var run = GameLoop.GameManager.Instance?.Run;
-            if (run?.terminalDeck != null && run.terminalDeck.Contains(TerminalIds.Counter))
+            // 〈柔軟な戦略〉: 基本以外の発動が累計 N 回ごとに与ダメージ +10%。 このターンに引いて場にある時だけ効く
+            //   (2026-11-20〜 説明文どおり「端子の効果」として。 旧: ランの山札に入っていれば、 引かなくても毎ターン効いた)。 累計は引いていない間も数える
+            //   素と強化した〈柔軟な戦略＋〉は別の端子 (両方が場にあれば両方効く・同じ名前の 2 枚目は足さない)
+            foreach (var cid in new[] { TerminalIds.Counter, TerminalIds.Upgraded(TerminalIds.Counter) })
             {
-                int stacks = _deck.state.firedTotal / TerminalCards.CounterEvery;
+                if (!_deck.board.Contains(cid)) continue;
+                int stacks = _deck.state.firedTotal / (TerminalCards.Get(cid).upgraded ? TerminalCards.CounterEveryUp : TerminalCards.CounterEvery);
                 if (stacks > 0) ctx.AddOutgoingPct(TerminalCards.CounterPct * stacks);
             }
         }
@@ -124,6 +135,7 @@ namespace CombatSystem
             {
                 hp = playerHP, maxHp = playerMaxHP, enemyAttack = enemyAttack,
                 whetBonus = run != null ? run.terminalWhetBonus : 0,
+                enemyHp = enemyHP, enemyMaxHp = EnemyMaxHP,      // 〈処刑の刃＋〉
                 // 時限デバフ〈罪悪感〉(2026-11-16): 防御に挿した出目 −2 (下限 0)。 Resolve が引く (本体・画面・BOT の同じ口)
                 blockDieCut = EventSystem.TimedEffects.TimedDebuffRule.BlockDieCut(run?.timedDebuffs),
             };
@@ -133,6 +145,7 @@ namespace CombatSystem
             e.bursts = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.BurstTotalKey);
             e.axCrit = ctx.AxisDepth(AxisRules.Crit); e.axBleed = ctx.AxisDepth(AxisRules.Bleed); e.axPoison = ctx.AxisDepth(AxisRules.Poison);
             e.axHeat = ctx.AxisDepth(AxisRules.Heat); e.axCharge = ctx.AxisDepth(AxisRules.Charge); e.axShield = ctx.AxisDepth(AxisRules.Shield);
+            e.axDeck = ctx.AxisDepth(AxisRules.Deck); e.axRole = ctx.AxisDepth(AxisRules.Role);
             // 賽のパッシブ (ADR-0015・DiePassives)
             e.dieId = GameLoop.EquippedDie.IdOf(run);
             e.diceRerolled = ctx.rerollsThisTurn > 0;
@@ -140,6 +153,10 @@ namespace CombatSystem
             if (_enemyDiceNow != null) foreach (int d in _enemyDiceNow) if (d > emax) emax = d;
             e.enemyMaxDie = emax;
             e.heavyTurn = Escalation.IsHeavyTurn(currentEnemy, ctx.currentTurn);
+            e.chargeCostCut = ctx.ChargeCostNow(2) < 2 ? 1 : 0;   // 〈過負荷チューナー〉: 過充電の間 1 減る (最低 1)
+            e.noAttack = GameLoop.Consumables.RapierContreOn(ctx);   // 〈シュヴァリエのレイピア〉のコントラタック中は攻撃の端子に挿せない
+            e.sealedRoleMask = ctx.sealedRoleMask;                    // 立つ役 (TerminalCards.RoleOf) は ResolveRoles と同じ判定 (2026-11-21)
+            e.pairAsTriple = OmniPairNow(ctx);                        // 〈万象のゾロ目〉: このターン 2 個そろいをゾロ目として扱う (振り直しの後に決める)
             return e;
         }
 
@@ -148,8 +165,13 @@ namespace CombatSystem
         {
             _termDamageMul = o.damageMul;
             if (o.chargeSpend > 0) ctx.ConsumeCharge(Math.Min(o.chargeSpend, ctx.GetCharge()));
+            if (o.chargeCapAdd > 0) ctx.chargeCapBonus += o.chargeCapAdd;      // 〈大導電＋〉: この戦闘の充電の上限 (満たす前に)
             if (o.chargeFill) ctx.AddCharge(ctx.ChargeCap);
+            if (o.rerollDiscountNext > 0) YachtRoleEffects.AddNextTurn(ctx, RerollDiscountKey, o.rerollDiscountNext);      // 〈賽振り台〉(2026-11-21)
+            //   〈応急箱＋〉: 回復の量のうち、 最大 HP を超えた分 (回復する前の空きを超えた分) はシールドになる
+            int overheal = o.overhealToShield > 0 ? Math.Max(0, o.overhealToShield - Math.Max(0, playerMaxHP - playerHP)) : 0;
             if (o.heal > 0) HealPlayer(o.heal);
+            if (overheal > 0) { ctx.consShield += overheal; ctx.shieldGainedTotal += overheal; ShieldDiag.Note("端子", overheal); }
             if (o.selfDamage > 0)
             {
                 playerHP = Math.Max(1, playerHP - o.selfDamage);
@@ -163,7 +185,7 @@ namespace CombatSystem
             }
             if (o.poison > 0) ItemSystem.PassiveSkills.Effects.Rw.Poison(ctx, o.poison);
             if (o.heat > 0) { ItemSystem.PassiveSkills.Keywords.Kw.EnableHeat(ctx); ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, o.heat, "端子"); }
-            if (o.retreatStage) YachtRoleEffects.AddEscalationDelay(ctx, YachtRoleEffects.TurnsToRetreatOneStage(ctx));
+            for (int r = 0; r < o.retreatStage; r++) YachtRoleEffects.AddEscalationDelay(ctx, YachtRoleEffects.TurnsToRetreatOneStage(ctx));
             if (o.escalationDelay > 0)      // 時計の賽 (ADR-0015)
             {
                 YachtRoleEffects.AddEscalationDelay(ctx, o.escalationDelay);
@@ -192,12 +214,49 @@ namespace CombatSystem
             }
         }
 
+        /// <summary>配線の解決の直後 (<see cref="ApplyTerminalOutcome"/> の後・OnWired の前): 端子の出来事を配る (2026-11-20・段 1-e・item-overhaul-spec §2-2)。
+        /// 判断の間に消耗品・品で引いて切り直した分の OnDeckShuffle もここで配る。 使い捨て = 1 枚につき OnTerminalDispose (量 1)・
+        /// 補助 (基本を除く) = OnSupportTerminalUse・残す印で残した端子 = OnKeptTerminalUse (量 = 挿した出目の合計・最低 1・名前で数える)。
+        /// ここはまだターンの解決中なので、 品が入れる敵へのダメージ (Kw.DamageEnemy) はこのターンの攻撃の固定ダメの枠で通る。</summary>
+        private void RaiseTerminalEvents(CombatContext ctx, TerminalOutcome o)
+        {
+            if (_deck == null || ctx == null || o == null) return;
+            RaiseDeckShuffles(ctx);
+            var kept = _deck.state.kept != null ? new List<string>(_deck.state.kept) : null;
+            for (int i = 0; i < o.fired.Count; i++)
+            {
+                int s = o.fired[i];
+                if (s < 0 || s >= _deck.board.Count) continue;
+                string id = _deck.board[s];
+                var d = TerminalCards.Get(id);
+                if (d == null) continue;
+                int amt = Math.Max(1, i < o.firedSums.Count ? o.firedSums[i] : 0);
+                if (d.disposable) ItemSystem.PassiveSkills.Keywords.Kw.Raise(ctx, PassiveSkillTrigger.OnTerminalDispose, 1);
+                if (d.kind == TerminalKind.Support && !d.basic) ItemSystem.PassiveSkills.Keywords.Kw.Raise(ctx, PassiveSkillTrigger.OnSupportTerminalUse, amt);
+                if (kept != null && s >= _deck.permanent.Count && kept.Remove(id)) ItemSystem.PassiveSkills.Keywords.Kw.Raise(ctx, PassiveSkillTrigger.OnKeptTerminalUse, amt);
+            }
+        }
+
+        /// <summary>まだ配っていない切り直しの出来事 (OnDeckShuffle・量 = 切り直した枚数) を配る。 ctx が null なら捨てずに次へ持ち越す。</summary>
+        private void RaiseDeckShuffles(CombatContext ctx)
+        {
+            if (_deck == null || ctx == null) return;
+            foreach (int n in _deck.TakeShuffled()) ItemSystem.PassiveSkills.Keywords.Kw.Raise(ctx, PassiveSkillTrigger.OnDeckShuffle, n);
+        }
+
         /// <summary>撃破のボーナスを配る端子のうち、 このターンに発動したもの。 場の添字は <see cref="TerminalDeckState.FinishTurn"/> で書き換わるので、
         /// ターン終了時の撃破を待つ間は名前で控えておく (<see cref="_termKillPending"/>)。</summary>
         private sealed class TermKillBonus
         {
-            public bool harvester, whet, loot, stripper;
-            public bool Any => harvester || whet || loot || stripper;
+            /// <summary>配る量 (<see cref="TerminalOutcome.killMaxHp"/> などの写し・〈残響〉の 2 回目も入っている)。</summary>
+            public int maxHp, whet, gold, choices;
+            /// <summary>撃破した時に戻る HP (〈諸刃の剣＋〉)。</summary>
+            public int refundHp;
+            public bool harvester => maxHp > 0;
+            public bool loot => gold > 0;
+            public bool stripper => choices > 0;
+            public bool whetOn => whet > 0;
+            public bool Any => harvester || whetOn || loot || stripper || refundHp > 0;
         }
         /// <summary>このターンに発動した撃破のボーナスの端子のうち、 まだ配っていない (敵がまだ倒れていない) もの。 ターン終了時の撃破 (〈絞り出し〉〈百断〉など)
         /// を <see cref="SettleTerminalKillBonus"/> で拾う。 null = 待っていない。 ターンの終わり (FinishTurnCommon) までに必ず null へ戻る。</summary>
@@ -214,11 +273,7 @@ namespace CombatSystem
             if (_deck == null) return;
             _termKillPending = null;
             var b = _deck.board;
-            var kb = new TermKillBonus
-            {
-                harvester = o.Fired(b, TerminalIds.Harvester), whet = o.Fired(b, TerminalIds.Whet),
-                loot = o.Fired(b, TerminalIds.LootBox), stripper = o.Fired(b, TerminalIds.Stripper),
-            };
+            var kb = new TermKillBonus { maxHp = o.killMaxHp, whet = o.killWhet, gold = o.killGold, choices = o.killChoices, refundHp = o.killRefundHp };
             if (kb.Any)
             {
                 if (enemyHP <= 0 && o.attackDice > 0) GrantTerminalKillBonus(kb);   // 旧い条件でも入る撃破
@@ -226,7 +281,7 @@ namespace CombatSystem
                 {
                     // 攻撃の端子なしで倒れた (毒・出血・爆発・反撃・品の直接ダメージなど)。 4 種とも攻撃の種類なので、 発動していればここへは来ない
                     // (〈剥ぎ取り〉が補助だった 2026-11-13 まではここへ来た)。 守りとして残す
-                    TerminalDiag.NoteKillNewOnly(kb.harvester, kb.whet, kb.loot, kb.stripper);   // [計装]
+                    TerminalDiag.NoteKillNewOnly(kb.harvester, kb.whetOn, kb.loot, kb.stripper);   // [計装]
                     if (!GameLoop.GameHooks.TerminalKillBonusNeedsAttack) GrantTerminalKillBonus(kb);
                 }
                 else _termKillPending = kb;
@@ -244,6 +299,14 @@ namespace CombatSystem
             _termRetain = _deck.FinishTurn(o);
         }
 
+        /// <summary>〈後の先〉(2026-11-20〜): 「防いだ量」= ブロックで実際に防いだ量。 Resolve が入れた見込み (<see cref="TerminalOutcome.parryStore"/>) を
+        /// 実際の量 (<paramref name="blocked"/> = 攻撃 1 回ごとの min(後の先のブロック, ブロックで止めた量) の和) へ直す。 BOT の見積もりは見込みのまま。</summary>
+        private void SettleParry(TerminalOutcome o, int blocked)
+        {
+            if (_deck == null || o == null || (o.parryBlock <= 0 && o.parryStore <= 0)) return;
+            _deck.state.storedAttackNext = Math.Max(0, _deck.state.storedAttackNext + blocked - o.parryStore);
+        }
+
         /// <summary>このターンに発動した端子の合図 (#319): 発動・使い捨て・〈火葬の剣〉が外した端子。 知らせるだけ。</summary>
         private static void CueTerminals(List<string> b, TerminalOutcome o)
         {
@@ -254,7 +317,7 @@ namespace CombatSystem
                 RaiseCue(CombatCue.TerminalFired, id);
                 var def = TerminalCards.Get(id);
                 if (def != null && def.disposable) RaiseCue(CombatCue.DisposableUsed, id);
-                if (id == TerminalIds.BurnOut && o.burnTarget >= 0 && o.burnTarget < b.Count) RaiseCue(CombatCue.BurnOut, b[o.burnTarget]);
+                if (TerminalCards.BaseOf(id) == TerminalIds.BurnOut && o.burnTarget >= 0 && o.burnTarget < b.Count) RaiseCue(CombatCue.BurnOut, b[o.burnTarget]);
             }
         }
 
@@ -268,7 +331,7 @@ namespace CombatSystem
             if (enemyHpNow <= 0)
             {
                 _termKillPending = null;
-                TerminalDiag.NoteKillNewOnly(kb.harvester, kb.whet, kb.loot, kb.stripper);   // [計装]
+                TerminalDiag.NoteKillNewOnly(kb.harvester, kb.whetOn, kb.loot, kb.stripper);   // [計装]
                 if (!GameLoop.GameHooks.TerminalKillBonusNeedsAttack) GrantTerminalKillBonus(kb);
             }
             else if (final) _termKillPending = null;
@@ -282,15 +345,23 @@ namespace CombatSystem
             if (kb.harvester)
             {
                 TerminalDiag.Note(TerminalIds.Harvester, TerminalDiag.KillBonus);   // [計装]
-                run.playerMaxHP += TerminalCards.HarvesterMaxHp; playerMaxHP += TerminalCards.HarvesterMaxHp;
+                run.playerMaxHP += kb.maxHp; playerMaxHP += kb.maxHp;
                 // ターン終了時の撃破では FinishTurnCommon の SyncHPFromContext が ctx から最大 HP を拾い直すので、 ctx にも入れる
                 var hctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
                 if (hctx != null) hctx.playerMaxHP = playerMaxHP;
-                Debug.Log($"[端子/魂狩り] 最大 HP +{TerminalCards.HarvesterMaxHp}");
+                Debug.Log($"[端子/魂狩り] 最大 HP +{kb.maxHp}");
             }
-            if (kb.whet) { TerminalDiag.Note(TerminalIds.Whet, TerminalDiag.KillBonus); run.terminalWhetBonus += TerminalCards.WhetGain; Debug.Log($"[端子/処刑の刃] 攻撃 +{TerminalCards.WhetGain} (計 {run.terminalWhetBonus})"); }
-            if (kb.loot) { TerminalDiag.Note(TerminalIds.LootBox, TerminalDiag.KillBonus); run.coins += TerminalCards.LootGold; Debug.Log($"[端子/賞金狩り] ゴールド +{TerminalCards.LootGold}"); }
-            if (kb.stripper) { TerminalDiag.Note(TerminalIds.Stripper, TerminalDiag.KillBonus); run.terminalExtraChoices += TerminalCards.StripperChoices; Debug.Log($"[端子/剥ぎ取り] 戦闘後の端子の選択肢 +{TerminalCards.StripperChoices} (計 +{run.terminalExtraChoices})"); }
+            if (kb.whetOn) { TerminalDiag.Note(TerminalIds.Whet, TerminalDiag.KillBonus); run.terminalWhetBonus += kb.whet; Debug.Log($"[端子/処刑の刃] 攻撃 +{kb.whet} (計 {run.terminalWhetBonus})"); }
+            if (kb.loot) { TerminalDiag.Note(TerminalIds.LootBox, TerminalDiag.KillBonus); run.coins += kb.gold; Debug.Log($"[端子/賞金狩り] ゴールド +{kb.gold}"); }
+            if (kb.refundHp > 0)
+            {
+                // 〈諸刃の剣＋〉: 払った HP が戻る (回復ではないので、 回復を減らす効果は掛からない・最大 HP は超えない)
+                playerHP = Math.Min(playerMaxHP, playerHP + kb.refundHp);
+                var rctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
+                if (rctx != null) rctx.playerCurrentHP = playerHP;
+                Debug.Log($"[端子/諸刃の剣＋] 払った HP が戻る +{kb.refundHp}");
+            }
+            if (kb.stripper) { TerminalDiag.Note(TerminalIds.Stripper, TerminalDiag.KillBonus); run.terminalExtraChoices += kb.choices; Debug.Log($"[端子/剥ぎ取り] 戦闘後の端子の選択肢 +{kb.choices} (計 +{run.terminalExtraChoices})"); }
         }
 
         /// <summary>[測定の口の時だけ] 使うとランの山札から抜ける端子 (〈応急箱〉・<see cref="TerminalCards.LeavesRunDeck"/>・既定では抜けない = 2026-11-14〜) を、
@@ -322,7 +393,7 @@ namespace CombatSystem
         {
             if (board == null || o == null || targets == null) return -1;
             foreach (int s in o.fired)
-                if (s >= 0 && s < board.Count && s < targets.Length && board[s] == TerminalIds.Retainer) return targets[s];
+                if (s >= 0 && s < board.Count && s < targets.Length && TerminalCards.BaseOf(board[s]) == TerminalIds.Retainer) return targets[s];
             return -1;
         }
 

@@ -225,7 +225,7 @@ static partial class T
         // ── 1. 口を閉じた形 (storm = false) は main の生成器と 1 点も変わらない・乱数の引く回数も同じ ──
         {
             int layers = 0, diff = 0, drawDiff = 0; string firstDiff = null;
-            foreach (int floor in new[] { 0, 1, 3, 5, 6, 7 })
+            foreach (int floor in new[] { 1, 3, 5, 6, 7 })   // 深さ 0 は 2026-11-20 に 5 つの点へ作り直した (参照の版とは違って当然)
                 for (int salt = 1; salt <= N(5000, 1500); salt++)
                 {
                     // 深さ 6 は 2 つの形: ふだん (固定の点なし・main とは隣の点の種別だけ違ってよい) と、 イベントなしの測定 (固定の点・main と 1 点も変わらない)
@@ -419,6 +419,14 @@ static partial class T
                 ok &= q;
             }
             Check(ok, $"嵐: 深さ 0/7 に嵐も天候も無い (始点は左端・ボスは見える)・深さ 6 は手番 0 からフェーズ 1・深さ 1/3/5 は {FreeMapParams.StormQuietTurns} 手番の静かな時間のあとフェーズ 1 (段の変わり目を知らせる)");
+            // 0 層 (2026-11-20): 前哨基地 → 戦闘 → 秘宝 → 店 → ボスの 1 本道
+            {
+                var Lf = FreeMapGenerator.Generate(0, false, true);
+                var want = new[] { TileType.Outpost, TileType.Battle, TileType.Treasure, TileType.Shop, TileType.Boss };
+                var got = new List<TileType>(); int cur = Lf.start, prev = -1;
+                for (int g = 0; g < 10; g++) { got.Add(Lf.types[cur]); int nx = -1; foreach (int v in Lf.adj[cur]) if (v != prev) { nx = v; break; } if (nx < 0) break; prev = cur; cur = nx; }
+                Check(Lf.Count == 5 && cur == Lf.goal && got.SequenceEqual(want), $"0 層: 5 つの点の 1 本道 ({string.Join(" → ", got)})");
+            }
         }
 
         // ── 6. 嵐の HP・種類 (雹・砂・雪)・近道・待つ ──
@@ -453,6 +461,29 @@ static partial class T
                 ok &= s.InFight || (hp2 - w.Hp == wantHp && p2 == w.Provision && s.Turn == t2);
             }
             Check(ok, $"嵐: 嵐の中の点への 1 歩は HP −{FreeMapParams.StormHp} (雹 −{FreeMapParams.StormHp + FreeMapParams.StormHailHp}・砂は物資 +{FreeMapParams.StormSandSupply}・雪は 2 手番で時計も 2)・待つも −{FreeMapParams.StormHp}・近道でも HP は払う ({string.Join(" / ", notes)})");
+            // 深さ 1 だけ嵐の HP は 2 (2026-11-20・FreeMapParams.StormHpAt)
+            {
+                var w1 = new Wallet { Provision = 100, Hp = 1000 };
+                var s1 = MakeStorm(11, 1, w1, WeatherKind.None);
+                s1.ShiftFront(FreeMapParams.StormQuietTurns + Storm.Phase4Start);
+                int j1 = s1.Neighbors(s1.Me).First(v => v != s1.Layout.goal);
+                int h1 = w1.Hp; s1.MoveTo(j1);
+                int h2 = w1.Hp; if (!s1.InFight) s1.Wait();
+                Check(s1.StormPhase == 4 && (s1.InFight || (h1 - h2 == FreeMapParams.StormHpDepth1 && h2 - w1.Hp == FreeMapParams.StormHpDepth1)),
+                      $"嵐: 深さ 1 は 1 歩・待つとも HP −{FreeMapParams.StormHpDepth1} (歩く {h1 - h2}・待つ {h2 - w1.Hp})");
+            }
+            // 〈油布の靴〉(hailHpCut 1・2026-11-20): 雹の嵐の 1 歩は HP −1 少ない (待つは変わらない)
+            {
+                var wb = new Wallet { Provision = 100, Hp = 1000 };
+                var sb = MakeStorm(11, 5, wb, WeatherKind.Hail);
+                sb.SetPerks(new FreeMapPerks { hailHpCut = 1 });
+                sb.ShiftFront(FreeMapParams.StormQuietTurns + Storm.Phase4Start);
+                int jb = sb.Neighbors(sb.Me).First(v => v != sb.Layout.goal);
+                int want = FreeMapParams.StormHp + FreeMapParams.StormHailHp - 1;
+                bool same = sb.StormHpFor(jb) == want && sb.HpLossFor(jb) == want;
+                int hb = wb.Hp; sb.MoveTo(jb);
+                Check(same && (sb.InFight || hb - wb.Hp == want), $"嵐: 〈油布の靴〉は雹の嵐の 1 歩を HP −{want} にする (払った {hb - wb.Hp})");
+            }
             // 嵐の外の点では払わない・終点 (ボス) へは払わない
             var w2 = new Wallet { Provision = 100, Hp = 1000 };
             var s2 = MakeStorm(12, 3, w2);

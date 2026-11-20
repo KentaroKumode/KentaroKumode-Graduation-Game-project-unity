@@ -285,6 +285,9 @@ namespace GameLoop
 
         /// <summary>報酬コイン。 <paramref name="encounterMultiplier"/> は 2 体戦の 2 倍など、
         /// エンカウントプリセット由来の倍率。</summary>
+        /// <summary>0 層の戦闘 (試練の木箱) の報酬ゴールド (2026-11-20)。 ボスはふつうの層と同じく 2 倍。</summary>
+        public const int FarmBattleGold = 20;
+
         public static int CalculateRewardCoins(int floor, bool playerWon, int turnsUsed,
                                                float encounterMultiplier)
         {
@@ -306,6 +309,8 @@ namespace GameLoop
             //   係数の正本は GameLoop.CombatRewards (ドロップ率と同じ場所で持つ)。
             int baseReward = Mathf.Max(1, Mathf.CeilToInt((7 + floor / 2) / 5f))
                              * CombatRewards.GoldScale;
+            // 0 層 (2026-11-20・docs/system-overhaul-spec.md §4-4): 試練の木箱は +20G (ボスはこの 2 倍)。 旧 木箱 12G ×3 + 宝箱 24G と同じ 60G
+            if (floor == MapSystem.FreeMove.FloorPlan.FarmFloor) baseReward = FarmBattleGold;
 
             // フロアデバフの報酬倍率（Fortune層・shopPriceMultiplier等）
             var mod = MapSystem.FloorModifierDatabase.Get(floor);

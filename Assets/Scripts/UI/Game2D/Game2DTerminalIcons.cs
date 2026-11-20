@@ -18,10 +18,11 @@ namespace UI.Game2D
 
         static Dictionary<string, byte[]> _cache;
 
-        /// <summary>長さ Size × Size (行優先・左上から)・値 0 / Back / Front。 無ければ null。</summary>
+        /// <summary>長さ Size × Size (行優先・左上から)・値 0 / Back / Front。 無ければ null。 強化した端子は基の端子と同じ絵 (2026-11-20)。</summary>
         public static byte[] Get(string id)
         {
             if (string.IsNullOrEmpty(id)) return null;
+            id = TerminalCards.BaseOf(id);
             if (_cache == null) Build();
             return _cache.TryGetValue(id, out var px) ? px : null;
         }

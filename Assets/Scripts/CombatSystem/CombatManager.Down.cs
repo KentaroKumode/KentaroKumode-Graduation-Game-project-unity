@@ -59,6 +59,14 @@ namespace CombatSystem
         {
             bool was = BossDown.ActiveNow;
             BeginBossDownTurnCore(ctx);
+            // 「ダウン中は発動しない」パッシブの後始末 (2026-11-20・BossDownPassives): 毒沼の主はダウンに入った時に毒 −2、 ヴェスカは前のターンの遺物を消す
+            if (BossDown.ActiveNow)
+            {
+                if (!was && BossDownPassives.SkipsDuringDown(ItemSystem.PassiveSkills.Effects.MiasmaCorrosion.Id))
+                    ItemSystem.PassiveSkills.Effects.MiasmaCorrosion.OnDownStart(ctx);
+                if (BossDownPassives.SkipsDuringDown(ItemSystem.PassiveSkills.Effects.RelicScholar.Id))
+                    ItemSystem.PassiveSkills.Effects.RelicScholar.ClearForDownTurn(ctx);
+            }
             if (!was && BossDown.ActiveNow) RaiseCue(CombatCue.BossDownStart);
             else if (was && !BossDown.ActiveNow)
             {
@@ -70,6 +78,22 @@ namespace CombatSystem
                     Debug.Log($"[柱折りの発破筒] ダウンが明けた → HP 0 の所に目盛りを足す (目盛り {_down.notches.Length} 本)");
                 }
             }
+        }
+
+        /// <summary>このターン敵が大技の予告かチャージを出しているか (〈英雄の意志〉がターン開始時に読む・2026-11-20)。
+        /// ターン開始のトリガーはダウンを立てる前に鳴るので、 待っているダウンがあれば (このターンはダウン = 予告を出さない) false。</summary>
+        public bool EnemyHeavyOrChargeNow(int turn)
+        {
+            if (currentEnemy == null || enemyHP <= 0 || (_down.Enabled && _down.pending > 0)) return false;
+            return Escalation.IsHeavyTurn(currentEnemy, turn) || Escalation.IsChargeTurn(currentEnemy, turn);
+        }
+
+        /// <summary>このターン敵がチャージ中 (大技の前で攻撃しない・天与の盾と指輪も) かダウン中か (〈隙衝きの短槍〉が配線の後に読む・2026-11-21)。
+        /// 予告の「チャージ」の印 (<see cref="FillDownTelegraph"/>)・敵の攻撃の解決の「攻撃しない」の枝と同じ判定。</summary>
+        public bool EnemyChargingOrDownNow(int turn)
+        {
+            if (currentEnemy == null || enemyHP <= 0) return false;
+            return _down.downNow || Escalation.IsChargeNoAttack(currentEnemy, turn) || TenyoHeavy.NoAttackAt(currentEnemy, turn);
         }
 
         /// <summary>〈柱折りの発破筒〉(2026-11-20): 次に割る目盛りを <paramref name="add"/> (HP) だけ上げる。 今の HP より上へは行かない (今の HP の 1 下まで ── 割るには通常攻撃が要る)。
@@ -102,6 +126,7 @@ namespace CombatSystem
             if (DownCancelsCycleAt(currentEnemy, ctx.currentTurn, Escalation.HeavyHpRatio))
                 Escalation.HeavyCycleOffset = ctx.currentTurn;
             _down.heavyCanceledNow = hadHeavy && (always || canceled);
+            if (canceled) RaiseBossEvent(ctx, PassiveSkillTrigger.OnHeavyCanceled, 1, false);   // 大技を取り消した (2026-11-21・〈大技殺しの楔〉)
             if (canceled) MetaProgression.Achievements.AchievementService.NoteBossDownCanceledHeavy();   // 実績〈出鼻をくじく〉   // 画面の「大技は取り消し」(旧い規則はどのダウンでも大技が先へ延びる)
             BossDown.ActiveNow = true;
             BossDown.TakenMulNow = !_down.downWeakNow;   // ひびで割れた弱いダウン (2026-11-14) は受けるダメージ ×1.5 なし
@@ -138,22 +163,25 @@ namespace CombatSystem
 
         /// <summary>主攻撃 (通常攻撃) が当たった直後 (主攻撃のダメージを HP から引いた所・固定ダメの枠より前・2026-11-14):
         /// 新しい判定 (MainAttackOnly) なら、 HP 以下にある未割りの目盛りを全部割る (満額のダウン・ひびの入った目盛りも)。 ダメージ 0 (回避・吸収) や撃破では割らない。
-        /// 旧い判定 (AnyDamage) では何もしない (計装だけ)。 1 ターンに主攻撃が複数回当たる時は、 当たるたびに呼んでよい。</summary>
-        private void NoteBossDownMainHit(int mainDmg, int turn)
+        /// 旧い判定 (AnyDamage) では何もしない (計装だけ)。 1 ターンに主攻撃が複数回当たる時は、 当たるたびに呼んでよい。
+        /// 戻り値 = この撃で割った目盛りの数 (旧い判定・割らなかった時は 0・端子〈崩し斬り〉が読む)。</summary>
+        private int NoteBossDownMainHit(int mainDmg, int turn)
         {
             _downMainWouldBreak = 0;
-            if (!_down.Enabled || currentEnemy == null || enemyHP <= 0 || mainDmg <= 0) return;
+            if (!_down.Enabled || currentEnemy == null || enemyHP <= 0 || mainDmg <= 0) return 0;
             if (GameLoop.GameHooks.DownBreak == DownBreakRule.AnyDamage)
             {
                 _downMainWouldBreak = BossDown.BrokenCount(_down.notches, currentEnemy.maxHP, enemyHP, _down.broken) - _down.broken;
-                return;
+                return 0;
             }
             int d = _down.NoteMainHit(enemyHP, currentEnemy.maxHP, mainDmg, turn, out int crackedBroken, out int waitSum);
-            if (d <= 0) return;
+            if (d <= 0) return 0;
             MetaProgression.Achievements.AchievementService.NoteBossDownBroken(d);   // 実績〈二枚抜き〉(1 回の攻撃で 2 つ)
+            RaiseBossEvent(PassiveSkillManager.Instance?.Context, PassiveSkillTrigger.OnBossDown, d, false);   // 通常攻撃で割った (2026-11-21)
             BossDownDiag.NoteMainBreak(d, crackedBroken, waitSum);
             Debug.Log($"[ダウン] 通常攻撃で目盛りを {d} つ割った (HP {enemyHP}/{currentEnemy.maxHP}"
                     + (crackedBroken > 0 ? $"・うちひびの入った目盛り {crackedBroken}" : "") + $") → 次のターンからダウン {_down.pending} ターン");
+            return d;
         }
 
         /// <summary>ターンの終わり (ターン終了時の削りを拾った後): 旧い判定 (AnyDamage) = 新しく割った目盛りを数え、 その数だけ次のターンからダウンを待たせる。
@@ -169,6 +197,7 @@ namespace CombatSystem
                 if (d > 0)
                 {
                     BossDownDiag.NoteAnyDamageBreak(d, System.Math.Min(d, _downMainWouldBreak));
+                    RaiseBossEvent(PassiveSkillManager.Instance?.Context, PassiveSkillTrigger.OnBossDown, d, false);   // 旧い判定はひびが無い (通常攻撃の扱い)
                     Debug.Log($"[ダウン] 目盛りを {d} つ割った (HP {enemyHP}/{currentEnemy.maxHP}) → 次のターンからダウン {_down.pending} ターン");
                 }
                 _downMainWouldBreak = 0;
@@ -182,6 +211,16 @@ namespace CombatSystem
             BossDownDiag.NoteCracks(newCracks, c);
             if (newCracks > 0) Debug.Log($"[ダウン] 通常攻撃以外で目盛りを下回った: ひび {newCracks} (HP {enemyHP}/{currentEnemy.maxHP})");
             if (c > 0) Debug.Log($"[ダウン] ひびの猶予が切れて目盛りが {c} つひとりでに割れた → 次のターンからダウン {_down.pending} ターン");
+            if (c > 0) RaiseBossEvent(PassiveSkillManager.Instance?.Context, PassiveSkillTrigger.OnBossDown, c, true);   // ひびで割れた (2026-11-21)
+        }
+
+        /// <summary>ボスの出来事 (OnBossDown / OnHeavyCanceled・2026-11-21) を配る。 <paramref name="crack"/> = ひびで割れた分 (<see cref="ItemSystem.PassiveSkills.Keywords.Kw.BossDownCrackKey"/>)。</summary>
+        private static void RaiseBossEvent(CombatContext ctx, PassiveSkillTrigger t, int amount, bool crack)
+        {
+            if (ctx == null) return;
+            ctx.accumulatedValues[ItemSystem.PassiveSkills.Keywords.Kw.BossDownCrackKey] = crack ? 1 : 0;
+            ItemSystem.PassiveSkills.Keywords.Kw.Raise(ctx, t, amount);
+            ctx.accumulatedValues[ItemSystem.PassiveSkills.Keywords.Kw.BossDownCrackKey] = 0;
         }
 
         /// <summary>戦闘の終わり: ダウンの倍率を戻す。</summary>

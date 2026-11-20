@@ -133,7 +133,6 @@ namespace AutoTest
             }
 
             // メタ恒久進行の前処理 (パターン別)
-            MetaAllocationPresets.AllowOverBudget = metaAllowOverBudget;
             try
             {
                 switch (metaPattern)
@@ -152,13 +151,15 @@ namespace AutoTest
                         if (_metaAblationSpec != null)
                         {
                             MetaProgression.MetaProgressManager.Instance?.ResetAll();
-                            MetaAllocationPresets.ApplyRanks(_metaAblationSpec, "ablation:" + curArmLabel);
+                            MetaAllocationPresets.ApplyLoadout(_metaAblationSpec, "ablation:" + curArmLabel);
                         }
                         else if (!string.IsNullOrWhiteSpace(metaRankSpec))
                         {
                             MetaProgression.MetaProgressManager.Instance?.ResetAll();
-                            MetaAllocationPresets.ApplyRanks(
-                                MetaAllocationPresets.ParseSpec(metaRankSpec), "spec:" + metaRankSpec);
+                            var lo = MetaAllocationPresets.ParseSpec(metaRankSpec);
+                            // 解釈できない指定は赤で出す (ここで投げると下の挑戦・測定の口まで飛ばされる)。 並列は Bootstrap が先に止める
+                            if (lo == null) Debug.LogError("[AutoRunner] metaRankSpec を解釈できない (未解禁で走る): " + metaRankSpec);
+                            else MetaAllocationPresets.ApplyLoadout(lo, "spec:" + metaRankSpec);
                         }
                         else MetaAllocationPresets.Apply(metaAllocation);
                         break;
@@ -187,9 +188,6 @@ namespace AutoTest
                 // 測定の差し込み口
                 {
                     GameHooks.ProvisionMaxOverride = provisionMaxOverride;
-                    GameHooks.ArmorDefPerRankOverride = armorDefPerRank;
-                    GameHooks.ArmorShieldPerRankOverride = armorShieldPerRank;
-                    GameHooks.ArmorFlatEveryOverride = armorFlatEvery;
                     MetaProgression.Relics.RelicApplicator.Override = RelicPresets.Parse(relicLoadoutSpec);
                     GameHooks.RelicStatOffMask = ParseRelicStatOff(relicStatOff);           // [#95] 既定 "" = 0 (止めない)
                     GameHooks.RelicSetBonusOffMask = ParseRelicSetBonusOff(relicSetBonusOff);
@@ -270,6 +268,10 @@ namespace AutoTest
             GameLoop.GameManager.SelectedClass = (GameLoop.ClassType)GameLoop.GameRng.RangeAuto("AutoRunner.1", 0, 4);
             // 端子の山札 (ADR-0014): 戦闘後の端子の報酬を選ぶ (AutoRunner.Terminals)。
             GameHooks.ChooseTerminalReward = ChooseTerminalReward;
+            // イベントの「山札から端子を抜く」(2026-11-21): 店・休憩で抜く時と同じ規則 (PruneTarget・山札を変えない腕は抜かない)
+            GameHooks.ChooseTerminalRemoval = deck => terminalsLeaveDeck ? -1 : PruneTarget(GameManager.Instance?.Run);
+            // イベントの値付けが読む端子の点 (戦闘の報酬の素の点・EventChoiceScorer.TerminalPoints)
+            EventChoiceScorer.TerminalPoints = (d, r) => RewardBaseScore(d, r);
             gm.StartNewRun();
             // アイテム アブレーション: 開幕付与。 **StartNewRun の直後**でないと
             //   ownedPassiveItems がまだ存在しない。 AddPassiveItem は GameRng を
@@ -294,13 +296,7 @@ namespace AutoTest
                 var mst = MetaProgression.MetaProgressManager.Instance?.State;
                 if (mst != null)
                 {
-                    var parts = new List<string>();
-                    foreach (MetaProgression.MetaPanelKind k in Enum.GetValues(typeof(MetaProgression.MetaPanelKind)))
-                    {
-                        int rk = mst.GetRank(k);
-                        if (rk > 0) parts.Add(k + ":" + rk);
-                    }
-                    _cur.metaRanks = string.Join(",", parts);
+                    _cur.metaRanks = mst.DescribePanel();   // 2026-11-20〜 基礎整備・枠・モジュール (旧: トラック:段)
                 }
                 _cur.startClass = gm.Run != null ? gm.Run.playerClass.ToString() : "";
                 _cur.policySig = PolicySignature();   // [計装 2026-11-17] 実際に効いていた方策の設定 (腕の取り違えを runs の記録で確かめる)
@@ -321,7 +317,7 @@ namespace AutoTest
                           ? string.Join("+", r.permanentDebuffs) : "なし";
                 _probeRunConfig = $"{GameLoop.GameManager.SelectedClass}"
                                 + $"/max{r?.playerMaxHP}"
-                                + $"/整備パネルHP+{MetaProgression.MetaPanel.ShellHp(MetaProgression.MetaProgressManager.Instance?.State?.GetRank(MetaProgression.MetaPanelKind.Shell) ?? 0)}"
+                                + $"/整備パネルHP+{MetaProgression.MetaPanel.BaseHp(MetaProgression.MetaProgressManager.Instance?.State?.EffectiveBaseTier ?? 0)}"
                                 + $"/遺物HP+{MetaProgression.Relics.RelicApplicator.GetMaxHpBonus(r)}"
                                 + $"/メタ{metaBuffMode}"
                                 + $"/恒久:{pd}";
@@ -557,6 +553,10 @@ namespace AutoTest
                     //   **常に true** になる。 つまり強化不能でも `RestUpgrade()` が呼ばれる
                     //   経路が既にあり、 ここに `&& canUpgrade` を足すと **その分が回復へ
                     //   移って既存の基準値が変わる**。 挙動は 1 ビットも変えない。
+                    // 端子の強化 (2026-11-20・最小限の規則): 武器の強化の判断を先に通し、 武器を強化できない時に、 HP が十分 (上の HP の理由で回復を選んでいない)
+                    //   で素材が足りれば、 山札の強化できる端子のうち報酬の点が最も高い 1 枚を強化する (AutoRunner.Terminals の TryRestUpgradeTerminal)
+                    bool hpEnough = hpR > 0.40f && !(greedyBossPrep && hpR < 0.8f);
+                    if (!canUpgrade && hpEnough && TryRestUpgradeTerminal(gm)) return false;
                     if (restPick == RestUpgradeIndex) { gm.RestUpgrade(); return false; }
 
                     // 2026-11-04: 回復の場面で使える休憩の残り (多めに休む・山札から抜く)。 面を外すは 2026-11-18 に削除 (ADR-0015)。
@@ -585,7 +585,8 @@ namespace AutoTest
                     return false;
 
                 case GameManager.GamePhase.ExchangeTile:
-                    // 交換は最低Tierパッシブ→上位ランダムの厳密アップグレード。所持があれば必ず交換。
+                    // 交換は最低Tierパッシブ→上位の 2 択の厳密アップグレード。所持があれば必ず交換。
+                    //   差し出す品は BotHooks.ChooseLowestBuyScore (買いの点が一番低い物)、 受け取る品は ChooseByBuyScore (点の高い方・2026-11-20)。
                     if (gm.CanExchangeTile) gm.DoExchangeTile();
                     else gm.SkipExchangeTile();
                     return false;
