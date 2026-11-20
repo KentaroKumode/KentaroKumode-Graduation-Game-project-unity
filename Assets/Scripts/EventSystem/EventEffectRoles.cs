@@ -35,6 +35,14 @@ namespace EventSystem
         public bool canTrade;
         /// <summary>武器をまだ鍛えられるか (終点でない)。 素材が足りるかは支払いの側で見る。</summary>
         public bool canForge;
+        /// <summary>条件 (2026-11-20) を読めたか (本体のランを渡した時だけ true)。 false なら条件は満たすとみなす。</summary>
+        public bool reqKnown;
+        /// <summary>装備中の武器の家系 (items.json の family・sword / axe / dagger / shield)。 無ければ null。</summary>
+        public string weaponFamily;
+        /// <summary>物資。</summary>
+        public int provision;
+        /// <summary>軸の秘宝の数 (偏重) を引く口 (軸の名前 → 数)。 null なら 0。</summary>
+        public System.Func<string, int> axisCount;
     }
 
     /// <summary>効果ごとの「得か代償か」と「今の状況で起きるか」を 1 か所で決める (2026-11-13・作者の決定)。
@@ -86,6 +94,8 @@ namespace EventSystem
                 case EventEffectType.ForgeWeapon:
                 case EventEffectType.NextShopDiscount:
                 case EventEffectType.NextRestBonus:
+                case EventEffectType.OfferDieSwap:
+                case EventEffectType.OfferAxisPassives:
                     return EventEffectRole.Benefit;
 
                 case EventEffectType.HpSetTo:          // 「HPがNになる」は下げる代償として書かれている (BOT も致死域として値付けする)
@@ -102,6 +112,7 @@ namespace EventSystem
                     return EventEffectRole.Cost;
 
                 case EventEffectType.Probability:
+                case EventEffectType.DieRoll:
                 {
                     bool cost = false;
                     if (e.branches != null)
@@ -159,7 +170,7 @@ namespace EventSystem
         /// それ以外は印 (<see cref="EventEffect.costMark"/>) があれば印のとおり、 無ければ <see cref="ShownByDefault"/>。</summary>
         public static bool IsShownCost(EventEffect e)
         {
-            if (e == null || e.postCombat || e.type == EventEffectType.Probability) return false;
+            if (e == null || e.postCombat || e.type == EventEffectType.Probability || e.type == EventEffectType.DieRoll) return false;
             return e.costMark != 0 ? e.costMark > 0 : ShownByDefault(e);
         }
 
@@ -257,6 +268,59 @@ namespace EventSystem
                     return null;
             }
             return null;
+        }
+
+        // ── 条件 (2026-11-20・効果「条件[種別]:効果」) ──────────────────────────────
+
+        /// <summary>条件の種別: 偏重[軸,N] (その軸の秘宝が N 以上)・武器[家系] (装備中の武器の家系)・物資>=N。</summary>
+        public const string ReqAxis = "偏重", ReqWeapon = "武器", ReqProvision = "物資";
+
+        /// <summary>event_list.txt の家系の書き方 (短剣 / 剣 / 盾 / 斧) → items.json の family。 知らない書き方は null。</summary>
+        public static string FamilyOfWord(string word) => word switch
+        {
+            "短剣" => GameLoop.ItemIds.FamilyDagger,
+            "剣"   => GameLoop.ItemIds.FamilySword,
+            "盾"   => GameLoop.ItemIds.FamilyShield,
+            "斧"   => GameLoop.ItemIds.FamilyAxe,
+            _      => null,
+        };
+
+        /// <summary>条件を満たさない理由 (画面に出す短い文)。 満たす・条件でない・状況を読めない時は null。</summary>
+        public static string RequirementReason(EventEffect e, in EventEffectSituation s)
+        {
+            if (e == null || e.type != EventEffectType.Requirement || !s.reqKnown) return null;
+            switch (e.param)
+            {
+                case ReqAxis:
+                {
+                    int n = s.axisCount != null ? s.axisCount(e.arg) : 0;
+                    return n >= e.amount ? null : $"{e.arg}の秘宝が {e.amount} つ要る（{n}）";
+                }
+                case ReqWeapon:
+                    return s.weaponFamily != null && s.weaponFamily == FamilyOfWord(e.arg) ? null : $"{e.arg}の武器が要る";
+                case ReqProvision:
+                    return s.provision >= e.amount ? null : $"物資が {e.amount} 要る（{s.provision}）";
+            }
+            return null;
+        }
+
+        /// <summary>効果の並びの条件のうち、 最初に満たさないものの理由。 全部満たすなら null。</summary>
+        public static string RequirementReason(IEnumerable<EventEffect> effects, in EventEffectSituation s)
+        {
+            if (effects == null) return null;
+            foreach (var e in effects) { string r = RequirementReason(e, s); if (r != null) return r; }
+            return null;
+        }
+
+        // ── 賽ロール (2026-11-20) ──────────────────────────────
+
+        /// <summary>賽ロールが成功する確率 (面のうち目標値以上の面の割合・面は一様に出る = 戦闘の振り方と同じ)。 面が無ければ 0。</summary>
+        public static float DieRollChance(int[] faces, int target)
+        {
+            if (faces == null || faces.Length == 0) return 0f;
+            int ok = 0;
+            foreach (int f in faces) if (f >= target) ok++;
+            return (float)ok / faces.Length;
         }
 
         /// <summary>規則 (b): 選択肢の<b>得になる効果が、 何ひとつ起きない</b>なら、 その理由 (最初に書かれた得の効果の理由)。

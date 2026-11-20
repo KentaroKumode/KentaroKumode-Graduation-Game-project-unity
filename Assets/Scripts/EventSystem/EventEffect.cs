@@ -14,6 +14,8 @@ namespace EventSystem
         /// <summary>代償を見せるかの印 (2026-11-16): +1 = 〔見せる〕・−1 = 〔伏せる〕・0 = 印なし (種類で決まる既定)。
         /// 読むのは <see cref="EventEffectRoles.IsShownCost"/> だけ (画面の説明と、 足りない時に選べなくするか)。 BOT の値付けは読まない。</summary>
         public int costMark;
+        /// <summary>条件 (<see cref="EventEffectType.Requirement"/>) の引数: 軸の名前 / 武器の家系 (2026-11-20)。 ほかの効果では null。</summary>
+        public string arg;
 
         // Probability 用
         public List<float> branchWeights;   // 0.0~1.0 の重み（合計 1.0 想定）
@@ -23,6 +25,8 @@ namespace EventSystem
         {
             if (type == EventEffectType.Probability)
                 return $"確率分岐({branches?.Count ?? 0})";
+            if (type == EventEffectType.DieRoll)
+                return $"賽ロール({amount})";
             return $"{type}({param},{amount})";
         }
     }
