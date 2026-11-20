@@ -2629,7 +2629,8 @@
       "category": "Passive",
       "rarity": "SILVER",
       "basePrice": 8,
-      "skill": "使い切りの矜持"
+      "skill": "使い切りの矜持",
+      "axis": "山札"
     },
     {
       "id": "底抜けの小瓶",
@@ -2639,7 +2640,8 @@
       "category": "Passive",
       "rarity": "GOLD",
       "basePrice": 9,
-      "skill": "底抜けの小瓶"
+      "skill": "底抜けの小瓶",
+      "axis": "役"
     },
     {
       "id": "行商人の見本箱",

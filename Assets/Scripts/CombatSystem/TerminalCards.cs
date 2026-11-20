@@ -160,8 +160,8 @@ namespace CombatSystem
     {
         public int charge, chargeCap, hp, maxHp, shield;
         public int enemyAttack, enemyPoison, enemyBleed, bursts;
-        /// <summary>偏重 (軸の品の数): 心眼・血晶・瘴気・炉温・電流・堅牢。</summary>
-        public int axCrit, axBleed, axPoison, axHeat, axCharge, axShield;
+        /// <summary>偏重 (軸の品の数): 心眼・血晶・瘴気・炉温・電流・堅牢・采配 (山札)・賽目 (役)。</summary>
+        public int axCrit, axBleed, axPoison, axHeat, axCharge, axShield, axDeck, axRole;
         /// <summary>〈処刑の刃〉の恒久の攻撃 (ラン単位)。</summary>
         public int whetBonus;
         /// <summary>敵の今の HP / 最大 HP (〈処刑の刃＋〉の「敵の HP が半分以下なら」・2026-11-20)。 最大 HP 0 = 読まない。</summary>

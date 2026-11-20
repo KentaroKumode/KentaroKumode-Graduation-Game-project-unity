@@ -56,7 +56,7 @@ namespace AutoTest
             public float[] hpLedger;
             /// <summary>[計装 2026-11-10] 見せる層 (RunState.currentFloor)。 <see cref="floor"/> は深さ (Run.Depth)。</summary>
             public int shownFloor;
-            /// <summary>[計装 2026-11-10] 戦闘 (段) の開始時の偏重 6 軸の品の数 (AxisRules.Ranked の順: 会心・出血・毒・臨界・充電・シールド)。</summary>
+            /// <summary>[計装 2026-11-10] 戦闘 (段) の開始時の偏重 8 軸の品の数 (AxisRules.Ranked の順: 会心・出血・毒・臨界・充電・シールド・山札・役・2026-11-20 に 6 → 8)。</summary>
             public int[] axisAtStart;
             /// <summary>[計装 2026-11-10 V3 mainCorr] この段で攻撃したターンの 主攻撃の見積もり (比を掛ける前) / 比を掛けた見積もり (切り替えが OFF でも、 掛けたなら の値) /
             /// 実際 (DamageBreakdown[7] の増分) の合計。</summary>
