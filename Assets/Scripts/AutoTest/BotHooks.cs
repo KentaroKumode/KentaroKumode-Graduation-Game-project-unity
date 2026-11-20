@@ -41,7 +41,8 @@ namespace AutoTest
         {
             GameHooks.BotDriving = true;
             GameHooks.ChooseStartingPassive = ChooseByBuyScore;
-            GameHooks.ChooseOfferedPassive = ChooseByBuyScore;   // イベントの「Nつから選ぶ」(2026-11-12)。 開幕の品と同じ買いの点で選ぶ
+            GameHooks.ChooseOfferedPassive = ChooseByBuyScore;   // イベントの「Nつから選ぶ」(2026-11-12)。 開幕の品と同じ買いの点で選ぶ (交換マスの 2 択も)
+            GameHooks.ChooseTradeAway = ChooseLowestBuyScore;     // 交換マスで差し出す品 (2026-11-20)。 買いの点 (ITT の序列) が一番低い物
             GameHooks.ChooseOfferedDie = ChooseDieByPower;        // イベントの「賽を提示して交換」(2026-11-20)。 店で賽を買う時と同じ見積もり (InventoryPower.DiePowerDelta)
             GameHooks.WeaponEvBonus = LearnedWeaponBonus;
             GameHooks.MeasureRunPower = InventoryPower.Compute;
@@ -93,6 +94,19 @@ namespace AutoTest
         }
 
         /// <summary>学習した購入スコアが最大の提示を選ぶ。 同点は先の方 (旧実装と同じ)。</summary>
+        /// <summary>買いの点 (<see cref="LearnedPriorityProvider.BuyScore"/>) が一番低い品の添字 (同点は先頭)。 軸に寄せる方策の加点も同じく足して比べる。</summary>
+        private static int ChooseLowestBuyScore(IReadOnlyList<string> offers)
+        {
+            int best = 0; float bestScore = float.PositiveInfinity;
+            for (int i = 0; i < offers.Count; i++)
+            {
+                float sc = LearnedPriorityProvider.BuyScore(offers[i]);
+                if (IsFocusItem(offers[i])) sc += AxisFocusBonus * LearnedPriorityProvider.StepPerTier;
+                if (sc < bestScore) { bestScore = sc; best = i; }
+            }
+            return best;
+        }
+
         private static int ChooseByBuyScore(IReadOnlyList<string> offers)
         {
             int best = 0; float bestScore = float.NegativeInfinity;

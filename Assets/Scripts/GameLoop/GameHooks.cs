@@ -41,6 +41,8 @@ namespace GameLoop
         /// <summary>イベント「パッシブアイテムをNつから選ぶ」の提示から 1 つ選ぶ (2026-11-12)。 戻り値は添字。
         /// null なら <see cref="ChooseStartingPassive"/> を使い、 それも null なら人が遊んでいる時は画面で選び、 BOT は先頭。</summary>
         public static Func<IReadOnlyList<string>, int> ChooseOfferedPassive;
+        /// <summary>交換マスで差し出す秘宝 (いちばん低いレア度の候補の id) から 1 つ選ぶ (2026-11-20)。 戻り値は添字。 null なら先頭 (人は画面で選ぶ)。</summary>
+        public static Func<IReadOnlyList<string>, int> ChooseTradeAway;
         /// <summary>イベント「賽を提示して交換」の 2 種の賽からどれに替えるか (2026-11-20)。 戻り値は添字、 負 = やめる (今の賽のまま)。
         /// null なら人が遊んでいる時は画面で選び、 BOT は替えない。</summary>
         public static Func<IReadOnlyList<string>, int> ChooseOfferedDie;
@@ -217,6 +219,7 @@ namespace GameLoop
             BotDriving = false;
             ChooseStartingPassive = null;
             ChooseOfferedPassive = null;
+            ChooseTradeAway = null;
             ChooseOfferedDie = null;
             ChooseChallengeCard = null;
             ChooseTerminalReward = null;

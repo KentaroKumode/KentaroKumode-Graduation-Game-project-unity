@@ -2732,6 +2732,15 @@
       "basePrice": 8
     },
     {
+      "id": "古物商の交換帳",
+      "name": "古物商の交換帳",
+      "description": "交換マスで受け取る秘宝の 2 択が、今いちばん偏重の高い軸の秘宝に寄る（その軸の品が 6 倍出やすい）",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9
+    },
+    {
       "id": "鋲の胸当て",
       "name": "鋲の胸当て",
       "description": "ターン開始時、シールド +1",
