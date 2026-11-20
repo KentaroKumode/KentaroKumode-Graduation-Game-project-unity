@@ -6,7 +6,7 @@ namespace GameLoop
     /// ラストスタンド: ランを通して1度だけ発動する救済システム。
     ///
     /// 仕様（2026-08-04 リワーク / 2026-09-12 代償を復活 / 2026-09-13 その場蘇生へ）:
-    /// - **メタ〈外殻〉r10 の特典**。 既定では発動しない (MetaPanel.ShellLastStandUnlocked)
+    /// - **整備パネルの主方針〈ラストスタンド〉** (2026-11-20〜・旧〈外殻〉r10)。 挿していなければ発動しない (MetaBuffApplicator.IsLastStandUnlocked)
     /// - **最大HP を半減し、 半減後の 15% の HP で生還**。 <b>ラン中 1 回限り</b>
     /// - **戦闘から退却しない。 その場で蘇生して戦闘を続ける**
     ///   (<see cref="TryConsumeLastStandInCombat"/> ＝ HP が 0 になったターンの中で解決)

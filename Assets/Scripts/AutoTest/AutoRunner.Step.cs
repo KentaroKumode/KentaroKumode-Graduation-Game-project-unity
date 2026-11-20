@@ -133,7 +133,6 @@ namespace AutoTest
             }
 
             // メタ恒久進行の前処理 (パターン別)
-            MetaAllocationPresets.AllowOverBudget = metaAllowOverBudget;
             try
             {
                 switch (metaPattern)
@@ -152,13 +151,15 @@ namespace AutoTest
                         if (_metaAblationSpec != null)
                         {
                             MetaProgression.MetaProgressManager.Instance?.ResetAll();
-                            MetaAllocationPresets.ApplyRanks(_metaAblationSpec, "ablation:" + curArmLabel);
+                            MetaAllocationPresets.ApplyLoadout(_metaAblationSpec, "ablation:" + curArmLabel);
                         }
                         else if (!string.IsNullOrWhiteSpace(metaRankSpec))
                         {
                             MetaProgression.MetaProgressManager.Instance?.ResetAll();
-                            MetaAllocationPresets.ApplyRanks(
-                                MetaAllocationPresets.ParseSpec(metaRankSpec), "spec:" + metaRankSpec);
+                            var lo = MetaAllocationPresets.ParseSpec(metaRankSpec);
+                            // 解釈できない指定は赤で出す (ここで投げると下の挑戦・測定の口まで飛ばされる)。 並列は Bootstrap が先に止める
+                            if (lo == null) Debug.LogError("[AutoRunner] metaRankSpec を解釈できない (未解禁で走る): " + metaRankSpec);
+                            else MetaAllocationPresets.ApplyLoadout(lo, "spec:" + metaRankSpec);
                         }
                         else MetaAllocationPresets.Apply(metaAllocation);
                         break;
@@ -187,9 +188,6 @@ namespace AutoTest
                 // 測定の差し込み口
                 {
                     GameHooks.ProvisionMaxOverride = provisionMaxOverride;
-                    GameHooks.ArmorDefPerRankOverride = armorDefPerRank;
-                    GameHooks.ArmorShieldPerRankOverride = armorShieldPerRank;
-                    GameHooks.ArmorFlatEveryOverride = armorFlatEvery;
                     MetaProgression.Relics.RelicApplicator.Override = RelicPresets.Parse(relicLoadoutSpec);
                     GameHooks.RelicStatOffMask = ParseRelicStatOff(relicStatOff);           // [#95] 既定 "" = 0 (止めない)
                     GameHooks.RelicSetBonusOffMask = ParseRelicSetBonusOff(relicSetBonusOff);
@@ -294,13 +292,7 @@ namespace AutoTest
                 var mst = MetaProgression.MetaProgressManager.Instance?.State;
                 if (mst != null)
                 {
-                    var parts = new List<string>();
-                    foreach (MetaProgression.MetaPanelKind k in Enum.GetValues(typeof(MetaProgression.MetaPanelKind)))
-                    {
-                        int rk = mst.GetRank(k);
-                        if (rk > 0) parts.Add(k + ":" + rk);
-                    }
-                    _cur.metaRanks = string.Join(",", parts);
+                    _cur.metaRanks = mst.DescribePanel();   // 2026-11-20〜 基礎整備・枠・モジュール (旧: トラック:段)
                 }
                 _cur.startClass = gm.Run != null ? gm.Run.playerClass.ToString() : "";
                 _cur.policySig = PolicySignature();   // [計装 2026-11-17] 実際に効いていた方策の設定 (腕の取り違えを runs の記録で確かめる)
@@ -321,7 +313,7 @@ namespace AutoTest
                           ? string.Join("+", r.permanentDebuffs) : "なし";
                 _probeRunConfig = $"{GameLoop.GameManager.SelectedClass}"
                                 + $"/max{r?.playerMaxHP}"
-                                + $"/整備パネルHP+{MetaProgression.MetaPanel.ShellHp(MetaProgression.MetaProgressManager.Instance?.State?.GetRank(MetaProgression.MetaPanelKind.Shell) ?? 0)}"
+                                + $"/整備パネルHP+{MetaProgression.MetaPanel.BaseHp(MetaProgression.MetaProgressManager.Instance?.State?.EffectiveBaseTier ?? 0)}"
                                 + $"/遺物HP+{MetaProgression.Relics.RelicApplicator.GetMaxHpBonus(r)}"
                                 + $"/メタ{metaBuffMode}"
                                 + $"/恒久:{pd}";

@@ -155,8 +155,10 @@ namespace GameLoop
         /// <summary>山札から抜ける (抜いても手札の枚数を下回らない)。</summary>
         public bool CanRemoveTerminal => Run?.terminalDeck != null && Run.terminalDeck.Count > TerminalCards.MinDeckSize;
 
-        /// <summary>店で山札から 1 枚抜く値段 (店で抜くたびに上がる)。</summary>
-        public int TerminalRemovePrice => TerminalRemoveBasePrice + TerminalRemoveStep * (Run != null ? Run.terminalShopRemovals : 0);
+        /// <summary>店で山札から 1 枚抜く値段 (店で抜くたびに上がる)。 整備パネル〈圧縮の心得〉ならランで最初の 1 回は 0 (2 回目からは今までどおり 2 回目の値段)。</summary>
+        public int TerminalRemovePrice
+            => Run != null && Run.terminalShopRemovals == 0 && MetaProgression.MetaBuffApplicator.IsFirstShopRemovalFree() ? 0
+             : TerminalRemoveBasePrice + TerminalRemoveStep * (Run != null ? Run.terminalShopRemovals : 0);
 
         /// <summary>店のサービス: 山札の deckIndex 枚目を抜く (払えない・抜けないなら false)。</summary>
         public bool ShopRemoveTerminal(int deckIndex)

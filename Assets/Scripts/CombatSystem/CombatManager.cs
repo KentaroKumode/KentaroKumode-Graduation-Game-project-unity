@@ -721,12 +721,12 @@ namespace CombatSystem
                 // (GetGuardDamageReductionPct)。 アイテム副次ステータスは 2026-09-15 に全廃。
                 // 残るのは遺物 (§15-5) だけ。
                 // 遺物の開幕シールドは 2026-11-10 の再編で撤去 (毎戦闘タダで配られ、 シールドバッシュで火力に化ける・§15-5)
-                int openingShield = MetaProgression.MetaBuffApplicator.GetArmorOpeningShield();   // 整備パネル〈装甲〉の開幕シールド (2026-11-10)
-                // 防御 r10 (極点): 前戦闘の残りシールドを持ち越す。 使い切ったら 0。
+                int openingShield = 0;   // (整備パネル〈装甲〉の開幕シールドは刻み 0 のまま 2026-11-20 に〈装甲〉ごと撤去)
+                // 〈剛胆〉: 前戦闘の残りシールドを持ち越す。 使い切ったら 0。
                 if (relicRun != null && relicRun.carriedShield > 0)
                 {
                     openingShield += relicRun.carriedShield;
-                    Debug.Log($"[MetaBuff] シールド持ち越し +{relicRun.carriedShield} (防御r10)");
+                    Debug.Log($"[MetaBuff] シールド持ち越し +{relicRun.carriedShield} (〈剛胆〉)");
                     relicRun.carriedShield = 0;
                 }
                 if (openingShield > 0)

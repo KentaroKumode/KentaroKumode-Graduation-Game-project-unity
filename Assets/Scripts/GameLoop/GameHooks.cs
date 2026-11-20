@@ -67,11 +67,6 @@ namespace GameLoop
         /// <summary>自動装備の武器評価に足す点 (武器 id → 加点)。 null なら 0。</summary>
         public static Func<string, float> WeaponEvBonus;
 
-        /// <summary>[測定] 整備パネル〈装甲〉の 1 段あたりの防御 / 開幕シールドを差し替える (負 = 差し替えない・2026-11-10)。</summary>
-        public static int ArmorDefPerRankOverride = -1, ArmorShieldPerRankOverride = -1;
-        /// <summary>[測定] 〈装甲〉の被ダメージ軽減: 何段ごとに −1 か (0 以下 = 差し替えない)。</summary>
-        public static int ArmorFlatEveryOverride = 0;
-
         /// <summary>[測定] 武器の段の上限 (0 = 上限なし・2026-11-11)。 強化 (休憩) と自動装備がこの段を超えない。
         /// 段 4 の本当の価値 (段 3 のままヴェスカに着いたら) を測る口 (AutoRunner.weaponTierCap)。</summary>
         public static int WeaponTierCap;

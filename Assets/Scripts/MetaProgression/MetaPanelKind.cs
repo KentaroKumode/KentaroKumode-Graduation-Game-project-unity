@@ -1,12 +1,9 @@
 namespace MetaProgression
 {
     /// <summary>
-    /// 整備パネルのトラック識別子 (18 個)。 うち Lantern / Precision / SparkCrit は廃止 (MaxRank 0 = 枠に出ない)。
-    /// 数値系 max 10 (Shell / Output / Guard / Vault / Plunder / Trade / Supply / Armor) +
-    /// 宣言系 max 3 (種火 5 + 端子 2)。 <b>enum は並べ替えも削除もしない</b> (panelRanks は enum のインデックスで引く)。
-    /// 旧 #16〈予見〉は ADR-0010 でパリィごと廃止した (enum 末尾だったのでセーブ移行は不要)。
-    /// <b>段ごとの数値の正本は MetaPanel.cs</b> (下の行のコメントは何のトラックかの目印だけ。 数値は写さない)。
-    /// 画面の説明文は Game2DMetaPanel。 仕様: docs/GAME.md §15-1
+    /// <b>旧い</b>整備パネル (24 点の配点式・2026-11-20 撤去) のトラック名。 今の整備パネル (<see cref="MetaPanel"/>・基礎整備 + 作戦の枠) は使わない。
+    /// 残す理由は測定の旧い指定 (<c>"Shell:10,Output:3"</c>) だけ ── AutoTest.MetaAllocationPresets が今の構造へ読み替える (表は docs/GAME.md §15-1)。
+    /// 旧いセーブの返金は買った点の数 (<c>panelPointsPurchased</c>) だけで決まり、 この名前は読まない。
     /// </summary>
     public enum MetaPanelKind
     {

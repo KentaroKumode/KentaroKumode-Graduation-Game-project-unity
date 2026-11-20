@@ -551,11 +551,11 @@ namespace MetaProgression.Achievements
         //  整備パネル (ランの外)
         // ============================================================
 
-        /// <summary>整備パネルに点を振った (MetaProgressManager.TryAssignRank)。</summary>
+        /// <summary>整備パネルで段・枠・モジュールを買った (MetaProgressManager.TrySpend)。</summary>
         public static void NotePanelAssigned(MetaProgressState s)
         {
             if (Suppressed || s == null) return;
-            if (s.TotalAssignedPoints() >= MetaPanel.MaxPoints) Unlock(Cat.PanelFull);
+            if (s.baseTier >= MetaPanel.BaseTierCount && s.slotsOpen >= MetaPanel.SlotOpenCost.Length) Unlock(Cat.PanelFull);
         }
 
         // ============================================================

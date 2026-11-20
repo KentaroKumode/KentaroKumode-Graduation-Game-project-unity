@@ -327,18 +327,15 @@ namespace GameLoop
                 }
             }
 
-            // 2026-07-25 v6: 種火 r3 (充電/臨界/毒/出血) - キーワード BRONZE を 1 本ずつ開幕所持
-            foreach (var kw in new[] { "charge", "rinkai", "poison", "bleed", "shield" })
+            // 整備パネル〈戦術の懐刀〉(補助の枠・2026-11-20): ランダムな戦術消耗品を 1 個 (1 品の重みは同じ・乱数は専用のキーなので他の抽選は変わらない)。
+            //   (旧: 種火 r3 の開幕の品 2 つは、 種火が枠のモジュールになった時に外した・docs/GAME.md §15-1)
+            if (MetaProgression.MetaBuffApplicator.HasTacticKnife())
             {
-                if (!MetaProgression.MetaBuffApplicator.IsSparkStartingItemUnlocked(kw)) continue;
-                for (int k = 0; k < MetaProgression.MetaPanel.SparkStartingItemCount; k++)
+                var tactics = Consumables.TacticPool();
+                if (tactics.Count > 0)
                 {
-                    string id = MetaProgression.SparkStarterPicker.PickStarterFor(kw, Run);
-                    if (string.IsNullOrEmpty(id)) break;
-                    if (Run.ownedPassiveItems == null)
-                        Run.ownedPassiveItems = new System.Collections.Generic.List<string>();
-                    ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, id);
-                    Log($"メタ報酬: 種火 [{kw}] 開幕の秘宝「{id}」を獲得 ({k + 1}/{MetaProgression.MetaPanel.SparkStartingItemCount})");
+                    string tid = tactics[GameRng.Range(0, tactics.Count, "meta.tacticKnife")].id;
+                    if (Run.TryAddConsumable(tid)) Log($"メタ報酬:〈戦術の懐刀〉戦術消耗品「{tid}」を獲得");
                 }
             }
 

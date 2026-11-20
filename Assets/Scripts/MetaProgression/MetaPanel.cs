@@ -1,476 +1,165 @@
-using UnityEngine;
-
 namespace MetaProgression
 {
     /// <summary>
-    /// 整備パネル (v6) の予算・コスト・段効果計算の中央定義。
-    /// 状態は MetaProgressState.panel*、購入 API は MetaProgressManager、
-    /// 効果適用は MetaBuffApplicator 経由で読み出される (Applicator が「開幕HP+N」等に翻訳)。
-    ///
-    /// 予算式: n 個目のポイント = 8 × n トークン。上限 36 個 = 総額 5,328 ≒ 現行 5,162。
-    /// 枠総数 108 (数値 9×10 + 宣言 6×3) / 上限 36 = 33% → 常に取捨選択。
+    /// 整備パネル (2026-11-20 刷新・docs/GAME.md §15-1・system-overhaul-spec §1) の<b>数値の正本</b>。
+    /// 二階建て: <b>基礎整備</b> (トークンで買い切る 6 段・安全網) ＋ <b>作戦の枠</b> 3 つ (主方針 / 補助 / 種火・モジュールを 1 つずつ挿す・ラン前に無料で組み替え)。
+    /// 状態は <see cref="MetaProgressState"/>、 購入の口は <see cref="MetaProgressManager"/>、 効果は <see cref="MetaBuffApplicator"/> が getter で配る。
+    /// 画面の説明文は Game2DMetaPanel。 <b>数値はすべて仮</b> (最後の 3 段階の測定で合わせる)。
+    /// <para>旧: 24 点の配点式 (n 個目の点 = 8n トークン・数値 8 本 ×10 段 + 宣言 7 本 ×3 段) は 2026-11-20 に撤去 (§24)。
+    /// 旧い段の名前 (<see cref="MetaPanelKind"/>) はセーブの返金と測定の旧い指定の読み替えにだけ残す。</para>
     /// </summary>
     public static class MetaPanel
     {
-        /// <summary>予算。 <b>2026-09-12: 33 → 24</b>。
-        ///
-        /// <para><b>24 は「均等配分」と「1 本振り切り」がぴったり一致する点。</b>
-        /// 数値系 8 本に 3pt ずつ = 24pt、 焦点 1 本を 10pt + 残り 7 本を 2pt ずつ = 24pt。
-        /// どちらの遊び方も同じ予算で成立し、 <b>極点を取る代償が「全軸を 1 段ずつ削る」</b>
-        /// という均一な形になる。</para>
-        ///
-        /// <para>これは測定の都合でもある ── 33pt 時代は Balanced が強奪/商才を 0 に置いていたため、
-        /// その 2 本を焦点にしたアームだけが 10pt 全額を新規に払い、 <b>出力を 4 段まるごと</b>
-        /// 手放していた。 犠牲が不均一で、 トラックの弱さと火力喪失が混ざって読めなかった。</para>
-        ///
-        /// <para>枠総数 98 に対し 24 = <b>24%</b>。 取捨選択の度合いは 33pt 時代 (34%) より強まる。</para>
-        ///
-        /// <para>(2026-09-10: 36 → 33 は精密トラック撤去に伴う出力中立化)</para></summary>
-        public const int MaxPoints = 24;
-        public const int PointCostBase = 8;
-
-        /// <summary>n 個目 (1-indexed) のポイントを買うためのトークンコスト。</summary>
-        public static int PointCost(int nthPoint)
-            => (nthPoint <= 0) ? int.MaxValue : PointCostBase * nthPoint;
-
         // ============================================================
-        //  種火・端子・スロット総枠数
+        //  ラン本体の開始値のうち、 整備パネルの getter が配るもの (§1-2 A)
         // ============================================================
 
-        /// <summary><b>1 段あたりのポイント単価 (2026-09-10)。</b> 宣言系 (max3) = 3pt / 数値系 (max10) = 1pt。
-        ///
-        /// <para><b>なぜ要るか。</b> drop-one 実測で端子トラックが突出して過小価格だった:
-        /// 攻撃端子 0.208 対数オッズ/pt に対し出力 0.063 ── <b>3.3 倍</b>。 端子は
-        /// 「接続ダイス 1 本あたり +N」なのでビルド規模に比例して伸びるのに、
-        /// 数値系と同じ 1pt/段 で買えていた。 効率格差 16.4 倍 の主因。</para>
-        ///
-        /// <para>宣言系はどれも max 3 段なので、 3pt/段 にすると <b>max まで 9pt</b> ＝
-        /// 数値系 (1pt × 最大10段) と近い水準で揃う。 種火 4 トラックも同じ扱いになる
-        /// ── こちらは効果量が未測定のまま値上げする点に注意。</para>
-        ///
-        /// <para><b>種火は 2pt/段 (2026-11-07)。</b> 実測で種火 r3 (9pt) の効果はクリア率 +0〜4 ポイント、
-        /// 同じ 9pt の強奪・商才・兵站は約 7.5 ポイントだった。 端子は 3pt/段 のまま。</para></summary>
-        public static int RankCost(MetaPanelKind kind)
-            => IsSpark(kind) ? 2 : kind.MaxRank() <= 3 ? 3 : 1;
+        /// <summary>店の特売枠の素の数 (整備パネルと無関係・ラン本体の値)。 2026-11-20 に 0 → 1。
+        /// 特売の抽選は ShopManager にあるが ShopManager は数を <see cref="MetaBuffApplicator.GetSaleItemCount"/> からしか読まないので、 素の値もここに置く。</summary>
+        public const int BaseSaleSlots = 1;
 
-        /// <summary>種火のトラックか。 enum の並び (末尾に足した会心・シールド) に依存しないよう名指しする。</summary>
-        public static bool IsSpark(MetaPanelKind kind) => kind switch
+        // ============================================================
+        //  基礎整備 (6 段・買い切り・§1-2 B)
+        // ============================================================
+
+        public const int BaseTierCount = 6;
+
+        /// <summary>n 段目 (1 起点) を買うトークン (仮)。 1〜2 周で 1 段目に届く程度。</summary>
+        public static readonly int[] BaseTierCost = { 40, 60, 120, 160, 240, 320 };
+
+        /// <summary>1 段目と 4 段目の最大 HP。</summary>
+        public const int BaseTier1Hp = 6, BaseTier4Hp = 4;
+        /// <summary>2 段目の防御。</summary>
+        public const int BaseTier2Defense = 2;
+        /// <summary>3 段目の開幕ゴールド (特売枠 +1 と一緒)。</summary>
+        public const int BaseTier3Gold = 10;
+        /// <summary>5 段目の与ダメ % (与ダメ % の池に足す)。</summary>
+        public const int BaseTier5DamagePct = 10;
+
+        /// <summary>段 <paramref name="tier"/> まで買った時の最大 HP の上乗せ。</summary>
+        public static int BaseHp(int tier) => (tier >= 1 ? BaseTier1Hp : 0) + (tier >= 4 ? BaseTier4Hp : 0);
+        public static int BaseDefense(int tier) => tier >= 2 ? BaseTier2Defense : 0;
+        public static int BaseGold(int tier) => tier >= 3 ? BaseTier3Gold : 0;
+        /// <summary>特売枠の上乗せ (3 段目と 6 段目で +1 ずつ)。</summary>
+        public static int BaseSaleSlotsBonus(int tier) => (tier >= 3 ? 1 : 0) + (tier >= 6 ? 1 : 0);
+        public static int BaseDamagePct(int tier) => tier >= 5 ? BaseTier5DamagePct : 0;
+
+        // ============================================================
+        //  作戦の枠 (3 つ・§1-2 C)
+        // ============================================================
+
+        /// <summary>n 枠目 (1 起点) を開くトークン (仮)。 開く順は <see cref="MetaSlot"/> の並び (主方針 → 補助 → 種火)。</summary>
+        public static readonly int[] SlotOpenCost = { 50, 150, 300 };
+
+        /// <summary>モジュールを解禁するトークン (仮)。 解禁は買い切り、 挿すのは無料。</summary>
+        public static int ModuleCost(MetaModule m) => SlotOf(m) == MetaSlot.Main ? 120 : 80;
+
+        /// <summary>モジュールが挿さる枠。 <b>新しい種火は <see cref="SparkKeyword"/> と一緒にここへ足す。</b></summary>
+        public static MetaSlot SlotOf(MetaModule m) => m switch
         {
-            MetaPanelKind.SparkCharge or MetaPanelKind.SparkRinkai or MetaPanelKind.SparkPoison or
-            MetaPanelKind.SparkBleed or MetaPanelKind.SparkCrit or MetaPanelKind.SparkShield => true,
-            _ => false,
+            MetaModule.SparkCharge or MetaModule.SparkRinkai or MetaModule.SparkPoison or MetaModule.SparkBleed
+                or MetaModule.SparkShield or MetaModule.SparkCrit => MetaSlot.Spark,
+            MetaModule.AttackTune or MetaModule.BlockTune or MetaModule.AxisTicket
+                or MetaModule.TacticKnife or MetaModule.Compression => MetaSlot.Support,
+            _ => MetaSlot.Main,
         };
 
-        /// <summary>その配分の総コスト (段数ではなく pt)。</summary>
-        public static int CostOf(MetaPanelKind kind, int rank)
-            => System.Math.Max(0, rank) * RankCost(kind);
+        /// <summary>種火のモジュールが宣言する軸のキーワード (<see cref="SparkStarterPicker"/> の表と店の出現の重みが読む)。 種火でなければ null。
+        /// 新しい軸 (山札・役) の種火を足す時: <see cref="MetaModule"/> の末尾 → ここ → <see cref="SlotOf"/> → SparkStarterPicker の表 → 固有効果の getter → 画面の説明文。</summary>
+        public static string SparkKeyword(MetaModule m) => m switch
+        {
+            MetaModule.SparkCharge => "charge",
+            MetaModule.SparkRinkai => "rinkai",
+            MetaModule.SparkPoison => "poison",
+            MetaModule.SparkBleed  => "bleed",
+            MetaModule.SparkShield => "shield",
+            MetaModule.SparkCrit   => "crit",
+            _ => null,
+        };
 
-        // ============================================================
-        //  段効果ゲッタ (rank 0..MaxRank に対する各種効果値)
-        //  意味論: 「rank 段まで購入した状態の現在値」
-        // ============================================================
+        // ---- 主方針 (旧 r10 の極点 8 つ・数値階段なしでそのまま) ----
 
-        /// <summary>外殻: HP +4/段。**最終段 (r10) のみ増加量 2 倍 (+8)** → 計 +44。
-        /// <b>2026-09-12: +3 → +4。</b> r9 が Balanced −4.88pt で、 目標帯 (±2pt) に届いていなかった。</summary>
-        public static int ShellHp(int rank)
-            => Mathf.Clamp(rank, 0, 10) * 4 + (rank >= 10 ? 4 : 0);
-
-        /// <summary>外殻 r10 の極点: **ラストスタンドを解禁する** (2026-08-04)。
-        /// 従来は全ランに既定で付いていた救済で、 代償に最大HPを半減していた。
-        ///   ・既定救済だと「一度は死ねる」が前提になり、 道中のリスク判断が緩む
-        ///   ・最大HP半減は、 救済を受けた側をそのまま詰ませる方向にしか働かない
-        /// 外殻トラックを振り切った者だけの特典に移し、 **ボス戦でも発動する**
-        /// (灯火 / フルーレ・バレエ は従来どおりボス戦では不可)。
-        ///
-        /// <para><b>2026-09-13: その場蘇生へ。</b> 灯火/フルーレと同じ「戦闘を畳んで
-        /// マップへ戻る」経路を共有していたため、 出力接続の無いボスノードで発動すると
-        /// 移動先なしで詰んでいた (300 ラン中 61 件)。 正本は
-        /// <see cref="CombatSystem.CombatManager"/>.TryLastStandRevive。</para>
-        ///
-        /// <para><b>2026-09-12: 最大HP半減を復活。</b> 移設時に半減も同時に廃止したため、
-        /// <b>専用化と無償化が重なって 10 段目 1pt が +11.87pt</b> になっていた
-        /// (r9 36.20% → r10 48.07%、 Balanced は 40.30%)。 発動率も 62.6% → 53.6% で、
-        /// 「一度は死ねるを前提から外す」という移設の目的自体が達成できていなかった。
-        /// 代償は <see cref="GameLoop.LastStand.TryConsumeRevival"/> が持つ。</para></summary>
-        public static bool ShellLastStandUnlocked(int rank) => rank >= 10;
-
-        /// <summary>出力: 与ダメ% <b>+7/段</b> (r10 で +70%)。
-        /// 2026-09-13: +6 → +7 / 2026-09-12: +5 → +6。 r9 が目標帯を外していたため段階的に増量。
-        /// 極点は <see cref="BattleSpiritUnlocked"/>。</summary>
-        public static int OutputPct(int rank)
-            => Mathf.Clamp(rank, 0, 10) * 7;
-
-        /// <summary><b>出力 r10 (極点): 〈戦意〉。</b> 2026-09-13 新設。
-        /// <b>戦闘に勝つたびに与ダメが恒久的に伸びる</b> (ラン中のみ・
-        /// <see cref="BattleSpiritPctPerWin"/>%/勝)。
-        ///
-        /// <para><b>なぜこれか。</b> 既存 7 極点は「定数を配る」か「戦闘内のルールを変える」の
-        /// どちらかで、 <b>ラン の時間軸で育つものが 1 つも無かった</b>。 ローグライクの
-        /// 「潜るほど強くなる」感覚を整備パネルが持っていない ── そこが最大の空き地。</para>
-        ///
-        /// <para>死因は 5層 / 6層 / 7層p4 に集中している。 そこへ着く頃には 25〜38 勝して
-        /// +50〜76% 乗っているので、 <b>死ぬ場所に効く形</b>になる。</para>
-        ///
-        /// <para><b>旧〈オーバーロード〉の撤去 (2026-09-13)。</b> 「1戦闘1回・与ダメ2倍・反動」は
-        /// 反動を HP (15%→5%) でも 物資 (−5) でも機能しなかった
-        /// ── HP は「HP を払って HP を守る」で釣り合わず、 物資は回復源ゼロで
-        /// <b>クリア率 7.92% (Balanced −39.66pt)</b> の大惨事。 床を入れて中立 (+0.19pt) に
-        /// 戻したが r10−r9 が +0.89pt で極点として死んでいた。
-        /// <b>資源にコストを置く設計を諦め、 コスト無しの累積成長へ振り替える。</b></para></summary>
-        public static bool BattleSpiritUnlocked(int rank) => rank >= 10;
-
-        /// <summary>〈戦意〉1 勝あたりの与ダメ上昇 (%)。 1 ラン 約 40 戦なので上限は +80% 相当。
-        /// 他の与ダメ% と同じ pool に加算合成される (純倍率にするとインフレするため)。</summary>
-        /// <summary>戦闘勝利 1 回あたりの与ダメ%。
-        /// <b>2026-09-13: 2 → 1.5。</b> r10−r9 が +7.76pt と全極点で突出していた
-        /// (次点の商才 +1.81pt の 4 倍)。 勝利数に線形なので、 深く進むほど加速する。
-        /// <para>端数は切り捨てで清算する (<c>MetaBuffApplicator.GetBattleSpiritPct</c>) ──
-        /// 与ダメ% の合成は整数 pool なので、 勝利ごとに四捨五入すると 2%/勝 に戻ってしまう。</para></summary>
+        /// <summary>〈戦意〉: 戦闘に勝つたびの与ダメ % (端数は累計に対して切り捨て・<see cref="MetaBuffApplicator.GetBattleSpiritPct"/>)。</summary>
         public const float BattleSpiritPctPerWin = 1.5f;
 
-        // [撤去 2026-09-13] OverloadProvisionCost / OverloadProvisionFloor ── 旧〈オーバーロード〉の調整つまみ。
-        //   経緯は BattleSpiritUnlocked を参照。
-
-        // [削除 2026-09-13] GuardShield / GuardDamageReduce ── どちらも呼び出し元が無い、
-        //   または 0 を返すだけの残骸だった。
-        //   **残骸を残したせいで「+2/段のシールド」という存在しない仕様を読み取り、
-        //   それを信じて 40,000 ラン 回して数字が 1 桁も動かない事故を起こした。**
-
-        // ============================================================
-        //  〈剛胆〉(旧〈防御〉) ── リスク軸。 2026-09-13 の完全リワーク。
-        // ============================================================
-        //
-        //  **なぜ防御を捨てたか。** 耐久で強くする限り外殻 (HP) と効果の向きが同じで、
-        //  何を作っても「死ににくくなる軸」が 2 本ある形にしかならなかった。
-        //  割合軽減はブロック後の残りに掛かって切り上げに飲まれ、 分散削りは
-        //  説明が数式になる。 どちらも筋が悪い。
-        //
-        //  **リスク軸にする。** 強敵を呼び込み、 その見返りを取る。 現状 8 軸が
-        //  すべて「盤面の数値」を動かすのに対し、 これは<b>遭遇の中身</b>を変える
-        //  唯一の軸になる。 そして「強敵が増える代わりに実入りが増える」の 1 行で済む。
-        //
-        //  抽選表を変えるだけなので **BOT の方策を書き換えなくても効く** ──
-        //  今日 2 回踏んだ「機構を作ったが使われない」を構造的に避けられる。
-
-        /// <summary>戦闘マスがエリートへ格上げされる確率 (1 段 5%、 r10 で 50%)。</summary>
-        public static float ValorEliteUpgradePct(int rank)
-            => Mathf.Clamp(rank, 0, 10) * 5f;
-
-        /// <summary>エリート戦の報酬ゴールド割増 (1 段 +10%、 r10 で +100%)。</summary>
-        public static float ValorEliteGoldPct(int rank)
-            => Mathf.Clamp(rank, 0, 10) * 10f;
-
-        /// <summary>エリート撃破時の追加パッシブドロップ率 (1 段 <b>+1%</b>、 r10 で +10%)。
-        ///
-        /// <para><b>2026-09-13: 5% → 2%。</b> 5% では r9 で 1 ラン 13.91 個ドロップし
-        /// (Balanced 3.79 の 3.7 倍)、 アイテムが降り注いでいた。 エリート戦は
-        /// 12.6 → 15.4 回/ラン と 1.2 倍にしかなっていないのにドロップだけ跳ねる
-        /// ── <b>1 戦あたりの率が高すぎた</b>。 段効果の主役は「強敵を呼ぶ」側に置く。</para></summary>
-        /// <para><b>2026-09-14: 2% → 1%。</b> 全軸 10,000 ラン で剛胆が Bal比 <b>+18.85pt</b>
-        /// (次点の強奪 +8.09 の 2 倍以上) と単独で壊れており、 計装が原因を指していた ──
-        /// <b>エリート戦は 1.33 倍 (11.21→14.94) にしかなっていないのに、
-        /// 精鋭ドロップだけ 4.5 倍 (1.33→5.98)</b>。 実測の 1 戦あたり率は 5.98/14.94 = 40% で、
-        /// 設定値 20% の倍 ── 激戦マスが連続 2 戦 (§5-2) なので<b>1 マスで 2 回抽選される</b>。
-        /// 設計コメントどおり「段効果の主役は強敵を呼ぶ側」なので、 ドロップ側を半分にする。</para></summary>
-        public static float ValorElitePassiveDropPct(int rank)
-            => Mathf.Clamp(rank, 0, 10) * 1f;
-
-        /// <summary><b>剛胆 r10 (極点): 精鋭への与ダメ +10%。</b>
-        ///
-        /// <para>段効果が「強敵を呼ぶ」なので、 極点は<b>呼んだ強敵を倒せるようにする</b>。
-        /// 段を積むほど極点の適用対象が増える ── 段と極点が同じ方向を向く。</para>
-        ///
-        /// <para><b>2026-09-14: 20% → 10%、 対象から<u>ボスを外した</u>。</b>
-        /// ボスを含めていたため最終ボス勝率が <b>90.2%</b> (他トラックは 67〜78%) まで跳ね、
-        /// r10−r9 の +11.17pt の主因になっていた。 ボスは<b>呼んだ強敵ではない</b>ので
-        /// トラックの筋 (リスクを取って強敵を呼び、 その見返りを取る) から外れる。</para></summary>
-        public static bool ValorEliteSlayerUnlocked(int rank) => SlayerEnabled && rank >= 10;
-
-        /// <summary>[較正専用] 極点〈精鋭スレイヤー〉を無効化する。 <b>既定 true = 有効。</b>
-        /// r10−r9 の +6.36pt が極点由来か線形 3 効果由来かを切り分けるための穴。</summary>
-        public static bool SlayerEnabled = true;
-
-        /// <summary>精鋭への与ダメ割増 (極点)。 <b>ボスには乗らない。</b></summary>
+        /// <summary>〈剛胆〉: 戦闘マスがエリートへ格上げされる確率 (%) / エリート戦の報酬ゴールド割増 (%) / エリートへの与ダメ (ボスには乗らない)。</summary>
+        public const float ValorEliteUpgradePct = 25f, ValorEliteGoldPct = 50f;
         public const int ValorEliteSlayerPct = 10;
-
-        /// <summary><b>防御 r10 (極点): 戦闘終了時に残ったシールドを次の戦闘へ持ち越す。</b>
-        /// 2026-09-10 新設。 現状シールドは戦闘ごとに破棄されるので、 これは<b>規則の変更</b>。
-        ///
-        /// <para>既存の知見と噛み合う ── 「盾の使い残しは ShieldBash の弾＝火力」(2026-08-15)。
-        /// 持ち越せると「守りに使うか、 溜めて撃つか」という<b>運用の選択</b>が生まれ、
-        /// 防御トラックが「耐える」だけの軸でなくなる。</para></summary>
-        public static bool GuardShieldCarryUnlocked(int rank) => rank >= 10;
-
-        /// <summary>剛胆 r10: 勝った戦闘の残りシールドのうち、 次の戦闘へ持ち越す割合 (切り上げ)。
-        /// 2026-09-13: 全量 → 50% → 30% (50% でも Balanced +6.31pt で基準帯を超えていた)。 適用は CombatManager.Finish。</summary>
+        /// <summary>[較正専用] 〈剛胆〉のエリートへの与ダメを止める。 既定 true = 有効 (AutoRunner.valorSlayerOff)。</summary>
+        public static bool SlayerEnabled = true;
+        /// <summary>〈剛胆〉: 勝った戦闘の残りシールドのうち、 次の戦闘へ持ち越す割合 (切り上げ・適用は CombatManager.Finish)。</summary>
         public const float GuardShieldCarryRatio = 0.30f;
 
-        /// <summary>金庫: 開幕ゴールド +5/段 (0..50)。</summary>
-        public static int VaultGold(int rank) => Mathf.Clamp(rank, 0, 10) * 5;
+        /// <summary>〈ショップ強盗〉: 通常の敵を倒した時の追加の秘宝ドロップ (%・ボス戦は対象外)。</summary>
+        public const float RobberyPassiveDropPct = 10f;
 
-        /// <summary>金庫 r10: 宝箱ゴールド復活。</summary>
-        public static bool VaultTreasureUnlocked(int rank) => rank >= 10;
+        /// <summary>〈99% 特売〉: 特売枠の上乗せ。</summary>
+        public const int Sale99SlotBonus = 2;
 
-        /// <summary><b>金庫 r10 (極点): 貸金庫。 ゴールドをランを跨いで持ち越せる。</b>
-        /// 2026-09-13 新設。 規則の正本は <see cref="VaultBank"/>。
-        ///
-        /// <para>宝箱ゴールド (<see cref="VaultTreasureUnlocked"/>) と同居させている。
-        /// 宝箱側は F1=3〜F7=12 の少額で、 貸金庫 (<see cref="VaultBank.Cap"/>G までの分が層ごとに増える) の横では誤差。
-        /// 分離すると Balanced の土台まで動いて基準が変わるので、 r10 にまとめた。</para></summary>
-        public static bool VaultBankUnlocked(int rank) => rank >= 10;
+        /// <summary>特売の割引率の段と重み。 既定 15/30/50% (42:38:20) / 〈99% 特売〉で 99% が加わる (42:35:15:8)。</summary>
+        public static int[] SaleTiers(bool sale99) => sale99 ? new[] { 15, 30, 50, 99 } : new[] { 15, 30, 50 };
+        public static int[] SaleWeights(bool sale99) => sale99 ? new[] { 42, 35, 15, 8 } : new[] { 42, 38, 20 };
 
-        /// <summary><b>強奪: ボス撃破時の追加ゴールド +1/段 (0..10)。</b>
-        ///
-        /// <para><b>旧名 PlunderCombatGold から改称 (2026-09-13)。</b> 「戦闘勝利ゴールド」と
-        /// 名乗っていたが、 実装は <c>GameManager</c> の <c>isBossNodeForMeta</c> で
-        /// <b>ボスマス限定</b>だった ── 1 ラン 約 40 戦のうち 7 戦だけ。
-        /// r9 で +9G/段 が「+360G のつもりで実際 +63G」になり、
-        /// 強奪 r9 が Balanced −5.78pt だった原因のひとつ。 <b>名前を実装に合わせた。</b>
-        /// ボス限定のまま据え置き、 道中は <see cref="PlunderPassiveDropPct"/> が担当する。</para></summary>
-        public static int PlunderBossGold(int rank) => Mathf.Clamp(rank, 0, 10);
+        /// <summary>〈開幕厳選〉: 開幕の秘宝の本数と、 <paramref name="itemIndex"/> 本目 (0 起点) の提示数 (1 本目 2 択・2 本目 3 択)。</summary>
+        public const int StartPickCount = 2;
+        public static int StartPickOffers(int itemIndex) => UnityEngine.Mathf.Clamp(itemIndex + 2, 2, 3);
 
-        /// <summary><b>強奪: 通常エネミー撃破時の追加パッシブドロップ確率 +2%/段 (0..20%)。</b>
-        /// 2026-09-13 新設。 <b>ボス戦は対象外</b> ── ボスは <see cref="PlunderBossGold"/> が担当。
-        ///
-        /// <para>金だけでは弱かった。 ITT の用量反応で<b>ランダムなパッシブ 1 本 ≒ 4.3pt</b> なので、
-        /// r9 = 18% × 道中 33 戦 ≒ 6 本。 金より遥かに直接的に効く。
-        /// 「道中で奪い、 ボスから奪う」で軸の性格も揃う。</para></summary>
-        public static float PlunderPassiveDropPct(int rank) => Mathf.Clamp(rank, 0, 10) * 2f;
-
-        /// <summary><b>強奪 r10 (極点): ショップ強盗を解禁する。</b> 2026-09-12 に商才から移設。
-        ///
-        /// <para><b>なぜ移したか。</b> 商才は「安く買う」、 強奪は「力ずくで奪う」で系統が違う。
-        /// 同居していたせいで <b>商才 r10 の +4.50pt が「割引下限」と「強盗」のどちらの取り分か
-        /// 分離できなかった</b>。 1 トラック 1 極点に戻して測定可能にする。</para>
-        ///
-        /// <para><b>旧 r10「ボス追加報酬」は廃止。</b> 単体で r10−r9 = +7.02pt と
-        /// 目標帯 (±3pt) の倍以上あり、 強盗と併せると二階建てになるため。</para></summary>
-        public static bool PlunderShopRobberyUnlocked(int rank) => rank >= 10;
-
-        /// <summary>商才: 特売枠数 = <b>rank × 2/3</b> (r3=2 / r6=4 / r9=6 / r10=6)。
-        ///
-        /// <para><b>2026-09-12 の経緯。</b> 旧 r3/6/9 で +1 (r9 で 3 枠) は r9 が Balanced −7.36pt で
-        /// 弱すぎた ── 3枠 × 平均8G × 40%引 ≒ 10G は 9pt の対価にならない。
-        /// いったん毎段 +1 (r9 で 9 枠) にしたが、 <b>実測 48.67% ＝ 旧 Balanced +7.99pt</b> と
-        /// 反対側へ 15pt 突き抜けた (陳列 12 枠のうち素材を除く 11 枠がほぼ全部特売になるため)。
-        /// 枠あたり約 2.5pt の勾配から、 目標帯 (±2pt) に入る 6 枠へ引き戻す。</para>
-        ///
-        /// <para>割引率は一様 20〜60% (期待値 40%、 r10 で下限 40% → 期待値 50%)。
-        /// 枠数を動かすと期待値が枠数に比例するので、 効き幅はここで調整する。</para></summary>
-        public static int TradeSaleSlots(int rank) => Mathf.Clamp(rank, 0, 10);
-
-        /// <summary><b>特売の割引率テーブル (2026-09-12)。</b> 一様乱数 20〜60% をやめ、
-        /// <b>固定値からの重み付き抽選</b>にした。
-        ///
-        /// <para><b>なぜ固定値か。</b> 一様だと 37%引 のような半端が出て、 プレイヤーが
-        /// 「これは安いのか」を毎回計算し直すことになる。 段が決まっていれば値札を見た瞬間に分かり、
-        /// <b>割引の深さ自体が判断材料になる</b>。 調整側も、 レンジではなく<b>重みだけ</b>で
-        /// 期待値を動かせる。</para>
-        ///
-        /// <para><b>r10 の極点は 99% 枠の解禁。</b> 「割引下限が 20→40%」という統計的な変化より、
-        /// <b>ほぼタダの品が並ぶ</b>ほうが極点として見て分かる。 頻度は 10 枠 × 5% = 0.5 個/店、
-        /// 1 ラン 5.5 店で約 2.8 個。</para></summary>
-        public static int[] TradeSaleTiers(int rank)
-            => rank >= 10 ? new[] { 15, 30, 50, 99 } : new[] { 15, 30, 50 };
-
-        /// <summary><see cref="TradeSaleTiers"/> に対応する重み。
-        /// 既定 <b>42:38:20</b> = 期待値 <b>28.30%</b> / r10 42:35:15:8 = 期待値 <b>32.07%</b>。
-        ///
-        /// <para><b>2026-09-13: 既定を 50:35:15 → 42:38:20。</b> 商才 r9 が Balanced −1.73pt で、
-        /// <b>段効果そのものが弱かった</b>。 枠数 (<see cref="TradeSaleSlots"/>) を増やすと
-        /// 「安い品が並ぶ数」が増えるだけで棚の質は変わらないので、 深い割引の出る率を上げる。
-        /// 期待値 25.50% → 28.30% (+2.8pt)。</para>
-        ///
-        /// <para><b>2026-09-13: 99% 枠の重みを 5 → 8。</b> r10−r9 が +1.81pt で目標 (+3pt) に
-        /// 届いていなかった。 99% 枠の頻度が 10 枠 × 5% = 0.5 個/店 では、
-        /// <b>1 店に 1 個も並ばない店が 6 割</b>で極点が見えない。 8% なら 0.8 個/店。</para>
-        ///
-        /// <para>トラックの効き幅は <see cref="TradeSaleSlots"/> (枠数・毎段+1) が持つ。
-        /// 重みを段依存にすると二重に効くので、 <b>動かすのは r10 だけ</b>。</para></summary>
-        public static int[] TradeSaleWeights(int rank)
-            => rank >= 10 ? new[] { 42, 35, 15, 8 } : new[] { 42, 38, 20 };
-
-        // (旧 SupplyStartMaterial: 宝物庫の開幕素材。 2026-09-10 廃止で常に 0 になり、 2026-11-12 に関数ごと削除。
-        //  理由: drop-one 実測で寄与が測定分解能未満 (0.013 対数オッズ/pt / 分解能 ±0.029)。 ラン終了時の平均残が 12〜16 もあり、
-        //  <b>需要のない資源を配っていた</b>。 宝物庫は開幕パッシブを配る)
-
-        /// <summary><b>宝物庫: 開幕パッシブの本数 = r2/5/8 で +1 (0..3)、 r10 で +1 (計4)。</b>
-        /// 2026-09-10 に素材から移行 ── 旧 r10 極点「開幕パッシブ1本」を刻んで前倒ししたもので、
-        /// 新しい機構は足していない。
-        ///
-        /// <para><b>較正の根拠。</b> ランダム付与 ITT の用量反応から
-        /// <b>ランダムなパッシブ 1 本 ≒ 0.174 対数オッズ</b> (0品 40.9% → 10品 79.7%)。
-        /// Balanced の r5 = 2 本 = 0.347 を 5pt で買う ＝ <b>0.069/pt</b> で、
-        /// 出力 (0.063/pt) とほぼ同値。 意図的に横並びへ置いている。</para>
-        ///
-        /// <para><b>他トラックと種類が違う</b>のが採用理由 ── HP でも火力でも金でもなく
-        /// 「開幕の手札」。 精密を貫通軸にする案が「出力の上位互換では」と却下された
-        /// のに対し、 こちらは倍率軸と competing しない。</para></summary>
-        public static int SupplyStartingPassives(int rank)
-        {
-            int n = 0;
-            if (rank >= 3) n++;
-            if (rank >= 6) n++;
-            if (rank >= 9) n++;
-            return n;   // r10 は本数を増やさない ── 極点は SupplyStartingChoiceUnlocked
-        }
-
-        /// <summary><b>宝物庫: 開幕パッシブのレア度重み付け (2026-09-13)。</b>
-        /// 段が上がるほど抽選が LEGENDARY 側へ寄る。 0 = 素の重み / 1.0 = 最大の寄せ。
-        ///
-        /// <para>本数だけ増やしても <b>r9 で Balanced −2.63pt</b> と弱かった。 配られるのが
-        /// <c>RarityWeightedPicker</c> の素の抽選 ＝ <b>カタログ平均の品</b>で、
-        /// BOT が自分で買う「学習序列の上位」に質で負けているため。
-        /// 本数ではなく<b>質</b>を段の報酬にする。</para>
-        ///
-        /// <para>しきい値は本数と同じ r3/6/9。 「段を踏むたびに開幕の手札が良くなる」が
-        /// 1 本の軸として読めるようにする。</para></summary>
-        public static float SupplyRarityBias(int rank)
-        {
-            if (rank >= 9) return 1.0f;
-            if (rank >= 6) return 0.6f;
-            if (rank >= 3) return 0.3f;
-            return 0f;
-        }
-
-        /// <summary>開幕パッシブ <paramref name="itemIndex"/> 本目 (0 起点) の提示数。
-        ///
-        /// <para>r10 未満は常に 1 ＝ ランダム。 <b>r10 は 1 本目 1 択 / 2 本目 2 択 / 3 本目 3 択</b>
-        /// と段階的に増える (2026-09-13)。 一律 3 択は r10−r9 +3.38pt / Balanced 比 +4.71 と
-        /// 強すぎた ── 3 本すべてを最良で揃えると開幕が完成しすぎる。
-        /// 後の本ほど選択肢が増えるので、 <b>最初の 1 本は運、 最後の 1 本は選択</b>になる。</para></summary>
-        public static int SupplyStartingOffers(int rank, int itemIndex)
-            => rank >= 10 ? Mathf.Clamp(itemIndex + 1, 1, 3) : 1;
-
-        // [削除 2026-11-12] LanternProvisionLossReduce ── 兵站の戦闘後の物資減少軽減。 2026-09-12 から常に 0・呼ぶ側も無かった。
-
-        /// <summary>兵站 (旧〈燈火〉・2026-11-09 改名): 物資上限 +1/段 (r10 で +10)。
-        /// <para>2026-11-09: 物資のデノミ (1 歩 = 1・素の上限 20)。 旧 +150/段 (1 歩 50) の 1/50。
-        /// 物資払い (旧 r10・ゴールドの不足分を物資で) と「物資で払える下限」の段効果は撤去した。
-        /// r10 の極点は〈補給線〉に差し替える (未実装・GAME.md §23-21)。</para></summary>
-        public static int LanternProvisionCapBonus(int rank) => Mathf.Clamp(rank, 0, 10) * 1;   // 2026-11-09: 上限 5 に合わせて +1/段 (2026-11-10 に兵站ごと枠から外した・MaxRank 0)
-
-        /// <summary><b>装甲 (2026-11-10): 防御 +2/段</b> (r10 で +20)。 r10〈不動〉は <see cref="ArmorHitCap"/>。
-        /// <para>2026-11-10: +1/段 では 7 点 (防御 5→12) が外殻・出力に負けた (−9.6) ので +2/段 へ。
-        /// 防御は逓減式 Rmax·D/(D+K) で軽減率になる (ADR-0013・今は 0.6 / 10)。 初期の防御 2 で軽減 10%、 r3 (8) で約 27%、 r10 (22) で約 41%。
-        /// 武器の防御はこれとは別に足される。 相手の貫通に固定値で削られる。</para>
-        /// <para>旧〈防御〉の開幕シールドは「危険でない戦闘だけを消す」形で外した (§24)。 防御値は割合の軽減なので、 強い攻撃ほど多く減らす。</para></summary>
-        public const int ArmorDefPerRank = 2, ArmorShieldPerRank = 0;
-        public static int ArmorDefense(int rank)
-            => Mathf.Clamp(rank, 0, 10) * (GameLoop.GameHooks.ArmorDefPerRankOverride >= 0 ? GameLoop.GameHooks.ArmorDefPerRankOverride : ArmorDefPerRank);
-
-        /// <summary>装甲: 開幕シールド (戦闘の始めに張る・戦闘中持続)。 段 × 刻み。</summary>
-        public static int ArmorOpeningShield(int rank)
-            => Mathf.Clamp(rank, 0, 10) * (GameLoop.GameHooks.ArmorShieldPerRankOverride >= 0 ? GameLoop.GameHooks.ArmorShieldPerRankOverride : ArmorShieldPerRank);
-
-        // [2026-11-10 撤去] 旧 r10〈不動〉(失った HP 10% ごとに防御 +1)。 防御は逓減式で効きが鈍るので、 r10 は「一撃の上限」(ArmorHitCap) へ差し替えた。
-        //   常に 0 を返す ArmorImmovable は 2026-11-12 に呼び出しごと削除。
-
-        /// <summary><b>装甲: 被ダメージ −1/段</b> (敵の攻撃を防御で減らした後に N 引く・下限 1)。 防御の逓減を受けない引き算。
-        /// 強すぎたら 2 段ごと (<see cref="ArmorFlatEvery"/>)。 [2026-11-10] 当初の「固定ダメージ −N」は、 敵に固定ダメージが無く常に 0 だったので戻した。</summary>
-        public const int ArmorFlatEvery = 2;   // 2026-11-10 測定: 1 段ごとだと他の項目から 7 点移して +2.9/+2.3 (有意) と強すぎ、 2 段ごとで +1.1/−1.5 (有意でない)
-        public static int ArmorFlatReduction(int rank)
-        {
-            int every = GameLoop.GameHooks.ArmorFlatEveryOverride > 0 ? GameLoop.GameHooks.ArmorFlatEveryOverride : ArmorFlatEvery;
-            return Mathf.Clamp(rank, 0, 10) / System.Math.Max(1, every);
-        }
-
-        /// <summary><b>装甲 r10〈不動〉(2026-11-10): 1 回の攻撃で受けるダメージは最大 HP の 35% まで</b> (条件なし)。 r10 未満は 0 (= 上限なし)。
-        /// 防御の逓減とは無関係に、 山場の一撃で死なないことを保証する極点。</summary>
+        /// <summary>〈不動〉: 1 回の攻撃で受けるダメージは最大 HP のこの割合まで ＋ 被ダメージ −N (防御の後に引く・下限 1)。</summary>
         public const float ArmorHitCapPct = 0.35f;
-        public static int ArmorHitCap(int rank, int maxHp) => rank >= 10 && maxHp > 0 ? Mathf.Max(1, Mathf.CeilToInt(maxHp * ArmorHitCapPct)) : 0;
+        public const int ImmovableFlatReduction = 2;
+        public static int ArmorHitCap(int maxHp) => maxHp > 0 ? UnityEngine.Mathf.Max(1, UnityEngine.Mathf.CeilToInt(maxHp * ArmorHitCapPct)) : 0;
 
-        // (旧 PrecisionCritRatePct: 2026-11-12 に関数ごと削除。 下は経緯の記録)
-        //  <summary>精密: 会心率 **+5%/段** (r10 で +50%)。 数値系トラック共通の全段リニア
-        //  (外殻 +3HP/段、 出力 +5%/段、 防御 +3シールド/段、 金庫 +5G/段) と同じ形。
-        //  極点は r10 の <see cref="PrecisionOverflowMultiplier"/>。
-        //
-        //  2026-07-26 は `rank × 0.55%` だったが、 逓減カーブ下では
-        //  **精密 9pt ≒ 期待与ダメ +23% に対し 出力 9pt = +45%** と 2 倍の開きがあり、
-        //  トラックとして選ばれる理由が無かった。 2026-07-28 に釣り合う水準へ増量 (§15-1)。
-        //  なお会心ダイス (分子) 経由は廃止済み ── 分子/分母モデル自体が存在しないため。</summary>
-        //  <b>【2026-09-10 廃止】常に 0。</b> 精密トラックを撤去した。
-        //  drop-one 実測で寄与が測定分解能未満 (−0.006 対数オッズ/pt / 分解能 ±0.049)。
-        //  原因は二重減衰 ── 双曲線逓減で名目 +15% が実効 +9.2pt になり、 会心倍率 2.0 で
-        //  与ダメ +6.9% にしかならない (出力の 46%)。 2026-07-28 の増量は会心倍率 3.0 を
-        //  前提に較正されており、 08-03 の 3.0→2.0 差し戻しで宙に浮いていた。
-        //  <b>貫通軸への転換も検討したが棄却</b> ── 実効会心率の分布が P90/P10 = 1.46 倍 と狭く
-        //  (逓減が分散ごと潰している) 倍率化してもビルド条件依存が成立しない。 貫通 (playerArmorPen)
-        //  は敵軽減 0/15/35% に沿って条件依存するが、 「totalDmg に掛かる倍率」という点で
-        //  出力と同種で、 9 本目のトラックを持つ理由にならないと判断した。
+        // ---- 種火 (軸の宣言・旧 r1 + r2 相当。 旧 r3 の開幕の品は外した) ----
 
-        /// <summary>精密 r10 の極点: **逓減で捨てられた会心率を、会心倍率へ変換する。**
-        ///
-        /// 会心率は <see cref="ItemSystem.PassiveSkills.CombatContext.ResolveCritRate"/> で
-        /// 双曲線逓減するため、 積むほど「加算したのに実効に乗らない分」が増える。 r10 はその
-        /// **捨てられた分 5 ポイントごとに会心倍率 +0.1** を返す (切り捨て)。
-        ///
-        /// 設計意図: 逓減の壁に当たっているビルドほど見返りが大きい。
-        /// 精密を 10 段積み切った時点で壁に届くので、 **最後の 1 点を踏むかどうかが分岐**になる
-        /// (他の数値系トラックが r10 に節目を持つのと同じ構造)。
-        /// 呼び出し側は逓減・天井適用後の実効率を渡すこと。</summary>
-        /// <param name="critAddTotal">逓減前の会心率加算合計 (1.0 = +100%)。</param>
-        /// <param name="effectiveRate">逓減・天井適用後の実効会心率。</param>
-        public static float PrecisionOverflowMultiplier(int rank, float critAddTotal, float effectiveRate)
-        {
-            return 0f;   // 【2026-09-10 廃止】精密トラック撤去に伴い極点も消滅
-#pragma warning disable 162
-            if (rank < 10) return 0f;
-            float discarded = critAddTotal - effectiveRate;
-            if (discarded <= 0f) return 0f;
-            // 捨て分 5pt ごとに +0.05。 他トラックの r10 節目 (被ダメ-2 / 解禁系) と釣り合う量。
-            return UnityEngine.Mathf.Floor(discarded * 100f / 5f) * 0.05f;
-#pragma warning restore 162
-        }
+        /// <summary>対応する軸の秘宝の、 店の秘宝の枠での出現の重み。</summary>
+        public const float SparkAppearanceWeightMul = 2.0f;
+        /// <summary>充電: 充電の上限と戦闘開始時の充電。</summary>
+        public const int ChargeCapBonus = 10, ChargeOpening = 10;
+        /// <summary>臨界: 戦闘の終わりのメーターを次の戦闘へ持ち越す割合。</summary>
+        public const float RinkaiCarryoverRatio = 0.5f;
+        /// <summary>毒: 1 ターンに最初の 1 回だけ、 毒の付与に足すスタック (CombatContext.AddStatus)。</summary>
+        public const int PoisonApplyBonus = 5;
+        /// <summary>出血: 出血がこれ以上の敵の攻撃値 −<see cref="BleedWeakenAmount"/>。</summary>
+        public const int BleedWeakenThreshold = 3, BleedWeakenAmount = 4;
+        /// <summary>シールド: ターン開始の減衰で残るシールド +N ポイント。</summary>
+        public const int ShieldKeepBonusPct = 10;
+        /// <summary>会心 (再設計): 会心倍率 +N。</summary>
+        public const float CritMulBonus = 0.5f;
 
-        // === 種火共通テンプレ ===
+        // ---- 補助 (戦術パーツ) ----
 
-        /// <summary>種火 r1: 対応キーワードアイテムの出現重み倍率 (r1 到達で 2.0 = +100%・2026-11-07 に 1.6 から)。</summary>
-        public static float SparkAppearanceWeightMul(int rank) => rank >= 1 ? 2.0f : 1.0f;
+        /// <summary>攻撃 / 防御の端子調律: その端子に挿した出目 1 個につき +N。</summary>
+        public const int TerminalTunePerDie = 1;
+        /// <summary>〈軸引きの手形〉: 店の軸指定リロールの追加から引く額。</summary>
+        public const int AxisTicketDiscount = 5;
+    }
 
-        /// <summary>種火 r3: 対応キーワードのアイテムを開幕所持。
-        /// **抽選対象は LEGENDARY を除く全等級**（BRONZE 固定ではない・2026-07-28）。</summary>
-        public static bool SparkStartingItemUnlocked(int rank) => rank >= 3;
+    /// <summary>作戦の枠。 <b>並びが開く順</b> (1 枠目 = 主方針・2 枠目 = 補助・3 枠目 = 種火)。 セーブの equippedModules の添え字なので並べ替えない。</summary>
+    public enum MetaSlot { Main, Support, Spark }
 
-        /// <summary>種火 r3 で開幕に持つ品の数 (2026-11-07 に 1 → 2)。</summary>
-        public const int SparkStartingItemCount = 2;
+    /// <summary>作戦のモジュール。 <b>セーブは int で持つので並べ替えも削除もしない</b> (足すのは末尾)。 枠は <see cref="MetaPanel.SlotOf"/>。</summary>
+    public enum MetaModule
+    {
+        // === 主方針 (旧 r10 の極点) ===
+        LastStand,     // 〈ラストスタンド〉 その場蘇生 (ボス戦でも 1 度だけ・最大 HP 半減)
+        BattleSpirit,  // 〈戦意〉
+        Valor,         // 〈剛胆〉 エリート格上げ・報酬・エリートへの与ダメ・シールド持ち越し
+        VaultBank,     // 〈貸金庫〉 層突破で所持金 1.5 倍 (200G まで)・宝箱ゴールド
+        Robbery,       // 〈ショップ強盗〉 値下げ交渉・通常の敵の追加ドロップ
+        Sale99,        // 〈99% 特売〉
+        StartPick,     // 〈開幕厳選〉
+        Immovable,     // 〈不動〉
 
-        /// <summary>充電 r2 拡張バッテリー: 充電上限 +10 (2026-11-07 に +5 から)。 あわせて戦闘開始時の充電 +10 (<see cref="ChargeOpening"/>)。
-        /// 上限だけでは上限に届く前に戦闘が終わり、 何も起きていなかった (種火・充電が Balanced に −0.7)。</summary>
-        public static int ChargeCapBonus(int rank) => rank >= 2 ? 10 : 0;
+        // === 種火 ===
+        SparkCharge, SparkRinkai, SparkPoison, SparkBleed, SparkShield, SparkCrit,
 
-        /// <summary>充電 r2: 戦闘開始時に得る充電 (2026-11-07)。</summary>
-        public static int ChargeOpening(int rank) => rank >= 2 ? 10 : 0;
+        // === 補助 ===
+        AttackTune,    // 攻撃端子調律
+        BlockTune,     // 防御端子調律
+        AxisTicket,    // 〈軸引きの手形〉
+        TacticKnife,   // 〈戦術の懐刀〉
+        Compression,   // 〈圧縮の心得〉
 
-        /// <summary>臨界 r2 保温炉: 戦闘終了時にメーターの何割を持ち越すか (0..1)。</summary>
-        public static float RinkaiCarryoverRatio(int rank) => rank >= 2 ? 0.5f : 0f;
-
-        /// <summary>毒 r2 濃縮: 1 ターンに最初の 1 回だけ、 毒の付与に足すスタック (CombatContext.AddStatus)。 2026-11-07 に +2 → +5。</summary>
-        public static int PoisonApplyBonus(int rank) => rank >= 2 ? 5 : 0;
-
-        /// <summary>出血 r2 失血衰弱: 出血 <see cref="BleedWeakenThreshold"/> 以上の敵の攻撃値 −<see cref="BleedWeakenAmount"/>。閾値未到達なら 0。</summary>
-        public static int BleedWeakenAttack(int rank, int enemyBleedStacks)
-            => (rank >= 2 && enemyBleedStacks >= BleedWeakenThreshold) ? BleedWeakenAmount : 0;
-
-        /// <summary>出血 r2 失血衰弱が効き始める敵の出血。</summary>
-        public const int BleedWeakenThreshold = 3;
-        /// <summary>出血 r2 失血衰弱で引く敵の攻撃値 (2026-11-07 に 2 から 4)。</summary>
-        public const int BleedWeakenAmount = 4;
-
-        /// <summary>会心 r2 研ぎ澄まし: 会心倍率 +0.8 (2026-11-07・+0.2 → +0.5 → +0.8)。</summary>
-        public static float CritMulBonus(int rank) => rank >= 2 ? 0.8f : 0f;
-
-        /// <summary>シールド r2 厚手の芯: ターン開始の減衰で残るシールド +10 ポイント (2026-11-07)。</summary>
-        public static int ShieldKeepBonusPct(int rank) => rank >= 2 ? 10 : 0;
-
-        // === 端子調律 ===
-
-        /// <summary>攻撃端子: **接続したダイス 1 本あたり** +N (0..3)。
-        /// 2026-07-28 に「配線合計 +N」から変更 ── 端子へ多く挿すほど伸びる形にして、
-        /// 配線判断 (§6-4) と噛ませる。 r3 で 3 本接続なら +9。</summary>
-        public static int AttackTerminalPerDice(int rank) => Mathf.Clamp(rank, 0, 3);
-
-        /// <summary>防御端子: **接続したダイス 1 本あたり** +N (0..3)。</summary>
-        public static int BlockTerminalPerDice(int rank) => Mathf.Clamp(rank, 0, 3);
+        // (新しい 2 軸の種火 SparkDeck / SparkRole は段 1-e の後に、 ここ = 末尾へ足す)
     }
 }

@@ -206,7 +206,7 @@ namespace MetaProgression.Achievements
             D(RelicAllMax, C.RelicPanel, 5, "完全無欠", "★4で、サブステータス3つがすべて最大の遺物を作る"),
             D(CursedRelicClear7, C.RelicPanel, 3, "揃いの至宝", "同じセットの遺物を3個持ち込んで、3層のボスを倒す"),
             D(RelicSetsAll, C.RelicPanel, 3, "六つの棚", $"{Relics.RelicCatalog.SetCount}つのセットの遺物を、すべて持つ"),
-            D(PanelFull, C.RelicPanel, 2, "整備完了", $"整備パネルの点を、{MetaPanel.MaxPoints}点すべて振る"),
+            D(PanelFull, C.RelicPanel, 2, "整備完了", $"整備パネルの基礎整備を{MetaPanel.BaseTierCount}段すべて買い、 作戦の枠を3つとも開く"),
 
             // ── 記録とイベント ──
             D(Events50, C.RecordEvent, 2, "寄り道の常連", $"イベントを通算{EventsGoal}回終える"),
