@@ -1456,6 +1456,22 @@ namespace AutoTest
             return at >= 0 && gm.RestRemoveTerminal(at);
         }
 
+        /// <summary>休憩: 素材が足りれば、 山札の強化できる端子のうち報酬の点 (<see cref="RewardBaseScore"/>) が最も高い 1 枚を強化する (休憩の行動を使う)。
+        /// 同点は山札の前の方。 強化したら true。 呼ぶ側 (休憩の判断) が「武器を強化できない・HP が十分」を確かめる。</summary>
+        private bool TryRestUpgradeTerminal(GameManager gm)
+        {
+            var run = gm?.Run; if (run?.terminalDeck == null || terminalsLeaveDeck) return false;
+            if (run.weaponMaterials < GameManager.TerminalUpgradeCost(run)) return false;
+            int at = -1; float best = float.NegativeInfinity;
+            for (int i = 0; i < run.terminalDeck.Count; i++)
+            {
+                if (!TerminalCards.CanUpgrade(run.terminalDeck[i])) continue;
+                float sc = RewardBaseScore(TerminalCards.Get(run.terminalDeck[i]), run);
+                if (sc > best) { best = sc; at = i; }
+            }
+            return at >= 0 && gm.RestUpgradeTerminal(at);
+        }
+
         /// <summary>抜く端子 (山札の添字・−1 = 抜かない)。 規則は上の注記。</summary>
         private static int PruneTarget(RunState run)
         {

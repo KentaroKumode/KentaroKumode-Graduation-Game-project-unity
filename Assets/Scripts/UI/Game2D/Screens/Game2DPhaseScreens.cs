@@ -257,13 +257,13 @@ namespace UI.Game2D
         }
 
         // ── 休憩 ──
-        //   休む / 多めに休む (ターンが進む) / 鍛える / 山札から抜く。 どれも 1 回の休憩で 1 つだけ (面を外すは 2026-11-18 に削除・ADR-0015)。
+        //   休む / 多めに休む (ターンが進む) / 鍛える / 山札から抜く / 端子を強化する (2026-11-20)。 どれも 1 回の休憩で 1 つだけ (面を外すは 2026-11-18 に削除・ADR-0015)。
 
         private ScreenDef Rest(GameManager gm)
         {
             var run = gm.Run;
             Game2DTutorial.Request(TutorialTopics.Equip);      // 手引き「装備と強化」: 初めて休憩に入った (武器の強化・面を外す)
-            if (_termPick == TermPick.Rest) return TerminalDeckList(gm);
+            if (_termPick == TermPick.Rest || _termPick == TermPick.RestUpgrade) return TerminalDeckList(gm);
             var d = New("休憩", "HP " + run.playerHP + "/" + run.playerMaxHP + "  素材 " + run.weaponMaterials);
             int more = Mathf.RoundToInt(MapSystem.FreeMove.FreeMapParams.RestMoreRatio * 100);
             d.Items.Add(new ModalItem { name = "休む", desc = "HP を回復する。 ターンは進まない。" });
@@ -273,6 +273,12 @@ namespace UI.Game2D
             bool canTerm = gm.CanRemoveTerminal; int deckN = run.terminalDeck != null ? run.terminalDeck.Count : 0;
             d.Items.Add(new ModalItem { name = "山札から抜く", value = canTerm ? "山札 " + deckN + " 枚" : "抜けない", disabled = !canTerm,
                 desc = canTerm ? "回復の代わりに、 山札から端子を 1 枚抜く (この先ずっと)。 抜く端子を次に選ぶ。" : "山札が下限の枚数 (" + CombatSystem.TerminalCards.MinDeckSize + ") を下回る抜き方はできない。" });
+            // 端子を強化する (2026-11-20): 素材を払って、 山札の端子 1 枚を強化した端子 (＋) に差し替える。 値段は強化するたびに上がる
+            int upCost = GameManager.TerminalUpgradeCost(run); bool anyUp = GameManager.HasUpgradableTerminal(run), canUp = anyUp && run.weaponMaterials >= upCost;
+            d.Items.Add(new ModalItem { name = "端子を強化する", value = "素材 " + upCost, disabled = !canUp,
+                desc = !anyUp ? "山札に強化できる端子が無い。"
+                     : canUp ? "素材 " + upCost + " を使って、 山札の端子を 1 枚強化する (この先ずっと・強化するたびに素材が 2 増える)。 強化する端子を次に選ぶ。"
+                             : "素材が足りない (" + upCost + " 要る)。" });
             d.buttons.Add(B("決める", "do", true));
             d.onAction = (a, sel) =>
             {
@@ -282,6 +288,7 @@ namespace UI.Game2D
                     case 1: gm.RestHealMore(); break;
                     case 2: gm.RestUpgrade(); break;
                     case 3: if (canTerm) { _termPick = TermPick.Rest; _termDeckPage = 0; } break;
+                    case 4: if (canUp) { _termPick = TermPick.RestUpgrade; _termDeckPage = 0; } break;
                     default: gm.RestHeal(); break;
                 }
                 Refresh();
@@ -527,9 +534,10 @@ namespace UI.Game2D
         }
 
         /// <summary>今の山札の中身 (名前ごとの枚数)。 並びは定義の順 (基本 → コモン → レア → 軸 → 使い捨て)。</summary>
-        /// <summary>山札の一覧を何のために開いているか。 View = 見るだけ (店の端子の頁から) / Shop = 店で抜く端子を選ぶ / Rest = 休憩で抜く端子を選ぶ。
+        /// <summary>山札の一覧を何のために開いているか。 View = 見るだけ (店の端子の頁から) / Shop = 店で抜く端子を選ぶ / Rest = 休憩で抜く端子を選ぶ /
+        /// RestUpgrade = 休憩で強化する端子を選ぶ (強化できる端子だけを並べ、 説明は強化後の文)。
         /// None は報酬の窓の「山札を見る」(_termDeckView) の時。</summary>
-        private enum TermPick { None, View, Shop, Rest }
+        private enum TermPick { None, View, Shop, Rest, RestUpgrade }
         private TermPick _termPick;
 
         private ScreenDef TerminalDeckList(GameManager gm)
@@ -538,34 +546,49 @@ namespace UI.Game2D
             var counts = new Dictionary<string, int>();
             foreach (var id in deck) { counts.TryGetValue(id, out int c); counts[id] = c + 1; }
             var names = new List<string>();
+            bool upPick = _termPick == TermPick.RestUpgrade;
             foreach (var t in CombatSystem.TerminalCards.All) if (counts.ContainsKey(t.id)) names.Add(t.id);
             foreach (var id in counts.Keys) if (!names.Contains(id)) names.Add(id);      // 定義に無い名前 (古いセーブなど) も落とさない
+            if (upPick) names.RemoveAll(id => !CombatSystem.TerminalCards.CanUpgrade(id));      // 強化: 強化できる端子だけ
             int pages = Mathf.Max(1, (names.Count + TermDeckPerPage - 1) / TermDeckPerPage); _termDeckPage = Mathf.Clamp(_termDeckPage, 0, pages - 1);
             var d = New("山札", "計 " + deck.Count + " 枚・" + names.Count + " 種", 460); d.cols = 2;
             int first = _termDeckPage * TermDeckPerPage, cnt = Mathf.Min(TermDeckPerPage, names.Count - first);
             for (int i = 0; i < cnt; i++)
             {
                 string id = names[first + i]; var t = CombatSystem.TerminalCards.Get(id);
+                var tu = upPick ? CombatSystem.TerminalCards.Get(CombatSystem.TerminalIds.Upgraded(id)) : null;
                 d.Items.Add(new ModalItem
                 {
                     name = id, value = "×" + counts[id], tone = t != null ? Game2DTerminalLook.KindColor(t.kind) : (Color32?)null,
-                    desc = t != null ? Game2DTerminalLook.Describe(t, run) : null,
+                    desc = tu != null ? "強化すると: " + Game2DTerminalLook.Describe(tu, run) : t != null ? Game2DTerminalLook.Describe(t, run) : null,
                 });
             }
             if (names.Count == 0) d.body = "山札は空。";
-            bool pick = _termPick == TermPick.Shop || _termPick == TermPick.Rest;
-            if (pick)
+            bool pick = _termPick == TermPick.Shop || _termPick == TermPick.Rest || upPick;
+            if (upPick)
+            {
+                d.title = "強化する端子を選ぶ ― 素材 " + GameManager.TerminalUpgradeCost(run);
+                d.buttons.Add(B("強化する", "upgrade", true));
+            }
+            else if (pick)
             {
                 d.title = _termPick == TermPick.Shop ? "抜く端子を選ぶ ― " + gm.TerminalRemovePrice + "G" : "抜く端子を選ぶ ― 休憩";
                 d.buttons.Add(B("抜く", "remove", true));
             }
             if (pages > 1) d.buttons.Add(B("次の頁 " + (_termDeckPage + 1) + "/" + pages, "page"));
             d.buttons.Add(B("戻る", "back", !pick));
-            d.footer = pick ? "抜いた端子は、 このランの山札から消える" : "名前の色は種類 (赤 = 攻撃・青 = 防御・金 = 充電・緑 = 補助)";
+            d.footer = upPick ? "強化した端子は名前に「＋」が付く。 同じ名前が 2 枚あれば 1 枚だけ強化する"
+                     : pick ? "抜いた端子は、 このランの山札から消える" : "名前の色は種類 (赤 = 攻撃・青 = 防御・金 = 充電・緑 = 補助)";
             d.onAction = (a, sel) =>
             {
                 if (a == "page") _termDeckPage = (_termDeckPage + 1) % pages;
                 else if (a == "back") { _termDeckView = false; _termPick = TermPick.None; }
+                else if (a == "upgrade" && upPick && sel >= 0 && sel < cnt)
+                {
+                    int at = deck.IndexOf(names[first + sel]);
+                    if (gm.RestUpgradeTerminal(at)) { Game2DSfx.Play("ui_confirm"); _termPick = TermPick.None; }
+                    else modal.ShowError("強化できない (素材が足りない・強化できない端子)");
+                }
                 else if (a == "remove" && pick && sel >= 0 && sel < cnt)
                 {
                     int at = deck.IndexOf(names[first + sel]);

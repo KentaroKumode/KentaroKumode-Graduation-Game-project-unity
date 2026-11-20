@@ -557,6 +557,10 @@ namespace AutoTest
                     //   **常に true** になる。 つまり強化不能でも `RestUpgrade()` が呼ばれる
                     //   経路が既にあり、 ここに `&& canUpgrade` を足すと **その分が回復へ
                     //   移って既存の基準値が変わる**。 挙動は 1 ビットも変えない。
+                    // 端子の強化 (2026-11-20・最小限の規則): 武器の強化の判断を先に通し、 武器を強化できない時に、 HP が十分 (上の HP の理由で回復を選んでいない)
+                    //   で素材が足りれば、 山札の強化できる端子のうち報酬の点が最も高い 1 枚を強化する (AutoRunner.Terminals の TryRestUpgradeTerminal)
+                    bool hpEnough = hpR > 0.40f && !(greedyBossPrep && hpR < 0.8f);
+                    if (!canUpgrade && hpEnough && TryRestUpgradeTerminal(gm)) return false;
                     if (restPick == RestUpgradeIndex) { gm.RestUpgrade(); return false; }
 
                     // 2026-11-04: 回復の場面で使える休憩の残り (多めに休む・山札から抜く)。 面を外すは 2026-11-18 に削除 (ADR-0015)。
