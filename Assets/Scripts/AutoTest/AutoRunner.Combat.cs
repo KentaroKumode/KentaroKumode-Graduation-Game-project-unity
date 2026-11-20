@@ -533,6 +533,8 @@ namespace AutoTest
             public float critP, critMulEff;    // 会心率 (配線前に分かる分) / 実効の会心倍率 (敵の会心耐性込み)
             /// <summary>[2026-11-20] このターンの最初の 1 撃の会心率 (〈抜き打ちの作法〉の確定・〈千里眼の水晶〉の上乗せ込み。 無ければ critP と同じ)。</summary>
             public float critP1;
+            /// <summary>[2026-11-21] 〈急所突きの針〉が仕込んである: 攻撃のある最初の 1 撃は必ず会心・敵の防御を無視 (本体 CombatManager.TakeTacticNeedle)。</summary>
+            public bool needleFirst;
             /// <summary>[2026-11-20] 〈寸鉄〉: 会心しなかった撃に掛かる上乗せ (会心倍率の上乗せ分 × 会心率 (100% まで)・0 = 持っていない)。</summary>
             public float nonCritShare;
             /// <summary>[2026-11-20] 〈加重の拳套〉: 撃の番号 (0 から) 1 につき足す最終与ダメージ倍率 (%・0 = 持っていない)。</summary>
@@ -625,7 +627,7 @@ namespace AutoTest
             float termMul = ws.damageMul;
             int fpct = s.finalPct + s.lateHitFinalPct * hitNo;   // ローカル関数は in の引数を捕まえられないので写す (〈加重の拳套〉: 2 撃目以降の上乗せ)
             float nonCritShare = s.nonCritShare;
-            int minDmg = s.minDmg, consBurst = s.consBurst, eDef = ws.ignoreDefense ? 0 : s.eDefNow, pen = s.myPen, critPen = s.critPen;
+            int minDmg = s.minDmg, consBurst = s.consBurst, eDef = ws.ignoreDefense || (hitNo == 0 && s.needleFirst) ? 0 : s.eDefNow, pen = s.myPen, critPen = s.critPen;
             float critMulEff = s.critMulEff + ws.critMultAdd, nonCritMul = s.nonCritMul, berserk = s.berserkMul;
             bool pinpoint = s.pinpointCut, vital = s.vitalIgnore, down = s.enemyDown && !s.enemyDownWeak;   // ひびの弱いダウン (2026-11-14) は ×1.5 なし
             float D(bool crit)
@@ -705,6 +707,8 @@ namespace AutoTest
                     p1 = ItemSystem.PassiveSkills.CombatContext.ResolveCritRate(add + ItemSystem.PassiveSkills.Effects.ClairvoyantCrystal.FirstHitBonus(ctx));
                 if (run != null && run.OwnsPassive(ItemSystem.PassiveSkills.Effects.QuickDrawArt.Id) && !ctx.critToDamage
                     && ItemSystem.PassiveSkills.Effects.QuickDrawArt.FirstHitForced(ctx)) p1 = 1f;
+                st.needleFirst = ctx.GetAccumulated(CombatSystem.CombatManager.TacticNeedleKey) > 0f;
+                if (st.needleFirst) p1 = 1f;      // 〈急所突きの針〉: 本体は forceCritThisHit (撃の会心の判定を確定にする)
                 st.critP1 = p1;
             }
             float cmul = ctx.criticalMultiplier;
