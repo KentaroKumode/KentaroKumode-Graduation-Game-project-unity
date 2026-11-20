@@ -154,22 +154,24 @@ namespace CombatSystem
 
         /// <summary>主攻撃 (通常攻撃) が当たった直後 (主攻撃のダメージを HP から引いた所・固定ダメの枠より前・2026-11-14):
         /// 新しい判定 (MainAttackOnly) なら、 HP 以下にある未割りの目盛りを全部割る (満額のダウン・ひびの入った目盛りも)。 ダメージ 0 (回避・吸収) や撃破では割らない。
-        /// 旧い判定 (AnyDamage) では何もしない (計装だけ)。 1 ターンに主攻撃が複数回当たる時は、 当たるたびに呼んでよい。</summary>
-        private void NoteBossDownMainHit(int mainDmg, int turn)
+        /// 旧い判定 (AnyDamage) では何もしない (計装だけ)。 1 ターンに主攻撃が複数回当たる時は、 当たるたびに呼んでよい。
+        /// 戻り値 = この撃で割った目盛りの数 (旧い判定・割らなかった時は 0・端子〈崩し斬り〉が読む)。</summary>
+        private int NoteBossDownMainHit(int mainDmg, int turn)
         {
             _downMainWouldBreak = 0;
-            if (!_down.Enabled || currentEnemy == null || enemyHP <= 0 || mainDmg <= 0) return;
+            if (!_down.Enabled || currentEnemy == null || enemyHP <= 0 || mainDmg <= 0) return 0;
             if (GameLoop.GameHooks.DownBreak == DownBreakRule.AnyDamage)
             {
                 _downMainWouldBreak = BossDown.BrokenCount(_down.notches, currentEnemy.maxHP, enemyHP, _down.broken) - _down.broken;
-                return;
+                return 0;
             }
             int d = _down.NoteMainHit(enemyHP, currentEnemy.maxHP, mainDmg, turn, out int crackedBroken, out int waitSum);
-            if (d <= 0) return;
+            if (d <= 0) return 0;
             MetaProgression.Achievements.AchievementService.NoteBossDownBroken(d);   // 実績〈二枚抜き〉(1 回の攻撃で 2 つ)
             BossDownDiag.NoteMainBreak(d, crackedBroken, waitSum);
             Debug.Log($"[ダウン] 通常攻撃で目盛りを {d} つ割った (HP {enemyHP}/{currentEnemy.maxHP}"
                     + (crackedBroken > 0 ? $"・うちひびの入った目盛り {crackedBroken}" : "") + $") → 次のターンからダウン {_down.pending} ターン");
+            return d;
         }
 
         /// <summary>ターンの終わり (ターン終了時の削りを拾った後): 旧い判定 (AnyDamage) = 新しく割った目盛りを数え、 その数だけ次のターンからダウンを待たせる。
