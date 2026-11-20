@@ -582,8 +582,6 @@ namespace ItemSystem.PassiveSkills
         public bool rinkaiMultiBurst;
         /// <summary>[persistent] 〈雷壷〉: 充電の上限が無くなる。 代わりにターン開始時、 上限を超えている分の 75% が捨てられる (過充電)。</summary>
         public bool chargeCapRemoved;
-        /// <summary>[persistent] 〈脈なしの鋼心臓〉: シールドがターン開始時に半減しない。</summary>
-        public bool shieldNoHalve;
         /// <summary>[persistent] 〈廃庭の霧吹き〉: 毒のダメージが、 ターン開始に加えて敵が攻撃するたびにも入る。</summary>
         public bool poisonTickOnEnemyAttack;
 
@@ -712,7 +710,7 @@ namespace ItemSystem.PassiveSkills
         /// <summary>[perTurn] このターンに振り直した回数（無料を含む）。 BOT の 1 ターンあたりの上限判定に使う。
         /// BeginNewTurn の Phase B で 0。</summary>
         public int rerollsThisTurn;
-        /// <summary>[decay] 残シールド吸収量。 毎ターン頭 (T2 以降) に半減 (BeginNewTurn の Phase C・〈脈なしの鋼心臓〉で止まる)。
+        /// <summary>[decay] 残シールド吸収量。 毎ターン頭 (T2 以降) に半減 (BeginNewTurn の Phase C)。
         /// <b>増えたときに〈シールドが増えた〉出来事を配る</b> (2026-10-31)。 減らすのは吸収 (Kw.AbsorbShield) と半減と品の消費。</summary>
         public int consShield
         {
@@ -1141,8 +1139,8 @@ namespace ItemSystem.PassiveSkills
             burstStackBonus -= (burstStackBonus + 3) / 4;   // 〈二度詰めの雷管〉の上乗せは毎ターン 1/4 を失う (ヴェスカ 4 段で積み上がらない・端数は切り上げて減らす = 3 からも 0 へ減る・2026-11-15 #320)
             // プレイヤーのシールドは毎ターン半減 (切り捨て。 1 → 0 で確実に消える)。 ヴェスカのシールド規約と同じ (GAME.md §13-4)。
             // T1 は戦闘開始時の付与 (開幕シールド等) をそのまま使うので半減しない。 そのターンの付与は OnTurnStart 以降なので「半減 → 付与」の順になる。
-            // 〈脈なしの鋼心臓〉で止まる。 失った分を〈半減で失った〉出来事として配る (2026-10-31)。
-            if (currentTurn > 1 && _consShield > 0 && !shieldNoHalve)
+            // 失った分を〈半減で失った〉出来事として配る (2026-10-31)。
+            if (currentTurn > 1 && _consShield > 0)
             {
                 // 〈堅牢〉の①: 残る割合 50% + 上乗せ (最大 80%・2026-11-07)
                 // 遺物 (§15-5) 堅牢 3 個: +25%。 遺物の分だけは上限 90% まで (それ以外の上乗せは 80% のまま)

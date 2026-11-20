@@ -576,12 +576,23 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>脈なしの鋼心臓【規則】: シールドがターン開始時に半減しなくなる。</summary>
-    public class PulselessHeart : IPassiveSkillEffect
+    /// <summary>脈なしの鋼心臓: 戦闘開始時、 シールド +X。 戦闘に勝利するたび X +1 (このランの間)。 X の最初の値は 10。
+    /// X は <see cref="GameLoop.RunState.pulselessHeartShield"/> (ランの始めに 10)。 勝ちを数えるのは CombatManager.FinishCombat (<see cref="NoteWin"/>)。
+    /// 2026-11-20 作り直し: 旧【規則】「シールドがターン開始時に半減しなくなる」。</summary>
+    public class PulselessHeart : IPassiveSkillEffect, IRelicDisplay
     {
-        public string SkillId => "脈なしの鋼心臓";
+        public const string Id = "脈なしの鋼心臓";
+        public const int StartShield = 10;
+        public string SkillId => Id;
+        /// <summary>秘宝の列 (#320) の見え方。</summary>
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Rw.Run?.pulselessHeartShield ?? StartShield);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.shieldNoHalve = true;
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => Rw.Shield(ctx, Rw.Run?.pulselessHeartShield ?? StartShield, SkillId);
+        /// <summary>戦闘に勝った時に呼ぶ。 持っている間の勝利だけ X +1。</summary>
+        public static void NoteWin(GameLoop.RunState run)
+        {
+            if (AxisRules.Owns(run, Id)) run.pulselessHeartShield++;
+        }
     }
 
     /// <summary>燻りの革胸当て: ターン開始の減衰で失ったシールドの半分を臨界にする。
