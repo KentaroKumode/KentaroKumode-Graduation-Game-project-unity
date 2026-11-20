@@ -59,14 +59,17 @@ namespace GameLoop
         /// <para><b>呼び出し側はコインの増減で判定しないこと</b> (2026-09-17)。
         /// 〈合札〉のように価格が 0 になる経路があると、 成功してもコインが減らないので
         /// 「失敗」と誤認する。 実際 BOT の余剰リロールは<b>店の 21.6% で金を持ったまま
-        /// 抜けており (そのとき平均 224.5G)</b>、 ラン終了時の残金 92G の主因だった。</para></summary>
-        public bool ShopReroll()
+        /// 抜けており (そのとき平均 224.5G)</b>、 ラン終了時の残金 92G の主因だった。</para>
+        /// <para><paramref name="focusAxis"/> = 軸指定リロール (2026-11-20・<see cref="ShopManager.TryReroll"/>)。 決まれば端子の棚の売れていない枠も、
+        /// その軸の端子を出やすくして引き直す (<see cref="RerollTerminalShop"/>)。 通常のリロールは端子の棚を引き直さない (今までどおり)。</para></summary>
+        public bool ShopReroll(string focusAxis = null)
         {
             if (CurrentPhase != GamePhase.ShopVisit) { RunStats.RerollOutcome[0]++; return false; }
             var sm = ShopManager.Instance;
             if (sm == null) { RunStats.RerollOutcome[1]++; return false; }
-            bool ok = sm.TryReroll(Run);
+            bool ok = sm.TryReroll(Run, focusAxis);
             RunStats.RerollOutcome[ok ? 3 : 2]++;
+            if (ok && focusAxis != null) RerollTerminalShop(focusAxis);
             return ok;
         }
 

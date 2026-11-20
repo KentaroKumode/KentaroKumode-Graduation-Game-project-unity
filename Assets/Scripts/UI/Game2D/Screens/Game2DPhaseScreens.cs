@@ -76,7 +76,7 @@ namespace UI.Game2D
             bool evKeys = ph == GameManager.GamePhase.EventEncounter && _evPlan != null && Game2DEventScreen.Showing && !modal.IsOpen;
             GameManager.EventKeysByScreen = evKeys;
             if (evKeys && !Game2DLoadingScreen.Blocking) EventKeys(gm);
-            if (ph != _shown) { _shown = ph; _dirty = true; _shopSell = false; _shopSupply = false; _robArmed = false; _sellPage = 0; _shopTerm = false; _termPick = TermPick.None; _termDeckPage = 0; if (ph != GameManager.GamePhase.EventEncounter) _eventResult = null; if (ph == GameManager.GamePhase.GateRitual) System.Array.Clear(_gateOffer, 0, 3); }
+            if (ph != _shown) { _shown = ph; _dirty = true; _shopSell = false; _shopSupply = false; _robArmed = false; _sellPage = 0; _shopTerm = false; _shopAxis = false; _termPick = TermPick.None; _termDeckPage = 0; if (ph != GameManager.GamePhase.EventEncounter) _eventResult = null; if (ph == GameManager.GamePhase.GateRitual) System.Array.Clear(_gateOffer, 0, 3); }
             // 画面の外で所持金・HP が変わった時も描き直す (買える品の明暗・副題の数字)
             int coins = gm.Run != null ? gm.Run.coins : 0, hp = gm.Run != null ? gm.Run.playerHP : 0;
             if (coins != _lastCoins || hp != _lastHp) { _lastCoins = coins; _lastHp = hp; if (_open || Game2DEventScreen.Showing) _dirty = true; }
@@ -333,7 +333,48 @@ namespace UI.Game2D
             Game2DTutorial.Request(TutorialTopics.Shop);      // 手引き「ショップ」: 初めてショップに入った
             if (_termPick != TermPick.None) return TerminalDeckList(gm);
             if (_shopTerm && !_shopSell) return ShopTerminals(gm);
+            if (_shopAxis && !_shopSell) return ShopAxisReroll(gm);
             return _shopSell ? ShopSell(gm) : ShopBuy(gm);
+        }
+
+        // ── 軸指定リロール (2026-11-20・item-overhaul-spec §2-3) ──
+        //   軸を 1 つ選んで振り直す。 値段は通常のリロール + ShopManager.AxisRerollSurcharge (回数は通常と共有)。 横の数は今の偏重 (軸の秘宝の数)。
+        private bool _shopAxis;
+
+        private ScreenDef ShopAxisReroll(GameManager gm)
+        {
+            var run = gm.Run; var sm = ShopManager.Instance; var inv = sm != null ? sm.Current : null;
+            int price = sm != null ? sm.AxisRerollPrice : 0;
+            var d = New("ショップ ― 軸で振り直す", "所持金 " + run.coins + "G", 460);
+            d.body = "選んだ軸の秘宝と端子が出やすくなる (棚の売れていない枠を振り直す)。"; d.bodyLines = 1;
+            var axes = ItemSystem.PassiveSkills.AxisRules.ShopFocus;
+            foreach (var ax in axes)
+            {
+                string word = ItemSystem.PassiveSkills.AxisRules.WordOf(ax);
+                d.Items.Add(new ModalItem
+                {
+                    name = ax, value = (string.IsNullOrEmpty(word) ? "秘宝 " : word + " ") + ItemSystem.PassiveSkills.AxisRules.Count(run, ax),
+                    desc = ax + "の秘宝" + (ax == ItemSystem.PassiveSkills.AxisRules.Gold ? "" : "と端子") + "が出やすくなる。 値段は振り直し " + (inv != null ? inv.CurrentRerollPrice : 0) + "G + " + ShopManager.AxisRerollSurcharge + "G。",
+                    disabled = inv == null || price > run.coins,
+                });
+            }
+            d.buttons.Add(B("振り直す " + price + "G", "axisroll", true));
+            d.buttons.Add(B("棚へ", "back"));
+            d.footer = "軸を選んで「振り直す」";
+            d.onAction = (a, sel) =>
+            {
+                switch (a)
+                {
+                    case "axisroll":
+                        if (sel < 0 || sel >= axes.Length) modal.ShowError("軸を選ぶ");
+                        else if (gm.ShopReroll(axes[sel])) { Game2DSfx.Play("ui_confirm"); _shopAxis = false; }
+                        else modal.ShowError("振り直せない (所持金が足りない)");
+                        break;
+                    case "back": _shopAxis = false; break;
+                }
+                Refresh();
+            };
+            return d;
         }
 
         // ── 店の端子 (ADR-0014): 端子の棚 (山札に加える) と、 山札から 1 枚抜くサービス (店で抜くたびに値段が上がる) ──
@@ -430,6 +471,7 @@ namespace UI.Game2D
             bool robOk = sm != null && !run.shopRobberyDone && MetaProgression.MetaBuffApplicator.IsShopRobberyUnlocked();
             d.buttons.Add(B("買う", "buy", true));
             if (inv != null && !_shopSupply) d.buttons.Add(B("振り直す " + inv.CurrentRerollPrice + "G", "reroll"));
+            if (inv != null && !_shopSupply) d.buttons.Add(B("軸で振り直す " + sm.AxisRerollPrice + "G", "axis"));
             d.buttons.Add(B(_shopSupply ? "棚へ" : "補給 (物資)", "supply"));
             d.buttons.Add(B("端子", "term"));
             d.buttons.Add(B("売る", "sellmode"));
@@ -461,6 +503,7 @@ namespace UI.Game2D
                     case "supply": _shopSupply = !_shopSupply; break;
                     case "term": _shopTerm = true; _shopSupply = false; break;
                     case "reroll": if (!gm.ShopReroll()) modal.ShowError("振り直せない (所持金が足りない)"); break;
+                    case "axis": _shopAxis = true; break;
                     case "sellmode": _shopSell = true; _sellPage = 0; if (!gm.ShopSellMode) gm.ToggleShopSellMode(); break;
                     case "rob": if (!_robArmed) _robArmed = true; else { _robArmed = false; gm.ShopRobbery(); } break;
                     case "leave": gm.ExitShop(); break;
