@@ -276,6 +276,9 @@ namespace ItemSystem.PassiveSkills
             // クロス軸の 6 品 (2026-11-21・CrossItemEffects.cs・品の軸の偏重 5 以上で働く)
             Register(new VenomPowderStore()); Register(new BloodstainedGear()); Register(new ThunderTriple());
             Register(new FatalSight()); Register(new BloodCipher()); Register(new VenomConduit());
+            // 戦術の 6 品 (2026-11-21・TacticItemEffects.cs・item-overhaul-spec §6-2)
+            Register(new HeftyPommel()); Register(new SilentStance()); Register(new GapSpear());
+            Register(new BreakingMove()); Register(new HeavyBreakerWedge()); Register(new AdversityHourglass());
 
             // ============================
             //  汎用パッシブ

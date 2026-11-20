@@ -606,6 +606,9 @@ namespace CombatSystem
             return Math.Max(1, ctx.currentTurn - delay);
         }
 
+        /// <summary>今のエスカレーションの段階 (〈鎮静香〉の遅延・段階の戻しを差し引いた、 予告に出る段階・〈逆境の砂時計〉が読む・2026-11-21)。</summary>
+        public int EscalationStageNow(CombatContext ctx) => Escalation.EffectiveStage(EscalationTurn(ctx));
+
         private void SyncHPFromContext(CombatContext ctx)
         {
             if (ctx == null) return;

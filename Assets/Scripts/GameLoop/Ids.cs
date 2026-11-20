@@ -218,6 +218,10 @@ namespace GameLoop
         public const string CrossVenomPowder = "劇毒の火薬庫", CrossBloodGear = "血染めの歯車", CrossThunderDice = "雷鳴のゾロ目";
         public const string CrossSniper = "必殺の照準器", CrossBloodCode = "血濡れの符丁", CrossVenomConduit = "雷毒の導管";
 
+        // === 戦術の 6 品 (2026-11-21・段 1-f・item-overhaul-spec §6-2・名前は仮) = TacticItemEffects.cs ===
+        public const string TacPommel = "渾身の柄頭", TacStill = "静寂の構え", TacGapSpear = "隙衝きの短槍";
+        public const string TacBreak = "崩しの一手", TacWedge = "大技殺しの楔", TacHourglass = "逆境の砂時計";
+
         // === 航行マップで使う消耗品 (2026-09-28・2026-10-18 に囮と罠を統合) ===
         //   **系統で判定する** (ConsFamilyOf)。 下の id 定数は「開始時に配る」「店で買う」の
         //   跨ファイル参照のためだけにあり、 効果の分岐には使わない。
