@@ -43,12 +43,13 @@ namespace UI.Game2D.Battle
             {
                 var o = sim.lastOutcome;
                 if (o == null || !o.fired.Contains(f)) return null;
-                t = id == CombatSystem.TerminalIds.Copier ? o.copyTarget : id == CombatSystem.TerminalIds.BurnOut ? o.burnTarget : o.retainTarget;
+                string bid = CombatSystem.TerminalCards.BaseOf(id);
+                t = bid == CombatSystem.TerminalIds.Copier ? o.copyTarget : bid == CombatSystem.TerminalIds.BurnOut ? o.burnTarget : o.retainTarget;
             }
             else
             {
                 if (!sim.IsPicker(f))
-                    return id == CombatSystem.TerminalIds.BurnOut      // 〈火葬の剣〉(2026-11-14): 外す端子が無ければ挿しても不発
+                    return CombatSystem.TerminalCards.BaseOf(id) == CombatSystem.TerminalIds.BurnOut      // 〈火葬の剣〉(2026-11-14): 外す端子が無ければ挿しても不発
                         ? "出目に挿すと、 挿していない手札の端子を外す対象に選べる (外す端子が無いと発動しない)"
                         : "出目に挿すと、 挿していない手札の端子を対象に選べる";
                 t = sim.TargetOf(f);

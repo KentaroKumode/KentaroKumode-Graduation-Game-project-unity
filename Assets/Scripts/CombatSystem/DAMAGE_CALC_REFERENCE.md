@@ -808,6 +808,10 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
 
 配線 (端子の山札・ADR-0014・2026-11-11〜 これだけ)
          式の正本は TerminalCards.Resolve (盤面を書き換えない純粋な計算・BOT も同じ関数を写しの状態で呼ぶ)。
+         強化した端子 (名前の後ろに「＋」・2026-11-20) は基の端子と同じ枝を通り、 量だけ *Up の定数に替わる (TerminalCards.Effect の up)。
+           式が素の端子と違う所: 〈号令の剣＋〉は 1. で挿した出目も +1 / 〈剛腕＋〉は挿した出目も攻撃に足す / 〈処刑の刃＋〉は敵の HP が半分以下 (解く時の HP) なら攻撃 +4 /
+           〈諸刃の剣＋〉は撃破した時に払った HP が戻る (回復ではない・TerminalOutcome.killRefundHp) / 〈応急箱＋〉は回復する前の空きを超えた分をシールドへ (overhealToShield) /
+           〈大導電＋〉は満たす前にこの戦闘の充電の上限 +5 (ctx.chargeCapBonus・chargeCapAdd)
          数値は TerminalCards の定数、 端子の一覧は TerminalCards.Build()。 ここには「どの値がどこへ入るか」だけを書く。
          Resolve の順:
            0. 止まった端子 (ヴェスカ〈停滞する時間〉・state.stopped) を挿した出目と、 挿せる数 (capacity・既定 1) を超えた出目を外す

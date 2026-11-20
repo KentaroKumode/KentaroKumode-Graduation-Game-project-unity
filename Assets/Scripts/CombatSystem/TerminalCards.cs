@@ -22,6 +22,7 @@ namespace CombatSystem
     {
         None,
         AtMost3,        // 3 以下
+        AtMost4,        // 4 以下 (強化した〈牽制斬り〉〈血の渇き〉・2026-11-20)
         AtLeast5,       // 5 以上
         AtLeast6,       // 6 以上
         Even,           // 偶数
@@ -53,12 +54,22 @@ namespace CombatSystem
         // 使い捨て
         public const string Detonator = "火薬樽", Piercer = "貫通弾", ReliefValve = "身代わり札", FirstAid = "応急箱", FullCharge = "大導電",
             CoolShot = "氷結瓶", Copier = "影写し", BurnOut = "火葬の剣";
+
+        /// <summary>強化した端子の名前の印 (全角の「＋」・2026-11-20)。</summary>
+        public const string UpgradeMark = "＋";
+        /// <summary>強化した端子の名前 (例: 「攻撃」→「攻撃＋」)。 強化した端子の名前を作るのはここだけ。
+        /// 強化した端子から基の端子を引くのは <see cref="TerminalCards.BaseOf"/> (定義が持つ <see cref="TerminalDef.baseId"/>・名前の綴りは切らない)。</summary>
+        public static string Upgraded(string id) => id + UpgradeMark;
     }
 
     /// <summary>端子 1 種の定義。</summary>
     public sealed class TerminalDef
     {
         public string id;
+        /// <summary>基の端子の名前 (素の端子は id と同じ・強化した端子は強化する前の名前)。 効果の分かれ道はこの名前で見る。</summary>
+        public string baseId;
+        /// <summary>強化した端子 (休憩で得る・名前の後ろに「＋」・<see cref="TerminalIds.Upgraded"/>・2026-11-20)。 店・報酬・付与の抽選には出ない。 強化した端子はもう強化できない。</summary>
+        public bool upgraded;
         public TerminalKind kind;
         public TerminalCond cond;
         /// <summary>挿せる出目の数 (既定 1)。</summary>
@@ -83,6 +94,8 @@ namespace CombatSystem
         public string description;
         /// <summary>条件の短い表記 (画面用)。 条件なしは null。</summary>
         public string condLabel;
+
+        public TerminalDef Copy() => (TerminalDef)MemberwiseClone();
     }
 
     /// <summary>戦闘の間に端子が覚えている値 (溜め・連続・持ち越し)。 BOT の見積もりは <see cref="Clone"/> した写しに掛ける。</summary>
@@ -90,8 +103,8 @@ namespace CombatSystem
     {
         /// <summary>溜める端子の溜まり (端子の名前 → 量)。</summary>
         public Dictionary<string, int> gauge = new Dictionary<string, int>();
-        /// <summary>〈反復突き〉: 前に挿した目 / 連続回数。</summary>
-        public int oscLast, oscStreak;
+        /// <summary>〈反復突き〉: 前に挿した目 / 連続回数。 / 強化した〈反復突き＋〉の分 (名前ごとに数える・2026-11-20)。</summary>
+        public int oscLast, oscStreak, oscLastUp, oscStreakUp;
         /// <summary>基本以外の端子の発動の累計 (〈柔軟な戦略〉)。</summary>
         public int firedTotal;
         /// <summary>このターン / 次のターン、 出目の条件を無視する (〈無形の構え〉)。</summary>
@@ -147,6 +160,8 @@ namespace CombatSystem
         public int axCrit, axBleed, axPoison, axHeat, axCharge, axShield;
         /// <summary>〈処刑の刃〉の恒久の攻撃 (ラン単位)。</summary>
         public int whetBonus;
+        /// <summary>敵の今の HP / 最大 HP (〈処刑の刃＋〉の「敵の HP が半分以下なら」・2026-11-20)。 最大 HP 0 = 読まない。</summary>
+        public int enemyHp, enemyMaxHp;
         /// <summary>防御の種類の端子に挿した出目 1 つから引く量 (下限 0)。 時限デバフ〈罪悪感〉(2026-11-16・EventSystem.TimedEffects.TimedDebuffRule) が 2。 0 = なし。
         /// <see cref="TerminalCards.Resolve"/> の「5. 効果」で、 端子へ入る出目の合計を作る所だけで引く (端子の条件は挿した目そのもので見る)。
         /// 本体・画面の見込み・BOT の配線の評価はどれも CombatManager.TerminalEnvNow の盤面を Resolve に渡すので、 同じ値を読む。</summary>
@@ -188,6 +203,12 @@ namespace CombatSystem
         /// <summary>撃破のボーナス (このターンに敵を倒した時だけ配る・本体 CombatManager.FinishTerminalTurn)。 〈残響〉で 2 回発動すれば 2 回分 (2026-11-20〜・旧: 発動したかの真偽で 1 回分)。
         /// 最大 HP (〈魂狩り〉) / 〈処刑の刃〉の恒久の攻撃 / ゴールド (〈賞金狩り〉) / 次の報酬の選択肢 (〈剥ぎ取り〉)。</summary>
         public int killMaxHp, killWhet, killGold, killChoices;
+        /// <summary>撃破した時に戻る HP (〈諸刃の剣＋〉が払った HP)。 回復ではない (回復を減らす効果は掛からない)。</summary>
+        public int killRefundHp;
+        /// <summary>〈応急箱＋〉の回復の量 (このうち最大 HP を超えた分がシールドになる)。 <see cref="heal"/> にも入っている。</summary>
+        public int overhealToShield;
+        /// <summary>この戦闘の充電の上限に足す量 (〈大導電＋〉・満たす前に足す)。</summary>
+        public int chargeCapAdd;
         /// <summary>このターンに払うシールド (〈重装突撃〉)。 足す分 (shield) より先に引く。</summary>
         public int shieldSpend;
         public bool chargeFill;
@@ -211,15 +232,16 @@ namespace CombatSystem
         public int retainTarget = -1, copyTarget = -1, burnTarget = -1;
         /// <summary>〈有効活用〉(手札の持ち越しの規則): 捨て札から 1 枚、 次のターンの手札に戻す (戻す 1 枚は <see cref="TerminalDeckState.RecallPick"/>)。</summary>
         public bool recall;
-        /// <summary>〈反復突き〉の連続をこのターンもう数えたか。</summary>
-        public bool oscCounted;
+        /// <summary>〈反復突き〉(素 / 強化) の連続をこのターンもう数えたか。</summary>
+        public bool oscCounted, oscCountedUp;
         /// <summary>ヴェスカ〈停滞する時間〉で止まっている場の端子 (Resolve に渡した状態の写し・null = なし)。
         /// 〈影写し〉〈火葬の剣〉〈有効活用〉の候補から外す (<see cref="TerminalCards.IsCandidate"/>)。</summary>
         public bool[] stopped;
 
+        /// <summary>このターンに id の端子 (強化した端子も基の名前で数える) が発動したか。</summary>
         public bool Fired(List<string> board, string id)
         {
-            for (int i = 0; i < fired.Count; i++) if (board[fired[i]] == id) return true;
+            for (int i = 0; i < fired.Count; i++) if (TerminalCards.BaseOf(board[fired[i]]) == id) return true;
             return false;
         }
     }
@@ -273,6 +295,101 @@ namespace CombatSystem
         /// <summary>〈千刃〉: この戦闘で使うたび、 以後の攻撃 +N。 / 〈先読み〉: 次のターンに多く引く枚数。</summary>
         public const int MainsPerUse = 1, SwitchboardDraw = 2;
 
+        // ===== 強化した端子 (＋) の数値 (2026-11-20・作者承認の表 Captures/overhaul/work/terminal_upgrades_draft.md・未測定) =====
+        //   強化した端子は基の端子の定義を写して、 表の分だけ変えた別の端子 (TerminalIds.Upgraded)。 効果の式は Effect の up の枝。
+        /// <summary>基本 (攻撃・防御・充電)・〈後の先〉〈攻防一体〉のブロック: 出目 +1。 / 〈無形の構え〉〈有効活用〉のブロック: 出目 +2。</summary>
+        public const int UpPip = 1, UpPipBlock2 = 2;
+        public const int DetectorBonusUp = 2, DischargeCostUp = 2, RelayPerFiredUp = 10, OscPerStreakUp = 7, TwinPairBonusUp = 3;
+        public const int FuseBlockUp = 10, InsulatorBonusUp = 5, BreakerCostUp = 5, RectifierBonusUp = 2, BatteryBonusUp = 3, HealShieldUp = 2;
+        public const int CapacitorNeedUp = 10, ArresterNeedUp = 7, SwitchboardDrawUp = 3;
+        public const float VacuumCritMultUp = 2.5f;
+        public const int CoolantNeedUp = 10, CounterEveryUp = 8, TwinShotMulUp = 4, HarvesterMaxHpUp = 3, WhetLowHpAttackUp = 4, LootGoldUp = 7, StripperChoicesUp = 2;
+        public const float SightPerRankUp = 0.25f, VitalPerRankUp = 0.15f, ShieldPushPerRankUp = 0.08f;
+        public const int BarbBonusUp = 2, MisterBonusUp = 2, PoisonScaleAttackUp = 4, StokerBonusUp = 2, AfterHeatPerBurstUp = 3, LeakBonusUp = 2, PatchBonusUp = 2;
+        public const int DetonatorMulUp = 5, PiercerMulUp = 2, ReliefShieldUp = 4, FullChargeCapUp = 5, BurnOutMulUp = 3;
+
+        /// <summary>強化できない端子 (作者の決定 2026-11-20)。 〈時計〉は山札に入らないので対象にならない。</summary>
+        private static readonly HashSet<string> NotUpgradable = new HashSet<string>
+        {
+            TerminalIds.Doubler, TerminalIds.Amplifier, TerminalIds.Resonator, TerminalIds.Mains, TerminalIds.Foundry, TerminalIds.Clock,
+        };
+
+        /// <summary>強化した端子の説明文 (基の端子の名前 → 強化後の文)。 ここに無い端子は強化できない。</summary>
+        private static readonly Dictionary<string, string> UpgradedText = new Dictionary<string, string>
+        {
+            [TerminalIds.Attack] = "出目 +" + UpPip + " を攻撃に。",
+            [TerminalIds.Block] = "出目 +" + UpPip + " をブロックに。",
+            [TerminalIds.Charge] = "出目 +" + UpPip + " を充電に。",
+            [TerminalIds.Igniter] = "攻撃 +" + IgniterAttack + "。",
+            [TerminalIds.Detector] = "出目 ×" + DetectorMul + " +" + DetectorBonusUp + " を攻撃に。",
+            [TerminalIds.DischargeTube] = "充電 " + DischargeCostUp + " を払い、出目 ×" + DischargeMul + " を攻撃に。",
+            [TerminalIds.Deathwish] = "出目の半分 (切り上げ) の HP を払い、出目 ×" + DeathwishMul + " を攻撃に。このターンに敵を倒すと、払った HP が戻る。",
+            [TerminalIds.Relay] = "出目を攻撃に。このターンに発動した基本以外の端子 1 つにつき攻撃 +" + RelayPerFiredUp + "。",
+            [TerminalIds.Grinder] = "出目を攻撃に。全部の出目 +1 (この端子に挿した出目も)。",
+            [TerminalIds.Oscillator] = "出目を攻撃に。前にこれを挿した目と同じなら攻撃 +" + OscPerStreakUp + " × 連続回数。",
+            [TerminalIds.Twin] = "出目を攻撃に。出目 2 個まで挿せる。2 個挿したら攻撃 +" + TwinPairBonusUp + "。",
+            [TerminalIds.Fuse] = "ブロック +" + FuseBlockUp + "。",
+            [TerminalIds.Ground] = "このターンの被ダメージ −" + GroundCutPct + "%。出目をブロックに。",
+            [TerminalIds.Insulator] = "シールド +出目 +" + InsulatorBonusUp + "。",
+            [TerminalIds.Parry] = "出目 +" + UpPip + " をブロックに。防いだ量を、次に攻撃するターンの攻撃に足す。",
+            [TerminalIds.Breaker] = "充電 " + BreakerCostUp + " を払い、このターンの敵の攻撃 −" + BreakerCutPct + "%。",
+            [TerminalIds.Rectifier] = "充電 +出目 ×" + RectifierMul + " +" + RectifierBonusUp + "。",
+            [TerminalIds.Battery] = "充電 +出目 +" + BatteryBonusUp + "。",
+            [TerminalIds.Heal] = (HealMul == 1 ? "HP +出目。" : "HP +出目 ×" + HealMul + "。") + "シールド +" + HealShieldUp + "。",
+            [TerminalIds.Capacitor] = "出目を溜める。" + CapacitorNeedUp + " で次の攻撃 +" + CapacitorAttack + "。",
+            [TerminalIds.Arrester] = "出目を溜める。" + ArresterNeedUp + " でそのターンの被ダメージ半分。",
+            [TerminalIds.Transformer] = "攻撃の端子を挿した出目を 2 倍。この端子に挿した出目も攻撃に足す。",
+            [TerminalIds.Switchboard] = "次のターン、端子を " + SwitchboardDrawUp + " 枚多く引く。",
+            [TerminalIds.VacuumTube] = "このターンの会心倍率 +" + VacuumCritMultUp.ToString("0.0") + "。",
+            [TerminalIds.Coolant] = "出目を溜める。" + CoolantNeedUp + " ごとにエスカレーションの段階を 1 つ戻す。",
+            [TerminalIds.Counter] = "出目を攻撃に。基本以外の発動が累計 " + CounterEveryUp + " 回になるごとに、この戦闘中の与ダメージ +" + (int)(CounterPct * 100) + "%。",
+            [TerminalIds.Preheater] = "出目 +" + UpPipBlock2 + " をブロックに。次のターン、端子の条件を無視する。",
+            [TerminalIds.TwinShot] = "同じ目 2 個で、出目の合計 ×" + TwinShotMulUp + " を攻撃に。",
+            [TerminalIds.Harvester] = "出目を攻撃に。このターンに敵を倒すと最大 HP +" + HarvesterMaxHpUp + " (恒久)。",
+            [TerminalIds.Whet] = "出目を攻撃に。敵の HP が半分以下なら攻撃 +" + WhetLowHpAttackUp + "。このターンに敵を倒すと、この端子の攻撃が恒久に +" + WhetGain + "。",
+            [TerminalIds.LootBox] = "出目を攻撃に。このターンに敵を倒すとゴールド +" + LootGoldUp + "。",
+            [TerminalIds.Stripper] = "出目を攻撃に。このターンに敵を倒すと、戦闘後の端子の選択肢が " + StripperChoicesUp + " つ増える。",
+            [TerminalIds.Retainer] = "出目 +" + UpPipBlock2 + " をブロックに。捨て札から 1 枚、次のターンの手札に戻す。",
+            [TerminalIds.StopSignal] = "敵は次のターン行動しない。出目をブロックに。",
+            [TerminalIds.Fork] = "出目を攻撃に、出目 +" + UpPip + " をブロックに入れる。",
+            [TerminalIds.Sight] = "出目を攻撃に。このターンの会心倍率 +心眼 ×" + SightPerRankUp.ToString("0.0#") + "。",
+            [TerminalIds.VitalRead] = "このターンの攻撃は必ず会心。会心倍率 +心眼 ×" + VitalPerRankUp.ToString("0.0#") + "。",
+            [TerminalIds.Barb] = "出目を攻撃に。攻撃が通れば出血 +血晶 +" + BarbBonusUp + "。",
+            [TerminalIds.BloodTap] = "敵の出血 " + BloodTapPer + " につき、このターンの与ダメージ +" + (int)(BloodTapPct * 100) + "%。",
+            [TerminalIds.Mister] = "敵に毒 +出目 +瘴気 +" + MisterBonusUp + "。",
+            [TerminalIds.PoisonScale] = "出目を攻撃に。敵の毒 " + PoisonScalePer + " につき攻撃 +" + PoisonScaleAttackUp + "。",
+            [TerminalIds.Stoker] = "臨界 +出目 +炉温 +" + StokerBonusUp + "。",
+            [TerminalIds.AfterHeat] = "出目を攻撃に。この戦闘の爆発 1 回につき攻撃 +" + AfterHeatPerBurstUp + "。",
+            [TerminalIds.Leak] = "充電 +出目 +電流 +" + LeakBonusUp + "。",
+            [TerminalIds.BigDischarge] = "充電をすべて払い、払った充電を攻撃に足す (電流 1 につき +" + (int)(BigDischargePerRank * 100) + "%)。挿した出目も攻撃に足す。",
+            [TerminalIds.Patch] = "出目をブロックに。シールド +堅牢 +" + PatchBonusUp + "。",
+            [TerminalIds.ShieldPush] = "出目を攻撃に。今のシールドの 堅牢 ×" + (int)Math.Round(ShieldPushPerRankUp * 100) + "% を攻撃に足し、足した分のシールドを払う。",
+            [TerminalIds.Detonator] = "出目 ×" + DetonatorMulUp + " を攻撃に。",
+            [TerminalIds.Piercer] = "出目 ×" + PiercerMulUp + " を攻撃に。このターン敵の防御を無視。",
+            [TerminalIds.ReliefValve] = "このターンの被ダメージ −" + ReliefCutPct + "%。シールド +" + ReliefShieldUp + "。",
+            [TerminalIds.FirstAid] = "HP +出目 ×" + FirstAidMul + "。最大 HP を超えた分はシールドになる。",
+            [TerminalIds.FullCharge] = "この戦闘中、充電の上限 +" + FullChargeCapUp + "。充電を上限まで満たす。",
+            [TerminalIds.CoolShot] = "エスカレーションの段階を 1 つ戻す。出目をブロックに。",
+            [TerminalIds.Copier] = "挿さずに空けた手札の端子を 1 枚、この戦闘中だけ複製して、次のターンの手札に加える。出目を充電に。",
+            [TerminalIds.BurnOut] = "出目 ×" + BurnOutMulUp + " を攻撃に。挿さずに空けた手札の端子を 1 枚、この戦闘から外す。",
+        };
+
+        /// <summary>基の端子の定義を写して、 強化した端子を作る (名前・説明文と、 表で変える条件・払う充電だけ変える)。</summary>
+        private static TerminalDef MakeUpgraded(TerminalDef b)
+        {
+            var u = b.Copy();
+            u.id = TerminalIds.Upgraded(b.id); u.baseId = b.id; u.upgraded = true;
+            u.description = UpgradedText[b.id];
+            switch (b.id)
+            {
+                case TerminalIds.Igniter: case TerminalIds.BloodTap: u.cond = TerminalCond.AtMost4; break;
+                case TerminalIds.DischargeTube: u.chargeCost = DischargeCostUp; break;
+                case TerminalIds.Breaker: u.chargeCost = BreakerCostUp; break;
+            }
+            u.condLabel = CondLabel(u.cond);
+            return u;
+        }
+
         /// <summary>〈包帯〉の倍率 (測定の口 <see cref="GameLoop.GameHooks.TerminalHealMulOverride"/> があればその値)。 効果はこれを読む。</summary>
         public static int HealMulNow => GameLoop.GameHooks.TerminalHealMulOverride > 0 ? GameLoop.GameHooks.TerminalHealMulOverride : HealMul;
         /// <summary>〈防御陣〉の溜める量 (測定の口 <see cref="GameLoop.GameHooks.TerminalArresterNeedOverride"/> があればその値)。 効果と BOT はこれを読む。</summary>
@@ -300,6 +417,7 @@ namespace CombatSystem
             switch (c)
             {
                 case TerminalCond.AtMost3: return "3以下";
+                case TerminalCond.AtMost4: return "4以下";
                 case TerminalCond.AtLeast5: return "5以上";
                 case TerminalCond.AtLeast6: return "6以上";
                 case TerminalCond.Even: return "偶数";
@@ -319,9 +437,20 @@ namespace CombatSystem
         private static TerminalDef Cap(TerminalDef d, int n) { d.capacity = n; return d; }
         private static TerminalDef ClockDef(TerminalDef d) { d.basic = true; d.permanent = true; return d; }
 
+        /// <summary>全部の端子 (素の端子の後ろに強化した端子)。 抽選 (店・報酬・付与) は <see cref="TerminalDef.upgraded"/> を外して使う。</summary>
         public static readonly List<TerminalDef> All = Build();
 
         private static List<TerminalDef> Build()
+        {
+            var l = BuildBase();
+            foreach (var b in l) b.baseId = b.id;
+            int n = l.Count;
+            for (int i = 0; i < n; i++)
+                if (!NotUpgradable.Contains(l[i].id) && UpgradedText.ContainsKey(l[i].id)) l.Add(MakeUpgraded(l[i]));
+            return l;
+        }
+
+        private static List<TerminalDef> BuildBase()
         {
             const TerminalKind A = TerminalKind.Attack, B = TerminalKind.Block, C = TerminalKind.Charge, S = TerminalKind.Support;
             string ax = ItemSystem.PassiveSkills.AxisRules.Crit, ab = ItemSystem.PassiveSkills.AxisRules.Bleed, ap = ItemSystem.PassiveSkills.AxisRules.Poison,
@@ -415,6 +544,30 @@ namespace CombatSystem
             return d;
         }
 
+        /// <summary>基の端子の名前 (強化した端子なら強化する前の名前・素の端子と知らない名前はそのまま)。 効果の分かれ道・品の判定はこれで見る。</summary>
+        public static string BaseOf(string id) => Get(id)?.baseId ?? id;
+
+        /// <summary>id の端子を強化できるか (強化できる素の端子)。 強化した端子は <see cref="TerminalIds.Upgraded"/> の名前で引ける。</summary>
+        public static bool CanUpgrade(string id)
+        {
+            var d = Get(id);
+            return d != null && !d.upgraded && Get(TerminalIds.Upgraded(id)) != null;
+        }
+
+        /// <summary>溜める端子の溜まりの必要量 (名前ごと・強化した端子は表の値)。 本体の効果と BOT の見積もりが読む。 溜める端子でなければ 0。</summary>
+        public static int GaugeNeed(string id)
+        {
+            var d = Get(id); if (d == null) return 0;
+            switch (d.baseId)
+            {
+                case TerminalIds.Capacitor: return d.upgraded ? CapacitorNeedUp : CapacitorNeed;
+                case TerminalIds.Arrester:  return d.upgraded ? ArresterNeedUp : ArresterNeedNow;
+                case TerminalIds.Foundry:   return FoundryNeed;
+                case TerminalIds.Coolant:   return d.upgraded ? CoolantNeedUp : CoolantNeed;
+                default: return 0;
+            }
+        }
+
         /// <summary>今の id の端子。 無い id は null (旧 id の対応表は 2026-11-14 に削除・docs/GAME.md §24)。</summary>
         public static TerminalDef Get(string id)
             => id != null && _byId.TryGetValue(id, out var d) ? d : null;
@@ -439,6 +592,7 @@ namespace CombatSystem
             switch (c)
             {
                 case TerminalCond.AtMost3: return v <= 3;
+                case TerminalCond.AtMost4: return v <= 4;
                 case TerminalCond.AtLeast5: return v >= 5;
                 case TerminalCond.AtLeast6: return v >= 6;
                 case TerminalCond.Even: return (v & 1) == 0;
@@ -480,10 +634,13 @@ namespace CombatSystem
                 cnt[s]++;
             }
 
-            // ── 1. 〈号令の剣〉: 他の出目すべて +1 (他の端子より先に効く) ──
+            // ── 1. 〈号令の剣〉: 他の出目すべて +1 (他の端子より先に効く)。 強化した〈号令の剣＋〉は挿した出目も +1 ──
             for (int i = 0; i < n; i++)
-                if (o.slotOfDie[i] >= 0 && board[o.slotOfDie[i]] == TerminalIds.Grinder)
-                    for (int j = 0; j < n; j++) if (j != i) v[j]++;
+                if (o.slotOfDie[i] >= 0 && defs[o.slotOfDie[i]]?.baseId == TerminalIds.Grinder)
+                {
+                    bool self = defs[o.slotOfDie[i]].upgraded;
+                    for (int j = 0; j < n; j++) if (j != i || self) v[j]++;
+                }
 
             // ── 2. 条件 ──
             bool ign = state.ignoreCond;
@@ -522,7 +679,7 @@ namespace CombatSystem
             {
                 if (defs[s] == null || !Plugged(o.slotOfDie, s)) continue;
                 int cost = defs[s].chargeCost > 1 ? System.Math.Max(1, defs[s].chargeCost - env.chargeCostCut) : defs[s].chargeCost;   // 〈過負荷チューナー〉
-                if (board[s] == TerminalIds.BigDischarge) { if (charge <= 0) { Unplug(o.slotOfDie, s); continue; } paid[s] = true; continue; }      // 全部払う (量は効果の所で)
+                if (defs[s].baseId == TerminalIds.BigDischarge) { if (charge <= 0) { Unplug(o.slotOfDie, s); continue; } paid[s] = true; continue; }      // 全部払う (量は効果の所で)
                 if (cost <= 0) { paid[s] = true; continue; }
                 if (charge < cost) { Unplug(o.slotOfDie, s); continue; }
                 charge -= cost; o.chargeSpend += cost; paid[s] = true;
@@ -540,11 +697,11 @@ namespace CombatSystem
             //   〈火葬の剣〉(2026-11-14): 外す端子 (候補) が無ければ不発 ── 挿した出目を外す (条件に合わない・充電が足りない時と同じ扱い・使い捨ても消費しない)。
             //   〈影写し〉と旧い規則の〈有効活用〉は今までどおり、 対象が無くても発動する (効果が無いだけ)。
             for (int s = 0; s < m; s++)
-                if (board[s] == TerminalIds.BurnOut && Plugged(o.slotOfDie, s) && Empty(s) < 0) Unplug(o.slotOfDie, s);
+                if (defs[s]?.baseId == TerminalIds.BurnOut && Plugged(o.slotOfDie, s) && Empty(s) < 0) Unplug(o.slotOfDie, s);
 
             // ── 5. 効果 ──
             bool doubler = false;
-            for (int s = 0; s < m; s++) if (board[s] == TerminalIds.Doubler && Plugged(o.slotOfDie, s)) doubler = true;
+            for (int s = 0; s < m; s++) if (defs[s]?.baseId == TerminalIds.Doubler && Plugged(o.slotOfDie, s)) doubler = true;
             // 連なりの賽 (2026-11-20): 3 つの目が連番のターン (役〈連なり〉)、 挿した端子がすべて倍化する (〈残響〉と同じ)
             if (env.dieId == GameLoop.DieIds.Straight && YachtRoles.IsRun(v)) doubler = true;
             //   〈剛腕〉(2026-11-20・説明文どおり): 攻撃の種類の端子に挿した出目を 2 倍にしてから、 その端子の効果に入れる (倍率の端子は 2 倍の目に掛かる)。
@@ -552,11 +709,11 @@ namespace CombatSystem
             //   旧: 攻撃の種類の端子に挿した出目の合計を、 攻撃にもう 1 回足していた (倍率の端子では説明より小さく、 出目を攻撃に使わない端子の分も足した)
             int pipMul = 1;
             for (int s = 0; s < m; s++)
-                if (board[s] == TerminalIds.Transformer && Plugged(o.slotOfDie, s)) pipMul *= doubler ? 4 : 2;
+                if (defs[s]?.baseId == TerminalIds.Transformer && Plugged(o.slotOfDie, s)) pipMul *= doubler ? 4 : 2;
             for (int s = 0; s < m; s++)
             {
                 if (defs[s] == null || !Plugged(o.slotOfDie, s)) continue;
-                var d = defs[s]; string id = board[s];
+                var d = defs[s]; string id = d.baseId;      // 効果の分かれ道は基の名前 (強化した端子は d.upgraded)
                 int sum = 0, num = 0;
                 //   〈罪悪感〉(2026-11-16): 防御の種類の端子に挿した出目は 1 つずつ −blockDieCut (下限 0)。 〈号令の剣〉の +1 の後に引く。
                 //   条件 (「2. 条件」) は引く前の目で見る ── 引いた目で見ると〈導火〉(3 以下) などに挿せる目が増え、 罰が得になる。
@@ -575,9 +732,9 @@ namespace CombatSystem
                 }
                 int times = doubler && id != TerminalIds.Doubler ? 2 : 1;
                 int atkBefore = o.attackAdd, chgBefore = charge;
-                for (int t = 0; t < times; t++) Effect(id, s, sum, raw, env, state, o, ref charge, Empty);
+                for (int t = 0; t < times; t++) Effect(id, d.upgraded, board[s], s, sum, raw, num, env, state, o, ref charge, Empty);
                 if (d.kind == TerminalKind.Attack) { o.attackHits.Add(o.attackAdd - atkBefore); o.attackHitDice.Add(num); }
-                if (o.attackAdd != atkBefore) o.attackLog.Add($"{id}(目{sum}{(times > 1 ? "・倍化" : "")}{(chgBefore != charge ? "・充電" + chgBefore + "→" + charge : "")}):+{o.attackAdd - atkBefore}");
+                if (o.attackAdd != atkBefore) o.attackLog.Add($"{board[s]}(目{sum}{(times > 1 ? "・倍化" : "")}{(chgBefore != charge ? "・充電" + chgBefore + "→" + charge : "")}):+{o.attackAdd - atkBefore}");
             }
 
             // ── 6. 他の端子を見る効果 (全部の発動が決まった後) ──
@@ -586,9 +743,9 @@ namespace CombatSystem
                 if (defs[s] == null || !Plugged(o.slotOfDie, s)) continue;
                 int times = doubler ? 2 : 1;
                 // 〈連係斬り〉: このターンに発動した基本以外の端子 (自分も数える・2026-11-20〜 説明文どおり。 旧: 自分を数えなかった)
-                if (board[s] == TerminalIds.Relay) o.attackAdd += RelayPerFired * o.firedNonBasic * times;
+                if (defs[s].baseId == TerminalIds.Relay) o.attackAdd += (defs[s].upgraded ? RelayPerFiredUp : RelayPerFired) * o.firedNonBasic * times;
             }
-            // 〈柔軟な戦略〉: 基本以外の発動の累計 (付けていなくても数える・積むのは持っている時だけ = 山札にあれば効く)
+            // 〈柔軟な戦略〉: 基本以外の発動の累計 (付けていなくても数える・効くのは引いて場にあるターンだけ = 本体 DrawTerminalHand)
             state.firedTotal += o.firedNonBasic;
             // 次に攻撃するターンの攻撃に足す分
             int atk6 = o.attackAdd;
@@ -605,11 +762,15 @@ namespace CombatSystem
             return o;
         }
 
-        /// <summary>捨て札の 1 枚を対象に取る端子 (手札の持ち越しの規則の〈有効活用〉)。 対象 (挿し方の targets の値) は捨て札の添字。</summary>
-        public static bool PicksDiscard(string id) => id == TerminalIds.Retainer && HandCarry;
+        /// <summary>捨て札の 1 枚を対象に取る端子 (手札の持ち越しの規則の〈有効活用〉・強化した端子も)。 対象 (挿し方の targets の値) は捨て札の添字。</summary>
+        public static bool PicksDiscard(string id) => BaseOf(id) == TerminalIds.Retainer && HandCarry;
 
-        /// <summary>挿さずに空けた手札の端子を対象に取る端子 (〈影写し〉〈火葬の剣〉・旧い規則の〈有効活用〉)。</summary>
-        public static bool PicksTarget(string id) => id == TerminalIds.Copier || id == TerminalIds.BurnOut || (id == TerminalIds.Retainer && !HandCarry);
+        /// <summary>挿さずに空けた手札の端子を対象に取る端子 (〈影写し〉〈火葬の剣〉・旧い規則の〈有効活用〉・強化した端子も)。</summary>
+        public static bool PicksTarget(string id)
+        {
+            string b = BaseOf(id);
+            return b == TerminalIds.Copier || b == TerminalIds.BurnOut || (b == TerminalIds.Retainer && !HandCarry);
+        }
 
         /// <summary>場の s が、 self (対象を取る端子) の対象の候補か: 自分でない・常設でない・止まっていない (ヴェスカ〈停滞する時間〉)・
         /// 出目が 1 個も挿さっていない手札の端子。 o は解決の結果 ── 挿し方を直した後の <see cref="TerminalOutcome.slotOfDie"/>
@@ -648,96 +809,111 @@ namespace CombatSystem
             return fired;
         }
 
-        /// <summary>端子 1 つの効果 (sum = 挿した出目の合計)。</summary>
-        private static void Effect(string id, int slot, int sum, int raw, TerminalEnv env, TerminalBattleState st, TerminalOutcome o, ref int charge, Func<int, int> empty)
+        /// <summary>端子 1 つの効果 (id = 基の名前・up = 強化した端子・name = 場の名前 (溜まりは名前ごと)・sum = 挿した出目の合計・raw = 〈剛腕〉で 2 倍にする前・num = 挿した出目の数)。</summary>
+        private static void Effect(string id, bool up, string name, int slot, int sum, int raw, int num, TerminalEnv env, TerminalBattleState st, TerminalOutcome o, ref int charge, Func<int, int> empty)
         {
+            int p1 = up ? UpPip : 0, p2 = up ? UpPipBlock2 : 0;      // 強化した端子の「出目 +1」「出目 +2」
             switch (id)
             {
                 // 基本
-                case TerminalIds.Attack:
+                case TerminalIds.Attack: o.attackAdd += sum + p1; break;
                 // 出目をそのまま攻撃に入れるだけの端子。 上乗せは別の所で付く:
                 //   号令の剣 = 解決の前に他の出目 +1 / 連係斬り = 下の「6. 他の端子を見る効果」/ 柔軟な戦略 = 本体 (DrawTerminalHand) /
                 //   魂狩り・賞金狩り・剥ぎ取り = 撃破した時 (CombatManager.FinishTerminalTurn)
-                case TerminalIds.Relay: case TerminalIds.Grinder: case TerminalIds.Twin: case TerminalIds.Counter:
+                case TerminalIds.Relay:
+                case TerminalIds.Grinder: case TerminalIds.Counter:
                     o.attackAdd += sum; break;
-                case TerminalIds.Harvester: o.attackAdd += sum; o.killMaxHp += HarvesterMaxHp; break;
-                case TerminalIds.LootBox: o.attackAdd += sum; o.killGold += LootGold; break;
-                case TerminalIds.Stripper: o.attackAdd += sum; o.killChoices += StripperChoices; break;
-                case TerminalIds.Block: o.blockAdd += sum; break;
-                case TerminalIds.Charge: o.chargeAdd += sum; break;
+                case TerminalIds.Twin: o.attackAdd += sum + (up && num >= 2 ? TwinPairBonusUp : 0); break;
+                case TerminalIds.Harvester: o.attackAdd += sum; o.killMaxHp += up ? HarvesterMaxHpUp : HarvesterMaxHp; break;
+                case TerminalIds.LootBox: o.attackAdd += sum; o.killGold += up ? LootGoldUp : LootGold; break;
+                case TerminalIds.Stripper: o.attackAdd += sum; o.killChoices += up ? StripperChoicesUp : StripperChoices; break;
+                case TerminalIds.Block: o.blockAdd += sum + p1; break;
+                case TerminalIds.Charge: o.chargeAdd += sum + p1; break;
                 // コモン
-                case TerminalIds.Igniter: o.attackAdd += IgniterAttack; break;
-                case TerminalIds.Detector: o.attackAdd += sum * DetectorMul; break;
-                case TerminalIds.DischargeTube: o.attackAdd += sum * DischargeMul; break;
+                case TerminalIds.Igniter: o.attackAdd += IgniterAttack; break;      // 強化は条件 (4 以下) だけ
+                case TerminalIds.Detector: o.attackAdd += sum * DetectorMul + (up ? DetectorBonusUp : 0); break;
+                case TerminalIds.DischargeTube: o.attackAdd += sum * DischargeMul; break;      // 強化は払う充電 (定義の chargeCost) だけ
                 case TerminalIds.Deathwish:
                 {
                     int self = Math.Min((sum + 1) / 2, Math.Max(0, env.hp - 1 - o.selfDamage));   // 出目の半分 (切り上げ)・2026-11-12 (旧: 出目ぶん)
-                    o.selfDamage += self; o.attackAdd += sum * DeathwishMul; break;
+                    o.selfDamage += self; o.attackAdd += sum * DeathwishMul;
+                    if (up) o.killRefundHp += self;      // 〈諸刃の剣＋〉: このターンに敵を倒すと、 払った HP が戻る
+                    break;
                 }
                 case TerminalIds.Oscillator:
-                    // 連続は 1 ターンに 1 つだけ進める (〈残響〉で効果が 2 回走っても、 2 回目は同じ連続回数で足すだけ)
-                    if (!o.oscCounted)
+                {
+                    // 連続は 1 ターンに 1 つだけ進める (〈残響〉で効果が 2 回走っても、 2 回目は同じ連続回数で足すだけ)。 素と強化した端子は別に数える
+                    ref int last = ref (up ? ref st.oscLastUp : ref st.oscLast);
+                    ref int streak = ref (up ? ref st.oscStreakUp : ref st.oscStreak);
+                    if (!(up ? o.oscCountedUp : o.oscCounted))
                     {
-                        if (st.oscLast == raw) st.oscStreak++; else st.oscStreak = 0;
-                        st.oscLast = raw; o.oscCounted = true;
+                        if (last == raw) streak++; else streak = 0;
+                        last = raw;
+                        if (up) o.oscCountedUp = true; else o.oscCounted = true;
                     }
-                    o.attackAdd += sum + OscPerStreak * st.oscStreak; break;
-                case TerminalIds.Fuse: o.blockAdd += FuseBlock; break;
-                case TerminalIds.Ground: o.takenMul *= 1f - GroundCutPct / 100f; break;
-                case TerminalIds.Insulator: o.shield += sum + InsulatorBonus; break;
-                case TerminalIds.Parry: o.blockAdd += sum; st.storedAttackNext += Math.Min(sum, Math.Max(0, env.enemyAttack)); break;
-                case TerminalIds.Breaker: o.enemyAttackMul *= 1f - BreakerCutPct / 100f; break;
-                case TerminalIds.Rectifier: o.chargeAdd += sum * RectifierMul; break;
-                case TerminalIds.Battery: o.chargeAdd += sum + BatteryBonus; break;
-                case TerminalIds.Heal: o.heal += sum * HealMulNow; break;
-                case TerminalIds.Capacitor: st.storedAttack += CapacitorAttack * Gauge(st, id, sum, CapacitorNeed); break;
-                case TerminalIds.Arrester: if (Gauge(st, id, sum, ArresterNeedNow) > 0) o.takenMul *= 0.5f; break;
-                case TerminalIds.Switchboard: st.extraDrawNext += SwitchboardDraw; break;
+                    o.attackAdd += sum + (up ? OscPerStreakUp : OscPerStreak) * streak; break;
+                }
+                case TerminalIds.Fuse: o.blockAdd += up ? FuseBlockUp : FuseBlock; break;
+                case TerminalIds.Ground: o.takenMul *= 1f - GroundCutPct / 100f; if (up) o.blockAdd += sum; break;
+                case TerminalIds.Insulator: o.shield += sum + (up ? InsulatorBonusUp : InsulatorBonus); break;
+                case TerminalIds.Parry: o.blockAdd += sum + p1; st.storedAttackNext += Math.Min(sum + p1, Math.Max(0, env.enemyAttack)); break;
+                case TerminalIds.Breaker: o.enemyAttackMul *= 1f - BreakerCutPct / 100f; break;      // 強化は払う充電だけ
+                case TerminalIds.Rectifier: o.chargeAdd += sum * RectifierMul + (up ? RectifierBonusUp : 0); break;
+                case TerminalIds.Battery: o.chargeAdd += sum + (up ? BatteryBonusUp : BatteryBonus); break;
+                case TerminalIds.Heal: o.heal += sum * HealMulNow; if (up) o.shield += HealShieldUp; break;
+                case TerminalIds.Capacitor: st.storedAttack += CapacitorAttack * Gauge(st, name, sum, GaugeNeed(name)); break;
+                case TerminalIds.Arrester: if (Gauge(st, name, sum, GaugeNeed(name)) > 0) o.takenMul *= 0.5f; break;
+                case TerminalIds.Transformer: if (up) o.attackAdd += sum; break;      // 2 倍は 5. の頭 (pipMul)。 〈剛腕＋〉は挿した出目も攻撃に足す
+                case TerminalIds.Switchboard: st.extraDrawNext += up ? SwitchboardDrawUp : SwitchboardDraw; break;
                 // レア
                 case TerminalIds.Amplifier: o.damageMul *= 1f + AmplifierPerPip * sum; break;
-                case TerminalIds.VacuumTube: o.critMultAdd += VacuumCritMult; break;
+                case TerminalIds.VacuumTube: o.critMultAdd += up ? VacuumCritMultUp : VacuumCritMult; break;
                 case TerminalIds.Resonator: o.damageMul *= ResonatorMul; break;
-                case TerminalIds.Foundry: st.foundryBonus += Gauge(st, id, sum, FoundryNeed); break;
-                case TerminalIds.Coolant: o.retreatStage += Gauge(st, id, sum, CoolantNeed); break;      // 1 ターンに 2 回届けば 2 段 (2026-11-20〜)
+                case TerminalIds.Foundry: st.foundryBonus += Gauge(st, name, sum, GaugeNeed(name)); break;
+                case TerminalIds.Coolant: o.retreatStage += Gauge(st, name, sum, GaugeNeed(name)); break;      // 1 ターンに 2 回届けば 2 段 (2026-11-20〜)
                 case TerminalIds.Clock: o.escalationDelay += sum; break;      // 時計の賽 (ADR-0015)
-                case TerminalIds.Preheater: o.blockAdd += sum; st.ignoreCondNext = true; break;
+                case TerminalIds.Preheater: o.blockAdd += sum + p2; st.ignoreCondNext = true; break;
                 case TerminalIds.Mains: o.attackAdd += sum + MainsPerUse * st.mainsUses; st.mainsUses++; break;
-                case TerminalIds.TwinShot: o.attackAdd += sum * TwinShotMul; break;
-                case TerminalIds.Whet: o.attackAdd += sum + env.whetBonus; o.killWhet += WhetGain; break;
-                // 剛腕・残響 (5. の頭で見る) は、 ここでは何もしない
-                case TerminalIds.Retainer: o.blockAdd += sum; if (!HandCarry) o.retainTarget = empty(slot); else o.recall = true; break;   // 持ち越しの規則では捨て札から 1 枚戻す (対象は RecallPick)
-                case TerminalIds.StopSignal: o.enemyStunNext = true; break;
-                case TerminalIds.Fork: o.attackAdd += sum; o.blockAdd += sum; break;
+                case TerminalIds.TwinShot: o.attackAdd += sum * (up ? TwinShotMulUp : TwinShotMul); break;
+                case TerminalIds.Whet:
+                    o.attackAdd += sum + env.whetBonus; o.killWhet += WhetGain;
+                    // 〈処刑の刃＋〉: 敵の HP が半分以下 (端子を解く時の HP) なら攻撃 +4
+                    if (up && env.enemyMaxHp > 0 && env.enemyHp * 2 <= env.enemyMaxHp) o.attackAdd += WhetLowHpAttackUp;
+                    break;
+                // 残響 (5. の頭で見る) は、 ここでは何もしない
+                case TerminalIds.Retainer: o.blockAdd += sum + p2; if (!HandCarry) o.retainTarget = empty(slot); else o.recall = true; break;   // 持ち越しの規則では捨て札から 1 枚戻す (対象は RecallPick)
+                case TerminalIds.StopSignal: o.enemyStunNext = true; if (up) o.blockAdd += sum; break;
+                case TerminalIds.Fork: o.attackAdd += sum; o.blockAdd += sum + p1; break;
                 // 軸
-                case TerminalIds.Sight: o.attackAdd += sum; o.critMultAdd += SightPerRank * env.axCrit; break;
-                case TerminalIds.VitalRead: o.forceCrit = true; o.critMultAdd += VitalPerRank * env.axCrit; break;
-                case TerminalIds.Barb: o.attackAdd += sum; o.bleedOnHit += env.axBleed; break;
-                case TerminalIds.BloodTap: o.outgoingPctAdd += BloodTapPct * (env.enemyBleed / BloodTapPer); break;
-                case TerminalIds.Mister: o.poison += sum + env.axPoison; break;
-                case TerminalIds.PoisonScale: o.attackAdd += sum + PoisonScaleAttack * (env.enemyPoison / PoisonScalePer); break;
-                case TerminalIds.Stoker: o.heat += sum + env.axHeat; break;
-                case TerminalIds.AfterHeat: o.attackAdd += sum + AfterHeatPerBurst * env.bursts; break;
-                case TerminalIds.Leak: o.chargeAdd += sum + env.axCharge; break;
+                case TerminalIds.Sight: o.attackAdd += sum; o.critMultAdd += (up ? SightPerRankUp : SightPerRank) * env.axCrit; break;
+                case TerminalIds.VitalRead: o.forceCrit = true; o.critMultAdd += (up ? VitalPerRankUp : VitalPerRank) * env.axCrit; break;
+                case TerminalIds.Barb: o.attackAdd += sum; o.bleedOnHit += env.axBleed + (up ? BarbBonusUp : 0); break;
+                case TerminalIds.BloodTap: o.outgoingPctAdd += BloodTapPct * (env.enemyBleed / BloodTapPer); break;      // 強化は条件 (4 以下) だけ
+                case TerminalIds.Mister: o.poison += sum + env.axPoison + (up ? MisterBonusUp : 0); break;
+                case TerminalIds.PoisonScale: o.attackAdd += sum + (up ? PoisonScaleAttackUp : PoisonScaleAttack) * (env.enemyPoison / PoisonScalePer); break;
+                case TerminalIds.Stoker: o.heat += sum + env.axHeat + (up ? StokerBonusUp : 0); break;
+                case TerminalIds.AfterHeat: o.attackAdd += sum + (up ? AfterHeatPerBurstUp : AfterHeatPerBurst) * env.bursts; break;
+                case TerminalIds.Leak: o.chargeAdd += sum + env.axCharge + (up ? LeakBonusUp : 0); break;
                 case TerminalIds.BigDischarge:
-                    o.attackAdd += (int)Math.Floor(charge * (1f + BigDischargePerRank * env.axCharge));
+                    o.attackAdd += (int)Math.Floor(charge * (1f + BigDischargePerRank * env.axCharge)) + (up ? sum : 0);      // 〈裁きの雷＋〉は挿した出目も攻撃に
                     o.chargeSpend += charge; charge = 0; break;
-                case TerminalIds.Patch: o.blockAdd += sum; o.shield += env.axShield; break;
+                case TerminalIds.Patch: o.blockAdd += sum; o.shield += env.axShield + (up ? PatchBonusUp : 0); break;
                 case TerminalIds.ShieldPush:
                 {
                     // 足した分と同じ量のシールドを払う (払える分まで・〈残響〉の 2 回目は残りのシールドから)
                     int left = Math.Max(0, env.shield - o.shieldSpend);
-                    int push = Math.Min(left, (int)Math.Floor(left * ShieldPushPerRank * env.axShield));
+                    int push = Math.Min(left, (int)Math.Floor(left * (up ? ShieldPushPerRankUp : ShieldPushPerRank) * env.axShield));
                     o.attackAdd += sum + push; o.shieldSpend += push; break;
                 }
                 // 使い捨て
-                case TerminalIds.Detonator: o.attackAdd += sum * DetonatorMul; break;
-                case TerminalIds.Piercer: o.attackAdd += sum; o.ignoreDefense = true; break;
-                case TerminalIds.ReliefValve: o.takenMul *= 1f - ReliefCutPct / 100f; break;
-                case TerminalIds.FirstAid: o.heal += sum * FirstAidMul; break;
-                case TerminalIds.FullCharge: o.chargeFill = true; break;
-                case TerminalIds.CoolShot: o.retreatStage++; break;
-                case TerminalIds.Copier: o.copyTarget = empty(slot); break;
-                case TerminalIds.BurnOut: o.attackAdd += sum * BurnOutMul; o.burnTarget = empty(slot); break;   // 候補は 4. で確かめ済み (無ければ不発)
+                case TerminalIds.Detonator: o.attackAdd += sum * (up ? DetonatorMulUp : DetonatorMul); break;
+                case TerminalIds.Piercer: o.attackAdd += sum * (up ? PiercerMulUp : 1); o.ignoreDefense = true; break;
+                case TerminalIds.ReliefValve: o.takenMul *= 1f - ReliefCutPct / 100f; if (up) o.shield += ReliefShieldUp; break;
+                case TerminalIds.FirstAid: o.heal += sum * FirstAidMul; if (up) o.overhealToShield += sum * FirstAidMul; break;
+                case TerminalIds.FullCharge: o.chargeFill = true; if (up) o.chargeCapAdd += FullChargeCapUp; break;
+                case TerminalIds.CoolShot: o.retreatStage++; if (up) o.blockAdd += sum; break;
+                case TerminalIds.Copier: o.copyTarget = empty(slot); if (up) o.chargeAdd += sum; break;
+                case TerminalIds.BurnOut: o.attackAdd += sum * (up ? BurnOutMulUp : BurnOutMul); o.burnTarget = empty(slot); break;   // 候補は 4. で確かめ済み (無ければ不発)
             }
         }
     }

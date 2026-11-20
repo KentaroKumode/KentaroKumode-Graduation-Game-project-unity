@@ -47,7 +47,7 @@ namespace AutoTest
             // [2026-11-12] 端子の ITT: プールは基本以外の端子だけ (品は配らない)。
             if (randomGrantTerminals)
             {
-                foreach (var d in CombatSystem.TerminalCards.All) if (d != null && !d.basic) pool.Add(d.id);
+                foreach (var d in CombatSystem.TerminalCards.All) if (d != null && !d.basic && !d.upgraded) pool.Add(d.id);      // 強化した端子は休憩でだけ得る
                 all = new List<ItemSystem.CompleteItemData>();   // 下の品の列挙を飛ばす
             }
             foreach (var it in all)
