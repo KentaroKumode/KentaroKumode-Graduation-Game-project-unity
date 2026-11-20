@@ -862,7 +862,8 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 攻撃 +10 はこの撃の倍率の前の量 (ProcessDamage の OnPreDealDamage で finalDamage に足す)。 旧: シールドを 10 使って、 その攻撃は敵の防御を無視する。</summary>
     public class SiegeAxe : IPassiveSkillEffect, IRelicDisplay
     {
-        public string SkillId => "破城斧";
+        public const string Id = "破城斧";
+        public string SkillId => Id;
         public const int MinShield = 10, PerHitShield = 5, PerHitAtk = 10;
         /// <summary>シールドが 10 以上だったターンの番号 (最初の 1 撃で決める)。</summary>
         private const string TurnKey = "rw.siegeAxe.turn";
