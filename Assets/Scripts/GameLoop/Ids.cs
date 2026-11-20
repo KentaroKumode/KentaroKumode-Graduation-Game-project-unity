@@ -199,6 +199,14 @@ namespace GameLoop
         public const string MacroReceipt = "研ぎ代の領収書", MacroAbacus = "相場師の算盤", MacroPass = "黄金の通行手形";
         public const string MacroLetter = "目利きの紹介状", MacroAppraisal = "二股の鑑定書", MacroLedger = "古物商の交換帳";
 
+        // === 采配 (山札の軸) の 18 品 (2026-11-20・段 1-e・item-overhaul-spec §4 / §12-4・名前は仮) ===
+        //   出来事で書く品 (焼き入れの挟み・灰払いの箒) = DeckItemEffects.cs。 端子の解決・山札を変える品 = CombatSystem.TerminalCards の DeckItems の旗
+        //   (TerminalCards.DeckItemsOf)。 予備の差込口・整理された工具箱 = CombatManager.BeginTerminalDeck。
+        public const string DeckTongs = "焼き入れの挟み", DeckSparePlug = "予備の差込口", DeckClasp = "留め金の栞", DeckAuxGear = "補助歯車", DeckIdleWeight = "空回りの錘";
+        public const string DeckBroom = "灰払いの箒", DeckRewind = "早回しのゼンマイ", DeckSwitchboard = "仕込みの配電盤", DeckMold = "型抜きの金型", DeckToolbox = "整理された工具箱";
+        public const string DeckCrucible = "再利用のるつぼ", DeckBlueprint = "無銘の設計図", DeckSeamless = "継ぎ目のない導線", DeckFolded = "折り目のついた札";
+        public const string DeckBag = "解体屋の袋", DeckWorkbench = "常設の作業台", DeckAsh = "灰から組む機関", DeckEngine = "永久機関の主軸";
+
         // === 航行マップで使う消耗品 (2026-09-28・2026-10-18 に囮と罠を統合) ===
         //   **系統で判定する** (ConsFamilyOf)。 下の id 定数は「開始時に配る」「店で買う」の
         //   跨ファイル参照のためだけにあり、 効果の分岐には使わない。
