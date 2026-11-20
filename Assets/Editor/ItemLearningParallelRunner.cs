@@ -149,6 +149,17 @@ namespace AutoTest.EditorTools
                 overrides: new Dictionary<string, string> { ["useIttBeta"] = "True", ["lockWeaponFamily"] = "True" });
         }
 
+        /// <summary>[小規模テスト 2026-11-20] ITT (Super の方策) を 500 ランだけ回す。 本走の前に例外・新しい品の扱いを確かめる口。
+        /// 序列は itt_clear.smoke.json へ書く (本番の序列を上書きしない)。 itt_effects.json などの共通のファイルは書き換わるので、 回す前に退避して後で戻すこと。</summary>
+        [MenuItem("Tools/AutoRun/診断: ITT 並列 (Super の方策) 小規模テスト 500ラン", priority = 14)]
+        private static void LaunchIttSuperSmoke()
+        {
+            AutoTest.GrantItt.Variant = "smoke";
+            LaunchWith(0, AutoRunner.WiringSkill.Super, 500, itt: true,
+                overrides: new Dictionary<string, string> { ["useIttBeta"] = "True", ["lockWeaponFamily"] = "True",
+                    ["v3.mainCorr"] = "True", ["v3.readOutgoingMult"] = "-1", ["daybreakNextAttackPct"] = "1.5" });
+        }
+
         /// <summary>ITT (Super の方策) を 10,000 ラン × 20 回 = 合計 200,000 ラン (2026-11-10)。
         /// <b>回ごとにラン番号をずらす</b> (同じ割り当てを引き直さない) ・<b>割り当ては積み上げて合算</b>し、 回の終わりごとに
         /// 序列を作り直す (次の回はその序列で買う)。 精度は 20 万ラン 1 回と同じで、 買い方だけが途中で更新される。
