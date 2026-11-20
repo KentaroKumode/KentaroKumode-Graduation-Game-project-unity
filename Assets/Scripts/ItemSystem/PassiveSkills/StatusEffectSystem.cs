@@ -64,7 +64,7 @@ namespace ItemSystem.PassiveSkills
                 id = "poison",
                 target = StatusTarget.Enemy,
                 tickTiming = StatusTick.TurnStart,
-                dotMaxHpPer10kPerStack = 5,   // 0.05% (2026-11-10: 旧 0.1%)
+                dotMaxHpPer10kPerStack = 10,  // 0.1% (2026-11-20 作者の決定: 旧 0.05%・2026-11-10 に 0.1% から 0.05% へ下げていた)
                 dotUsesCurrentHp = false,
                 dotScalesWithStacks = true,
                 decayPerTurn = 0,
