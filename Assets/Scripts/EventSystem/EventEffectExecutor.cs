@@ -392,6 +392,62 @@ namespace EventSystem
                     result.log.Add($"次の休憩の回復 +{eff.amount}%（最大 HP の）");
                     result.NoteGain(MapSystem.FreeMove.EventGainKind.RestBonus);
                     break;
+
+                // ── 2026-11-20: 装備・偏重とつながる汎用の動詞 ──
+
+                case EventEffectType.DieRoll:
+                    ExecuteDieRoll(eff, run, result);
+                    break;
+
+                case EventEffectType.Requirement:
+                    // 条件は選べるかの判定 (EventChoice.UnavailableReason) だけが読む。 ここでは何もしない
+                    break;
+
+                case EventEffectType.OfferDieSwap:
+                {
+                    var pool = new List<string>();
+                    foreach (var id in GameLoop.EquippedDie.AllIds())
+                        if (GameLoop.EquippedDie.Offerable(ItemDatabase.Instance?.GetItem(id), run)) pool.Add(id);
+                    var cands = new List<string>();
+                    for (int k = 0; k < DieSwapChoices && pool.Count > 0; k++)
+                    {
+                        int at = GameLoop.GameRng.Range(0, pool.Count, "event.dieSwap");
+                        cands.Add(pool[at]);
+                        pool.RemoveAt(at);
+                    }
+                    if (cands.Count == 0) { result.log.Add("差し出せる賽は無かった"); break; }
+                    foreach (var id in cands) result.log.Add($"賽の提示: 〈{GameLoop.EquippedDie.Label(id)}〉 面 {string.Join(" ", GameLoop.EquippedDie.FacesOf(id))}");
+                    var gm = GameLoop.GameManager.Instance;
+                    string got = gm != null ? gm.OfferDieSwap(cands) : "";
+                    if (got != null)   // null = 人が地図へ戻ってから選ぶ
+                        result.log.Add(got == "" ? "賽は替えなかった" : $"賽を〈{GameLoop.EquippedDie.Label(got)}〉に替えた");
+                    break;
+                }
+
+                case EventEffectType.OfferAxisPassives:
+                {
+                    string axis = TopAxis(run);
+                    var cands = new List<string>();
+                    for (int k = 0; k < Mathf.Max(1, eff.amount); k++)
+                    {
+                        string id = PickRandomItemId(ItemCategory.Passive, run, cands, axis);
+                        if (!string.IsNullOrEmpty(id) && !cands.Contains(id)) cands.Add(id);
+                    }
+                    if (cands.Count == 0) { result.log.Add($"{axis}の秘宝は見つからなかった"); break; }
+                    result.relicsGained++;   // 不安定化: 「パッシブアイテムをNつから選ぶ」と同じく、 提示した時点で 1 つ得たと数える
+                    var gm = GameLoop.GameManager.Instance;
+                    if (gm != null)
+                    {
+                        string got = gm.OfferPassiveChoice(cands);
+                        result.log.Add(got == null ? $"{axis}の秘宝を {cands.Count} つから 1 つ選ぶ" : $"秘宝獲得: {ResolveLabel(got)}");
+                    }
+                    else
+                    {
+                        ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(run, cands[0]);
+                        result.log.Add($"秘宝獲得: {ResolveLabel(cands[0])}");
+                    }
+                    break;
+                }
             }
         }
 
@@ -459,6 +515,37 @@ namespace EventSystem
                 ExecuteOne(sub, run, result);
         }
 
+        /// <summary>「賽を提示して交換」で見せる賽の数。</summary>
+        public const int DieSwapChoices = 2;
+
+        /// <summary>今の偏重が一番高い軸 (同数なら AxisRules.Ranked の順・全部 0 なら先頭)。 「軸の秘宝をNつから選ぶ」が読む。</summary>
+        public static string TopAxis(RunState run)
+        {
+            string best = ItemSystem.PassiveSkills.AxisRules.Ranked[0];
+            int bestN = -1;
+            foreach (var a in ItemSystem.PassiveSkills.AxisRules.Ranked)
+            {
+                int n = GameLoop.GameManager.AxisCountOf(run, a);
+                if (n > bestN) { bestN = n; best = a; }
+            }
+            return best;
+        }
+
+        /// <summary>賽ロール (2026-11-20): 装備中の賽を 1 回振る (面は一様・戦闘の振り方と同じ)。 目標値以上なら branches[0] (成功)、 未満なら branches[1] (失敗)。
+        /// 引いた側を pickedBranch に渡す (選んだ後の文・記録の文を「||」で成功・失敗に分けられる)。</summary>
+        private static void ExecuteDieRoll(EventEffect eff, RunState run, ExecutionResult result)
+        {
+            if (eff.branches == null || eff.branches.Count == 0) return;
+            var faces = GameLoop.EquippedDie.FacesOf(GameLoop.EquippedDie.IdOf(run));
+            int face = faces[GameLoop.GameRng.Range(0, faces.Length, "event.dieRoll")];
+            int picked = face >= eff.amount ? 0 : 1;
+            result.log.Add($"〈{GameLoop.EquippedDie.Label(GameLoop.EquippedDie.IdOf(run))}〉を振った: {face}（{eff.amount} 以上で成功）→ {(picked == 0 ? "成功" : "失敗")}");
+            if (result.pickedBranch < 0) result.pickedBranch = picked;
+            if (picked < eff.branches.Count)
+                foreach (var sub in eff.branches[picked])
+                    ExecuteOne(sub, run, result);
+        }
+
         private static void AddOrIncrement(Dictionary<string, int> dict, string key, int delta)
         {
             if (string.IsNullOrEmpty(key)) return;
@@ -497,7 +584,7 @@ namespace EventSystem
         }
 
         /// <summary>イベントの品の抽選 (秘宝は持った・見た品を除く)。 0 層の支給の秘宝 (GameManager.OpenFarmSupply) も使う。</summary>
-        internal static string PickRandomItemId(ItemCategory category, GameLoop.RunState run = null, List<string> alsoExclude = null)
+        internal static string PickRandomItemId(ItemCategory category, GameLoop.RunState run = null, List<string> alsoExclude = null, string axis = null)
         {
             var db = ItemDatabase.Instance;
             if (db == null) return null;
@@ -505,6 +592,8 @@ namespace EventSystem
             if (pool == null || pool.Count == 0) return null;
 
             var filtered = pool.FindAll(ItemSystem.Shop.EventOnlyItemFilter.IsAllowed);
+            // 軸の秘宝をNつから選ぶ (2026-11-20): その軸の品だけから引く
+            if (axis != null) filtered = filtered.FindAll(it => it.axis == axis);
             if (filtered.Count == 0) return null;
 
             // パッシブはラン重複排除（消費は使い切る前提なので重複可）。枯渇時は元プール（重複許可）。

@@ -41,6 +41,9 @@ namespace GameLoop
         /// <summary>イベント「パッシブアイテムをNつから選ぶ」の提示から 1 つ選ぶ (2026-11-12)。 戻り値は添字。
         /// null なら <see cref="ChooseStartingPassive"/> を使い、 それも null なら人が遊んでいる時は画面で選び、 BOT は先頭。</summary>
         public static Func<IReadOnlyList<string>, int> ChooseOfferedPassive;
+        /// <summary>イベント「賽を提示して交換」の 2 種の賽からどれに替えるか (2026-11-20)。 戻り値は添字、 負 = やめる (今の賽のまま)。
+        /// null なら人が遊んでいる時は画面で選び、 BOT は替えない。</summary>
+        public static Func<IReadOnlyList<string>, int> ChooseOfferedDie;
         /// <summary>挑戦カードの 2 枚 ("デバフの id|バフの id") からどれを受けるか。 null なら人が遊んでいる時は画面で選び、 BOT は先頭。</summary>
         public static Func<IReadOnlyList<string>, int> ChooseChallengeCard;
         /// <summary>端子の山札 (ADR-0014): 戦闘後の報酬の端子 (2〜3 択の名前) からどれを山札に加えるか。 戻り値は添字、 負 = 受け取らない。
@@ -214,6 +217,7 @@ namespace GameLoop
             BotDriving = false;
             ChooseStartingPassive = null;
             ChooseOfferedPassive = null;
+            ChooseOfferedDie = null;
             ChooseChallengeCard = null;
             ChooseTerminalReward = null;
             ForcedChallengeCards = null;

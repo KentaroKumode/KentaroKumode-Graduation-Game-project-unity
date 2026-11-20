@@ -333,6 +333,53 @@ namespace GameLoop
             Log($"イベント: 秘宝「{id}」を選んで獲得");
         }
 
+        // =====================================================================
+        //  条件・賽の交換 (イベント「条件[種別]:効果」「賽を提示して交換」・2026-11-20)
+        // =====================================================================
+
+        /// <summary>装備中の武器の家系 (items.json の family)。 武器が無い・家系の無い武器なら null。 イベントの条件「武器[家系]」が読む。</summary>
+        public static string WeaponFamilyOf(RunState run)
+        {
+            if (run == null || string.IsNullOrEmpty(run.equippedWeaponId)) return null;
+            var d = ItemDatabase.Instance?.GetItem(run.equippedWeaponId);
+            return string.IsNullOrEmpty(d?.family) ? null : d.family;
+        }
+
+        /// <summary>軸の秘宝の数 (偏重)。 イベントの条件「偏重[軸,N]」と「軸の秘宝をNつから選ぶ」が読む。</summary>
+        public static int AxisCountOf(RunState run, string axis) => ItemSystem.PassiveSkills.AxisRules.Count(run, axis);
+
+        /// <summary>選ぶのを預かっている賽の提示 (人が遊んでいる時だけ)。 地図へ戻ると選択画面が出る (Game2DPhaseScreens)。 先頭から順に選ぶ。</summary>
+        public readonly List<List<string>> PendingEventDiceOffers = new List<List<string>>();
+
+        /// <summary>賽の提示を受ける。 BOT (GameHooks.ChooseOfferedDie・負 = 替えない・無ければ替えない) はこの場で決め、 替えた賽の id (替えなければ "") を返す。
+        /// 人が遊んでいる時は選択画面へ預けて null を返す (提示の抽選は呼ぶ側で済んでいるので、 乱数の消費は BOT と同じ)。</summary>
+        public string OfferDieSwap(List<string> cands)
+        {
+            if (Run == null || cands == null || cands.Count == 0) return "";
+            var chooser = GameHooks.ChooseOfferedDie;
+            if (chooser == null && !GameHooks.BotDriving && !Application.isBatchMode)
+            {
+                PendingEventDiceOffers.Add(new List<string>(cands));
+                return null;
+            }
+            int pick = chooser?.Invoke(cands) ?? -1;
+            if (pick < 0 || pick >= cands.Count) return "";
+            EquippedDie.Equip(Run, cands[pick]);
+            Log($"イベント: 賽を〈{EquippedDie.Label(cands[pick])}〉に替えた");
+            return cands[pick];
+        }
+
+        /// <summary>預かっている賽の提示の先頭を閉じる (選択画面から呼ぶ)。 pick が負 = やめる (今の賽のまま)。</summary>
+        public void ResolveEventDiceOffer(int pick)
+        {
+            if (Run == null || PendingEventDiceOffers.Count == 0) return;
+            var cands = PendingEventDiceOffers[0];
+            PendingEventDiceOffers.RemoveAt(0);
+            if (cands == null || pick < 0 || pick >= cands.Count) { Log("イベント: 賽は替えなかった"); return; }
+            Log($"イベント: 賽を〈{EquippedDie.Label(EquippedDie.IdOf(Run))}〉から〈{EquippedDie.Label(cands[pick])}〉に替えた");
+            EquippedDie.Equip(Run, cands[pick]);
+        }
+
         /// <summary>イベントから戦闘を開始する。</summary>
         private void StartEventCombat(bool elite)
         {

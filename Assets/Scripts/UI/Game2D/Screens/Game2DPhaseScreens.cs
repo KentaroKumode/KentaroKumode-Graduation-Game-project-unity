@@ -80,7 +80,7 @@ namespace UI.Game2D
             // 画面の外で所持金・HP が変わった時も描き直す (買える品の明暗・副題の数字)
             int coins = gm.Run != null ? gm.Run.coins : 0, hp = gm.Run != null ? gm.Run.playerHP : 0;
             if (coins != _lastCoins || hp != _lastHp) { _lastCoins = coins; _lastHp = hp; if (_open || Game2DEventScreen.Showing) _dirty = true; }
-            int pend = gm.PendingStartingPassiveChoices.Count + gm.PendingEventPassiveOffers.Count * 100000000 + gm.PendingChallengeTiers.Count * 100 + (gm.Run != null ? gm.Run.pendingWeaponIds.Count * 10000 + gm.Run.pendingTerminalOffer.Count * 1000000 : 0);
+            int pend = gm.PendingStartingPassiveChoices.Count + gm.PendingEventPassiveOffers.Count * 100000000 + gm.PendingEventDiceOffers.Count * 10000000 + gm.PendingChallengeTiers.Count * 100 + (gm.Run != null ? gm.Run.pendingWeaponIds.Count * 10000 + gm.Run.pendingTerminalOffer.Count * 1000000 : 0);
             if (pend != _lastPending) { _lastPending = pend; _dirty = true; }
             // イベントが替わった (同じフェーズのまま・QA の口 QaBattle.ShowEvent で続けて出した時など) も描き直す
             var evNow = ph == GameManager.GamePhase.EventEncounter && EventEncounter.Instance != null ? EventEncounter.Instance.Current : null;
@@ -134,6 +134,7 @@ namespace UI.Game2D
             _termDeckView = false;
             if (ph == GameManager.GamePhase.MapNavigation && gm.PendingStartingPassiveChoices.Count > 0) return StartingPick(gm);
             if (ph == GameManager.GamePhase.MapNavigation && gm.PendingEventPassiveOffers.Count > 0) return EventPassivePick(gm);
+            if (ph == GameManager.GamePhase.MapNavigation && gm.PendingEventDiceOffers.Count > 0) return EventDicePick(gm);
             if (ph == GameManager.GamePhase.MapNavigation && gm.PendingChallengeTiers.Count > 0) return ChallengePick(gm);
             switch (ph)
             {
@@ -233,6 +234,24 @@ namespace UI.Game2D
             }
             d.buttons.Add(B("選ぶ", "pick", true));
             d.onAction = (a, sel) => { if (a == "pick") { gm.ResolveEventPassiveOffer(Mathf.Clamp(sel, 0, cands.Count - 1)); Game2DSfx.Play("ui_confirm"); } Refresh(); };
+            return d;
+        }
+
+        // ── イベントの「賽を提示して交換」(2026-11-20)。 品の選択と同じ形・面を見せて、 替えるか「やめる」 ──
+
+        private ScreenDef EventDicePick(GameManager gm)
+        {
+            var cands = gm.PendingEventDiceOffers[0];
+            var d = New("賽を替える", "今の賽: " + EquippedDie.Label(EquippedDie.IdOf(gm.Run)) + "（面 " + string.Join(" ", EquippedDie.FacesOf(EquippedDie.IdOf(gm.Run))) + "）", 420);
+            d.body = "差し出された賽と、 今の賽を入れ替えられる。 前の賽は手元に残らない。";
+            foreach (var id in cands)
+            {
+                var data = ItemDatabase.Instance?.GetItem(id);
+                d.Items.Add(new ModalItem { name = EquippedDie.Label(id), desc = "面 " + string.Join(" ", EquippedDie.FacesOf(id)) + (string.IsNullOrEmpty(data?.description) ? "" : "。 " + data.description) });
+            }
+            d.buttons.Add(B("替える", "pick", true));
+            d.buttons.Add(B("やめる", "keep"));
+            d.onAction = (a, sel) => { gm.ResolveEventDiceOffer(a == "pick" ? Mathf.Clamp(sel, 0, cands.Count - 1) : -1); Game2DSfx.Play("ui_confirm"); Refresh(); };
             return d;
         }
 

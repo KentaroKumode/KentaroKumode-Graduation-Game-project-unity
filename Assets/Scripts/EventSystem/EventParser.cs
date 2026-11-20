@@ -265,7 +265,7 @@ namespace EventSystem
         {
             if (effects == null) return 0;
             foreach (var e in effects)
-                if (e != null && e.type == EventEffectType.Probability && e.branches != null) return e.branches.Count;
+                if (e != null && (e.type == EventEffectType.Probability || e.type == EventEffectType.DieRoll) && e.branches != null) return e.branches.Count;
             return 0;
         }
 
@@ -287,6 +287,41 @@ namespace EventSystem
         {
             var list = new List<EventEffect>();
             if (string.IsNullOrEmpty(s) || s == "なし") return list;
+
+            // 条件[種別]:効果 (2026-11-20): 結果の欄の頭だけ。 種別の中の ',' (偏重[毒,3]) で切らないよう、 角括弧の対で読む
+            if (s.StartsWith(ReqLead, StringComparison.Ordinal))
+            {
+                int close = MatchingBracket(s, ReqLead.Length - 1);
+                if (close > 0 && close + 1 < s.Length && s[close + 1] == ':')
+                {
+                    var req = ParseRequirement(s.Substring(ReqLead.Length, close - ReqLead.Length));
+                    if (req != null)
+                    {
+                        list.Add(req);
+                        list.AddRange(ParseEffects(s.Substring(close + 2).Trim()));
+                        return list;
+                    }
+                }
+                Debug.LogWarning($"[EventParser] 条件の書式不正: '{s}'");
+                return list;
+            }
+
+            // 賽ロール[N]:成功|失敗 (2026-11-20): 前は全部に共通の効果、 後ろは '|' で成功・失敗に分ける (分岐の中は ',' 区切り)
+            int roll = s.IndexOf(RollLead, StringComparison.Ordinal);
+            if (roll >= 0)
+            {
+                var m = dieRoll.Match(s.Substring(roll));
+                if (!m.Success) { Debug.LogWarning($"[EventParser] 賽ロールの書式不正: '{s}'"); return list; }
+                string common = s.Substring(0, roll).TrimEnd('、', ',', ' ', '　');
+                if (common.Length > 0) list.AddRange(ParseEffects(common));
+                list.Add(new EventEffect
+                {
+                    type = EventEffectType.DieRoll,
+                    amount = int.Parse(m.Groups[1].Value),
+                    branches = new List<List<EventEffect>> { ParseEffects(m.Groups[2].Value.Trim()), ParseEffects(m.Groups[3].Value.Trim()) },
+                });
+                return list;
+            }
 
             // 確率分岐かどうかチェック（「N%で」を2回以上含む）
             var probMatches = probSplitRegex.Matches(s);
@@ -314,6 +349,38 @@ namespace EventSystem
                 if (eff != null) list.Add(eff);
             }
             return list;
+        }
+
+        private const string ReqLead = "条件[";
+        private const string RollLead = "賽ロール[";
+        private static readonly Regex dieRoll   = new Regex(@"^賽ロール\[(\d+)\]:([^|]*)\|([^|]*)$");
+        private static readonly Regex reqAxis   = new Regex(@"^偏重\[(.+?),(\d+)\]$");
+        private static readonly Regex reqWeapon = new Regex(@"^武器\[(.+?)\]$");
+        private static readonly Regex reqProv   = new Regex(@"^物資>=(\d+)$");
+
+        /// <summary>s[open] の '[' に対になる ']' の位置。 無ければ -1。</summary>
+        private static int MatchingBracket(string s, int open)
+        {
+            int depth = 0;
+            for (int i = open; i < s.Length; i++)
+            {
+                if (s[i] == '[') depth++;
+                else if (s[i] == ']' && --depth == 0) return i;
+            }
+            return -1;
+        }
+
+        /// <summary>条件の種別 (「条件[」と「]:」の間) を読む。 知らない書き方は null。</summary>
+        private static EventEffect ParseRequirement(string t)
+        {
+            var m = reqAxis.Match(t);
+            if (m.Success) return new EventEffect { type = EventEffectType.Requirement, param = EventEffectRoles.ReqAxis, arg = m.Groups[1].Value.Trim(), amount = int.Parse(m.Groups[2].Value) };
+            m = reqWeapon.Match(t);
+            if (m.Success && EventEffectRoles.FamilyOfWord(m.Groups[1].Value.Trim()) != null)
+                return new EventEffect { type = EventEffectType.Requirement, param = EventEffectRoles.ReqWeapon, arg = m.Groups[1].Value.Trim() };
+            m = reqProv.Match(t);
+            if (m.Success) return new EventEffect { type = EventEffectType.Requirement, param = EventEffectRoles.ReqProvision, amount = int.Parse(m.Groups[1].Value) };
+            return null;
         }
 
         private static EventEffect ParseProbabilityBranches(string s, MatchCollection matches)
@@ -377,6 +444,7 @@ namespace EventSystem
         private static readonly Regex offerPassive = new Regex(@"^パッシブアイテムを(\d+)つから選ぶ$");
         private static readonly Regex nextShop     = new Regex(@"^次の店の値段-(\d+)%$");
         private static readonly Regex nextRest     = new Regex(@"^次の休憩の回復\+(\d+)%$");
+        private static readonly Regex offerAxis    = new Regex(@"^軸の秘宝を(\d+)つから選ぶ$");
 
         /// <summary>1 つの効果を読む。 頭の印 〔見せる〕/〔伏せる〕(2026-11-16・代償を見せるかの例外・EventEffectRoles.ShowMark) を外して
         /// <see cref="EventEffect.costMark"/> に写す。 印は「勝利後」より前に書く。</summary>
@@ -445,6 +513,8 @@ namespace EventSystem
             if (t == "追跡者を撒く")       return Eff(EventEffectType.ShakeOffPursuer, postCombat: postCombat);
             if (t == "パッシブを差し出して替える") return Eff(EventEffectType.TradePassive, postCombat: postCombat);
             if (t == "武器を鍛える")       return Eff(EventEffectType.ForgeWeapon, postCombat: postCombat);
+            if (t == "賽を提示して交換")   return Eff(EventEffectType.OfferDieSwap, postCombat: postCombat);
+            m = offerAxis.Match(t);    if (m.Success) return Eff(EventEffectType.OfferAxisPassives, amount: int.Parse(m.Groups[1].Value), postCombat: postCombat);
             m = revealMap.Match(t);    if (m.Success) return Eff(EventEffectType.RevealMap, amount: int.Parse(m.Groups[1].Value), postCombat: postCombat);
             m = revealEnc.Match(t);    if (m.Success) return Eff(EventEffectType.RevealEncounters, amount: int.Parse(m.Groups[1].Value), postCombat: postCombat);
             m = pushFoe.Match(t);      if (m.Success) return Eff(EventEffectType.PushPursuer, amount: int.Parse(m.Groups[1].Value), postCombat: postCombat);

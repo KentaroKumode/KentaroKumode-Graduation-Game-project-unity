@@ -289,6 +289,7 @@ namespace GameLoop
             {
                 PendingStartingPassiveChoices.Clear();
                 PendingEventPassiveOffers.Clear();
+                PendingEventDiceOffers.Clear();
                 int startPassives = MetaProgression.MetaBuffApplicator.GetStartingPassiveCount();
                 for (int sp = 0; sp < startPassives; sp++)
                 {

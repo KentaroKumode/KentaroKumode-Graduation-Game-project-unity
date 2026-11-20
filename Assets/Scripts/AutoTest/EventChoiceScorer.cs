@@ -173,11 +173,16 @@ namespace AutoTest
                     hp = UnityEngine.Mathf.Min(hp, maxHp);
                     break;
                 case EventEffectType.Probability:
+                case EventEffectType.DieRoll:
                 {
                     if (e.branches == null || e.branches.Count == 0) return;
+                    // 賽ロール (2026-11-20): 起こり得ない側 (装備の賽で確率 0) は最悪に数えない
+                    float pSuccess = e.type == EventEffectType.DieRoll ? DieRollChance(e) : -1f;
                     int worst = int.MaxValue, worstMax = maxHp, worstProv = prov;
-                    foreach (var br in e.branches)
+                    for (int bi = 0; bi < e.branches.Count; bi++)
                     {
+                        var br = e.branches[bi];
+                        if (pSuccess >= 0f && (bi == 0 ? pSuccess <= 0f : pSuccess >= 1f)) continue;
                         int h = hp, m = maxHp, p = prov;
                         foreach (var c in br) ApplyWorst(c, ref h, ref m, ref p);
                         if (h < worst) { worst = h; worstMax = m; worstProv = p; }
@@ -206,6 +211,17 @@ namespace AutoTest
                     exp += sub * w;
                 }
                 return wsum > 0f ? exp / wsum : 0f;
+            }
+
+            // 賽ロール (2026-11-20): 成功の確率 (装備の賽の面のうち目標値以上の割合) × 成功の値 + 失敗の確率 × 失敗の値
+            if (e.type == EventEffectType.DieRoll)
+            {
+                if (e.branches == null || e.branches.Count == 0) return 0f;
+                float p = DieRollChance(e);
+                float win = 0f, lose = 0f;
+                foreach (var c in e.branches[0]) win += ScoreEffect(c, run);
+                if (e.branches.Count > 1) foreach (var c in e.branches[1]) lose += ScoreEffect(c, run);
+                return p * win + (1f - p) * lose;
             }
 
             int hp     = run != null ? run.playerHP : 30;
@@ -395,6 +411,7 @@ namespace AutoTest
                 case EventEffectType.ShiftFront:       return ScoreFront(e.amount, run);
 
                 case EventEffectType.OfferPassives:
+                case EventEffectType.OfferAxisPassives:   // 軸の秘宝 (2026-11-20): 値は同じに置く (軸に寄るほど強いかは学習のリフトに任せる)
                     // N つから選べる分の上乗せ: 3 つなら ×1.3 (BOT は開幕の品と同じ買いの点で選ぶ)
                     return PassivePrice(run) * (1f + V_OFFER_PER_EXTRA * UnityEngine.Mathf.Max(0, e.amount - 1));
                 case EventEffectType.TradePassive:
@@ -561,6 +578,13 @@ namespace AutoTest
             }
             // 縄張りの外に居れば、 巡回の番人は通りかからない ── 追跡者なしと同じ値 (2026-11-13・縄張りの番人)
             return (sim.FoeAlive && !sim.OutsideFoeReach ? V_TURN_FOE_PATROL : V_TURN_NO_FOE) * turns;
+        }
+
+        /// <summary>賽ロールの成功の確率 (今の装備の賽・本体の判定と同じ EventEffectRoles.DieRollChance)。</summary>
+        static float DieRollChance(EventEffect e)
+        {
+            var run = GameManager.Instance?.Run;
+            return EventEffectRoles.DieRollChance(EquippedDie.FacesOf(EquippedDie.IdOf(run)), e.amount);
         }
 
         /// <summary>L1.5 学習リフトの加算重み。 観測 lift1点 ≈ 数値スコア何点ぶんに相当させるか。</summary>

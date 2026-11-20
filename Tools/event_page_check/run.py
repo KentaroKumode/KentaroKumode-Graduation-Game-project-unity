@@ -25,6 +25,8 @@ EV = 'Assets/Scripts/EventSystem/'
 SOURCES = [EV + n + '.cs' for n in ('EventBranchText', 'EventEffectType', 'EventEffect', 'EventEffectRoles', 'EventChoice',
                                      'EventDefinition', 'EventCondition', 'EventParser')] + [
     'Assets/Scripts/UI/Game2D/JpTextLayout.cs', 'Assets/Scripts/UI/Game2D/JpBreakModel.cs', 'Assets/Scripts/UI/Game2D/LcdSafeArea.cs', 'Assets/Scripts/UI/Game2D/Screens/EventLayout.cs', 'Assets/Scripts/UI/Game2D/Screens/EventBackdropTable.cs', 'Assets/Scripts/UI/Game2D/Screens/EventPaging.cs']
+# 条件「武器[家系]」の家系の名前 (EventEffectRoles.FamilyOfWord → ItemIds・2026-11-20)。 Unity の型は event_branch_check/Stubs.cs の代役
+SOURCES += ['Assets/Scripts/GameLoop/Ids.cs', 'Assets/Scripts/GameLoop/ConvictionSystem.cs']
 
 
 def fwd(p):
