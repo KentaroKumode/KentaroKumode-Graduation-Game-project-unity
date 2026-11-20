@@ -159,6 +159,10 @@ namespace CombatSystem
         public int enemyMaxDie;
         /// <summary>このターンが敵の大技か (大技読みの賽)。</summary>
         public bool heavyTurn;
+        /// <summary>充電を払う端子の払う量から引く量 (最低 1・〈過負荷チューナー〉の過充電の間 1・2026-11-20)。 「全部払う」端子には掛けない。</summary>
+        public int chargeCostCut;
+        /// <summary>攻撃の種類の端子に挿せない (〈シュヴァリエのレイピア〉のコントラタック中・2026-11-20)。 挿した出目は「0.」で外す (止まった端子と同じ)。</summary>
+        public bool noAttack;
     }
 
     /// <summary>1 ターンの端子の結果。 本体がこれを攻撃・防御・充電・戦闘の情報へ反映する。</summary>
@@ -467,7 +471,7 @@ namespace CombatSystem
             for (int i = 0; i < n; i++)
             {
                 int s = o.slotOfDie[i]; if (s < 0) continue;
-                if (defs[s] == null || state.IsStopped(s) || cnt[s] >= defs[s].capacity) { o.slotOfDie[i] = -1; continue; }
+                if (defs[s] == null || state.IsStopped(s) || cnt[s] >= defs[s].capacity || (env.noAttack && defs[s].kind == TerminalKind.Attack)) { o.slotOfDie[i] = -1; continue; }
                 cnt[s]++;
             }
 
@@ -512,7 +516,7 @@ namespace CombatSystem
             for (int s = 0; s < m; s++)
             {
                 if (defs[s] == null || !Plugged(o.slotOfDie, s)) continue;
-                int cost = defs[s].chargeCost;
+                int cost = defs[s].chargeCost > 1 ? System.Math.Max(1, defs[s].chargeCost - env.chargeCostCut) : defs[s].chargeCost;   // 〈過負荷チューナー〉
                 if (board[s] == TerminalIds.BigDischarge) { if (charge <= 0) { Unplug(o.slotOfDie, s); continue; } paid[s] = true; continue; }      // 全部払う (量は効果の所で)
                 if (cost <= 0) { paid[s] = true; continue; }
                 if (charge < cost) { Unplug(o.slotOfDie, s); continue; }

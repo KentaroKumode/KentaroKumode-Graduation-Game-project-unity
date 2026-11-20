@@ -188,7 +188,7 @@ namespace CombatSystem
             totalDmg = EnemyHpLedger.ProbeMain(totalDmg);
             // 最終与ダメージ倍率 (2026-11-20・GAME.md §23-32・〈防人の軍標〉): すべての倍率の後・敵の軽減パッシブと防御の前 (怠惰の直前)。
             //   主攻撃以外は敵の HP を減らす口 (HpLossDiag.Lose) で掛ける
-            totalDmg = ItemSystem.PassiveSkills.Keywords.Kw.ApplyFinalDamage(ctx, totalDmg);
+            totalDmg = ItemSystem.PassiveSkills.Keywords.Kw.ApplyFinalDamage(ctx, totalDmg, ctx.hitFinalDamagePct);   // この 1 撃だけの上乗せ (〈加重の拳套〉) も足す
             // 大罪:怠惰 (挑戦カード IV・2026-11-11) /〈徒労〉の戦闘のデバフ (2026-11-14・GameHooks.ToilDamageDownPct・既定 50): 主攻撃の最終ダメージ −N%
             //   (すべての倍率の後・敵の防御の前)。 2 つが重なったら厳しい方 1 つ (BattleBoonRule.OutgoingCutPct)
             totalDmg = MetaProgression.MetaDebuffApplicator.ApplyOutgoingCut(totalDmg);   // 主攻撃以外は敵の HP を減らす口 (HpLossDiag.Lose) で掛ける
@@ -221,10 +221,6 @@ namespace CombatSystem
                 && ItemSystem.PassiveSkills.Effects.VitalStrike.IgnoresDefense(ctx))
             {
                 Debug.Log($"[急所] 会心 → 敵の防御{ctx.enemyDefense} を無視");
-            }
-            else if (ctx.enemyDefense > 0 && totalDmg > 0 && ctx.suppressedCritProc)
-            {
-                Debug.Log($"[銑鉄棍] 会心の代わりに敵の防御{ctx.enemyDefense} を無視");
             }
             else if (ctx.enemyDefense > 0 && totalDmg > 0)
             {
@@ -290,10 +286,11 @@ namespace CombatSystem
         /// <summary>
         /// プレイヤー敗北時の被ダメージ修飾（ProcessDamage後〜プレイヤーHP適用前）。適用順:
         /// 天変地異(×2) → メタ被ダメ軽減 → 不屈の鎧/苦難の刻印 → 地獄門 → 亡者の招待(+30%)
-        /// → 共助(T1半減) → 獣の絆 → コントラタック(50%軽減+反射) → 消費シールド → 鏡写し反射。
+        /// → 共助(T1半減) → 獣の絆 → 消費シールド → コントラタック (ブロックとシールドで防いだ分 ×2 を返す) → 鏡写し反射。
+        /// <paramref name="blocked"/> = この攻撃のうちブロックで止めた量 (〈シュヴァリエのレイピア〉のコントラタックが読む)。
         /// enemyHP はメンバフィールドのため反射系はここで直接削る。
         /// </summary>
-        private int ApplyLossDamageModifiers(int totalDmg, MapSystem.FloorModifier floorMod, CombatContext ctx)
+        private int ApplyLossDamageModifiers(int totalDmg, MapSystem.FloorModifier floorMod, CombatContext ctx, int blocked = 0)
         {
             // 挑戦デバフ〈狂暴化〉: 敵ダメージ倍率。
             //   〈天変地異〉のボス初撃強化は 2026-08-08 に廃止し、 エスカレーション閾値の
@@ -395,25 +392,14 @@ namespace CombatSystem
                 totalDmg = 0;
             }
 
-            // シュヴァリエのレイピア コントラタック: 被ダメ50%軽減 + 軽減量×2 を敵へ反射
-            if (ctx.GetAccumulated("player_contre") > 0 && totalDmg > 0)
-            {
-                int mitigated = totalDmg / 2;
-                totalDmg -= mitigated;
-                int reflect = mitigated * 2;
-                if (reflect > 0)
-                {
-                    HpLossDiag.Lose(ref enemyHP, reflect, "反射(コントラタック)");
-                    Debug.Log($"[コントラタック] 軽減{mitigated} → 被ダメ{totalDmg + mitigated}→{totalDmg}、反射{reflect} → 敵HP{enemyHP}");
-                }
-            }
-
             // 消費: シールド吸収（残量から差し引き）
+            int shieldAbsorbed = 0;
             if (ctx.consShield > 0 && totalDmg > 0)
             {
                 // 吸収・割れの出来事を配る (2026-10-31)。 吸収に応じて品が敵へ返す分 (〈鏡返しの小盾〉) はここで使う。
                 int absorbed = ItemSystem.PassiveSkills.Keywords.Kw.AbsorbShield(ctx, totalDmg, isAttack: true);
                 totalDmg -= absorbed;
+                shieldAbsorbed = absorbed;
                 if (GuardDiag.InVesca()) GuardDiag.Cut7F[7] += absorbed;   // [計装 2026-11-11]
                 ctx.dbgShieldToNormal += absorbed;   // [計装] チップ側との配分を見る
                 ctx.shieldAbsorbedAttackThisTurn += absorbed;   // 灰燼の王の〈烈炎〉が読む (主攻撃の肩代わりだけ・2026-11-14)
@@ -424,6 +410,18 @@ namespace CombatSystem
                     HpLossDiag.Lose(ref enemyHP, reflect, "反射(シールドの返し)");
                     ctx.accumulatedValues[ItemSystem.PassiveSkills.Keywords.Kw.ReflectKey] = 0;
                     Debug.Log($"[シールドの返し] {reflect} → 敵HP {enemyHP}");
+                }
+            }
+
+            // 〈シュヴァリエのレイピア〉のコントラタック (2026-11-20 作り直し): ブロックとシールドで防いだダメージの 2 倍を敵へ軽減不可で返す。
+            //   旧: 被ダメ 50% 軽減 + 軽減した量 ×2 を返す
+            if (GameLoop.Consumables.RapierContreOn(ctx))
+            {
+                int reflect = 2 * (Math.Max(0, blocked) + shieldAbsorbed);
+                if (reflect > 0)
+                {
+                    HpLossDiag.Lose(ref enemyHP, reflect, "反射(コントラタック)");
+                    Debug.Log($"[コントラタック] ブロック {blocked}・シールド {shieldAbsorbed} で防いだ → ×2 = {reflect} を返す → 敵HP{enemyHP}");
                 }
             }
 

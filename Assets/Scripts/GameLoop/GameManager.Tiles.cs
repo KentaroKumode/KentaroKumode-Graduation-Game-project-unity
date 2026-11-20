@@ -208,7 +208,8 @@ namespace GameLoop
                 }
             }
             if (pool.Count == 0) return null;
-            return ItemSystem.RarityWeightedPicker.Pick(pool)?.internalName;
+            // 〈サーベル・ワルツ〉: [剣の舞] を持っていれば、 LEGENDARY の枠がまれに [剣の舞] に差し替わる (店と同じ・2026-11-20)
+            return SwordDanceSet.MaybeSwapToDance(Run, ItemSystem.RarityWeightedPicker.Pick(pool), pool, "exchange.dance")?.internalName;
         }
 
         /// <summary>所持パッシブからランダムに1つ除去（刻印も同期）。除去した index を返す。無ければ -1。</summary>

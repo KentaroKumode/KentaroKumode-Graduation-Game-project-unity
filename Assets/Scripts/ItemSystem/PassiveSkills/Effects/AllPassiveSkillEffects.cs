@@ -344,8 +344,8 @@ namespace ItemSystem.PassiveSkills.Effects
             //   「揃えば強い、 単体でも損しない」へ寄せる。 集めに行く動機はここで作る。
             //   (2026-09-05 に HP半減 → -10% へ緩和した経緯があり、 今回で全廃。)
             if (trigger == PassiveSkillTrigger.OnBattleStart) return;
-            // OnPostRoll: 与ダメージ +10% (2026-11-10・旧 攻撃に挿した出目 +10%・その前は 攻撃+1)
-            ctx.AddOutgoingPct(0.1f);
+            // OnPostRoll: 与ダメージ +10% (2026-11-10・旧 攻撃に挿した出目 +10%・その前は 攻撃+1)。 [剣の舞] 2 枚で 1.5 倍・3 枚で 2 倍 (2026-11-20)
+            ctx.AddOutgoingPct(0.1f * GameLoop.SwordDanceSet.SoloScale(GameLoop.GameManager.Instance?.Run));
         }
     }
 
@@ -366,8 +366,9 @@ namespace ItemSystem.PassiveSkills.Effects
             {
                 // 旧: 自他ダイス合計+5 (差分不変で「合計」参照系と相乗) / 新: 自攻撃+5 のみ
                 // (敵ダイス合計+5 は新モデルではロール勝負がないため機能喪失 = 廃止)
-                // 与ダメージ +40% (2026-11-10: 旧 出目 +50% と与ダメージ +20% を 1 本にまとめた・毎ターンリセット→再適用)
-                ctx.AddOutgoingPct(0.4f);
+                // 与ダメージ +40% (2026-11-10: 旧 出目 +50% と与ダメージ +20% を 1 本にまとめた・毎ターンリセット→再適用)。
+                //   [剣の舞] 2 枚で 1.5 倍・3 枚で 2 倍 (2026-11-20・受けるダメージ +20% は伸ばさない)
+                ctx.AddOutgoingPct(0.4f * GameLoop.SwordDanceSet.SoloScale(GameLoop.GameManager.Instance?.Run));
                 return;
             }
             // OnPreReceiveDamage: 被ダメ+20%（毎被弾イベントで都度乗る＝累積しない）
@@ -385,8 +386,8 @@ namespace ItemSystem.PassiveSkills.Effects
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll };
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
-            // 与ダメージ +25% (2026-11-10・旧 攻撃に挿した出目 +30%・その前は 攻撃+3)
-            ctx.AddOutgoingPct(0.25f);
+            // 与ダメージ +25% (2026-11-10・旧 攻撃に挿した出目 +30%・その前は 攻撃+3)。 [剣の舞] 2 枚で 1.5 倍・3 枚で 2 倍 (2026-11-20)
+            ctx.AddOutgoingPct(0.25f * GameLoop.SwordDanceSet.SoloScale(GameLoop.GameManager.Instance?.Run));
         }
     }
 
@@ -408,7 +409,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
             if (trigger != PassiveSkillTrigger.OnPostRoll) return;
-            ctx.AddOutgoingPct(OutgoingPct);
+            ctx.AddOutgoingPct(OutgoingPct * GameLoop.SwordDanceSet.SoloScale(GameLoop.GameManager.Instance?.Run));   // [剣の舞] 2 枚で 1.5 倍・3 枚で 2 倍 (2026-11-20)
         }
     }
 

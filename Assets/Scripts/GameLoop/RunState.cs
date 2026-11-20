@@ -274,7 +274,7 @@ namespace GameLoop
         public bool lastStandActive;
 
         /// <summary>5層裏ボス（シュヴァリエ・サン=ジョリオラ）撃破済みフラグ。
-        /// 立っている場合、シュヴァリエのレイピア解除時に会心+9 補正が付与される。</summary>
+        /// 立っている場合、シュヴァリエのレイピア解除の次のターン、 会心倍率 +1.0 が付く (2026-11-20・旧 会心+9)。</summary>
         public bool defeatedSaintGeorges;
 
         /// <summary>ヴェスカ (8 層 Null Point・id は boss_layer7 のまま) の戦闘に敗北したか。

@@ -72,6 +72,14 @@ namespace CombatSystem
             }
         }
 
+        /// <summary>このターン敵が大技の予告かチャージを出しているか (〈英雄の意志〉がターン開始時に読む・2026-11-20)。
+        /// ターン開始のトリガーはダウンを立てる前に鳴るので、 待っているダウンがあれば (このターンはダウン = 予告を出さない) false。</summary>
+        public bool EnemyHeavyOrChargeNow(int turn)
+        {
+            if (currentEnemy == null || enemyHP <= 0 || (_down.Enabled && _down.pending > 0)) return false;
+            return Escalation.IsHeavyTurn(currentEnemy, turn) || Escalation.IsChargeTurn(currentEnemy, turn);
+        }
+
         /// <summary>〈柱折りの発破筒〉(2026-11-20): 次に割る目盛りを <paramref name="add"/> (HP) だけ上げる。 今の HP より上へは行かない (今の HP の 1 下まで ── 割るには通常攻撃が要る)。
         /// 目盛りの無い敵では何もしない。 ターンの解決中は CombatManager の手元の HP、 それ以外は ctx の HP の低い方を今の HP とみなす。</summary>
         public void RaiseBossNextNotch(int add)
