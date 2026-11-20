@@ -92,6 +92,8 @@ namespace CombatSystem
         // 采配と共通の端子 (2026-11-20・段 1-e・item-overhaul-spec §8 / §12-4・名前は仮)。 〈焼却斬り〉だけ山札の軸の端子
         public const string BurnSlash = "焼却斬り", Reload = "緊急再装填", OneCut = "一刀両断", Gear = "歯車の軸", Bell = "巡りの鐘" /* 設計書の〈残響の鐘〉(〈残響〉と紛れるので仮に改名) */,
             Mikiri = "見切りの構え", Crush = "崩し斬り";
+        // 役の軸の端子 (2026-11-21・段 1-f・item-overhaul-spec §8-1 / §12-4・名前は仮)
+        public const string DiceTable = "賽振り台", RoleDrop = "役落とし";
 
         /// <summary>強化した端子の名前の印 (全角の「＋」・2026-11-20)。</summary>
         public const string UpgradeMark = "＋";
@@ -291,6 +293,8 @@ namespace CombatSystem
         public bool enemyStunNext, ignoreDefense;
         /// <summary>このターンに立つ役 (<see cref="TerminalCards.RoleOf"/>・2026-11-21): 0 = 立たない / 1 = 2 個そろい / 2 = ゾロ目か連なり。 端子〈役落とし〉と賽目の品が読む。</summary>
         public int roleNow;
+        /// <summary>次のターンの最初の振り直しの充電の費用から引く量 (〈賽振り台〉・2026-11-21)。 本体が nextTurnBuffs (CombatManager.RerollDiscountKey) へ足す。</summary>
+        public int rerollDiscountNext;
         /// <summary>エスカレーションの段階を戻す数 (〈氷結瓶〉・溜まりが届いた〈鎮静香〉。 〈残響〉の 2 回目・1 ターンに 2 回届いた〈鎮静香〉も数える・2026-11-20〜 旧: 真偽で 1 段だけ)。</summary>
         public int retreatStage;
         /// <summary>時計の賽の端子: エスカレーションの次の段階を何ターン先へ送るか (挿した出目の合計)。</summary>
@@ -390,6 +394,8 @@ namespace CombatSystem
         // ===== 賽目 (役の軸) の品の数値 (2026-11-21・段 1-f・item-overhaul-spec §5・未測定) =====
         /// <summary>〈見切りの木札〉役が立ったターン 各撃の攻撃 +N・ブロック +N / 〈符丁の刻み板〉各撃の攻撃 + 賽目 × N (ゾロ目・連なりなら 2 倍)。</summary>
         public const int WoodTagBonus = 4, NotchBoardPer = 2;
+        /// <summary>〈賽振り台〉次のターンの最初の振り直しの費用から引く上限 (min(上限, 賽目)) / 〈役落とし〉役が成立したターン 攻撃 + 賽目 × N。 *Up = 強化した端子。</summary>
+        public const int DiceTableCap = 6, DiceTableCapUp = 8, RoleDropPer = 3, RoleDropPerUp = 4;
         // ===== 采配と共通の端子 (2026-11-20・段 1-e・未測定) =====
         /// <summary>〈焼却斬り〉出目の倍率 / 使い捨て 1 回あたりの下限 (max(2, 采配)) / 〈一刀両断〉出目の倍率 / 〈歯車の軸〉挿した目 1 つあたり / 〈崩し斬り〉最大 HP の %。 *Up = 強化した端子。</summary>
         public const int BurnSlashMul = 2, BurnSlashMulUp = 3, BurnSlashMinPer = 2, OneCutMul = 3, OneCutMulUp = 4, GearPip = 2, GearPipUp = 3, CrushPct = 5, CrushPctUp = 6;
@@ -478,6 +484,9 @@ namespace CombatSystem
             [TerminalIds.Gear] = "出目は挿せない。場にあれば、毎ターン最初に発動した基本以外の端子 (場の左から) の挿した目 1 つにつき +" + GearPipUp + "。一度引くとこの戦闘中ずっと場に残る。",
             [TerminalIds.Bell] = "この戦闘の残りの間、山札を切り直すたび、次のターンに端子を 1 枚多く引く。出目を充電に。",
             [TerminalIds.Mikiri] = "出目をブロックに。敵が大技を予告したターンなら 2 倍。",
+            // 役の軸の端子 (2026-11-21)
+            [TerminalIds.DiceTable] = "充電 +出目。次のターンの最初の振り直しの充電の費用 −min(" + DiceTableCapUp + ", 賽目)。",
+            [TerminalIds.RoleDrop] = "出目を攻撃に。このターン役が成立していれば、攻撃 +賽目 ×" + RoleDropPerUp + " (ゾロ目・連なりなら 2 倍)。",
             [TerminalIds.Crush] = "出目 +" + UpPip + " を攻撃に。この撃でボスの目盛りを割ったら、敵に最大 HP の " + CrushPctUp + "% の軽減不可ダメージ。",
         };
 
@@ -651,6 +660,10 @@ namespace CombatSystem
                 Rare(Once(D(TerminalIds.Bell, S, "この戦闘の残りの間、山札を切り直すたび、次のターンに端子を 1 枚多く引く。"))),
                 D(TerminalIds.Mikiri, B, "出目をブロックに。敵が大技を予告したターンなら 2 倍。", TerminalCond.AtMost3),
                 D(TerminalIds.Crush, A, "出目を攻撃に。この撃でボスの目盛りを割ったら、敵に最大 HP の " + CrushPct + "% の軽減不可ダメージ。", TerminalCond.AtLeast5),
+                // ── 役の軸の端子 (2026-11-21・段 1-f・item-overhaul-spec §8-1 / §12-4) ──
+                //   〈賽振り台〉: 配線は振り直しの後なので、 安くするのは次のターンの最初の振り直し (§12-4)
+                D(TerminalIds.DiceTable, C, "充電 +出目。次のターンの最初の振り直しの充電の費用 −min(" + DiceTableCap + ", 賽目)。", TerminalCond.None, ItemSystem.PassiveSkills.AxisRules.Role),
+                D(TerminalIds.RoleDrop, A, "出目を攻撃に。このターン役が成立していれば、攻撃 +賽目 ×" + RoleDropPer + " (ゾロ目・連なりなら 2 倍)。", TerminalCond.None, ItemSystem.PassiveSkills.AxisRules.Role),
             };
         }
 
@@ -1207,6 +1220,11 @@ namespace CombatSystem
                 case TerminalIds.Bell: st.bells++; if (up) o.chargeAdd += sum; break;
                 case TerminalIds.Mikiri: o.blockAdd += sum * (env.heavyTurn ? 2 : 1); break;      // 強化は条件 (4 以下) だけ
                 case TerminalIds.Crush: o.attackAdd += sum + p1; break;      // 目盛りを割った時の追加は本体の撃の輪 (attackHitIds)
+                // 役の軸の端子 (2026-11-21)。 立つ役は Resolve の 5. の頭で決めた o.roleNow (ResolveRoles と同じ判定)
+                case TerminalIds.DiceTable: o.chargeAdd += sum; o.rerollDiscountNext += Math.Min(up ? DiceTableCapUp : DiceTableCap, env.axRole); break;
+                case TerminalIds.RoleDrop:
+                    o.attackAdd += sum + (o.roleNow > 0 ? env.axRole * (up ? RoleDropPerUp : RoleDropPer) * (o.roleNow >= 2 ? 2 : 1) : 0);
+                    break;
             }
         }
     }

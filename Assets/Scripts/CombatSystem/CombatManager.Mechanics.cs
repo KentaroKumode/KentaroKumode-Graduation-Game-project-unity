@@ -181,9 +181,18 @@ namespace CombatSystem
             return n;
         }
 
-        /// <summary>今の ctx での、 次の振り直し 1 回の費用 (無料の回数を読む・2026-11-21)。 本体・画面・BOT の 1 か所。</summary>
+        /// <summary>〈賽振り台〉(2026-11-21): このターンの最初の振り直しの充電の費用から引く量 (nextTurnBuffs → currentBuffs・前のターンに挿した分の合計)。</summary>
+        public const string RerollDiscountKey = "roleRerollDiscount";
+
+        /// <summary>今の ctx での、 次の振り直し 1 回の費用 (無料の回数・〈賽振り台〉の値引きを読む・2026-11-21)。 本体・画面・BOT の 1 か所。
+        /// 値引きはこのターンの最初の振り直し (rerollsThisTurn = 0) だけ・下限 0。</summary>
         public static int RerollCostNow(CombatContext ctx, int diceCount, int nth)
-            => RerollCostNow(diceCount, nth, FreeRerollsLeft(ctx) > 0);
+        {
+            int cost = RerollCostNow(diceCount, nth, FreeRerollsLeft(ctx) > 0);
+            if (ctx != null && cost > 0 && ctx.rerollsThisTurn == 0 && ctx.currentBuffs.TryGetValue(RerollDiscountKey, out float cut) && cut > 0f)
+                cost = Mathf.Max(0, cost - (int)cut);
+            return cost;
+        }
 
         /// <summary>振り直しを 1 回払った後: 無料を使ったなら 1 つ減らす (〈擦り切れた賽袋〉の分が先 ── 戦闘の最初の振り直し)。 振り直した印を立てる。</summary>
         private static void NoteRerollPaid(CombatContext ctx, bool usedFree)

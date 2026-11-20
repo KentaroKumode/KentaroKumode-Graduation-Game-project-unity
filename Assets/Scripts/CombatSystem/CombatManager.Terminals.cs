@@ -166,6 +166,7 @@ namespace CombatSystem
             if (o.chargeSpend > 0) ctx.ConsumeCharge(Math.Min(o.chargeSpend, ctx.GetCharge()));
             if (o.chargeCapAdd > 0) ctx.chargeCapBonus += o.chargeCapAdd;      // 〈大導電＋〉: この戦闘の充電の上限 (満たす前に)
             if (o.chargeFill) ctx.AddCharge(ctx.ChargeCap);
+            if (o.rerollDiscountNext > 0) YachtRoleEffects.AddNextTurn(ctx, RerollDiscountKey, o.rerollDiscountNext);      // 〈賽振り台〉(2026-11-21)
             //   〈応急箱＋〉: 回復の量のうち、 最大 HP を超えた分 (回復する前の空きを超えた分) はシールドになる
             int overheal = o.overhealToShield > 0 ? Math.Max(0, o.overhealToShield - Math.Max(0, playerMaxHP - playerHP)) : 0;
             if (o.heal > 0) HealPlayer(o.heal);

@@ -1531,7 +1531,7 @@ namespace AutoTest
                 return new[] { TerminalIds.Detonator, TerminalIds.Piercer, TerminalIds.ReliefValve, TerminalIds.FirstAid, TerminalIds.FullCharge,
                                TerminalIds.CoolShot, TerminalIds.Copier, TerminalIds.BurnOut, TerminalIds.Switchboard, TerminalIds.Retainer,
                                TerminalIds.BurnSlash, TerminalIds.Reload, TerminalIds.Bell, TerminalIds.Gear };
-            if (axis == ItemSystem.PassiveSkills.AxisRules.Role) return Array.Empty<string>();
+            if (axis == ItemSystem.PassiveSkills.AxisRules.Role) return new[] { TerminalIds.DiceTable, TerminalIds.RoleDrop };      // 役の軸の端子 (2026-11-21)
             return PersonaTerminals(AxisPersona(axis));
         }
 
