@@ -131,6 +131,35 @@ namespace UI.Game2D.Battle
             return d;
         }
 
+        /// <summary>〈複製の水銀〉(2026-11-20): 写す手札の端子を選ぶ窓 (場の手札の端子・左から)。 選んで「写す」で使う。</summary>
+        private ScreenDef MercuryDef()
+        {
+            var dk = CombatSystem.CombatManager.Instance?.TerminalDeck;
+            var d = new ScreenDef { id = "battle_mercury", jp = true, title = "〈" + ItemIds.TacticMercury + "〉: 写す端子", w = 460, cols = 2,
+                sub = "手札の端子を 1 枚選ぶ (写しを " + Consumables.MercuryCopies + " 枚、 この戦闘の間だけ手札に加える)" };
+            var slots = new List<int>();
+            if (dk != null)
+                for (int s = dk.permanent.Count; s < dk.board.Count; s++)
+                {
+                    slots.Add(s);
+                    var td = CombatSystem.TerminalCards.Get(dk.board[s]);
+                    d.Items.Add(new ModalItem { name = dk.board[s], desc = td?.description });
+                }
+            d.buttons.Add(new ModalBtn { label = "写す", action = "pick", primary = true });
+            d.buttons.Add(new ModalBtn { label = "戻る", action = "back" });
+            d.onAction = (a, sel) =>
+            {
+                if (a == "back") { _modal.Replace(ItemsDef()); return; }
+                if (a != "pick" || sel < 0 || sel >= slots.Count) return;
+                if (!sim.CanUseItems || !sim.UseItem(ItemIds.TacticMercury, slots[sel])) { _modal.ShowError("今は使えない"); return; }
+                Game2DSfx.Play("ui_confirm"); _modal.ShowToast("使った");
+                _redraw?.Invoke();
+                if (CombatItems().Count == 0) { _modal.Close(); return; }
+                _modal.Replace(ItemsDef());
+            };
+            return d;
+        }
+
         private int _itemPage;
         private const int ItemsPerPage = 10;
 
@@ -193,6 +222,7 @@ namespace UI.Game2D.Battle
                         var r = rows[sel]; var rs = GameManager.Instance?.Run;
                         string why = rs != null ? RowBlock(rs, r) : "使えない";
                         if (why != null) { _modal.ShowError(why); return; }
+                        if (!r.rapier && r.id == ItemIds.TacticMercury) { _modal.Replace(MercuryDef()); return; }   // 写す手札の端子を選ぶ
                         bool ok = r.rapier ? sim.UseRapier() : sim.UseItem(r.id);
                         if (!ok) { _modal.ShowError("今は使えない"); return; }
                         Game2DSfx.Play("ui_confirm"); _modal.ShowToast(r.rapier ? (Consumables.RapierContreOn() ? "構えた" : "構えを解いた") : "使った");

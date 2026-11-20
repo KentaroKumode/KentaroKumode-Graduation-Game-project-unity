@@ -104,5 +104,7 @@ namespace ItemSystem.PassiveSkills
         OnBleedZero,
         /// <summary>超臨界爆発 (閾値を引く前の臨界が閾値の 2 倍以上・2026-11-20・§23-32)。 OnRinkaiBurst の直後に配る (量 = その爆発のダメージ)。</summary>
         OnSuperBurst,
+        /// <summary>戦闘中に消耗品を使った (2026-11-20・item-overhaul-spec §2-2・量 = 消耗品の Tier・Tier の無い品 (戦術消耗品ほか) は 1)。 GameLoop.Consumables.Use が配る。</summary>
+        OnConsumableUse,
     }
 }

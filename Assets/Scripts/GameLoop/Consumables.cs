@@ -96,8 +96,10 @@ namespace GameLoop
             VescaPhaseConsumables[i]++;
         }
 
-        /// <summary>所持から id を1つ消費し効果適用。意味があった場合 true。</summary>
-        public static bool Use(RunState run, string id)
+        /// <summary>所持から id を1つ消費し効果適用。意味があった場合 true。
+        /// <paramref name="target"/> = 対象を取る品 (〈複製の水銀〉) の対象 (場の添字・−1 = 選ばない → 左端の手札の端子)。
+        /// 戦闘中に使えたら出来事 <see cref="PassiveSkillTrigger.OnConsumableUse"/> を配る (量 = Tier・Tier の無い品は 1)。</summary>
+        public static bool Use(RunState run, string id, int target = -1)
         {
             if (run == null || string.IsNullOrEmpty(id)) return false;
             if (run.ownedConsumables == null || !run.ownedConsumables.Contains(id)) return false;
@@ -117,24 +119,34 @@ namespace GameLoop
                 return false;
             }
 
-            bool ok = Apply(run, id);
+            bool ok = Apply(run, id, target);
             if (ok)
             {
                 if (useCap > 0 && lockCtx != null) lockCtx.accumulatedValues[BattleUseKey] = lockCtx.GetAccumulated(BattleUseKey) + 1f;
-                // 古い手紙は 1 枚で OldLetterUses 回使える。 使い切ったときだけ手放す。
-                bool keep = false;
-                if (id == ItemIds.OldLetter)
-                {
-                    run.oldLetterUsesSpent++;
-                    keep = run.oldLetterUsesSpent < ItemIds.OldLetterUses;
-                    if (!keep) run.oldLetterUsesSpent = 0;
-                }
-                if (!keep) run.ownedConsumables.Remove(id);
+                // 〈底抜けの小瓶〉(2026-11-20): 戦闘で最初に使った消耗品は消費しない (その戦闘中にもう 1 回使える・使わなければ戦闘の終わりに消える)
+                if (!ItemSystem.PassiveSkills.Effects.BottomlessVial.TryKeep(lockCtx, run, id)) Consume(run, id);
                 MetaProgression.Achievements.AchievementService.NoteConsumableUsed();
                 NoteVescaPhaseUse();
                 Debug.Log($"[Consumables] 使用: {id}");
+                // 消耗品の連動品の出来事 (2026-11-20・item-overhaul-spec §2-2)。 戦闘中だけ
+                if (lockCtx != null) ItemSystem.PassiveSkills.Keywords.Kw.Raise(lockCtx, PassiveSkillTrigger.OnConsumableUse, System.Math.Max(1, ItemIds.ConsTierOf(id)));
             }
             return ok;
+        }
+
+        /// <summary>使った品を所持から 1 つ減らす。 古い手紙は 1 枚で OldLetterUses 回使える (使い切ったときだけ手放す)。
+        /// 〈底抜けの小瓶〉が戦闘の終わりに、 もう 1 回使わなかった品を消すのもここ。</summary>
+        public static void Consume(RunState run, string id)
+        {
+            if (run?.ownedConsumables == null || string.IsNullOrEmpty(id)) return;
+            bool keep = false;
+            if (id == ItemIds.OldLetter)
+            {
+                run.oldLetterUsesSpent++;
+                keep = run.oldLetterUsesSpent < ItemIds.OldLetterUses;
+                if (!keep) run.oldLetterUsesSpent = 0;
+            }
+            if (!keep) run.ownedConsumables.Remove(id);
         }
 
         /// <summary>今 <see cref="Use"/> を呼んだら使えるか (使えれば null・使えなければ理由の短い文)。 画面が品を暗く出すための<b>読むだけ</b>の判定で、
@@ -156,6 +168,7 @@ namespace GameLoop
                 var gm = GameManager.Instance;
                 return gm != null && gm.CanPlaceLure ? null : "航行中だけ置ける";
             }
+            if (ItemIds.ConsFamilyOf(id) == ItemIds.ConsTacticFamily) return TacticBlockReason(ctx, id);
             if (HealRatio(id) > 0f)
             {
                 var cm = CombatManager.Instance;
@@ -197,7 +210,7 @@ namespace GameLoop
         public static bool RapierContreOn(CombatContext ctx) => ctx != null && ctx.GetAccumulated(ContreKey) > 0;
 
         /// <summary>効果適用本体（リスト削除はしない）。</summary>
-        private static bool Apply(RunState run, string id)
+        private static bool Apply(RunState run, string id, int target = -1)
         {
             var ctx = ActiveCtx();
 
@@ -205,6 +218,7 @@ namespace GameLoop
             //   戦闘中・航行マップでない層では使えない (false = 消費しない)。
             string mapFamily = ItemIds.ConsFamilyOf(id);
             if (mapFamily == ItemIds.ConsLureFamily) return GameManager.Instance != null && GameManager.Instance.TryPlaceLure();
+            if (mapFamily == ItemIds.ConsTacticFamily) return TacticBlockReason(ctx, id) == null && ApplyTactic(ctx, id, target);
 
             // 回復: 最大HP割合の即時回復。 割合の表は HealRatio の 1 か所だけ (BOT の選び方と共有)。
             float healRatio = HealRatio(id);
@@ -277,6 +291,102 @@ namespace GameLoop
 
                 default:
                     return false;
+            }
+        }
+
+        // ===== 戦術消耗品 (2026-11-20・item-overhaul-spec §7-1・数値は仮) =====
+        //   どれも戦闘中・判断の間 (振り直し・配線) だけ使える。 効き目が無い時 (同じターンに 2 つ目の潤滑油など) は使えない (消費しない)。
+        //   端子に効く物は TerminalBattleState の旗 (本体・画面・BOT の写しが同じ値を読む)・手札を動かす物は TerminalDeckState を直に動かす。
+
+        /// <summary>〈鎧割りの酸瓶〉: 敵の防御から引く量 (この戦闘中・下限 0)。</summary>
+        public const int AcidDefenseCut = 12;
+        /// <summary>〈目盛り削りの鑿〉: 敵へのダメージ。</summary>
+        public const int ChiselDamage = 15;
+        /// <summary>〈複製の水銀〉: 手札に足す写しの枚数。</summary>
+        public const int MercuryCopies = 2;
+
+        /// <summary>戦術消耗品の一覧 (items.json の consFamily = <see cref="ItemIds.ConsTacticFamily"/>・レア度が <paramref name="maxRarity"/> 以下・items.json の並び順)。
+        /// 店の 3 枠目 (ShopManager) と〈行商人の見本箱〉が引く。</summary>
+        public static System.Collections.Generic.List<CompleteItemData> TacticPool(ItemRarity maxRarity = ItemRarity.LEGENDARY)
+        {
+            var all = ItemDatabase.Instance?.GetItemsByCategory(ItemCategory.Consumable);
+            var l = new System.Collections.Generic.List<CompleteItemData>();
+            if (all != null) foreach (var it in all) if (it.consFamily == ItemIds.ConsTacticFamily && it.rarity <= maxRarity) l.Add(it);
+            return l;
+        }
+
+        /// <summary>〈複製の水銀〉の対象: 場の添字 <paramref name="want"/> が手札の端子ならそれ、 でなければ左端の手札の端子 (−1 = 手札が無い)。</summary>
+        public static int MercuryTarget(TerminalDeckState dk, int want)
+        {
+            if (dk == null || dk.hand.Count == 0) return -1;
+            int p = dk.permanent.Count;
+            return want >= p && want < dk.board.Count ? want : p;
+        }
+
+        /// <summary>戦術消耗品を今使えるか (使えれば null・使えなければ理由)。 <see cref="ApplyTactic"/> と同じ条件。</summary>
+        private static string TacticBlockReason(CombatContext ctx, string id)
+        {
+            var cm = CombatManager.Instance;
+            var dk = cm?.TerminalDeck;
+            if (ctx == null || cm == null || !cm.IsCombatActive) return "戦闘中だけ使える";
+            switch (id)
+            {
+                case ItemIds.TacticSwap: return dk == null || dk.hand.Count == 0 ? "手札が無い" : null;
+                case ItemIds.TacticOil: return dk == null ? "使えない" : dk.state.ignoreCond ? "このターンはもう効いている" : null;
+                case ItemIds.TacticOrb: return dk == null ? "使えない" : dk.state.doubleAll ? "このターンはもう効いている" : null;
+                case ItemIds.TacticMercury: return dk == null || dk.hand.Count == 0 ? "写す端子が無い" : null;
+                case ItemIds.TacticNeedle: return ctx.GetAccumulated(CombatManager.TacticNeedleKey) > 0f ? "もう仕込んである" : null;
+                case ItemIds.TacticChisel: return cm.EnemyHP <= 0 ? "敵が倒れている" : null;
+                case ItemIds.TacticAcid: case ItemIds.TacticSand: return null;
+                default: return "使えない";
+            }
+        }
+
+        private static bool ApplyTactic(CombatContext ctx, string id, int target)
+        {
+            var cm = CombatManager.Instance; var dk = cm.TerminalDeck;
+            switch (id)
+            {
+                case ItemIds.TacticSwap:
+                    Debug.Log($"[入れ替えの符] 手札を捨てて {dk.SwapHand()} 枚引き直した");
+                    return true;
+                case ItemIds.TacticOil:
+                    dk.state.ignoreCond = true;      // 〈無形の構え〉の「条件を無視」と同じ旗 (このターンだけ・BeginTurn が戻す)
+                    return true;
+                case ItemIds.TacticOrb:
+                    dk.state.doubleAll = true;
+                    return true;
+                case ItemIds.TacticAcid:
+                {
+                    int before = ctx.enemyDefense;
+                    ctx.enemyDefense = Mathf.Max(0, ctx.enemyDefense - AcidDefenseCut);
+                    ctx.accumulatedValues[CombatManager.TacticAcidKey] = ctx.GetAccumulated(CombatManager.TacticAcidKey) + 1f;
+                    Debug.Log($"[鎧割りの酸瓶] 敵の防御 {before} → {ctx.enemyDefense} (この戦闘中)");
+                    return true;
+                }
+                case ItemIds.TacticNeedle:
+                    ctx.accumulatedValues[CombatManager.TacticNeedleKey] = 1f;      // 撃のループ (CombatManager.Turn) が攻撃のある最初の撃で使う
+                    return true;
+                case ItemIds.TacticChisel:
+                    return cm.TacticChisel(ctx, ChiselDamage);
+                case ItemIds.TacticSand:
+                {
+                    // 〈氷結瓶〉と同じ口 (エスカレーションの遅延)。 段階 0 で戻せない時は、 次のターンに段階が進まないよう 1 ターン遅らせる
+                    int t = YachtRoleEffects.TurnsToRetreatOneStage(ctx);
+                    YachtRoleEffects.AddEscalationDelay(ctx, t > 0 ? t : 1);
+                    Debug.Log(t > 0 ? "[反転の砂] エスカレーションの段階を 1 つ戻す" : "[反転の砂] 段階 0: 次のターンは段階が進まない");
+                    return true;
+                }
+                case ItemIds.TacticMercury:
+                {
+                    int s = MercuryTarget(dk, target);
+                    if (s < 0) return false;
+                    string copied = dk.board[s];
+                    dk.AddToHand(copied, MercuryCopies);
+                    Debug.Log($"[複製の水銀] 〈{copied}〉の写しを {MercuryCopies} 枚手札に (この戦闘の間だけ)");
+                    return true;
+                }
+                default: return false;
             }
         }
 

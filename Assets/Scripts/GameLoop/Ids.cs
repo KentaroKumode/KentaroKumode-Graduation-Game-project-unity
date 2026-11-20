@@ -182,6 +182,16 @@ namespace GameLoop
         public const string OldLetter = "古い手紙";
         public const int OldLetterUses = 3;
 
+        // === 戦術消耗品 (2026-11-20・item-overhaul-spec §7-1・名前は仮) ===
+        //   items.json の consFamily = ConsTacticFamily・tier 1 (出来事 OnConsumableUse の量)。 効果の正本は Consumables.ApplyTactic。
+        //   店の消費の 3 枠目に 1 種 (ShopManager・乱数キー "shop.consTactic")。 戦闘中だけ使える。
+        public const string ConsTacticFamily = "tactic";
+        public const string TacticSwap = "入れ替えの符", TacticOil = "無銘の潤滑油", TacticAcid = "鎧割りの酸瓶", TacticNeedle = "急所突きの針",
+            TacticChisel = "目盛り削りの鑿", TacticSand = "反転の砂", TacticOrb = "倍化の共鳴玉", TacticMercury = "複製の水銀";
+
+        // === 消耗品の連動品 (2026-11-20・item-overhaul-spec §7-2・名前は仮) ===
+        public const string LinkPouch = "帯革の薬嚢", LinkPride = "使い切りの矜持", LinkBottomless = "底抜けの小瓶", LinkSampleBox = "行商人の見本箱";
+
         // === 航行マップで使う消耗品 (2026-09-28・2026-10-18 に囮と罠を統合) ===
         //   **系統で判定する** (ConsFamilyOf)。 下の id 定数は「開始時に配る」「店で買う」の
         //   跨ファイル参照のためだけにあり、 効果の分岐には使わない。

@@ -265,6 +265,8 @@ namespace ItemSystem.PassiveSkills
             Register(new WildKilnHearth()); Register(new PillarBreakerCharge());
             Register(new ThunderReliquary()); Register(new FourthStrikeCore());
             Register(new FallenCastleCornerstone()); Register(new BorderGuardStandard());
+            // 消耗品の連動品 (2026-11-20・ConsumableLinkEffects.cs・item-overhaul-spec §7-2)
+            Register(new BeltPouch()); Register(new SpentPride()); Register(new BottomlessVial()); Register(new SampleBox());
 
             // ============================
             //  汎用パッシブ

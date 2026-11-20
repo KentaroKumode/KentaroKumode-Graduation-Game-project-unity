@@ -107,8 +107,11 @@ namespace CombatSystem
         public int oscLast, oscStreak, oscLastUp, oscStreakUp;
         /// <summary>基本以外の端子の発動の累計 (〈柔軟な戦略〉)。</summary>
         public int firedTotal;
-        /// <summary>このターン / 次のターン、 出目の条件を無視する (〈無形の構え〉)。</summary>
+        /// <summary>このターン / 次のターン、 出目の条件を無視する (〈無形の構え〉・このターンの分は戦術消耗品〈無銘の潤滑油〉も立てる)。</summary>
         public bool ignoreCond, ignoreCondNext;
+        /// <summary>このターン、 挿した端子がすべて 2 回働く (戦術消耗品〈倍化の共鳴玉〉・2026-11-20・〈残響〉と同じ倍化)。 <see cref="BeginTurn"/> で戻す。
+        /// 盤面 (TerminalEnv) でなく状態に持つのは、 判断の間 (配線の画面・BOT の写し) に使っても、 本体・画面・BOT が同じ値を読むため。</summary>
+        public bool doubleAll;
         /// <summary>次に攻撃するターンの攻撃に足す量 (〈力溜め〉)。 / 次のターンから使える分 (〈後の先〉)。</summary>
         public int storedAttack, storedAttackNext;
         /// <summary>次のターンに多く引く枚数 (〈先読み〉)。</summary>
@@ -144,6 +147,7 @@ namespace CombatSystem
         public int BeginTurn()
         {
             ignoreCond = ignoreCondNext; ignoreCondNext = false;
+            doubleAll = false;
             storedAttack += storedAttackNext; storedAttackNext = 0;
             emberCarry = emberNext; emberNext = 0;
             int extra = extraDrawNext; extraDrawNext = 0;
@@ -707,6 +711,7 @@ namespace CombatSystem
             for (int s = 0; s < m; s++) if (defs[s]?.baseId == TerminalIds.Doubler && Plugged(o.slotOfDie, s)) doubler = true;
             // 連なりの賽 (2026-11-20): 3 つの目が連番のターン (役〈連なり〉)、 挿した端子がすべて倍化する (〈残響〉と同じ)
             if (env.dieId == GameLoop.DieIds.Straight && YachtRoles.IsRun(v)) doubler = true;
+            if (state.doubleAll) doubler = true;      // 〈倍化の共鳴玉〉(2026-11-20): このターン、 挿した端子がすべて 2 回働く (〈残響〉と同じ)
             //   〈剛腕〉(2026-11-20・説明文どおり): 攻撃の種類の端子に挿した出目を 2 倍にしてから、 その端子の効果に入れる (倍率の端子は 2 倍の目に掛かる)。
             //   条件 (2.) は挿した目そのもので見る。 〈剛腕〉1 枚 (効果 1 回) につき ×2 ── 〈残響〉で 2 回発動すれば ×4、 2 枚挿せば ×4。
             //   旧: 攻撃の種類の端子に挿した出目の合計を、 攻撃にもう 1 回足していた (倍率の端子では説明より小さく、 出目を攻撃に使わない端子の分も足した)
@@ -1200,6 +1205,68 @@ namespace CombatSystem
             }
             if (burn != null && hand.Remove(burn)) exiled.Add(burn);
             return retain;
+        }
+
+        // ── 判断の間に手札を動かす (戦術消耗品・2026-11-20) ──
+        //   手札が変わったら場 (常設 + 手札) を作り直す。 止まった端子の印 (ヴェスカ〈停滞する時間〉) は、 残る端子の分だけ写す (新しく入った端子は止まらない)。
+        //   BOT の先読み (AutoRunner.Terminals の SampleNextBoard) はこの後の山札・捨て札・手札をそのまま読むので、 同じ状態から次のターンを見積もる。
+        //   「次のターンの手札に足す」口 (copyNext 1 枚・recallNext 1 枚・keepNext・extraDrawNext) は使わない ── どれもこのターンの手札へ直に入れる。
+
+        /// <summary>〈入れ替えの符〉: 今の手札をすべて捨て札へ送り、 同じ枚数を山札から引き直す (山札が尽きたら捨て札を切り直す ── いま捨てた端子も混ざる)。
+        /// 常設を引いたら場に残し、 手札の枚数には数えない (<see cref="DrawTurn"/> と同じ)。 戻り値 = 引き直した枚数。</summary>
+        public int SwapHand()
+        {
+            int n = hand.Count, perm0 = permanent.Count;
+            if (n == 0) return 0;
+            discard.AddRange(hand); hand.Clear();
+            int got = DrawInto(n);
+            RebuildBoard(perm0, 0);
+            return got;
+        }
+
+        /// <summary>手札へ n 枚引き足す (〈帯革の薬嚢〉)。 戻り値 = 引いた枚数。</summary>
+        public int DrawIntoHand(int n)
+        {
+            int perm0 = permanent.Count, keep = hand.Count;
+            int got = DrawInto(n);
+            RebuildBoard(perm0, keep);
+            return got;
+        }
+
+        /// <summary>手札へ id の写しを copies 枚足す (〈複製の水銀〉・この戦闘の間だけ ── 次の戦闘は <see cref="BeginBattle"/> がランの山札から作り直す)。</summary>
+        public void AddToHand(string id, int copies)
+        {
+            if (string.IsNullOrEmpty(id) || copies <= 0) return;
+            int perm0 = permanent.Count, keep = hand.Count;
+            for (int i = 0; i < copies; i++) hand.Add(id);
+            RebuildBoard(perm0, keep);
+        }
+
+        private int DrawInto(int n)
+        {
+            int got = 0, guard = 0, want = hand.Count + n;
+            while (hand.Count < want && guard++ < 64)
+            {
+                var id = DrawOne();
+                if (id == null) break;
+                got++;
+                var d = TerminalCards.Get(id);
+                if (d != null && d.permanent) { permanent.Add(id); continue; }
+                hand.Add(id);
+            }
+            return got;
+        }
+
+        /// <summary>場を作り直す。 <paramref name="perm0"/> = 前の常設の枚数 / <paramref name="keepHand"/> = 前の手札のうち、 同じ位置に残っている先頭の枚数 (止まった印を写す)。</summary>
+        private void RebuildBoard(int perm0, int keepHand)
+        {
+            var old = state.stopped;
+            board.Clear(); board.AddRange(permanent); board.AddRange(hand);
+            if (old == null) return;
+            var st = new bool[board.Count]; bool any = false;
+            for (int p = 0; p < perm0 && p < old.Length; p++) { st[p] = old[p]; any |= old[p]; }
+            for (int h = 0; h < keepHand && perm0 + h < old.Length; h++) { bool f = old[perm0 + h]; st[permanent.Count + h] = f; any |= f; }
+            state.stopped = any ? st : null;
         }
 
         /// <summary>山札の残り (山 + 捨て札 + 手札 + 場)。 画面用。</summary>

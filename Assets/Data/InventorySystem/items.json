@@ -1566,6 +1566,94 @@
       "basePrice": 7
     },
     {
+      "id": "入れ替えの符",
+      "name": "入れ替えの符",
+      "description": "戦闘中に使う。今の手札をすべて捨て札へ送り、同じ枚数を山札から引き直す。",
+      "flavorText": "",
+      "category": "Consumable",
+      "rarity": "BRONZE",
+      "basePrice": 5,
+      "consFamily": "tactic",
+      "tier": 1
+    },
+    {
+      "id": "無銘の潤滑油",
+      "name": "無銘の潤滑油",
+      "description": "戦闘中に使う。このターン、すべての端子の出目の条件を無視して挿せる。",
+      "flavorText": "",
+      "category": "Consumable",
+      "rarity": "BRONZE",
+      "basePrice": 5,
+      "consFamily": "tactic",
+      "tier": 1
+    },
+    {
+      "id": "鎧割りの酸瓶",
+      "name": "鎧割りの酸瓶",
+      "description": "戦闘中に使う。この戦闘中、敵の防御を 12 下げる（下限 0）。",
+      "flavorText": "",
+      "category": "Consumable",
+      "rarity": "SILVER",
+      "basePrice": 6,
+      "consFamily": "tactic",
+      "tier": 1
+    },
+    {
+      "id": "急所突きの針",
+      "name": "急所突きの針",
+      "description": "戦闘中に使う。次の 1 撃は必ず会心になり、敵の防御を無視する。",
+      "flavorText": "",
+      "category": "Consumable",
+      "rarity": "SILVER",
+      "basePrice": 6,
+      "consFamily": "tactic",
+      "tier": 1
+    },
+    {
+      "id": "目盛り削りの鑿",
+      "name": "目盛り削りの鑿",
+      "description": "戦闘中に使う。敵に 15 ダメージ。ボスの目盛りは通常攻撃として割れる（ひびの入った目盛りも満額のダウンに割れる）。",
+      "flavorText": "",
+      "category": "Consumable",
+      "rarity": "SILVER",
+      "basePrice": 7,
+      "consFamily": "tactic",
+      "tier": 1
+    },
+    {
+      "id": "反転の砂",
+      "name": "反転の砂",
+      "description": "戦闘中に使う。エスカレーションの段階を 1 つ戻す（段階 0 のときは、次のターンに段階が進まない）。",
+      "flavorText": "",
+      "category": "Consumable",
+      "rarity": "GOLD",
+      "basePrice": 8,
+      "consFamily": "tactic",
+      "tier": 1
+    },
+    {
+      "id": "倍化の共鳴玉",
+      "name": "倍化の共鳴玉",
+      "description": "戦闘中に使う。このターン、挿した端子がすべて 2 回働く。",
+      "flavorText": "",
+      "category": "Consumable",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "consFamily": "tactic",
+      "tier": 1
+    },
+    {
+      "id": "複製の水銀",
+      "name": "複製の水銀",
+      "description": "戦闘中に使う。手札の端子を 1 枚選び、この戦闘中だけ、その写しを 2 枚手札に加える（使い捨ても写せる）。",
+      "flavorText": "",
+      "category": "Consumable",
+      "rarity": "LEGENDARY",
+      "basePrice": 10,
+      "consFamily": "tactic",
+      "tier": 1
+    },
+    {
       "id": "囮罠",
       "name": "囮罠",
       "description": "マップで使う。今いる点に仕掛けると、近くの追跡者の気を引き、踏んだ追跡者を2ターン足止めする。8ターンで効果が切れる。",
@@ -2522,6 +2610,47 @@
       "basePrice": 10,
       "skill": "防人の軍標",
       "axis": "シールド"
+    },
+    {
+      "id": "帯革の薬嚢",
+      "name": "帯革の薬嚢",
+      "description": "戦闘中に消耗品を使うたび、端子を 1 枚引いて手札に加え、シールド +6",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "BRONZE",
+      "basePrice": 7,
+      "skill": "帯革の薬嚢"
+    },
+    {
+      "id": "使い切りの矜持",
+      "name": "使い切りの矜持",
+      "description": "消耗品を使ったターン、与ダメージ +25%",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "skill": "使い切りの矜持"
+    },
+    {
+      "id": "底抜けの小瓶",
+      "name": "底抜けの小瓶",
+      "description": "戦闘で最初に使った消耗品は消費されず、その戦闘中にもう 1 回使える（1 戦闘 1 回・もう 1 回使わなければ戦闘の終わりに消える）",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "底抜けの小瓶"
+    },
+    {
+      "id": "行商人の見本箱",
+      "name": "行商人の見本箱",
+      "description": "店の戦術消耗品の値段 −50%。戦闘の始めに消耗品を 1 つも持っていなければ、BRONZE か SILVER の戦術消耗品を 1 つ得る（その戦闘の間だけ）",
+      "flavorText": "",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "行商人の見本箱",
+      "axis": "金"
     },
     {
       "id": "鋲の胸当て",

@@ -1117,8 +1117,13 @@ namespace CombatSystem
                     ctx.fixedDamageToEnemy = 0;
                     ctx.outgoingDamageMultiplier = hitPool; ctx.criticalMultiplier = hitCritMul; ctx.critRatePctAdd = hitCritAdd;
                 }
+                // 戦術消耗品〈急所突きの針〉(2026-11-20): 攻撃のある最初の撃は必ず会心・敵の防御を無視 (この撃だけ・貫通は撃の後に戻す)
+                bool needle = TakeTacticNeedle(ctx, h, h < hitBases.Count);
+                int needlePen = ctx.playerArmorPen;
+                if (needle) { ctx.forceCritThisHit = true; ctx.playerArmorPen += DefenseFormula.IgnoreAll; Debug.Log("[急所突きの針] この撃は必ず会心・敵の防御を無視"); }
                 var (d, f, c) = psm.ProcessDamage(h < hitBases.Count ? hitBases[h] : 0, h == 0 ? ctx.pursuitDamage : 0, playerCritBaseRate);
                 d = ApplyWinDamageModifiers(d, ref f, ref c, lbStage, psm, ctx);
+                if (needle) ctx.playerArmorPen = needlePen;
                 if (h == 0) { afterPool = ctx.outgoingDamageMultiplier; afterCritMul = ctx.criticalMultiplier; afterCritAdd = ctx.critRatePctAdd; }
                 hitDealt.Add(d); hitCrit.Add(c);
                 dealtDmg += d; dealtFixed += f; isCrit |= c;
