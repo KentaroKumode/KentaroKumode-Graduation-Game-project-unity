@@ -251,12 +251,18 @@ namespace AutoTest.EditorTools
             var cur = new List<string>();
             foreach (var raw in File.ReadAllLines(path, Encoding.UTF8))
             {
-                if (raw.Trim() == "---") { _queue.Add(cur.ToArray()); cur = new List<string>(); }
+                if (raw.Trim() == "---") { AddArmIfAny(cur); cur = new List<string>(); }
                 else cur.Add(raw);
             }
-            _queue.Add(cur.ToArray());
+            AddArmIfAny(cur);   // 最後の「---」の後ろが空なら足さない (2026-11-20: 空の腕が既定の設定 = Optimal・5,000 ランで走っていた)
             Debug.Log($"[V3] キュー {_queue.Count} 本");
             LaunchNextQueued();
+        }
+
+        /// <summary>注釈 (#) と空行しか無い腕は足さない。</summary>
+        private static void AddArmIfAny(List<string> lines)
+        {
+            foreach (var l in lines) { string t = l.Trim(); if (t.Length > 0 && !t.StartsWith("#")) { _queue.Add(lines.ToArray()); return; } }
         }
 
         private static void LaunchNextQueued()
