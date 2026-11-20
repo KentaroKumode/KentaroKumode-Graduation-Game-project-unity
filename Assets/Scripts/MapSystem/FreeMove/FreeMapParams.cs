@@ -108,6 +108,10 @@ namespace MapSystem.FreeMove
         public const double StormOffsetMin = 0.3, StormOffsetMax = 0.7;
         /// <summary>嵐の中の点へ動く (・嵐の中で待つ / 偵察する) たびに払う HP。</summary>
         public const int StormHp = 3;
+        /// <summary>深さ 1 (画面の第 1 層) だけの嵐の HP (2026-11-20・docs/system-overhaul-spec.md §4-3・1 層の死の半分が嵐の中を歩いて HP が尽きた死だったため 3 → 2)。</summary>
+        public const int StormHpDepth1 = 2;
+        /// <summary>深さ <paramref name="depth"/> の、 嵐の中の点へ動く (・嵐の中で待つ / 偵察する) たびに払う HP (雹の上乗せは別)。</summary>
+        public static int StormHpAt(int depth) => depth == 1 ? StormHpDepth1 : StormHp;
         /// <summary>落石のような雹の嵐: 嵐の中の点への 1 歩の HP の追加。</summary>
         public const int StormHailHp = 1;
         /// <summary>削る砂の嵐: 嵐の中の点への 1 歩の物資の追加 (確定・乱数を引かない)。</summary>
@@ -143,6 +147,10 @@ namespace MapSystem.FreeMove
         /// 深さ 6 のその増え方は 1 手番あたり 1.04 (案 B の測定・Super・ボスに着いた 6,199 層・層ごとの中央 1.06) → 3 手番 ≈ 3 ポイント。
         /// 崩れ始めた後の動きは前と同じで、 嵐の全体が約 3 手番遅れる (GAME.md §5-12)。 手番の時計 (stormClock = Turns・測定の口) の <see cref="Storm.QuietTurns"/> は変えていない。</summary>
         public const int InstabilityDepth6Start = 12;
+        /// <summary>深さ 1 (画面の第 1 層) だけの崩れ始める境目 (2026-11-20・docs/system-overhaul-spec.md §4-3・15 → 20)。 段の長さ (15・15・5) は変えないので、 後の境目も 5 ずつ遅れる (35・50・55)。</summary>
+        public const int InstabilityDepth1Phase1At = 20;
+        /// <summary>深さ <paramref name="depth"/> の崩れ始める境目 (累計)。</summary>
+        public static int InstabilityPhase1AtOf(int depth) => depth == 1 ? InstabilityDepth1Phase1At : InstabilityPhase1At;
 
         // ── 縄張り ─────────────────────────────────────────────
         public const int TerritoryMin = 7;

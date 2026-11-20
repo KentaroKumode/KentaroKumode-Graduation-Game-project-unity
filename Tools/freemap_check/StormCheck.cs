@@ -453,6 +453,29 @@ static partial class T
                 ok &= s.InFight || (hp2 - w.Hp == wantHp && p2 == w.Provision && s.Turn == t2);
             }
             Check(ok, $"嵐: 嵐の中の点への 1 歩は HP −{FreeMapParams.StormHp} (雹 −{FreeMapParams.StormHp + FreeMapParams.StormHailHp}・砂は物資 +{FreeMapParams.StormSandSupply}・雪は 2 手番で時計も 2)・待つも −{FreeMapParams.StormHp}・近道でも HP は払う ({string.Join(" / ", notes)})");
+            // 深さ 1 だけ嵐の HP は 2 (2026-11-20・FreeMapParams.StormHpAt)
+            {
+                var w1 = new Wallet { Provision = 100, Hp = 1000 };
+                var s1 = MakeStorm(11, 1, w1, WeatherKind.None);
+                s1.ShiftFront(FreeMapParams.StormQuietTurns + Storm.Phase4Start);
+                int j1 = s1.Neighbors(s1.Me).First(v => v != s1.Layout.goal);
+                int h1 = w1.Hp; s1.MoveTo(j1);
+                int h2 = w1.Hp; if (!s1.InFight) s1.Wait();
+                Check(s1.StormPhase == 4 && (s1.InFight || (h1 - h2 == FreeMapParams.StormHpDepth1 && h2 - w1.Hp == FreeMapParams.StormHpDepth1)),
+                      $"嵐: 深さ 1 は 1 歩・待つとも HP −{FreeMapParams.StormHpDepth1} (歩く {h1 - h2}・待つ {h2 - w1.Hp})");
+            }
+            // 〈油布の靴〉(hailHpCut 1・2026-11-20): 雹の嵐の 1 歩は HP −1 少ない (待つは変わらない)
+            {
+                var wb = new Wallet { Provision = 100, Hp = 1000 };
+                var sb = MakeStorm(11, 5, wb, WeatherKind.Hail);
+                sb.SetPerks(new FreeMapPerks { hailHpCut = 1 });
+                sb.ShiftFront(FreeMapParams.StormQuietTurns + Storm.Phase4Start);
+                int jb = sb.Neighbors(sb.Me).First(v => v != sb.Layout.goal);
+                int want = FreeMapParams.StormHp + FreeMapParams.StormHailHp - 1;
+                bool same = sb.StormHpFor(jb) == want && sb.HpLossFor(jb) == want;
+                int hb = wb.Hp; sb.MoveTo(jb);
+                Check(same && (sb.InFight || hb - wb.Hp == want), $"嵐: 〈油布の靴〉は雹の嵐の 1 歩を HP −{want} にする (払った {hb - wb.Hp})");
+            }
             // 嵐の外の点では払わない・終点 (ボス) へは払わない
             var w2 = new Wallet { Provision = 100, Hp = 1000 };
             var s2 = MakeStorm(12, 3, w2);
