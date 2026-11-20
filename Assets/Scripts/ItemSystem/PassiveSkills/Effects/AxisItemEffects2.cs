@@ -174,7 +174,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (Rw.PlayerHit(ctx) && Rw.OncePerTurn(ctx, "ax2.flintNeedle")) ctx.AddCharge(1);
+            if (Rw.PlayerHit(ctx)) ctx.AddCharge(1);
         }
     }
 
@@ -201,7 +201,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>絶縁の外套: 過充電の間、 ターンの始めにシールド +4 (2026-11-10・#40: 旧「受けるダメージ −3」。 充電軸に被ダメ −N が寄りすぎていた)。</summary>
+    /// <summary>絶縁の外套: 過充電の間、 ターンの始めにシールド +2 (2026-11-20: 旧 +4・2026-11-10・#40: 旧「受けるダメージ −3」。 充電軸に被ダメ −N が寄りすぎていた)。</summary>
     public class InsulatedCloak : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "絶縁の外套";
@@ -210,7 +210,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (ctx.IsOvercharged()) Rw.Shield(ctx, 4, "絶縁の外套");
+            if (ctx.IsOvercharged()) Rw.Shield(ctx, 2, "絶縁の外套");
         }
     }
 
@@ -227,7 +227,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>雷鳴の太鼓: 電流 1 につき充電の上限 +3 (2026-11-07: 旧 +2)。</summary>
+    /// <summary>雷鳴の太鼓: 電流 1 につき充電の上限 +2 (2026-11-19: +3 → +2・〈雷壷〉と掛け合わさって充電が 150 まで溜まった)。</summary>
     public class ThunderDrum : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "雷鳴の太鼓";
@@ -235,7 +235,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.AxisDepth(AxisRules.Charge) > 0);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-            => ctx.chargeCapBonus = System.Math.Max(ctx.chargeCapBonus, 3 * ctx.AxisDepth(AxisRules.Charge));
+            => ctx.chargeCapBonus = System.Math.Max(ctx.chargeCapBonus, 2 * ctx.AxisDepth(AxisRules.Charge));
     }
 
     // ============================================================
@@ -249,7 +249,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (Rw.PlayerHit(ctx) && Rw.OncePerTurn(ctx, "ax2.chipped")) ctx.AddEnemyBleed(1);
+            if (Rw.PlayerHit(ctx)) ctx.AddEnemyBleed(1);
         }
     }
 
@@ -273,7 +273,7 @@ namespace ItemSystem.PassiveSkills.Effects
         {
             int mn = Ax2.Count(ctx, MutualKeys.AttackDiceMin);
             if (!Rw.PlayerHit(ctx) || mn < 1 || mn > 2) return;
-            if (Rw.OncePerTurn(ctx, "ax2.riftWedge")) ctx.AddEnemyBleed(3);
+            ctx.AddEnemyBleed(3);
         }
     }
 
@@ -344,7 +344,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (Rw.PlayerHit(ctx) && Rw.OncePerTurn(ctx, "ax2.needleRing")) Rw.Poison(ctx, Ax2.Count(ctx, MutualKeys.AttackDiceCount));
+            if (Rw.PlayerHit(ctx)) Rw.Poison(ctx, Ax2.Count(ctx, MutualKeys.AttackDiceCount));
         }
     }
 
@@ -400,35 +400,37 @@ namespace ItemSystem.PassiveSkills.Effects
     //  シールド (4)
     // ============================================================
 
-    /// <summary>鋲の胸当て: ターン開始時シールド +6 (2026-11-07: 旧 +2)。</summary>
+    /// <summary>鋲の胸当て: ターン開始時シールド +1 (2026-11-20: 旧 +6・2026-11-07: 旧 +2)。</summary>
     public class RivetPlate : IPassiveSkillEffect
     {
         public string SkillId => "鋲の胸当て";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => Rw.Shield(ctx, 6, SkillId);
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => Rw.Shield(ctx, 1, SkillId);
     }
 
-    /// <summary>受け太刀の籠手: ブロックで敵の攻撃を受けきったターン、 シールド +10 (2026-11-07: 旧 +4)。</summary>
+    /// <summary>受け太刀の籠手: ブロックで敵の攻撃を受けきったターン、 シールド +3 (2026-11-20: 旧 +10・2026-11-07: 旧 +4)。</summary>
     public class CatchBracer : IPassiveSkillEffect
     {
         public string SkillId => "受け太刀の籠手";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (Ax2.BlockedAll(ctx)) Rw.Shield(ctx, 10, SkillId);
+            if (Ax2.BlockedAll(ctx)) Rw.Shield(ctx, 3, SkillId);
         }
     }
 
-    /// <summary>重ね札の盾: シールドが 8 以上の間、 受けるダメージ −5 (2026-11-07: 旧 10 以上・−2 → −3 → −5)。</summary>
+    /// <summary>重ね札の盾: シールドが 8 以上の間、 受けるダメージ −2 (2026-11-20: 旧 −5・2026-11-07: 旧 10 以上・−2 → −3 → −5)。
+    /// 敵の攻撃を受けるその時のシールドで判定する (2026-11-20: 旧 ターンの頭に 1 回だけ判定し、 途中で 8 を切っても残っていた)。</summary>
     public class LayeredTagShield : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "重ね札の盾";
         /// <summary>秘宝の列 (#320) の見え方。</summary>
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.consShield >= 8);
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreReceiveDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (ctx.consShield >= 8) ctx.playerFlatDamageReduction += 5;
+            if (ctx.playerWonRoll || ctx.finalDamage <= 0 || ctx.consShield < 8) return;
+            ctx.finalDamage = System.Math.Max(0, ctx.finalDamage - 2);
         }
     }
 

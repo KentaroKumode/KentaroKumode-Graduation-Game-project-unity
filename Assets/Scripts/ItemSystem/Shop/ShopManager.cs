@@ -555,6 +555,14 @@ namespace ItemSystem.Shop
 
             // Tier重みで抽選 (武器は専用重みで T4 を超レア化)
             var weights = (kind == ShopSlotKind.Weapon) ? weaponTierWeights : tierWeights;
+            // 呪物の賽 (ADR-0016): 秘宝の枠は LEGENDARY の重み ×3 (他のレア度の重みはそのまま)
+            float legMul = kind == ShopSlotKind.Passive ? CombatSystem.DiePassives.LegendaryOfferMul(GameLoop.GameManager.Instance?.Run) : 1f;
+            if (legMul != 1f)
+            {
+                weights = ((ItemRarity, float)[])weights.Clone();
+                for (int i = 0; i < weights.Length; i++)
+                    if (weights[i].rarity == ItemRarity.LEGENDARY) weights[i].weight *= legMul;
+            }
             ItemRarity targetRarity = RollTier(pool, weights);
             var byTier = pool.FindAll(it => it.rarity == targetRarity);
 

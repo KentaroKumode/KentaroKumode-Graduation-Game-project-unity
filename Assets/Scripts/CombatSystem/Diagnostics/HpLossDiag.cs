@@ -60,6 +60,8 @@ namespace CombatSystem
         {
             // 大罪:怠惰 (2026-11-11) /〈徒労〉の戦闘のデバフ (2026-11-14): プレイヤーが敵に与えるダメージを全部 −N% (重なったら厳しい方)。 ここは CombatManager が敵の HP を減らす唯一の口。
             //   主攻撃 ("通常攻撃") は倍率の後・敵の防御の前に掛け済み (ApplyWinDamageModifiers) なので二重に掛けない。
+            // 最終与ダメージ倍率 (2026-11-20・§23-32) も同じ扱い (主攻撃は ApplyWinDamageModifiers で掛け済み)
+            if (channel != "通常攻撃") dmg = ItemSystem.PassiveSkills.Keywords.Kw.ApplyFinalDamageNow(dmg);
             if (channel != "通常攻撃") dmg = MetaProgression.MetaDebuffApplicator.ApplyOutgoingCut(dmg);
             // ボスのダウン (2026-11-13): 受けるダメージ ×1.5。 主攻撃は ApplyWinDamageModifiers で掛け済み (怠惰と同じ扱い)
             if (channel != "通常攻撃") dmg = BossDown.ApplyTakenNow(dmg);

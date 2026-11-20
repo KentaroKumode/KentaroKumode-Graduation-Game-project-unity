@@ -523,7 +523,9 @@ namespace EventSystem
                 if (ex.Count > 0) filtered = ex;
             }
 
-            var picked = ItemSystem.RarityWeightedPicker.Pick(filtered);
+            // 呪物の賽: イベントの秘宝は LEGENDARY の重み ×3 (ADR-0016)
+            float legMul = category == ItemCategory.Passive ? CombatSystem.DiePassives.LegendaryOfferMul(run ?? GameLoop.GameManager.Instance?.Run) : 1f;
+            var picked = ItemSystem.RarityWeightedPicker.Pick(filtered, null, 0f, legMul);
             return picked?.internalName;
         }
 

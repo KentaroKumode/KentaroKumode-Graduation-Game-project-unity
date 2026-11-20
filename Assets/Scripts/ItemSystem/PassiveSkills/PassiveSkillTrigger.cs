@@ -102,5 +102,7 @@ namespace ItemSystem.PassiveSkills
         OnBleedConsume,
         /// <summary>敵の出血が 0 になった。</summary>
         OnBleedZero,
+        /// <summary>超臨界爆発 (閾値を引く前の臨界が閾値の 2 倍以上・2026-11-20・§23-32)。 OnRinkaiBurst の直後に配る (量 = その爆発のダメージ)。</summary>
+        OnSuperBurst,
     }
 }

@@ -149,6 +149,17 @@ namespace AutoTest.EditorTools
                 overrides: new Dictionary<string, string> { ["useIttBeta"] = "True", ["lockWeaponFamily"] = "True" });
         }
 
+        /// <summary>[小規模テスト 2026-11-20] ITT (Super の方策) を 500 ランだけ回す。 本走の前に例外・新しい品の扱いを確かめる口。
+        /// 序列は itt_clear.smoke.json へ書く (本番の序列を上書きしない)。 itt_effects.json などの共通のファイルは書き換わるので、 回す前に退避して後で戻すこと。</summary>
+        [MenuItem("Tools/AutoRun/診断: ITT 並列 (Super の方策) 小規模テスト 500ラン", priority = 14)]
+        private static void LaunchIttSuperSmoke()
+        {
+            AutoTest.GrantItt.Variant = "smoke";
+            LaunchWith(0, AutoRunner.WiringSkill.Super, 500, itt: true,
+                overrides: new Dictionary<string, string> { ["useIttBeta"] = "True", ["lockWeaponFamily"] = "True",
+                    ["v3.mainCorr"] = "True", ["v3.readOutgoingMult"] = "-1", ["daybreakNextAttackPct"] = "1.5" });
+        }
+
         /// <summary>ITT (Super の方策) を 10,000 ラン × 20 回 = 合計 200,000 ラン (2026-11-10)。
         /// <b>回ごとにラン番号をずらす</b> (同じ割り当てを引き直さない) ・<b>割り当ては積み上げて合算</b>し、 回の終わりごとに
         /// 序列を作り直す (次の回はその序列で買う)。 精度は 20 万ラン 1 回と同じで、 買い方だけが途中で更新される。
@@ -240,12 +251,18 @@ namespace AutoTest.EditorTools
             var cur = new List<string>();
             foreach (var raw in File.ReadAllLines(path, Encoding.UTF8))
             {
-                if (raw.Trim() == "---") { _queue.Add(cur.ToArray()); cur = new List<string>(); }
+                if (raw.Trim() == "---") { AddArmIfAny(cur); cur = new List<string>(); }
                 else cur.Add(raw);
             }
-            _queue.Add(cur.ToArray());
+            AddArmIfAny(cur);   // 最後の「---」の後ろが空なら足さない (2026-11-20: 空の腕が既定の設定 = Optimal・5,000 ランで走っていた)
             Debug.Log($"[V3] キュー {_queue.Count} 本");
             LaunchNextQueued();
+        }
+
+        /// <summary>注釈 (#) と空行しか無い腕は足さない。</summary>
+        private static void AddArmIfAny(List<string> lines)
+        {
+            foreach (var l in lines) { string t = l.Trim(); if (t.Length > 0 && !t.StartsWith("#")) { _queue.Add(lines.ToArray()); return; } }
         }
 
         private static void LaunchNextQueued()
@@ -467,6 +484,11 @@ namespace AutoTest.EditorTools
             Directory.CreateDirectory(dst);
             foreach (string f in Directory.GetFiles(dst)) File.Delete(f);
             if (!Directory.Exists(_st.learningRoot)) return;
+            // 回帰のキャッシュ (regression_fit.txt) を、 写す前に親で今の csv に合わせておく (2026-11-20)。
+            //   古い鍵のまま写すと、 ワーカー 22 本が起動のたびに 376 MB の csv から計算し直す (1 本約 50 秒・ラウンドの頭が遅かった原因)。
+            //   入力が変わっていなければ親の中で即座に戻る (ItemRegression.Recompute の鍵の比較)。
+            try { AutoTest.ItemRegression.Recompute(_st.learningRoot); }
+            catch (Exception ex) { Debug.LogWarning("[学習並列] 回帰のキャッシュを作れなかった (ワーカーが各自で計算する): " + ex.Message); }
             foreach (string f in Directory.GetFiles(_st.learningRoot))
                 File.Copy(f, Path.Combine(dst, Path.GetFileName(f)), true);
         }

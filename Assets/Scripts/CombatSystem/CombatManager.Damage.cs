@@ -186,6 +186,9 @@ namespace CombatSystem
             // 端子の山札 (ADR-0014): 別枠の与ダメージの掛け算 (〈激昂〉〈共鳴〉)。 他の与ダメ% と足さずに掛ける。
             if (_termDamageMul != 1f && totalDmg > 0) totalDmg = Mathf.Max(1, Mathf.RoundToInt(totalDmg * _termDamageMul));
             totalDmg = EnemyHpLedger.ProbeMain(totalDmg);
+            // 最終与ダメージ倍率 (2026-11-20・GAME.md §23-32・〈防人の軍標〉): すべての倍率の後・敵の軽減パッシブと防御の前 (怠惰の直前)。
+            //   主攻撃以外は敵の HP を減らす口 (HpLossDiag.Lose) で掛ける
+            totalDmg = ItemSystem.PassiveSkills.Keywords.Kw.ApplyFinalDamage(ctx, totalDmg);
             // 大罪:怠惰 (挑戦カード IV・2026-11-11) /〈徒労〉の戦闘のデバフ (2026-11-14・GameHooks.ToilDamageDownPct・既定 50): 主攻撃の最終ダメージ −N%
             //   (すべての倍率の後・敵の防御の前)。 2 つが重なったら厳しい方 1 つ (BattleBoonRule.OutgoingCutPct)
             totalDmg = MetaProgression.MetaDebuffApplicator.ApplyOutgoingCut(totalDmg);   // 主攻撃以外は敵の HP を減らす口 (HpLossDiag.Lose) で掛ける
@@ -200,6 +203,13 @@ namespace CombatSystem
             int ledgerBeforeRed = totalDmg;   // [計装] 敵の軽減パッシブで削られた量
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnPreReceiveDamage);
             totalDmg = System.Math.Max(0, ctx.finalDamage);
+            // 〈血の楔〉(2026-11-20・§23-32): 敵の軽減パッシブで減った量のうち 出血 ÷ (出血 + 40) を戻す (効き目を弱める)
+            if (ctx.bleedWedge && ledgerBeforeRed > totalDmg)
+            {
+                int cut = ledgerBeforeRed - totalDmg;
+                int back = cut - ctx.WedgeEnemyGain(cut);
+                if (back > 0) { totalDmg += back; Debug.Log($"[血の楔] 敵の軽減 −{cut} のうち {back} を戻す (出血 {ctx.enemyBleedStacks}) → {totalDmg}"); }
+            }
             EnemyHpLedger.NoteMainEnemyReduction(ledgerBeforeRed, totalDmg);
             if (CombatStats.DiagWinAttack) CombatStats.Stage(8, totalDmg);   // 段 H
 
@@ -364,6 +374,17 @@ namespace CombatSystem
                 totalDmg = totalDmg / 2;
                 ctx.halveFirstEnemyAttack = false;
                 Debug.Log("[CombatManager] 共助発動: 敵の最初の攻撃を半減");
+            }
+
+            // 〈死相の面頬〉(2026-11-20・§23-32): 会心したターン、 そのターンの敵の攻撃を (会心倍率 − 1) × 20% 減らす (最大 −50%・切り捨てで減らす)
+            {
+                float maskCut = ItemSystem.PassiveSkills.Effects.DeathMaskVisor.CutNow(ctx);
+                if (maskCut > 0f && totalDmg > 0)
+                {
+                    int reduced = (int)(totalDmg * maskCut);
+                    totalDmg -= reduced;
+                    Debug.Log($"[死相の面頬] 会心したターン: 敵の攻撃 −{maskCut:P0} (−{reduced}) → {totalDmg}");
+                }
             }
 
             // 獣の絆: 被弾無効化チャージ消費

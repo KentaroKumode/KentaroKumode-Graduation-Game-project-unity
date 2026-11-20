@@ -82,7 +82,7 @@ namespace AutoTest
             int k = rolls.Length;
             var ws = WiredSums.None();
             // ---- 今ターンの合計と個数 (本体 CombatManager.Turn の「5. 配線」と同じく、 端子の結果から) ----
-            ws.aCount = o.attackDice; ws.bCount = o.blockDice;
+            ws.aCount = o.attackDice; ws.bCount = o.blockDice; ws.aHits = o.attackHits.Count;
             ws.aSum = o.attackAdd; ws.blockRaw = o.blockAdd; ws.chargeRaw = o.chargeAdd;
             for (int i = 0; i < k && i < o.kindOfDie.Length; i++)
                 if (o.kindOfDie[i] == DiceTerminal.Block && rolls[i] > ws.maxBlockDie) ws.maxBlockDie = rolls[i];
@@ -1340,6 +1340,13 @@ namespace AutoTest
             if (deck != null) foreach (var id in deck) { var k = TerminalCards.Get(id)?.kind; if (k == TerminalKind.Attack) atk++; else if (k == TerminalKind.Block) blk++; }
             float shareNow = total > 0 ? atk / (float)total : 0f, blkShareNow = total > 0 ? blk / (float)total : 0f;
             var want = PersonaTerminals(_currentPersona);
+            // [2026-11-20] 軸に寄せる方策 (buyAxisFocus): 寄せた軸の端子も「型に合う端子」に足す
+            if (!string.IsNullOrEmpty(buyAxisFocus))
+            {
+                var add = new List<string>(want);
+                foreach (var a in buyAxisFocus.Split(',', '、')) add.AddRange(PersonaTerminals(AxisPersona(a.Trim())));
+                want = add.ToArray();
+            }
             float threshold = RewardRejectBelow + RewardThresholdPerCard * Math.Max(0, total - RewardThresholdFreeSize);
 
             int best = -1; float bestScore = float.NegativeInfinity;
@@ -1453,6 +1460,21 @@ namespace AutoTest
                 if (cnt.TryGetValue(id, out int c) && c > most) { most = c; pick = id; }
             }
             return pick != null ? deck.IndexOf(pick) : -1;
+        }
+
+        /// <summary>items.json の軸の名前 → 端子の好みを引くペルソナ (軸に寄せる方策で使う)。</summary>
+        private static BuildPersona AxisPersona(string axis)
+        {
+            switch (axis)
+            {
+                case ItemSystem.PassiveSkills.AxisRules.Crit:   return BuildPersona.Crit;
+                case ItemSystem.PassiveSkills.AxisRules.Bleed:  return BuildPersona.Bleed;
+                case ItemSystem.PassiveSkills.AxisRules.Poison: return BuildPersona.Poison;
+                case ItemSystem.PassiveSkills.AxisRules.Heat:   return BuildPersona.Rinkai;
+                case ItemSystem.PassiveSkills.AxisRules.Charge: return BuildPersona.Charge;
+                case ItemSystem.PassiveSkills.AxisRules.Shield: return BuildPersona.Shield;
+                default: return BuildPersona.RawTier;
+            }
         }
 
         /// <summary>ビルドの型に合う端子 (規則 2)。 軸の端子は偏重の点で別に上がるので、 ここは軸の外の相性。</summary>

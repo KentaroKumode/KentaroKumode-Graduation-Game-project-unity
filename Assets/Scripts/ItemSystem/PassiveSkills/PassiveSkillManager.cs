@@ -225,8 +225,8 @@ namespace ItemSystem.PassiveSkills
         public void BeginCombat(int playerMaxHP, int enemyMaxHP = 0, int playerDiceMax = 6, int enemyDiceMax = 6, int enemyThreat = 0)
         {
             context = new CombatContext(playerMaxHP, enemyMaxHP, enemyThreat);
-            // 誓約の封じは、 戦闘開始時に入る資源 (遺物の開幕・臨界の持ち越し・品の OnBattleStart) より前に立てる (2026-11-07)。
-            Effects.OathSeals.Apply(context, GameLoop.GameManager.Instance?.Run);
+            // 〈一点読みの片眼〉の代価の印 (戦闘の情報を作った直後・品の OnBattleStart より前)
+            Effects.PinpointEye.ApplyCost(context, GameLoop.GameManager.Instance?.Run);
 
             // ダイス設定値を設定
             context.playerDiceMax = playerDiceMax;
@@ -422,18 +422,32 @@ namespace ItemSystem.PassiveSkills
         /// <summary>連鎖の深さと、 この連鎖で既に働いた品 (2026-10-31 アイテム再編)。</summary>
         private int _kwDepth;
         private readonly HashSet<string> _kwFired = new HashSet<string>();
+        /// <summary>[計装 2026-11-19] 連鎖の深さの最大 / 同じ品が 1 つの連鎖で 2 度以上働いた回数 / 網に掛かった回数。 BOT がランの始めに 0 へ戻す。</summary>
+        public static int ChainMaxDepth, ChainRepeats, ChainGuardHits;
+        /// <summary>[計装 2026-11-19] いちばん深くなった時の並び (「出来事:品(量) → …」)。 BOT がランの始めに空にする。</summary>
+        public static string ChainDeepestPath = "";
+        private readonly List<string> _kwPath = new List<string>();
+        /// <summary>不具合の網 (遊びの決まりではない): 連鎖がこの深さに達したら、 そこで止めてエラーを出す。 正しく作られた品なら届かない深さ。</summary>
+        public const int ChainGuardDepth = 200;
 
         /// <summary>キーワードの出来事を配る。 量は <see cref="Keywords.Kw.EventAmount"/> で読める。
         ///
-        /// <para><b>1 つの出来事から続く一続き (連鎖) の中では、 同じ品は 1 度しか働かない。</b>
-        /// 出来事の処理中に起きた出来事は同じ連鎖として数え、 いちばん外の出来事が終わったら数え直す。
-        /// これが無いと「爆発 → 充電 → 臨界 → 爆発」のような輪が 1 拍の中で回り続ける。</para></summary>
+        /// <para>同じ品が 1 つの連鎖で何度働いてもよい (2026-11-19・作者の決定で旧い決まり「同じ品は 1 つの連鎖で 1 度だけ」を削除)。
+        /// 書かれていない決まりで止めず、 輪は品の文の制限 (回数・割合・資源を使い切る) だけで止める。
+        /// 2026-11-19 の測定 (① を外した 4,300 ラン) で、 今の品では止まらない輪は出なかった。 <see cref="ChainGuardDepth"/> は不具合の網。</para></summary>
         public void RaiseKeyword(PassiveSkillTrigger trigger, int amount)
         {
             if (context == null || amount <= 0) return;
             if (!activeSkillsByTrigger.TryGetValue(trigger, out var skills) || skills.Count == 0) return;
             if (_kwDepth == 0) _kwFired.Clear();
+            if (_kwDepth >= ChainGuardDepth)
+            {
+                ChainGuardHits++;
+                Debug.LogError($"[PassiveSkillManager] 連鎖が {ChainGuardDepth} 段に達した ({trigger})。 止まらない輪を作る品の組み合わせがある (不具合)");
+                return;
+            }
             _kwDepth++;
+            if (_kwDepth > ChainMaxDepth) { ChainMaxDepth = _kwDepth; ChainDeepestPath = string.Join(" → ", _kwPath) + " → " + trigger + "(" + amount + ")"; }
             float prevAmount = context.GetAccumulated(Keywords.Kw.AmountKey);
             try
             {
@@ -442,11 +456,12 @@ namespace ItemSystem.PassiveSkills
                 for (int i = 0; i < list.Length; i++)
                 {
                     var s = list[i];
-                    if (!_kwFired.Add(s.SkillId)) continue;
+                    if (!_kwFired.Add(s.SkillId)) ChainRepeats++;   // 計装だけ (止めない)
                     context.accumulatedValues[Keywords.Kw.AmountKey] = amount;
                     try
                     {
                         CombatContext.CurrentSkillId = s.SkillId;
+                        _kwPath.Add(trigger + "(" + amount + "):" + s.SkillId);
                         bool probe = RelicFireProbe.Active && RelicFireProbe.Wants(s); ulong fp = probe ? RelicFireProbe.Take(context) : 0;      // 秘宝の発動の表示 (#320)
                         s.Execute(trigger, context);
                         if (probe) RelicFireProbe.After(s.SkillId, fp, context);
@@ -457,6 +472,7 @@ namespace ItemSystem.PassiveSkills
                     {
                         Debug.LogError($"[PassiveSkillManager] Error in skill '{s.SkillId}' ({trigger}): {e.Message}");
                     }
+                    finally { if (_kwPath.Count > 0) _kwPath.RemoveAt(_kwPath.Count - 1); }
                 }
             }
             finally
@@ -643,8 +659,6 @@ namespace ItemSystem.PassiveSkills
             // 末那識など: 会心強制（乱数・会心率capを無視して確定）
             // **敵の攻撃には効かせない** ── forceCritical もプレイヤー側のフラグ。
             if (context.forceCritical && !attackerIsEnemy) context.isCritical = true;
-            // 誓約の封じ (〈赤錆の誓約〉): 会心確定の効果より後に落とす (2026-11-07)。
-            if (context.critSealed && !attackerIsEnemy) context.isCritical = false;
 
             if (context.isCritical && totalDamage > 0)
             {
@@ -666,6 +680,7 @@ namespace ItemSystem.PassiveSkills
                     && GameLoop.GameRng.Value("PassiveSkillManager.critStack") < context.lastCritAddPct - 1f)
                     effCritMul += 1f;
                 totalDamage = (int)(totalDamage * effCritMul);
+                if (!attackerIsEnemy) context.accumulatedValues[Keywords.Kw.LastCritMulKey] = effCritMul;   // 〈天眼の鍔〉が読む (2026-11-20)
                 // [診断] 会心倍率は 3.0 固定ではない (メタ精密 r10 の逓減還元・一点集中 等)。
                 // 実測の平均を取らないと会心係数を 1+p×2 で見積もれない。
                 if (diag) { CombatSystem.CombatStats.Stage(16, context.criticalMultiplier); CombatSystem.CombatStats.Stage(17, 1); }

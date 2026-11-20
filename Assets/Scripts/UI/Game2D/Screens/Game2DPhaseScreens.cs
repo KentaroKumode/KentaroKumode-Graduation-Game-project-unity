@@ -341,12 +341,11 @@ namespace UI.Game2D
             foreach (var s in shelf)
             {
                 var t = CombatSystem.TerminalCards.Get(s.id);
-                bool sealedAx = CombatSystem.TerminalCards.AxisSealedByRun(t, run);
                 d.Items.Add(new ModalItem
                 {
                     name = s.id, tone = t != null ? Game2DTerminalLook.KindColor(t.kind) : (Color32?)null,
                     value = s.sold ? "売切" : s.price + "G",
-                    desc = t != null ? Game2DTerminalLook.Marks(t, run) + "\n" + t.description + (sealedAx ? "\n誓約で封じられている" : "") : null,
+                    desc = t != null ? Game2DTerminalLook.Marks(t, run) + "\n" + t.description : null,
                     disabled = s.sold || s.price > run.coins,
                 });
             }
@@ -550,7 +549,7 @@ namespace UI.Game2D
                 d.Items.Add(new ModalItem
                 {
                     name = id, value = "×" + counts[id], tone = t != null ? Game2DTerminalLook.KindColor(t.kind) : (Color32?)null,
-                    desc = t != null ? Game2DTerminalLook.Describe(t, run) + (CombatSystem.TerminalCards.AxisSealedByRun(t, run) ? "\n誓約で封じられている" : "") : null,
+                    desc = t != null ? Game2DTerminalLook.Describe(t, run) : null,
                 });
             }
             if (names.Count == 0) d.body = "山札は空。";

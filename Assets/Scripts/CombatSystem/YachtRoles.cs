@@ -81,16 +81,20 @@ namespace CombatSystem
         /// 2 個そろい = ちょうど 2 つ、 ゾロ目 = 3 つ。 連なりの賽を持つ時だけ、 3 つの連番 (<see cref="RoleKind.Straight"/>) も役になる。</para></summary>
         /// <param name="faceIdx">使わない (呼び手の互換のため残す)。</param>
         /// <param name="tiers">使わない (呼び手の互換のため残す)。</param>
+        /// <summary>3 つの目が連番か (例 2・3・4)。 役〈連なり〉と、 連なりの賽の倍化 (TerminalCards.Resolve) が同じ判定を使う。</summary>
+        public static bool IsRun(int[] dice)
+        {
+            if (dice == null || dice.Length != 3) return false;
+            int a = dice[0], b = dice[1], c = dice[2];
+            int lo = System.Math.Min(a, System.Math.Min(b, c)), hi = System.Math.Max(a, System.Math.Max(b, c));
+            return a != b && b != c && a != c && hi - lo == 2;
+        }
+
         public static void Evaluate(int[] dice, int[] faceIdx, DiceFaceParts.Tier[] tiers, List<RoleKind> into)
         {
             if (into == null || dice == null || dice.Length < 2) return;
 
-            if (dice.Length == 3 && StraightsEnabled())
-            {
-                int a = dice[0], b = dice[1], c = dice[2];
-                int lo = System.Math.Min(a, System.Math.Min(b, c)), hi = System.Math.Max(a, System.Math.Max(b, c));
-                if (a != b && b != c && a != c && hi - lo == 2) { into.Add(RoleKind.Straight); return; }
-            }
+            if (StraightsEnabled() && IsRun(dice)) { into.Add(RoleKind.Straight); return; }
 
             for (int i = 0; i < dice.Length; i++)
             {

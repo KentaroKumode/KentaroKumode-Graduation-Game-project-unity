@@ -467,6 +467,8 @@ namespace GameLoop
         public int  stepsSinceBattle;
         /// <summary>〈天工開物〉: このランで武器・ダイスを強化した回数 (持っている間だけ数える)。 戦闘開始時の臨界 +5 × 回数。</summary>
         public int  heavenlyCraftUpgrades;
+        /// <summary>〈脈なしの鋼心臓〉の X: 戦闘開始時のシールド。 ランの始めに 10、 持っている間に戦闘に勝つたび +1 (2026-11-20)。</summary>
+        public int  pulselessHeartShield = ItemSystem.PassiveSkills.Effects.PulselessHeart.StartShield;
 
         /// <summary>次戦闘持ち越しバフをすべて消去（戦闘開始時にコピー後 or リセット時）。</summary>
         public void ClearPendingCombatConsumables()

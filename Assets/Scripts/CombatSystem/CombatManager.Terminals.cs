@@ -11,6 +11,9 @@ namespace CombatSystem
     {
         /// <summary>この戦闘の山札。 戦闘の始め (<see cref="BeginTerminalDeck"/>) に必ず作る (最初の戦闘の前だけ null)。</summary>
         private TerminalDeckState _deck;
+        /// <summary>[計装 2026-11-19] ランの中で最大の攻撃の端子の合計と、 その内訳。 BOT がランの始めに空にする。</summary>
+        public static int AttackSumMax;
+        public static string AttackSumMaxInfo = "";
         /// <summary>このターンの敵の出目 (夜番の賽が読む・ロールの直後に入れる)。</summary>
         private int[] _enemyDiceNow;
         /// <summary>このターンの端子の結果 (配線の前は null)。</summary>
@@ -130,9 +133,6 @@ namespace CombatSystem
             e.bursts = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.BurstTotalKey);
             e.axCrit = ctx.AxisDepth(AxisRules.Crit); e.axBleed = ctx.AxisDepth(AxisRules.Bleed); e.axPoison = ctx.AxisDepth(AxisRules.Poison);
             e.axHeat = ctx.AxisDepth(AxisRules.Heat); e.axCharge = ctx.AxisDepth(AxisRules.Charge); e.axShield = ctx.AxisDepth(AxisRules.Shield);
-            // 誓約の封じ (OathSeals.Apply が戦闘の始めに立てる)。 Resolve が同じ物を結果から落とす
-            e.sealPoison = ctx.poisonSealed; e.sealBleed = ctx.bleedSealed; e.sealHeat = ctx.heatSealed;
-            e.sealCharge = ctx.chargeSealed; e.sealShield = ctx.shieldSealed; e.sealCrit = ctx.critSealed;
             // 賽のパッシブ (ADR-0015・DiePassives)
             e.dieId = GameLoop.EquippedDie.IdOf(run);
             e.diceRerolled = ctx.rerollsThisTurn > 0;
@@ -162,7 +162,7 @@ namespace CombatSystem
                 ShieldDiag.Note("端子", o.shield);
             }
             if (o.poison > 0) ItemSystem.PassiveSkills.Effects.Rw.Poison(ctx, o.poison);
-            if (o.heat > 0) { ItemSystem.PassiveSkills.Keywords.Kw.EnableHeat(ctx); ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, o.heat); }
+            if (o.heat > 0) { ItemSystem.PassiveSkills.Keywords.Kw.EnableHeat(ctx); ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, o.heat, "端子"); }
             if (o.retreatStage) YachtRoleEffects.AddEscalationDelay(ctx, YachtRoleEffects.TurnsToRetreatOneStage(ctx));
             if (o.escalationDelay > 0)      // 時計の賽 (ADR-0015)
             {

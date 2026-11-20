@@ -229,8 +229,14 @@ namespace ItemSystem.PassiveSkills
         // 段が変わっても引き継がれる。
 
         /// <summary>[persistent] ヴェスカのシールド。 §6-3 段0 で **半減(切り捨て) → 抽選付与** の順に処理する。
-        /// 定常上限は「毎ターン収入 × 2」で自動的に決まるため別途キャップ不要。</summary>
-        public int vescaShield;
+        /// 定常上限は「毎ターン収入 × 2」で自動的に決まるため別途キャップ不要。
+        /// 挑戦カード〈敵のシールド〉もこの池。 <b>増えた分には〈血の楔〉(<see cref="WedgeEnemyGain"/>) が掛かる</b> (2026-11-20)。</summary>
+        public int vescaShield
+        {
+            get => _vescaShield;
+            set { if (value > _vescaShield) value = _vescaShield + WedgeEnemyGain(value - _vescaShield); _vescaShield = value; }
+        }
+        private int _vescaShield;
         /// <summary>[persistent] このターン、 ヴェスカのシールドが吸収したダメージ量。
         /// 返しの盾 / 不落の城盾 の反射量算出に使う。 遺物学者の OnTurnStart で 0 に戻す。</summary>
         public int vescaShieldAbsorbedThisTurn;
@@ -556,11 +562,6 @@ namespace ItemSystem.PassiveSkills
         /// 閾値 (RinkaiThreshold 基準50、LowerThreshold で下がる) 到達で 次T の攻撃に爆発ボーナス +RinkaiBurstDamage を付与し、0リセット。
         /// パッシブ「連鎖爆発」で爆発T会心確定、「不朽の熱」で致命耐え、「余熱」で爆発後20残し、等の派生あり。</summary>
         public int rinkaiMeter;
-        /// <summary>[persistent] 臨界爆発が予約されているか (前Tに meter 閾値到達で set)。
-        /// ProcessDamage が finalDamage += RinkaiBurstDamage を適用してから false に戻す。
-        /// 攻撃機会のない T (自撃破後等) を跨いでも予約は残る = 持続扱い。</summary>
-        public bool rinkaiBurstActive;
-
         /// <summary>[persistent] 直近ターンにプレイヤーが与えた総ダメージ。
         /// オーバーロードの発動判断 (「倍にすれば倒し切れるか」) にだけ使う。
         /// ctx は戦闘ごとに作り直されるので戦闘跨ぎでは残らない。</summary>
@@ -579,33 +580,24 @@ namespace ItemSystem.PassiveSkills
         // ---- 規則の品 (2026-10-31 アイテム再編)。 どれも戦闘開始時に品が立てる [persistent] ----
         /// <summary>[persistent] 〈帳簿外の爆薬〉: 爆発で臨界を 0 にせず閾値ぶんだけ減らし、 溜まっている限り何度でも爆発する。</summary>
         public bool rinkaiMultiBurst;
-        /// <summary>[persistent] 〈雷壷〉: 充電の上限が無くなる。 代わりにターン開始時、 上限を超えている分の半分が捨てられる (過充電)。</summary>
+        /// <summary>[persistent] 〈雷壷〉: 充電の上限が無くなる。 代わりにターン開始時、 上限を超えている分の 75% が捨てられる (過充電)。</summary>
         public bool chargeCapRemoved;
-        /// <summary>[persistent] 〈脈なしの鋼心臓〉: シールドがターン開始時に半減しない。</summary>
-        public bool shieldNoHalve;
         /// <summary>[persistent] 〈廃庭の霧吹き〉: 毒のダメージが、 ターン開始に加えて敵が攻撃するたびにも入る。</summary>
         public bool poisonTickOnEnemyAttack;
 
-        // ---- 誓約の封じ (2026-11-06 軸の品)。 [persistent] ----
-        //   **戦闘の情報を作った直後に、 所持品から立てる** (OathSeals.Apply)。 品の OnBattleStart で立てると、
-        //   遺物の開幕の毒・出血・充電と臨界の持ち越し (OnBattleStart より前) が漏れた (2026-11-07)。
-        //   封じは付与の入口 (AddStatus の毒 / AddEnemyBleed / Kw.AddHeat / AddCharge / consShield の setter / 会心の判定) だけで止める。
-        /// <summary>[persistent] 敵に毒を与えられない (AddStatus で捨てる)。</summary>
-        public bool poisonSealed;
-        /// <summary>[persistent] 敵に出血を与えられない (AddEnemyBleed で捨てる)。</summary>
-        public bool bleedSealed;
-        /// <summary>[persistent] 臨界が溜まらない (Kw.AddHeat で捨てる)。</summary>
-        public bool heatSealed;
-        /// <summary>[persistent] 充電を得られない (AddCharge で捨てる)。</summary>
-        public bool chargeSealed;
-        /// <summary>[persistent] シールドを得られない (consShield の setter で増加を捨てる)。</summary>
-        public bool shieldSealed;
-        /// <summary>[persistent] 会心が出ない (会心の判定の最後で落とす ── 会心確定の効果より後)。</summary>
-        public bool critSealed;
-        /// <summary>[persistent] 〈赤錆の誓約〉: 敵に与える出血が 2 倍。</summary>
-        public bool bleedDoubled;
-        /// <summary>[persistent] 〈雷精の誓約〉: 得る充電が 2 倍。</summary>
-        public bool chargeDoubled;
+        // ---- 軸の締めの LEGENDARY (2026-11-20・GAME.md §23-32) ----
+        /// <summary>[persistent・戦闘開始で 0] 最終与ダメージ倍率の上乗せ (%)。 すべての倍率 (会心・与ダメ % の池・端子の別枠) の後、
+        /// 敵の軽減パッシブと防御の前に ×(100 + これ)/100 で掛ける (<see cref="Keywords.Kw.ApplyFinalDamage"/>・大罪:怠惰と同じ位置)。 〈防人の軍標〉が積む。</summary>
+        public int finalDamagePct;
+        /// <summary>[persistent] 〈腐蝕の王冠〉: 敵の毒の上限 (99) が無くなる (AddStatus)。</summary>
+        public bool poisonCapRemoved;
+        /// <summary>[persistent] 〈血の楔〉: 敵が得るシールドと回復の量、 敵の被ダメ軽減のパッシブで減る量を 出血 ÷ (出血 + 40) だけ弱める (<see cref="WedgeEnemyGain"/>)。</summary>
+        public bool bleedWedge;
+        /// <summary>〈血の楔〉の割る数の足し分 (出血 ÷ (出血 + これ))。</summary>
+        public const int BleedWedgeK = 40;
+        /// <summary>〈血の楔〉: 敵の得る量 n を 40 ÷ (出血 + 40) 倍にする (切り捨て)。 品が無い・出血 0 なら素通し。</summary>
+        public int WedgeEnemyGain(int n)
+            => bleedWedge && n > 0 && enemyBleedStacks > 0 ? (int)((long)n * BleedWedgeK / (enemyBleedStacks + BleedWedgeK)) : n;
 
         // ---- 軸の ① 数を参照・②【規則】の品が立てる値 (2026-11-07)。 どれも戦闘開始時に品が書く [persistent] ----
         /// <summary>[persistent] 毒がダメージを出したあとに残る割合 (%)。 基準 50 (半減)。 〈瘴気〉の②で上がる。</summary>
@@ -619,10 +611,8 @@ namespace ItemSystem.PassiveSkills
         public float bleedDamagePct;
         /// <summary>[persistent] 臨界を得るたびの上乗せ (Kw.AddHeat)。 〈炉温〉の①。</summary>
         public int heatGainBonus;
-        /// <summary>[persistent] 〈炉温〉の②: 爆発に会心が乗る。 代わりに爆発の基礎が 15 + 炉温 / 2。</summary>
+        /// <summary>[persistent] 〈炉温〉の②: 爆発のたびに会心の判定をし、 会心なら会心倍率の半分が乗る (CombatManager.LandBurst)。 代わりに爆発の基礎が 15 + 炉温 / 2。</summary>
         public bool burstCritRule;
-        /// <summary>[persistent] 〈炉心の誓約〉: 爆発の基礎が 2 倍。</summary>
-        public bool burstDoubled;
         /// <summary>[decay] 爆発への上乗せ (〈二度詰めの雷管〉が爆発のたびに積み、 ターン開始時に 1/4 を失う)。</summary>
         public int burstStackBonus;
         /// <summary>[persistent] ターン開始の減衰で残るシールドへの上乗せ (% ポイント)。 〈堅牢〉の①。 残る割合は最大 80%。</summary>
@@ -675,11 +665,12 @@ namespace ItemSystem.PassiveSkills
         public float lastCritAddPct;
 
 
-        /// <summary>敵(自身)の回復量に enemyHealReductionPct を適用して返す（治癒阻害用）。</summary>
+        /// <summary>敵(自身)の回復量に enemyHealReductionPct と〈血の楔〉を適用して返す（治癒阻害用）。</summary>
         public int ReduceEnemyHeal(int heal)
         {
-            if (enemyHealReductionPct <= 0f || heal <= 0) return heal;
-            return (int)(heal * (1f - enemyHealReductionPct));
+            if (heal <= 0) return heal;
+            if (enemyHealReductionPct > 0f) heal = (int)(heal * (1f - enemyHealReductionPct));
+            return WedgeEnemyGain(heal);   // 〈血の楔〉(2026-11-20)
         }
 
 
@@ -719,14 +710,13 @@ namespace ItemSystem.PassiveSkills
         /// <summary>[perTurn] このターンに振り直した回数（無料を含む）。 BOT の 1 ターンあたりの上限判定に使う。
         /// BeginNewTurn の Phase B で 0。</summary>
         public int rerollsThisTurn;
-        /// <summary>[decay] 残シールド吸収量。 毎ターン頭 (T2 以降) に半減 (BeginNewTurn の Phase C・〈脈なしの鋼心臓〉で止まる)。
+        /// <summary>[decay] 残シールド吸収量。 毎ターン頭 (T2 以降) に半減 (BeginNewTurn の Phase C)。
         /// <b>増えたときに〈シールドが増えた〉出来事を配る</b> (2026-10-31)。 減らすのは吸収 (Kw.AbsorbShield) と半減と品の消費。</summary>
         public int consShield
         {
             get => _consShield;
             set
             {
-                if (shieldSealed && value > _consShield) value = _consShield;   // 誓約で封じた: 増加を捨てる
                 // 遺物 (§15-5): シールドの獲得量 +N% (堅牢の符・堅牢 2 個)。 増えた分にだけ掛ける (切り捨て)
                 if (value > _consShield)
                 {
@@ -737,7 +727,7 @@ namespace ItemSystem.PassiveSkills
                     if (MetaProgression.MetaDebuffApplicator.GetSinBlockCutPct() > 0f)
                         value = _consShield + (int)((value - _consShield) * (1f - MetaProgression.ChallengeCards.SinPrideShieldCutPct / 100f));
                     // [計装 2026-11-12・#95] 呼び出し側は頼んだ量だけを shieldGainedTotal へ足すので、 遺物の上乗せと傲慢の削りの差をここで足す
-                    //   (遺物なし・傲慢なしでは 0 ── 学習の条件では記録が変わらない)。 誓約の封じ (上の行) の分は従来どおり数えたまま。
+                    //   (遺物なし・傲慢なしでは 0 ── 学習の条件では記録が変わらない)。
                     shieldGainedTotal += value - asked;
                 }
                 int gained = value - _consShield;
@@ -836,7 +826,6 @@ namespace ItemSystem.PassiveSkills
         public void AddStatus(StatusTarget target, string id, int stacks)
         {
             if (stacks == 0 || string.IsNullOrEmpty(id)) return;
-            if (stacks > 0 && poisonSealed && target == StatusTarget.Enemy && id == "poison") return;   // 誓約で封じた
             // 2026-08-16: 〈回帰性真理〉のデバフ**付与拒否**は撤去した。
             //   毒/出血ビルドが最終ボスに参加できない状態になっていたため。
             //   累積の抑制は RecurrentTruth 側の「毎ターン半減」が担う。
@@ -850,6 +839,7 @@ namespace ItemSystem.PassiveSkills
             var dict = target == StatusTarget.Enemy ? enemyStatusStacks : playerStatusStacks;
             int cur = dict.TryGetValue(id, out var v) ? v : 0;
             int max = StatusRegistry.Defs.TryGetValue(id, out var def) ? def.maxStacks : int.MaxValue;
+            if (poisonCapRemoved && target == StatusTarget.Enemy && id == "poison") max = int.MaxValue;   // 〈腐蝕の王冠〉(2026-11-20)
             int next = System.Math.Max(0, System.Math.Min(max, cur + stacks));
             dict[id] = next;
             if (target == StatusTarget.Enemy && id == "poison" && stacks > 0)   // [計装 2026-11-05] 毒の付与量を出どころ別に
@@ -892,8 +882,7 @@ namespace ItemSystem.PassiveSkills
         /// 2026-08-16: 〈回帰性真理〉の付与拒否を撤去（累積抑制は毎ターン半減へ移行）。</summary>
         public void AddEnemyBleed(int stacks)
         {
-            if (stacks <= 0 || bleedSealed) return;   // 誓約で封じた
-            if (bleedDoubled) stacks *= 2;
+            if (stacks <= 0) return;
             enemyBleedStacks += stacks;
             if (enemyBleedStacks > GetAccumulated(Keywords.Kw.BleedMaxKey))
                 accumulatedValues[Keywords.Kw.BleedMaxKey] = enemyBleedStacks;   // 〈血車〉が読む
@@ -1150,8 +1139,8 @@ namespace ItemSystem.PassiveSkills
             burstStackBonus -= (burstStackBonus + 3) / 4;   // 〈二度詰めの雷管〉の上乗せは毎ターン 1/4 を失う (ヴェスカ 4 段で積み上がらない・端数は切り上げて減らす = 3 からも 0 へ減る・2026-11-15 #320)
             // プレイヤーのシールドは毎ターン半減 (切り捨て。 1 → 0 で確実に消える)。 ヴェスカのシールド規約と同じ (GAME.md §13-4)。
             // T1 は戦闘開始時の付与 (開幕シールド等) をそのまま使うので半減しない。 そのターンの付与は OnTurnStart 以降なので「半減 → 付与」の順になる。
-            // 〈脈なしの鋼心臓〉で止まる。 失った分を〈半減で失った〉出来事として配る (2026-10-31)。
-            if (currentTurn > 1 && _consShield > 0 && !shieldNoHalve)
+            // 失った分を〈半減で失った〉出来事として配る (2026-10-31)。
+            if (currentTurn > 1 && _consShield > 0)
             {
                 // 〈堅牢〉の①: 残る割合 50% + 上乗せ (最大 80%・2026-11-07)
                 // 遺物 (§15-5) 堅牢 3 個: +25%。 遺物の分だけは上限 90% まで (それ以外の上乗せは 80% のまま)
@@ -1165,14 +1154,14 @@ namespace ItemSystem.PassiveSkills
                 _consShield -= lost;
                 Keywords.Kw.Raise(this, PassiveSkillTrigger.OnShieldDecay, lost);
             }
-            // 〈雷壷〉: 上限を超えている充電の半分 (切り捨て) を捨てる。 捨てた分は過充電として配る。
+            // 〈雷壷〉: 上限を超えている充電の 75% (切り捨て・2026-11-19 半分 → 75%) を捨てる。 捨てた分は過充電として配る。
             if (chargeCapRemoved)
             {
                 int cap = ChargeCap;
                 int ch = GetCharge();
                 if (ch > cap)
                 {
-                    int leak = (ch - cap) / 2;
+                    int leak = (ch - cap) * 3 / 4;
                     if (leak > 0)
                     {
                         accumulatedValues["mutualCharge"] = ch - leak;
@@ -1308,10 +1297,9 @@ namespace ItemSystem.PassiveSkills
         /// (〈電流〉の① の毎ターンの分。 配ると〈十五年目の計測器〉が溢れを攻撃に換え、 余った資源で強さを買える穴になる)。</para>
         public void AddCharge(int n, bool raiseOverflow = true)
         {
-            if (n <= 0 || chargeSealed) return;   // 誓約で封じた
-            if (chargeDoubled) n *= 2;
+            if (n <= 0) return;
             int cur = GetCharge();
-            // 〈雷壷〉は上限を外す (超えた分はターン開始時に半分捨てる・BeginNewTurn の Phase C)。
+            // 〈雷壷〉は上限を外す (超えた分はターン開始時に 75% 捨てる・BeginNewTurn の Phase C)。
             int cap = chargeCapRemoved ? int.MaxValue : ChargeCap;
             int next = (int)System.Math.Min((long)cap, (long)cur + n);
             // [計装] 充電経済。 **上限で捨てられた分**を分けて数える ── 収入が支出を上回って

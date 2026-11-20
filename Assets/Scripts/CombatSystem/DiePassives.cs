@@ -12,8 +12,9 @@ namespace CombatSystem
     /// 墓標 = HP 0 からの踏みとどまり (CombatManager.TryLastStandRevive)。</para>
     ///
     /// <para><b>ほかの所にある賽</b>: 目利き = 振り直し (CombatManager.RerollPhase・残す目)・逆巻き = エスカレーションの段階 (ApplyRewind・Escalation.StageOffset)・
-    /// 繋ぎ = 残す印 (TerminalDeckState.KeepFromMarks)・時計 = 常設の〈時計〉の端子 (TerminalIds.Clock)・分け身 = 主攻撃を 2 回 (CombatManager.Turn)・
-    /// 連なり = 役〈連なり〉(YachtRoles / YachtRoleEffects)。 効果の数値はすべて仮の値 (items.json の説明文と同じ)。</para>
+    /// 繋ぎ = 残す印 (TerminalDeckState.KeepFromMarks)・時計 = 常設の〈時計〉の端子 (TerminalIds.Clock)・
+    /// 連なり = 役〈連なり〉(YachtRoles / YachtRoleEffects)。 呪物 = 店とイベントの秘宝の LEGENDARY の重み (<see cref="LegendaryOfferMul"/>) と
+    /// 秘宝を手に入れた時の最大 HP (<see cref="OnPassiveAcquired"/>)。 効果の数値はすべて仮の値 (items.json の説明文と同じ)。</para>
     ///
     /// <para><b>出目は書き換えない</b> (ADR-0015 の 2)。 ここは出目が決まって端子に挿された後の上乗せだけ。</para>
     /// </summary>
@@ -23,18 +24,36 @@ namespace CombatSystem
         public const int RustyNailMin = 5;
         /// <summary>渡し守: 振り直した後の目を攻撃に挿すと攻撃 +N。</summary>
         public const int FerryAttack = 2;
-        /// <summary>夜番: 防御に挿した目が敵の出目の最大より大きければシールド +N。</summary>
-        public const int NightWatchShield = 3;
+        /// <summary>夜番: 防御に挿した目が敵の出目の最大より大きければシールド +目 × N (2026-11-20: 旧 +3 固定)。</summary>
+        public const int NightWatchShieldPerPip = 2;
+        /// <summary>秤: 目がほかの 2 つの目の間の値なら、 挿した先に +N (2026-11-20: 旧 +1)。</summary>
+        public const int ScaleBonus = 3;
         /// <summary>残り火: 挿さずに捨てた目の何倍を次のターンの攻撃に足すか。</summary>
         public const int EmberMul = 2;
         /// <summary>拾い物: ①が出たターンの終わりにゴールド +N。</summary>
         public const int ScavengerGold = 1;
-        /// <summary>古銭: ⑧が出たターンに敵を倒すとゴールド +N。</summary>
-        public const int OldCoinGold = 3;
+        /// <summary>古銭: ⑧が出るたびゴールド +N (2026-11-20: 旧「⑧が出たターンに敵を倒すと +3」)。</summary>
+        public const int OldCoinGold = 2;
         public const int OldCoinFace = 8;
+        /// <summary>呪物の賽 (ADR-0016・2026-11-20): 店とイベントで秘宝を選ぶ時の LEGENDARY の重みに掛ける数 (他のレア度の重みはそのまま)。</summary>
+        public const float CursedLegendaryMul = 3f;
+        /// <summary>呪物の賽: LEGENDARY の秘宝を手に入れるたびに減る最大 HP (このランの間・1 より下にはならない・2026-11-20: 旧 秘宝なら何でも −3)。</summary>
+        public const int CursedMaxHpPerLegendary = 5;
 
-        /// <summary>端子の結果へ賽のパッシブを足す。 <paramref name="v"/> は端子に入る目 (〈号令の剣〉の +1 の後)。
-        /// 誓約の封じ (シールド) より前に呼ぶ ── 夜番のシールドも封じで落ちる。</summary>
+        /// <summary>店とイベントで秘宝を選ぶ時の LEGENDARY の重みの倍率 (呪物の賽なら <see cref="CursedLegendaryMul"/>・それ以外 1)。 戦闘の報酬には掛けない。</summary>
+        public static float LegendaryOfferMul(RunState run) => EquippedDie.IdOf(run) == DieIds.Cursed ? CursedLegendaryMul : 1f;
+
+        /// <summary>秘宝 (category Passive) を手に入れた (PassiveAddHelper.AddPassiveItem)。 呪物の賽で、 LEGENDARY なら最大 HP −<see cref="CursedMaxHpPerLegendary"/>。</summary>
+        public static void OnPassiveAcquired(RunState run, string itemId)
+        {
+            if (run == null || EquippedDie.IdOf(run) != DieIds.Cursed) return;
+            if (ItemSystem.ItemDatabase.Instance?.GetItem(itemId)?.rarity != ItemSystem.ItemRarity.LEGENDARY) return;
+            run.playerMaxHP = System.Math.Max(1, run.playerMaxHP - CursedMaxHpPerLegendary);
+            if (run.playerHP > run.playerMaxHP) run.playerHP = run.playerMaxHP;
+            UnityEngine.Debug.Log($"[賽] 呪物の賽: LEGENDARY の秘宝を手に入れた → 最大 HP {run.playerMaxHP}");
+        }
+
+        /// <summary>端子の結果へ賽のパッシブを足す。 <paramref name="v"/> は端子に入る目 (〈号令の剣〉の +1 の後)。</summary>
         public static void ApplyToTerminals(TerminalEnv env, TerminalBattleState state, TerminalOutcome o, TerminalDef[] defs, int[] v)
         {
             string die = env.dieId;
@@ -71,13 +90,13 @@ namespace CombatSystem
                         if (k == TerminalKind.Attack) o.attackAdd += System.Math.Max(0, (7 - val) / 2);
                         break;
                     case DieIds.Scale:
-                        if (n == 3 && Between(v, i)) AddByKind(o, k, 1);
+                        if (n == 3 && Between(v, i)) AddByKind(o, k, ScaleBonus);
                         break;
                     case DieIds.Ferry:
                         if (env.diceRerolled && k == TerminalKind.Attack) o.attackAdd += FerryAttack;
                         break;
                     case DieIds.NightWatch:
-                        if (k == TerminalKind.Block && val > env.enemyMaxDie) o.shield += NightWatchShield;
+                        if (k == TerminalKind.Block && val > env.enemyMaxDie) o.shield += val * NightWatchShieldPerPip;
                         break;
                     case DieIds.HeavyRead:
                         if (env.heavyTurn) AddByKind(o, k, val / 2);
@@ -111,7 +130,7 @@ namespace CombatSystem
             }
         }
 
-        /// <summary>ターンの終わり: 拾い物 (①が出た) と古銭 (⑧が出て敵を倒した) のゴールド。 <paramref name="dice"/> = このターンの出目。</summary>
+        /// <summary>ターンの終わり: 拾い物 (①が出た) と古銭 (⑧が出た数) のゴールド。 <paramref name="dice"/> = このターンの出目。</summary>
         public static void OnTurnEnd(RunState run, int[] dice, bool enemyKilled)
         {
             if (run == null || dice == null) return;
@@ -121,10 +140,15 @@ namespace CombatSystem
                 GoldIncome.Gain(run, ScavengerGold, "拾い物の賽", GoldOrigin.Die);
                 UnityEngine.Debug.Log($"[賽] 拾い物の賽: ①が出た → +{ScavengerGold}G");
             }
-            else if (die == DieIds.OldCoin && enemyKilled && Has(dice, OldCoinFace))
+            else if (die == DieIds.OldCoin)
             {
-                GoldIncome.Gain(run, OldCoinGold, "古銭の賽", GoldOrigin.Die);
-                UnityEngine.Debug.Log($"[賽] 古銭の賽: ⑧のターンに撃破 → +{OldCoinGold}G");
+                int eights = 0;
+                foreach (int d in dice) if (d == OldCoinFace) eights++;
+                if (eights > 0)
+                {
+                    GoldIncome.Gain(run, OldCoinGold * eights, "古銭の賽", GoldOrigin.Die);
+                    UnityEngine.Debug.Log($"[賽] 古銭の賽: ⑧ × {eights} → +{OldCoinGold * eights}G");
+                }
             }
         }
 

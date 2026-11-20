@@ -150,6 +150,9 @@ outgoingDamageMultiplier += メタ% + 遺物% + 研磨剤1.5 + consDmgMultPct/10
 + consAtkBurst                     ← 消費:攻撃バースト(単発)
 + メタ会心ボーナス(会心時)
 − メタデバフ向かい風(最低1)
+× (100 + finalDamagePct)/100      ← 最終与ダメージ倍率【2026-11-20・GAME.md §23-32】(Kw.ApplyFinalDamage・切り捨て・既定 0 = 素通し)。 〈防人の軍標〉がシールドを得るたび +5 (この戦闘・上限なし)。
+                                     怠惰の直前 = すべての倍率 (会心・与ダメ% の池・端子の別枠・物差し) の後・敵の軽減パッシブと防御の前。 与ダメ% の池には足さない。
+                                     掛ける口は怠惰と同じ 4 つ (主攻撃 = ApplyWinDamageModifiers / HpLossDiag.Lose (channel ≠ "通常攻撃") / 〈逆綴じの止血帯〉/ Kw.DamageEnemy の直接)。 BOT の見積もりも同じ位置 (AutoRunner.ApplyFinalPct)
 × (100 − 30)/100                  ← 大罪:怠惰 (挑戦カード IV) を受けている時だけ・与えるダメージ −30%【2026-11-11】(主攻撃はすべての倍率の後・敵の防御の前・切り捨て。 毒・出血・爆発・固定ダメ・反射・品の直接は敵の HP を減らす口 HpLossDiag.Lose で同じく −30%)
                                      〈徒労〉の戦闘のデバフ【2026-11-14・GameHooks.ToilDamageDownPct・既定 50 (BattleBoonRule.DefaultToilDamageDownPct・作者の決定)・測定の口 toilDamageDownPct で 0 にすれば切れる】も同じ枠: 〈徒労〉を持っている間 −N% (既定 −50%)。
                                      実体は MetaDebuffApplicator.ApplyOutgoingCut の 1 つで、 怠惰と重なったら厳しい方 1 つ (× (100 − max(30, N))/100・足さない・掛けない)。
@@ -160,6 +163,8 @@ outgoingDamageMultiplier += メタ% + 遺物% + 研磨剤1.5 + consDmgMultPct/10
                                      怠惰の直後 = すべての倍率の後・敵の軽減パッシブと敵の防御の前。 与ダメ% の池には足さない (別枠の掛け算)。
                                      主攻撃以外も全部掛かる (下の「ボスのダウン」)
 ─ FireEnemyTrigger(OnPreReceiveDamage): 灰塵の鎧/Ethereal/各敵被ダメ軽減
+                                     〈血の楔〉【2026-11-20】: 持っていれば、 この軽減で減った量のうち 出血 ÷ (出血 + 40) を戻す (切り捨て・CombatManager.Damage.cs)。
+                                     同じ品は敵が得るシールド (vescaShield の増加) と回復 (ReduceEnemyHeal・フロアデバフ・挑戦カード〈再生〉) を 40 ÷ (出血 + 40) 倍にする (CombatContext.WedgeEnemyGain)
   → total = max(0, ctx.finalDamage)
 × 敵の防御値【2026-10-28・ADR-0013】: effDef = max(0, enemyDefense − playerArmorPen)
                        total = DefenseFormula.Apply(total, effDef)   ← ceil(total × (1 − R(effDef)))・整数演算
@@ -596,18 +601,19 @@ Passive カテゴリのシナジー武器群。4枚がインベントリに揃�
 
 **キーワードの出来事。** 量の変化は `Keywords.Kw` と `CombatContext` の 1 か所を通り、 品へ出来事として配られる
 (`PassiveSkillManager.RaiseKeyword`)。 量は `Kw.EventAmount(ctx)`。
-**1 つの出来事から続く連鎖の中では、 同じ品は 1 度しか働かない** (外側の出来事が終わったら数え直す)。
+同じ品が 1 つの連鎖で何度働いてもよい (2026-11-19〜・旧い「1 連鎖 1 度」は削除)。 輪は品の文の制限で止める。 深さ 200 は不具合の網 (`ChainGuardDepth`・エラーを出して止める)。
 
 | 出来事 (トリガー) | 出る場所 | 量 |
 |---|---|---|
 | OnRinkaiBurst | Kw.AddHeat が閾値をまたいだとき | その爆発で使った臨界 |
-| OnChargeGain / OnOvercharge | CombatContext.AddCharge | 増えた分 / 上限で捨てた分 (〈雷壷〉はターン開始時に上限超過の半分を捨てる) |
+| OnSuperBurst | 同じ爆発が超臨界のとき (OnRinkaiBurst の直後・2026-11-20) | その爆発のダメージ (基礎 ×1.5) |
+| OnChargeGain / OnOvercharge | CombatContext.AddCharge | 増えた分 / 上限で捨てた分 (〈雷壷〉はターン開始時に上限超過の 75% を捨てる) |
 | OnChargeSpend | CombatContext.ConsumeCharge (リロールも通る) | 使った分 |
 | OnShieldGain | consShield の setter (増えたときだけ) | 増えた分 |
 | OnShieldAbsorb / OnShieldBreak | Kw.AbsorbShield (敵の直接攻撃と軽減無視の肩代わり) | 吸収した分 / 割られる前の量 |
-| OnShieldDecay | BeginNewTurn Phase C の半減 (〈脈なしの鋼心臓〉で止まる) | 失った分 |
+| OnShieldDecay | BeginNewTurn Phase C の半減 | 失った分 |
 | OnPoisonGain / OnPoisonCap | CombatContext.AddStatus (敵の毒) | 増えた分 / 上限到達 |
-| OnPoisonTick | TickStatuses と〈廃庭の霧吹き〉(敵の攻撃のたび・TickPoisonOnce) | 毒のダメージ = `floor(毒 × enemyMaxHP × 5 / 10000)` (**2026-11-10: 1 スタック = 最大 HP の 0.05%**・旧 0.1%)・下限 1・`fixedDamageToEnemy` 経由 (両経路とも `CombatContext.DotDamage`)。 **2026-11-07: 1 スタック = 敵の最大 HP の 0.1% (旧 0.5%)・上限 99 (旧 10)**。 同日に一度「現在 HP」基準にしたが、 毒を積んでも与ダメの 13% しか出ず最大 HP に戻した。 ダメージを出すたびに、 残っているスタックを `poisonKeepPct`% に減らす (切り捨て・基準 50 = 半減・〈腐れ沼の苔玉〉で最大 70) |
+| OnPoisonTick | TickStatuses と〈廃庭の霧吹き〉(敵の攻撃のたび・TickPoisonOnce) | 毒のダメージ = `floor(毒 × enemyMaxHP × 10 / 10000)` (**2026-11-20: 1 スタック = 最大 HP の 0.1%**・旧 0.05%〔2026-11-10 に 0.1% から〕)・下限 1・`fixedDamageToEnemy` 経由 (両経路とも `CombatContext.DotDamage`)。 **2026-11-07: 1 スタック = 敵の最大 HP の 0.1% (旧 0.5%)・上限 99 (旧 10)**。 同日に一度「現在 HP」基準にしたが、 毒を積んでも与ダメの 13% しか出ず最大 HP に戻した。 ダメージを出すたびに、 残っているスタックを `poisonKeepPct`% に減らす (切り捨て・基準 50 = 半減・〈腐れ沼の苔玉〉で最大 70) |
 | OnBleedDecay / OnBleedConsume / OnBleedZero | Phase C の自然減 / Kw.ConsumeBleed / 0 到達 | 減った分 / 使った分 / 1。 **自然減は 2026-11-07〜 比例減衰** `1 + 出血 / (10 + bleedDecayDivisorBonus)` (`AxisRules.BleedDecay`・〈凝血の小瓶〉で割る数が増える) |
 
 **敵への軽減不可ダメージ (Kw.DamageEnemy)。** ターンの解決中 (`ExecuteTurnMutual` の頭〜最後の HP 同期) は
@@ -628,15 +634,14 @@ CombatManager に預け、 プレイヤーの攻撃の直前に固定ダメ枠�
 
 | 計算の位置 | 式 |
 |---|---|
-| 爆発 1 回の基礎 (`Kw.BurstBase`) | `burstCritRule ? 15 + 炉温 / 2 : rinkaiBurstDamage (既定 30)` → 〈炉心の誓約〉で ×2 → `+ burstStackBonus` (〈二度詰めの雷管〉が爆発のたび +5 (2026-11-10: 旧 +6)・ターン開始時に 1/4 を失う)。 2026-11-07: 既定 50 → 30 |
-| 爆発に会心 (〈火花読みの眼鏡〉) | 主攻撃の会心の判定後、 この攻撃が爆発を使っていれば `dealtFixed += floor(爆発 × max(0, criticalMultiplier / 2 − 1))` (2026-11-10: 会心倍率の半分で乗る・旧 `criticalMultiplier − 1`) |
+| 爆発 1 回の基礎 (`Kw.BurstBase`) | `burstCritRule ? 15 + 炉温 / 2 : rinkaiBurstDamage (既定 30)` → `+ burstStackBonus` (〈二度詰めの雷管〉が爆発のたび +5 (2026-11-10: 旧 +6)・ターン開始時に 1/4 を失う)。 2026-11-07: 既定 50 → 30 |
+| 爆発に会心 (〈火花読みの眼鏡〉) | 爆発のたびに会心の判定をし (CombatManager.LandBurst・2026-11-20)、 会心なら `+ floor(爆発 × max(0, criticalMultiplier / 2 − 1))` (2026-11-10: 会心倍率の半分で乗る・旧 `criticalMultiplier − 1`。 2026-11-20 まで主攻撃の会心に合わせて乗った) |
 | 臨界を得る (`Kw.AddHeat`) | `n + heatGainBonus` (〈焚き足しの炭〉で +1)。 閾値は 50 固定 (〈早沸かし釜〉は −15) |
 | 重ね会心 (〈重ね斬りの型〉) | 会心時、 会心率の加算合計 > 100% なら `(合計 − 100) / 100` の確率で会心倍率 +1.0 (`PassiveSkillManager`) |
 | 出血のダメージ | `ApplyBleedModifiers`: `floor(出血 × (1 + bleedDamagePct))` (〈血止め知らずの針箱〉が 血晶 × 3%) |
-| シールドの減衰 | 残る割合 `min(80, 50 + shieldKeepBonusPct)`% (〈油染みの盾革〉が 堅牢 × 5) |
+| シールドの減衰 | 残る割合 `min(80, 50 + shieldKeepBonusPct)`% (〈油染みの盾革〉が 堅牢 × 3・2026-11-20 に × 5 から) |
 | 充電端子 → 攻撃 (〈二股の導線〉) | 配線集計で `attackSum += floor(充電端子の出目の合計 × chargeToAttackPct)` (上乗せ率の前・電流 × 12%・最大 80%) |
 | 盾押し (〈盾押しの心得〉) | OnWired・攻撃の端子を挿したターン: 攻撃 + `floor(シールド × 堅牢 × 5%)`（2026-11-11 に 10% から） |
-| 誓約の封じ (`OathSeals.Apply`) | 戦闘の情報を作った直後に所持品から立てる。 入口で捨てる: 毒 (AddStatus) / 出血 (AddEnemyBleed) / 臨界 (Kw.AddHeat と臨界の持ち越し) / 充電 (AddCharge) / シールド (consShield の setter の増加) / 会心 (会心確定の後で落とす) |
 | 入り口 (`EntryEffect`) | 毒・臨界の軸の既存品 22 品に、 決まった機会 (ターン開始 / 攻撃が通る / 敵の攻撃 / 受けきり / ブロックのダイス 1 個) で毒 +1〜2・臨界 +3 を重ねる。 表は `EntryEffect.Table`。 2026-11-10 から 13 品に**偏重の条件**が付く: `AtLeast n` (軸の品が n 個以上) / `Top n` (`CombatContext.AxisRank` < n ＝ その軸より品の多い軸が n 未満・同数は満たす・比べるのは金を除く 6 軸)。 条件を満たさない機会は何も足さない (品の本来の効果は動く) |
 | 種火・毒 r2 | 2026-11-07: 毒を与えるたび +1 → 1 ターンに最初の 1 回だけ +2 |
 
@@ -729,7 +734,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
 | 欠陥 | 掛かる位置 | 効果 |
 |---|---|---|
 | 〈不完全な修復〉 | `ExecuteTurnMutual` ターン終了（充電の獲得より後・次Tの消費より前） | `ConsumeHalfCharge()`（切り捨て）。**支出には計上しない** ── `ConsumeCharge` を使うと〈短絡〉と充電経済の計装が汚れる |
-| 〈不完全な起動〉 | `atkBase` 確定の直後（`GateFlaws.ApplyIgnitionCut`） | `atkBase -= floor(atkBase × IgnitionAttackCutPct)`（既定 0.12）。旧「1 端子 2 本まで」（`SanitizeWiring`）は 2026-09-14 に撤去・`SanitizeWiring` 自体も 2026-11-11 に削除 |
+| 〈不完全な起動〉 | `atkBase` 確定の直後（`GateFlaws.ApplyIgnitionCut`） | 1 撃ごとに `hitBases[h] -= floor(hitBases[h] × IgnitionAttackCutPct)`（既定 0.12・ADR-0016）。旧「1 端子 2 本まで」（`SanitizeWiring`）は 2026-09-14 に撤去・`SanitizeWiring` 自体も 2026-11-11 に削除 |
 | 〈不完全な転移〉 | `blockSum` 確定後・〈貫きの錐〉の**直後** | `blockSum -= floor(blockSum × 0.50)`。錐（敵攻撃値に比例）と違い**ブロック量に比例**するので、厚く配線した分は必ず一定割合残る。両方掛かるときは錐で削られた残りへ乗る |
 
 > 〈不完全な転移〉の 0.50 は**未計測の仮置き**。8 層ボス戦のブロック／被ダメ分布を採ってから決めること。
@@ -791,17 +796,13 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
            1. 〈号令の剣〉を挿した出目があれば、 他の出目すべて +1 (以降の条件と量はこの値で見る)
            2. 条件 (3 以下 / 5 以上 / 6 以上 / 偶数 / 奇数 / 同じ目が他の端子に / 同じ目 2 個)。 合わない出目は外す。
               〈無形の構え〉の次のターンは条件を無視 (同じ目 2 個の端子も 2 個そろっていれば通る)
-           3. 充電の支払い (場の順)。 足りなければその端子は不発。 〈裁きの雷〉は充電 1 以上で通り、 効果の所で全部払う
+           3. 充電の支払い (場の順)。 足りなければその端子は不発。 〈裁きの雷〉は充電 1 以上で通り、 効果の所で全部払う (使い捨て・2026-11-19〜)
            4. 〈火葬の剣〉(2026-11-14): 外す端子の候補 (下の「対象」) が無ければ不発 (挿した出目を外す・使い捨ても消費しない)
            5. 効果 (場の順)。 〈残響〉が発動していれば他の端子の効果を 2 回走らせる
               端子へ入る量 (sum) = 挿した出目の合計。 ただし**防御の種類の端子**に挿した出目は 1 つずつ max(0, 出目 − TerminalEnv.blockDieCut)
               (時限デバフ〈罪悪感〉で 2・2026-11-16・〈号令の剣〉の +1 の後)。 条件 (2.) は引く前の目で見る。 攻撃・充電・補助の端子の出目は変えない
            6. 他の端子を見る効果: 〈連係斬り〉攻撃 + RelayPerFired × (基本以外の発動数 − 1)、 〈剛腕〉攻撃 + (攻撃の種類の端子を挿した出目の合計)
               溜めた攻撃 (〈力溜め〉〈後の先〉) は、 攻撃の種類の端子を 1 枚以上挿したターンに attackAdd へ足して 0 に戻す
-           7. 誓約の封じ (TerminalEnv.seal* = ctx.poisonSealed などの写し): 封じた資源を足す分だけを結果から落とす
-              (毒 → poison=0 / 出血 → bleedOnHit=0 / 臨界 → heat=0 / 充電 → chargeAdd=0・chargeFill=false / シールド → shield=0 / 会心 → forceCrit・critMultAdd)。
-              本体の口 (AddStatus・AddEnemyBleed・Kw.AddHeat・AddCharge・consShield・会心の判定) も同じ物を止めるので、 落とすのは見込み (画面・BOT) と揃えるため。
-              攻撃・ブロックへ入る量は落とさない。 充電を落とすので、 封じた戦闘では〈電流〉の② (chargeToAttackPct) にも端子の充電は乗らない (2026-11-11〜)
          〈影写し〉〈火葬の剣〉〈保持器〉の対象: Resolve の wantTarget (人 = 画面で選んだ端子 / BOT = WiringPlan.targets)。
            候補 = 自分でない・常設でない・止まっていない・挿し方を直した後に出目が 1 個も無い手札の端子 (TerminalCards.IsCandidate)。 選ばない・候補でない時は左端の候補
          結果 (TerminalOutcome) の行き先:
@@ -846,7 +847,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
                             時間: エスカレーションの遅延 (term Coolant と同じキー) +2 / 1 段戻す /
                             封じ: enemyPassivesDisabledTurns = 2 (2 個そろいもゾロ目も・旧 T4 を本体へ)
            次ターンへ     … 封じ: currentBuffs["roleEnemyAtkCut"] (敵攻撃 −40%) / ["roleEnemyStun"] (敵が行動しない) /
-                            特別: ["roleFreeReroll"] (無料リロール 2 回) / 連なり: ["roleFreeReroll"] +1 と 手札 +1 枚 (端子の extraDrawNext)
+                            特別: ["roleFreeReroll"] (無料リロール 2 回) / 連なり: そのターン、 挿した端子がすべて倍化 (TerminalCards.Resolve・〈残響〉と同じ・2026-11-20〜)
            特別 2 個そろい … 小さな極も撃つ (面数×5%・ボス・ヴェスカは面数×2.5%・旧 T4 を本体へ)
            盤面フラグ (RoleOutcome)
                           … 極 (yachtFired + yachtChunkPct: 敵最大HP の 面数×30% (ボス・ヴェスカは ×15%) を軽減無視) /
@@ -860,25 +861,29 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
          atkBase = 0・追撃 0 に加えて、 ApplyWinDamageModifiers の後で **主攻撃 dealtDmg = 0・会心なし**。
          (旧: ProcessDamage の damageBonus バフと OnPreDealDamage のパッシブが主攻撃へ加算し、 攻撃しないターンに 1 以上入っていた)
          役の追撃も乗せない。 攻撃端子 0 本のターンは固定ダメ枠 (反撃・出血・毒・〈虚空〉など) を通す。
-         **逃げるターンは固定ダメ枠も 0** (臨界爆発・品が預けた分を含む・爆発の予約は消費される)。 出血の DOT は別の段なので入る。
+         **逃げるターンは固定ダメ枠も 0** (品が預けた分を含む)。 出血の DOT は別の段なので入る。 臨界の爆発はその場で入る (下の「臨界」) ので逃げるターンも入る。
 
-自攻撃   atkBase   = playerAttackPower + attackSum + ctx.mutualAttackBonus
-           attackSum = 端子の結果の attackAdd + 端子調律メタ(攻撃の個数×N) + floor(chargeSum × ctx.chargeToAttackPct)
-         ctx.mutualAttackBonus には、 atkBase の直前に **ceil(attackSum × ctx.attackDicePct)** が足される
-           (2026-11-06・攻撃の端子を挿した出目への上乗せ率。 品は OnPostRoll までに AddAttackDicePct で率を積み、 ここで 1 回だけ掛ける。
-            攻撃端子 0 本なら 0。 ステータス `atkDicePct` / 〈間合〉〈一対一〉〈猛り〉など武器の段。
+自攻撃   **攻撃の端子 1 枚につき 1 撃 (ADR-0016・2026-11-20)**。 撃 h の攻撃値 hitBases[h]:
+           hitBases[h] = 端子 h の出力 + 端子の外の攻撃 (毎回に乗せる)
+             端子 h の出力 = TerminalOutcome.attackHits[h] (その端子の効果で attackAdd が増えた分・〈残響〉で 2 回発動ならその合計)
+                             + attackHitDice[h] × 端子調律メタ (挿した出目の数 × N)
+                             + ceil(その撃の端子の出力 × ctx.attackDicePct) (2026-11-06 の出目 +%・1 撃ごとに掛ける)
+             端子の外の攻撃 = playerAttackPower + ctx.mutualAttackBonus (品の攻撃 +N) + consAtk (消耗品) + relicAtk (遺物)
+           端子に紐づかない攻撃の加算は **最初の 1 撃 (h = 0) だけ** に入る:
+             連係・変圧・溜めた攻撃 (〈力溜め〉〈後の先〉)・賽の加算 (attackAdd − Σ attackHits) と floor(chargeSum × ctx.chargeToAttackPct) (〈電流〉の②)・
+             挑戦カード〈金で殴る〉(#6) の GoldPunchAttack(G) (攻撃するターンだけ・払った金 G・所持金まで)
+           (品は OnPostRoll までに AddAttackDicePct で率を積む。 攻撃端子 0 本なら 0。 ステータス `atkDicePct` / 〈間合〉〈一対一〉〈猛り〉など武器の段。
             [剣の舞] 4 種・刻みを使い切る 3 品・充電/出血/シールドの 5 品は 2026-11-10 に与ダメージ +% (`AddOutgoingPct` → outgoingDamageMultiplier) へ移した)
-         (式の上では消費の攻撃 consAtk と遺物の攻撃 relicAtk も同じ和に入る)
-         → 挑戦カード〈金で殴る〉(#6・2026-11-12): 攻撃するターンだけ、 払った金 G に対して atkBase += ChallengeCards.GoldPunchAttack(G)
-           (= floor(G × 札の値)・所持金まで・1 ターンの上限なし)。 攻撃+N の枠なので、 この後の麻痺毒の減算・〈不完全な起動〉・会心・与ダメ% ・防御がそのまま掛かる
-         → 臨界爆発 (予約消費): rinkaiBurstActive なら fixedDamageToEnemy += rinkaiBurstDamage
-           (rinkaiCritOnBurst なら forceCritical=true。消費後 false に戻す)
-         → ProcessDamage(atkBase, pursuitDamage, playerCriticalNumerator)
+           麻痺毒の減算 (playerAttackPowerPenalty) と〈不完全な起動〉も 1 撃ごと (各撃の攻撃値から引く・各撃に掛ける)。
+           atkBase = Σ hitBases (画面の倍率・計装が読む合計)。 ターンの終わりに臨界へ足す attackSum は端子の合計のまま。
+         各撃 h について (2 撃目以降は、 1 撃目の前の与ダメの池・会心倍率・会心率へ戻してから通す ── 同じ % を重ねて足さない。 固定ダメの枠も空にする):
+         → ProcessDamage(hitBases[h], h == 0 ? pursuitDamage : 0, playerCriticalNumerator)   ← 会心の判定・OnPreDealDamage / OnPostDealDamage (「攻撃が通るたび」)・敵の防御
          → ApplyWinDamageModifiers（旧勝利分岐と同一チェーン）
            その末尾 (練度不足の後・大罪:怠惰と敵の軽減パッシブの前) で **端子の別枠**:
            totalDmg = max(1, round(totalDmg × _termDamageMul))  (〈激昂〉1 + AmplifierPerPip × 出目・〈共鳴〉ResonatorMul。 _termDamageMul ≠ 1 かつ totalDmg > 0 のときだけ)
          → 物資の疲労（15% で**最終ダメージ半減**。 isCrit は落とさない）
-         → 敵HP -= dealtDmg + dealtFixed
+         → 敵HP -= 撃ごとの dealtDmg (1 撃ずつ HP へ入れ、 〈天眼の鍔〉の首落とし・ボスの目盛りを割る判定も 1 撃ごと。
+              合計が役〈追撃〉・ヴェスカの守りで変わった分は配り直す: 減った分は後ろの撃から、 増えた分は最後の撃へ) → 敵HP -= dealtFixed
          → 鋼の皮膚
          → **役の追撃**: ApplyWinDamageModifiers の直後に ApplyRoleExtraDamage (与ダメ内訳の算出後)。
            敵の〈飛翔〉〈不動〉が ProcessDamage の中で nullifyPursuitDamage を立てていれば入れない (2026-11-11 #104)
@@ -990,18 +995,23 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
          **溜める処理は Kw.AddHeat の 1 か所** (2026-10-31 アイテム再編)。 ターン終わりに meter += attackSum、
            品が溜める分 (被弾・充電・会心・毒のダメージ・移動・開幕) はその出来事の時点で同じ関数を通る。
          meter >= rinkaiThreshold (基準50 /〈早沸かし釜〉で35) をまたいだ瞬間に爆発が決まる
-           → 次の攻撃に乗る予約 (rinkaiBurstActive=true・回数 Kw.BurstCountKey)、 meter = 0、 OnRinkaiBurst を配る。
-           〈帳簿外の爆薬〉(rinkaiMultiBurst): meter を閾値ぶんだけ減らし、 溜まっている限り同じ処理で何度でも爆発する。
-         爆発 flat = Kw.BurstBase (既定 30) × 回数 ＋ Kw.BurstBonusKey (今これを積む品は無い)。
-         **2026-11-10: 爆発を主攻撃へ返す品** (爆発そのものは増やさない・与ダメージ +% = outgoingDamageMultiplier の加算プール):
+           → **その場でダメージを出す (ADR-0016・2026-11-20・CombatManager.LandBurst)**、 meter = 0、 OnRinkaiBurst を配る。
+             旧: 次の攻撃の固定ダメの枠に乗せる予約 (rinkaiBurstActive・BurstCountKey) ── 2026-08-03 の修正の名残で理由は残っていなかった。
+           〈帳簿外の爆薬〉(rinkaiMultiBurst): meter を閾値ぶんだけ減らし、 溜まっている限り同じ処理で何度でも爆発する (1 回ごとにその場で入る)。
+         爆発 1 回の量 = Kw.BurstBase (既定 30・その時の〈二度詰めの雷管〉の上乗せ込み)、 超臨界なら + floor(BurstBase / 2)。
+           **軽減無視・倍率は乗らない** (会心・与ダメの池・敵の防御を通さない)。 最終与ダメージ倍率・大罪:怠惰・ダウンの ×1.5 は HpLossDiag.Lose (channel "臨界の爆発") が掛ける。
+           〈火花読みの眼鏡〉(burstCritRule): 爆発のたびに会心の判定 (CritRateOf・封印で外れ・forceCritical で確定) をし、 会心なら
+             + floor(爆発 × max(0, criticalMultiplier / 2 − 1)) (会心倍率の半分が乗る)。
+           遺物 (§15-5) の臨界軸: 爆発 1 回ごとに + floor(その時の敵の現在HP × N%)。
+           ターンの解決中は CombatManager の手元の HP を減らす (ターンの終わりの meter += attackSum も、 手元の HP を ctx へ書き戻す前に置く)。 解決の外は ctx の HP。
+         **超臨界爆発 (2026-11-20・GAME.md §23-32)**: 爆発が決まった時、 閾値を引く前の meter が閾値の 2 倍以上なら超臨界。 その爆発のダメージ ×1.5。
+           OnRinkaiBurst の直後に OnSuperBurst を配る。 出来事の間は Kw.BurstSuperKey (1/0) と Kw.BurstDamageNowKey (その爆発 1 回のダメージ) が読める。
+         **爆発を読む品** (爆発そのものは増やさない・与ダメージ +% = outgoingDamageMultiplier の加算プール):
            〈溢れ取りの鋳型〉: 爆発のとき、 閾値を超えた臨界 1 につき次の攻撃の与ダメージ +2% (攻撃したら使い切る・旧: 爆発 +2)。
-           〈二度目の打金〉: 爆発した次のターン、 与ダメージ +30% (旧: その爆発ダメージの半分を固定ダメ枠へ)。
-           〈荒砥〉: 爆発 1 回につき、 この戦闘中の与ダメージ +5% (積もる)。
-         **2026-08-03 修正: 爆発は atkBase ではなく fixedDamageToEnemy へ入る。**
-           旧実装は atkBase へ加算していたため、 その後の会心 ×3.0 と outgoingDamageMultiplier
-           が丸ごと乗り、 「flat 50」が実効 150〜300 になっていた。
-           固定ダメ枠へ移したことで倍率が乗らなくなった代わりに、 敵の基礎防御%も通らなくなる。
-         遺物 (§15-5) の臨界軸 (爆発時に敵の現在HP の N%) も同じ枠へ入る。
+           〈二度目の打金〉: 爆発した (Kw.BurstTurnKey) 次のターン、 与ダメージ +30%。
+           〈荒砥〉: 爆発のたび敵に出血 +2 (2026-11-20・旧: 爆発した攻撃が通ると出血 +4)。 爆発 1 回につき、 この戦闘中の与ダメージ +5% (積もる)。
+           〈爆破祭の小切手〉: 爆発のダメージそのもので敵が倒れた戦闘 (Kw.BurstKilledKey) に勝つと +4G。
+           〈柱折りの発破筒〉: 「爆発のダメージ」= その場の 1 回の量 (Kw.BurstDamageNowKey)。
 ```
 
 ### 9.3 収支トリガー（柱2 の再定義・§0 の敵視点は変わらない）

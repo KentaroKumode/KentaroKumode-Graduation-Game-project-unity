@@ -147,10 +147,6 @@ namespace CombatSystem
         public int axCrit, axBleed, axPoison, axHeat, axCharge, axShield;
         /// <summary>〈処刑の刃〉の恒久の攻撃 (ラン単位)。</summary>
         public int whetBonus;
-        /// <summary>誓約の封じ (CombatContext の poisonSealed などの写し)。 本体では封じは資源の付与の口 (AddStatus の毒・AddEnemyBleed・
-        /// Kw.AddHeat・AddCharge・consShield・会心の判定) で止まる。 <see cref="TerminalCards.Resolve"/> は同じ物を結果から落とし、
-        /// 見込み (画面・BOT) が本体と食い違わないようにする。</summary>
-        public bool sealPoison, sealBleed, sealHeat, sealCharge, sealShield, sealCrit;
         /// <summary>防御の種類の端子に挿した出目 1 つから引く量 (下限 0)。 時限デバフ〈罪悪感〉(2026-11-16・EventSystem.TimedEffects.TimedDebuffRule) が 2。 0 = なし。
         /// <see cref="TerminalCards.Resolve"/> の「5. 効果」で、 端子へ入る出目の合計を作る所だけで引く (端子の条件は挿した目そのもので見る)。
         /// 本体・画面の見込み・BOT の配線の評価はどれも CombatManager.TerminalEnvNow の盤面を Resolve に渡すので、 同じ値を読む。</summary>
@@ -194,6 +190,11 @@ namespace CombatSystem
         public int escalationDelay;
         /// <summary>このターンに発動した端子 (場の添字)。</summary>
         public readonly List<int> fired = new List<int>();
+        /// <summary>[計装 2026-11-19] 攻撃の合計 (attackAdd) を増やした所ごとの量 (「端子名:+N」)。 判断には使わない。</summary>
+        public readonly List<string> attackLog = new List<string>();
+        /// <summary>攻撃の端子 1 枚ごとの攻撃の量と挿した出目の数 (場の順・ADR-0016: 攻撃は端子 1 枚につき 1 回当たる)。
+        /// attackAdd のうちここに入らない分 (連係・変圧・溜めた攻撃・賽の加算) は、 本体が最初の 1 撃に入れる。</summary>
+        public readonly List<int> attackHits = new List<int>(), attackHitDice = new List<int>();
         /// <summary>このターンに発動した基本以外の端子の数。</summary>
         public int firedNonBasic;
         /// <summary>〈有効活用〉〈影写し〉〈火葬の剣〉の対象 (場の添字・−1 = なし)。 選んだ対象 (Resolve の wantTarget) が候補なら それ、
@@ -379,7 +380,8 @@ namespace CombatSystem
                 D(TerminalIds.Stoker, S, "臨界 +出目 +炉温。", TerminalCond.None, ah),
                 D(TerminalIds.AfterHeat, A, "出目を攻撃に。この戦闘の爆発 1 回につき攻撃 +" + AfterHeatPerBurst + "。", TerminalCond.None, ah),
                 D(TerminalIds.Leak, C, "充電 +出目 +電流。", TerminalCond.None, ac),
-                D(TerminalIds.BigDischarge, A, "充電をすべて払い、払った充電を攻撃に足す (電流 1 につき +" + (int)(BigDischargePerRank * 100) + "%)。", TerminalCond.None, ac),
+                // 2026-11-19: 使い捨てに (作者の決定)。 〈繋ぎの賽〉で毎ターン撃ち続けられ、 溜めて撃つ判断が消えていた
+                Once(D(TerminalIds.BigDischarge, A, "充電をすべて払い、払った充電を攻撃に足す (電流 1 につき +" + (int)(BigDischargePerRank * 100) + "%)。", TerminalCond.None, ac)),
                 D(TerminalIds.Patch, B, "出目をブロックに。シールド +堅牢。", TerminalCond.None, asx),
                 D(TerminalIds.ShieldPush, A, "出目を攻撃に。今のシールドの 堅牢 ×" + (int)(ShieldPushPerRank * 100) + "% を攻撃に足し、足した分のシールドを払う。", TerminalCond.None, asx),
                 // ── 使い捨て ──
@@ -413,10 +415,6 @@ namespace CombatSystem
         /// 山札に残っていても、 引いた先で「無い端子」として場に出さない。 今の id だけの一覧は何も変わらない。</para></summary>
         public static int DropUnknownIds(List<string> ids)
             => ids == null ? 0 : ids.RemoveAll(id => id == null || !_byId.ContainsKey(id));
-
-        /// <summary>ランの持ち物 (誓約) で、 この端子の軸が封じられているか (戦闘の外 ── 報酬・店・山札の一覧)。 軸の無い端子は false。</summary>
-        public static bool AxisSealedByRun(TerminalDef d, GameLoop.RunState run)
-            => d?.axis != null && run != null && ItemSystem.PassiveSkills.Effects.OathSeals.SealedAxes(run).Contains(d.axis);
 
         /// <summary>開始の山札: 攻撃 2・防御 2・充電 1。</summary>
         public static List<string> StartingDeck()
@@ -538,6 +536,8 @@ namespace CombatSystem
             // ── 5. 効果 ──
             bool doubler = false;
             for (int s = 0; s < m; s++) if (board[s] == TerminalIds.Doubler && Plugged(o.slotOfDie, s)) doubler = true;
+            // 連なりの賽 (2026-11-20): 3 つの目が連番のターン (役〈連なり〉)、 挿した端子がすべて倍化する (〈残響〉と同じ)
+            if (env.dieId == GameLoop.DieIds.Straight && YachtRoles.IsRun(v)) doubler = true;
             int attackPips = 0;      // 攻撃の種類の端子に挿した出目 (〈剛腕〉が 2 倍にする分)
             for (int s = 0; s < m; s++)
             {
@@ -558,7 +558,10 @@ namespace CombatSystem
                     default: o.supportDice += num; break;
                 }
                 int times = doubler && id != TerminalIds.Doubler ? 2 : 1;
+                int atkBefore = o.attackAdd, chgBefore = charge;
                 for (int t = 0; t < times; t++) Effect(id, s, sum, env, state, o, ref charge, Empty);
+                if (d.kind == TerminalKind.Attack) { o.attackHits.Add(o.attackAdd - atkBefore); o.attackHitDice.Add(num); }
+                if (o.attackAdd != atkBefore) o.attackLog.Add($"{id}(目{sum}{(times > 1 ? "・倍化" : "")}{(chgBefore != charge ? "・充電" + chgBefore + "→" + charge : "")}):+{o.attackAdd - atkBefore}");
             }
 
             // ── 6. 他の端子を見る効果 (全部の発動が決まった後) ──
@@ -572,21 +575,14 @@ namespace CombatSystem
             // 〈柔軟な戦略〉: 基本以外の発動の累計 (付けていなくても数える・積むのは持っている時だけ = 山札にあれば効く)
             state.firedTotal += o.firedNonBasic;
             // 次に攻撃するターンの攻撃に足す分
+            int atk6 = o.attackAdd;
             if (o.attackDice > 0 && state.storedAttack > 0) { o.attackAdd += state.storedAttack; state.storedAttack = 0; }
+            if (o.attackAdd != atk6) o.attackLog.Add($"連係・変圧・溜めた攻撃:+{o.attackAdd - atk6}");
 
-            // ── 6b. 装備中の賽のパッシブ (ADR-0015): 挿した目ごとに効く・残り火の持ち越し。 封じ (7) より前 ──
+            // ── 6b. 装備中の賽のパッシブ (ADR-0015): 挿した目ごとに効く・残り火の持ち越し ──
+            int atkDie = o.attackAdd;
             DiePassives.ApplyToTerminals(env, state, o, defs, v);
-
-            // ── 7. 誓約の封じ: 封じた軸の資源を足す分だけを落とす (攻撃・ブロックへ入る出目は残す) ──
-            //   本体の口 (AddStatus の毒・AddEnemyBleed・Kw.AddHeat・AddCharge・consShield・会心の判定) と同じ物を落とす。
-            //   軸の端子 (〈毒霧〉〈鉤爪〉〈火種〉〈招雷〉〈装甲板〉〈弱点看破〉〈一閃〉) も品と同じくここで止まり、
-            //   軸の外の端子 (〈二重障壁〉〈雷溜め〉・基本の充電) も品と同じく口で止まる。 本体で二度落としても結果は同じ。
-            if (env.sealPoison) o.poison = 0;
-            if (env.sealBleed) o.bleedOnHit = 0;
-            if (env.sealHeat) o.heat = 0;
-            if (env.sealCharge) { o.chargeAdd = 0; o.chargeFill = false; }
-            if (env.sealShield) o.shield = 0;
-            if (env.sealCrit) { o.forceCrit = false; o.critMultAdd = 0f; }
+            if (o.attackAdd != atkDie) o.attackLog.Add($"賽:+{o.attackAdd - atkDie}");
 
             for (int i = 0; i < n; i++)
                 o.kindOfDie[i] = o.slotOfDie[i] >= 0 ? LegacyKind(defs[o.slotOfDie[i]].kind) : DiceTerminal.None;

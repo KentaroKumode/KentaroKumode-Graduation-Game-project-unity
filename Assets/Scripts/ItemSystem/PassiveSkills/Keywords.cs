@@ -33,19 +33,18 @@ namespace ItemSystem.PassiveSkills.Keywords
         //  臨界
         // ============================================================
 
-        /// <summary>このターン、 爆発で次の攻撃に乗る回数 (アクセス用キー・[perTurn] ではなく使ったら 0)。</summary>
-        public const string BurstCountKey = "kw.burstCount";
         /// <summary>[persistent・戦闘開始で 0] この戦闘で爆発した回数の累計 (端子〈爆炎斬り〉が読む・ADR-0014)。</summary>
         public const string BurstTotalKey = "kw.burstTotal";
         /// <summary>閾値を超えて溜まっていた臨界 (〈溢れ取りの鋳型〉が読む)。</summary>
         public const string BurstExcessKey = "kw.burstExcess";
-        /// <summary>爆発に上乗せするダメージ (品が積む。 爆発を使ったら 0)。</summary>
-        public const string BurstBonusKey = "kw.burstBonus";
-        /// <summary>この攻撃が爆発を使った (〈荒砥〉〈爆破祭の小切手〉が読む)。 毎ターン攻撃の前に書き直す。</summary>
-        public const string BurstThisAttackKey = "kw.burstThisAttack";
-        /// <summary>直近に爆発を使ったターンと、 そのダメージ (〈二度目の打金〉が読む)。</summary>
-        public const string BurstAppliedTurnKey = "kw.burstAppliedTurn";
-        public const string BurstAppliedDmgKey = "kw.burstAppliedDmg";
+        /// <summary>直近に爆発したターン (〈二度目の打金〉が読む)。</summary>
+        public const string BurstTurnKey = "kw.burstTurn";
+        /// <summary>[persistent・戦闘開始で 0] この戦闘で、 爆発のダメージそのもので敵が倒れた (1/0・〈爆破祭の小切手〉が読む)。</summary>
+        public const string BurstKilledKey = "kw.burstKilled";
+        /// <summary>いま決まった爆発が超臨界か (1/0・爆発の出来事を配っている間に読む)。 超臨界爆発 = 閾値を引く前の臨界が閾値の 2 倍以上 (2026-11-20・§23-32)。</summary>
+        public const string BurstSuperKey = "kw.burstSuper";
+        /// <summary>いま決まった爆発 1 回のダメージ (<see cref="BurstBase"/>・超臨界なら ×1.5・爆発の出来事を配っている間に読む)。</summary>
+        public const string BurstDamageNowKey = "kw.burstDamageNow";
 
         /// <summary>臨界を有効にする (どれか 1 つの臨界の品が戦闘開始時に呼べば動き出す)。</summary>
         public static void EnableHeat(CombatContext ctx)
@@ -54,37 +53,74 @@ namespace ItemSystem.PassiveSkills.Keywords
             if (ctx.rinkaiBurstDamage <= 0) ctx.rinkaiBurstDamage = Effects.RinkaiInit.DefaultBurstDamage;
         }
 
-        /// <summary>爆発 1 回の基礎 (2026-11-07)。 〈炉温〉の②なら 15 + 炉温 / 2、 なければ 30。 〈炉心の誓約〉で 2 倍、
+        /// <summary>爆発 1 回の基礎 (2026-11-07)。 〈炉温〉の②なら 15 + 炉温 / 2、 なければ 30。
         /// 〈二度詰めの雷管〉の上乗せを足す。 品は ctx.rinkaiBurstDamage を直接書かない ── 書く品どうしの順番で値が変わったため。</summary>
         public static int BurstBase(CombatContext ctx)
         {
             int b = ctx.burstCritRule ? 15 + ctx.AxisDepth(AxisRules.Heat) / 2 : ctx.rinkaiBurstDamage;
-            if (ctx.burstDoubled) b *= 2;
             return b + ctx.burstStackBonus;
         }
 
-        /// <summary>臨界を n 溜める。 閾値をまたいだら爆発を決め、 出来事を配る。
-        /// 爆発は次の攻撃に乗る (CombatManager が <see cref="BurstCountKey"/> を見て使う)。
+        /// <summary>臨界を n 溜める。 閾値をまたいだら爆発し、 その場でダメージを出して (ADR-0016)、 出来事を配る。
         /// 〈帳簿外の爆薬〉(rinkaiMultiBurst) があれば臨界を閾値ぶんだけ減らし、 溜まっている限り何度でも爆発する。</summary>
-        public static void AddHeat(CombatContext ctx, int n)
+        /// <summary>[計装 2026-11-19] 1 回の (いちばん外側の) 足し込みで起きた爆発の回数の最大と、 その時の出どころ・量・溜まり。 BOT がランの始めに空にする。</summary>
+        public static int HeatMaxBurstsOneAdd;
+        public static string HeatMaxBurstsInfo = "";
+        private static int _heatOuter;
+
+        /// <summary>src = 出どころの名前 (null なら働いている品の名前・品の外なら「本体」)。 計装にだけ使う。</summary>
+        public static void AddHeat(CombatContext ctx, int n, string src = null)
         {
-            if (ctx == null || n <= 0 || ctx.rinkaiThreshold <= 0 || ctx.heatSealed) return;   // heatSealed: 誓約で封じた
+            if (ctx == null || n <= 0 || ctx.rinkaiThreshold <= 0) return;
+            bool outer = _heatOuter == 0;
+            int n0 = n, meterBefore = ctx.rinkaiMeter, burstsBefore = (int)ctx.GetAccumulated(BurstTotalKey);
+            _heatOuter++;
+            try { AddHeatCore(ctx, n); }
+            finally
+            {
+                _heatOuter--;
+                if (outer)
+                {
+                    int bursts = (int)ctx.GetAccumulated(BurstTotalKey) - burstsBefore;
+                    if (bursts > HeatMaxBurstsOneAdd)
+                    {
+                        HeatMaxBurstsOneAdd = bursts;
+                        string who = src ?? (string.IsNullOrEmpty(CombatContext.CurrentSkillId) ? "本体" : CombatContext.CurrentSkillId);
+                        HeatMaxBurstsInfo = $"{who} +{n0} (溜まり {meterBefore}・閾値 {ctx.rinkaiThreshold}・帳簿外 {(ctx.rinkaiMultiBurst ? "あり" : "なし")}・ターン {ctx.currentTurn}) → 爆発 {bursts} 回";
+                    }
+                }
+            }
+        }
+
+        private static void AddHeatCore(CombatContext ctx, int n)
+        {
             n += ctx.heatGainBonus;   // 〈炉温〉の①: 臨界を得るたび +1
             float relicHeat = MetaProgression.Relics.RelicApplicator.GetHeatGainPct();   // 遺物 炉温 2 個: 臨界の獲得量 +20% (切り上げ)
             if (relicHeat > 0f) n += (int)System.Math.Ceiling(n * relicHeat);
             ctx.rinkaiMeter += n;
-            int guard = 0;
-            while (ctx.rinkaiMeter >= ctx.rinkaiThreshold && guard++ < 50)
+            // 1 回の足し込みで爆発できる回数に上限は無い (2026-11-19・作者の決定で旧い「最大 50 回」を削除)。
+            //   〈帳簿外の爆薬〉でも 1 回ごとに閾値 (≥ 1) ずつ減るので必ず止まる。
+            while (ctx.rinkaiThreshold > 0 && ctx.rinkaiMeter >= ctx.rinkaiThreshold)
             {
                 int th = ctx.rinkaiThreshold;
+                // 超臨界爆発 (2026-11-20・§23-32): 閾値を引く前の臨界が閾値の 2 倍以上。 その爆発のダメージ ×1.5 (上乗せ = 基礎の半分・切り捨て)
+                bool super = ctx.rinkaiMeter >= 2 * th;
                 int excess = ctx.rinkaiMeter - th;
                 ctx.rinkaiMeter = ctx.rinkaiMultiBurst ? excess : 0;
-                ctx.rinkaiBurstActive = true;
-                ctx.accumulatedValues[BurstCountKey] = ctx.GetAccumulated(BurstCountKey) + 1;
                 ctx.accumulatedValues[BurstTotalKey] = ctx.GetAccumulated(BurstTotalKey) + 1;
                 ctx.accumulatedValues[BurstExcessKey] = ctx.rinkaiMultiBurst ? 0 : excess;
-                Debug.Log($"[臨界] 閾値{th} 到達 → 爆発 (超過 {excess}・残 {ctx.rinkaiMeter})");
+                ctx.accumulatedValues[BurstTurnKey] = ctx.currentTurn;
+                int burstDmg = BurstBase(ctx);
+                if (super) burstDmg += burstDmg / 2;
+                ctx.accumulatedValues[BurstSuperKey] = super ? 1 : 0;
+                ctx.accumulatedValues[BurstDamageNowKey] = burstDmg;
+                Debug.Log($"[臨界] 閾値{th} 到達 → {(super ? "超臨界" : "")}爆発 (超過 {excess}・残 {ctx.rinkaiMeter}・ダメージ {burstDmg})");
+                // ADR-0016: 閾値に届いたその場でダメージを出す (軽減無視・倍率は乗らない)。 旧: 次の攻撃の固定ダメの枠に乗せていた
+                var pm = PassiveSkillManager.Instance;
+                var cm = pm != null && ReferenceEquals(pm.Context, ctx) ? CombatSystem.CombatManager.Instance : null;
+                if (cm != null && cm.LandBurst(ctx, burstDmg)) ctx.accumulatedValues[BurstKilledKey] = 1;
                 Raise(ctx, PassiveSkillTrigger.OnRinkaiBurst, th);
+                if (super) Raise(ctx, PassiveSkillTrigger.OnSuperBurst, burstDmg);
                 int relicSh = MetaProgression.Relics.RelicApplicator.GetBurstShield();   // 遺物 炉温 3 個: 爆発のたびにシールド +6
                 if (relicSh > 0) { ctx.consShield += relicSh; ctx.shieldGainedTotal += relicSh; CombatSystem.ShieldDiag.Note("遺物〈炉温〉3", relicSh); }
                 if (!ctx.rinkaiMultiBurst) break;
@@ -138,6 +174,8 @@ namespace ItemSystem.PassiveSkills.Keywords
 
         /// <summary>この戦闘で出した会心の回数 (〈戦果の天秤〉が読む)。</summary>
         public const string CritCountKey = "kw.critCount";
+        /// <summary>直近の会心した主攻撃に実際に掛かった会心倍率 (敵の会心耐性・〈寸鉄〉〈心眼〉の② 込み・PassiveSkillManager.ProcessDamage が書く)。 〈天眼の鍔〉が読む。</summary>
+        public const string LastCritMulKey = "kw.lastCritMul";
 
         // ============================================================
         //  敵への軽減不可ダメージ
@@ -154,8 +192,17 @@ namespace ItemSystem.PassiveSkills.Keywords
         {
             if (ctx == null || dmg <= 0) return;
             if (ctx.GetAccumulated(ResolvingKey) > 0) Add(ctx, PendingEnemyDamageKey, dmg);
-            else ctx.enemyCurrentHP = System.Math.Max(0, ctx.enemyCurrentHP - CombatSystem.BossDown.ApplyTakenNow(MetaProgression.MetaDebuffApplicator.ApplyOutgoingCut(dmg)));   // 預けた分は HpLossDiag.Lose で掛かる (ボスのダウンの ×1.5 も)
+            else ctx.enemyCurrentHP = System.Math.Max(0, ctx.enemyCurrentHP - CombatSystem.BossDown.ApplyTakenNow(MetaProgression.MetaDebuffApplicator.ApplyOutgoingCut(ApplyFinalDamage(ctx, dmg))));   // 預けた分は HpLossDiag.Lose で掛かる (最終与ダメージ倍率・ボスのダウンの ×1.5 も)
         }
+
+        /// <summary>最終与ダメージ倍率 (2026-11-20・GAME.md §23-32)。 すべての倍率の後・敵の軽減パッシブと防御の前に掛ける (切り捨て)。
+        /// 掛ける口は大罪:怠惰 (<see cref="MetaProgression.MetaDebuffApplicator.ApplyOutgoingCut"/>) と同じ所: 主攻撃 = CombatManager.Damage.cs・
+        /// 主攻撃以外 = HpLossDiag.Lose・<see cref="DamageEnemy"/> の直接の口・〈逆綴じの止血帯〉。 BOT の見積もり (AutoRunner.Combat.cs) も同じ位置。</summary>
+        public static int ApplyFinalDamage(CombatContext ctx, int dmg)
+            => ctx != null && dmg > 0 && ctx.finalDamagePct != 0 ? (int)((long)dmg * (100 + ctx.finalDamagePct) / 100) : dmg;
+
+        /// <summary>今の戦闘の ctx で <see cref="ApplyFinalDamage"/> (戦闘の外では素通し)。</summary>
+        public static int ApplyFinalDamageNow(int dmg) => ApplyFinalDamage(PassiveSkillManager.Instance?.Context, dmg);
 
         /// <summary>預かっている敵へのダメージを取り出して 0 に戻す。</summary>
         public static int TakePendingEnemyDamage(CombatContext ctx)

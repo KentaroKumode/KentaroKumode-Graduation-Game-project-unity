@@ -238,15 +238,15 @@ namespace ItemSystem.PassiveSkills
             Register(new UnwhettedClub());
 
             // ============================
-            //  軸の品 (2026-11-07・AxisItemEffects.cs)。 各軸に 燃料 / ① 数を参照 / ②【規則】 / 誓約
+            //  軸の品 (2026-11-07・AxisItemEffects.cs)。 各軸に 燃料 / ① 数を参照 / ②【規則】
             // ============================
             // 研ぎ師の見立て書 / 千里眼の水晶 / 麻痺の吹き矢 はステータス化 (段 3・2026-11-11)
             Register(new FalconerGlove());                                       Register(new LayeredCutForm());     Register(new LayeredScabbard()); Register(new PinpointEye());
-            Register(new ReturnEdgeClasp());  Register(new UnstanchedNeedles()); Register(new ClotVial());            Register(new RustOath());
-            Register(new TasterSpoon());      Register(new MiasmaJar());         Register(new RotMossBall());         Register(new DregsOath());
-            Register(new FirekeeperPoker());  Register(new CharcoalFeeder());       Register(new SparkReadingGlasses()); Register(new RefiredPrimer());   Register(new CoreOath());
-            Register(new ToppedJar());        Register(new LeakyCopperWire());   Register(new ForkedTerminal());      Register(new SpriteOath());
-            Register(new PaddedBracer());     Register(new OiledShieldLeather());Register(new ShieldPushArt());       Register(new WardenOath());
+            Register(new ReturnEdgeClasp());  Register(new UnstanchedNeedles()); Register(new ClotVial());
+            Register(new TasterSpoon());      Register(new MiasmaJar());         Register(new RotMossBall());
+            Register(new FirekeeperPoker());  Register(new CharcoalFeeder());       Register(new SparkReadingGlasses()); Register(new RefiredPrimer());
+            Register(new ToppedJar());        Register(new LeakyCopperWire());   Register(new ForkedTerminal());
+            Register(new PaddedBracer());     Register(new OiledShieldLeather());Register(new ShieldPushArt());
             // 軸の品・追加 34 品 (2026-11-07・AxisItemEffects2.cs)。 各軸を 23 品にそろえた
             Register(new AimNotch());   Register(new FirstArrow());   Register(new LingeringBell()); Register(new ParryFan());
             Register(new NickAppraisal()); Register(new LosingStreakDie()); Register(new ChainedFlash()); Register(new QuickDrawArt());
@@ -257,6 +257,13 @@ namespace ItemSystem.PassiveSkills
             Register(new AcidVial()); Register(new NeedleRing()); Register(new LeafMoldBag());
             Register(new MiasmaMantle()); Register(new PoolKeeper());
             Register(new RivetPlate()); Register(new CatchBracer()); Register(new LayeredTagShield()); Register(new BrokenShieldGrudge());
+            // 軸の締めの LEGENDARY (2026-11-20・AxisItemEffects3.cs・GAME.md §23-32)
+            Register(new HeavenEyeGuard()); Register(new DeathMaskVisor());
+            Register(new ReturningBloodSickle()); Register(new BloodWedge());
+            Register(new CorrosionCrown()); Register(new BoneMeltOil());
+            Register(new WildKilnHearth()); Register(new PillarBreakerCharge());
+            Register(new ThunderReliquary()); Register(new FourthStrikeCore());
+            Register(new FallenCastleCornerstone()); Register(new BorderGuardStandard());
 
             // ============================
             //  汎用パッシブ
