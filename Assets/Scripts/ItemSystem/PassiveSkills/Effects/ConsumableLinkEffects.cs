@@ -23,24 +23,6 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>使い切りの矜持: 消耗品を使ったターン、 与ダメージ +25% (与ダメ % の池・そのターン 1 回)。
-    /// 設計書の「最終与ダメージ倍率 +8%」は、 最終倍率の積み上げを〈防人の軍標〉だけに残す方針 (§12-1) に合わないので変えた (2026-11-20・Claude の判断)。</summary>
-    public class SpentPride : IPassiveSkillEffect, IRelicDisplay
-    {
-        public string SkillId => ItemIds.LinkPride;
-        public const float Pct = 0.25f;
-        /// <summary>[persistent] 最後に効いたターン。</summary>
-        private const string TurnKey = "link.pride.turn";
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.currentTurn > 0 && Rw.Count(ctx, TurnKey) == ctx.currentTurn);
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnConsumableUse };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (!Rw.OncePerTurn(ctx, TurnKey)) return;
-            ctx.AddOutgoingPct(Pct);
-            Rw.Log($"[使い切りの矜持] 消耗品を使ったターン: 与ダメージ +{(int)(Pct * 100)}%");
-        }
-    }
-
     /// <summary>底抜けの小瓶: 戦闘で最初に使った消耗品は消費されず、 その戦闘中にもう 1 回使える (1 戦闘 1 回)。
     /// もう 1 回使わなければ、 戦闘の終わりに消える (<see cref="Consumables.Consume"/>)。 使う時の判定は <see cref="Consumables.Use"/> が <see cref="TryKeep"/> で聞く。</summary>
     public class BottomlessVial : IPassiveSkillEffect, IRelicDisplay

@@ -630,7 +630,7 @@ namespace AutoTest
             outMul += ws.outPctAdd;
             float termMul = ws.damageMul;
             int fpct = s.finalPct + s.lateHitFinalPct * hitNo;   // ローカル関数は in の引数を捕まえられないので写す (〈加重の拳套〉: 2 撃目以降の上乗せ)
-            int minDmg = s.minDmg, consBurst = s.consBurst, eDef = ws.ignoreDefense || (hitNo == 0 && s.needleFirst) ? 0 : s.eDefNow, pen = s.myPen, critPen = s.critPen;
+            int minDmg = s.minDmg, consBurst = s.consBurst, eDef = ws.ignoreDefense || (hitNo == 0 && s.needleFirst) ? 0 : s.eDefNow, pen = s.myPen + ws.armorPen, critPen = s.critPen;
             float nonCritMul = s.nonCritMul, berserk = s.berserkMul;
             // 会心 (CritCore・本体の ProcessDamage と同じ式): 撃ごとの会心率と会心倍率。 配線で決まる品はこの撃の目・撃の数で足す
             float add = s.critAdd, mulAdd = ws.critMultAdd;
@@ -857,6 +857,7 @@ namespace AutoTest
             public int atkFaceMax;
             public int[] hitFace;
             public bool ignoreDefense;   // 敵の防御を無視
+            public int armorPen;         // 敵の防御を N 無視 (〈継ぎ目のない導線〉)
             public float takenMul;       // このターンの被ダメに掛ける (1 = なし)
             public float enemyAtkMul;    // このターンの敵の攻撃に掛ける (1 = なし)
             public int shield, heal, selfDamage;
@@ -971,7 +972,7 @@ namespace AutoTest
             if (aCount > 0) dmg = CombatSystem.BossDown.ApplyTaken(dmg, s.enemyDown && !s.enemyDownWeak);   // ボスのダウン ×1.5: 本体と同じ位置 (怠惰の直後・ひびの弱いダウンは無し)
             // 敵の防御 (このターンの値) で軽減
             if (aCount > 0 && eDefNow > 0)
-                dmg = CombatSystem.DefenseFormula.Apply(dmg, CombatSystem.DefenseFormula.Effective(eDefNow, myPen));
+                dmg = CombatSystem.DefenseFormula.Apply(dmg, CombatSystem.DefenseFormula.Effective(eDefNow, myPen + ws.armorPen));
             int dmgOld = dmg, dmgNew = 0, rawNew = wantNew ? s.atkPower + s.atkFlat + aSumNew : 0;
             // [V3 readOutgoingMult] 攻撃+N・与ダメ倍率・会心の期待値・端子調律・〈電流〉の② を本体の順で読む
             if (wantNew) dmgNew = ReadOutMainDamage(in s, aCount, bCount, aSumNew, in ws);

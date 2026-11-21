@@ -206,6 +206,13 @@ namespace ItemSystem.PassiveSkills
             Register(new Suntetsu()); Register(new PinpointEye()); Register(new ClairvoyantCrystal()); Register(new HeavenEyeGuard()); Register(new DeathMaskVisor());
         }
 
+        /// <summary>山札の軸 19 品のうち効果クラスを持つ 2 品 (2026-11-21・DeckEffects.cs)。 残りの 17 品と〈焼き入れの挟み〉の撃の分・〈仕込みの配電盤〉の手札の分は
+        /// CombatSystem.TerminalCards の DeckItems の旗 (〈予備の差込口〉〈整理された工具箱〉は CombatManager.BeginTerminalDeck)。</summary>
+        private static void RegisterDeck()
+        {
+            Register(new TemperTongs()); Register(new PrimedSwitchboard());
+        }
+
         private static void RegisterAll()
         {
             RegisterCharge();
@@ -214,6 +221,7 @@ namespace ItemSystem.PassiveSkills
             RegisterBleed();
             RegisterHeat();
             RegisterCrit();
+            RegisterDeck();
             // ============================
             //  アイテム再編 (2026-10-31・ReworkItemEffects.cs)
             // ============================
@@ -226,11 +234,9 @@ namespace ItemSystem.PassiveSkills
             // 〈負け越しの賽〉(役の軸へ移った・新しい効果は Phase 3e・AxisItemEffects2.cs)
             Register(new LosingStreakDie());
             // 消耗品の連動品 (2026-11-20・ConsumableLinkEffects.cs・item-overhaul-spec §7-2)
-            Register(new BeltPouch()); Register(new SpentPride()); Register(new BottomlessVial()); Register(new SampleBox());
+            Register(new BeltPouch()); Register(new BottomlessVial()); Register(new SampleBox());
             // 嵐・店・金のマクロ秘宝の戦闘の側 (2026-11-20・MacroItemEffects.cs・item-overhaul-spec §9)
             Register(new MacroBarometer()); Register(new MacroReceipt()); Register(new MacroAbacus());
-            // 采配 (山札の軸) の出来事で書く 2 品 (2026-11-20・DeckItemEffects.cs・残り 16 品は TerminalCards の DeckItems の旗)
-            Register(new TemperTongs()); Register(new AshBroom());
             // 賽目 (役の軸) の出来事で書く 2 品 (2026-11-21・RoleItemEffects.cs・残り 6 品は TerminalCards の RoleItems の旗と CombatManager の役の適用)
             Register(new ChippedEyeReading()); Register(new MatchedClappers());
             // 戦術の 5 品 (2026-11-21・TacticItemEffects.cs・item-overhaul-spec §6-2)

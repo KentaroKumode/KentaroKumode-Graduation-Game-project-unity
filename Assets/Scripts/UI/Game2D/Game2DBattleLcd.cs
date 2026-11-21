@@ -291,7 +291,7 @@ namespace UI.Game2D
         /// <summary>k = 0〜2: おまかせ・道具・逃げる / −1: 【再起動】(〈二股の導線〉) / −2: 【オーバークロック】(〈雷鳴の太鼓〉)・仮置き (2026-11-21)。
         /// −3: 【起爆】の見込み (〈石抜きの毒指輪〉〈劇毒の火薬庫〉・押す札ではない・2026-11-21)。 −4: 【ジャスト防御】の見込み (防御/予告+許容幅・押す札ではない・2026-11-21)。
         /// −5: 出血の見込み (今の出血 + この配線の撃ごとの出血・押す札ではない・2026-11-21)。 −6: 臨界の爆発の見込み (今の臨界/閾値 + この配線の爆発の回数・押す札ではない・2026-11-21)。</summary>
-        private string SideLabel(int k) => k == -1 ? _sim.RebootLabel : k == -2 ? _sim.OverclockLabel : k == -3 ? _sim.DetonateLabel : k == -4 ? _sim.JustGuardLabel : k == -5 ? _sim.BleedLabel : k == -6 ? _sim.HeatLabel : k == -7 ? _sim.CritLabel : k == 2 && _fleeArmed ? "本当に?" : SideLabels[k];
+        private string SideLabel(int k) => k == -1 ? _sim.RebootLabel : k == -2 ? _sim.OverclockLabel : k == -3 ? _sim.DetonateLabel : k == -4 ? _sim.JustGuardLabel : k == -5 ? _sim.BleedLabel : k == -6 ? _sim.HeatLabel : k == -7 ? _sim.CritLabel : k == -8 ? _sim.DeckLabel : k == 2 && _fleeArmed ? "本当に?" : SideLabels[k];
         private RectInt SideRect(int k)
         {
             int w = Game2DJpFont.Width(SideLabel(k)) + 2;
@@ -579,6 +579,8 @@ namespace UI.Game2D
                 if (s.HasHeat) { var r = SideRect(-6); Txt(SideLabel(-6), r.x + 1, r.y + 1, s.HeatLive ? Gold2 : Bone); }
                 // 会心率と会心倍率 (仮): 100% を超えた分は倍率に入る。 100% 以上なら金 (表示だけ)
                 if (s.HasCrit) { var r = SideRect(-7); Txt(SideLabel(-7), r.x + 1, r.y + 1, s.CritLive ? Gold2 : Bone); }
+                // 山札の品 (仮): この戦闘で使い捨てを使った回数 + この配線で使う数・別枠の倍率。 この配線で使い捨てを使うなら金 (表示だけ)
+                if (s.HasDeckItems) { var r = SideRect(-8); Txt(SideLabel(-8), r.x + 1, r.y + 1, s.DeckLive ? Gold2 : Bone); }
             }
             if (!GoVisible) return;
             bool en = s.ButtonEnabled;

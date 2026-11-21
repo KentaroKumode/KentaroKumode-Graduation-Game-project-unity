@@ -691,6 +691,14 @@ namespace UI.Game2D.Battle
             }
         }
 
+        // ── 山札の品 (2026-11-21・仮置き) ── 山札の品を持つ戦闘で、 この戦闘で使い捨てを使った回数 (+ この配線で使う数) を右の列に出す (表示だけ)。
+        //   この配線で使い捨てを使うなら金。 〈再利用のるつぼ〉〈灰から組む機関〉〈解体屋の袋〉が読む回数。
+        private TerminalBattleState DeckSt => CombatManager.Instance?.TerminalDeck?.state;
+        public bool HasDeckItems => DeckSt != null && DeckSt.deckItems != DeckItems.None;
+        public bool DeckLive => HasDeckItems && preview != null && preview.disposedNow > 0;
+        public string DeckLabel => !HasDeckItems ? "" : "使い捨て " + DeckSt.disposedTotal + (DeckLive ? "+" + preview.disposedNow : "")
+                                   + (preview != null && preview.damageMul != 1f ? " ×" + preview.damageMul.ToString("0.00") : "");
+
         /// <summary>出目 i を端子 s に挿せるか (挿せる数・払う充電・出目の条件)。 他の出目との関係を見る条件は、 そろう見込みがあれば通す
         /// (〈十字斬り〉の 1 個目を挿せるように)。 本当に発動するかは見込み (Resolve) が決める。</summary>
         public bool Accepts(int i, int s)

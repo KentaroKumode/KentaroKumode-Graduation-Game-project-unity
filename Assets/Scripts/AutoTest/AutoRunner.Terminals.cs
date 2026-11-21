@@ -103,7 +103,7 @@ namespace AutoTest
             ws.chargeUnits = (ch - env.charge) / DeckChargePipsPerDie;
             // ---- 今ターンの追加の効果 (効用の Core が本体の位置で掛ける) ----
             ws.damageMul = o.damageMul; ws.outPctAdd = o.outgoingPctAdd; ws.critMultAdd = o.critMultAdd; ws.forceCrit = o.forceCrit;
-            ws.ignoreDefense = o.ignoreDefense; ws.takenMul = o.takenMul; ws.enemyAtkMul = o.enemyAttackMul;
+            ws.ignoreDefense = o.ignoreDefense; ws.armorPen = o.armorPen; ws.takenMul = o.takenMul; ws.enemyAtkMul = o.enemyAttackMul;
             //   〈急所突きの針〉: 新しい式 (readOut) は最初の 1 撃だけで見る (ReadOutOneHit)。 旧の式は撃を分けないので、 攻撃するターン全体を会心・防御無視と見る (多段では過大)
             if (s.needleFirst && !s.readOut && o.attackDice > 0) { ws.forceCrit = true; ws.ignoreDefense = true; }
             ws.shield = o.shield - o.shieldSpend; ws.heal = o.heal; ws.selfDamage = o.selfDamage;
@@ -114,13 +114,8 @@ namespace AutoTest
             float sightFlat = 0f, sightHp = 0f;      // 与ダメ相当 (下で dw を掛ける) / HP 相当
             if (o.disposedNow > 0)
             {
-                // 使い捨てを使うたび (OnTerminalDispose・配線の解決の直後 = このターンの固定ダメの枠): 〈焼き入れの挟み〉
+                // 使い捨てを使うたび (OnTerminalDispose・配線の解決の直後 = このターンの固定ダメの枠): 〈焼き入れの挟み〉の防御無視ダメージ (撃の +2 は Resolve の 6c)
                 ws.extraDmg += o.disposedNow * sg.tongsDmg;
-                // 〈灰払いの箒〉: 次の撃の会心率 +采配 × 5% (使った数だけ)。 1 撃ぶんの与ダメ × 上がる会心率 × (会心倍率 − 1) と見る
-                //   shortcut: 1 撃の与ダメは 1 ターンの見込み ÷ 撃の数 (攻撃しないターンは次の攻撃に乗るので同じ値)・会心率 100% で頭打ちは見ない
-                if (sg.broomPct > 0f)
-                    sightFlat += Math.Min(1f, o.disposedNow * sg.broomPct) * Math.Max(0f, s.critMulEff - 1f)
-                               * DeckPerTurnDamage(in s, k) / Math.Max(1, o.attackHits.Count);
             }
             // 〈破城斧〉: 最初の 1 撃の時のシールド (持ち越し + このターンの端子の分) が 15 以上なら、 撃ごとにシールド 8 を使い その撃の最終与ダメージ +80%・防御無視。
             //   shortcut: 1 撃の与ダメは 1 ターンの見込み ÷ 撃の数・防御無視の分は見ない。 使ったシールドは、 半分 (毎ターン半減) を先の HP で引く。 このターンの被弾を吸えなくなる分は見ない
@@ -532,10 +527,8 @@ namespace AutoTest
         /// <see cref="PrepareDeckEval"/> が盤面を読むたびに組み直し、 <see cref="DeckSums"/> が挿し方ごとに読む (所持の検索を挿し方ごとにしないため)。</summary>
         private struct ItemSight
         {
-            /// <summary>〈焼き入れの挟み〉: 使い捨て 1 枚あたりの軽減不可ダメージ (4 + 采配・持っていなければ 0)。</summary>
+            /// <summary>〈焼き入れの挟み〉: 使い捨て 1 枚あたりの防御無視ダメージ (持っていなければ 0)。</summary>
             public int tongsDmg;
-            /// <summary>〈灰払いの箒〉: 使い捨て 1 枚あたり、 次の撃の会心率 +采配 × 5%。</summary>
-            public float broomPct;
             /// <summary>〈破城斧〉: シールド 15 以上のターン、 撃ごとにシールド 8 を使い その撃の最終与ダメージ +80%・防御無視。</summary>
             public bool siegeAxe;
             /// <summary>〈無害灯〉: 臨界 15 以上なら、 敵の直接攻撃で失う HP を無効にする (1 ターン 1 回・HarmlessLamp.Ready)。</summary>
@@ -543,7 +536,6 @@ namespace AutoTest
             /// <summary>臨界の盤面の写し (Kw.HeatState・HeatCore.Forecast に渡す) / 【過熱】/ 前のターンに爆発した / 〈二度目の打金〉〈烈刃〉を持つ。</summary>
             public HeatCore.State heat;
             public bool overheated, burstLastTurn, secondStrike, fierceBlade;
-            public int axDeck;
             /// <summary>〈石抜きの毒指輪〉: このターンまだ起爆していない (持っていなければ false)。 / 毒の品の旗・この戦闘で起爆した回数 (起爆のダメージの式 PoisonCore.Damage が読む)。</summary>
             public bool ring;
             public PoisonItems poisonItems;
@@ -560,9 +552,7 @@ namespace AutoTest
             {
                 var v = new ItemSight();
                 if (run == null || ctx == null) return v;
-                v.axDeck = ctx.AxisDepth(ItemSystem.PassiveSkills.AxisRules.Deck);
-                if (run.OwnsPassive(ItemIds.DeckTongs)) v.tongsDmg = ItemSystem.PassiveSkills.Effects.TemperTongs.Base + v.axDeck;
-                if (run.OwnsPassive(ItemIds.DeckBroom)) v.broomPct = ItemSystem.PassiveSkills.Effects.AshBroom.PctPerDepth * v.axDeck;
+                if (run.OwnsPassive(ItemIds.DeckTongs)) v.tongsDmg = ItemSystem.PassiveSkills.Effects.TemperTongs.Damage;
                 v.siegeAxe = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.SiegeAxe.Id);
                 v.lamp = ItemSystem.PassiveSkills.Effects.HarmlessLamp.Ready(ctx);
                 v.heat = ItemSystem.PassiveSkills.Keywords.Kw.HeatState(ctx);
@@ -1489,7 +1479,7 @@ namespace AutoTest
                 hand.Add(id);
             }
             if (copy != null) hand.Add(copy);      // 〈影写し〉の写し: 本体の DrawTurn と同じく、 引く枚数とは別に手札の最後へ
-            hand.AddRange(ret);                    // 戻る使い捨て (〈灰から組む機関〉〈緊急再装填〉〈解体屋の袋〉): 本体の DrawTurn と同じく写しの後ろへ
+            hand.AddRange(ret);                    // 戻る使い捨て (〈緊急再装填〉〈解体屋の袋〉): 本体の DrawTurn と同じく写しの後ろへ
             var nb = new List<string>(perm.Count + hand.Count);
             nb.AddRange(perm); nb.AddRange(hand);
             stopped = null;

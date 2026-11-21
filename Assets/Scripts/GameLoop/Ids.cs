@@ -190,7 +190,7 @@ namespace GameLoop
             TacticChisel = "目盛り削りの鑿", TacticSand = "反転の砂", TacticOrb = "倍化の共鳴玉", TacticMercury = "複製の水銀";
 
         // === 消耗品の連動品 (2026-11-20・item-overhaul-spec §7-2・名前は仮) ===
-        public const string LinkPouch = "帯革の薬嚢", LinkPride = "使い切りの矜持", LinkBottomless = "底抜けの小瓶", LinkSampleBox = "行商人の見本箱";
+        public const string LinkPouch = "帯革の薬嚢", LinkBottomless = "底抜けの小瓶", LinkSampleBox = "行商人の見本箱";
 
         // === 嵐・店・金のマクロ秘宝 (2026-11-20・item-overhaul-spec §9・名前は仮) ===
         //   嵐: 風見鶏・天幕 = GameManager.Instability / 気圧計 = MacroItemEffects。 店: 算盤・手形・紹介状 = ShopManager / 研ぎ代 = GameManager.Terminals + MacroItemEffects。
@@ -199,12 +199,13 @@ namespace GameLoop
         public const string MacroReceipt = "研ぎ代の領収書", MacroAbacus = "相場師の算盤", MacroPass = "黄金の通行手形";
         public const string MacroLetter = "目利きの紹介状", MacroAppraisal = "二股の鑑定書", MacroLedger = "古物商の交換帳";
 
-        // === 采配 (山札の軸) の 18 品 (2026-11-20・段 1-e・item-overhaul-spec §4 / §12-4・名前は仮) ===
-        //   出来事で書く品 (焼き入れの挟み・灰払いの箒) = DeckItemEffects.cs。 端子の解決・山札を変える品 = CombatSystem.TerminalCards の DeckItems の旗
-        //   (TerminalCards.DeckItemsOf)。 予備の差込口・整理された工具箱 = CombatManager.BeginTerminalDeck。
+        // === 山札の軸の 19 品 (full-item-rework-ledger §⑦) ===
+        //   端子の解決・山札を変える分 = CombatSystem.TerminalCards の DeckItems の旗 (TerminalCards.DeckItemsOf)。 予備の差込口・整理された工具箱 = CombatManager.BeginTerminalDeck。
+        //   出来事で書く分 (焼き入れの挟み の敵へのダメージ・仕込みの配電盤 の目盛りの削り) = DeckEffects.cs。
         public const string DeckTongs = "焼き入れの挟み", DeckSparePlug = "予備の差込口", DeckClasp = "留め金の栞", DeckAuxGear = "補助歯車", DeckIdleWeight = "空回りの錘";
         public const string DeckBroom = "灰払いの箒", DeckRewind = "早回しのゼンマイ", DeckSwitchboard = "仕込みの配電盤", DeckMold = "型抜きの金型", DeckToolbox = "整理された工具箱";
         public const string DeckCrucible = "再利用のるつぼ", DeckBlueprint = "無銘の設計図", DeckSeamless = "継ぎ目のない導線", DeckFolded = "折り目のついた札";
+        public const string DeckPride = "使い切りの矜持";
         public const string DeckBag = "解体屋の袋", DeckWorkbench = "常設の作業台", DeckAsh = "灰から組む機関", DeckEngine = "永久機関の主軸";
 
         // === 賽目 (役の軸) の 8 品 (2026-11-21・段 1-f・item-overhaul-spec §5 / §12-2・名前は仮) ===

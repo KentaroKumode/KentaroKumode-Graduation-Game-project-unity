@@ -44,6 +44,8 @@ namespace CombatSystem
         /// <summary>[計装] 超過会心率 (100% 超え) が会心倍率になった会心の回数 / 〈天眼の鍔〉で処刑した回数 / 〈必殺の照準器〉がもう 1 回発火した回数
         /// (ランの始めに BOT が 0 へ戻す・ランの記録の critOverflowFired / critExecuteFired / critRefireFired)。</summary>
         public static long CritOverflowFired, CritExecuteFired, CritRefireFired;
+        /// <summary>[計装] 使い捨ての端子を使った回数 / 山札を切り直した回数 (ランの始めに BOT が 0 へ戻す・ランの記録の deckDisposeFired / deckShuffleFired)。</summary>
+        public static long DeckDisposeFired, DeckShuffleFired;
 
         /// <summary>〈猫の手〉がこのターン先に挿した出目 (−1 = 無し)。 BOT の挿し方の方策はこの 1 組を固定として扱う (外さない)。</summary>
         public int CatPawDie => _catDie;
@@ -69,7 +71,7 @@ namespace CombatSystem
             else runDeck = TerminalCards.StartingDeck();
             _deck = new TerminalDeckState();
             _deck.BeginBattle(runDeck);
-            // 采配の品 (2026-11-20・段 1-e): 端子の解決と山札の出し入れを変える品の旗 (本体も BOT の写しも state から読む)
+            // 山札の品: 端子の解決と山札の出し入れを変える品の旗 (本体も BOT の写しも state から読む)
             _deck.state.deckItems = TerminalCards.DeckItemsOf(run);
             _deck.state.roleItems = TerminalCards.RoleItemsOf(run);      // 賽目の品 (2026-11-21・段 1-f)
             _deck.state.chargeItems = ChargeCore.ItemsOf(run);           // 充電の品 (再起動・オーバークロック・2026-11-21)
@@ -223,6 +225,7 @@ namespace CombatSystem
         private void ApplyTerminalOutcome(CombatContext ctx, TerminalOutcome o, ref int enemyAtkValue)
         {
             _termDamageMul = o.damageMul;
+            DeckDisposeFired += o.disposedNow;      // [計装]
             // 充電の支払いは 1 回ずつ (「充電を使うたび」の品が回数と量を数える・端子 → 再起動 → 〈逆さ避雷針〉 → オーバークロックの順)
             foreach (int pay in o.chargePays) ctx.ConsumeCharge(Math.Min(pay, ctx.GetCharge()));
             if (o.takenFlatCut > 0) ctx.playerFlatDamageReduction += o.takenFlatCut;      // 〈逆さ避雷針〉
@@ -264,6 +267,7 @@ namespace CombatSystem
             }
             if (o.enemyStunNext) ctx.nextTurnBuffs[YachtRoleEffects.EnemyStunKey] = 1f;
             if (o.ignoreDefense) ctx.playerArmorPen += DefenseFormula.IgnoreAll;
+            if (o.armorPen > 0) ctx.playerArmorPen += o.armorPen;      // 〈継ぎ目のない導線〉
             if (o.forceCrit) ctx.forceCritical = true;
             if (o.critMultAdd > 0f) ctx.criticalMultiplier += o.critMultAdd;      // 会心倍率は毎ターン組み直されるので、 このターンだけ効く
             if (o.outgoingPctAdd > 0f) ctx.AddOutgoingPct(o.outgoingPctAdd);
@@ -312,7 +316,7 @@ namespace CombatSystem
         private void RaiseDeckShuffles(CombatContext ctx)
         {
             if (_deck == null || ctx == null) return;
-            foreach (int n in _deck.TakeShuffled()) ItemSystem.PassiveSkills.Keywords.Kw.Raise(ctx, PassiveSkillTrigger.OnDeckShuffle, n);
+            foreach (int n in _deck.TakeShuffled()) { DeckShuffleFired++; ItemSystem.PassiveSkills.Keywords.Kw.Raise(ctx, PassiveSkillTrigger.OnDeckShuffle, n); }
         }
 
         /// <summary>撃破のボーナスを配る端子のうち、 このターンに発動したもの。 場の添字は <see cref="TerminalDeckState.FinishTurn"/> で書き換わるので、
