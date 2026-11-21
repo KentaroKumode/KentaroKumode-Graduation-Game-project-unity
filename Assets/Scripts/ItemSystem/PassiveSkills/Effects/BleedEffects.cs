@@ -177,7 +177,7 @@ namespace ItemSystem.PassiveSkills.Effects
             int b = ctx.enemyBleedStacks;
             if (b < Need) return;
             ctx.enemyAtkCutPct += Cut;
-            if (b < HeavyNeed || BossDown.ActiveNow || !BountyHunterHelper.IsBoss(ctx)) return;
+            if (b < HeavyNeed || BossDown.ActiveNow || !Rw.IsBoss()) return;
             var e = CombatManager.Instance?.CurrentEnemy;
             if (e == null || !Escalation.IsHeavyTurn(e, ctx.currentTurn) || e.heavyMul <= 0f) return;
             float mul = e.heavyMul + MetaProgression.MetaDebuffApplicator.GetHeavyMulBonus();

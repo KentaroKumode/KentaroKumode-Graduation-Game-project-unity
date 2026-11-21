@@ -158,15 +158,6 @@ namespace AutoTest
         public bool ReadEnemyPassivesEffective
             => v3.readEnemyPassives > 0 || (v3.readEnemyPassives < 0 && EffectiveWiringSkill == WiringSkill.Super);
 
-        /// <summary>[2026-11-10 試験] 盾〈黎明〉を「溜めて次の主攻撃 +%」にする形の率 (<see cref="ItemSystem.PassiveSkills.Effects.Daybreak.NextAttackPctPerUnit"/>)。
-        /// 0 = 今の挙動 (最大 HP を直接削る)。 ラン開始時に本体の static へ入れ、 ラン終了時に 0 へ戻す。</summary>
-        public float daybreakNextAttackPct = 0f;
-        /// <summary>[計装] 本体へ入れる値。 ラン開始後は直近のラン開始時に実際に入れた値、 ラン開始前 (ワーカーの実効状態はここで読む) は
-        /// ラン開始時に入れる値 (負は 0 に切り詰める)。 2026-11-10: 開始前に読むと 0 と出ていたので直した。 実際に効いたかは戦闘記録の dawnShots で見る。</summary>
-        public float DaybreakNextAttackPctApplied => _daybreakAppliedOnce ? _daybreakApplied : System.Math.Max(0f, daybreakNextAttackPct);
-        private bool _daybreakAppliedOnce;
-        private float _daybreakApplied;
-
         /// <summary>[測定用の物差し 2026-11-10] プレイヤーの主攻撃の最終ダメージに掛ける倍率 (<see cref="CombatSystem.EnemyHpLedger.ProbeMainMult"/>)。
         /// 既定 1 = 今の挙動と同じ。 ラン開始時に本体の static へ入れ、 ラン終了時に 1 へ戻す。 製品では使わない。</summary>
         public float probeMainMult = 1f;
@@ -256,6 +247,9 @@ namespace AutoTest
         /// <summary>[測定の口・2026-11-18] 最初に持つ賽を指定する (ADR-0015 の賽 20 種の確かめ)。 空 = 製品と同じ (角の取れた賽)。
         /// ゲームの数値ではない・乱数は引かない。 v3_queue の腕で <c>forceStartDie=逆巻きの賽</c> のように渡す。</summary>
         public string forceStartDie = "";
+        /// <summary>[測定の口・2026-11-21] 最初に持つ武器を指定する (武器 13 品の家系別の確かめ・Loadout.SwapWeapon)。 空 = 製品と同じ (職業の武器)。
+        /// ゲームの数値ではない・乱数は引かない。 v3_queue の腕で <c>forceStartWeapon=竜閃</c> のように渡す。</summary>
+        public string forceStartWeapon = "";
         /// <summary>[測定 2026-11-18・同上] 嵐の航行の道選び (<see cref="StormNavView.StormStep"/>) が、 第 4 層 (深さ 6) で道すがらの戦闘の点 (行き先でない・未起動の通常・精鋭・種別の見えていない点)
         /// を「その戦闘で失う HP の見込み (学習の戦闘名か種類の平均 × 最大 HP) × この倍率」だけ費用に入れる (着いた点は必ず起動するので、 道順は「どのマスを踏むか」)。 0 = 使わない = 既定。 乱数は引かない。</summary>
         public float navD6PathFightCost = 0f;

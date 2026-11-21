@@ -64,7 +64,6 @@ namespace AutoTest
             /// <summary>[計装 2026-11-10] この段の配線のターン数を攻撃の本数 0/1/2/3+ で数えたもの。</summary>
             public int[] atkHist;
             /// <summary>[計装 2026-11-10 黎明の溜める形] 攻撃したターンに乗った溜め (%・1 回 1 値)。</summary>
-            public int[] dawnShots;
             public bool isFightEnd; // OnBattleEnded で確定した1戦分か（チェーン途中形態は false）
             // この戦闘時点の装備（武器×ダイス勝率集計用）。武器は family_tN まで（業物+段階は区別しない）。
             public string weaponId = "";
@@ -200,9 +199,11 @@ namespace AutoTest
             /// 秘宝が出血を使った回数 / 〈百人切りの鉈〉の処刑の回数 (BleedSpendFired / BleedExecuteFired)。 臨界の爆発 / 〈柱折りの発破筒〉の正規のダウン (BurstFired / BurstBreakFired)。
             /// 超過会心率が倍率になった会心 / 〈天眼の鍔〉の処刑 / 〈必殺の照準器〉のもう 1 回 (CritOverflowFired / CritExecuteFired / CritRefireFired)。
             /// 使い捨ての端子を使った回数 / 山札の切り直し (DeckDisposeFired / DeckShuffleFired)。 役の成立 / 〈万象のゾロ目〉の格上げ (RoleFormedFired / RoleOmniFired)。
-            /// 見送り換金の回数 / 額 (AxisPool.RunSkips / RunSkipGold・額は〈銭皿〉込み・金の出入りは goldKeys の「見送り(…)」と totalCoinsSpent)。</summary>
+            /// 見送り換金の回数 / 額 (AxisPool.RunSkips / RunSkipGold・額は〈銭皿〉込み・金の出入りは goldKeys の「見送り(…)」と totalCoinsSpent)。
+            /// 武器の〈連刃〉の追撃 /〈処刑〉/〈画竜点睛〉/〈シールドバッシュ〉(CombatManager.WeaponChainFired ほか)。</summary>
             public int rebootFired, overclockFired, detonateFired, justGuardFired, bleedSpendFired, bleedExecuteFired, burstFired, burstBreakFired, critOverflowFired, critExecuteFired, critRefireFired,
-                deckDisposeFired, deckShuffleFired, roleFormedFired, roleOmniFired, skipFired, skipGold;
+                deckDisposeFired, deckShuffleFired, roleFormedFired, roleOmniFired, skipFired, skipGold,
+                weaponChainFired, weaponExecuteFired, weaponGaryoFired, weaponBashFired;
             public string chainPath = "", heatBurstInfo = "", attackSumInfo = "";
             public bool ashBaseOpened;
             /// <summary>[計装 2026-11-14] 〈徒労〉: 掛かった通常の戦闘の勝ちの数 (今の形 = 何も得られなかった戦闘 / 別の形 = 品を落とさなかった戦闘)・

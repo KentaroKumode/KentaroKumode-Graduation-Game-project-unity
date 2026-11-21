@@ -76,6 +76,13 @@ namespace ItemSystem.PassiveSkills.Effects
             if (deck != null && n > 0) deck.state.extraDrawNext += n;
         }
 
+        /// <summary>いまの敵がボスか (BossIds.IsBoss)。</summary>
+        public static bool IsBoss()
+        {
+            var enemy = CombatSystem.CombatManager.Instance?.CurrentEnemy;
+            return enemy != null && GameLoop.BossIds.IsBoss(enemy.id);
+        }
+
         /// <summary>いまの戦闘がエリート戦かボス戦か (StatModifierEffect の strongFoe と同じ判定)。</summary>
         public static bool StrongFoe()
         {

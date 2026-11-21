@@ -12,7 +12,7 @@ namespace ItemSystem.PassiveSkills
     ///   T3   : A-II + B-I
     ///   T3+  : A-II + B-II + 固有1
     ///   T4   : A-III + B-II + 固有1 + 固有2
-    ///   T4+  : A-III + B-III + 固有1 + 固有2
+    ///   T4+  : A-III + B-II + 固有1 + 固有2 (B は II まで・+ は武器の防御/貫通だけ上がる・2026-11-21)
     ///
     ///   T4+ が終点 (業物は 2026-08-10 に廃止)。
     ///   武器そのものの防御・貫通 (ADR-0013) はパッシブではなく items.json の武器の
@@ -40,10 +40,10 @@ namespace ItemSystem.PassiveSkills
         //
         //  | 家系 | 性格 | A (T2〜) | B (T3〜) | 固有1 (T3+) | 固有2 (T4) |
         //  |---|---|---|---|---|---|
-        //  | 短剣 | すり抜ける (開幕から装甲を抜ける) | 疾手 | 毒手 | 急所 | 処刑 |
-        //  | 剣   | 攻防一体 (分け続けるほど伸びる)   | 間合 | 一対一 | 切り返し | 不滅の刃 |
-        //  | 盾   | 受けて溜め、 まとめて放つ        | 城壁 | シールドバッシュ | 堅守の構え | 黎明 |
-        //  | 斧   | 叩き割る (殴るほど敵の防御が下がる) | 猛り | 鎧砕き | 捨て身 | 血令 |
+        //  | 短剣 | 超手数・先制・装甲素通し・処刑 | 疾手 | 連刃 | 急所 | 処刑 |
+        //  | 剣   | 攻防一体・盤面熟練・対単体   | 間合 | 一対一 | 切り返し | 不滅の刃 |
+        //  | 盾   | 鉄壁要塞・ジャスト見切り・反撃 | 城壁 | シールドバッシュ | 堅守の構え | 黎明 |
+        //  | 斧   | 重撃・装甲粉砕・全力攻撃     | 猛り | 鎧砕き | 捨て身 | 血令 |
         //
         //  2026-10-28 整理 (ADR-0013): 1 段に仕組み 1 つ。 家系ごとに防御と貫通の使い方を分けた。
         //
@@ -51,21 +51,22 @@ namespace ItemSystem.PassiveSkills
         //  (SwordReachI / Riposte / Destiny …) と日本語の表示名を別々に持っていた。
         // ============================================================
 
-        private static readonly string[] SwiftHand  = { "疾手I",   "疾手II",   "疾手III"   };
-        private static readonly string[] VenomHand  = { "毒手I",   "毒手II",   "毒手III"   };
-        private static readonly string[] SwordReach = { "間合I",   "間合II",   "間合III"   };
-        private static readonly string[] Duelist    = { "一対一I", "一対一II", "一対一III" };
-        private static readonly string[] Bulwark    = { "城壁I",   "城壁II",   "城壁III"   };
-        private static readonly string[] ShieldBash = { "シールドバッシュI", "シールドバッシュII", "シールドバッシュIII" };
-        private static readonly string[] Fervor     = { "猛りI",   "猛りII",   "猛りIII"   };
-        private static readonly string[] ArmorBreak = { "鎧砕きI", "鎧砕きII", "鎧砕きIII" };
+        //  A は I〜III・B は I〜II (full-item-rework-ledger §⑫)。 id は効果クラスが持つ (Effects.Fervor.Ids など)。
+        private static readonly string[] SwiftHand  = Effects.SwiftHand.Ids;
+        private static readonly string[] ChainBlade = Effects.ChainBlade.Ids;
+        private static readonly string[] SwordReach = Effects.SwordReach.Ids;
+        private static readonly string[] Duelist    = Effects.Duelist.Ids;
+        private static readonly string[] Bulwark    = Effects.Bulwark.Ids;
+        private static readonly string[] ShieldBash = Effects.ShieldBash.Ids;
+        private static readonly string[] Fervor     = Effects.Fervor.Ids;
+        private static readonly string[] ArmorBreak = Effects.ArmorBreak.Ids;
 
         // 家系プレフィックス → 構成（上のラダー配列より後に初期化されるよう宣言順に注意）
         private static readonly Dictionary<string, Family> Families = new Dictionary<string, Family>
         {
             [GameLoop.ItemIds.FamilySword]  = new Family { aLine = SwordReach, bLine = Duelist,    uniq1 = "切り返し",   uniq2 = "不滅の刃" },
             [GameLoop.ItemIds.FamilyAxe]    = new Family { aLine = Fervor,     bLine = ArmorBreak, uniq1 = "捨て身",     uniq2 = "血令" },
-            [GameLoop.ItemIds.FamilyDagger] = new Family { aLine = SwiftHand,  bLine = VenomHand,  uniq1 = "急所",       uniq2 = "処刑" },
+            [GameLoop.ItemIds.FamilyDagger] = new Family { aLine = SwiftHand,  bLine = ChainBlade, uniq1 = "急所",       uniq2 = "処刑" },
             [GameLoop.ItemIds.FamilyShield] = new Family { aLine = Bulwark,    bLine = ShieldBash, uniq1 = "堅守の構え", uniq2 = "黎明" },
             // curse 系列 (curse_t1〜t4) は 2026-07-17 削除。 uniq1=CurseBind / uniq2=Abyss は class 残置・アイテムから参照なし。
             // 複合武器 6 品 (swordaxe/swordshield/sworddagger/axeshield/axedagger/shielddagger) は
@@ -96,9 +97,9 @@ namespace ItemSystem.PassiveSkills
             //   T3  : A-II + B-I
             //   T3+ : A-II + B-II + 固有1
             //   T4  : A-III + B-II + 固有1 + 固有2
-            //   T4+ : A-III + B-III + 固有1 + 固有2
+            //   T4+ : A-III + B-II + 固有1 + 固有2
             int aLv = stage == 0 ? 1 : (stage <= 3 ? 2 : 3);
-            int bLv = stage < 2 ? 0 : (stage == 2 ? 1 : (stage < 5 ? 2 : 3));
+            int bLv = stage < 2 ? 0 : (stage == 2 ? 1 : 2);
 
             result.Add(fam.aLine[aLv - 1]);
             if (bLv > 0) result.Add(fam.bLine[bLv - 1]);

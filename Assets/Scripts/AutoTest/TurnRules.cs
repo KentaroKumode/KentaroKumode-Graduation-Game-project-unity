@@ -1,5 +1,4 @@
 using ItemSystem.PassiveSkills.Effects;
-using UnityEngine;
 
 namespace AutoTest
 {
@@ -15,42 +14,22 @@ namespace AutoTest
     /// </summary>
     public static class TurnRules
     {
-        /// <summary>剣〈切り返し〉: 攻撃と防御の端子を両方挿したターン、 ブロック合計 × <see cref="GuardCut.Rate"/> を攻撃へ。</summary>
+        /// <summary>剣〈切り返し〉: 攻撃と防御の端子を両方挿したターン、 ブロック合計 × 0.6 (切り上げ) を攻撃へ。</summary>
         public static int GuardCutBonus(int blockSum) => CombatSystem.CombatRules.GuardCutBonus(blockSum);
 
-        /// <summary>盾〈シールドバッシュ〉: 全部攻撃のターン、 シールドを使い切って × 率 を攻撃へ。</summary>
-        public static int BashBonus(int shield, float rate) => CombatSystem.CombatRules.BashBonus(shield, rate);
+        /// <summary>盾〈シールドバッシュ〉: 防御なしのターン、 シールド (半分 / 全部) を使った量 × 率% を攻撃へ。</summary>
+        public static int BashBonus(int spent, int ratePct) => CombatSystem.CombatRules.BashBonus(spent, ratePct);
 
-        /// <summary>剣〈不滅の刃〉が与ダメ倍率の池へ足す量 (+0.08 × 連続数)。 <paramref name="streakAfter"/> = このターンで続いた後の連続数。
-        /// <b>本体は池 (ctx.outgoingDamageMultiplier・加算) へ足す</b> (WeaponFamilyEffects.UndyingBlade → Fam.Outgoing)。
-        /// 池と別に掛けると、 池が大きいほど過大になる (#122)。</summary>
-        public static float UndyingAdd(int streakAfter) => UndyingBlade.PerTurn * streakAfter;
+        /// <summary>盾〈城壁〉: ジャスト防御なら固定量・完全に受け止めたら余ったブロック × 率%・それ以外 0。</summary>
+        public static int BulwarkGain(int block, int enemyAtk, int ratePct, bool just, int justShield)
+            => CombatSystem.CombatRules.BulwarkGain(block, enemyAtk, ratePct, just, justShield);
 
-        /// <summary>剣〈不滅の刃〉の与ダメ倍率 (池が 1 のときの値 = 1 + <see cref="UndyingAdd"/>)。 池が 1 でないなら
-        /// <c>(池 + UndyingAdd) / 池</c> を使うこと (#122)。</summary>
-        public static float UndyingMul(int streakAfter) => 1f + UndyingAdd(streakAfter);
-
-        /// <summary>盾〈城壁〉: 完全に受け止めたら (ブロック ≥ 敵の攻撃)、 余ったブロック × 率 をシールドへ。 受け止められなければ 0。</summary>
-        public static int BulwarkGain(int block, int enemyAtk, float rate)
-            => CombatSystem.CombatRules.BulwarkGain(block, enemyAtk, rate);
-
-        /// <summary>盾〈黎明〉: HP が減らなかったターンに敵の最大 HP を削る量。 敵の攻撃が <c>PerUnit</c> 未満なら 0。
+        /// <summary>盾〈黎明〉: HP が減らなかったターンに敵の最大 HP を削る量 (ジャスト防御なら 8%)。 敵の攻撃が <c>PerUnit</c> 未満なら 0。
         /// 呼ぶ側が「HP が減らなかった」を確かめてから足すこと。</summary>
-        public static int DaybreakDamage(int enemyMaxHp, int enemyAtk)
+        public static int DaybreakDamage(int enemyMaxHp, int enemyAtk, bool just)
         {
-            if (Daybreak.NextAttackPctPerUnit > 0f) return 0;   // [2026-11-10 試験] 溜めて次の主攻撃へ乗せる形のときは、 敵の HP を直接削らない
             int units = enemyAtk / Daybreak.PerUnit;
-            return units > 0 ? CombatSystem.CombatRules.DaybreakCut(enemyMaxHp, units) : 0;
-        }
-
-        /// <summary>[2026-11-10 試験] 盾〈黎明〉の溜める形 (<see cref="Daybreak.NextAttackPctPerUnit"/> &gt; 0): HP が減らなかったターンに溜まる
-        /// 「次の主攻撃 +%」の価値を、 先のターンの 1 ターンの与ダメの見込み <paramref name="nextMain"/> × 溜まる率で見積もる。 溜める形でなければ 0。</summary>
-        public static int DaybreakDeferredValue(float nextMain, int enemyAtk)
-        {
-            float pct = Daybreak.NextAttackPctPerUnit;
-            int units = enemyAtk / Daybreak.PerUnit;
-            if (pct <= 0f || units <= 0 || nextMain <= 0f) return 0;
-            return Mathf.RoundToInt(nextMain * pct * units);
+            return units > 0 ? CombatSystem.CombatRules.DaybreakCut(enemyMaxHp, units, just) : 0;
         }
 
         /// <summary>処刑人の烙印: 攻撃終了時の HP が最大の 20% 以下なら即死。 <paramref name="hpAfterHit"/> = 被弾後の HP。</summary>

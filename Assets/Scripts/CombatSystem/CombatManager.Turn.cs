@@ -938,8 +938,8 @@ namespace CombatSystem
             //   自攻撃前に true、敵攻撃前に false へ toggle する (収支トリガーは §収支計算 で最終確定)
             ctx.playerWonRoll = true; ctx.playerLostRoll = false;
             // 2026-07-25: 消費 (cons_atk_*) の攻撃バフ。旧モデルでは consDiceRoll=勝敗判定のみだったが、
-            // 相互攻撃モデルでは攻撃値に直接加算する (竜閃 rollPurity 中は無効)。
-            int consAtk = ctx.rollPurity ? 0 : ctx.consDiceRoll;
+            // 相互攻撃モデルでは攻撃値に直接加算する。
+            int consAtk = ctx.consDiceRoll;
             // 遺物 (§15-5) 攻撃+N。 パッシブ由来の mutualAttackBonus と同じ枠へ足す。
             int relicAtk = MetaProgression.Relics.RelicApplicator
                            .GetAttackBonus(GameLoop.GameManager.Instance?.Run, ctx);
@@ -977,6 +977,12 @@ namespace CombatSystem
             {
                 int outside = playerAttackPower + itemAtk + consAtk + relicAtk;
                 for (int h = 0; h < hitBases.Count; h++) hitBases[h] += outside;
+            }
+            // 短剣〈連刃〉: 攻撃の端子 2 枚以上のターン、 最後に追撃を 1 撃 (攻撃 = 武器の攻撃力 × 率・敵の防御を無視・撃ごとの効果は通常の撃と同じ)
+            int chainHit = -1;
+            {
+                int cb = attackDiceCount > 0 ? ItemSystem.PassiveSkills.Effects.ChainBlade.HitBase(ctx, playerAttackPower) : 0;
+                if (cb > 0 && hitBases.Count >= ItemSystem.PassiveSkills.Effects.ChainBlade.NeedTerminals) { hitBases.Add(cb); chainHit = hitBases.Count - 1; WeaponChainFired++; }
             }
             // atkBase = 1 撃ずつの合計 (画面・計装が読む)。 1 撃ずつの量は hitBases
             int atkBase = hitBases.Sum();
@@ -1067,7 +1073,7 @@ namespace CombatSystem
             bool refire = false; float sniperAdd = 0f;
             for (int h = 0; h < nHits; h++)
             {
-                ctx.hitIndex = h; ctx.forceCritThisHit = refire; ctx.critSkipRoll = refire; ctx.hitFinalDamagePct = 0; ctx.hitOutgoingPct = 0; ctx.hitIgnoreDefense = false;   // 撃ごとの値 (〈抜き打ちの作法〉〈加重の拳套〉など)
+                ctx.hitIndex = h; ctx.forceCritThisHit = refire; ctx.critSkipRoll = refire; ctx.hitFinalDamagePct = 0; ctx.hitOutgoingPct = 0; ctx.hitIgnoreDefense = h == chainHit; ctx.hitArmorPen = 0;   // 撃ごとの値 (〈抜き打ちの作法〉〈加重の拳套〉・〈連刃〉の追撃は防御を無視)
                 ctx.hitFaceMax = CritCore.HitFaceMax(term, playerDice, h);   // 〈狙い目の刻み〉が読む
                 if (h > 0 || refire)
                 {
@@ -1088,13 +1094,14 @@ namespace CombatSystem
                 //   出血の品 (5f・BleedCore・2026-11-21): その撃が当たった直後に、 撃ごとの出血を入れる (次の撃は増えた出血を見る)
                 if (d > 0 && h < hitBases.Count && h < term.attackHitBleed.Count && term.attackHitBleed[h] > 0) ctx.AddEnemyBleed(term.attackHitBleed[h]);
                 if (needle || oc) ctx.playerArmorPen = needlePen;
+                if (d > 0 && h < hitBases.Count) ItemSystem.PassiveSkills.Effects.ArmorBreak.OnHit(ctx);   // 斧〈鎧砕き〉: 撃が当たったら敵の防御 −N (この撃の防御の計算の後)
                 if (h == 0) { afterPool = ctx.outgoingDamageMultiplier; afterCritMul = ctx.criticalMultiplier; afterCritAdd = ctx.critRatePctAdd; }
                 hitDealt.Add(d); hitCrit.Add(c);
                 dealtDmg += d; dealtFixed += f; isCrit |= c;
                 if (refire) { refire = false; CritRefireFired++; Debug.Log($"[必殺の照準器] 会心の撃をもう 1 回発火 → {d}"); }
                 else if (sniper && c && h == 0) { refire = true; sniperAdd = ctx.lastCritAddPct; h--; }
             }
-            ctx.forceCritThisHit = false; ctx.critSkipRoll = false; ctx.hitFinalDamagePct = 0; ctx.hitOutgoingPct = 0; ctx.hitIgnoreDefense = false;
+            ctx.forceCritThisHit = false; ctx.critSkipRoll = false; ctx.hitFinalDamagePct = 0; ctx.hitOutgoingPct = 0; ctx.hitIgnoreDefense = false; ctx.hitArmorPen = 0;
             if (nHits > 1)
             {
                 // この後の処理 (計装・画面の倍率) は 1 撃目の後の値を読む前提なので、 1 撃目の後の値へ戻す
@@ -1183,7 +1190,7 @@ namespace CombatSystem
                         $"{(currentEnemy != null ? currentEnemy.displayName : ctx.bossId)} T{ctx.currentTurn} "
                       + $"主{dealtDmg} 固{dealtFixed} | crit={isCrit} critMul={ctx.criticalMultiplier:F2} "
                       + $"outMul={ctx.outgoingDamageMultiplier:F2} 臨界={ctx.rinkaiMeter}/{ctx.rinkaiThreshold} 脆弱={ctx.enemyVulnerabilityMultiplier:F2} "
-                      + $"armorPen={ctx.playerArmorPen} 敵防御={ctx.enemyDefense} 画竜={ctx.garyoProc} "
+                      + $"armorPen={ctx.playerArmorPen} 敵防御={ctx.enemyDefense} "
                       + $"atkDice={(int)ctx.GetAccumulated("mutualAttackDiceCount")} "
                       + $"pRoll={ctx.playerDiceTotal} 武器={GameLoop.GameManager.Instance?.Run?.equippedWeaponId}");
                 }
@@ -1242,6 +1249,17 @@ namespace CombatSystem
                         EnemyHpLedger.Land("処刑(百人切りの鉈)", left, left);
                         Debug.Log($"[百人切りの鉈] 出血 {ctx.enemyBleedStacks} の敵 HP {left} ≤ {line} → 倒す");
                     }
+                }
+                // 短剣〈処刑〉: 撃が当たったあと、 敵の残り HP が 15% 以下 (ボス 10% 以下) なら倒す。 CanExecuteEnemy で止まる
+                if (hitDmg > 0 && enemyHP > 0 && currentEnemy != null
+                    && ItemSystem.PassiveSkills.Effects.Execution.Kills(ctx, enemyHP, ctx.enemyMaxHP, GameLoop.BossIds.IsBoss(currentEnemy.id)))
+                {
+                    int left = enemyHP;
+                    enemyHP = 0;
+                    WeaponExecuteFired++;
+                    HpLossDiag.Add("経路:処刑(短剣)", left);
+                    EnemyHpLedger.Land("処刑(短剣)", left, left);
+                    Debug.Log($"[処刑] 敵 HP {left}/{ctx.enemyMaxHP} → 倒す");
                 }
                 int broke = NoteBossDownMainHit(hitDmg, ctx.currentTurn);   // ボスのダウン (2026-11-14): 目盛りを割れるのは通常攻撃だけ (固定ダメの枠より前の HP で判定)
                 // 端子〈崩し斬り〉(2026-11-20): この撃 (撃 h = 攻撃の端子 h 枚目) で目盛りを割ったら、 最大 HP の 5% の軽減不可 (預かり・ターンの最後に通る。 通常攻撃ではないので次の目盛りは割らない)

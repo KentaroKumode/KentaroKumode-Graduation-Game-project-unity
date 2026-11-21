@@ -142,6 +142,8 @@ namespace ItemSystem.PassiveSkills
         public int hitFinalDamagePct;
         /// <summary>[perTurn] (撃ごとに CombatManager が false に戻す) この 1 撃は敵の防御を無視する (〈破城斧〉が OnPreDealDamage で立てる・CombatManager.Damage の防御の計算)。</summary>
         public bool hitIgnoreDefense;
+        /// <summary>[perTurn] (撃ごとに CombatManager が 0 に戻す) この 1 撃だけ敵の防御を N 無視する (貫通に足す・剣〈切り返し〉の最初の 1 撃が OnPreDealDamage で書く・CombatManager.Damage の防御の計算)。</summary>
+        public int hitArmorPen;
         /// <summary>[perTurn] (撃ごとに CombatManager が書く) この撃 (攻撃の端子 1 枚) に挿した目の一番大きい値 (CombatSystem.CritCore.HitFaceMax・0 = 目なし)。 〈狙い目の刻み〉が読む。 BeginNewTurn で 0。</summary>
         public int hitFaceMax;
         /// <summary>[perTurn] (撃ごとに CombatManager が false に戻す) この撃は会心の乱数を引かない (〈必殺の照準器〉がもう 1 回発火した撃・会心は forceCritThisHit で決まる)。
@@ -765,11 +767,6 @@ namespace ItemSystem.PassiveSkills
         // ===== エリート: 精鋭ハーピィ「死翔」 =====
         public bool consumablesLocked;    // [persistent] この戦闘中、消費アイテム使用不可（戦闘開始時に付与・戦闘ごとに新規生成でリセット）
 
-        // ===== 竜閃 =====
-        public bool rollPurity;           // [persistent] 無我無心: カスタムダイス以外の補正を一切受けない（戦闘中持続）
-        public bool garyoProc;            // [perTurn] 画竜点睛: このターン発動したか（毎ターンリセット）
-        public int  garyoDieValue;        // [perTurn] 画竜点睛: 発動時の出目
-
         /// <summary>
         /// コンテキストを初期化
         /// </summary>
@@ -1073,7 +1070,7 @@ namespace ItemSystem.PassiveSkills
             isCritical = false;
             forceCritical = false;
             forceCritThisHit = false;
-            hitIndex = 0; hitCount = 0; hitFinalDamagePct = 0; hitOutgoingPct = 0; hitIgnoreDefense = false; hitFaceMax = 0; critSkipRoll = false;
+            hitIndex = 0; hitCount = 0; hitFinalDamagePct = 0; hitOutgoingPct = 0; hitIgnoreDefense = false; hitArmorPen = 0; hitFaceMax = 0; critSkipRoll = false;
             critSuppressed = false;
             lastCritAddPct = 0f;
             critRatePctAdd = 0f;
@@ -1129,8 +1126,6 @@ namespace ItemSystem.PassiveSkills
 
             // その他 単ターンフラグ
             truceThisTurn = false;
-            garyoProc = false;              // 画竜点睛は毎ターン判定（rollPurity は戦闘中持続）
-            garyoDieValue = 0;
 
             // 遺物の刻印 (§15-5) 判定用。 配線は毎ターン確定するので perTurn。
             blockWiredThisTurn = false;

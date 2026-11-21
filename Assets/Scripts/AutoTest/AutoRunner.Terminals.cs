@@ -88,6 +88,7 @@ namespace AutoTest
             {
                 if (o.kindOfDie[i] == DiceTerminal.Block && rolls[i] > ws.maxBlockDie) ws.maxBlockDie = rolls[i];
                 if (o.kindOfDie[i] == DiceTerminal.Attack && rolls[i] > ws.atkFaceMax) ws.atkFaceMax = rolls[i];   // 〈鷹匠の革手袋〉(本体は MutualKeys.AttackDiceMax)
+                if (o.kindOfDie[i] != DiceTerminal.Attack && o.kindOfDie[i] != DiceTerminal.None) ws.otherDice += rolls[i];   // 竜閃〈無我無心〉
             }
             //   〈狙い目の刻み〉: 撃ごとの挿した目 (本体の撃の輪と同じ CritCore.HitFaceMax)
             if (s.aim && o.attackHits.Count > 0)

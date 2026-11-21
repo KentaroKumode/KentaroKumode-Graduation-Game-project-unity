@@ -8,7 +8,7 @@ namespace ItemSystem.PassiveSkills
     /// JSONの internalName → IPassiveSkillEffect のマッピング
     /// 
     /// 新スキル追加手順:
-    /// 1. AllPassiveSkillEffects.cs に IPassiveSkillEffect 実装クラスを追加
+    /// 1. Effects/ の軸別ファイル (ChargeEffects.cs など・武器は WeaponFamilyEffects.cs) に IPassiveSkillEffect 実装クラスを追加
     /// 2. RegisterAll() 内に Register(new XxxSkill()) を1行追加
     /// </summary>
     public static class PassiveSkillRegistry
@@ -236,6 +236,16 @@ namespace ItemSystem.PassiveSkills
             Register(new SaberWaltz()); Register(new EspadaPasodoble()); Register(new FleuretBallet()); Register(new FalconTango()); Register(new BladeDance());
         }
 
+        /// <summary>武器 13 品のスキル (2026-11-21・WeaponFamilyEffects.cs・full-item-rework-ledger §⑫)。 段の割り当ては WeaponProgression.Families、 竜閃は items.json の skills。</summary>
+        private static void RegisterWeapon()
+        {
+            for (int i = 0; i < 3; i++) { Register(new Fervor(i)); Register(new SwordReach(i)); Register(new SwiftHand(i)); Register(new Bulwark(i)); }
+            for (int i = 0; i < 2; i++) { Register(new ArmorBreak(i)); Register(new Duelist(i)); Register(new ChainBlade(i)); Register(new ShieldBash(i)); }
+            Register(new Recklessness()); Register(new BloodEdict()); Register(new GuardCut()); Register(new UndyingBlade());
+            Register(new VitalStrike()); Register(new Execution()); Register(new SteadfastStance()); Register(new Daybreak());
+            Register(new GaryoTensei()); Register(new MugaMushin());
+        }
+
         private static void RegisterAll()
         {
             RegisterCharge();
@@ -248,6 +258,7 @@ namespace ItemSystem.PassiveSkills
             RegisterRole();
             RegisterGold();
             RegisterGeneral();
+            RegisterWeapon();
 
             // ============================
             //  汎用パッシブ
@@ -262,29 +273,6 @@ namespace ItemSystem.PassiveSkills
             // 活力
             // VitalityI はステータス化
 
-            // ============================
-            //  武器家系 専用ラダー (2026-09-05)
-            //   共通ラダー (筋力/追撃/心眼/頑強/活力) の借用をやめ、家系ごとに 2 本ずつ持たせた。
-            //   正本: WeaponFamilyEffects.cs / 割り当ては WeaponProgression.Families
-            // ============================
-            //   2026-10-28 整理: 1 段に仕組み 1 つ・家系ごとに防御と貫通の使い方を分けた (ADR-0013)。
-            Register(new SwiftHandI());   // II / III はステータス化
-            Register(new VenomHandI());   Register(new VenomHandII());   Register(new VenomHandIII());
-            Register(new VitalStrike());  // 急所: 会心は防御無視 (会心率 +10% は stats)
-            // 処刑はステータスだけ (残HP 35% 以下で与ダメ +80%・2026-11-11 に 25% から)
-            Register(new SwordReachI());  // II / III はステータス化
-            Register(new DuelistIII());   // I / II はステータス化
-            Register(new GuardCut());     // 切り返し
-            Register(new UndyingBlade()); // 不滅の刃
-            Register(new BulwarkI());     Register(new BulwarkII());     Register(new BulwarkIII());
-            Register(new ShieldBashLadderI()); Register(new ShieldBashLadderII()); Register(new ShieldBashLadderIII());
-            Register(new SteadfastStance());   // 堅守の構え
-            Register(new Daybreak());          // 黎明
-            Register(new FervorI());      // II / III はステータス化 (段 3・経過ターン 1 につき 攻撃に挿した出目 +10%・上限 9 / 14)
-            Register(new ArmorBreakI());  Register(new ArmorBreakII());  Register(new ArmorBreakIII());
-            // 捨て身はステータスだけ (HP 割合で劣勢)
-            Register(new BloodEdict());   // 血令
-
             // 複合武器 T4 の固有 6 種は 2026-09-21 削除 (複合武器の廃止・GAME.md §24)。
             // 反攻 / 大鉈 / パリィ / 衛士の慣い / 復讐 / 蝕夜 / 処刑のダイス潰し / 果たし合い は 2026-10-28 削除 (GAME.md §24)。
 
@@ -298,8 +286,6 @@ namespace ItemSystem.PassiveSkills
             //  ダイス固有パッシブ
             // ============================
             // Destiny はステータス化 (単体戦)
-            // 武器Tier段階補正 (Lightweight/Mastery/Skill) は 2026-07-15 廃止
-            // (筋力とロールが重複)。クラス実装は AllPassiveSkillEffects に残置 = items.json 参照は将来的に別スキルへ差し替え要
 
             // 処刑・対タンク・役・触媒（2026-05-29 追加）
             // LifestealII はステータス化
@@ -313,9 +299,6 @@ namespace ItemSystem.PassiveSkills
 
             // 2026-06-05 会心バリエーション（OnCriticalDamage / OnCriticalCheck）
 
-            // 竜閃（ユニーク武器）
-            Register(new MugaMushin());
-            Register(new GaryoTensei());
 
             // 2026-07-15 鈍器系 (新規 9 種・会心を犠牲に非会心火力を伸ばすトレードオフ型)
             // 重い一撃 / 破城槌 / 鈍器 はステータス化 (items.json の stats)

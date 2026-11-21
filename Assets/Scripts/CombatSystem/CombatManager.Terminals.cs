@@ -48,6 +48,9 @@ namespace CombatSystem
         public static long DeckDisposeFired, DeckShuffleFired;
         /// <summary>[計装] 役が成立した回数 / 〈万象のゾロ目〉が 2 個そろいをゾロ目として扱った回数 (ランの始めに BOT が 0 へ戻す・ランの記録の roleFormedFired / roleOmniFired)。</summary>
         public static long RoleFormedFired, RoleOmniFired;
+        /// <summary>[計装] 武器: 〈連刃〉の追撃 / 〈処刑〉で倒した / 〈画竜点睛〉が働いた撃 / 〈シールドバッシュ〉でシールドを攻撃にした
+        /// (ランの始めに BOT が 0 へ戻す・ランの記録の weaponChainFired / weaponExecuteFired / weaponGaryoFired / weaponBashFired)。</summary>
+        public static long WeaponChainFired, WeaponExecuteFired, WeaponGaryoFired, WeaponBashFired;
 
         /// <summary>〈猫の手〉がこのターン先に挿した出目 (−1 = 無し)。 BOT の挿し方の方策はこの 1 組を固定として扱う (外さない)。</summary>
         public int CatPawDie => _catDie;

@@ -413,7 +413,7 @@ namespace ItemSystem.PassiveSkills.Effects
         {
             if (!Held(ctx) || ctx.enemyMaxHP <= 0) return -1;
             float frac = System.Math.Min(MaxPct, ctx.GetAccumulated(Kw.LastCritMulKey) * PctPerMul);
-            if (BountyHunterHelper.IsBoss(ctx)) frac /= 2f;
+            if (Rw.IsBoss()) frac /= 2f;
             return frac > 0f ? (int)(ctx.enemyMaxHP * frac) : -1;
         }
     }

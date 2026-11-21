@@ -86,7 +86,7 @@ namespace AutoTest.ParallelSweep
         /// <summary>[計装 2026-11-13] 基地の版 (true = 再訪)・選んだ選択肢・起きた時の深さ 6 の航行の手番 (起きていなければ -1)・手記の最後の頁を開いたか。</summary>
         public bool ashBaseRevisit;
         public int ashBaseChoice = -1, ashBaseTurn = -1;
-        public int chainMaxDepth, chainRepeats, chainGuardHits, rebootFired, overclockFired, detonateFired, justGuardFired, bleedSpendFired, bleedExecuteFired, burstFired, burstBreakFired, critOverflowFired, critExecuteFired, critRefireFired, deckDisposeFired, deckShuffleFired, roleFormedFired, roleOmniFired, skipFired, skipGold;
+        public int chainMaxDepth, chainRepeats, chainGuardHits, rebootFired, overclockFired, detonateFired, justGuardFired, bleedSpendFired, bleedExecuteFired, burstFired, burstBreakFired, critOverflowFired, critExecuteFired, critRefireFired, deckDisposeFired, deckShuffleFired, roleFormedFired, roleOmniFired, skipFired, skipGold, weaponChainFired, weaponExecuteFired, weaponGaryoFired, weaponBashFired;
         public string chainPath = "", heatBurstInfo = "", attackSumInfo = "";
         public bool ashBaseOpened;
         /// <summary>[計装 2026-11-14] 〈徒労〉の記録 (AutoRunner.RunRec と同じ意味): 掛かった通常の戦闘の勝ち・止めた品のドロップ・開けた宝箱・〈徒労〉で空だった宝箱。</summary>
@@ -126,7 +126,7 @@ namespace AutoTest.ParallelSweep
                 layerFlow = r.layerFlow != null ? r.layerFlow.ToArray() : Array.Empty<int>(),
                 metaRanks = r.metaRanks ?? "",
                 startClass = r.startClass ?? "",
-                ashBase = r.ashBase, ashBaseRevisit = r.ashBaseRevisit, ashBaseChoice = r.ashBaseChoice, chainMaxDepth = r.chainMaxDepth, chainRepeats = r.chainRepeats, chainGuardHits = r.chainGuardHits, rebootFired = r.rebootFired, overclockFired = r.overclockFired, detonateFired = r.detonateFired, justGuardFired = r.justGuardFired, bleedSpendFired = r.bleedSpendFired, bleedExecuteFired = r.bleedExecuteFired, burstFired = r.burstFired, burstBreakFired = r.burstBreakFired, critOverflowFired = r.critOverflowFired, critExecuteFired = r.critExecuteFired, critRefireFired = r.critRefireFired, deckDisposeFired = r.deckDisposeFired, deckShuffleFired = r.deckShuffleFired, roleFormedFired = r.roleFormedFired, roleOmniFired = r.roleOmniFired, skipFired = r.skipFired, skipGold = r.skipGold, chainPath = r.chainPath ?? "", heatBurstInfo = r.heatBurstInfo ?? "", attackSumInfo = r.attackSumInfo ?? "", ashBaseTurn = r.ashBaseTurn,
+                ashBase = r.ashBase, ashBaseRevisit = r.ashBaseRevisit, ashBaseChoice = r.ashBaseChoice, chainMaxDepth = r.chainMaxDepth, chainRepeats = r.chainRepeats, chainGuardHits = r.chainGuardHits, rebootFired = r.rebootFired, overclockFired = r.overclockFired, detonateFired = r.detonateFired, justGuardFired = r.justGuardFired, bleedSpendFired = r.bleedSpendFired, bleedExecuteFired = r.bleedExecuteFired, burstFired = r.burstFired, burstBreakFired = r.burstBreakFired, critOverflowFired = r.critOverflowFired, critExecuteFired = r.critExecuteFired, critRefireFired = r.critRefireFired, deckDisposeFired = r.deckDisposeFired, deckShuffleFired = r.deckShuffleFired, roleFormedFired = r.roleFormedFired, roleOmniFired = r.roleOmniFired, skipFired = r.skipFired, skipGold = r.skipGold, weaponChainFired = r.weaponChainFired, weaponExecuteFired = r.weaponExecuteFired, weaponGaryoFired = r.weaponGaryoFired, weaponBashFired = r.weaponBashFired, chainPath = r.chainPath ?? "", heatBurstInfo = r.heatBurstInfo ?? "", attackSumInfo = r.attackSumInfo ?? "", ashBaseTurn = r.ashBaseTurn,
                 ashBaseOpened = r.ashBaseOpened,
                 toilNothingBattles = r.toilNothingBattles, toilBlockedDrops = r.toilBlockedDrops, chestsOpened = r.chestsOpened, toilEmptyChests = r.toilEmptyChests,
                 shelves = r.shelves != null ? r.shelves.ToArray() : Array.Empty<string>(), policySig = r.policySig ?? "",
@@ -151,7 +151,7 @@ namespace AutoTest.ParallelSweep
                     hpLedger = c.hpLedger ?? Array.Empty<float>(), shownFloor = c.shownFloor,
                     axisAtStart = c.axisAtStart ?? Array.Empty<int>(),
                     mainPred = c.mainPred, mainPredCorr = c.mainPredCorr, mainActual = c.mainActual,
-                    atkHist = c.atkHist ?? Array.Empty<int>(), dawnShots = c.dawnShots ?? Array.Empty<int>(),
+                    atkHist = c.atkHist ?? Array.Empty<int>(),
                     escRises = c.escRises, instEsc = c.instEsc, downs = c.downs,
                     heavyHits = c.heavyHits, heavyTaken = c.heavyTaken, heavyMax = c.heavyMax,
                     stormIn = c.stormIn, stormPhase = c.stormPhase, stormInst = c.stormInst,
@@ -217,7 +217,6 @@ namespace AutoTest.ParallelSweep
         /// <summary>[計装 2026-11-10] 配線のターン数を攻撃の本数 0/1/2/3+ で数えたもの。</summary>
         public int[] atkHist;
         /// <summary>[計装 2026-11-10] 黎明の溜める形で、 攻撃したターンに乗った溜め (%)。</summary>
-        public int[] dawnShots;
         /// <summary>[計装 2026-11-13] この戦闘でエスカレーションの段が上がった数 (ボス戦も) / そこから溜まった不安定化ポイント (end の行だけ)。</summary>
         public int escRises, instEsc;
         /// <summary>[計装 2026-11-14] この戦闘 (ヴェスカは段) でボスがダウンしたターンの数。 Tools/boss_loss_report.py が読む。</summary>
@@ -517,8 +516,8 @@ namespace AutoTest.ParallelSweep
                 // 2026-11-10: 配線が与ダメの倍率を読むか (−1 = 技量に従う) と実効値・軸に寄せる方策・配布の有無 (配布は使わない前提を確かめる)
                 "v3.readOutgoingMult", "ReadOutgoingMultEffective", "buyAxisFocus", "buyAxisFocusBonus",
                 "axisPackageAxis", "axisPackageCount", "v3.hpLedger", "v3.axisCommitBuy", "predTrace",
-                // 2026-11-10: 主攻撃の見積もりを実績の比で掛け直すか・黎明の溜める形 (送った値と、 ラン開始時に本体へ入れた値)
-                "v3.mainCorr", "daybreakNextAttackPct", "DaybreakNextAttackPctApplied", "weaponTierCap", "vescaDiceForce",
+                // 2026-11-10: 主攻撃の見積もりを実績の比で掛け直すか・2026-11-21: 最初の武器の指定
+                "v3.mainCorr", "weaponTierCap", "forceStartWeapon", "vescaDiceForce",
                 "pursuerNoReward", "pursuerAtkMul", "pursuerHpAdd", "pursuerSupply", "navFear", "navFearMacro", "navFearRange",
                 // 2026-11-12: 縄張りの作り (追跡者が縄張りの外へ出るか・縄張りの宝の中身・BOT が宝を取りに行くしきい値)
                 "pursuerLeavesTerritory", "territoryTreasure", "territoryTreasureHpMargin", "navTerritoryDetour",

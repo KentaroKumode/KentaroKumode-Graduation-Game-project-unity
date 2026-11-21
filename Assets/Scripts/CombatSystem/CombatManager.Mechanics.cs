@@ -588,7 +588,7 @@ namespace CombatSystem
             int metaPct = MetaProgression.MetaBuffApplicator.GetOutgoingDamagePct()
                         + MetaProgression.MetaBuffApplicator.GetBattleSpiritPct(GameLoop.GameManager.Instance?.Run);
             // 消耗品の分 (ApplyWinDamageModifiers の〈瞬間研磨剤〉+150%・〈油・膏薬〉consDmgMultPct と同じ条件)
-            s.consOutgoingPct = Mathf.Max(0, ctx.consDmgMultPct) + (ctx.polishArmed && !ctx.rollPurity ? 150 : 0);
+            s.consOutgoingPct = Mathf.Max(0, ctx.consDmgMultPct) + (ctx.polishArmed ? 150 : 0);
             s.outgoingPct = Mathf.RoundToInt((mul - 1f) * 100f) + metaPct + s.consOutgoingPct;
             s.defense = ctx.playerDefense;
             s.pen = ctx.playerArmorPen;

@@ -11,7 +11,7 @@ namespace CombatSystem
     {
         /// <summary>
         /// プレイヤー勝利時の与ダメージ修飾（ProcessDamage後〜敵HP適用前）。適用順:
-        /// 画竜点睛 → 与ダメ倍率 (パッシブ・メタ・遺物・研磨剤・鬼火の油を 1 つのプールで加算) → 攻撃バースト → メタ会心 → 向かい風
+        /// 与ダメ倍率 (パッシブ・メタ・遺物・研磨剤・鬼火の油を 1 つのプールで加算) → 攻撃バースト → メタ会心 → 向かい風
         /// → 敵被ダメ軽減(灰塵等の OnPreReceiveDamage) → 基礎防御%(利刃で相殺) → 勝利時最低保証
         /// → 狂暴化 → メタ俊敏回避。
         /// </summary>
@@ -41,14 +41,6 @@ namespace CombatSystem
         private int ApplyWinDamageModifiers(int totalDmg, ref int fixedDmg, ref bool isCrit,
                                             int lbStage, PassiveSkillManager psm, CombatContext ctx)
         {
-            // 画竜点睛: ダメージ＝(出目+10)×会心倍率、会心確定
-            if (ctx.garyoProc)
-            {
-                totalDmg = Mathf.CeilToInt((ctx.garyoDieValue + 10) * ctx.criticalMultiplier);
-                isCrit = true;
-                Debug.Log($"[画竜点睛] 確定会心 {totalDmg} ダメ (出目{ctx.garyoDieValue}+10 ×{ctx.criticalMultiplier})");
-            }
-
             // 与ダメ倍率の内訳計測 (診断用)。 **ここへ来る時点で outgoing にはパッシブ由来が
             // 既に積まれている** (OnPreDealDamage は ProcessDamage の中で発火するため)。
             // 以降の 業物/メタ/遺物 の増分と分けて記録する。
@@ -126,8 +118,7 @@ namespace CombatSystem
 
             // 瞬間研磨剤 (剣士スターター・2026-07-27 リワーク): 次の 1 撃だけ 与ダメージ+150%。
             // 旧「ダイス合計+[本数×2]」は相互攻撃モデルで無効だったため倍率へ移設。
-            // 無我無心 (rollPurity) 中は消費アイテム由来の補正を受けない規約に従い不発。
-            if (ctx.polishArmed && !ctx.rollPurity)
+            if (ctx.polishArmed)
             {
                 if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
                 ctx.outgoingDamageMultiplier += 1.5f;
@@ -225,11 +216,11 @@ namespace CombatSystem
             }
             else if (ctx.hitIgnoreDefense && ctx.enemyDefense > 0 && totalDmg > 0)
             {
-                Debug.Log($"[破城斧] この撃は敵の防御{ctx.enemyDefense} を無視");
+                Debug.Log($"[防御の無視] この撃は敵の防御{ctx.enemyDefense} を無視 (破城斧・急所の 2 撃目以降・連刃の追撃)");
             }
             else if (ctx.enemyDefense > 0 && totalDmg > 0)
             {
-                int effDef = DefenseFormula.Effective(ctx.enemyDefense, ctx.playerArmorPen + (isCrit ? ctx.critArmorPen : 0));
+                int effDef = DefenseFormula.Effective(ctx.enemyDefense, ctx.playerArmorPen + ctx.hitArmorPen + (isCrit ? ctx.critArmorPen : 0));
                 if (effDef > 0)
                 {
                     int beforeDef = totalDmg;

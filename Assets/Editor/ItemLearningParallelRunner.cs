@@ -157,20 +157,20 @@ namespace AutoTest.EditorTools
             AutoTest.GrantItt.Variant = "smoke";
             LaunchWith(0, AutoRunner.WiringSkill.Super, 500, itt: true,
                 overrides: new Dictionary<string, string> { ["useIttBeta"] = "True", ["lockWeaponFamily"] = "True",
-                    ["v3.mainCorr"] = "True", ["v3.readOutgoingMult"] = "-1", ["daybreakNextAttackPct"] = "1.5" });
+                    ["v3.mainCorr"] = "True", ["v3.readOutgoingMult"] = "-1" });
         }
 
         /// <summary>ITT (Super の方策) を 10,000 ラン × 20 回 = 合計 200,000 ラン (2026-11-10)。
         /// <b>回ごとにラン番号をずらす</b> (同じ割り当てを引き直さない) ・<b>割り当ては積み上げて合算</b>し、 回の終わりごとに
         /// 序列を作り直す (次の回はその序列で買う)。 精度は 20 万ラン 1 回と同じで、 買い方だけが途中で更新される。
-        /// 条件は今の測定と同じ: 〈黎明〉の新しい形 (+150%)・主攻撃の見積もりの補正 (v3.mainCorr)。 物差しは掛けない。</summary>
+        /// 条件は今の測定と同じ: 主攻撃の見積もりの補正 (v3.mainCorr)。 物差しは掛けない。</summary>
         [MenuItem("Tools/AutoRun/■ ITT 並列 (Super の方策): 10000ラン × 20 回 (合算 20万)", priority = 8)]
         private static void LaunchIttSuperPooled()
         {
             AutoTest.GrantItt.Variant = "super";
             LaunchWith(0, AutoRunner.WiringSkill.Super, 10000, itt: true, ittRounds: 20,
                 overrides: new Dictionary<string, string> { ["useIttBeta"] = "True", ["lockWeaponFamily"] = "True",
-                    ["v3.mainCorr"] = "True", ["v3.readOutgoingMult"] = "-1", ["daybreakNextAttackPct"] = "1.5" });
+                    ["v3.mainCorr"] = "True", ["v3.readOutgoingMult"] = "-1" });
         }
 
         /// <summary><b>端子の ITT (2026-11-12・#102)。</b> 基本以外の端子 57 種だけを、 1 ランに期待 5 枚、 ランダムな層 (深さ 1〜5) で山札へ足し、
