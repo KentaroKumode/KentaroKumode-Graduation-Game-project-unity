@@ -21,7 +21,7 @@ namespace ItemSystem
         public const int LockSlots = 4;
         /// <summary>抽選の第 1 段: 軸ありの秘宝を引く割合 (残りは枠外 = 金・軸なし・仮)。</summary>
         public const float AxisShare = 0.8f;
-        /// <summary>軸指定リロール (店) と〈古物商の交換帳〉で、 指定の軸を選ぶ重み (他の軸は 1)。</summary>
+        /// <summary>軸指定リロール (店) で、 指定の軸を選ぶ重み (他の軸は 1)。</summary>
         public const float FocusWeight = 4f;
         /// <summary>枠外の呼び名 (計装・画面)。</summary>
         public const string Outside = "枠外";
@@ -61,8 +61,9 @@ namespace ItemSystem
             ItemRarity.BRONZE => 15, ItemRarity.SILVER => 22, ItemRarity.GOLD => 35, _ => r >= ItemRarity.LEGENDARY ? 50 : 15,
         };
 
-        /// <summary>提示 (id の並び) を見送った時の額: 提示の中で一番高いレア度の額。 秘宝が 1 つも無ければ 0。</summary>
-        public static int SkipGoldFor(IEnumerable<string> ids)
+        /// <summary>提示 (id の並び) を見送った時の額: 提示の中で一番高いレア度の額 (〈銭皿〉を持っていれば +50%・切り上げ・<see cref="PassiveSkills.Effects.CoinDish"/>)。
+        /// 秘宝が 1 つも無ければ 0。 <paramref name="run"/> を省くと今のラン。</summary>
+        public static int SkipGoldFor(IEnumerable<string> ids, RunState run = null)
         {
             int best = 0;
             if (ids == null) return 0;
@@ -71,14 +72,14 @@ namespace ItemSystem
                 var d = ItemDatabase.Instance?.GetItem(id);
                 if (d != null && d.IsPassive) best = System.Math.Max(best, SkipGold(d.rarity));
             }
-            return best;
+            return PassiveSkills.Effects.CoinDish.Apply(run ?? GameManager.Instance?.Run, best);
         }
 
-        /// <summary>見送りを受け取る (ゴールドを足して数える)。 実際に入った額 (挑戦デバフの収入減の後) を返す。</summary>
+        /// <summary>見送りを受け取る (ゴールドを足して数える)。 実際に入った額を返す。</summary>
         public static int TakeSkip(RunState run, IEnumerable<string> ids, string source)
         {
-            int gold = GoldIncome.Gain(run, SkipGoldFor(ids), "見送り(" + source + ")");
-            Skips++; SkipGoldTotal += gold;
+            int gold = GoldIncome.Gain(run, SkipGoldFor(ids, run), "見送り(" + source + ")");
+            Skips++; SkipGoldTotal += gold; RunSkips++; RunSkipGold += gold;
             UnityEngine.Debug.Log($"[見送り] {source}: +{gold}G");
             return gold;
         }
@@ -143,6 +144,8 @@ namespace ItemSystem
         /// <summary>第 1 段で選んだ軸 (と <see cref="Outside"/>) の回数。</summary>
         public static readonly Dictionary<string, long> Drawn = new Dictionary<string, long>();
         public static long Skips, SkipGoldTotal, LocksCompleted, LockFloorSum;
+        /// <summary>今のランの見送り換金の回数と額 (ランの頭で BOT が 0 に戻す・ランの記録の skipFired / skipGold)。</summary>
+        public static int RunSkips, RunSkipGold;
         public static void ResetStats() { Drawn.Clear(); Skips = SkipGoldTotal = LocksCompleted = LockFloorSum = 0; }
 
         /// <summary>計装を経路の集計 (PassiveSourceAudit.Counts) へ「軸抽選:」「見送り:」「ロック:」付きで混ぜる (並列ワーカーの返し・通常バッチのサマリー)。</summary>

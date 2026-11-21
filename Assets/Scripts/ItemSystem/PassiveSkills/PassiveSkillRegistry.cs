@@ -221,6 +221,21 @@ namespace ItemSystem.PassiveSkills
             Register(new ChippedEyeReading()); Register(new MatchedClappers()); Register(new LosingStreakDie()); Register(new LowFaceConduit());
         }
 
+        /// <summary>金の 12 品のうち効果クラスを持つ 5 品 (2026-11-21・GoldEffects.cs)。 残りの 7 品 (封蝋・紹介状・合札・銭皿・天秤・溶金・手形) は戦闘の外で、
+        /// 持っているかを読む所が効かせる (溶金は items.json の stats・銭皿 = CoinDish・天秤 = SpoilsScale)。</summary>
+        private static void RegisterGold()
+        {
+            Register(new LuckyCoin()); Register(new BlastPrize()); Register(new MacroReceipt()); Register(new MacroAbacus()); Register(new SampleBox());
+        }
+
+        /// <summary>軸なし汎用の 36 品のうち効果クラスを持つ 13 品 (2026-11-21・GeneralEffects.cs)。 残りは戦闘の外で働く (探索・嵐・報酬・特殊戦術)。</summary>
+        private static void RegisterGeneral()
+        {
+            Register(new WeightingGauntlet()); Register(new BeltPouch()); Register(new BottomlessVial()); Register(new GapSpear());
+            Register(new BreakingMove()); Register(new HeavyBreakerWedge()); Register(new AdversityHourglass()); Register(new MacroBarometer());
+            Register(new SaberWaltz()); Register(new EspadaPasodoble()); Register(new FleuretBallet()); Register(new FalconTango()); Register(new BladeDance());
+        }
+
         private static void RegisterAll()
         {
             RegisterCharge();
@@ -231,22 +246,8 @@ namespace ItemSystem.PassiveSkills
             RegisterCrit();
             RegisterDeck();
             RegisterRole();
-            // ============================
-            //  アイテム再編 (2026-10-31・ReworkItemEffects.cs)
-            // ============================
-            Register(new WeightingGauntlet());
-            Register(new CoinDish());
-            Register(new LuckyCoin());
-            Register(new SpoilsScale());
-            Register(new BlastPrize());
-
-            // 消耗品の連動品 (2026-11-20・ConsumableLinkEffects.cs・item-overhaul-spec §7-2)
-            Register(new BeltPouch()); Register(new BottomlessVial()); Register(new SampleBox());
-            // 嵐・店・金のマクロ秘宝の戦闘の側 (2026-11-20・MacroItemEffects.cs・item-overhaul-spec §9)
-            Register(new MacroBarometer()); Register(new MacroReceipt()); Register(new MacroAbacus());
-            // 戦術の 5 品 (2026-11-21・TacticItemEffects.cs・item-overhaul-spec §6-2)
-            Register(new GapSpear());
-            Register(new BreakingMove()); Register(new HeavyBreakerWedge()); Register(new AdversityHourglass());
+            RegisterGold();
+            RegisterGeneral();
 
             // ============================
             //  汎用パッシブ
@@ -311,13 +312,6 @@ namespace ItemSystem.PassiveSkills
             // EvenEyes / MasterworkNotes / KaleidoDice はステータス化
 
             // 2026-06-05 会心バリエーション（OnCriticalDamage / OnCriticalCheck）
-
-            // 2026-06-04 [剣の舞] セット（4枚集約→無銘の剣舞譜に変化）
-            Register(new SaberWaltz());       // サーベル・ワルツ（ダイス+1／孤剣時HP半減）
-            Register(new EspadaPasodoble());  // エスパーダ・パソドブレ（自他ダイス+5／与被ダメ+20%）
-            Register(new FleuretBallet());    // フルーレ・バレエ（ダイス+3／敗北時自壊は救済チェーン）
-            Register(new FalconTango());      // ファコン・タンゴ（戦闘終了時 廃棄+全カテゴリ獲得）
-            Register(new BladeDance());       // 無銘の剣舞譜（剣先スタック：ダイス/回復/反射）
 
             // 竜閃（ユニーク武器）
             Register(new MugaMushin());

@@ -221,12 +221,17 @@ namespace GameLoop
             SetPhase(GamePhase.MapNavigation);
         }
 
-        /// <summary>〈古物商の交換帳〉: 交換マスの択を寄せる軸 (今の偏重の一番高い軸・軸の秘宝が 1 つも無ければ null)。 持っていなければ null。</summary>
+        /// <summary>〈古物商の交換帳〉: 交換マスの択を確定する軸 = ロック済みの軸 (RunState.lockedAxes) のうち所持数が一番多い軸 (同数なら先に登録した軸・所持 0 なら null)。 持っていなければ null。</summary>
         private string ExchangeLedgerAxis()
         {
-            if (!Run.OwnsPassive(ItemIds.MacroLedger)) return null;
-            string axis = EventSystem.EventEffectExecutor.TopAxis(Run);
-            return AxisCountOf(Run, axis) > 0 ? axis : null;
+            if (!Run.OwnsPassive(ItemIds.MacroLedger) || Run.lockedAxes == null) return null;
+            string best = null; int bestN = 0;
+            foreach (var a in Run.lockedAxes)
+            {
+                int n = AxisCountOf(Run, a);
+                if (n > bestN) { bestN = n; best = a; }
+            }
+            return best;
         }
 
         /// <summary>交換せずに通過。</summary>
@@ -249,7 +254,7 @@ namespace GameLoop
         }
 
         /// <summary>交換マスの択: 上のレア度の秘宝を重ねずに <paramref name="n"/> 個 (引き方は <see cref="PickHigherTierPassive"/> と同じ)。
-        /// <paramref name="biasAxis"/> (〈古物商の交換帳〉) = 軸均等の抽選でその軸を選ぶ重みを ×<see cref="ItemSystem.AxisPool.FocusWeight"/> にする (軸指定リロールと同じ)。</summary>
+        /// <paramref name="biasAxis"/> (〈古物商の交換帳〉) = その軸の品が残っていれば、 択をその軸の秘宝に確定する (AxisPool.Narrow の forceFocus)。</summary>
         private List<string> PickHigherTierPassives(ItemRarity givenRarity, int n, string biasAxis)
         {
             var res = new List<string>();
@@ -257,7 +262,7 @@ namespace GameLoop
             if (pool == null) return res;
             while (res.Count < n && pool.Count > 0)
             {
-                var narrowed = ItemSystem.AxisPool.Narrow(Run, pool, "exchange.axis", biasAxis);   // 出現の枠と軸均等の抽選 (択ごとに軸を引く)
+                var narrowed = ItemSystem.AxisPool.Narrow(Run, pool, "exchange.axis", biasAxis, forceFocus: biasAxis != null);   // 出現の枠と軸均等の抽選 (択ごとに軸を引く)
                 if (narrowed.Count == 0) break;
                 var got = SwordDanceSet.MaybeSwapToDance(Run, ItemSystem.RarityWeightedPicker.Pick(narrowed), narrowed, "exchange.dance");
                 if (got == null) break;

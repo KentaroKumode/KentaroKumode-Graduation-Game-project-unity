@@ -39,8 +39,6 @@ namespace ItemSystem.PassiveSkills.Keywords
         public const string BurstExcessKey = "kw.burstExcess";
         /// <summary>直近に爆発したターン (【過熱】= このターンに爆発した・<see cref="Overheated"/>)。</summary>
         public const string BurstTurnKey = "kw.burstTurn";
-        /// <summary>[persistent・戦闘開始で 0] この戦闘で、 爆発のダメージそのもので敵が倒れた (1/0・〈爆破祭の小切手〉が読む)。</summary>
-        public const string BurstKilledKey = "kw.burstKilled";
         /// <summary>いま決まった爆発が超臨界か (1/0・爆発の出来事を配っている間に読む)。 超臨界爆発 = 閾値の 1.5 倍以上の臨界で起きた爆発 (HeatCore.SuperAtPct)。</summary>
         public const string BurstSuperKey = "kw.burstSuper";
         /// <summary>いま決まった爆発 1 回の敵の防御の後のダメージ (HeatCore.Burst.landed・爆発の出来事を配っている間に読む)。</summary>
@@ -133,7 +131,7 @@ namespace ItemSystem.PassiveSkills.Keywords
                 var cm = pm != null && ReferenceEquals(pm.Context, ctx) ? CombatSystem.CombatManager.Instance : null;
                 if (cm != null)
                 {
-                    if (cm.LandBurst(ctx, b.landed)) ctx.accumulatedValues[BurstKilledKey] = 1;
+                    cm.LandBurst(ctx, b.landed);
                     // 爆発はボスの次の目盛りにひびを入れる (標準)。 〈柱折りの発破筒〉はそのひびを即座に正規のダウンへ割る
                     cm.CrackBossNotch("臨界の爆発");
                     if (CombatSystem.HeatCore.Has(s.items, CombatSystem.HeatItems.Pillar) && cm.BreakBossCrack("柱折りの発破筒")) CombatSystem.CombatManager.BurstBreakFired++;
@@ -195,8 +193,6 @@ namespace ItemSystem.PassiveSkills.Keywords
         //  会心
         // ============================================================
 
-        /// <summary>この戦闘で出した会心の回数 (〈戦果の天秤〉が読む)。</summary>
-        public const string CritCountKey = "kw.critCount";
         /// <summary>直近の会心した主攻撃に実際に掛かった会心倍率 (敵の会心耐性・超過会心率・〈天眼の鍔〉の ×1.25 込み・PassiveSkillManager.ProcessDamage が書く)。 〈天眼の鍔〉が読む。</summary>
         public const string LastCritMulKey = "kw.lastCritMul";
 

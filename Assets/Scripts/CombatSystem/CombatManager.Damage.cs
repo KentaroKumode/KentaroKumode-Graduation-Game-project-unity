@@ -147,12 +147,13 @@ namespace CombatSystem
             }
 
             // 与ダメ倍率（激情の刃 等のパッシブ由来 + メタ% + 遺物 + 研磨剤 + 鬼火の油）
-            if (ctx.outgoingDamageMultiplier > 0f
-                && Mathf.Abs(ctx.outgoingDamageMultiplier - 1f) > 0.001f)
+            //   + この 1 撃だけの池への上乗せ (〈加重の拳套〉・ctx.hitOutgoingPct)
+            float outMul = (ctx.outgoingDamageMultiplier > 0f ? ctx.outgoingDamageMultiplier : 1f) + ctx.hitOutgoingPct / 100f;
+            if (Mathf.Abs(outMul - 1f) > 0.001f)
             {
                 int orig = totalDmg;
-                totalDmg = Mathf.CeilToInt(totalDmg * ctx.outgoingDamageMultiplier);
-                Debug.Log($"[CombatManager] 与ダメ補正 ×{ctx.outgoingDamageMultiplier:F2}: {orig}→{totalDmg}");
+                totalDmg = Mathf.CeilToInt(totalDmg * outMul);
+                Debug.Log($"[CombatManager] 与ダメ補正 ×{outMul:F2}: {orig}→{totalDmg}");
             }
             if (CombatStats.DiagWinAttack)
             {
@@ -188,7 +189,7 @@ namespace CombatSystem
             totalDmg = EnemyHpLedger.ProbeMain(totalDmg);
             // 最終与ダメージ倍率 (2026-11-20・GAME.md §23-32・〈防人の軍標〉): すべての倍率の後・敵の軽減パッシブと防御の前 (怠惰の直前)。
             //   主攻撃以外は敵の HP を減らす口 (HpLossDiag.Lose) で掛ける
-            totalDmg = ItemSystem.PassiveSkills.Keywords.Kw.ApplyFinalDamage(ctx, totalDmg, ctx.hitFinalDamagePct);   // この 1 撃だけの上乗せ (〈加重の拳套〉) も足す
+            totalDmg = ItemSystem.PassiveSkills.Keywords.Kw.ApplyFinalDamage(ctx, totalDmg, ctx.hitFinalDamagePct);   // この 1 撃だけの上乗せ (〈血桜〉〈血の楔〉・オーバークロック) も足す
             // 大罪:怠惰 (挑戦カード IV・2026-11-11) /〈徒労〉の戦闘のデバフ (2026-11-14・GameHooks.ToilDamageDownPct・既定 50): 主攻撃の最終ダメージ −N%
             //   (すべての倍率の後・敵の防御の前)。 2 つが重なったら厳しい方 1 つ (BattleBoonRule.OutgoingCutPct)
             totalDmg = MetaProgression.MetaDebuffApplicator.ApplyOutgoingCut(totalDmg);   // 主攻撃以外は敵の HP を減らす口 (HpLossDiag.Lose) で掛ける

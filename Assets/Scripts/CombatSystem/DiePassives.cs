@@ -137,7 +137,7 @@ namespace CombatSystem
             string die = EquippedDie.IdOf(run);
             if (die == DieIds.Scavenger && Has(dice, 1))
             {
-                GoldIncome.Gain(run, ScavengerGold, "拾い物の賽", GoldOrigin.Die);
+                GoldIncome.Gain(run, ScavengerGold, "拾い物の賽");
                 UnityEngine.Debug.Log($"[賽] 拾い物の賽: ①が出た → +{ScavengerGold}G");
             }
             else if (die == DieIds.OldCoin)
@@ -146,7 +146,7 @@ namespace CombatSystem
                 foreach (int d in dice) if (d == OldCoinFace) eights++;
                 if (eights > 0)
                 {
-                    GoldIncome.Gain(run, OldCoinGold * eights, "古銭の賽", GoldOrigin.Die);
+                    GoldIncome.Gain(run, OldCoinGold * eights, "古銭の賽");
                     UnityEngine.Debug.Log($"[賽] 古銭の賽: ⑧ × {eights} → +{OldCoinGold * eights}G");
                 }
             }

@@ -290,6 +290,7 @@ namespace AutoTest
             CombatSystem.CombatManager.CritOverflowFired = CombatSystem.CombatManager.CritExecuteFired = CombatSystem.CombatManager.CritRefireFired = 0;
             CombatSystem.CombatManager.DeckDisposeFired = CombatSystem.CombatManager.DeckShuffleFired = 0;
             CombatSystem.CombatManager.RoleFormedFired = CombatSystem.CombatManager.RoleOmniFired = 0;
+            ItemSystem.AxisPool.RunSkips = ItemSystem.AxisPool.RunSkipGold = 0;
             ItemSystem.PassiveSkills.PassiveSkillManager.ChainDeepestPath = "";
             ItemSystem.PassiveSkills.Keywords.Kw.HeatMaxBurstsOneAdd = 0;
             ItemSystem.PassiveSkills.Keywords.Kw.HeatMaxBurstsInfo = "";

@@ -541,8 +541,8 @@ namespace AutoTest
             public bool critDouble, critHeaven, ironClub, critOff, critOn;
             /// <summary>[会心の軸] 配線で決まる品: 〈鷹匠の革手袋〉〈狙い目の刻み〉/ 攻撃の端子 1 枚の撃の〈一の矢〉〈渾身の柄頭〉〈必殺の照準器〉/ 最初の 1 撃が〈抜き打ちの作法〉で確定会心。</summary>
             public bool falconer, aim, firstArrow, pommel, sniper, quickDrawFirst;
-            /// <summary>[2026-11-20] 〈加重の拳套〉: 撃の番号 (0 から) 1 につき足す最終与ダメージ倍率 (%・0 = 持っていない)。</summary>
-            public int lateHitFinalPct;
+            /// <summary>〈加重の拳套〉: 2 撃目以降の撃で与ダメ % の池に足す割合 (0 = 持っていない・本体 ctx.hitOutgoingPct)。</summary>
+            public float lateHitOutPct;
             public float nonCritMul;           // 鈍器: 非会心だけ ×(1+x)
             public bool pinpointCut;           // 〈一点読みの片眼〉の代価: 非会心 ×0.7
             public float outMul;               // 与ダメ倍率の池 (ctx.outgoing + 整備パネル + 戦意 + 剛胆 + 遺物 + 研磨剤 + 油・膏薬)
@@ -628,8 +628,9 @@ namespace AutoTest
             if (s.stepUndying && bCount > 0) outMul += TurnRules.UndyingMul(s.undyingStreak + 1) - 1f;   // 本体は与ダメ倍率の池へ足す (式は今のまま: float の値を変えない)
             // 端子の山札 (旧い配線では全部「なし」): 与ダメ% は池へ足す (ctx.AddOutgoingPct)・会心倍率 +N・必ず会心・別枠の掛け算・防御の無視
             outMul += ws.outPctAdd;
+            if (hitNo >= 1) outMul += s.lateHitOutPct;   // 〈加重の拳套〉
             float termMul = ws.damageMul;
-            int fpct = s.finalPct + s.lateHitFinalPct * hitNo;   // ローカル関数は in の引数を捕まえられないので写す (〈加重の拳套〉: 2 撃目以降の上乗せ)
+            int fpct = s.finalPct;   // ローカル関数は in の引数を捕まえられないので写す
             int minDmg = s.minDmg, consBurst = s.consBurst, eDef = ws.ignoreDefense || (hitNo == 0 && s.needleFirst) ? 0 : s.eDefNow, pen = s.myPen + ws.armorPen, critPen = s.critPen;
             float nonCritMul = s.nonCritMul, berserk = s.berserkMul;
             // 会心 (CritCore・本体の ProcessDamage と同じ式): 撃ごとの会心率と会心倍率。 配線で決まる品はこの撃の目・撃の数で足す
@@ -740,7 +741,7 @@ namespace AutoTest
                 st.critP1 = p1;
             }
             st.critMulEff = CombatSystem.CritCore.EffectiveMul(st.critMulBase, st.critRed, add, st.critDouble, st.critHeaven);
-            st.lateHitFinalPct = run != null && run.OwnsPassive(ItemSystem.PassiveSkills.Effects.WeightingGauntlet.Id) ? ItemSystem.PassiveSkills.Effects.WeightingGauntlet.PctPerHit : 0;
+            st.lateHitOutPct = run != null && run.OwnsPassive(ItemSystem.PassiveSkills.Effects.WeightingGauntlet.Id) ? ItemSystem.PassiveSkills.Effects.WeightingGauntlet.Pct / 100f : 0f;
             st.nonCritMul = ctx.nonCritOutgoingMultiplier;
             st.pinpointCut = ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.PinpointEye.NonCritCutKey) > 0f;
             st.outMul = OutgoingPoolNow(ctx, run);

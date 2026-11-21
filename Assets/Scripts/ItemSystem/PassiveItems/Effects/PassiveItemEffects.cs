@@ -17,25 +17,18 @@ namespace ItemSystem.PassiveItems.Effects
 
 
 
-    /// <summary>道銭の帯封: 層に入るたび ゴールド+6 (2026-09-15)。
-    ///
-    /// <para><b>層はランに 8 回しか来ない</b>ので 1 回の量を大きく取れる (+48G ≒ 獲得 316G の 15%)。
-    /// マップ移動系 (1 ラン 30〜40 回) と同じ量にすると桁が変わってしまう。</para>
-    ///
-    /// <para><b>ゴールドは倍率チェーンを通らない</b>ので、 攻撃や被ダメ軽減と違って
-    /// 値が暴れない ── atkBase に乗る量は実測で ×4.16 されるが、 金は金のまま。
-    /// 「基礎的な小品」を置ける数少ない軸。</para></summary>
+    /// <summary>黄金色の封蝋 (金・full-item-rework-ledger §⑨): 層に入るたび ゴールド +18。</summary>
     public class RoadMoneyBandEffect : ITimedEffect
     {
-        private const int Gain = 15;   // 2026-11-06: 6 → 15。 早く買うほど得な投資にする (品物の価格 ×2 で買値が約 14G になり、 1 層で元が取れる)
+        private const int Gain = 18;
         public string Id => "黄金色の封蝋";
         public TimedEffectTrigger Trigger => TimedEffectTrigger.OnFloorEnter;
 
         public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
         {
             if (run == null) return;
-            GameLoop.GoldIncome.Gain(run, Gain, "黄金色の封蝋", GameLoop.GoldOrigin.Item);
-            Debug.Log($"[PassiveItem] 道銭の帯封: 層突入 ゴールド+{Gain} (所持 {run.coins})");
+            GameLoop.GoldIncome.Gain(run, Gain, "黄金色の封蝋");
+            Debug.Log($"[PassiveItem] 黄金色の封蝋: 層突入 ゴールド+{Gain} (所持 {run.coins})");
         }
     }
 

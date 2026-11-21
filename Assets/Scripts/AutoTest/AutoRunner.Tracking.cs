@@ -499,6 +499,8 @@ namespace AutoTest
                 _cur.deckShuffleFired = (int)CombatSystem.CombatManager.DeckShuffleFired;
                 _cur.roleFormedFired = (int)CombatSystem.CombatManager.RoleFormedFired;
                 _cur.roleOmniFired = (int)CombatSystem.CombatManager.RoleOmniFired;
+                _cur.skipFired = ItemSystem.AxisPool.RunSkips;
+                _cur.skipGold = ItemSystem.AxisPool.RunSkipGold;
                 _cur.chainPath = ItemSystem.PassiveSkills.PassiveSkillManager.ChainDeepestPath;
                 _cur.heatBurstInfo = ItemSystem.PassiveSkills.Keywords.Kw.HeatMaxBurstsOneAdd + "|" + ItemSystem.PassiveSkills.Keywords.Kw.HeatMaxBurstsInfo;
                 _cur.attackSumInfo = CombatSystem.CombatManager.AttackSumMaxInfo;

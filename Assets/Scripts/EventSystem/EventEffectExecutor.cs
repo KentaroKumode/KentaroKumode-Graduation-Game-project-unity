@@ -128,7 +128,6 @@ namespace EventSystem
                     run.coins = Mathf.Max(0, run.coins + delta);
                     result.log.Add($"ゴールド{delta:+0;-0} (現在 {run.coins})");
                     if (delta > 0) result.NoteGain(MapSystem.FreeMove.EventGainKind.Gold);
-                    if (delta > 0) GameLoop.GoldIncome.CountWindfall(run, GameLoop.GoldOrigin.Event, delta);   // 溶金の領主剣 (額は変えず数えるだけ)
                     break;
                 }
 
@@ -602,7 +601,7 @@ namespace EventSystem
                 ApplyPassiveAcquisitionBonus(run, id, result);
             }
             run.weaponMaterials += 8;
-            GameLoop.GoldIncome.Gain(run, 60, "観測所の写し", GameLoop.GoldOrigin.Event);
+            GameLoop.GoldIncome.Gain(run, 60, "観測所の写し");
             run.playerHP = run.playerMaxHP;
 
             UnityEngine.Debug.Log($"[観測所] 写しの上乗せ: パッシブ{(string.IsNullOrEmpty(id) ? "なし" : ResolveLabel(id))}"
@@ -668,7 +667,7 @@ namespace EventSystem
             {
                 case GameLoop.ConvictionSystem.IdResolve:
                 {
-                    int gain = GameLoop.GoldIncome.Gain(run, 1, "イベント(決意)", GameLoop.GoldOrigin.Event);
+                    int gain = GameLoop.GoldIncome.Gain(run, 1, "イベント(決意)");
                     result.log.Add($"決意の獲得ボーナス: +{gain}ゴールド");
                     break;
                 }

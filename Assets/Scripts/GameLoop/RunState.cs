@@ -362,9 +362,8 @@ namespace GameLoop
         /// <summary>〈富〉(目 9) の役で積んだ、 この戦闘のゴールド報酬への加算 (%)。
         /// 戦闘開始時に 0 へ戻し、 勝利報酬の計算で使い切る。 [perCombat]</summary>
         public int roleGoldBonusPct;
-        /// <summary>溶金の領主剣 (2026-11-19): 持っている間に秘宝・賽・イベントから得た金の累計 (<see cref="GoldIncome.CountWindfall"/>)。
-        /// 1G につき与ダメージ +2% (items.json の stats・per = swordWindfall)。 [persistent]</summary>
-        public int swordWindfallGold;
+        /// <summary>溶金の領主剣: 持っている間に店で使った金の累計 (ShopManager.Close が足す)。 100G につき基礎攻撃 +2 (items.json の stats・per = swordShopSpent)。 [persistent]</summary>
+        public int swordShopSpent;
 
         /// <summary>ヴェスカ撃破後の選択 (2026-08-17)。 **true = 裂け目を閉じなかった**。
         ///
@@ -480,9 +479,9 @@ namespace GameLoop
         // === マクロ秘宝 (2026-11-20・item-overhaul-spec §9)。 どれも持っている間の出来事だけ数える ===
         /// <summary>〈研ぎ代の領収書〉: 店・休憩で山札から端子を抜いた回数 (攻撃 +2 × 回数)。</summary>
         public int  receiptRemovals;
-        /// <summary>〈相場師の算盤〉: 店に入って最初のリロールをした回数 (戦闘開始時の充電 +3・臨界 +5 × 回数)。</summary>
+        /// <summary>〈相場師の算盤〉: 持っている間に店でリロールした回数 (最大 10・戦闘開始時のブロック +2・最初の 1 撃 +1 × 回数)。</summary>
         public int  abacusStacks;
-        /// <summary>〈黄金の通行手形〉: 店で使ったゴールドの 100G に満たない端数 (店を出る時に足す)。</summary>
+        /// <summary>〈黄金の通行手形〉: 店で使ったゴールドの 80G に満たない端数 (店を出る時に足す)。</summary>
         public int  passShopSpent;
         /// <summary>〈黄金の通行手形〉: 秘宝の棚が 1 段上のレア度で並ぶ店の残り軒数 (店に入るたび 1 つ使う)。</summary>
         public int  passShopsUp;
@@ -559,7 +558,7 @@ namespace GameLoop
             _cardMap = null;
             if (chronicle == null) chronicle = new List<string>(); else chronicle.Clear();
             roleGoldBonusPct = 0;
-            swordWindfallGold = 0;
+            swordShopSpent = 0;
             riftLeftOpen = false;
             totalCombatTurns = 0;
             judgmentPostDamage = judgmentHealRequested = judgmentHealActual = judgmentHealPrevented = 0;

@@ -134,7 +134,10 @@ namespace ItemSystem.PassiveSkills
         /// <summary>[perTurn] (撃の前に CombatManager が書く) このターンの主攻撃の撃の数 (攻撃しないターンは 0)。 BeginNewTurn で 0。
         /// 攻撃しないターンも固定ダメの枠を取り出すために 1 回 ProcessDamage を通るので、 「撃ごと」の品は <c>hitIndex &lt; hitCount</c> で本物の撃か見る。</summary>
         public int hitCount;
-        /// <summary>[perTurn] (撃ごとに CombatManager が 0 に戻す) この 1 撃だけの最終与ダメージ倍率の上乗せ (%)。 〈加重の拳套〉が OnPreDealDamage で書く。
+        /// <summary>[perTurn] (撃ごとに CombatManager が 0 に戻す) この 1 撃だけの与ダメ % の池への上乗せ (%)。 〈加重の拳套〉が OnPreDealDamage で書く。
+        /// 与ダメ % の池 (<see cref="outgoingDamageMultiplier"/>) にその撃だけ足して掛ける (CombatManager.Damage.cs・池そのものは書き換えない)。</summary>
+        public int hitOutgoingPct;
+        /// <summary>[perTurn] (撃ごとに CombatManager が 0 に戻す) この 1 撃だけの最終与ダメージ倍率の上乗せ (%)。 〈血桜〉が OnPreDealDamage で書く。
         /// 主攻撃の最終与ダメージ倍率 (<see cref="finalDamagePct"/>) に足して掛ける (CombatManager.Damage.cs)。</summary>
         public int hitFinalDamagePct;
         /// <summary>[perTurn] (撃ごとに CombatManager が false に戻す) この 1 撃は敵の防御を無視する (〈破城斧〉が OnPreDealDamage で立てる・CombatManager.Damage の防御の計算)。</summary>
@@ -1070,7 +1073,7 @@ namespace ItemSystem.PassiveSkills
             isCritical = false;
             forceCritical = false;
             forceCritThisHit = false;
-            hitIndex = 0; hitCount = 0; hitFinalDamagePct = 0; hitIgnoreDefense = false; hitFaceMax = 0; critSkipRoll = false;
+            hitIndex = 0; hitCount = 0; hitFinalDamagePct = 0; hitOutgoingPct = 0; hitIgnoreDefense = false; hitFaceMax = 0; critSkipRoll = false;
             critSuppressed = false;
             lastCritAddPct = 0f;
             critRatePctAdd = 0f;

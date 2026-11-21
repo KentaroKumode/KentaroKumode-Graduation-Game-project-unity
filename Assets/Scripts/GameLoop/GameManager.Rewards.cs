@@ -204,7 +204,8 @@ namespace GameLoop
                 // パッシブ刻印〈守銭〉: 発動分 × 1G/ボス
                 // ADR-0011 〈富〉(目 9): 戦闘中に積んだ報酬加算 (%)。 割合先 (メタの定額 +N の前)。
                 rewardBase = ApplyRoleGoldBonus(rewardBase);
-                int reward = GoldIncome.Gain(Run, rewardBase + metaWinGold, "ボス報酬", GoldOrigin.Battle);
+                rewardBase = ItemSystem.PassiveSkills.Effects.SpoilsScale.Apply(Run, rewardBase, strong: true);   // 〈戦果の天秤〉
+                int reward = GoldIncome.Gain(Run, rewardBase + metaWinGold, "ボス報酬");
                 // 物資の補給 (2026-09-28): ボス +150
                 ProvisionSystem.Supply(Run, MapSystem.FreeMove.FreeMapParams.RewardBoss);
 
@@ -243,10 +244,11 @@ namespace GameLoop
 
             // ADR-0011 〈富〉(目 9): 戦闘中に積んだ報酬加算 (%)。 割合先 (メタの定額 +N の前)。
             coins = ApplyRoleGoldBonus(coins);
+            coins = ItemSystem.PassiveSkills.Effects.SpoilsScale.Apply(Run, coins, strong: eliteNodeReward);   // 〈戦果の天秤〉
             coins += metaWinGold;
             // 〈徒労〉0 (別の形 LayerLong はそのまま) /〈開眼〉2 倍 (2026-11-13・通常の戦闘だけ・判定は TakeNormalBattleBoon)。 挑戦デバフの収入減より前 (GoldIncome.Gain の中) に掛ける
             coins = ScaleByBattleBoon(coins);
-            coins = GoldIncome.Gain(Run, coins, "戦闘報酬", GoldOrigin.Battle);
+            coins = GoldIncome.Gain(Run, coins, "戦闘報酬");
             IsEliteSecondFight = false;
             // 不安定化 (2026-11-13・GAME.md §5-12): エリート +2 / 通常の戦闘 +1 (ボスは上で抜けている)。 報酬の秘宝は GrantRewardItem で +3 ずつ
             AddBattleWinInstability(eliteNodeReward, pursuer: false);

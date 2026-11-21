@@ -148,8 +148,8 @@ namespace ItemSystem.Shop
         /// <summary>通常のリロールで払う額 (画面の表示用・〈目利きの紹介状〉の無料なら 0)。 BOT の「まだ回せる」の判定は 0 にならない <see cref="ShopInventory.CurrentRerollPrice"/> を読む。</summary>
         public int RerollPrice => Current == null ? 0 : LetterFreeReroll(GameLoop.GameManager.Instance?.Run) ? 0 : Current.CurrentRerollPrice;
 
-        /// <summary>〈黄金の通行手形〉: 使ったゴールド 100G ごとに、 次の店 1 軒の秘宝の棚が 1 段上のレア度で並ぶ (仮)。</summary>
-        public const int PassSpendStep = 100;
+        /// <summary>〈黄金の通行手形〉: 店で使ったゴールド 80G ごとに、 次の店 1 軒の秘宝の棚が 1 段上のレア度で並ぶ。</summary>
+        public const int PassSpendStep = 80;
         /// <summary>この店の秘宝の棚を 1 段上のレア度で並べるか (入店で決める・リロールにも効く)。</summary>
         private bool _passRarityUp;
         /// <summary>入店した時の run.coinsSpent (店を出る時に、 この店で使った額を出す)。</summary>
@@ -287,7 +287,7 @@ namespace ItemSystem.Shop
                 Debug.Log($"[ShopManager] イベントの値引き: 全価格 ×{rsCons.nextShopPriceMul:F2}");
                 rsCons.nextShopPriceMul = 1f;
             }
-            // 〈黄金の通行手形〉: 前の店までに使った 100G ごとに 1 軒、 秘宝の棚が 1 段上のレア度で並ぶ
+            // 〈黄金の通行手形〉: 前の店までに使った 80G ごとに 1 軒、 秘宝の棚が 1 段上のレア度で並ぶ
             _passRarityUp = false;
             _spentAtOpen = rsCons != null ? rsCons.coinsSpent : 0;
             if (rsCons != null && rsCons.passShopsUp > 0)
@@ -746,10 +746,10 @@ namespace ItemSystem.Shop
 
             if (slot.sold) { Log("売り切れ"); return false; }
             if (string.IsNullOrEmpty(slot.itemId)) { Log("空スロット"); return false; }
-            // 〈合札〉(2026-10-31): 同じショップで 2 品目以降を買うとき 10G 安い。
+            // 〈合札〉: 同じショップで 2 品目以降を買うとき 10G 安い (下限 1G)。
             int pay = slot.price;
             bool tally = Current.purchaseCount >= 1 && run.OwnsPassive(ItemIds.TrialTossToken);
-            if (tally) pay = Mathf.Max(0, pay - TallyDiscount);
+            if (tally) pay = Mathf.Max(Mathf.Min(pay, 1), pay - TallyDiscount);
             // 武器は 1 本だけ (2026-11-11): 人が別の武器を持って武器を買う時は、 今の武器を下取りに出して差額で乗り換える
             int tradeIn = WeaponTradeIn(slotIndex, run);
             if (tradeIn > 0) pay = Mathf.Max(0, pay - tradeIn);
@@ -769,8 +769,6 @@ namespace ItemSystem.Shop
             Current.purchaseCount++;
             if (tally && pay < slot.price) { TallyDiscounts++; Log($"〈合札〉: 2 品目以降 {TallyDiscount}G 引き"); }
             if (tradeIn > 0) Log($"下取り: {run.equippedWeaponId} を {tradeIn}G で引き取り、 差額 {pay}G で乗り換え");
-
-            // 〈銭皿〉の「買うたび物資 +10」は 2026-10-31 に「戦闘終了時、 残っているシールド 3 につき 1G」へ作り替えた (ReworkItemEffects)。
 
             switch (slot.kind)
             {
@@ -841,7 +839,6 @@ namespace ItemSystem.Shop
             bool letterFree = focusAxis == null && LetterFreeReroll(run);   // 〈目利きの紹介状〉: 店の最初の通常リロールは無料
             int price = focusAxis != null ? AxisRerollPrice : letterFree ? 0 : Current.CurrentRerollPrice;
 
-            // 〈合札〉の初回リロール無料は 2026-10-31 に「2 品目以降 10G 引き」へ作り替えた (TryBuy)。
             if (run.coins < price) { RerollFailNoGold++; Log($"リロール: ゴールド不足 ({price}G 必要)"); return false; }
 
             run.coins -= price;
@@ -849,8 +846,8 @@ namespace ItemSystem.Shop
             MetaProgression.Achievements.AchievementService.NoteShopReroll();
             GameLoop.RunChronicle.Reroll(run, price);
             if (letterFree) { Current.freeRerollUsed = true; Log($"〈{GameLoop.ItemIds.MacroLetter}〉: 最初のリロールは無料"); }
-            // 〈相場師の算盤〉: 店に入って最初のリロール (軸指定も) をした時だけ、 以後の戦闘開始時の充電 +3・臨界 +5 が 1 回分積もる (店の数で止まる)
-            if (Current.rerollCount == 0 && run.OwnsPassive(GameLoop.ItemIds.MacroAbacus))
+            // 〈相場師の算盤〉: リロール (軸指定も) 1 回ごとに 1 回分積もる (最大 10・戦闘開始時のブロック +2・最初の 1 撃 +1)
+            if (run.abacusStacks < ItemSystem.PassiveSkills.Effects.MacroAbacus.MaxStacks && run.OwnsPassive(GameLoop.ItemIds.MacroAbacus))
             {
                 run.abacusStacks++;
                 Log($"〈{GameLoop.ItemIds.MacroAbacus}〉: {run.abacusStacks} 回分");
@@ -1102,8 +1099,11 @@ namespace ItemSystem.Shop
 
         public void Close()
         {
-            // 〈黄金の通行手形〉: この店で使った額を足し、 100G ごとに次の店 1 軒 (持っている時に出た店だけ)
+            // 〈黄金の通行手形〉: この店で使った額を足し、 80G ごとに次の店 1 軒 (持っている時に出た店だけ)
             var run = GameLoop.GameManager.Instance?.Run;
+            // 〈溶金の領主剣〉: この店で使った額を積む (100G につき基礎攻撃 +2・items.json の stats・per = swordShopSpent)
+            if (Current != null && run != null && run.OwnsPassive(GameLoop.ItemIds.GoldenKingSword))
+                run.swordShopSpent += System.Math.Max(0, run.coinsSpent - _spentAtOpen);
             if (Current != null && run != null && run.OwnsPassive(GameLoop.ItemIds.MacroPass))
             {
                 run.passShopSpent += System.Math.Max(0, run.coinsSpent - _spentAtOpen);

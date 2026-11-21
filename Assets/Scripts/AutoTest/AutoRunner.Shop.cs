@@ -532,7 +532,7 @@ namespace AutoTest
             {
                 var run = gm.Run;
 
-                // 店の頭のリロール (2026-11-21・段 3): 〈目利きの紹介状〉の無料の 1 回 (ただ) / 〈相場師の算盤〉(店の最初のリロールで以後の戦闘の充電 +3・臨界 +5 が 1 回分積もる)。
+                // 店の頭のリロール: 〈目利きの紹介状〉の無料の 1 回 (ただ) / 〈相場師の算盤〉(リロール 1 回で以後の戦闘開始時のブロック +2・最初の 1 撃 +1 が 1 回分積もる・最大 10)。
                 //   まだ何も見ていない棚を回すので、 棚の良し悪しは期待値で変わらない (払うのは値段だけ・後のリロールの値段は 1 段上がる)。 算盤は残金が 値段 + 取り置き 以上の時だけ
                 if (!ablateShop && run != null && inv.rerollCount == 0)
                 {
@@ -540,7 +540,7 @@ namespace AutoTest
                     int rp0 = inv.CurrentRerollPrice;
                     int before0 = run.coins;
                     bool rolled0 = letterFree ? AuditedReroll(gm, inv)
-                                 : run.OwnsPassive(ItemIds.MacroAbacus) && rp0 > 0 && run.coins >= rp0 + AbacusRerollReserve && AuditedReroll(gm, inv, rp0 + AbacusRerollReserve);
+                                 : run.OwnsPassive(ItemIds.MacroAbacus) && run.abacusStacks < ItemSystem.PassiveSkills.Effects.MacroAbacus.MaxStacks && rp0 > 0 && run.coins >= rp0 + AbacusRerollReserve && AuditedReroll(gm, inv, rp0 + AbacusRerollReserve);
                     if (rolled0 && _cur != null) { _cur.shopRerolls++; _cur.shopRerollCoins += before0 - run.coins; }
                 }
 
@@ -978,10 +978,9 @@ namespace AutoTest
                 void BuyPhase3Items()
                 {
                     float gate = RunPowerBudget.GateScale(PowerGap());
-                    bool gk = false;   // 2026-11-19: 溶金の領主剣は使った金では伸びなくなった (秘宝・賽・イベントの金で伸びる) ので、 買い回しを緩める特別扱いをやめた
                     bool lastShopForP3 = run.Depth >= run.normalClearFloor;   // フェーズ3 の lastShop と同じ式
-                    int passiveGate = lastShopForP3 ? 0 : Mathf.RoundToInt((gk ? 15 : 25) * gate);
-                    int weaponGate  = lastShopForP3 ? 0 : Mathf.RoundToInt((gk ? 25 : 40) * gate);
+                    int passiveGate = lastShopForP3 ? 0 : Mathf.RoundToInt(25 * gate);
+                    int weaponGate  = lastShopForP3 ? 0 : Mathf.RoundToInt(40 * gate);
                     for (int i = 0; i < inv.slots.Count; i++)
                     {
                         var s = inv.slots[i];
@@ -1001,7 +1000,7 @@ namespace AutoTest
                     if (run.coins < price) return;
                     int after = run.coins - price;
                     float gate = RunPowerBudget.GateScale(PowerGap());
-                    int passiveGate = Mathf.RoundToInt(25 * gate);   // 溶金の特別扱いは 2026-11-19 にやめた
+                    int passiveGate = Mathf.RoundToInt(25 * gate);
                     int weaponGate  = Mathf.RoundToInt(40 * gate);
                     DiscardRolls++;
                     int nth = Mathf.Min(3, inv.rerollCount);   // 0=1回目 … 3=4回目以降
@@ -1341,12 +1340,8 @@ namespace AutoTest
                 // (旧フェーズ2.5 の強盗判定はフェーズ0 へ移動 ── 買う前に撃つ)
 
                 // ============================================================
-                // フェーズ3: 通常購入（旧ロジック）
-                //   黄金卿の剣 所持時 (2026-05-31 v3 消費Gold基準に変更後):
-                //   旧 = 余剰金保持 / 新 = **積極消費**で与ダメ倍率を伸ばす
-                //   → 通常購入閾値を緩める (=より積極的に買い回し)
+                // フェーズ3: 通常購入
                 // ============================================================
-                bool hasGoldKing = false;   // 2026-11-19: 溶金の領主剣は使った金では伸びなくなったので、 積極消費の特別扱いをやめた
                 if (lastShop)
                 {
                     // ボス直前。 **まず防御系を上限まで積む** ── 装備より先に生存資源を確保する。
@@ -1395,9 +1390,9 @@ namespace AutoTest
                     // 次のボスに対する戦力ギャップでゲートを動かす (天井専用・§RunPowerBudget)。
                     //   足りないほど金を使う。 充足なら倍率 1.0 ＝ 従来どおり。
                     float gate = RunPowerBudget.GateScale(PowerGap());
-                    int weaponGate   = Mathf.RoundToInt((hasGoldKing ? 25 : 40) * gate);
-                    int passiveGate  = Mathf.RoundToInt((hasGoldKing ? 15 : 25) * gate);
-                    int materialGate = Mathf.RoundToInt((hasGoldKing ? 10 : 20) * gate);
+                    int weaponGate   = Mathf.RoundToInt(40 * gate);
+                    int passiveGate  = Mathf.RoundToInt(25 * gate);
+                    int materialGate = Mathf.RoundToInt(20 * gate);
                     // **装備に至らない武器/ダイスは買わない (2026-08-10)。**
                     //   旧: 所持金がゲートを超えていれば枠を無条件に全部買っていた。
                     //   Loadout.TryAutoEquip は「今より良い時だけ」装備するので、

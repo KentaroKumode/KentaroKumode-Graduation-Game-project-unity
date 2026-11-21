@@ -853,7 +853,7 @@
     {
       "id": "加重の拳套",
       "name": "加重の拳套",
-      "description": "同じターンに 2 撃目以降の攻撃が通るたび、 その撃の最終与ダメージ +15%（2 撃目 +15%・3 撃目 +30%）",
+      "description": "同じターンに 2 撃目以降の攻撃が通るたび、その撃の与ダメージ +20%",
       "flavorText": "外して目方を測ると、ただの古い革の重さしかない。「殴っている最中に測れ」という苦情は、一度も受理されなかった。",
       "category": "Passive",
       "rarity": "SILVER",
@@ -1133,7 +1133,7 @@
     {
       "id": "溶金の領主剣",
       "name": "溶金の領主剣",
-      "description": "秘宝・賽・イベントからゴールドを得るたび、1G につき与ダメージ +2%。",
+      "description": "現在の所持ゴールド 50G ごとに与ダメージ +10%（最大 +80%）。さらに店で 100G 使うたび、このラン中の全攻撃ヒットの基礎攻撃 +2（累積）",
       "flavorText": "領主は貨幣を炉へ投じるたび、剣へ新しい都市名を刻ませた。最後の銘は彼自身の領地で、そこだけ金が剥がれている。",
       "category": "Passive",
       "rarity": "LEGENDARY",
@@ -1142,11 +1142,19 @@
       "stats": [
         {
           "stat": "dmgPct",
-          "value": 2,
-          "per": "swordWindfall",
+          "value": 10,
+          "per": "coins",
+          "perEvery": 50,
+          "perMax": 8,
           "when": {
             "hit": true
           }
+        },
+        {
+          "stat": "atk",
+          "value": 2,
+          "per": "swordShopSpent",
+          "perEvery": 100
         }
       ],
       "axis": "金"
@@ -1208,12 +1216,11 @@
     {
       "id": "戦果の天秤",
       "name": "戦果の天秤",
-      "description": "戦闘に勝ったとき、その戦闘で出した会心の回数だけゴールド",
+      "description": "戦闘勝利時の獲得ゴールド +30%（切り上げ）。エリート・ボスを倒したならさらに +15G",
       "flavorText": "「皿の血は拭いてから乗せろ」「拭いたら目方が減るだろうが」",
       "category": "Passive",
       "rarity": "GOLD",
       "basePrice": 9,
-      "skill": "戦果の天秤",
       "axis": "金"
     },
     {
@@ -1738,7 +1745,7 @@
     {
       "id": "黄金色の封蝋",
       "name": "黄金色の封蝋",
-      "description": "層に入るたび、ゴールド+15。",
+      "description": "層に入るたび、ゴールド +18",
       "flavorText": "成金貴族の間で流行った、本物の金粉入りの封蝋。中身の手紙より封のほうが値打ちがあると陰口を叩かれた。",
       "category": "Passive",
       "rarity": "BRONZE",
@@ -1748,7 +1755,7 @@
     {
       "id": "合札",
       "name": "合札",
-      "description": "同じショップで 2 品目以降を買うとき 10G 安い",
+      "description": "同じショップで 2 品目以降を買うとき −10G（下限 1G）",
       "flavorText": "「木目が合ったな。よし、端数は引いておく」",
       "category": "Passive",
       "rarity": "SILVER",
@@ -1758,18 +1765,17 @@
     {
       "id": "銭皿",
       "name": "銭皿",
-      "description": "シールドが残った状態で戦闘に勝つたび 2G",
+      "description": "秘宝を「見送り換金」したとき、獲得ゴールド +50%（切り上げ）",
       "flavorText": "縁の欠けた木皿。釣りを手渡ししない店の作法で、客と店主は最後まで指を合わせない。",
       "category": "Passive",
       "rarity": "SILVER",
       "basePrice": 8,
-      "skill": "銭皿",
       "axis": "金"
     },
     {
       "id": "爆破祭の小切手",
       "name": "爆破祭の小切手",
-      "description": "臨界の爆発でとどめを刺すたび +4G",
+      "description": "3 ターン以内に戦闘に勝利したとき、追加ゴールド +12",
       "flavorText": "鉱山町の祭りで出た賞金小切手。種目は「音の大きさ」「煙の高さ」——上位三枚はいずれも、受取人不在で換金されていない。",
       "category": "Passive",
       "rarity": "SILVER",
@@ -1801,7 +1807,7 @@
     {
       "id": "幸運の硬貨",
       "name": "幸運の硬貨",
-      "description": "同じ目が 2 個以上出たターン、2G",
+      "description": "同じ目が 2 個以上出たターン、ゴールド +3（1 戦闘最大 12G）",
       "flavorText": "行商人の帳面には『贈答品』とだけある。同じ硬貨が同じ行に、日付を変えて何度も書かれている。",
       "category": "Passive",
       "rarity": "BRONZE",
@@ -2551,7 +2557,7 @@
     {
       "id": "帯革の薬嚢",
       "name": "帯革の薬嚢",
-      "description": "戦闘中に消耗品を使うたび、端子を 1 枚引いて手札に加え、シールド +6",
+      "description": "戦闘中に消耗品を使うたび、端子を 1 枚引いて手札に加え、ブロック +6",
       "flavorText": "",
       "category": "Passive",
       "rarity": "BRONZE",
@@ -2581,7 +2587,7 @@
     {
       "id": "行商人の見本箱",
       "name": "行商人の見本箱",
-      "description": "店の戦術消耗品の値段 −50%。戦闘の始めに消耗品を 1 つも持っていなければ、BRONZE か SILVER の戦術消耗品を 1 つ得る（その戦闘の間だけ）",
+      "description": "店の戦術消耗品の値段 −50%。戦闘開始時に消耗品が 0 個なら、BRONZE か SILVER の戦術消耗品を 1 個借りる（その戦闘中のみ）",
       "flavorText": "",
       "category": "Passive",
       "rarity": "GOLD",
@@ -2620,7 +2626,7 @@
     {
       "id": "研ぎ代の領収書",
       "name": "研ぎ代の領収書",
-      "description": "店または休憩で山札から端子を 1 枚抜くたび、ランの間ずっと攻撃 +2（累積）",
+      "description": "店または休憩で山札から端子を 1 枚削除するたび、このラン中の全攻撃ヒットの基礎攻撃 +2（累積）",
       "flavorText": "",
       "category": "Passive",
       "rarity": "SILVER",
@@ -2631,7 +2637,7 @@
     {
       "id": "相場師の算盤",
       "name": "相場師の算盤",
-      "description": "店に入って最初のリロール（軸指定を含む）をするたび、以後の戦闘開始時に充電 +3・臨界 +5（累積・このランの間）",
+      "description": "店でリロール（軸指定を含む）を 1 回行うたび、このラン中の戦闘開始時ブロック +2・最初の 1 撃の基礎攻撃 +1（最大 10 回累積）",
       "flavorText": "",
       "category": "Passive",
       "rarity": "GOLD",
@@ -2642,7 +2648,7 @@
     {
       "id": "黄金の通行手形",
       "name": "黄金の通行手形",
-      "description": "店で 100G 使うたび、次の店 1 軒の秘宝の棚が全部 1 段上のレア度で並ぶ（LEGENDARY はそのまま）",
+      "description": "店で 80G 使うたび、次の店 1 軒の秘宝の棚がすべて 1 段上のレア度で並ぶ（LEGENDARY はそのまま）",
       "flavorText": "",
       "category": "Passive",
       "rarity": "LEGENDARY",
@@ -2652,7 +2658,7 @@
     {
       "id": "目利きの紹介状",
       "name": "目利きの紹介状",
-      "description": "店に入るたび、最初の 1 回の通常リロールが無料。軸指定リロールの追加 −3G",
+      "description": "店に入るたび、最初の 1 回の通常リロールが無料。軸指定リロールの追加費用 −3G（6G → 3G）",
       "flavorText": "",
       "category": "Passive",
       "rarity": "BRONZE",
@@ -2671,7 +2677,7 @@
     {
       "id": "古物商の交換帳",
       "name": "古物商の交換帳",
-      "description": "交換マスで受け取る秘宝の 2 択が、今いちばん偏重の高い軸の秘宝に寄る（その軸の品が 6 倍出やすい）",
+      "description": "交換マスで受け取る秘宝の 2 択が、ロック済みの軸のうち所持数が最も多い軸の秘宝に確定する",
       "flavorText": "",
       "category": "Passive",
       "rarity": "GOLD",
@@ -3038,7 +3044,7 @@
     {
       "id": "崩しの一手",
       "name": "崩しの一手",
-      "description": "ボスの目盛りを割ってダウンさせたターン、次のターンの手札 +2 枚・充電 +10",
+      "description": "ボスの目盛りを割ってダウンさせたターン、次のターンの手札 +2 枚・次のターンの全撃の基礎攻撃 +6",
       "flavorText": "",
       "category": "Passive",
       "rarity": "SILVER",
@@ -3048,7 +3054,7 @@
     {
       "id": "大技殺しの楔",
       "name": "大技殺しの楔",
-      "description": "ダウンか〈封じ〉で敵の大技を取り消したとき、敵に最大 HP の 10% の軽減不可ダメージ・シールド +15",
+      "description": "ダウンか〈封じ〉で敵の大技を取り消したとき、敵に最大 HP の 10% の軽減不可ダメージ・次のターンのブロック +15",
       "flavorText": "",
       "category": "Passive",
       "rarity": "GOLD",
@@ -3058,7 +3064,7 @@
     {
       "id": "逆境の砂時計",
       "name": "逆境の砂時計",
-      "description": "エスカレーションの段階が 2 以上の間、ターン開始時にシールド +4・与ダメージ +25%",
+      "description": "エスカレーションの段階が 2 以上の間、ターン開始時にブロック +4・与ダメージ +25%",
       "flavorText": "",
       "category": "Passive",
       "rarity": "SILVER",

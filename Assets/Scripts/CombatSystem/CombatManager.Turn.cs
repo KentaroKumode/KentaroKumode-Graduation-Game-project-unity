@@ -1067,7 +1067,7 @@ namespace CombatSystem
             bool refire = false; float sniperAdd = 0f;
             for (int h = 0; h < nHits; h++)
             {
-                ctx.hitIndex = h; ctx.forceCritThisHit = refire; ctx.critSkipRoll = refire; ctx.hitFinalDamagePct = 0; ctx.hitIgnoreDefense = false;   // 撃ごとの値 (〈抜き打ちの作法〉〈加重の拳套〉など)
+                ctx.hitIndex = h; ctx.forceCritThisHit = refire; ctx.critSkipRoll = refire; ctx.hitFinalDamagePct = 0; ctx.hitOutgoingPct = 0; ctx.hitIgnoreDefense = false;   // 撃ごとの値 (〈抜き打ちの作法〉〈加重の拳套〉など)
                 ctx.hitFaceMax = CritCore.HitFaceMax(term, playerDice, h);   // 〈狙い目の刻み〉が読む
                 if (h > 0 || refire)
                 {
@@ -1094,7 +1094,7 @@ namespace CombatSystem
                 if (refire) { refire = false; CritRefireFired++; Debug.Log($"[必殺の照準器] 会心の撃をもう 1 回発火 → {d}"); }
                 else if (sniper && c && h == 0) { refire = true; sniperAdd = ctx.lastCritAddPct; h--; }
             }
-            ctx.forceCritThisHit = false; ctx.critSkipRoll = false; ctx.hitFinalDamagePct = 0; ctx.hitIgnoreDefense = false;
+            ctx.forceCritThisHit = false; ctx.critSkipRoll = false; ctx.hitFinalDamagePct = 0; ctx.hitOutgoingPct = 0; ctx.hitIgnoreDefense = false;
             if (nHits > 1)
             {
                 // この後の処理 (計装・画面の倍率) は 1 撃目の後の値を読む前提なので、 1 撃目の後の値へ戻す

@@ -109,6 +109,7 @@ namespace AutoTest
 
         /// <summary><b>見送り換金の判断 (2026-11-21・full-item-rework-spec §1-5)。</b> 取る品: 枠外 (金・軸なし)・寄せる軸 (<see cref="AxisFocus"/>)・
         /// 本命の軸 (偏重の上位 2 軸・2 番目と同数の軸も)。 軸の秘宝を持つ軸が 2 つに満たないうちは何でも取る (軸を探る段)。 それ以外の 8 軸の品は見送る (4 枠を汚さない)。
+        /// 〈銭皿〉を持っていれば、 一番の軸でない BRONZE も見送る。
         /// 乱数は引かない。</summary>
         public static bool WantsPassive(RunState run, string id)
         {
@@ -122,7 +123,11 @@ namespace AutoTest
                 held++;
                 if (n > first) { second = first; first = n; } else if (n > second) second = n;
             }
-            return held < 2 || ItemSystem.PassiveSkills.AxisRules.Count(run, d.axis) >= second;
+            if (held < 2) return true;
+            int mine = ItemSystem.PassiveSkills.AxisRules.Count(run, d.axis);
+            // 〈銭皿〉(見送り換金 +50%): 一番の軸でない BRONZE は見送る (23G の方が重い)
+            if (d.rarity == ItemSystem.ItemRarity.BRONZE && mine < first && run.OwnsPassive(ItemIds.GoldCoinDish)) return false;
+            return mine >= second;
         }
 
         /// <summary>提示から、 欲しい品 (<see cref="WantsPassive"/>) の中で買いの点が一番の品を選ぶ。 欲しい品が無ければ −1 (見送り換金)。</summary>

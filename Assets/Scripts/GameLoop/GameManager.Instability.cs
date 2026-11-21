@@ -125,7 +125,7 @@ namespace GameLoop
             var sim = FreeMap;
             if (Run != null && sim != null && sim.InStorm(sim.Me) && Run.OwnsPassive(ItemIds.MacroVane))
             {
-                GoldIncome.Gain(Run, VaneGold, ItemIds.MacroVane, GoldOrigin.Item);
+                GoldIncome.Gain(Run, VaneGold, ItemIds.MacroVane);
                 d += AddInstability(InstabilitySource.Shift, -VaneCalm, ItemIds.MacroVane);
             }
             return d;

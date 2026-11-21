@@ -37,8 +37,10 @@ namespace GameLoop
     {
         // === 名前付きパッシブ (日本語 ID ── items.json の id と一致必須) ===
         // MerchantSeal (商人の符牒) / GourmetKnife (食通の懐刀) は 2026-07-18 削除 (アイテム削除に伴う)
-        /// <summary>黄金卿の剣: AutoRunner の装備判断が参照。</summary>
+        /// <summary>溶金の領主剣: ShopManager.Close が店で使った額を数える (RunState.swordShopSpent)。</summary>
         public const string GoldenKingSword = "溶金の領主剣";
+        /// <summary>金の品 (2026-11-21・full-item-rework-ledger §⑨・GoldEffects.cs)。 銭皿 = AxisPool.SkipGoldFor / 天秤 = GameManager.Rewards。</summary>
+        public const string GoldCoinDish = "銭皿", GoldScale = "戦果の天秤", GoldLuckyCoin = "幸運の硬貨", GoldBlastPrize = "爆破祭の小切手";
         /// <summary>天工開物: GameManager の強化フックが参照。</summary>
         public const string HeavenlyCraft = "天工開物";
         /// <summary>竜閃: items.json に family / tier を持たない特殊武器。 戦闘演出 (Game2DBattleSim) が竜閃の絵とモーションを選ぶ判定に使う。</summary>
@@ -53,7 +55,7 @@ namespace GameLoop
         // === 店連動パッシブ (2026-09-15) ===
         //   ShopManager が所持判定に使う ＝ 跨ファイル参照なのでここを経由する。
         //   下の帯 (BRONZE/SILVER) に店の機能へ触る品が 1 つも無かったのを埋めるもの。
-        /// <summary>合札: 同じショップで 2 品目以降を買うとき 10G 安い (ShopManager.TryBuy・2026-10-31)。</summary>
+        /// <summary>合札: 同じショップで 2 品目以降を買うとき 10G 安い (下限 1G・ShopManager.TryBuy)。</summary>
         public const string TrialTossToken = "合札";
 
         // === 確信チェーンのフラグ品 (5F-6F の進路・2026-11-12 に定数化) ===
@@ -189,11 +191,11 @@ namespace GameLoop
         public const string TacticSwap = "入れ替えの符", TacticOil = "無銘の潤滑油", TacticAcid = "鎧割りの酸瓶", TacticNeedle = "急所突きの針",
             TacticChisel = "目盛り削りの鑿", TacticSand = "反転の砂", TacticOrb = "倍化の共鳴玉", TacticMercury = "複製の水銀";
 
-        // === 消耗品の連動品 (2026-11-20・item-overhaul-spec §7-2・名前は仮) ===
+        // === 消耗品の連動品 (帯革・小瓶 = GeneralEffects.cs / 見本箱 = GoldEffects.cs) ===
         public const string LinkPouch = "帯革の薬嚢", LinkBottomless = "底抜けの小瓶", LinkSampleBox = "行商人の見本箱";
 
         // === 嵐・店・金のマクロ秘宝 (2026-11-20・item-overhaul-spec §9・名前は仮) ===
-        //   嵐: 風見鶏・天幕 = GameManager.Instability / 気圧計 = MacroItemEffects。 店: 算盤・手形・紹介状 = ShopManager / 研ぎ代 = GameManager.Terminals + MacroItemEffects。
+        //   嵐: 風見鶏・天幕 = GameManager.Instability / 気圧計 = GeneralEffects。 店: 算盤・手形・紹介状 = ShopManager (算盤の戦闘の側は GoldEffects) / 研ぎ代 = GameManager.Terminals + GoldEffects。
         //   報酬: 鑑定書 = GameManager.OfferTerminalReward / 交換帳 = GameManager.Tiles (交換マス)。
         public const string MacroVane = "嵐読みの風見鶏", MacroBarometer = "気圧計のペンダント", MacroTent = "避雷の天幕";
         public const string MacroReceipt = "研ぎ代の領収書", MacroAbacus = "相場師の算盤", MacroPass = "黄金の通行手形";
@@ -238,7 +240,7 @@ namespace GameLoop
         public const string CritFirstArrow = "一の矢", CritPommel = "渾身の柄頭", CritSniper = "必殺の照準器", CritHeaven = "天眼の鍔",
             CritSuntetsu = "寸鉄", CritIronClub = "銑鉄棍", CritPinpoint = "一点読みの片眼", CritQuickDraw = "抜き打ちの作法",
             CritClairvoyant = "千里眼の水晶", CritMask = "死相の面頬", CritAim = "狙い目の刻み";
-        // === 戦術の 5 品 (2026-11-21・段 1-f・item-overhaul-spec §6-2・名前は仮) = TacticItemEffects.cs ===
+        // === ボス・大技の戦術の 4 品 (軸なし汎用) = GeneralEffects.cs ===
         public const string TacGapSpear = "隙衝きの短槍";
         public const string TacBreak = "崩しの一手", TacWedge = "大技殺しの楔", TacHourglass = "逆境の砂時計";
 

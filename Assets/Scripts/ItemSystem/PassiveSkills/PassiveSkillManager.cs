@@ -655,7 +655,6 @@ namespace ItemSystem.PassiveSkills
             {
                 if (!attackerIsEnemy)
                 {
-                    context.accumulatedValues[Keywords.Kw.CritCountKey] = context.GetAccumulated(Keywords.Kw.CritCountKey) + 1;
                     Effects.Crit.Note(context);   // このターンの会心の数・会心を出したターン (会心の軸の品が読む)
                 }
                 FireTrigger(PassiveSkillTrigger.OnCriticalDamage);
