@@ -528,7 +528,6 @@ namespace AutoTest
             public int atkPower, atkPenalty;   // 武器の素火力 / 麻痺毒の減算 (本体は atkBase 全体から引く)
             public int atkFlat;                // 攻撃+N: ctx.mutualAttackBonus (配線前に積まれた分) + 消費の攻撃 + 遺物の攻撃
             public int atkPerDie;              // 端子調律: 攻撃に挿したダイス 1 本あたり
-            public float chgToAtk;             // 〈電流〉の②: 充電に挿した出目のこの割合が攻撃へ
             public float igCut;                // 〈不完全な起動〉の攻撃カット率
             public int dmgBonus;               // バフ damageBonus (ProcessDamage の 1.)
             public float critP, critMulEff;    // 会心率 (配線前に分かる分) / 実効の会心倍率 (敵の会心耐性込み)
@@ -690,7 +689,6 @@ namespace AutoTest
             int consAtk = ctx.rollPurity ? 0 : ctx.consDiceRoll;
             st.atkFlat = ctx.mutualAttackBonus + consAtk + MetaProgression.Relics.RelicApplicator.GetAttackBonus(run, ctx);
             st.atkPerDie = MetaProgression.MetaBuffApplicator.GetAttackTerminalPerDice();
-            st.chgToAtk = ctx.chargeToAttackPct;
             st.igCut = (run != null && run.HasFlaw(GameLoop.GateFlaw.IncompleteIgnition)) ? System.Math.Max(0f, GameLoop.GateFlaws.IgnitionAttackCutPct) : 0f;
             st.dmgBonus = (int)ctx.GetBuff("damageBonus");
             // 会心率: 本体の CritRateOf(pendingBuff: true) と同じ (武器 + このターンの加算 + 整備パネル + 戦闘中バフ)。 OnCriticalCheck の条件付きは入らない。
@@ -902,7 +900,6 @@ namespace AutoTest
             if (wantNew)
             {
                 aSumNew += aCount * s.atkPerDie;
-                if (s.chgToAtk > 0f && chargeRaw > 0) aSumNew += Mathf.FloorToInt(chargeRaw * s.chgToAtk);
                 if (s.diceAtkPct > 0f && aSumNew > 0) aSumNew += CombatSystem.CombatRules.AttackDiceScaled(aSumNew, s.diceAtkPct);
             }
             // 攻撃に挿した出目への上乗せ率 (2026-11-06): 本体と同じく 攻撃の出目の合計 × 率 (切り上げ)

@@ -158,12 +158,24 @@ namespace ItemSystem.PassiveSkills
             registry[effect.SkillId] = effect;
         }
 
+        /// <summary>充電の軸 (2026-11-21・ChargeEffects.cs・full-item-rework-ledger §①)。 〈二股の導線〉〈逆さ避雷針〉〈灼線鞭〉は端子の解決の中だけで効く (CombatSystem.ChargeCore の旗・クラスなし)。</summary>
+        private static void RegisterCharge()
+        {
+            Register(new InfiniteMotor()); Register(new ThunderPowder()); Register(new ChargedCuirass()); Register(new OldGauge());
+            Register(new ToppedJar()); Register(new SpareBattery()); Register(new StaticBlanket()); Register(new FlintNeedle());
+            Register(new LightningHelm()); Register(new CatfishSpine()); Register(new LeakyCopperWire()); Register(new StorageGauntlet());
+            Register(new RerollHammer()); Register(new InsulatedCloak()); Register(new LightningStake());
+            Register(new OverloadTuner()); Register(new ScorchedWire()); Register(new ThunderJar()); Register(new ThunderDrum());
+            Register(new ThunderSpear()); Register(new LentTime()); Register(new FourthStrikeCore()); Register(new ThunderReliquary());
+        }
+
         /// <summary>
         /// 全スキルを登録
         /// ★ 新スキル追加時はここに1行追加するだけ ★
         /// </summary>
         private static void RegisterAll()
         {
+            RegisterCharge();
             // ============================
             //  アイテム再編 (2026-10-31・ReworkItemEffects.cs)
             // ============================
@@ -183,16 +195,6 @@ namespace ItemSystem.PassiveSkills
             Register(new ArsenalCrate());
             Register(new PatchedBoots());
             Register(new HopeShard());
-            Register(new InfiniteMotor());
-            Register(new ThunderPowder());
-            Register(new OldGauge());
-            Register(new InvertedRod());
-            Register(new ThunderJar());
-            Register(new ScorchedWire());
-            Register(new ChargedCuirass());
-            Register(new CatfishSpine());
-            Register(new SearingWhip());
-            Register(new LentTime());
             Register(new WornBuckler());
             Register(new Pauldron());
             Register(new MirrorBuckler());
@@ -202,7 +204,6 @@ namespace ItemSystem.PassiveSkills
             Register(new VeteranPatch());
             Register(new PulselessHeart());
             Register(new SmolderingBreastplate());
-            Register(new LightningHeadguard());
             Register(new ThornBuckler());
             // 鎧縫いの針 はステータス化 (段 3・敵の出血 1 につき貫通 +1)
             Register(new StrainGauntlet());
@@ -240,19 +241,16 @@ namespace ItemSystem.PassiveSkills
             // ============================
             //  軸の品 (2026-11-07・AxisItemEffects.cs)。 各軸に 燃料 / ① 数を参照 / ②【規則】
             // ============================
-            // 研ぎ師の見立て書 / 麻痺の吹き矢 はステータス化 (段 3・2026-11-11)。 千里眼の水晶・英雄の意志・過負荷チューナーは 2026-11-20 にクラスへ戻した (下の追加 34 品の並び)
+            // 研ぎ師の見立て書 / 麻痺の吹き矢 はステータス化 (段 3・2026-11-11)。 千里眼の水晶・英雄の意志は 2026-11-20 にクラスへ戻した (下の追加 34 品の並び)
             Register(new FalconerGlove());                                       Register(new LayeredCutForm());     Register(new LayeredScabbard()); Register(new PinpointEye());
             Register(new ReturnEdgeClasp());  Register(new UnstanchedNeedles()); Register(new ClotVial());
             Register(new TasterSpoon());      Register(new MiasmaJar());         Register(new RotMossBall());
             Register(new FirekeeperPoker());  Register(new CharcoalFeeder());       Register(new SparkReadingGlasses()); Register(new RefiredPrimer());
-            Register(new ToppedJar());        Register(new LeakyCopperWire());   Register(new ForkedTerminal());
             Register(new PaddedBracer());     Register(new OiledShieldLeather());Register(new ShieldPushArt());
             // 軸の品・追加 34 品 (2026-11-07・AxisItemEffects2.cs)。 各軸を 23 品にそろえた
             Register(new AimNotch());   Register(new FirstArrow());   Register(new LingeringBell()); Register(new ParryFan());
             Register(new NickAppraisal()); Register(new LosingStreakDie()); Register(new ChainedFlash()); Register(new QuickDrawArt());
-            Register(new SpareBattery()); Register(new StaticBlanket()); Register(new FlintNeedle()); Register(new StorageGauntlet());
-            Register(new RerollHammer()); Register(new InsulatedCloak()); Register(new LightningStake()); Register(new ThunderDrum());
-            Register(new ClairvoyantCrystal()); Register(new OverloadTuner()); Register(new HeroWill());   // 2026-11-20 作り直し (旧 items.json の stats)
+            Register(new ClairvoyantCrystal()); Register(new HeroWill());   // 2026-11-20 作り直し (旧 items.json の stats)
             Register(new ChippedKnife()); Register(new ThornGlove()); Register(new RiftWedge()); Register(new DrippingEdge());
             Register(new NoClotSalve()); Register(new CrimsonPress()); Register(new EndlessSpringCrystal());
             Register(new AcidVial()); Register(new NeedleRing()); Register(new LeafMoldBag());
@@ -263,7 +261,6 @@ namespace ItemSystem.PassiveSkills
             Register(new ReturningBloodSickle()); Register(new BloodWedge());
             Register(new CorrosionCrown()); Register(new BoneMeltOil());
             Register(new WildKilnHearth()); Register(new PillarBreakerCharge());
-            Register(new ThunderReliquary()); Register(new FourthStrikeCore());
             Register(new FallenCastleCornerstone()); Register(new BorderGuardStandard());
             // 消耗品の連動品 (2026-11-20・ConsumableLinkEffects.cs・item-overhaul-spec §7-2)
             Register(new BeltPouch()); Register(new SpentPride()); Register(new BottomlessVial()); Register(new SampleBox());
@@ -374,10 +371,6 @@ namespace ItemSystem.PassiveSkills
             Register(new BloodStrike());     // 血の一撃 (出血1消費で×3ダメ)
             Register(new AntiClotting());    // 止血阻害 (出血減衰無効化)
             Register(new BloodFate());       // 血の宿命 (開幕 出血+2)
-
-            // 2026-07-15 充電系 (ADR-0009 柱5・新パイプライン専用)
-            // Overload はステータス化
-            // 雷神槍 (旧 ShortCircuit) はステータス化 (段 3・このターンに使った充電の半分を攻撃へ)
 
             // 臨界系 (Rinkai) 2026-07-16 追加: メーター蓄積型・Burn 撤廃後の新軸
             Register(new UnyieldingHeat());    // 不朽の熱 (meter40+ で致命耐え・meter全消費)      // 臨界 (過充電3T継続で会心確定+全消費)

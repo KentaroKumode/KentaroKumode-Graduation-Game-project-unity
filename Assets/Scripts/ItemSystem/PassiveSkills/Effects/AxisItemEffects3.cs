@@ -206,56 +206,6 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     // ============================================================
-    //  充電
-    // ============================================================
-
-    /// <summary>積雷の黒舎利: 毎ターンの終わり、 充電が 30 を超えている分 10 につき、 敵に最大 HP の 1% の軽減不可ダメージ (切り捨て・Kw.DamageEnemy)。
-    /// 30 は固定 (充電の上限が伸びても動かない)。 充電は使わない。</summary>
-    public class ThunderReliquary : IPassiveSkillEffect, IRelicDisplay
-    {
-        public const string Id = "積雷の黒舎利";
-        public string SkillId => Id;
-        public const int Base = 30, Per = 10, PctPerStep = 1;
-        /// <summary>秘宝の列の見え方。</summary>
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.GetCharge() >= Base + Per);
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            int steps = (ctx.GetCharge() - Base) / Per;
-            if (steps <= 0 || ctx.enemyCurrentHP <= 0) return;
-            int dmg = (int)((long)steps * PctPerStep * ctx.enemyMaxHP / 100);
-            if (dmg <= 0) return;
-            Kw.DamageEnemy(ctx, dmg);
-            Rw.Log($"[積雷の黒舎利] 充電 {ctx.GetCharge()} → 30 を超えた分 {steps} × 最大 HP の 1% = {dmg} (軽減不可)");
-        }
-    }
-
-    /// <summary>四つ打ちの鉄芯: 充電が上限の間、 攻撃が通るたびに数え (この戦闘の間・上限でない時の攻撃は数えない)、 4 回目ごとに
-    /// 充電 × 電流 × 50% (切り捨て) の軽減不可ダメージ (Kw.DamageEnemy)。 充電は使わない。</summary>
-    public class FourthStrikeCore : IPassiveSkillEffect, IRelicDisplay
-    {
-        public const string Id = "四つ打ちの鉄芯";
-        public string SkillId => Id;
-        public const int Every = 4, PctPerAxis = 50;
-        private const string CountKey = "ax3.fourthStrike";
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.GetCharge() >= ctx.ChargeCap);
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (!Rw.PlayerHit(ctx) || ctx.enemyCurrentHP <= 0) return;
-            int charge = ctx.GetCharge();
-            if (charge <= 0 || charge < ctx.ChargeCap) return;
-            int n = (int)ctx.GetAccumulated(CountKey) + 1;
-            ctx.accumulatedValues[CountKey] = n % Every;
-            if (n < Every) return;
-            int dmg = (int)((long)charge * ctx.AxisDepth(AxisRules.Charge) * PctPerAxis / 100);
-            if (dmg <= 0) return;
-            Kw.DamageEnemy(ctx, dmg);
-            Rw.Log($"[四つ打ちの鉄芯] 4 回目 → 充電 {charge} × 電流 {ctx.AxisDepth(AxisRules.Charge)} × 50% = {dmg} (軽減不可)");
-        }
-    }
-
-    // ============================================================
     //  シールド
     // ============================================================
 

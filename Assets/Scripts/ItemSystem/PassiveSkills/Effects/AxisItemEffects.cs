@@ -35,10 +35,9 @@ namespace ItemSystem.PassiveSkills.Effects
             // 〈重ね斬りの型〉〈凝血の小瓶〉は 2026-11-20 (段 1-a) に【規則】の品でなくなったので、 表から外した (軸の普通の品として買う)
             ["瘴気溜まりの壺"] = (AxisRules.Poison, Kind.Count),   ["腐れ沼の苔玉"] = (AxisRules.Poison, Kind.Rule),
             ["焚き足しの炭"] = (AxisRules.Heat, Kind.Count),         ["火花読みの眼鏡"] = (AxisRules.Heat, Kind.Rule),
-            ["漏電する銅線"] = (AxisRules.Charge, Kind.Count),     ["二股の導線"] = (AxisRules.Charge, Kind.Rule),
             ["油染みの盾革"] = (AxisRules.Shield, Kind.Count),   [ShieldPushArt.Id] = (AxisRules.Shield, Kind.Rule),
             // 追加 34 品のうち軸の品の数を読む品 (AxisItemEffects2.cs)
-            ["千里眼の水晶"] = (AxisRules.Crit, Kind.Count), ["雷鳴の太鼓"] = (AxisRules.Charge, Kind.Count),
+            ["千里眼の水晶"] = (AxisRules.Crit, Kind.Count),
             ["涸れぬ血晶"] = (AxisRules.Bleed, Kind.Count), ["瘴気の外套"] = (AxisRules.Poison, Kind.Count),
             // 采配 (山札の軸・2026-11-20): ① 采配を読む・②【規則】
             [GameLoop.ItemIds.DeckBroom] = (AxisRules.Deck, Kind.Count), [GameLoop.ItemIds.DeckSeamless] = (AxisRules.Deck, Kind.Count),
@@ -391,40 +390,6 @@ namespace ItemSystem.PassiveSkills.Effects
             Kw.EnableHeat(ctx);
             if (t == PassiveSkillTrigger.OnRinkaiBurst) ctx.burstStackBonus += PerBurst;
         }
-    }
-
-    // ============================================================
-    //  充電 (電流)
-    // ============================================================
-
-    /// <summary>継ぎ足しの蓄電瓶 (燃料): 充電の端子を挿したダイス 1 個につき、 充電 +2。</summary>
-    public class ToppedJar : IPassiveSkillEffect
-    {
-        public string SkillId => "継ぎ足しの蓄電瓶";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            int n = Ax.Count(ctx, MutualKeys.ChargeDiceCount);
-            if (n > 0) ctx.AddCharge(2 * n);
-        }
-    }
-
-    /// <summary>漏電する銅線 (①): ターン開始時、 充電 + 電流の半分 (切り捨て・2026-11-20: 旧 電流・2026-11-07: 旧 電流の半分)。 上限で溢れた分は捨てるだけ (〈過充電〉の出来事を配らない)。</summary>
-    public class LeakyCopperWire : IPassiveSkillEffect
-    {
-        public string SkillId => "漏電する銅線";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-            => ctx.AddCharge(ctx.AxisDepth(AxisRules.Charge) / 2, raiseOverflow: false);
-    }
-
-    /// <summary>二股の導線 (②【規則】): 充電の端子を挿した出目の「電流 × 12%」(最大 80%) が攻撃にも加わる (2026-11-07: 旧 ×8%) (CombatManager の配線集計)。</summary>
-    public class ForkedTerminal : IPassiveSkillEffect
-    {
-        public string SkillId => "二股の導線";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-            => ctx.chargeToAttackPct = System.Math.Min(0.8f, 0.12f * ctx.AxisDepth(AxisRules.Charge));
     }
 
     // ============================================================

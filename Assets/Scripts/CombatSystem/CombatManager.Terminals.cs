@@ -31,6 +31,8 @@ namespace CombatSystem
 
         /// <summary>[計装 #6] 挑戦カード〈金で殴る〉で払った金の累計 (G) / 払ったターンの累計。 プロセスの中で累計し続ける (読む側が差分を取る)。</summary>
         public static long GoldPunchPaidTotal, GoldPunchTurnsTotal;
+        /// <summary>[計装] 【再起動】した回数 / 【オーバークロック】した回数 (プロセスの中で累計・読む側が差分を取る)。</summary>
+        public static long RebootFired, OverclockFired;
 
         /// <summary>〈猫の手〉がこのターン先に挿した出目 (−1 = 無し)。 BOT の挿し方の方策はこの 1 組を固定として扱う (外さない)。</summary>
         public int CatPawDie => _catDie;
@@ -59,6 +61,7 @@ namespace CombatSystem
             // 采配の品 (2026-11-20・段 1-e): 端子の解決と山札の出し入れを変える品の旗 (本体も BOT の写しも state から読む)
             _deck.state.deckItems = TerminalCards.DeckItemsOf(run);
             _deck.state.roleItems = TerminalCards.RoleItemsOf(run);      // 賽目の品 (2026-11-21・段 1-f)
+            _deck.state.chargeItems = ChargeCore.ItemsOf(run);           // 充電の品 (再起動・オーバークロック・2026-11-21)
             if (AxisRules.Owns(run, GameLoop.ItemIds.DeckSparePlug)) _deck.state.extraDrawNext += TerminalCards.SparePlugDraw;      // 〈予備の差込口〉: 1 ターン目に多く引く
             _deck.state.extraDrawNext += MetaProgression.MetaBuffApplicator.GetSparkDeckOpeningDraw();      // 種火・山札 (2026-11-21): 1 ターン目の手札 +1
             if (AxisRules.Owns(run, GameLoop.ItemIds.DeckToolbox) && runDeck.Count <= TerminalCards.ToolboxMaxDeck)
@@ -153,7 +156,8 @@ namespace CombatSystem
             if (_enemyDiceNow != null) foreach (int d in _enemyDiceNow) if (d > emax) emax = d;
             e.enemyMaxDie = emax;
             e.heavyTurn = Escalation.IsHeavyTurn(currentEnemy, ctx.currentTurn);
-            e.chargeCostCut = ctx.ChargeCostNow(2) < 2 ? 1 : 0;   // 〈過負荷チューナー〉: 過充電の間 1 減る (最低 1)
+            e.chargeCostCut = ctx.ChargeCostCut;   // 〈過負荷チューナー〉: 過充電の間 2 減る (最低 1)
+            e.chargeSpendsTurn = (int)ctx.GetAccumulated(CombatContext.ChargeSpendsThisTurnKey);   // 〈灼線鞭〉: 配線より前に充電を使った回数
             e.noAttack = GameLoop.Consumables.RapierContreOn(ctx);   // 〈シュヴァリエのレイピア〉のコントラタック中は攻撃の端子に挿せない
             e.sealedRoleMask = ctx.sealedRoleMask;                    // 立つ役 (TerminalCards.RoleOf) は ResolveRoles と同じ判定 (2026-11-21)
             e.pairAsTriple = OmniPairNow(ctx);                        // 〈万象のゾロ目〉: このターン 2 個そろいをゾロ目として扱う (振り直しの後に決める)
@@ -164,7 +168,15 @@ namespace CombatSystem
         private void ApplyTerminalOutcome(CombatContext ctx, TerminalOutcome o, ref int enemyAtkValue)
         {
             _termDamageMul = o.damageMul;
-            if (o.chargeSpend > 0) ctx.ConsumeCharge(Math.Min(o.chargeSpend, ctx.GetCharge()));
+            // 充電の支払いは 1 回ずつ (「充電を使うたび」の品が回数と量を数える・端子 → 再起動 → 〈逆さ避雷針〉 → オーバークロックの順)
+            foreach (int pay in o.chargePays) ctx.ConsumeCharge(Math.Min(pay, ctx.GetCharge()));
+            if (o.takenFlatCut > 0) ctx.playerFlatDamageReduction += o.takenFlatCut;      // 〈逆さ避雷針〉
+            if (o.rebooted.Count > 0 || o.overclock)
+            {
+                RebootFired += o.rebooted.Count; if (o.overclock) OverclockFired++;      // [計装] BOT のサマリー
+                Debug.Log($"[充電] 再起動 {string.Join(" / ", o.rebooted.ConvertAll(i => _deck != null && i < _deck.board.Count ? _deck.board[i] : i.ToString()))}"
+                        + (o.overclock ? "・オーバークロック" : ""));
+            }
             if (o.chargeCapAdd > 0) ctx.chargeCapBonus += o.chargeCapAdd;      // 〈大導電＋〉: この戦闘の充電の上限 (満たす前に)
             if (o.chargeFill) ctx.AddCharge(ctx.ChargeCap);
             if (o.rerollDiscountNext > 0) YachtRoleEffects.AddNextTurn(ctx, RerollDiscountKey, o.rerollDiscountNext);      // 〈賽振り台〉(2026-11-21)

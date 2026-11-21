@@ -104,8 +104,6 @@ namespace ItemSystem.PassiveSkills.Effects
     //   「シールドを攻撃に変える」は盾家系の〈シールドバッシュ〉(WeaponFamilyEffects.cs) へ一本化した。
 
 
-    // 旧〈貸与された時間〉(被ダメの肩代わりと分割返済・LentTimeI〜IV) と、 品の付いていない段階クラス
-    //   (Counter / Vitality / BladeEdge / BountyHunter / Conqueror / Lifesteal の I〜IV) は 2026-10-31 のアイテム再編で削除。
 
 
 
@@ -504,18 +502,6 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    // ============================================================
-    //  充電系 (ADR-0009 柱5・2026-07-15 追加)
-    //  充電キー "mutualCharge" は ctx.GetCharge/AddCharge/ConsumeCharge/IsOvercharged 経由で操作。
-    //  過充電 = charge >= ChargeMax (10)。新パイプライン専用 (旧では no-op)。
-    // ============================================================
-
-
-
-
-
-
-    // 〈雷神槍〉(旧 ShortCircuit・このターンに使った充電の 50% を攻撃へ・端数切り捨て) は 2026-11-11 に items.json の stats へ移した (段 3・per=chargeSpent)。
 
 
     // ============================================================

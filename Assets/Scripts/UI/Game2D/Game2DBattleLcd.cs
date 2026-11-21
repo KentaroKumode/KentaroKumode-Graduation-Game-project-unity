@@ -171,6 +171,8 @@ namespace UI.Game2D
                     if (In(d, SideRect(0))) { sim.AutoWire(); return; }
                     if (In(d, SideRect(1))) { if (_win != null) _win.OpenItems(); return; }
                     if (In(d, SideRect(2))) { PressFlee(); return; }
+                    if (sim.HasReboot && In(d, SideRect(-1))) { sim.CycleReboot(); return; }
+                    if (sim.HasOverclock && In(d, SideRect(-2))) { sim.ToggleOverclock(); return; }
                 }
                 if (GoVisible && In(d, GoRect())) { if (sim.ButtonEnabled) { _fleeArmed = false; sim.Button(); } return; }
             }
@@ -286,7 +288,8 @@ namespace UI.Game2D
         private RectInt HeadRect() => new RectInt(BattleMotion.EX - 70, BattleMotion.FloorY + BattleLcdLayout.HeadNextDy - 2, 140, -BattleLcdLayout.HeadNextDy + BattleLcdLayout.HeadIntentDy + Game2DJpFont.Cell + 4);
 
         private static readonly string[] SideLabels = { "おまかせ", "道具", "逃げる" };
-        private string SideLabel(int k) => k == 2 && _fleeArmed ? "本当に?" : SideLabels[k];
+        /// <summary>k = 0〜2: おまかせ・道具・逃げる / −1: 【再起動】(〈二股の導線〉) / −2: 【オーバークロック】(〈雷鳴の太鼓〉)・仮置き (2026-11-21)。</summary>
+        private string SideLabel(int k) => k == -1 ? _sim.RebootLabel : k == -2 ? _sim.OverclockLabel : k == 2 && _fleeArmed ? "本当に?" : SideLabels[k];
         private RectInt SideRect(int k)
         {
             int w = Game2DJpFont.Width(SideLabel(k)) + 2;
@@ -562,6 +565,9 @@ namespace UI.Game2D
             {
                 bool[] on = { s.CanOperate, _win != null && _win.AnyUsable(), s.CanFlee };
                 for (int k = 0; k < 3; k++) { var r = SideRect(k); Txt(SideLabel(k), r.x + 1, r.y + 1, k == 2 && _fleeArmed ? RedC : on[k] ? Bone : DimC); }
+                // 充電のコアアクション (仮): 見込みで成り立つ時は金・選んだが成り立たない時は白・選んでいない時は暗く
+                if (s.HasReboot) { var r = SideRect(-1); Txt(SideLabel(-1), r.x + 1, r.y + 1, s.RebootLive ? Gold2 : s.rebootSel >= 0 ? Bone : DimC); }
+                if (s.HasOverclock) { var r = SideRect(-2); Txt(SideLabel(-2), r.x + 1, r.y + 1, s.OverclockLive ? Gold2 : s.overclockOn ? Bone : DimC); }
             }
             if (!GoVisible) return;
             bool en = s.ButtonEnabled;

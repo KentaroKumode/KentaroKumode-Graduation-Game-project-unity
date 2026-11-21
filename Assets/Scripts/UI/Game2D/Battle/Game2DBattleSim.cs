@@ -297,6 +297,7 @@ namespace UI.Game2D.Battle
                 for (int s = 0; s < target.Length; s++) target[s] = -1;
                 for (int s = 0; s < keepMark.Length; s++) keepMark[s] = false;
                 lastOutcome = null; focusSlot = -1;
+                rebootSel = ChargeCore.RebootNone; overclockOn = false;
                 if (AutoWireOnTurnStart) AutoWire(false);
             }
             else ValidateSlots();
@@ -350,7 +351,7 @@ namespace UI.Game2D.Battle
                     {
                         Game2DSfx.Play("decide");
                         int n = p.playerDice != null ? p.playerDice.Length : 0;
-                        cm.AnswerWiringSlots(BuildSlots(n), (int[])target.Clone(), 0, (bool[])keepMark.Clone());   // 残す印は本体が KeepFromMarks で直す (挿した端子には効かない)
+                        cm.AnswerWiringSlots(BuildSlots(n), (int[])target.Clone(), 0, (bool[])keepMark.Clone(), rebootSel, overclockOn);   // 残す印は本体が KeepFromMarks で直す (挿した端子には効かない)
                         if (!cm.IsAwaitingDecision) Resolve(cm);
                     }
                     break;
@@ -546,8 +547,53 @@ namespace UI.Game2D.Battle
         {
             if (lastOutcome != null) { preview = lastOutcome; return; }
             if (!TermInputs(out var dice, out var env, out var st)) { preview = null; return; }
-            preview = TerminalCards.Resolve(board, BuildSlots(dice.Length), dice, env, st.Clone(), target);
+            preview = TerminalCards.Resolve(board, BuildSlots(dice.Length), dice, env, st.Clone(), target, reboot: rebootSel, overclock: overclockOn);
         }
+
+        // ── 充電のコアアクション (2026-11-21・ChargeCore・仮置き) ──
+        //   【再起動】(〈二股の導線〉): 押すたびに対象を「しない → 発動する攻撃・防御の端子を左から順に」と回す。 見込み (preview) は同じ指定で解く。
+        //   【オーバークロック】(〈雷鳴の太鼓〉): 押すと入り切り。 条件 (攻撃の端子・充電 15 以上) を満たさなければ本体が使わない (見込みにも出ない)。
+
+        /// <summary>再起動の対象 (場の添字・<see cref="ChargeCore.RebootNone"/> = しない)。 / オーバークロックを使う。 ターンの頭に戻す。</summary>
+        public int rebootSel = ChargeCore.RebootNone;
+        public bool overclockOn;
+
+        private ChargeItems ChargeFlags => CombatManager.Instance?.TerminalDeck?.state.chargeItems ?? ChargeItems.None;
+        public bool HasReboot => (ChargeFlags & ChargeItems.Fork) != 0;
+        public bool HasOverclock => (ChargeFlags & ChargeItems.Drum) != 0;
+
+        /// <summary>再起動の対象を次へ回す (発動する攻撃・防御の端子だけ・最後の次は「しない」)。</summary>
+        public void CycleReboot()
+        {
+            if (!CanOperate || !HasReboot) return;
+            var cands = new List<int>();
+            var o = TermInputs(out var dice, out var env, out var st) ? TerminalCards.Resolve(board, BuildSlots(dice.Length), dice, env, st.Clone(), target) : null;
+            if (o != null)
+                foreach (int s in o.fired)
+                {
+                    var d = TerminalCards.Get(board[s]);
+                    if (d != null && (d.kind == TerminalKind.Attack || d.kind == TerminalKind.Block) && !cands.Contains(s)) cands.Add(s);
+                }
+            int i = cands.IndexOf(rebootSel);
+            rebootSel = i + 1 < cands.Count ? cands[i + 1] : ChargeCore.RebootNone;
+            Game2DSfx.Play("ui_tab");
+            RecomputePreview(); Touch();
+        }
+
+        public void ToggleOverclock()
+        {
+            if (!CanOperate || !HasOverclock) return;
+            overclockOn = !overclockOn;
+            Game2DSfx.Play("ui_tab");
+            RecomputePreview(); Touch();
+        }
+
+        /// <summary>見込みで再起動が成り立っている (充電が足り、 対象が発動する)。 / オーバークロックが成り立っている。</summary>
+        public bool RebootLive => preview != null && preview.rebootSlot >= 0;
+        public bool OverclockLive => preview != null && preview.overclock;
+        /// <summary>右の列の札の文字 (仮)。</summary>
+        public string RebootLabel => rebootSel < 0 || rebootSel >= board.Count ? "再起動:なし" : "再起動:" + board[rebootSel];
+        public string OverclockLabel => "オーバークロック";
 
         /// <summary>出目 i を端子 s に挿せるか (挿せる数・払う充電・出目の条件)。 他の出目との関係を見る条件は、 そろう見込みがあれば通す
         /// (〈十字斬り〉の 1 個目を挿せるように)。 本当に発動するかは見込み (Resolve) が決める。</summary>

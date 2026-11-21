@@ -810,20 +810,21 @@ namespace CombatSystem
                 // 挑戦カード〈猫の手〉: 出目と予告が確定したここで、 1 組を先に挿す (人の画面・BOT の方策はこの 1 組を外せない)
                 ChooseCatPaw(playerDice, tele, tenv);
                 int[] slots = null, targets = null; bool[] keepMarks = null;
+                int reboot = ChargeCore.RebootNone; bool overclock = false;      // 充電のコアアクション (人 = 画面 / BOT = 方策・2026-11-21)
                 if (_interactiveTurn)
                 {
                     _pause.Set(TurnPauseKind.Wiring, playerDice, playerFaceIdx, tele);
                     _pause.board = _deck.board; _pause.terminalEnv = tenv; _pause.terminalState = _deck.state;
                     _pause.catDie = _catDie; _pause.catSlot = _catSlot;
                     yield return _pause;
-                    slots = _pause.slots; targets = _pause.targets; goldAsk = _pause.goldSpend; keepMarks = _pause.keep;
+                    slots = _pause.slots; targets = _pause.targets; goldAsk = _pause.goldSpend; keepMarks = _pause.keep; reboot = _pause.reboot; overclock = _pause.overclock;
                 }
-                else if (WiringPolicy != null) { var plan = WiringPolicy(playerDice, tele); slots = plan.slots; targets = plan.targets; goldAsk = plan.goldSpend; keepMarks = plan.keep; }
+                else if (WiringPolicy != null) { var plan = WiringPolicy(playerDice, tele); slots = plan.slots; targets = plan.targets; goldAsk = plan.goldSpend; keepMarks = plan.keep; reboot = plan.reboot ?? ChargeCore.RebootNone; overclock = plan.overclock; }
                 if (slots == null) slots = TerminalWiring.Auto(_deck.board, playerDice, tenv, _deck.state, _catDie, _catSlot);
                 // 猫の 1 組は答えに関わらず入れる (外した答え・同じ口に挿しすぎた答えは、 猫の組を残して直す)
                 if (_catDie >= 0) slots = TerminalWiring.WithPair(slots, playerDice.Length, _deck.board, _catDie, _catSlot);
                 // 〈影写し〉〈火葬の剣〉〈有効活用〉の対象: 人 = 画面で選んだ端子 / BOT = 方策 / どちらも無ければ左端の候補
-                term = TerminalCards.Resolve(_deck.board, slots, playerDice, tenv, _deck.state, targets, logAttack: true);
+                term = TerminalCards.Resolve(_deck.board, slots, playerDice, tenv, _deck.state, targets, logAttack: true, reboot: reboot, overclock: overclock);
                 _termWanted = (int[])slots.Clone();   // [計装 #106] 直す前の挿し方 (挿したが不発の数え)
                 mutualWiring = term.kindOfDie;
                 _termOutcome = term;
@@ -867,6 +868,8 @@ namespace CombatSystem
             int _diagAtkGhost = 0;   // (ゴースト接続は ADR-0011 で廃止)
             attackSum += attackDiceCount * MetaProgression.MetaBuffApplicator.GetAttackTerminalPerDice();
             blockSum  += blockDiceCount  * MetaProgression.MetaBuffApplicator.GetBlockTerminalPerDice();
+            // 品のブロック +N (〈帯電の胸甲〉〈絶縁の外套〉〈避雷の杭〉・ctx.itemBlockBonus)。 充電の支払い (振り直し・ApplyTerminalOutcome) の後なので、 このターンの消費の分も入っている
+            blockSum += ctx.itemBlockBonus;
 
             // 〈貫きの錐〉(7層ヴェスカ GOLD 遺物・2026-07-29 変更)。
             //   旧: ブロック配線を **丸ごと 0 にする**。 防御という選択肢が消えるため、
@@ -901,9 +904,6 @@ namespace CombatSystem
             //       雷撃を毎ターン撃つだけで 5 本中 3 本を充電に固定する必要があった。
             //   山札 (ADR-0014) では、 充電に入る量は端子ごとに違う (〈雷溜め〉は 出目 +2 など)。 chargeSum は端子の結果の合計。
             if (chargeSum > 0) ctx.AddCharge(chargeSum);
-            // 〈電流〉の②: 充電端子に挿した出目の一部が攻撃にも加わる (2026-11-07)。 攻撃に 1 個も挿していないターンは攻撃しないので乗らない。
-            if (ctx.chargeToAttackPct > 0f && chargeSum > 0)
-                attackSum += Mathf.FloorToInt(chargeSum * ctx.chargeToAttackPct);
 
             // 遺物 (§15-5): 刻印〈ブロック端子に未配線〉の判定材料。 **配線集計の直後に確定させる**。
             ctx.blockWiredThisTurn = blockDiceCount > 0;
@@ -1000,6 +1000,7 @@ namespace CombatSystem
             //   端子に紐づかない攻撃の加算 (連係・変圧・溜めた攻撃・賽の加算・〈電流〉の②) は最初の 1 撃に入れる。
             int itemAtk = ctx.mutualAttackBonus;   // 品の攻撃 +N (下の出目 +% は足す前に控える ── 出目 +% は端子ごとの 1 撃に入れる)
             var hitBases = new List<int>();
+            attackSum += ctx.firstHitAttackBonus;      // 〈引き直しの撃鉄〉: 最初の 1 撃へ (端子に紐づかない加算と同じく下の rest に入る)
             {
                 int metaPerDie = MetaProgression.MetaBuffApplicator.GetAttackTerminalPerDice();
                 int rest = attackSum;
@@ -1126,9 +1127,12 @@ namespace CombatSystem
                 bool needle = TakeTacticNeedle(ctx, h, h < hitBases.Count);
                 int needlePen = ctx.playerArmorPen;
                 if (needle) { ctx.forceCritThisHit = true; ctx.playerArmorPen += DefenseFormula.IgnoreAll; Debug.Log("[急所突きの針] この撃は必ず会心・敵の防御を無視"); }
+                //   【オーバークロック】(〈雷鳴の太鼓〉・ChargeCore): 最初の 1 撃の最終与ダメージ +60%・敵の防御を全部無視 (この撃だけ・貫通は撃の後に戻す)
+                bool oc = term.overclock && h == 0 && h < hitBases.Count;
+                if (oc) { ctx.hitFinalDamagePct += ChargeCore.OverclockFinalPct; if (!needle) ctx.playerArmorPen += DefenseFormula.IgnoreAll; }
                 var (d, f, c) = psm.ProcessDamage(h < hitBases.Count ? hitBases[h] : 0, h == 0 ? ctx.pursuitDamage : 0, playerCritBaseRate);
                 d = ApplyWinDamageModifiers(d, ref f, ref c, lbStage, psm, ctx);
-                if (needle) ctx.playerArmorPen = needlePen;
+                if (needle || oc) ctx.playerArmorPen = needlePen;
                 if (h == 0) { afterPool = ctx.outgoingDamageMultiplier; afterCritMul = ctx.criticalMultiplier; afterCritAdd = ctx.critRatePctAdd; }
                 hitDealt.Add(d); hitCrit.Add(c);
                 dealtDmg += d; dealtFixed += f; isCrit |= c;

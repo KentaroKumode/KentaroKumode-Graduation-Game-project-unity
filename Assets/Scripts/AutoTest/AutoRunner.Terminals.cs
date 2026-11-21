@@ -513,13 +513,13 @@ namespace AutoTest
                                      out TerminalBattleState after)
         {
             after = ev.deck.state.Clone();
-            o = TerminalCards.Resolve(ev.board, cand, rolls, ev.env, after);
+            o = TerminalCards.Resolve(ev.board, cand, rolls, ev.env, after, reboot: BotReboot, overclock: true);
             // 〈影写し〉〈火葬の剣〉〈有効活用〉が発動する挿し方なら、 対象を方策で選び直して解き直す (対象は今ターンの攻防を変えない)
             tgts = ChooseDeckTargets(ev.board, o, ev.run, _recallPrefer);
             if (tgts != null)
             {
                 after = ev.deck.state.Clone();
-                o = TerminalCards.Resolve(ev.board, cand, rolls, ev.env, after, tgts);
+                o = TerminalCards.Resolve(ev.board, cand, rolls, ev.env, after, tgts, reboot: BotReboot, overclock: true);
             }
             var ws = DeckSums(in ev.st, rolls, ev.board, o, ev.deck.state, after, in ev.env, ev.counterPerFire);
             return OptimalUtilityCore(in ev.st, rolls.Length, in ws, out outc);
@@ -536,7 +536,7 @@ namespace AutoTest
             if (best == null) return null;
             var ev = PrepareDeckEval(rolls, tele);
             // 挿し方を直した後の値で数える (条件に合わず外れる組を猫が挿さないように)
-            var fixedUp = TerminalCards.Resolve(ev.board, best, rolls, ev.env, ev.deck.state.Clone(), targets).slotOfDie;
+            var fixedUp = TerminalCards.Resolve(ev.board, best, rolls, ev.env, ev.deck.state.Clone(), targets, reboot: BotReboot, overclock: true).slotOfDie;
             return TerminalWiring.MostValuablePair(fixedUp, w => EvalDeckWiring(ev, rolls, w, out _, out _, out _));
         }
 
@@ -1031,8 +1031,16 @@ namespace AutoTest
             BeginMainCorrTurn(_lastPredA);
             _fbDecided++; if (_lastFreeBlock) _fbTurns++; if (_lastKillsNow) _fbKillTurns++;
             _fbPrevHp = hpNow; _fbPrevExpTaken = _lastExpTaken;
-            return slots != null ? WiringPlan.OfSlots(slots, targets, gold, keep) : default;      // null なら本体が既定 (TerminalWiring.Auto) で挿す
+            if (slots == null) return default;      // null なら本体が既定 (TerminalWiring.Auto) で挿す
+            var plan = WiringPlan.OfSlots(slots, targets, gold, keep);
+            plan.reboot = BotReboot; plan.overclock = true;      // 充電のコアアクション: 見積もり (下の Resolve) と同じ規則で本体も解く
+            return plan;
         }
+
+        /// <summary>充電のコアアクション (2026-11-21) の BOT の規則: 再起動は払える時はいつも、 対象はおまかせ (<see cref="ChargeCore.AutoValue"/> の最大)・
+        /// オーバークロックは使える時はいつも。 挿し方の見積もり (Resolve) にも同じ指定を渡すので、 再起動の撃・ブロックは効用に入る
+        /// (オーバークロックの +60% と〈逆さ避雷針〉の被ダメ −6 は本体の撃の輪・被ダメの所で掛かるので効用には入らない)。</summary>
+        private const int BotReboot = ChargeCore.RebootAuto;
 
         // =====================================================================
         //  挑戦カード〈金で殴る〉(#6・2026-11-12) の払い方 (効果の定義は ChallengeCards.GoldPunchAttack)
@@ -1118,12 +1126,12 @@ namespace AutoTest
         private void ResolveDeckCand(in DeckEval ev, int[] rolls, int[] cand, out TerminalOutcome o, out TerminalBattleState after, out int[] tgts)
         {
             after = ev.deck.state.Clone();
-            o = TerminalCards.Resolve(ev.board, cand, rolls, ev.env, after);
+            o = TerminalCards.Resolve(ev.board, cand, rolls, ev.env, after, reboot: BotReboot, overclock: true);
             tgts = ChooseDeckTargets(ev.board, o, ev.run, _recallPrefer);
             if (tgts != null)
             {
                 after = ev.deck.state.Clone();
-                o = TerminalCards.Resolve(ev.board, cand, rolls, ev.env, after, tgts);
+                o = TerminalCards.Resolve(ev.board, cand, rolls, ev.env, after, tgts, reboot: BotReboot, overclock: true);
             }
         }
 
@@ -1411,9 +1419,9 @@ namespace AutoTest
                 for (int i = 1; i < k && !dup; i++) if (dice[i] == dice[i - 1] && w[i] < w[i - 1]) dup = true;
                 if (dup) continue;
                 var after = state.Clone();
-                var o = TerminalCards.Resolve(board, w, dice, env, after);
+                var o = TerminalCards.Resolve(board, w, dice, env, after, reboot: BotReboot, overclock: true);
                 var tg = ChooseDeckTargets(board, o, ev.run, _recallPrefer);
-                if (tg != null) { after = state.Clone(); o = TerminalCards.Resolve(board, w, dice, env, after, tg); }
+                if (tg != null) { after = state.Clone(); o = TerminalCards.Resolve(board, w, dice, env, after, tg, reboot: BotReboot, overclock: true); }
                 var ws = DeckSums(in ns, dice, board, o, state, after, in env, ev.counterPerFire);
                 if (ws.aCount > 0) anyAttack = true;
                 sums.Add(ws);

@@ -318,6 +318,15 @@ namespace CombatSystem
         public int CrackBreakTurn(int grace)
             => grace >= 0 && crackTurn != null && broken < crackTurn.Length && crackTurn[broken] >= 0 ? crackTurn[broken] + grace : -1;
 
+        /// <summary>まだ割っていない一番上の目盛りのひびを今割る (満額のダウンを待ちに積む・〈積雷の黒舎利〉・2026-11-21)。 ひびが無ければ false。</summary>
+        public bool BreakTopCrack()
+        {
+            if (!TopCracked) return false;
+            Push(1, false);
+            crackTurn[broken] = -1; crackStrong[broken] = false; broken++;
+            return true;
+        }
+
         /// <summary>まだ割っていない一番上の目盛りにひびが入っているか。</summary>
         public bool TopCracked => crackTurn != null && broken < crackTurn.Length && crackTurn[broken] >= 0;
 

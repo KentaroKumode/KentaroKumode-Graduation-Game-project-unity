@@ -32,6 +32,10 @@ namespace CombatSystem
         public int goldSpend;
         /// <summary>手札の規則 Pick (2026-11-13): 次のターンも手札に残す印 (添字 = 場の位置)。 残せるのは挿さなかった手札の端子だけ (本体が KeepFromMarks で直す)。 null = 何も残さない。</summary>
         public bool[] keep;
+        /// <summary>〈二股の導線〉【再起動】の対象 (場の添字・<see cref="ChargeCore.RebootAuto"/> = おまかせ)。 null = 再起動しない。</summary>
+        public int? reboot;
+        /// <summary>〈雷鳴の太鼓〉【オーバークロック】を使う (条件を満たさなければ本体が使わない)。</summary>
+        public bool overclock;
 
         public static WiringPlan Of(DiceTerminal[] main) => new WiringPlan { main = main };
         public static WiringPlan OfSlots(int[] slots, int[] targets = null, int goldSpend = 0, bool[] keep = null) => new WiringPlan { slots = slots, targets = targets, goldSpend = goldSpend, keep = keep };

@@ -108,6 +108,14 @@ namespace CombatSystem
             if (to >= 0) Debug.Log($"[柱折りの発破筒] 次の目盛り {before} → {to} (+{add}・HP {hpNow})");
         }
 
+        /// <summary>ボスの一番上のひびを今割る (満額のダウン・<see cref="BossDownState.BreakTopCrack"/>)。 目盛りの無い敵・ひびが無ければ false。</summary>
+        public bool BreakBossCrack(string label)
+        {
+            if (!_down.Enabled || currentEnemy == null || enemyHP <= 0 || !_down.BreakTopCrack()) return false;
+            Debug.Log($"[{label}] ボスの目盛りのひびを割った (満額のダウン・割った目盛り {_down.broken})");
+            return true;
+        }
+
         private void BeginBossDownTurnCore(CombatContext ctx)
         {
             _diagHpTurnHead = playerHP; _diagChargeTurn = false;

@@ -32,7 +32,7 @@ namespace ItemSystem
 
         /// <summary>単位数の出どころ (省略 = 定量)。 <c>coinsSpent</c> (このランで使ったゴールド) /
         /// <c>axis:軸名</c> (その軸の品の数・例 <c>axis:会心</c>) / <c>enemyBleed</c> / <c>enemyPoison</c> /
-        /// <c>chargeSpent</c> (このターンに使った充電) / <c>turnsElapsed</c> (経過ターン = 現在ターン − 1)。
+        /// <c>turnsElapsed</c> (経過ターン = 現在ターン − 1)。
         /// 読み方は <see cref="PassiveSkills.Effects.StatModifierEffect"/>。</summary>
         public string per;
         /// <summary>何ごとに 1 単位か (整数の割り算・切り捨て)。 0 / 1 = 1 ごと。 例: 毒 5 につき → 5。</summary>

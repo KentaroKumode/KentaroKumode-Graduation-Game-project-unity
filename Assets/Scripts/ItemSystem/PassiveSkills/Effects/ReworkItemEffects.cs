@@ -11,7 +11,7 @@ namespace ItemSystem.PassiveSkills.Effects
     //  キーワードの出来事 (爆発・充電を得る/使う・過充電・シールドの吸収/半減/割れ・毒の増加/ダメージ/上限・
     //  出血の減衰/消費/0) は Keywords.Kw が配る。 1 つの連鎖の中で同じ品は 1 度しか働かない。
     //
-    //  効果を据え置いた品 (八日目の灰燼・雷神槍・過負荷チューナー・蛇血瓶・鋸刃の山刀・先血の腕輪・
+    //  効果を据え置いた品 (八日目の灰燼・蛇血瓶・鋸刃の山刀・先血の腕輪・
     //  医家の反り刃・逆綴じの止血帯・血桜・医書裏の開き針・溶金の領主剣・黄金色の封蝋) は元のクラスのまま。
     // ============================================================
 
@@ -360,136 +360,6 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     // ============================================================
-    //  充電
-    // ============================================================
-
-    /// <summary>無限モーター: ブロックで敵の攻撃を完全に止めたターン、 止めて余ったブロックの 2 倍を充電にする (2026-11-20: 旧 1 倍)。</summary>
-    public class InfiniteMotor : IPassiveSkillEffect
-    {
-        public string SkillId => "無限モーター";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (Rw.Count(ctx, MutualKeys.EnemyAtkPreDefense) <= 0) return;   // 敵が攻撃していない
-            if (Rw.Count(ctx, MutualKeys.HpLossFromEnemy) > 0) return;        // 止めきれていない
-            int spare = ctx.blockSumThisTurn - Rw.Count(ctx, MutualKeys.EnemyAtk);
-            if (spare > 0) ctx.AddCharge(2 * spare);
-        }
-    }
-
-    /// <summary>呼雷粉: 会心のたび充電 +3。</summary>
-    public class ThunderPowder : IPassiveSkillEffect
-    {
-        public string SkillId => "呼雷粉";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.AddCharge(3);
-    }
-
-    /// <summary>十五年目の計測器: 上限で溢れた充電 1 につき、 次の攻撃で与ダメージ +3% (攻撃したら使い切る)。
-    /// 2026-11-10: 「溢れた充電 2 につき出目 +5%」から変更 (出目 +% の掛け先が小さすぎた)。
-    /// 2026-11-07: 旧「溢れた充電 1 につき次の攻撃 +2」は、 満タンのあと充電端子に挿した出目 1 が攻撃 +2 になり
-    /// (攻撃端子は +1)、 余った資源で強さを買える穴だった。</summary>
-    public class OldGauge : IPassiveSkillEffect, IRelicDisplay
-    {
-        public string SkillId => "十五年目の計測器";
-        /// <summary>秘宝の列 (#320) の見え方。</summary>
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Rw.Count(ctx, Key));
-        private const string Key = "rw.gauge";
-        public const float PctPer1 = 0.03f;
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnOvercharge, PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnWired };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (t == PassiveSkillTrigger.OnOvercharge) { Kw.Add(ctx, Key, Kw.EventAmount(ctx)); return; }
-            int spilled = Rw.Count(ctx, Key);
-            if (t == PassiveSkillTrigger.OnPostRoll) { if (spilled > 0) ctx.AddOutgoingPct(PctPer1 * spilled); return; }
-            if (Rw.Count(ctx, MutualKeys.AttackDiceCount) > 0) ctx.accumulatedValues[Key] = 0f;   // 攻撃したら使い切る
-        }
-    }
-
-    /// <summary>逆さ避雷針: 敵の攻撃を受けるとき、 充電を 5 使って被ダメ −2 (1 ターン 1 回・2026-11-20: 旧 −5)。</summary>
-    public class InvertedRod : IPassiveSkillEffect
-    {
-        public string SkillId => "逆さ避雷針";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreReceiveDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            int cost = ctx.ChargeCostNow(5);   // 〈過負荷チューナー〉
-            if (ctx.playerWonRoll || ctx.finalDamage <= 0 || ctx.GetCharge() < cost) return;
-            if (!Rw.OncePerTurn(ctx, "rw.rod")) return;
-            if (!ctx.ConsumeCharge(cost)) return;
-            ctx.finalDamage = System.Math.Max(0, ctx.finalDamage - 2);
-        }
-    }
-
-    /// <summary>雷壷【規則】: 充電の上限が無くなる。 代わりにターン開始時、 上限を超えている分の 75% が捨てられる。</summary>
-    public class ThunderJar : IPassiveSkillEffect
-    {
-        public string SkillId => "雷壷";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.chargeCapRemoved = true;
-    }
-
-    /// <summary>焦げ導線: 充電を使うたび (リロールを含む)、 使った量 × 2 の臨界。</summary>
-    public class ScorchedWire : IPassiveSkillEffect
-    {
-        public string SkillId => "焦げ導線";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnChargeSpend };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (t == PassiveSkillTrigger.OnBattleStart) { Kw.EnableHeat(ctx); return; }
-            Kw.AddHeat(ctx, Kw.EventAmount(ctx) * 2);
-        }
-    }
-
-    /// <summary>帯電の胸甲: 充電を 5 得るたびシールド +1 (2026-11-20: 旧 充電 3 につき +2)。</summary>
-    public class ChargedCuirass : IPassiveSkillEffect
-    {
-        public string SkillId => "帯電の胸甲";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnChargeGain };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-            => Rw.Shield(ctx, Kw.Tally(ctx, "rw.cuirass", Kw.EventAmount(ctx), 5), SkillId);
-    }
-
-    /// <summary>雷鯰の棘: 充電 7 以上の間、 攻撃が通るたび敵に毒 +1。</summary>
-    public class CatfishSpine : IPassiveSkillEffect, IRelicDisplay
-    {
-        public string SkillId => "雷鯰の棘";
-        /// <summary>秘宝の列 (#320) の見え方。</summary>
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.GetCharge() >= 7);
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (Rw.PlayerHit(ctx) && ctx.GetCharge() >= 7) Rw.Poison(ctx, 1);
-        }
-    }
-
-    /// <summary>灼線鞭: 充電を得るたび、 得た量だけ臨界。</summary>
-    public class SearingWhip : IPassiveSkillEffect
-    {
-        public string SkillId => "灼線鞭";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnChargeGain };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (t == PassiveSkillTrigger.OnBattleStart) { Kw.EnableHeat(ctx); return; }
-            Kw.AddHeat(ctx, Kw.EventAmount(ctx));
-        }
-    }
-
-    /// <summary>貸与された時間【規則】: 充電を 10 使うたび、 エスカレーションの段階が上がるのを 1 ターン遅らせる。</summary>
-    public class LentTime : IPassiveSkillEffect
-    {
-        public string SkillId => "貸与された時間";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnChargeSpend };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            int n = Kw.Tally(ctx, "rw.lent", Kw.EventAmount(ctx), 10);
-            if (n <= 0) return;
-            CombatSystem.YachtRoleEffects.AddEscalationDelay(ctx, n);
-            Rw.Log($"[貸与された時間] 充電を払って段階を {n} ターン遅らせる");
-        }
-    }
-
-    // ============================================================
     //  シールド
     // ============================================================
 
@@ -629,18 +499,6 @@ namespace ItemSystem.PassiveSkills.Effects
         {
             if (t == PassiveSkillTrigger.OnBattleStart) { Kw.EnableHeat(ctx); return; }
             Kw.AddHeat(ctx, Kw.EventAmount(ctx) / 2);
-        }
-    }
-
-    /// <summary>避雷の鉢金: シールドが吸収したダメージ 3 につき充電 +1。</summary>
-    public class LightningHeadguard : IPassiveSkillEffect
-    {
-        public string SkillId => "避雷の鉢金";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnShieldAbsorb };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            int n = Kw.Tally(ctx, "rw.headguard", Kw.EventAmount(ctx), 3);
-            if (n > 0) ctx.AddCharge(n);
         }
     }
 

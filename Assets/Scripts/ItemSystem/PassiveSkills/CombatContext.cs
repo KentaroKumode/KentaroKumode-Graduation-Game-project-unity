@@ -581,7 +581,7 @@ namespace ItemSystem.PassiveSkills
         // ---- 規則の品 (2026-10-31 アイテム再編)。 どれも戦闘開始時に品が立てる [persistent] ----
         /// <summary>[persistent] 〈帳簿外の爆薬〉: 爆発で臨界を 0 にせず閾値ぶんだけ減らし、 溜まっている限り何度でも爆発する。</summary>
         public bool rinkaiMultiBurst;
-        /// <summary>[persistent] 〈雷壷〉: 充電の上限が無くなる。 代わりにターン開始時、 上限を超えている分の 75% が捨てられる (過充電)。</summary>
+        /// <summary>[persistent] 〈雷壷〉: 充電の上限が無くなる (<see cref="AddCharge"/>)。 ターン終了時の目減りは品のクラス (ChargeEffects.ThunderJar)。</summary>
         public bool chargeCapRemoved;
         /// <summary>[persistent] 〈廃庭の霧吹き〉: 毒のダメージが、 ターン開始に加えて敵が攻撃するたびにも入る。</summary>
         public bool poisonTickOnEnemyAttack;
@@ -618,11 +618,9 @@ namespace ItemSystem.PassiveSkills
         public int burstStackBonus;
         /// <summary>[persistent] ターン開始の減衰で残るシールドへの上乗せ (% ポイント)。 〈堅牢〉の①。 残る割合は最大 80%。</summary>
         public int shieldKeepBonusPct;
-        /// <summary>[persistent] 〈電流〉の②: 充電端子に挿した出目のこの割合が攻撃にも加わる。</summary>
-        public float chargeToAttackPct;
         /// <summary>[persistent] 会心した攻撃だけに足す貫通 (〈刃毀れの見立て〉・CombatManager.Damage の防御の計算)。</summary>
         public int critArmorPen;
-        /// <summary>[persistent] 充電の上限への上乗せ (〈雷鳴の太鼓〉・<see cref="ChargeCap"/>)。</summary>
+        /// <summary>[persistent] 充電の上限への上乗せ (〈雷鳴の太鼓〉・端子〈大導電＋〉・<see cref="ChargeCap"/>)。</summary>
         public int chargeCapBonus;
         /// <summary>[perTurn] 敵の攻撃を割合で減らす (0.2 = −20%)。 予告の前に掛ける (CombatManager.Turn の予告)。 BeginNewTurn の Phase B で 0。</summary>
         public float enemyAtkCutPct;
@@ -659,12 +657,18 @@ namespace ItemSystem.PassiveSkills
         public int burstFlatBonus;
         /// <summary>[persistent] 〈重装兵の隠し刃〉: ボスのダウン中のターンは、 ターン開始時にシールドが半減しない (BeginNewTurn)。</summary>
         public bool shieldKeepOnBossDown;
-        /// <summary>[persistent] 〈過負荷チューナー〉: 過充電の間、 充電を払う端子・秘宝・振り直しの払う量が 1 減る (最低 1・<see cref="ChargeCostNow"/>)。</summary>
+        /// <summary>[persistent] 〈過負荷チューナー〉: 過充電の間、 充電を払う行動 (振り直し・再起動・端子・秘宝) の払う量が 2 減る (最低 1・<see cref="ChargeCostNow"/>)。</summary>
         public bool overloadChargeCut;
         /// <summary>[persistent] 〈血止め知らずの針箱〉: 出血のダメージに会心が乗る (会心倍率の半分・1 回のダメージごとに判定・CombatManager.Turn の出血)。</summary>
         public bool bleedCritRule;
-        /// <summary>充電を n 払う時に実際に払う量 (〈過負荷チューナー〉: 過充電の間 1 減る・最低 1)。 品・端子・振り直しの支払いが通す。</summary>
-        public int ChargeCostNow(int n) => overloadChargeCut && n > 1 && IsOvercharged() ? n - 1 : n;
+        /// <summary>充電を払う量から今引く量 (〈過負荷チューナー〉の過充電の間 <see cref="CombatSystem.ChargeCore.TunerCut"/>・それ以外 0)。 端子の解決には TerminalEnv.chargeCostCut で渡す。</summary>
+        public int ChargeCostCut => overloadChargeCut && IsOvercharged() ? CombatSystem.ChargeCore.TunerCut : 0;
+        /// <summary>充電を n 払う時に実際に払う量 (<see cref="CombatSystem.ChargeCore.CostNow"/>・最低 1)。 振り直しの支払いが通す。</summary>
+        public int ChargeCostNow(int n) => CombatSystem.ChargeCore.CostNow(n, ChargeCostCut);
+        /// <summary>[perTurn] 品のブロック +N (このターンのブロックに足す・CombatManager.Turn の配線の集計)。 BeginNewTurn の Phase B で 0。</summary>
+        public int itemBlockBonus;
+        /// <summary>[perTurn] このターンの最初の 1 撃の攻撃 +N (〈引き直しの撃鉄〉・攻撃しないターンは消える)。 BeginNewTurn の Phase B で 0。</summary>
+        public int firstHitAttackBonus;
         /// <summary>[perTurn] 直近のプレイヤーの攻撃で合算した会心率 (%・100 超えもそのまま)。 〈寸鉄〉〈銑鉄棍〉が読む。
         /// ProcessDamage が書き、 BeginNewTurn の Phase B で 0。</summary>
         public float lastCritAddPct;
@@ -1118,7 +1122,10 @@ namespace ItemSystem.PassiveSkills
             // 遺物の刻印 (§15-5) 判定用。 配線は毎ターン確定するので perTurn。
             blockWiredThisTurn = false;
             blockSumThisTurn = 0;
-            accumulatedValues[ChargeSpentThisTurnKey] = 0f;   // 〈短絡〉が読む [perTurn] 値
+            accumulatedValues[ChargeSpentThisTurnKey] = 0f;   // 充電の品が読む [perTurn] 値
+            accumulatedValues[ChargeSpendsThisTurnKey] = 0f;
+            itemBlockBonus = 0;
+            firstHitAttackBonus = 0;
 
             // ADR-0010: このターン切った役の記録。 usedRoles は [persistent] なのでここでは触らない。
             firedRolesThisTurn.Clear();
@@ -1160,22 +1167,6 @@ namespace ItemSystem.PassiveSkills
                 int lost = _consShield - _consShield * keepPct / 100;
                 _consShield -= lost;
                 Keywords.Kw.Raise(this, PassiveSkillTrigger.OnShieldDecay, lost);
-            }
-            // 〈雷壷〉: 上限を超えている充電の 75% (切り捨て・2026-11-19 半分 → 75%) を捨てる。 捨てた分は過充電として配る。
-            if (chargeCapRemoved)
-            {
-                int cap = ChargeCap;
-                int ch = GetCharge();
-                if (ch > cap)
-                {
-                    int leak = (ch - cap) * 3 / 4;
-                    if (leak > 0)
-                    {
-                        accumulatedValues["mutualCharge"] = ch - leak;
-                        ChargeWasted += leak;
-                        Keywords.Kw.Raise(this, PassiveSkillTrigger.OnOvercharge, leak);
-                    }
-                }
             }
         }
 
@@ -1306,7 +1297,7 @@ namespace ItemSystem.PassiveSkills
         {
             if (n <= 0) return;
             int cur = GetCharge();
-            // 〈雷壷〉は上限を外す (超えた分はターン開始時に 75% 捨てる・BeginNewTurn の Phase C)。
+            // 〈雷壷〉は上限を外す (超えた分の目減りは品のクラスがターン終了時に)。
             int cap = chargeCapRemoved ? int.MaxValue : ChargeCap;
             int next = (int)System.Math.Min((long)cap, (long)cur + n);
             // [計装] 充電経済。 **上限で捨てられた分**を分けて数える ── 収入が支出を上回って
@@ -1352,10 +1343,23 @@ namespace ItemSystem.PassiveSkills
         /// 毎ターン自動でクリアされない (frenzyDiceBonus のような戦闘持続値が同居する) ので、
         /// perTurn 扱いのキーは明示的に 0 へ戻すこと。</para></summary>
         public const string ChargeSpentThisTurnKey = "chargeSpentThisTurn";
+        /// <summary>[perTurn] このターンに充電を使った回数 (支払い 1 回 = 1・振り直しも)。 〈灼線鞭〉の「2 回以上」が読む (TerminalEnv.chargeSpendsTurn)。 BeginNewTurn の Phase B で 0。</summary>
+        public const string ChargeSpendsThisTurnKey = "chargeSpendsThisTurn";
         private void NoteChargeSpent(int n)
         {
             if (n <= 0) return;
             accumulatedValues[ChargeSpentThisTurnKey] = GetAccumulated(ChargeSpentThisTurnKey) + n;
+            accumulatedValues[ChargeSpendsThisTurnKey] = GetAccumulated(ChargeSpendsThisTurnKey) + 1;
+        }
+
+        /// <summary>充電を n 失う (使ったことにならない ── 「充電を使うたび」の品は鳴らない・〈雷壷〉の目減り)。 戻り値 = 失った量。</summary>
+        public int LoseCharge(int n)
+        {
+            int cur = GetCharge(), take = System.Math.Min(System.Math.Max(0, n), cur);
+            if (take <= 0) return 0;
+            accumulatedValues["mutualCharge"] = cur - take;
+            ChargeWasted += take;
+            return take;
         }
 
         /// <summary>充電の**半分**（切り捨て）を没収し、没収した量を返す。
@@ -1370,9 +1374,8 @@ namespace ItemSystem.PassiveSkills
             return take;
         }
 
-        /// <summary>過充電判定 (charge が OverchargeThreshold 以上・2026-07-16: 上限10維持のまま閾値を7に下方)。
-        /// 目的: Spark/LightningStrike の消費と Overload/Criticality 維持を両立可能にする。</summary>
-        public const int OverchargeThreshold = 7;
+        /// <summary>過充電 = 充電 10 以上 (2026-11-21・full-item-rework-ledger §①・<see cref="CombatSystem.ChargeCore.OverchargeAt"/>)。</summary>
+        public const int OverchargeThreshold = CombatSystem.ChargeCore.OverchargeAt;
         public bool IsOvercharged() => GetCharge() >= OverchargeThreshold;
 
         /// <summary>蓄積値を安全に取得（キーが無ければ0）</summary>

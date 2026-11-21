@@ -429,7 +429,7 @@ namespace ItemSystem.PassiveSkills.Effects
         /// <summary>溜めた「次の主攻撃 +%」(accumulatedValues の鍵・1.0 = +100%)。 BOT の計装も読む。</summary>
         public const string ChargeKey = "daybreakNextAtkPct";
         public string SkillId => "黎明";
-        // 発火の順序は〈十五年目の計測器〉(ReworkItemEffects.OldGauge) と同じ: OnPostRoll で乗せる・OnWired で攻撃したら使い切る・OnTurnEnd で溜める
+        // 発火の順序: OnPostRoll で乗せる・OnWired で攻撃したら使い切る・OnTurnEnd で溜める
         //   既定 (0) では OnTurnEnd だけ (今の挙動と発火の列を同じに保つ)。 Triggers は戦闘ごとの登録時に読まれる。
         public PassiveSkillTrigger[] Triggers => NextAttackPctPerUnit > 0f
             ? new[] { PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnWired, PassiveSkillTrigger.OnTurnEnd }

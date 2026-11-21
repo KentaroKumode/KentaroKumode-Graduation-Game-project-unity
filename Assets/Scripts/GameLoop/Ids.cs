@@ -213,6 +213,9 @@ namespace GameLoop
         public const string RoleBag = "擦り切れた賽袋", RoleWoodTag = "見切りの木札", RoleNotchBoard = "符丁の刻み板", RoleChipped = "欠け目の見立て";
         public const string RoleClapper = "揃いの拍子木", RoleMirror = "鏡合わせの盤", RoleFate = "宿命の刻み目", RoleOmni = "万象のゾロ目";
 
+        // === 充電の軸の品で、 端子の解決の中で効く 4 品 (2026-11-21・full-item-rework-ledger §①) = CombatSystem.ChargeCore の ChargeItems の旗 ===
+        public const string ChargeFork = "二股の導線", ChargeRod = "逆さ避雷針", ChargeWhip = "灼線鞭", ChargeDrum = "雷鳴の太鼓";
+
         // === 戦術の 6 品 (2026-11-21・段 1-f・item-overhaul-spec §6-2・名前は仮) = TacticItemEffects.cs ===
         public const string TacPommel = "渾身の柄頭", TacStill = "静寂の構え", TacGapSpear = "隙衝きの短槍";
         public const string TacBreak = "崩しの一手", TacWedge = "大技殺しの楔", TacHourglass = "逆境の砂時計";
