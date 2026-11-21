@@ -56,6 +56,23 @@ namespace AutoTest.EditorTests
             Assert.That(CombatManager.OmniPairChance(3), Is.EqualTo(CombatManager.OmniPctMid));
             Assert.That(CombatManager.OmniPairChance(5), Is.EqualTo(1f));
         }
+
+        /// <summary>役の端子〈役落とし〉〈賽振り台〉は賽目でなく、 この戦闘の役の回数 (このターンを含む) を読む (Phase 3i)。</summary>
+        [Test]
+        public void RoleTerminalsReadRoleCount()
+        {
+            var env = new TerminalEnv { chargeCap = 30, hp = 50, maxHp = 50, enemyAttack = 10, enemyHp = 100, enemyMaxHp = 100 };
+            TerminalOutcome R(string id, int[] dice, int count)
+                => TerminalCards.Resolve(new List<string> { id, TerminalIds.Block, TerminalIds.Block }, new[] { 0, 1, 2 }, dice,
+                                         env, new TerminalBattleState { roleCount = count });
+            int[] pair = { 3, 3, 5 }, triple = { 4, 4, 4 }, none = { 1, 3, 6 };
+            Assert.That(R(TerminalIds.RoleDrop, pair, 2).attackAdd - R(TerminalIds.RoleDrop, pair, 0).attackAdd, Is.EqualTo(2 * TerminalCards.RoleDropPer));
+            Assert.That(R(TerminalIds.RoleDrop, triple, 1).attackAdd - R(TerminalIds.RoleDrop, triple, 0).attackAdd, Is.EqualTo(2 * TerminalCards.RoleDropPer));
+            Assert.That(R(TerminalIds.RoleDrop, none, 5).attackAdd, Is.EqualTo(R(TerminalIds.RoleDrop, none, 0).attackAdd));
+            Assert.That(R(TerminalIds.DiceTable, pair, 2).rerollDiscountNext, Is.EqualTo(3));
+            Assert.That(R(TerminalIds.DiceTable, none, 2).rerollDiscountNext, Is.EqualTo(2));
+            Assert.That(R(TerminalIds.DiceTable, pair, 20).rerollDiscountNext, Is.EqualTo(TerminalCards.DiceTableCap));
+        }
     }
 }
 #endif

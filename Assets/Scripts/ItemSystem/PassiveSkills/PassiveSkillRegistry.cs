@@ -4,12 +4,10 @@ using ItemSystem.PassiveSkills.Effects;
 namespace ItemSystem.PassiveSkills
 {
     /// <summary>
-    /// 全パッシブスキル実装の静的レジストリ
-    /// JSONの internalName → IPassiveSkillEffect のマッピング
-    /// 
-    /// 新スキル追加手順:
-    /// 1. Effects/ の軸別ファイル (ChargeEffects.cs など・武器は WeaponFamilyEffects.cs) に IPassiveSkillEffect 実装クラスを追加
-    /// 2. RegisterAll() 内に Register(new XxxSkill()) を1行追加
+    /// 全パッシブスキル実装の静的レジストリ (スキル id → IPassiveSkillEffect)。
+    ///
+    /// 新スキル追加手順: 品の軸の Effects/ のファイル (ChargeEffects.cs など・武器は WeaponFamilyEffects.cs) にクラスを足し、
+    /// その軸の Register&lt;軸&gt;() に 1 行足す。 抜けは Tools/rework_audit.py が数える。
     /// </summary>
     public static class PassiveSkillRegistry
     {
@@ -154,10 +152,6 @@ namespace ItemSystem.PassiveSkills
             Register(new ThunderSpear()); Register(new LentTime()); Register(new FourthStrikeCore()); Register(new ThunderReliquary());
         }
 
-        /// <summary>
-        /// 全スキルを登録
-        /// ★ 新スキル追加時はここに1行追加するだけ ★
-        /// </summary>
         /// <summary>毒の軸 (2026-11-21・PoisonEffects.cs・full-item-rework-ledger §②)。 〈緑染みの小刀〉〈蛇血瓶〉〈毒見役の小匙〉は端子の解決の中だけで効く (CombatSystem.PoisonCore の旗・クラスなし)。</summary>
         private static void RegisterPoison()
         {
@@ -246,6 +240,7 @@ namespace ItemSystem.PassiveSkills
             Register(new GaryoTensei()); Register(new MugaMushin());
         }
 
+        /// <summary>全スキルを登録する。 秘宝は軸ごと (Effects/ の軸別 10 ファイル)・武器・敵の順。 ステータスだけのスキルは <see cref="RegisterStatSkills"/>。</summary>
         private static void RegisterAll()
         {
             RegisterCharge();
@@ -259,64 +254,12 @@ namespace ItemSystem.PassiveSkills
             RegisterGold();
             RegisterGeneral();
             RegisterWeapon();
+            RegisterEnemy();
+        }
 
-            // ============================
-            //  汎用パッシブ
-            // ============================
-            // 追撃・剛力・堅忍・慧眼・不屈・治癒阻害の I〜IV の効果クラス (英字の id) は 2026-11-12 削除。
-            //   スキル id が品の名前になった (2026-09-22) あと、 どの品もその id を持っていなかった。
-
-            // 素のステータス品 (2026-09-15)。 **ラダーではない** ── 1 品 1 効果の独立品。
-            //   BRONZE/SILVER に発動条件なしで乗る品が 3 / 1 しか無かった穴を埋める。
-            // 荒砥 / 二度目の打金 / 肩当て / 擦り減った小盾 はステータス化 (items.json の stats)
-
-            // 活力
-            // VitalityI はステータス化
-
-            // 複合武器 T4 の固有 6 種は 2026-09-21 削除 (複合武器の廃止・GAME.md §24)。
-            // 反攻 / 大鉈 / パリィ / 衛士の慣い / 復讐 / 蝕夜 / 処刑のダイス潰し / 果たし合い は 2026-10-28 削除 (GAME.md §24)。
-
-            // ============================
-            //  ユニークパッシブ
-            // ============================
-
-            // Ignite / CurseBind / Abyss は 2026-07-18 に class ごと削除 (dead_staff / curse 系列全廃)
-
-            // ============================
-            //  ダイス固有パッシブ
-            // ============================
-            // Destiny はステータス化 (単体戦)
-
-            // 処刑・対タンク・役・触媒（2026-05-29 追加）
-            // LifestealII はステータス化
-            // IndomitableIII はステータス化
-            // ShieldBashI〜IV (旧〈内から落ちた城盾〉) は 2026-10-28 削除。 盾家系の〈シールドバッシュ〉へ一本化した。
-            // Bloodlust / Hermes はステータス化
-            // 溶金の領主剣 はステータス化 (段 3・使ったゴールド 1 につき与ダメ +0.2%)
-
-            // 2026-06-03 新規追加アイテム
-            // EvenEyes / MasterworkNotes / KaleidoDice はステータス化
-
-            // 2026-06-05 会心バリエーション（OnCriticalDamage / OnCriticalCheck）
-
-
-            // 2026-07-15 鈍器系 (新規 9 種・会心を犠牲に非会心火力を伸ばすトレードオフ型)
-            // 重い一撃 / 破城槌 / 鈍器 はステータス化 (items.json の stats)
-            // SingleMinded はステータス化 (非会心の連続)
-            // Stubbornness はステータス化
-
-            // 2026-07-15 炎上系 拡張 (既存 Ignite + 新 8種で計9のキーワードビルド化)
-            // Burn (炎上) 系 2026-07-16 削除: Bleed と機構重複のため撤廃、「臨界」新軸に置換
-            // Kindling/FlamingWeapon/InfernoOrder/Stoke/Immortalflame/InfernoManifest/FlameEdge/EverBurning は 2026-07-18 class ごと削除
-
-            // 2026-07-15 出血系 拡張 (既存3種+新6種で計9のキーワードビルド化)
-            // BloodScent はステータス化
-
-
-            // ============================
-            //  敵専用スキル
-            // ============================
-
+        /// <summary>敵とボスのパッシブ (EnemyPassiveSkillEffects.cs・7 層のヴェスカは VescaEffects.cs)。</summary>
+        private static void RegisterEnemy()
+        {
             // 1～3層: シンプル型
             Register(new Trapper());
             Register(new Undying());
@@ -366,7 +309,6 @@ namespace ItemSystem.PassiveSkills
             Register(new MirrorTwinsResponse());
             Register(new JudgmentFlames());
             Register(new BlazeBrand());
-            // 灰燼の王 リワーク（見切り＆カウンター型）※ADR-0009 相互攻撃モデル下で発火経路が壊れており deprecated
             Register(new JudgmentBlaze());
             Register(new AshArmor());
             // 灰燼の王 v2 リワーク (2026-07-16 ADR-0009 相互攻撃対応): 外殻半減/周期予兆/階段回復/収支負けスタック
@@ -386,12 +328,6 @@ namespace ItemSystem.PassiveSkills
             Register(new RecurrentTruth());      // 回帰性真理（毒/出血の毎T半減・受ける会心倍率-0.5・臨界-5/T・処刑/最大HP変更を拒否）
             Register(new ContinuousExperiment()); // 連続実験（HP0で死なず次フェーズへ。最終段は非所持）
             Register(new DivineTalent());        // 天与の才（段4のみ 2枚抽選）
-            // [削除 2026-10-17] FlawlessRobe (天衣無縫) ── 覚者専用・使う敵なし        // 天衣無縫（回復/シールド獲得の減衰。 ヴェスカでも流用可）
-
-            // [廃止] 覚者×7形態連戦 (AwakenedP1..P7 / TrueSelf)。
-            //   旧ロール勝負モデル専用の機構で ADR-0009 既定 true 下では発火経路が成立しない。
-            //   **2026-08-24 にクラスごと削除済み** (再登録できるコードはもう無い)。
-            //   経緯と代替は docs/GAME.md §24 / §13-4。
         }
     }
 }

@@ -853,8 +853,6 @@ namespace CombatSystem
             //   山札 (ADR-0014) では、 充電に入る量は端子ごとに違う (〈雷溜め〉は 出目 +2 など)。 chargeSum は端子の結果の合計。
             if (chargeSum > 0) ctx.AddCharge(chargeSum);
 
-            // 遺物 (§15-5): 刻印〈ブロック端子に未配線〉の判定材料。 **配線集計の直後に確定させる**。
-            ctx.blockWiredThisTurn = blockDiceCount > 0;
             // 剣〈切り返し〉・盾〈城壁〉が読む「守った量」。 **貫通 (playerBlockIgnored) を差し引いた後の値**を渡す
             //   ── 実際に受け止めた分だけを数える。 ここは解決 (step6) より前なので
             //   OnWired / OnPreDealDamage から読める (OnPostRoll は配線より前なので読めない)。
@@ -1378,9 +1376,6 @@ namespace CombatSystem
                 ctx.enemyCurrentHP = enemyHP;
                 EnemyHpLedger.CtxOverwritten();
             }
-
-            if (enemyHP == 0 && dealtDmg > 0)
-                ctx.overDamageAccumulated = dealtDmg + dealtFixed;
 
             // 吸血 / シールドバッシュ (旧法の勝利分岐と同一)
             if (ctx.lifestealPct > 0f && dealtDmg > 0)

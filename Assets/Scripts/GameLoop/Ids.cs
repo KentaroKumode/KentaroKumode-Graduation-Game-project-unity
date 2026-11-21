@@ -12,7 +12,6 @@ namespace GameLoop
     public static class DieIds
     {
         public const string Starting   = "角の取れた賽";
-        public const string Pumice     = "軽石の賽";
         public const string RustyNail  = "錆釘の賽";
         public const string Scavenger  = "拾い物の賽";
         public const string Dull       = "鈍色の賽";

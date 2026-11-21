@@ -515,7 +515,7 @@ namespace AutoTest.ParallelSweep
                 "suppressEvents", "suppressConvictionChain", "freeNavScout", "navLearnedDanger", "measureNoExplore",
                 // 2026-11-10: 配線が与ダメの倍率を読むか (−1 = 技量に従う) と実効値・軸に寄せる方策・配布の有無 (配布は使わない前提を確かめる)
                 "v3.readOutgoingMult", "ReadOutgoingMultEffective", "buyAxisFocus", "buyAxisFocusBonus",
-                "axisPackageAxis", "axisPackageCount", "v3.hpLedger", "v3.axisCommitBuy", "predTrace",
+                "axisPackageAxis", "axisPackageCount", "v3.hpLedger", "predTrace",
                 // 2026-11-10: 主攻撃の見積もりを実績の比で掛け直すか・2026-11-21: 最初の武器の指定
                 "v3.mainCorr", "weaponTierCap", "forceStartWeapon", "vescaDiceForce",
                 "pursuerNoReward", "pursuerAtkMul", "pursuerHpAdd", "pursuerSupply", "navFear", "navFearMacro", "navFearRange",

@@ -271,7 +271,7 @@ namespace GameLoop
             return true;
         }
 
-        /// <summary>〈研ぎ代の領収書〉: 店・休憩で抜くたび、 ランの間ずっと攻撃 +2 (持っている間に抜いた回数・効果は MacroItemEffects)。</summary>
+        /// <summary>〈研ぎ代の領収書〉: 店・休憩で抜くたび、 ランの間ずっと攻撃 +2 (持っている間に抜いた回数・効果は GoldEffects.cs の MacroReceipt)。</summary>
         private void NoteReceiptRemoval()
         {
             if (!Run.OwnsPassive(ItemIds.MacroReceipt)) return;

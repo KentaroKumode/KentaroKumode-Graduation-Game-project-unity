@@ -927,15 +927,6 @@ namespace AutoTest
                         if (v3.partDelta && s.kind == ShopSlotKind.Dice)
                             pw -= AutoTest.LearnedPriorityProvider.PowerScore(GameLoop.EquippedDie.IdOf(run));
                     }
-                    // 軸に絞る買い方 (v3.axisCommitBuy・Super)。 軸が深ければ ① / ② を最優先。
-                    if (v3.axisCommitBuy && s.kind == ShopSlotKind.Passive && !string.IsNullOrEmpty(s.itemId)
-                        && ItemSystem.PassiveSkills.Effects.AxisCatalog.Items.TryGetValue(s.itemId, out var cat))
-                    {
-                        int n = ItemSystem.PassiveSkills.AxisRules.Count(run, cat.axis);
-                        var K = ItemSystem.PassiveSkills.Effects.AxisCatalog.Kind.Count;
-                        int need = cat.kind == K ? v3.commitCountAt : v3.commitRuleAt;
-                        if (n >= need) pw = Mathf.Max(pw, AutoTest.LearnedPriorityProvider.PowerCuts[0] + step);
-                    }
                     // 特売補正。 **60/40 は割引段 {15,30,50} に対する意図的な線引き**。
                     //   50/30 は全条件で悪化した (2026-09-17・安物買いになる)。 下げないこと。
                     pw += (s.discountPct >= SaleBonusHiPct ? 2

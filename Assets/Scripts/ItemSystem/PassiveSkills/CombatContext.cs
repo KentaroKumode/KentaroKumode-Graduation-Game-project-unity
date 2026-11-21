@@ -35,7 +35,6 @@ namespace ItemSystem.PassiveSkills
         public int playerCurrentHP;
         /// <summary>[persistent]</summary>
         public int playerMaxHP;
-        public int playerBaseMaxHP;     // [persistent] 装備補正前の最大HP
 
         // ===== 敵状態 =====
         /// <summary>[persistent] (CombatManager が HP を同期する)</summary>
@@ -48,10 +47,6 @@ namespace ItemSystem.PassiveSkills
         public int[] enemyDice;         // [persistent] (BeginNewTurn では戻さない。 毎ターンの振り (PassiveSkillManager) が上書きする) 敵が振った各ダイスの値
         public int playerDiceTotal;     // [persistent] (BeginNewTurn では戻さない。 毎ターンの振り (PassiveSkillManager) が上書きする) プレイヤーのダイス合計値
         public int enemyDiceTotal;      // [persistent] (BeginNewTurn では戻さない。 毎ターンの振り (PassiveSkillManager) が上書きする) 敵のダイス合計値
-        /// <summary>ダイス差（playerDiceTotal − enemyDiceTotal）。両合計から常に算出する読み取り専用プロパティ。
-        /// 視点スワップ時も両合計が入れ替わるため符号が自動反転し、明示的な反転代入は不要。
-        /// 常に最新値を返すため、OnPostRoll パッシブが合計を改変しても鮮度ズレが起きない。</summary>
-        public int diceDifference => playerDiceTotal - enemyDiceTotal;
         
         // ===== ダイス設定値 =====  
         public int playerDiceMax;       // [persistent] (戦闘開始で設定・CombatManager.Turn.cs が毎ターン入れ直す) プレイヤーのダイス最大出目（装備武器由来）
@@ -98,10 +93,6 @@ namespace ItemSystem.PassiveSkills
         public int baseDamage;          // [persistent] (ProcessDamage が計算のたびに上書きする作業値) 基本ダメージ
         public int finalDamage;         // [persistent] (ProcessDamage が計算のたびに上書きする作業値) 最終ダメージ（スキル補正後）
         public int pursuitDamage;       // [perTurn] 追撃ダメージ（パッシブ由来の固定追撃）
-        /// <summary>[perTurn] このターン、 ブロック端子に 1 本以上配線したか。
-        /// 遺物の刻印〈そのターン、ブロック端子に 1 本も配線していない〉の判定に使う (§15-5)。
-        /// CombatManager の配線集計が毎ターン set し、 BeginNewTurn Phase B でリセットする。</summary>
-        public bool blockWiredThisTurn;
 
         /// <summary>[perTurn] このターン、 ブロック端子へ配線した**出目の合計**。 本数ではない。
         /// 剣〈切り返し〉と盾〈城壁〉が読む (2026-10-28・旧読み手は盾〈反攻〉)。
@@ -152,15 +143,12 @@ namespace ItemSystem.PassiveSkills
         /// <summary>この撃が本物の主攻撃の撃か (攻撃しないターンの空の 1 回ではない)。</summary>
         public bool IsRealHit => playerWonRoll && hitIndex < hitCount;
         public float criticalMultiplier; // [perTurn] (Phase B で基礎値 + メタ・遺物へ戻す) 会心倍率（既定 2.0。2026-07-26 に 3.0 へ上げ、2026-08-03 に 2.0 へ差し戻し）
-        public bool damageReduced;      // [perTurn] ダメージ軽減が発生したか
 
         // ===== Threat/Scratchシステム =====
         /// <summary>[persistent] (戦闘開始・段の差し替えで設定) 敵の脅威値。毎ターン宣言される削りダメージの基準</summary>
         public int enemyThreat;
         /// <summary>[perTurn] 今ターンのscratchダメージ（勝利時: max(0, threat-diff)）</summary>
         public int scratchDamage;
-        /// <summary>[perTurn] scratch無効化フラグ（パリィ等）</summary>
-        public bool nullifyScratchDamage;
 
         // ===== 戦場修飾子 =====
         /// <summary>[persistent] この戦闘のアクティブな修飾子一覧</summary>
@@ -223,10 +211,6 @@ namespace ItemSystem.PassiveSkills
         // ===== ダメージ無効化フラグ =====
         /// <summary>[perTurn]</summary>
         public bool nullifyPursuitDamage;
-
-        // ===== オーバーダメージ蓄積 =====
-        /// <summary>[persistent] (CombatManager.Turn.cs が毎ターン上書きする)</summary>
-        public int overDamageAccumulated;
 
         // ===== 固定ダメージ =====
         public int fixedDamageToEnemy;  // [perTurn] プレイヤー→敵への軽減不可固定ダメージ
@@ -336,13 +320,6 @@ namespace ItemSystem.PassiveSkills
         public int healAppliedTotal;
         /// <summary>[persistent] (戦闘の累計)</summary>
         public int shieldGainedTotal;
-        /// <summary>[persistent] (戦闘の累計) L1学習用: 戦闘中にプレイヤーが敵に与えた総ダメージ（メイン+固定+出血+反射 等の合算）。
-        /// 戦闘開始時 enemyMaxHP からの最終 enemyCurrentHP 差分で簡易的に算出するため、
-        /// 実体は OnBattleEnded で評価する。フィールド自体はオプションのインクリメント用。</summary>
-        public int damageDealtTotal;
-        /// <summary>[persistent] (戦闘の累計) L1学習用: 戦闘中にプレイヤーが受けた総ダメージ（ヒール前の純粋な損失）。
-        /// 同じく OnBattleEnded 時に最終確定する。</summary>
-        public int damageTakenTotal;
 
         /// <summary>[perTurn] このターンにプレイヤーが実際に受けたダメージ量（メイン＋固定）。
         /// 焦土〈最大HP -被ダメ10%〉が参照する。BeginNewTurn でリセット。</summary>
@@ -354,10 +331,6 @@ namespace ItemSystem.PassiveSkills
 
         /// <summary>[perTurn] 貪欲のダイス: 与ダメージのこの割合をプレイヤーが回復（0=無し。BeginNewTurn でリセット、パッシブが毎ターン再適用）</summary>
         public float lifestealPct;
-
-        /// <summary>[perTurn] 停戦協定: このターンが「完全引き分け→停戦の一撃」で解決されたか。
-        /// true の間は引き分けブランチで出血など他の効果を発動させない。BeginNewTurn でリセット。</summary>
-        public bool truceThisTurn;
 
         /// <summary>[perTurn] 苦難の刻印・不屈の鎧 等の被ダメ固定減算（複数アイテム合算）。CombatManager 敗北分岐で適用。BeginNewTurn でリセット。</summary>
         public int playerFlatDamageReduction;
@@ -773,7 +746,6 @@ namespace ItemSystem.PassiveSkills
         public CombatContext(int playerMaxHP, int enemyMaxHP = 0, int enemyThreat = 0)
         {
             this.playerMaxHP = playerMaxHP;
-            playerBaseMaxHP = playerMaxHP;
             playerCurrentHP = playerMaxHP;
             this.enemyMaxHP = enemyMaxHP;
             enemyCurrentHP = enemyMaxHP;
@@ -1044,12 +1016,10 @@ namespace ItemSystem.PassiveSkills
             // ダメージ処理の単ターンフラグ
             shieldAbsorbedAttackThisTurn = 0;   // 〈烈炎〉が読む: このターンに主攻撃をシールドが肩代わりした量 (2026-11-14)
             nullifyPursuitDamage = false;
-            nullifyScratchDamage = false;
             fixedDamageToEnemy = 0;
             CombatSystem.EnemyHpLedger.BeginTurn();   // [計装 2026-11-10] 固定ダメ枠と一緒に予約を捨てる
             fixedDamageToPlayer = 0;
             scratchDamage = 0;
-            damageReduced = false;
             pursuitDamage = 0;
             playerDamageThisTurn = 0;   // 焦土用の被ダメ計測
             rerollsThisTurn = 0;        // リロール: このターンの回数 (戦闘の回数 rerollsThisCombat は戻さない)
@@ -1124,11 +1094,7 @@ namespace ItemSystem.PassiveSkills
             enemyDiceOverrides.Clear();
             enemyDiceTotalPenalty = 0;      // 沈黙の剣帯の1T目-99 等
 
-            // その他 単ターンフラグ
-            truceThisTurn = false;
-
-            // 遺物の刻印 (§15-5) 判定用。 配線は毎ターン確定するので perTurn。
-            blockWiredThisTurn = false;
+            // 配線は毎ターン確定するので perTurn。
             blockSumThisTurn = 0;
             accumulatedValues[ChargeSpentThisTurnKey] = 0f;   // 充電の品が読む [perTurn] 値
             accumulatedValues[ChargeSpendsThisTurnKey] = 0f;

@@ -39,8 +39,6 @@ namespace ItemSystem.PassiveSkills.Keywords
         public const string BurstExcessKey = "kw.burstExcess";
         /// <summary>直近に爆発したターン (【過熱】= このターンに爆発した・<see cref="Overheated"/>)。</summary>
         public const string BurstTurnKey = "kw.burstTurn";
-        /// <summary>いま決まった爆発が超臨界か (1/0・爆発の出来事を配っている間に読む)。 超臨界爆発 = 閾値の 1.5 倍以上の臨界で起きた爆発 (HeatCore.SuperAtPct)。</summary>
-        public const string BurstSuperKey = "kw.burstSuper";
         /// <summary>いま決まった爆発 1 回の敵の防御の後のダメージ (HeatCore.Burst.landed・爆発の出来事を配っている間に読む)。</summary>
         public const string BurstDamageNowKey = "kw.burstDamageNow";
 
@@ -123,7 +121,6 @@ namespace ItemSystem.PassiveSkills.Keywords
                 StoreHeat(ctx, in s);
                 ctx.accumulatedValues[BurstExcessKey] = b.excess;
                 ctx.accumulatedValues[BurstTurnKey] = ctx.currentTurn;
-                ctx.accumulatedValues[BurstSuperKey] = b.super ? 1 : 0;
                 ctx.accumulatedValues[BurstDamageNowKey] = b.landed;
                 CombatSystem.CombatManager.BurstFired++;   // [計装]
                 Debug.Log($"[臨界] 閾値{b.threshold} 到達 → {(b.super ? "超臨界" : "")}爆発 (溜まり {b.meterAt}・超過 {b.excess}・残 {s.meter}・ダメージ {b.damage} → 防御の後 {b.landed}・この戦闘 {s.burstsTotal} 回目)");

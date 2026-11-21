@@ -5,7 +5,7 @@ namespace GameLoop
     /// 定義と所持数ヘルパ。フレーバー上は"武器"だが実体は Passive カテゴリのシナジーセット（佯狂者と同型）。
     /// 4枚がインベントリに揃うと全て消滅し〈無銘の剣舞譜〉(Finale) に変化する。
     ///
-    /// 効果本体は IPassiveSkillEffect (AllPassiveSkillEffects.cs / SaberWaltz 等) 側に実装。
+    /// 効果本体は IPassiveSkillEffect (GeneralEffects.cs の SaberWaltz 等) 側に実装。
     /// ここは「セット所持判定」と「4枚→変化」の純ロジックだけを持つ。
     /// </summary>
     /// <summary>[剣の舞] 4 枚セット。 <b>2026-09-14: 4 枚とも LEGENDARY へ統一。</b>

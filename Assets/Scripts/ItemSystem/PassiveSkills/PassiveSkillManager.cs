@@ -349,8 +349,6 @@ namespace ItemSystem.PassiveSkills
             bool tmpWon = context.playerWonRoll;
             context.playerWonRoll = context.playerLostRoll;
             context.playerLostRoll = tmpWon;
-            // diceDifference は playerDiceTotal/enemyDiceTotal から算出する読み取り専用プロパティ。
-            // 上で両合計を入れ替えたので符号は自動反転する（明示反転は不要）。
         }
 
         /// <summary>

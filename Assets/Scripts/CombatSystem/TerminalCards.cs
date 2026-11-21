@@ -251,8 +251,8 @@ namespace CombatSystem
     {
         public int charge, chargeCap, hp, maxHp, shield;
         public int enemyAttack, enemyPoison, enemyBleed, bursts;
-        /// <summary>偏重 (軸の品の数): 心眼・血晶・瘴気・炉温・電流・堅牢・采配 (山札)・賽目 (役)。</summary>
-        public int axCrit, axBleed, axPoison, axHeat, axCharge, axShield, axDeck, axRole;
+        /// <summary>偏重 (軸の品の数): 心眼・血晶・瘴気・炉温・電流・堅牢・采配 (山札)。 役の端子は賽目でなく役の回数 (TerminalBattleState.roleCount) を読む。</summary>
+        public int axCrit, axBleed, axPoison, axHeat, axCharge, axShield, axDeck;
         /// <summary>〈処刑の刃〉の恒久の攻撃 (ラン単位)。</summary>
         public int whetBonus;
         /// <summary>敵の今の HP / 最大 HP (〈処刑の刃＋〉の「敵の HP が半分以下なら」・2026-11-20)。 最大 HP 0 = 読まない。</summary>
@@ -468,7 +468,8 @@ namespace CombatSystem
         public const int WoodTagAttack = 4, WoodTagBlock = 5, NotchBoardPer = 2, NotchBoardMax = 16, ChippedPen = 12, GearAttack = 6, ThunderBlock = 10;
         /// <summary>〈揃いの拍子木〉与ダメージ % の池 / 〈雷鳴のゾロ目〉最終与ダメージ / 〈血濡れの符丁〉役の回数 1 回あたりの最終与ダメージ・上限・〈追撃〉〈攻め〉の上乗せ。</summary>
         public const float ClapperPct = 0.35f, ThunderFinalPct = 0.50f, BloodmarkPer = 0.10f, BloodmarkMax = 1.00f, BloodmarkBonus = 0.30f;
-        /// <summary>〈賽振り台〉次のターンの最初の振り直しの費用から引く上限 (min(上限, 賽目)) / 〈役落とし〉役が成立したターン 攻撃 + 賽目 × N。 *Up = 強化した端子。</summary>
+        /// <summary>〈賽振り台〉次のターンの最初の振り直しの費用から引く上限 (min(上限, 役の回数)) / 〈役落とし〉役が成立したターン 攻撃 + 役の回数 × N。
+        /// 役の回数 = この戦闘で役が成立した回数 (このターンの役を含む・役の軸の品と同じ数え方・台帳 §⑧)。 *Up = 強化した端子。</summary>
         public const int DiceTableCap = 6, DiceTableCapUp = 8, RoleDropPer = 3, RoleDropPerUp = 4;
         // ===== 采配と共通の端子 (2026-11-20・段 1-e・未測定) =====
         /// <summary>〈焼却斬り〉出目の倍率 / 使い捨て 1 回あたりの下限 (max(2, 采配)) / 〈一刀両断〉出目の倍率 / 〈歯車の軸〉挿した目 1 つあたり / 〈崩し斬り〉最大 HP の %。 *Up = 強化した端子。</summary>
@@ -559,8 +560,8 @@ namespace CombatSystem
             [TerminalIds.Bell] = "この戦闘の残りの間、山札を切り直すたび、次のターンに端子を 1 枚多く引く。出目を充電に。",
             [TerminalIds.Mikiri] = "出目をブロックに。敵が大技を予告したターンなら 2 倍。",
             // 役の軸の端子 (2026-11-21)
-            [TerminalIds.DiceTable] = "充電 +出目。次のターンの最初の振り直しの充電の費用 −min(" + DiceTableCapUp + ", 賽目)。",
-            [TerminalIds.RoleDrop] = "出目を攻撃に。このターン役が成立していれば、攻撃 +賽目 ×" + RoleDropPerUp + " (ゾロ目・連なりなら 2 倍)。",
+            [TerminalIds.DiceTable] = "充電 +出目。次のターンの最初の振り直しの充電の費用 −min(" + DiceTableCapUp + ", この戦闘で役が成立した回数)。",
+            [TerminalIds.RoleDrop] = "出目を攻撃に。このターン役が成立していれば、攻撃 +この戦闘で役が成立した回数 ×" + RoleDropPerUp + " (ゾロ目・連なりなら 2 倍)。",
             [TerminalIds.Crush] = "出目 +" + UpPip + " を攻撃に。この撃でボスの目盛りを割ったら、敵に最大 HP の " + CrushPctUp + "% の軽減不可ダメージ。",
         };
 
@@ -736,8 +737,8 @@ namespace CombatSystem
                 D(TerminalIds.Crush, A, "出目を攻撃に。この撃でボスの目盛りを割ったら、敵に最大 HP の " + CrushPct + "% の軽減不可ダメージ。", TerminalCond.AtLeast5),
                 // ── 役の軸の端子 (2026-11-21・段 1-f・item-overhaul-spec §8-1 / §12-4) ──
                 //   〈賽振り台〉: 配線は振り直しの後なので、 安くするのは次のターンの最初の振り直し (§12-4)
-                D(TerminalIds.DiceTable, C, "充電 +出目。次のターンの最初の振り直しの充電の費用 −min(" + DiceTableCap + ", 賽目)。", TerminalCond.None, ItemSystem.PassiveSkills.AxisRules.Role),
-                D(TerminalIds.RoleDrop, A, "出目を攻撃に。このターン役が成立していれば、攻撃 +賽目 ×" + RoleDropPer + " (ゾロ目・連なりなら 2 倍)。", TerminalCond.None, ItemSystem.PassiveSkills.AxisRules.Role),
+                D(TerminalIds.DiceTable, C, "充電 +出目。次のターンの最初の振り直しの充電の費用 −min(" + DiceTableCap + ", この戦闘で役が成立した回数)。", TerminalCond.None, ItemSystem.PassiveSkills.AxisRules.Role),
+                D(TerminalIds.RoleDrop, A, "出目を攻撃に。このターン役が成立していれば、攻撃 +この戦闘で役が成立した回数 ×" + RoleDropPer + " (ゾロ目・連なりなら 2 倍)。", TerminalCond.None, ItemSystem.PassiveSkills.AxisRules.Role),
             };
         }
 
@@ -1425,9 +1426,9 @@ namespace CombatSystem
                 case TerminalIds.Mikiri: o.blockAdd += sum * (env.heavyTurn ? 2 : 1); break;      // 強化は条件 (4 以下) だけ
                 case TerminalIds.Crush: o.attackAdd += sum + p1; break;      // 目盛りを割った時の追加は本体の撃の輪 (attackHitIds)
                 // 役の軸の端子 (2026-11-21)。 立つ役は Resolve の 5. の頭で決めた o.roleNow (ResolveRoles と同じ判定)
-                case TerminalIds.DiceTable: o.chargeAdd += sum; o.rerollDiscountNext += Math.Min(up ? DiceTableCapUp : DiceTableCap, env.axRole); break;
+                case TerminalIds.DiceTable: o.chargeAdd += sum; o.rerollDiscountNext += Math.Min(up ? DiceTableCapUp : DiceTableCap, st.roleCount + (o.roleNow > 0 ? 1 : 0)); break;
                 case TerminalIds.RoleDrop:
-                    o.attackAdd += sum + (o.roleNow > 0 ? env.axRole * (up ? RoleDropPerUp : RoleDropPer) * (o.roleNow >= 2 ? 2 : 1) : 0);
+                    o.attackAdd += sum + (o.roleNow > 0 ? (st.roleCount + 1) * (up ? RoleDropPerUp : RoleDropPer) * (o.roleNow >= 2 ? 2 : 1) : 0);
                     break;
             }
         }

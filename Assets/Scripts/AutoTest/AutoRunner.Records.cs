@@ -109,7 +109,7 @@ namespace AutoTest
              .Append(" freeBlock=").Append(FreeBlockRule ? 1 : 0)
              .Append(" def=").Append(v3.superDefense ? 1 : 0).Append(" cons=").Append(v3.superConsumables ? 1 : 0)
              .Append(" nav=").Append(v3.superNav ? 1 : 0).Append(" plan=").Append(v3.macroPlan ? 1 : 0)
-             .Append(" p3=").Append(v3.phase3Ranked ? 1 : 0).Append(" commit=").Append(v3.axisCommitBuy ? 1 : 0)
+             .Append(" p3=").Append(v3.phase3Ranked ? 1 : 0)
              .Append(" out=").Append(ReadOutgoingMultEffective ? 1 : 0).Append(" epas=").Append(ReadEnemyPassivesEffective ? 1 : 0)
              .Append(" danger=").Append(UseLearnedDanger ? 1 : 0)
              .Append(" abl=").Append(ablateShop ? "S" : "").Append(ablateShopScore ? "R" : "").Append(ablateEvent ? "E" : "")

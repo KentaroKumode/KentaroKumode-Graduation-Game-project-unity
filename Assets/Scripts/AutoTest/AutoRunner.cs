@@ -114,7 +114,7 @@ namespace AutoTest
             /// 護符の使い時 (v3.superConsumables)・与ダメの倍率と敵のパッシブを配線の効用で読む (v3.readOutgoingMult / readEnemyPassives の −1)・
             /// 航行の計画 (v3.macroPlan)・戦闘名の危険度で避ける (v3.superNav → UseLearnedDanger)・無段階の序列 (superBuyTiers)・
             /// ITT の Super 版の序列と価格の差し引き (superOwnItt / superIttPriceK)・段階 3 の値順の購入 (v3.phase3Ranked)・
-            /// 軸に絞る買い方 (v3.axisCommitBuy)・難易度 10 の 6 層の店の全投入 (IsSuperTailMode)。
+            /// 難易度 10 の 6 層の店の全投入 (IsSuperTailMode)。
             /// 配線のミスなし (Super は wiringMistakeRate=0・Optimal は 2026-11-12 #134 から optimalMistakeRate で次点を選ぶ) は Optimal との差になる。 防ぎ切りの規則 (FreeBlockRule) は、 山札の方策と HP の帳簿 (既定) では差にならない。</para></summary>
             Super,
             /// <summary>厳密: 旧い expectimax の参照実装 (ExactCombatAI) を差していた技量。
@@ -2023,7 +2023,7 @@ namespace AutoTest
             bool isSuperSkill = wiringSkill == WiringSkill.Super;
             // Super = Optimal + 無段階の序列 + 激しい防御 + 消耗品の読み + 偵察と戦闘名の回避 (2026-11-06・同じシードで +4.86σ)。
             //   **戦闘の先読みは含まない** (配線とリロールは山札の方策・先読みは deckLookahead だけ・2026-11-12 に確認)。
-            if (isSuperSkill) { v3.superDefense = true; v3.superConsumables = true; v3.superNav = true; v3.macroPlan = true; v3.phase3Ranked = true; v3.axisCommitBuy = true; UseLearnedDanger = true; AvoidLoseRate = v3.avoidLoseRate; }
+            if (isSuperSkill) { v3.superDefense = true; v3.superConsumables = true; v3.superNav = true; v3.macroPlan = true; v3.phase3Ranked = true; UseLearnedDanger = true; AvoidLoseRate = v3.avoidLoseRate; }
             // [2026-11-10] 軸に寄せる方策を本体の差し込み口 (開幕の品・挑戦カード) へも渡す。 空なら無効。
             BotHooks.AxisFocus = buyAxisFocus ?? "";
             BotHooks.AxisFocusBonus = buyAxisFocusBonus;

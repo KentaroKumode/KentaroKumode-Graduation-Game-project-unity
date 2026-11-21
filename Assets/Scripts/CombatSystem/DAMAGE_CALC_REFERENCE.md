@@ -72,7 +72,7 @@ OnTurnEnd の 4 か所。これ以外の位置で敵パッシブが ctx の HP �
 - 整備パネルの種火・役（2026-11-21）: 各戦闘の最初の振り直し 1 回（`MetaPanel.RoleFreeRerolls`）も同じ無料分に足す（`CombatManager.FreeRerollsLeft`）。〈特別・対〉の分と重なった時は〈特別・対〉の分（ターンの終わりで消える）から先に使い、種火の分はその戦闘の間残る（`ctx.accumulatedValues[SparkRoleFreeUsedKey]`）。
 - 無料の回数は `CombatManager.FreeRerollsLeft` の 1 か所（2026-11-21・段 1-f）= currentBuffs `roleFreeReroll`（〈特別・対〉+2・〈鏡合わせの盤〉の 1 の 2 個そろい +1・〈揃いの拍子木〉+1 ── 次のターンへ足し合わせる `YachtRoleEffects.AddNextTurn`）
   + 〈擦り切れた賽袋〉（この戦闘でまだ 1 回も振り直していなければ 1・`role.rerolled`）+ 種火・役の残り。 使う順は 賽袋 → currentBuffs → 種火（`NoteRerollPaid`・currentBuffs から減らす）。
-- 〈賽振り台〉（端子・2026-11-21）: 挿した次のターンの最初の振り直し（`rerollsThisTurn = 0`）の費用 −min(6, 賽目)（強化 8・下限 0・複数挿せば足す）。
+- 〈賽振り台〉（端子・2026-11-21）: 挿した次のターンの最初の振り直し（`rerollsThisTurn = 0`）の費用 −min(6, この戦闘で役が成立した回数〔このターンの役を含む・`roleCount`〕)（強化 8・下限 0・複数挿せば足す）。
   `TerminalOutcome.rerollDiscountNext` → nextTurnBuffs `roleRerollDiscount` → `RerollCostNow(ctx, 個数, 回目)` が引く（本体・画面・BOT の同じ関数・〈過負荷チューナー〉の −1 の後）。
 - 振るかどうかは `RerollPolicy`（BOT / UI が差す）。人が操作するターンは `TurnPauseKind.Reroll` で止まって答えを待つ。
 - 〈過負荷チューナー〉（2026-11-21〜）: 過充電（充電 10 以上・`ChargeCore.OverchargeAt`）の間、費用 −2（2 以上の物だけ・最低 1・`ChargeCore.CostNow` を `CombatContext.ChargeCostNow` 経由で `RerollCostNow` が最後に通す）。
@@ -1026,7 +1026,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
            立つ役 (2026-11-21・段 1-f): 5. の頭で o.roleNow = TerminalCards.RoleOf(振った目, env) (0 = 立たない / 1 = 2 個そろい / 2 = ゾロ目か連なり)。
               判定は ResolveRoles と同じ (YachtRoles.Evaluate・〈凶運〉で封じた役は立たない env.sealedRoleMask・〈万象のゾロ目〉の格上げ env.pairAsTriple)。
               BOT の先読みの次のターンは引いた出目で決まる (格上げは見込まない)。
-              〈役落とし〉: 出目 + (役が立てば 賽目 × 3 (強化 × 4)・ゾロ目か連なりなら 2 倍) を攻撃に / 〈賽振り台〉: 充電 +出目・rerollDiscountNext += min(6 (強化 8), 賽目)
+              〈役落とし〉: 出目 + (役が立てば この戦闘の役の回数 (このターンを含む) × 3 (強化 × 4)・ゾロ目か連なりなら 2 倍) を攻撃に / 〈賽振り台〉: 充電 +出目・rerollDiscountNext += min(6 (強化 8), 役の回数)
            5c. 充電のコアアクション (2026-11-21・ChargeCore・旗は TerminalBattleState.chargeItems・Resolve の引数 reboot / overclock = 人の画面 / BOT の方策):
               控え = 5. で各端子に入れた sum / raw / num と、 その端子が足した攻撃 atkD・ブロック blkD。 支払いは Pay (o.chargePays に 1 回ずつ・合計 chargeSpend)
               【再起動】〈二股の導線〉: reboot ≠ RebootNone・このターン発動した攻撃か防御の端子 (〈裁きの雷〉〈残響〉は除く)・充電 ≥ CostNow(6) → 払って、 その端子の効果を控えの量で 1 回走らせる
@@ -1248,7 +1248,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
          爆発 1 回 = HeatCore.Damage (基礎 30 + 上乗せ → 超臨界 ×1.5 ほか) を HeatCore.VsDefense (敵の防御の 50% を無視) に通した量。
            会心・与ダメの池は乗らない。 最終与ダメージ倍率・大罪:怠惰・ダウンの ×1.5 は HpLossDiag.Lose (channel "臨界の爆発") が掛ける。 遺物 (§15-5) の臨界軸: 爆発 1 回ごとに + floor(その時の敵の現在HP × N%)。
          爆発のたびボスの次の目盛りにひび (CrackBossNotch)。
-         超臨界爆発: 閾値を引く前の meter が閾値の 1.5 倍以上 (2026-11-21・旧 2 倍)。 OnRinkaiBurst の直後に OnSuperBurst。 出来事の間は Kw.BurstSuperKey / BurstDamageNowKey (防御の後の量) / BurstExcessKey が読める。
+         超臨界爆発: 閾値を引く前の meter が閾値の 1.5 倍以上 (2026-11-21・旧 2 倍)。 OnRinkaiBurst の直後に OnSuperBurst。 出来事の間は Kw.BurstDamageNowKey (防御の後の量) / BurstExcessKey が読める。
 ```
 
 ### 9.3 収支トリガー（柱2 の再定義・§0 の敵視点は変わらない）
