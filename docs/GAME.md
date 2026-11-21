@@ -2797,7 +2797,7 @@ Hades 鏡式の A/B 二択は「**不均衡なら答え探し / 均衡ならコ�
 | `stage:full,main:Valor` | 主方針を 1 つずつ（`LastStand` / `BattleSpirit` / `Valor` / `VaultBank` / `Robbery` / `Sale99` / `StartPick` / `Immovable`） |
 | `base:6,slots:3,main:LastStand,support:Compression,spark:bleed` | 細かく。種火はキーワード（`charge` など）か `SparkBleed` の名前。`none` = 空。`baseoff:1` = 基礎整備を切る |
 
-開いた枠で指定しなかったものは**既定で埋める**（仮: 主方針〈ラストスタンド〉・補助 攻撃端子調律・種火 出血・`MetaAllocationPresets.DefaultModule`）。解釈できない指定は、並列は起動で止め、逐次は赤いログを出して未解禁で走る。
+開いた枠で指定しなかったものは**既定で埋める**（測定の標準・旧 Standard と同じく軸に寄せない: 主方針〈ラストスタンド〉・補助 攻撃端子調律・**種火は空**・`MetaAllocationPresets.DefaultModule`。2026-11-21 に種火 出血から空へ ── どの腕でも店が出血へ傾き、軸どうしの比較が出血に偏った。種火を測る時は `spark:<キーワード>` を明示する）。解釈できない指定は、並列は起動で止め、逐次は赤いログを出して未解禁で走る。
 
 **旧い測定の指定の読み替え**（`MetaLoadout.FromLegacy`・旧いメニュー・スイープ・`metaBuffMode` / `metaBuildAxis` がそのまま走るように）:
 
