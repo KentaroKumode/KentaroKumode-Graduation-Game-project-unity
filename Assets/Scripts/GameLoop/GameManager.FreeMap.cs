@@ -325,7 +325,7 @@ namespace GameLoop
             if (cands.Count == 0) return false;
             string got = OfferPassiveChoice(cands);
             string what = axis != null ? axis + "の秘宝" : "秘宝";
-            note = got == null ? $"宝: {what}を {cands.Count} つから選ぶ" : $"宝: {ItemSystem.ItemDatabase.Instance?.GetItem(got)?.displayName ?? got}";
+            note = got == null ? $"宝: {what}を {cands.Count} つから選ぶ" : got == "" ? "宝: 見送った" : $"宝: {ItemSystem.ItemDatabase.Instance?.GetItem(got)?.displayName ?? got}";
             return true;
         }
 

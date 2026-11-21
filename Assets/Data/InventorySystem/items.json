@@ -2717,7 +2717,7 @@
     {
       "id": "目利きの紹介状",
       "name": "目利きの紹介状",
-      "description": "店に入るたび、最初の 1 回の通常リロールが無料。軸指定リロールの追加 −5G",
+      "description": "店に入るたび、最初の 1 回の通常リロールが無料。軸指定リロールの追加 −3G",
       "flavorText": "",
       "category": "Passive",
       "rarity": "BRONZE",

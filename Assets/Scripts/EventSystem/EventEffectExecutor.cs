@@ -348,7 +348,7 @@ namespace EventSystem
                     {
                         // 人が遊んでいる時は地図へ戻ってからの選択画面へ預ける。 BOT は GameHooks で今選ぶ (乱数の消費は同じ)
                         string got = gm.OfferPassiveChoice(cands);
-                        result.log.Add(got == null ? $"秘宝を {cands.Count} つから 1 つ選ぶ" : $"秘宝獲得: {ResolveLabel(got)}");
+                        result.log.Add(got == null ? $"秘宝を {cands.Count} つから 1 つ選ぶ" : got == "" ? "秘宝を見送った" : $"秘宝獲得: {ResolveLabel(got)}");
                     }
                     else
                     {
@@ -439,7 +439,7 @@ namespace EventSystem
                     if (gm != null)
                     {
                         string got = gm.OfferPassiveChoice(cands);
-                        result.log.Add(got == null ? $"{axis}の秘宝を {cands.Count} つから 1 つ選ぶ" : $"秘宝獲得: {ResolveLabel(got)}");
+                        result.log.Add(got == null ? $"{axis}の秘宝を {cands.Count} つから 1 つ選ぶ" : got == "" ? "秘宝を見送った" : $"秘宝獲得: {ResolveLabel(got)}");
                     }
                     else
                     {
@@ -637,6 +637,13 @@ namespace EventSystem
             {
                 var ex = filtered.FindAll(it => !alsoExclude.Contains(it.internalName));
                 if (ex.Count > 0) filtered = ex;
+            }
+
+            // 秘宝: 出現の枠と 2 段階の軸均等の抽選 (軸か枠外に絞ってからレア度で引く・full-item-rework-spec §1-2)。 軸の指定がある時は、 その軸が枠に無ければ出さない
+            if (category == ItemCategory.Passive)
+            {
+                filtered = ItemSystem.AxisPool.Narrow(run ?? GameLoop.GameManager.Instance?.Run, filtered, "event.axis");
+                if (filtered.Count == 0) return null;
             }
 
             // 呪物の賽: イベントの秘宝は LEGENDARY の重み ×3 (ADR-0016)

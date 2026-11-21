@@ -252,6 +252,11 @@ namespace GameLoop
         /// パッシブの重複取得を禁止する判定に使う（= 一度捨てたものも再取得しない）。</summary>
         public HashSet<string> seenPassiveItemIds = new HashSet<string>();
 
+        /// <summary><b>出現の枠 (動的 4 枠ロック・2026-11-21・docs/full-item-rework-spec.md §1-1)。</b> 8 軸の秘宝を取得した順の軸 (最大 4)。
+        /// 4 つ埋まると、 秘宝と軸の端子はこの 4 軸と枠外 (金・軸なし) からだけ出る。 手放しても外れない。 種火を挿していれば、 その軸が最初から 1 つ目。
+        /// 書くのは <see cref="ItemSystem.AxisPool.NoteAcquired"/> とランの始めだけ。</summary>
+        public List<string> lockedAxes = new List<string>();
+
         /// <summary>〈昇華〉済みパッシブID（グリッド外・刻印なしの永久パッシブ）。
         /// 戦闘では owned と同様に発動するが、容量/トリアージ/グリッドには載らない（枠を消費しない）。</summary>
         public List<string> ascendedPassiveIds = new List<string>();
@@ -530,6 +535,8 @@ namespace GameLoop
             permanentDebuffs = new HashSet<string>();
             seenOnceEvents = new HashSet<string>();
             seenPassiveItemIds = new HashSet<string>();
+            lockedAxes = new List<string>();
+            { string spark = MetaProgression.MetaBuffApplicator.GetSparkAxis(); if (spark != null) lockedAxes.Add(spark); }   // 種火の軸は最初から 1 つ目の枠
             ascendedPassiveIds = new List<string>();
             sublimationCount = 0;
             lastStandActive = false;

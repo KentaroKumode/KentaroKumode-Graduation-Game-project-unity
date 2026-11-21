@@ -30,7 +30,7 @@ namespace UI.Game2D
         };
 
         private static string SparkDesc(string axis, string own)
-            => axis + "の秘宝が店に出やすい (+" + N((MetaPanel.SparkAppearanceWeightMul - 1f) * 100f) + "%)。 " + own + "。";
+            => axis + "が最初から出現の 4 枠の 1 つ目に入る。 " + own + "。";
 
         /// <summary>モジュールの名前と説明。 新しいモジュール (種火の 2 軸など) はここにも足す。</summary>
         private static (string name, string desc) Info(MetaModule m) => m switch

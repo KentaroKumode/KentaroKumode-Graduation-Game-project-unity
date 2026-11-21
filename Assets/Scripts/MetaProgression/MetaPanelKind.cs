@@ -19,7 +19,7 @@ namespace MetaProgression
         Precision,    // #9 精密:  2026-09-10 廃止 (MaxRank 0)。 旧: 会心ダイス・会心率 +%/段
 
         // === 種火 (キーワードビルド宣言・max 3) ===
-        //   r1: 対応キーワードアイテムの出現重み (SparkAppearanceWeightMul)
+        //   r1: 対応する軸がランの始めから出現の枠 (RunState.lockedAxes) の 1 つ目 (2026-11-21・旧 出現重み ×2)
         //   r2: 固有効果 (下記)
         //   r3: 対応キーワードアイテムを開幕所持 (SparkStartingItemCount 個)
         SparkCharge,  // #10 充電:   r2 拡張バッテリー (充電上限 + と開幕の充電・ChargeCapBonus / ChargeOpening)

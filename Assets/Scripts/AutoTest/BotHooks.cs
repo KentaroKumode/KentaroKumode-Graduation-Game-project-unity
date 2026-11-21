@@ -41,7 +41,7 @@ namespace AutoTest
         {
             GameHooks.BotDriving = true;
             GameHooks.ChooseStartingPassive = ChooseByBuyScore;
-            GameHooks.ChooseOfferedPassive = ChooseByBuyScore;   // イベントの「Nつから選ぶ」(2026-11-12)。 開幕の品と同じ買いの点で選ぶ (交換マスの 2 択も)
+            GameHooks.ChooseOfferedPassive = ChooseOrSkip;       // イベントの「Nつから選ぶ」(2026-11-12)・宝箱・支給・縄張りの宝・交換マス。 欲しい軸の品から買いの点で選び、 無ければ見送り換金 (2026-11-21)
             GameHooks.ChooseTradeAway = ChooseLowestBuyScore;     // 交換マスで差し出す品 (2026-11-20)。 買いの点 (ITT の序列) が一番低い物
             GameHooks.ChooseOfferedDie = ChooseDieByPower;        // イベントの「賽を提示して交換」(2026-11-20)。 店で賽を買う時と同じ見積もり (InventoryPower.DiePowerDelta)
             GameHooks.WeaponEvBonus = LearnedWeaponBonus;
@@ -103,6 +103,39 @@ namespace AutoTest
                 float sc = LearnedPriorityProvider.BuyScore(offers[i]);
                 if (IsFocusItem(offers[i])) sc += AxisFocusBonus * LearnedPriorityProvider.StepPerTier;
                 if (sc < bestScore) { bestScore = sc; best = i; }
+            }
+            return best;
+        }
+
+        /// <summary><b>見送り換金の判断 (2026-11-21・full-item-rework-spec §1-5)。</b> 取る品: 枠外 (金・軸なし)・寄せる軸 (<see cref="AxisFocus"/>)・
+        /// 本命の軸 (偏重の上位 2 軸・2 番目と同数の軸も)。 軸の秘宝を持つ軸が 2 つに満たないうちは何でも取る (軸を探る段)。 それ以外の 8 軸の品は見送る (4 枠を汚さない)。
+        /// 乱数は引かない。</summary>
+        public static bool WantsPassive(RunState run, string id)
+        {
+            var d = ItemSystem.ItemDatabase.Instance?.GetItem(id);
+            if (d == null || !d.IsPassive || !ItemSystem.AxisPool.IsRanked(d.axis) || InFocus(d.axis)) return true;
+            int first = 0, second = 0, held = 0;
+            foreach (var a in ItemSystem.PassiveSkills.AxisRules.Ranked)
+            {
+                int n = ItemSystem.PassiveSkills.AxisRules.Count(run, a);
+                if (n <= 0) continue;
+                held++;
+                if (n > first) { second = first; first = n; } else if (n > second) second = n;
+            }
+            return held < 2 || ItemSystem.PassiveSkills.AxisRules.Count(run, d.axis) >= second;
+        }
+
+        /// <summary>提示から、 欲しい品 (<see cref="WantsPassive"/>) の中で買いの点が一番の品を選ぶ。 欲しい品が無ければ −1 (見送り換金)。</summary>
+        private static int ChooseOrSkip(IReadOnlyList<string> offers)
+        {
+            var run = GameManager.Instance?.Run;
+            int best = -1; float bestScore = float.NegativeInfinity;
+            for (int i = 0; i < offers.Count; i++)
+            {
+                if (!WantsPassive(run, offers[i])) continue;
+                float sc = LearnedPriorityProvider.BuyScore(offers[i]);
+                if (IsFocusItem(offers[i])) sc += AxisFocusBonus * LearnedPriorityProvider.StepPerTier;
+                if (sc > bestScore) { bestScore = sc; best = i; }
             }
             return best;
         }

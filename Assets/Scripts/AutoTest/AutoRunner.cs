@@ -2382,6 +2382,7 @@ namespace AutoTest
 
             // パッシブ取得の経路別計装をバッチ単位で数え直す (前バッチの値を持ち越さない)。
             ItemSystem.Helpers.PassiveSourceAudit.Reset();
+            ItemSystem.AxisPool.ResetStats();
             ItemSystem.PassiveSkills.Effects.MirrorTwinsResponse.ResetStats();
 
             // **マスターシードはスイープ経路にも適用する** (2026-08-05)。

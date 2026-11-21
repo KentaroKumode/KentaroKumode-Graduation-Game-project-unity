@@ -189,6 +189,7 @@ namespace AutoTest.ParallelSweep
                 GameLoop.GoldIncome.ResetStats();
                 GameLoop.RunState.ResetConsumableStats();
                 ItemSystem.Helpers.PassiveSourceAudit.Reset();
+                ItemSystem.AxisPool.ResetStats();
                 ItemSystem.Shop.ShopManager.ResetSlotStats();
                 ItemSystem.Shop.ShopManager.ResetSaleStats();
                 ItemSystem.Helpers.PassiveAddHelper.ResetAcquiredStats();
@@ -290,6 +291,7 @@ namespace AutoTest.ParallelSweep
                 ItemSystem.Helpers.PassiveSourceAudit.Counts["HP外回:" + kv.Key] = (int)System.Math.Min(int.MaxValue, kv.Value);
             foreach (var kv in GameLoop.GoldIncome.BySource)
                 ItemSystem.Helpers.PassiveSourceAudit.Counts["金:" + kv.Key] = (int)System.Math.Min(int.MaxValue, kv.Value);
+            ItemSystem.AxisPool.WriteStats(ItemSystem.Helpers.PassiveSourceAudit.Counts);   // [計装 2026-11-21] 軸均等の抽選・見送り換金・4 枠ロック
             var runnerForDump = FindObjectOfType<AutoRunner>();
             runnerForDump?.CloseTurnAudit();
             // 並列アイテム学習: 担当区間のラン記録を書き出す。 先頭の捨てラン 1 本は除く (末尾 runs 本だけ)。

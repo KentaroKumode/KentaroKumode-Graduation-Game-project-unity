@@ -303,31 +303,34 @@ namespace GameLoop
         /// <summary>選ぶのを預かっているイベントの品の提示 (人が遊んでいる時だけ)。 地図へ戻ると選択画面が出る (Game2DPhaseScreens)。 先頭から順に選ぶ。</summary>
         public readonly List<List<string>> PendingEventPassiveOffers = new List<List<string>>();
 
-        /// <summary>品の提示を受ける。 BOT (GameHooks.ChooseOfferedPassive・無ければ開幕パッシブの口) はこの場で選び、 選んだ品の id を返す。
-        /// 人が遊んでいる時は選択画面へ預けて null を返す (提示の抽選は呼ぶ側で済んでいるので、 乱数の消費は BOT と同じ)。</summary>
+        /// <summary>品の提示を受ける (イベント・支給の秘宝・縄張りの宝・交換マス・宝箱)。 BOT (GameHooks.ChooseOfferedPassive・無ければ開幕パッシブの口) はこの場で選び、 選んだ品の id を返す。
+        /// 選んだ添字が負なら見送り換金 (<see cref="ItemSystem.AxisPool.TakeSkip"/>・full-item-rework-spec §1-3) で "" を返す。
+        /// 人が遊んでいる時は選択画面へ預けて null を返す (1 択でも見送れるので預ける・提示の抽選は呼ぶ側で済んでいるので、 乱数の消費は BOT と同じ)。</summary>
         public string OfferPassiveChoice(List<string> cands)
         {
             if (Run == null || cands == null || cands.Count == 0) return null;
             var chooser = GameHooks.ChooseOfferedPassive ?? GameHooks.ChooseStartingPassive;
-            if (cands.Count > 1 && chooser == null && !GameHooks.BotDriving && !Application.isBatchMode)
+            if (chooser == null && !GameHooks.BotDriving && !Application.isBatchMode)
             {
                 PendingEventPassiveOffers.Add(new List<string>(cands));
                 return null;
             }
             int pick = chooser?.Invoke(cands) ?? 0;
-            string id = cands[Math.Max(0, Math.Min(pick, cands.Count - 1))];
+            if (pick < 0) { ItemSystem.AxisPool.TakeSkip(Run, cands, ItemSystem.Helpers.PassiveSourceAudit.CurrentSource(Run)); return ""; }
+            string id = cands[Math.Min(pick, cands.Count - 1)];
             ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, id);
             Log($"イベント: 秘宝「{id}」を {cands.Count} つから選んで獲得");
             return id;
         }
 
-        /// <summary>預かっているイベントの品の提示の先頭から 1 つ選んで所持する (選択画面から呼ぶ)。</summary>
+        /// <summary>預かっているイベントの品の提示の先頭から 1 つ選んで所持する (選択画面から呼ぶ)。 pick が負 = 見送る (見送り換金)。</summary>
         public void ResolveEventPassiveOffer(int pick)
         {
             if (Run == null || PendingEventPassiveOffers.Count == 0) return;
             var cands = PendingEventPassiveOffers[0];
             PendingEventPassiveOffers.RemoveAt(0);
             if (cands == null || cands.Count == 0) return;
+            if (pick < 0) { ItemSystem.AxisPool.TakeSkip(Run, cands, "提示"); return; }
             string id = cands[Math.Max(0, Math.Min(pick, cands.Count - 1))];
             ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, id);
             Log($"イベント: 秘宝「{id}」を選んで獲得");

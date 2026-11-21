@@ -460,7 +460,7 @@ namespace AutoTest
             return gm.ShopReroll(need >= 0 ? AxisRerollFocus(gm.Run, need) : null);
         }
 
-        /// <summary>軸指定リロールで指定する軸 (null = 通常のリロール)。 最も深い偏重 (同数は AxisRules.Ranked の順で先) が 3 以上・残金が need + 追加 以上。</summary>
+        /// <summary>軸指定リロールで指定する軸 (null = 通常のリロール)。 出現の枠の軸のうち最も深い偏重 (同数は枠の順で先) が 3 以上・残金が need + 追加 以上。</summary>
         private string AxisRerollFocus(RunState run, int need)
         {
             if (!axisFocusReroll || run == null || run.coins < need + ItemSystem.Shop.ShopManager.AxisRerollSurchargeFor(run)) return null;   // 追加は〈目利きの紹介状〉・〈軸引きの手形〉の値引きの後
@@ -468,7 +468,7 @@ namespace AutoTest
             var shop = ItemSystem.Shop.ShopManager.Instance?.Current;
             if (shop != null && !shop.freeRerollUsed && run.OwnsPassive(ItemIds.MacroLetter)) return null;
             string best = null; int bestD = 0;
-            foreach (var ax in ItemSystem.PassiveSkills.AxisRules.Ranked)
+            foreach (var ax in run.lockedAxes)
             {
                 int d = ItemSystem.PassiveSkills.AxisRules.Count(run, ax);
                 if (d > bestD) { bestD = d; best = ax; }

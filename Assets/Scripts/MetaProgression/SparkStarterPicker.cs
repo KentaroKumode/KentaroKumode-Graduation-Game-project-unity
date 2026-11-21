@@ -6,7 +6,7 @@ namespace MetaProgression
 {
     /// <summary>
     /// 種火のキーワード ("charge" など・<see cref="MetaPanel.SparkKeyword"/>) と品の軸 (items.json の axis) の対応。
-    /// 店の秘宝の枠の出現の重み (ShopManager.PickWithSparkBias → <see cref="KeywordOf"/>) が読む。
+    /// ランの始めの出現の枠 (RunState.lockedAxes の 1 つ目) が読む (2026-11-21・旧 店の出現の重み ×2)。
     /// (旧: 種火 r3 の開幕の品の抽選 PickStarterFor は、 2026-11-20 に種火を作戦の枠のモジュールにした時に外した)
     /// </summary>
     public static class SparkStarterPicker
@@ -26,19 +26,9 @@ namespace MetaProgression
             ["role"]   = ItemSystem.PassiveSkills.AxisRules.Role,
         };
 
-        /// <summary>与えられたパッシブアイテムが keyword に該当するか (品の軸で判定)。</summary>
-        public static bool HasKeyword(CompleteItemData item, string keyword)
-            => item != null && KwToAxis.TryGetValue(keyword, out var axis) && item.axis == axis;
-
-        /// <summary>抽選重みバイアス用: アイテムがどのキーワードに属するかを返す (最初にヒットしたもの)。
-        /// ShopManager の Tier 抽選前に呼び、該当キーワードの r1 バフから重みを乗算する用途。</summary>
-        public static string KeywordOf(CompleteItemData item)
-        {
-            if (item == null) return null;
-            foreach (var kv in KwToAxis)
-                if (HasKeyword(item, kv.Key)) return kv.Key;
-            return null;
-        }
+        /// <summary>種火のキーワード → 軸 (知らないキーワード・null は null)。 ランの始めの出現の枠 (MetaBuffApplicator.GetSparkAxis) が読む。</summary>
+        public static string AxisOf(string keyword)
+            => keyword != null && KwToAxis.TryGetValue(keyword, out var axis) ? axis : null;
     }
 }
 

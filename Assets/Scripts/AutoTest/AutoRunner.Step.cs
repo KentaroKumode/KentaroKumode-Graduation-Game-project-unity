@@ -519,6 +519,12 @@ namespace AutoTest
                             bool fa = !ownsA && IsAxisFocusItem(ra), fb = !ownsB && IsAxisFocusItem(rb);
                             if (fa != fb) pick = fa ? 0 : 1;
                         }
+                        // 見送り換金 (2026-11-21): 秘宝の 2 択で、 欲しい品 (BotHooks.WantsPassive) が片方だけならそちら・どちらも違えば見送る
+                        if (ItemSystem.AxisPool.SkipGoldFor(new[] { ra, rb }) > 0)
+                        {
+                            bool wa = BotHooks.WantsPassive(gm.Run, ra), wb = BotHooks.WantsPassive(gm.Run, rb);
+                            if (!wa && !wb) pick = -1; else if (wa != wb) pick = wa ? 0 : 1;
+                        }
                         gm.ResolveRewardChoice(pick);
                     }
                     gm.ConfirmReward();

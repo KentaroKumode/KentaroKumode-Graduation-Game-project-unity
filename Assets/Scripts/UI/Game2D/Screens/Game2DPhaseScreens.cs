@@ -225,7 +225,8 @@ namespace UI.Game2D
                 d.Items.Add(new ModalItem { name = ItemDatabase.DisplayNameOf(data, id), desc = data?.description });
             }
             d.buttons.Add(B("選ぶ", "pick", true));
-            d.onAction = (a, sel) => { if (a == "pick") { gm.ResolveStartingPassive(Mathf.Clamp(sel, 0, cands.Count - 1)); Game2DSfx.Play("ui_confirm"); } Refresh(); };
+            d.buttons.Add(SkipButton(cands));
+            d.onAction = (a, sel) => { if (a == "pick" || a == "skip") { gm.ResolveStartingPassive(a == "skip" ? -1 : Mathf.Clamp(sel, 0, cands.Count - 1)); Game2DSfx.Play("ui_confirm"); } Refresh(); };
             return d;
         }
 
@@ -235,16 +236,20 @@ namespace UI.Game2D
         {
             var cands = gm.PendingEventPassiveOffers[0];
             var d = New("品を選ぶ", gm.PendingEventPassiveOffers.Count > 1 ? "残り " + gm.PendingEventPassiveOffers.Count : null, 420);
-            d.body = "差し出された品から 1 つ選ぶ。";
+            d.body = cands.Count > 1 ? "差し出された品から 1 つ選ぶ。 見送ればゴールドになる。" : "受け取るか、 見送ってゴールドにする。";
             foreach (var id in cands)
             {
                 var data = ItemDatabase.Instance?.GetItem(id);
                 d.Items.Add(new ModalItem { name = data != null && !string.IsNullOrEmpty(data.displayName) ? data.displayName : id, desc = data?.description });
             }
-            d.buttons.Add(B("選ぶ", "pick", true));
-            d.onAction = (a, sel) => { if (a == "pick") { gm.ResolveEventPassiveOffer(Mathf.Clamp(sel, 0, cands.Count - 1)); Game2DSfx.Play("ui_confirm"); } Refresh(); };
+            d.buttons.Add(B(cands.Count > 1 ? "選ぶ" : "受け取る", "pick", true));
+            d.buttons.Add(SkipButton(cands));
+            d.onAction = (a, sel) => { if (a == "pick" || a == "skip") { gm.ResolveEventPassiveOffer(a == "skip" ? -1 : Mathf.Clamp(sel, 0, cands.Count - 1)); Game2DSfx.Play("ui_confirm"); } Refresh(); };
             return d;
         }
+
+        /// <summary>秘宝の提示の「見送る（+NG）」(見送り換金・full-item-rework-spec §1-3)。 額は提示の中で一番高いレア度の額 (ItemSystem.AxisPool.SkipGoldFor)。</summary>
+        private static ModalBtn SkipButton(IEnumerable<string> cands) => B("見送る（+" + ItemSystem.AxisPool.SkipGoldFor(cands) + "G）", "skip");
 
         // ── イベントの「賽を提示して交換」(2026-11-20)。 品の選択と同じ形・面を見せて、 替えるか「やめる」 ──
 
@@ -374,15 +379,16 @@ namespace UI.Game2D
             var run = gm.Run; var sm = ShopManager.Instance; var inv = sm != null ? sm.Current : null;
             int price = sm != null ? sm.AxisRerollPrice : 0;
             var d = New("ショップ ― 軸で振り直す", "所持金 " + run.coins + "G", 460);
-            d.body = "選んだ軸の秘宝と端子が出やすくなる (棚の売れていない枠を振り直す)。"; d.bodyLines = 1;
-            var axes = ItemSystem.PassiveSkills.AxisRules.ShopFocus;
+            d.body = "出現の枠 " + ItemSystem.AxisPool.SlotsLabel(run) + " の軸か金を選ぶ。 売れていない秘宝の前の " + ShopManager.AxisRerollGuaranteed + " 枠はその軸の品になり、 残りの枠と端子も出やすくなる。"; d.bodyLines = 2;
+            var axList = new List<string>(run.lockedAxes) { ItemSystem.PassiveSkills.AxisRules.Gold };
+            var axes = axList.ToArray();
             foreach (var ax in axes)
             {
                 string word = ItemSystem.PassiveSkills.AxisRules.WordOf(ax);
                 d.Items.Add(new ModalItem
                 {
                     name = ax, value = (string.IsNullOrEmpty(word) ? "秘宝 " : word + " ") + ItemSystem.PassiveSkills.AxisRules.Count(run, ax),
-                    desc = ax + "の秘宝" + (ax == ItemSystem.PassiveSkills.AxisRules.Gold ? "" : "と端子") + "が出やすくなる。 値段は振り直し " + (inv != null ? inv.CurrentRerollPrice : 0) + "G + " + ShopManager.AxisRerollSurchargeFor(run) + "G。",
+                    desc = ax + "の秘宝" + (ax == ItemSystem.PassiveSkills.AxisRules.Gold ? "" : "と端子") + "が出やすくなる (秘宝の " + ShopManager.AxisRerollGuaranteed + " 枠は確定)。 値段は振り直し " + (inv != null ? inv.CurrentRerollPrice : 0) + "G + " + ShopManager.AxisRerollSurchargeFor(run) + "G。",
                     disabled = inv == null || price > run.coins,
                 });
             }
@@ -465,7 +471,8 @@ namespace UI.Game2D
         private ScreenDef ShopBuy(GameManager gm)
         {
             var run = gm.Run; var sm = ShopManager.Instance; var inv = sm != null ? sm.Current : null;
-            var d = New(_shopSupply ? "ショップ ― 補給" : "ショップ", "所持金 " + run.coins + "G  物資 " + run.provision + "/" + run.provisionCap + "  武器 " + WeaponLabel(run.equippedWeaponId), 460); d.cols = 2;
+            var d = New(_shopSupply ? "ショップ ― 補給" : "ショップ", "所持金 " + run.coins + "G  物資 " + run.provision + "/" + run.provisionCap + "  武器 " + WeaponLabel(run.equippedWeaponId)
+                + "  出現 " + ItemSystem.AxisPool.SlotsLabel(run) + (ItemSystem.AxisPool.IsLocked(run) ? "ロック" : ""), 460); d.cols = 2;
             int n = 0;
             if (inv != null && !_shopSupply)
             {
@@ -914,7 +921,8 @@ namespace UI.Game2D
             if (gm.HasPendingRewardChoice)
             {
                 var (a, b) = gm.CurrentRewardChoice;
-                d.body = "どちらか 1 つを受け取る。";
+                bool relicPair = ItemSystem.AxisPool.SkipGoldFor(new[] { a, b }) > 0;
+                d.body = relicPair ? "どちらか 1 つを受け取る。 見送ればゴールドになる。" : "どちらか 1 つを受け取る。";
                 foreach (var id in new[] { a, b })
                 {
                     var data = ItemDatabase.Instance?.GetItem(id);
@@ -922,7 +930,8 @@ namespace UI.Game2D
                 }
                 AddInstabilityLine(gm, d, d.Items.Count);   // 不安定化: 2 つから選ぶ報酬の窓にも (2026-11-13)
                 d.buttons.Add(B("受け取る", "pick", true));
-                d.onAction = (act, sel) => { if (act == "pick") gm.ResolveRewardChoice(Mathf.Clamp(sel, 0, 1)); Refresh(); };
+                if (relicPair) d.buttons.Add(SkipButton(new[] { a, b }));
+                d.onAction = (act, sel) => { if (act == "pick") gm.ResolveRewardChoice(Mathf.Clamp(sel, 0, 1)); else if (act == "skip") gm.ResolveRewardChoice(-1); Refresh(); };
                 return d;
             }
             d.body = _lastCoinsGained > 0 ? _lastCoinsGained + "G を手に入れた。" : "戦利品を手に入れた。";
