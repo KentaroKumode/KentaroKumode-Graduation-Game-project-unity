@@ -24,7 +24,7 @@ namespace AutoTest.EditorTests
         public void Aim_FiveAndSix()
         {
             Assert.That(CritCore.AimRate(4), Is.EqualTo(0f));
-            Assert.That(CritCore.AimRate(5), Is.EqualTo(0.40f));
+            Assert.That(CritCore.AimRate(5), Is.EqualTo(CritCore.AimPct));
             Assert.That(CritCore.AimForce(5), Is.False);
             Assert.That(CritCore.AimForce(6), Is.True);
         }

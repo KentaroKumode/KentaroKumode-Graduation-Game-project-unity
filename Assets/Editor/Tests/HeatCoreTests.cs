@@ -54,11 +54,11 @@ namespace AutoTest.EditorTests
             var st = new TerminalBattleState { heatItems = HeatItems.Stone | HeatItems.Spanner | HeatItems.Breastplate | HeatItems.Flint };
             var env = new TerminalEnv { chargeCap = 30, hp = 50, maxHp = 50, enemyAttack = 10, enemyHp = 100, enemyMaxHp = 100 };
             var o = TerminalCards.Resolve(board, new[] { 0, 1, 2 }, new[] { 5, 4, 3 }, env, st);
-            // 過熱石 +10 (攻撃に 2 個)・燻り +4 (防御 1 枚)・スパナ +4 × 2 撃・燧石の倍 (攻撃 2 枚)
+           // 過熱石 +6 (攻撃に 2 個)・燻り +4 (防御 1 枚)・スパナ +2 × 2 撃・燧石の倍 (攻撃 2 枚)
             Assert.That(o.heatGains, Is.EquivalentTo(new[] { HeatCore.StoneTwo, HeatCore.BreastHeat, HeatCore.SpannerPerHit, HeatCore.SpannerPerHit }));
             Assert.That(o.heatDouble, Is.True);
-            var f = HeatCore.Forecast(new HeatCore.State { items = st.heatItems, threshold = 30 }, o, 0);
-            Assert.That(f.burstsWired, Is.EqualTo(1));   // (10+4+4+4) × 2 = 44 で 1 回 (30 を越えた時に 0 へ)
+            var f = HeatCore.Forecast(new HeatCore.State { items = st.heatItems, threshold = 25 }, o, 0);
+            Assert.That(f.burstsWired, Is.EqualTo(1));   // (6+4+2+2) × 2 = 28 で 1 回 (閾値 25 を越えた時に 0 へ)
         }
     }
 }

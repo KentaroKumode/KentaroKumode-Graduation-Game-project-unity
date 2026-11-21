@@ -41,10 +41,10 @@ namespace AutoTest.EditorTests
             int more = 0;
             for (int i = 0; i < 3; i++) more += TerminalDeckState.BeforeShuffle(discard, new List<string>(), 10, st, null, null, null);
             Assert.That(more, Is.EqualTo(TerminalCards.EngineDrawMax));      // 1 ターンに 2 枚まで
-            Assert.That(st.doubleAll, Is.True);                              // 切り直し 2 回目で倍化
-            // 〈解体屋の袋〉: 3 回ごとに 1 枚・1 戦闘 5 回まで
-            var bag = new TerminalBattleState { deckItems = DeckItems.Bag, disposedTotal = 3 };
-            var o = new TerminalOutcome { disposedNow = 3 };
+           Assert.That(st.doubleAll, Is.True);                              // 切り直し EngineEvery (3) 回目で倍化
+           // 〈解体屋の袋〉: BagEvery (4) 回ごとに 1 枚・1 戦闘 5 回まで
+            var bag = new TerminalBattleState { deckItems = DeckItems.Bag, disposedTotal = TerminalCards.BagEvery };
+            var o = new TerminalOutcome { disposedNow = TerminalCards.BagEvery };
             var exiled = new List<string> { TerminalIds.Detonator };
             var ret = new List<string>();
             TerminalDeckState.DisposeFired(new List<string>(), o, new List<string>(), exiled, ret, bag, new List<string>(), new List<string>(), new List<string>());

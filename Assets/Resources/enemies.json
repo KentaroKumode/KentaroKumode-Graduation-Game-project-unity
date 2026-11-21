@@ -1271,7 +1271,7 @@
       "displayName": "ゴブリン王",
       "description": "討ち取った探検隊長の鉄帽を冠代わりに被る、異様に肥え太った群れの主。荷箱を積んだ玉座にふんぞり返り、奪った軍用笛を吹き鳴らす。",
       "floor": 3,
-      "maxHP": 505,
+      "maxHP": 750,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 4,
@@ -1283,7 +1283,7 @@
           "flavorText": "号令の内容は誰にも聞き取れなかった。それでも全員が、同時に、強くなった。"
         }
       ],
-      "baseAttack": 10,
+      "baseAttack": 16,
       "attackRollMin": 1,
       "attackRollMax": 4
     },
@@ -1292,7 +1292,7 @@
       "displayName": "毒沼の主",
       "description": "三層の底にたまった腐水と毒霧の中で育った巨大な両生獣。紫色の粘液に覆われた背を泥から浮かせ、ぬるい沼の底で獲物を待っている。",
       "floor": 3,
-      "maxHP": 505,
+      "maxHP": 750,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 4,
@@ -1304,7 +1304,7 @@
           "flavorText": "沼は急がない。急ぐ理由が、沼の側には無い。"
         }
       ],
-      "baseAttack": 10,
+      "baseAttack": 17,
       "attackRollMin": 1,
       "attackRollMax": 4
     },
@@ -1313,7 +1313,7 @@
       "displayName": "鏡の双子",
       "description": "四層の空間のゆがみが生んだ、寸分違わぬ二つの人影。向かい合わせの鏡のように同じ歩幅で進み、瞬きの間合いまで完全に重なっている。",
       "floor": 3,
-      "maxHP": 505,
+      "maxHP": 750,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 6,
@@ -1331,7 +1331,7 @@
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         }
       ],
-      "baseAttack": 8,
+      "baseAttack": 14,
       "attackRollMin": 4,
       "attackRollMax": 4
     },
@@ -1359,7 +1359,7 @@
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         }
       ],
-      "baseAttack": 10,
+      "baseAttack": 13,
       "attackRollMin": 2,
       "attackRollMax": 4,
       "heavyPeriod": 5,
@@ -1390,7 +1390,7 @@
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         }
       ],
-      "baseAttack": 10,
+      "baseAttack": 13,
       "attackRollMin": 2,
       "attackRollMax": 3,
       "heavyPeriod": 5,
@@ -1439,7 +1439,7 @@
           "flavorText": "盾を構えるほど、灰は厚く積もる。焼かれているのは腕ではなく、迷っている時間の方だ。"
         }
       ],
-      "baseAttack": 13,
+      "baseAttack": 16,
       "attackRollMin": 2,
       "attackRollMax": 6,
       "heavyPeriod": 4,

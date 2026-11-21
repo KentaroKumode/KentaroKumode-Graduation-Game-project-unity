@@ -32,8 +32,8 @@ namespace AutoTest.EditorTests
         public void LedgerNumbers()
         {
             Assert.That(DiePassives.ScavengerGold, Is.EqualTo(2));
-            Assert.That(DiePassives.OldCoinGold, Is.EqualTo(4));
-            Assert.That(DiePassives.OldCoinHeal, Is.EqualTo(3));
+            Assert.That(DiePassives.OldCoinGold, Is.EqualTo(2));
+            Assert.That(DiePassives.OldCoinHeal, Is.EqualTo(1));
             Assert.That(DiePassives.RoleHealBonus(null), Is.EqualTo(0));
             var rusty = ItemSystem.ItemDatabase.Instance?.GetItem(DieIds.RustyNail);
             if (rusty != null) Assert.That(rusty.diceFaces, Is.EqualTo(new[] { 1, 2, 4, 5, 6 }));

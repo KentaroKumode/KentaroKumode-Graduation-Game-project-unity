@@ -11,12 +11,12 @@ namespace ItemSystem.PassiveSkills.Effects
     //  本体・画面の見込み・BOT の写しが同じ関数を通る)。 ここは端子の解決の外で働く 2 品だけ。
     // ============================================================
 
-    /// <summary>焼き入れの挟み: 使い捨ての端子を使うたび (OnTerminalDispose)、 敵に 6 の防御無視ダメージ (Kw.DamageEnemy)。
-    /// このターンの各撃の攻撃 +2 は旗 (<see cref="DeckItems.Tongs"/>)。 鳴るのは配線の解決の直後なので、 このターンの攻撃の固定ダメの枠で通る。</summary>
+    /// <summary>焼き入れの挟み: 使い捨ての端子を使うたび (OnTerminalDispose)、 敵に 3 の防御無視ダメージ (Kw.DamageEnemy)。
+    /// このターンの各撃の攻撃 +1 は旗 (<see cref="DeckItems.Tongs"/>)。 鳴るのは配線の解決の直後なので、 このターンの攻撃の固定ダメの枠で通る。</summary>
     public class TemperTongs : IPassiveSkillEffect
     {
         public string SkillId => ItemIds.DeckTongs;
-        public const int Damage = 6;
+        public const int Damage = 3;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTerminalDispose };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {

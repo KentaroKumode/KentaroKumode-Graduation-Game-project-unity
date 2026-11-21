@@ -34,10 +34,10 @@ namespace CombatSystem
         public const int ScavengerGold = 2;
         /// <summary>鈍色: 偶数を防御に挿すと防御 +N・奇数を攻撃に挿すと攻撃 +N (2026-11-21 台帳 §⑪: 旧 1)。</summary>
         public const int DullBonus = 2;
-        /// <summary>古銭: ⑧が出るたびゴールド +N (2026-11-21 台帳 §⑪: 旧 2)。</summary>
-        public const int OldCoinGold = 4;
+        /// <summary>古銭: ⑧が出るたびゴールド +N (2026-11-21 Phase 4 較正: 台帳 §⑪ の 4 から 2 へ戻す)。</summary>
+        public const int OldCoinGold = 2;
         /// <summary>古銭: そのターンの役〈癒し〉(⑧の役) の回復量 +N (YachtRoleEffects の〈癒し〉が読む・1 回働くごと)。</summary>
-        public const int OldCoinHeal = 3;
+        public const int OldCoinHeal = 1;
         public const int OldCoinFace = 8;
         /// <summary>呪物の賽 (ADR-0016・2026-11-20): 店とイベントで秘宝を選ぶ時の LEGENDARY の重みに掛ける数 (他のレア度の重みはそのまま)。</summary>
         public const float CursedLegendaryMul = 3f;

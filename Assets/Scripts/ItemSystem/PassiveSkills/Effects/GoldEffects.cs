@@ -18,10 +18,10 @@ namespace ItemSystem.PassiveSkills.Effects
             => gold > 0 && run != null && run.OwnsPassive(ItemIds.GoldCoinDish) ? (gold * (100 + Pct) + 99) / 100 : gold;
     }
 
-    /// <summary>戦果の天秤: 戦闘勝利時の獲得ゴールド +30% (切り上げ)・エリートかボスを倒したならさらに +15G (GameManager.Rewards が報酬に掛ける)。</summary>
+    /// <summary>戦果の天秤: 戦闘勝利時の獲得ゴールド +10% (切り上げ)・エリートかボスを倒したならさらに +5G (GameManager.Rewards が報酬に掛ける)。</summary>
     public static class SpoilsScale
     {
-        public const int Pct = 30, StrongBonus = 15;
+        public const int Pct = 10, StrongBonus = 5;
         /// <summary>戦闘の報酬 <paramref name="coins"/> に〈戦果の天秤〉を掛けた額 (<paramref name="strong"/> = エリート戦かボス戦)。</summary>
         public static int Apply(RunState run, int coins, bool strong)
         {
@@ -55,11 +55,11 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>爆破祭の小切手: 3 ターン以内に戦闘に勝ったとき、 ゴールド +12。</summary>
+    /// <summary>爆破祭の小切手: 3 ターン以内に戦闘に勝ったとき、 ゴールド +6。</summary>
     public class BlastPrize : IPassiveSkillEffect
     {
         public string SkillId => ItemIds.GoldBlastPrize;
-        public const int Turns = 3, Gold = 12;
+        public const int Turns = 3, Gold = 6;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleEnd };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {

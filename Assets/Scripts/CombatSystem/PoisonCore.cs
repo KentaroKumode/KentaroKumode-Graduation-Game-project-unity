@@ -21,7 +21,7 @@ namespace CombatSystem
     /// <summary>
     /// 毒の軸 (2026-11-21・full-item-rework-spec §3 軸2) の式の<b>正本</b>。
     ///
-    /// <para><b>【起爆】</b>: 敵の毒を半分 (切り上げ) 消費し、 消費量 × 倍率 (既定 ×3) の軽減不可ダメージ (防御も無視)。
+    /// <para><b>【起爆】</b>: 敵の毒を半分 (切り上げ) 消費し、 消費量 × 倍率 (既定 ×4・2026-11-22 Phase 4 較正: 旧 ×3) の軽減不可ダメージ (防御も無視)。
     /// 起爆したターンの終わりに、 ボスの目盛りのひびを全部、 正規のダウン (受けるダメージ ×1.5 あり) として割る (CombatManager.NoteBossDownTurnEnd)。
     /// 起爆は品が起こす (〈石抜きの毒指輪〉〈劇毒の火薬庫〉)。 ダメージの式はここだけにあり、 本体 (PoisonEffects の Psn.Detonate) と BOT の見積もり (AutoRunner の ItemSight) が同じ関数を呼ぶ。</para>
     /// <para>このファイルは UnityEngine に依存しない。</para>
@@ -29,9 +29,9 @@ namespace CombatSystem
     public static class PoisonCore
     {
         /// <summary>起爆の倍率 (消費した毒 1 につき) / 〈劇毒の火薬庫〉を持つ時の倍率。</summary>
-        public const int DetonateMul = 3, MagazineMul = 4;
+        public const int DetonateMul = 4, MagazineMul = 5;
         /// <summary>〈石抜きの毒指輪〉: 起爆に要る敵の毒。</summary>
-        public const int RingNeed = 24;
+        public const int RingNeed = 16;
         /// <summary>〈劇毒の火薬庫〉: 1 ターンに与えた毒の合計がこれ以上なら、 ターンの終わりに起爆。</summary>
         public const int MagazineGiven = 8;
         /// <summary>〈遅効の毒刃〉: この戦闘で起爆した回数 1 回につき、 起爆のダメージ +%。</summary>
@@ -46,9 +46,9 @@ namespace CombatSystem
         /// 〈廃庭の霧吹き〉の分・〈毒溜まりの主〉の 2 回目は 0。</summary>
         public const string DecayTickKey = "psn.decayTick";
         /// <summary>〈麻痺の吹き矢〉: 敵の防御を全部無視する毒。</summary>
-        public const int BlowpipeIgnoreAt = 18;
+        public const int BlowpipeIgnoreAt = 12;
         /// <summary>5d の量: 〈緑染みの小刀〉毒 / 回数 ・〈蛇血瓶〉毒 / 目 / 回数・〈毒見役の小匙〉毒 / HP・〈毒棘の小盾〉ブロック。</summary>
-        public const int KnifePoison = 2, KnifeMax = 3, SerpentPoison = 3, SerpentFace = 4, SerpentMax = 3, TasterPoison = 4, TasterHeal = 2, ThornBlock = 4;
+        public const int KnifePoison = 3, KnifeMax = 3, SerpentPoison = 4, SerpentFace = 4, SerpentMax = 3, TasterPoison = 3, TasterHeal = 1, ThornBlock = 4;
 
         /// <summary>起爆で消費する毒 (半分・切り上げ)。</summary>
         public static int Spend(int poison) => poison > 0 ? (poison + 1) / 2 : 0;

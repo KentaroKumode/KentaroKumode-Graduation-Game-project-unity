@@ -40,13 +40,13 @@ namespace ItemSystem.PassiveSkills.Effects
 
     // ── B: 起点 ── (〈肩当て〉〈当て布の籠手〉〈鋲の胸当て〉は端子の解決の中だけ・ShieldCore の旗)
 
-    /// <summary>鏡返しの小盾: シールドまたはブロックで敵の攻撃を防いだとき、 防いだ量の 40% を敵へ返す (【ジャスト防御】なら 100%)。
+    /// <summary>鏡返しの小盾: シールドまたはブロックで敵の攻撃を防いだとき、 防いだ量の 60% を敵へ返す (【ジャスト防御】なら 100%)。
     /// 防いだ量 = min(敵の攻撃, ブロック) + 敵の攻撃をシールドが吸った量。 ターンの終わりに軽減不可ダメージで返す (切り捨て)。</summary>
     public class MirrorBuckler : IPassiveSkillEffect
     {
         public const string Id = "鏡返しの小盾";
         public string SkillId => Id;
-        public const int Pct = 40, JustPct = 100;
+        public const int Pct = 60, JustPct = 100;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -75,11 +75,11 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>重ね札の盾: シールドが 10 以上ある間、 受ける直接ダメージ −3 (敵の攻撃を受けるその時のシールドで判定)。</summary>
+    /// <summary>重ね札の盾: シールドが 10 以上ある間、 受ける直接ダメージ −2 (敵の攻撃を受けるその時のシールドで判定)。</summary>
     public class LayeredTagShield : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "重ね札の盾";
-        public const int Need = 10, Cut = 3;
+        public const int Need = 10, Cut = 2;
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.consShield >= Need);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreReceiveDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
@@ -183,12 +183,12 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>敗残兵の部隊章: シールドを消費・吸収・減衰で 8 失うたび【反骨】+1 (最大 10)。 【反骨】1 つにつき与ダメージ +12% (与ダメ % の池・戦闘の間・減らない)。</summary>
+    /// <summary>敗残兵の部隊章: シールドを消費・吸収・減衰で 8 失うたび【反骨】+1 (最大 10)。 【反骨】1 つにつき与ダメージ +10% (与ダメ % の池・戦闘の間・減らない)。</summary>
     public class VeteranPatch : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "敗残兵の部隊章";
         public const int Every = 8, Max = 10;
-        public const float PctPer = 0.12f;
+        public const float PctPer = 0.10f;
         private const string Stk = "shd.veteran", Tally = "shd.veteranTally";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Shd.Count(ctx, Stk));
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnShieldAbsorb, PassiveSkillTrigger.OnShieldDecay, PassiveSkillTrigger.OnShieldSpend, PassiveSkillTrigger.OnPostRoll };
@@ -305,11 +305,11 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>二拍目の心臓: 戦闘中初めて HP が 50% 以下になった瞬間、 最大 HP の 60% (切り上げ) のシールドを得て、 以後この戦闘のシールドの獲得量 ×1.5 (ctx.shieldGainPct += 50・1 戦闘 1 回)。</summary>
+    /// <summary>二拍目の心臓: 戦闘中初めて HP が 50% 以下になった瞬間、 最大 HP の 30% (切り上げ) のシールドを得て、 以後この戦闘のシールドの獲得量 ×1.5 (ctx.shieldGainPct += 50・1 戦闘 1 回)。</summary>
     public class SecondBeatHeart : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "二拍目の心臓";
-        public const int ShieldPct = 60, GainPct = 50;
+        public const int ShieldPct = 30, GainPct = 50;
         private const string Once = "shd.secondBeat";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Once(Shd.Count(ctx, Once) > 0, true);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostReceiveDamage };
@@ -325,12 +325,12 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>脈なしの鋼心臓: 戦闘開始時、 シールド +X (X = <see cref="GameLoop.RunState.pulselessHeartShield"/>・ランの始めに 12・持っている間に戦闘に勝つたび +2)。
-    /// 現在のシールドが 25 以上の間、 ターン開始時にシールドが減衰しない (ctx.shieldNoDecayAt)。 勝ちを数えるのは CombatManager.FinishCombat (<see cref="NoteWin"/>)。</summary>
+    /// <summary>脈なしの鋼心臓: 戦闘開始時、 シールド +X (X = <see cref="GameLoop.RunState.pulselessHeartShield"/>・ランの始めに 6・持っている間に戦闘に勝つたび +1)。
+    /// 現在のシールドが 35 以上の間、 ターン開始時にシールドが減衰しない (ctx.shieldNoDecayAt)。 勝ちを数えるのは CombatManager.FinishCombat (<see cref="NoteWin"/>)。</summary>
     public class PulselessHeart : IPassiveSkillEffect, IRelicDisplay
     {
         public const string Id = "脈なしの鋼心臓";
-        public const int StartShield = 12, PerWin = 2, NoDecayAt = 25;
+        public const int StartShield = 6, PerWin = 1, NoDecayAt = 35;
         public string SkillId => Id;
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Rw.Run?.pulselessHeartShield ?? StartShield);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
@@ -339,7 +339,7 @@ namespace ItemSystem.PassiveSkills.Effects
             Rw.Shield(ctx, Rw.Run?.pulselessHeartShield ?? StartShield, SkillId);
             ctx.shieldNoDecayAt = NoDecayAt;
         }
-        /// <summary>戦闘に勝った時に呼ぶ。 持っている間の勝利だけ X +2。</summary>
+        /// <summary>戦闘に勝った時に呼ぶ。 持っている間の勝利だけ X +1。</summary>
         public static void NoteWin(GameLoop.RunState run)
         {
             if (AxisRules.Owns(run, Id)) run.pulselessHeartShield += PerWin;
@@ -364,12 +364,12 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>防人の軍標【規則】: 【ジャスト防御】を成立させるたび、 この戦闘の最終与ダメージ倍率 +35% (累積・ctx.finalDamagePct) と、 次のターンの手札 +1 枚 (Rw.DrawNext)。</summary>
+    /// <summary>防人の軍標【規則】: 【ジャスト防御】を成立させるたび、 この戦闘の最終与ダメージ倍率 +45% (累積・ctx.finalDamagePct) と、 次のターンの手札 +1 枚 (Rw.DrawNext)。</summary>
     public class BorderGuardStandard : IPassiveSkillEffect, IRelicDisplay
     {
         public const string Id = "防人の軍標";
         public string SkillId => Id;
-        public const int PctPerGuard = 35, Draw = 1;
+        public const int PctPerGuard = 45, Draw = 1;
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Pct(ctx.finalDamagePct / 100f);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnJustGuard };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)

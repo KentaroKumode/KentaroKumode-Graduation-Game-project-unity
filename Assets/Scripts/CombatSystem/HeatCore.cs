@@ -6,13 +6,13 @@ namespace CombatSystem
     public enum HeatItems
     {
         None = 0,
-        Stone = 1 << 0,        // 過熱石: 攻撃の端子に 2 個以上挿したターン 臨界 +10 (3 個とも攻撃なら +18)
+        Stone = 1 << 0,        // 過熱石: 攻撃の端子に 2 個以上挿したターン 臨界 +6 (3 個とも攻撃なら +12)
         Breastplate = 1 << 1,  // 燻りの革胸当て: 防御の端子を発動するたび 臨界 +4・ブロック +2
         Poker = 1 << 2,        // 火守りの火搔き棒: 攻撃以外の端子に挿したダイス 1 個につき 臨界 +6
         Spanner = 1 << 3,      // 点火スパナ: 撃ごとに 臨界 +4
         Whetstone = 1 << 4,    // 荒砥: 撃ごとに 臨界 +2
         Oven = 1 << 5,         // 恒温の竈: 戦闘開始時 閾値の半分から・爆発の後は 8 から
-        Primer = 1 << 6,       // 二度詰めの雷管: 爆発のたび この戦闘の爆発の基礎 +10 (最大 +80)
+        Primer = 1 << 6,       // 二度詰めの雷管: 爆発のたび この戦闘の爆発の基礎 +6 (最大 +48)
         Coal = 1 << 7,         // 焚き足しの炭: 臨界を得るたび +2 (1 ターン 6 回)
         Mold = 1 << 8,         // 溢れ取りの鋳型: 溢れた臨界 1 につき爆発 +3
         Ledger = 1 << 9,       // 帳簿外の爆薬: 閾値ぶんだけ減らして続けて爆発 (1 ターン 5 回)
@@ -37,8 +37,8 @@ namespace CombatSystem
     {
         public const int Threshold = 30, ThresholdFloor = 12, BurstBase = 30, DefensePenPct = 50;
         public const int SuperAtPct = 150, SuperMulPct = 150, KilnSuperMulPct = 200;
-        public const int StoneTwo = 10, StoneAll = 18, BreastHeat = 4, BreastBlock = 2, PokerPerDie = 6, SpannerPerHit = 4, WhetPerHit = 2;
-        public const int OvenRestart = 8, PrimerAdd = 10, PrimerMax = 80, CoalAdd = 2, CoalMax = 6, MoldPerExcess = 3, LedgerMax = 5, KettleCut = 12;
+        public const int StoneTwo = 6, StoneAll = 12, BreastHeat = 4, BreastBlock = 2, PokerPerDie = 6, SpannerPerHit = 2, WhetPerHit = 1;
+        public const int OvenRestart = 8, PrimerAdd = 6, PrimerMax = 48, CoalAdd = 2, CoalMax = 6, MoldPerExcess = 3, LedgerMax = 5, KettleCut = 8;
         public const int SparkPctPerBurst = 15, AshenNeed = 40, AshenMulPct = 160, FlintPctPerBurst = 25, KilnStep = 4, KilnMax = 16, PillarDownMulPct = 200;
         /// <summary>〈燧石の指輪〉: 攻撃の端子をこの枚数以上発動したターン。</summary>
         public const int FlintAttackTerminals = 2;
@@ -81,7 +81,7 @@ namespace CombatSystem
             return f;
         }
 
-        /// <summary>戦闘の始めの閾値 (〈早沸かし釜〉−12・下限 <see cref="ThresholdFloor"/>)。</summary>
+        /// <summary>戦闘の始めの閾値 (〈早沸かし釜〉−8・下限 <see cref="ThresholdFloor"/>)。</summary>
         public static int StartThreshold(HeatItems f) => System.Math.Max(ThresholdFloor, Threshold - (Has(f, HeatItems.Kettle) ? KettleCut : 0));
 
         /// <summary>臨界を n 得る (〈焚き足しの炭〉+2 → 〈燧石の指輪〉×2 → 遺物 +%)。 戻り値 = 実際に足した量。</summary>

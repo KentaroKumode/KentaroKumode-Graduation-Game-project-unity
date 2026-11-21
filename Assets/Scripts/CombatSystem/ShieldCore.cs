@@ -6,10 +6,10 @@ namespace CombatSystem
     public enum ShieldItems
     {
         None = 0,
-        Pauldron = 1 << 0,   // 肩当て: 防御の端子に 3 個とも挿したターン シールド +16
-        Padded = 1 << 1,     // 当て布の籠手: 防御の端子に 2 個以上挿したターン シールド +8
-        Rivet = 1 << 2,      // 鋲の胸当て: 敵の予告攻撃 12 以上のターン シールド +5 (12 未満なら +2)
-        Worn = 1 << 3,       // 擦り減った小盾: 防御の端子に挿したダイス 1 個につきシールド +3・ジャスト防御の許容幅 +2
+        Pauldron = 1 << 0,   // 肩当て: 防御の端子に 3 個とも挿したターン シールド +12
+        Padded = 1 << 1,     // 当て布の籠手: 防御の端子に 2 個以上挿したターン シールド +6
+        Rivet = 1 << 2,      // 鋲の胸当て: 敵の予告攻撃 12 以上のターン シールド +3
+        Worn = 1 << 3,       // 擦り減った小盾: 防御の端子に挿したダイス 1 個につきシールド +2・ジャスト防御の許容幅 +2
     }
 
     /// <summary>
@@ -26,8 +26,8 @@ namespace CombatSystem
     {
         /// <summary>ジャスト防御の許容幅 (既定) / 〈擦り減った小盾〉の上乗せ。</summary>
         public const int JustWidth = 2, WornWidth = 2;
-        /// <summary>5e の量: 〈肩当て〉/〈当て布の籠手〉(2 個以上)/〈擦り減った小盾〉(1 個につき)/〈鋲の胸当て〉(予告 12 以上 +5・未満 +2)。</summary>
-        public const int PauldronShield = 16, PaddedShield = 8, PaddedNeed = 2, WornPerDie = 3, RivetNeed = 12, RivetHigh = 5, RivetLow = 2;
+        /// <summary>5e の量: 〈肩当て〉/〈当て布の籠手〉(2 個以上)/〈擦り減った小盾〉(1 個につき)/〈鋲の胸当て〉(予告 12 以上 +3・未満 0)。</summary>
+        public const int PauldronShield = 12, PaddedShield = 6, PaddedNeed = 2, WornPerDie = 2, RivetNeed = 12, RivetHigh = 3, RivetLow = 0;
 
         /// <summary>ジャスト防御の許容幅。</summary>
         public static int Width(ShieldItems f) => JustWidth + ((f & ShieldItems.Worn) != 0 ? WornWidth : 0);

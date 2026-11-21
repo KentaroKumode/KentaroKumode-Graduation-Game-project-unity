@@ -26,8 +26,8 @@ namespace AutoTest.EditorTests
             var run = new RunState();
             Assert.That(SpoilsScale.Apply(run, 21, true), Is.EqualTo(21));
             run.ownedPassiveItems.Add(ItemIds.GoldScale);
-            Assert.That(SpoilsScale.Apply(run, 21, false), Is.EqualTo(28));                          // 27.3 の切り上げ
-            Assert.That(SpoilsScale.Apply(run, 21, true), Is.EqualTo(28 + SpoilsScale.StrongBonus));
+            Assert.That(SpoilsScale.Apply(run, 21, false), Is.EqualTo(24));                          // 23.1 の切り上げ
+            Assert.That(SpoilsScale.Apply(run, 21, true), Is.EqualTo(24 + SpoilsScale.StrongBonus));
             Assert.That(SpoilsScale.Apply(run, 0, false), Is.EqualTo(0));
         }
     }

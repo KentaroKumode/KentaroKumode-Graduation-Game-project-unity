@@ -67,11 +67,11 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => Kw.AddHeat(ctx, Stored);
     }
 
-    /// <summary>荒砥: 爆発するたび、 この戦闘中の与ダメージ +8% (最大 +48%・次のターンの振り直しの後から)。 撃ごとの臨界 +2 は HeatCore の旗 (5g)。</summary>
+    /// <summary>荒砥: 爆発するたび、 この戦闘中の与ダメージ +5% (最大 +30%・次のターンの振り直しの後から)。 撃ごとの臨界 +1 は HeatCore の旗 (5g)。</summary>
     public class RoughWhetstone : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => GameLoop.ItemIds.HeatWhetstone;
-        public const int PctPerBurst = 8, MaxPct = 48;
+        public const int PctPerBurst = 5, MaxPct = 30;
         /// <summary>[persistent] 積もった与ダメージの % 。</summary>
         private const string Key = "heat.whet";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Pct(Rw.Count(ctx, Key) / 100f);
@@ -86,7 +86,7 @@ namespace ItemSystem.PassiveSkills.Effects
 
     // ── S: エンジン・安定 ── (〈恒温の竈〉〈二度詰めの雷管〉〈焚き足しの炭〉は HeatCore の旗)
 
-    /// <summary>点火スパナ: 爆発したターン、 次のターンの手札 +1 枚 (1 ターン 1 回)。 撃ごとの臨界 +4 は HeatCore の旗 (5g)。</summary>
+    /// <summary>点火スパナ: 爆発したターン、 次のターンの手札 +1 枚 (1 ターン 1 回)。 撃ごとの臨界 +2 は HeatCore の旗 (5g)。</summary>
     public class IgnitionSpanner : IPassiveSkillEffect
     {
         public string SkillId => GameLoop.ItemIds.HeatSpanner;
@@ -108,12 +108,12 @@ namespace ItemSystem.PassiveSkills.Effects
             => ctx.itemBlockBonus += System.Math.Min(Max, Rw.Count(ctx, Kw.BurstDamageNowKey) * Pct / 100);
     }
 
-    /// <summary>二度目の打金: 【過熱】(爆発が起きたターン) と、 その次のターン、 すべての撃の攻撃 +6 (配線で起きた爆発はそのターンの撃に間に合う)。</summary>
+    /// <summary>二度目の打金: 【過熱】(爆発が起きたターン) と、 その次のターン、 すべての撃の攻撃 +3 (配線で起きた爆発はそのターンの撃に間に合う)。</summary>
     public class SecondStrike : IPassiveSkillEffect, IRelicDisplay
     {
         public const string Id = "二度目の打金";
         public string SkillId => Id;
-        public const int Atk = 6;
+       public const int Atk = 3;
         public static bool On(CombatContext ctx) { int b = Rw.Count(ctx, Kw.BurstTurnKey); return b > 0 && (b == ctx.currentTurn || b == ctx.currentTurn - 1); }
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(On(ctx));
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
@@ -144,11 +144,11 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>早沸かし釜 (分岐 A): 敵が攻撃したターンの終わり、 臨界 +5。 閾値 −12 (下限 12) は HeatCore の旗。</summary>
+    /// <summary>早沸かし釜 (分岐 A): 敵が攻撃したターンの終わり、 臨界 +3。 閾値 −8 (下限 12) は HeatCore の旗。</summary>
     public class QuickKettle : IPassiveSkillEffect
     {
         public string SkillId => GameLoop.ItemIds.HeatKettle;
-        public const int Heat = 5;
+       public const int Heat = 3;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -227,31 +227,31 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>無害灯【規則】: 臨界 15 以上のとき、 敵の直接攻撃で HP を失う代わりに臨界 10 を使って無効にする (1 ターン 1 回)。
-    /// 無効にしたとき、 臨界を使わずに爆発の 50% のダメージ (基礎 30 + 上乗せの半分・敵の防御 50% 無視) を敵へ返す。 掛ける所は CombatManager の敵の攻撃 (<see cref="Apply"/>)。</summary>
+    /// <summary>無害灯【規則】: 臨界 15 以上のとき、 敵の直接攻撃で HP を失う代わりに臨界 15 を使って無効にする (1 戦闘 2 回・1 ターン 1 回・2026-11-22 Phase 4 較正: 旧 1 ターン 1 回だけ)。
+    /// 無効にしたとき、 臨界を使わずに爆発の 30% のダメージ (基礎 30 + 上乗せの 30%・敵の防御 50% 無視) を敵へ返す。 掛ける所は CombatManager の敵の攻撃 (<see cref="Apply"/>)。</summary>
     public class HarmlessLamp : IPassiveSkillEffect, IRelicDisplay
     {
         public const string Id = "無害灯";
         public string SkillId => Id;
-        public const int MinHeat = 15, Pay = 10;
-        /// <summary>[persistent] この品を持っている / [1 ターン 1 回] 使ったターンの番号。</summary>
-        private const string HeldKey = "heat.lamp.held", TurnKey = "heat.lamp.turn";
+        public const int MinHeat = 15, Pay = 15, BackPct = 30, MaxPerBattle = 2;
+        /// <summary>[persistent] この品を持っている / [1 ターン 1 回] 使ったターンの番号 / [persistent] この戦闘で使った回数。</summary>
+        private const string HeldKey = "heat.lamp.held", TurnKey = "heat.lamp.turn", UsesKey = "heat.lamp.uses";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(Ready(ctx));
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.accumulatedValues[HeldKey] = 1;
 
         /// <summary>このターン、 次の敵の直接攻撃を無効にできる (BOT の見積もりも読む)。</summary>
         public static bool Ready(CombatContext ctx)
-            => ctx != null && ctx.GetAccumulated(HeldKey) > 0f && ctx.rinkaiMeter >= MinHeat && Rw.Count(ctx, TurnKey) != ctx.currentTurn;
+            => ctx != null && ctx.GetAccumulated(HeldKey) > 0f && ctx.rinkaiMeter >= MinHeat && Rw.Count(ctx, TurnKey) != ctx.currentTurn && Rw.Count(ctx, UsesKey) < MaxPerBattle;
 
         /// <summary>敵の直接攻撃で失う HP <paramref name="taken"/> に掛ける。 戻り値 = 実際に失う HP。</summary>
         public static int Apply(CombatContext ctx, int taken)
         {
             if (taken <= 0 || !Ready(ctx)) return taken;
-            ctx.accumulatedValues[TurnKey] = ctx.currentTurn;
+           ctx.accumulatedValues[TurnKey] = ctx.currentTurn; ctx.accumulatedValues[UsesKey] = Rw.Count(ctx, UsesKey) + 1;
             ctx.rinkaiMeter -= Pay;
             var s = Kw.HeatState(ctx);
-            int back = HeatCore.VsDefense((HeatCore.BurstBase + s.stack + s.flat) / 2, s.enemyDefense, s.items);
+            int back = HeatCore.VsDefense((HeatCore.BurstBase + s.stack + s.flat) * BackPct / 100, s.enemyDefense, s.items);
             CombatManager.Instance?.LandBurst(ctx, back);
             Rw.Log($"[無害灯] 臨界 {Pay} を使って被ダメージ {taken} を無効 → 敵へ {back} (臨界 残 {ctx.rinkaiMeter})");
             return 0;

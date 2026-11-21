@@ -5,7 +5,7 @@ namespace ItemSystem.PassiveSkills.Effects
 {
     // ============================================================
     //  毒の軸 25 品 (2026-11-21・full-item-rework-ledger §②・docs/GAME.md §7-1)。
-    //  毒 = 蝕み (敵の攻撃・防御を削る) と【起爆】(毒を半分消費して消費量 × 3 の軽減不可ダメージ・そのターンのひびを正規のダウンに割る)。
+    //  毒 = 蝕み (敵の攻撃・防御を削る) と【起爆】(毒を半分消費して消費量 × 4 の軽減不可ダメージ・そのターンのひびを正規のダウンに割る)。
     //  起爆の式は CombatSystem.PoisonCore (BOT の見積もりと同じ)。 端子の解決の中で効く 6 品の分 (緑染みの小刀・蛇血瓶・毒見役の小匙・
     //  毒棘の小盾のブロック・瘴気の外套の被ダメ・麻痺の吹き矢の防御無視) は PoisonCore.ApplyToTerminals (Resolve の 5d)。
     //  毒のダメージは毎ターン開始時 (StatusRegistry の poison)・ダメージを出した後に残る割合 50% (〈腐れ沼の苔玉〉で 75%)。
@@ -229,7 +229,7 @@ namespace ItemSystem.PassiveSkills.Effects
 
     // ── G: 分岐 A〈蝕み〉/ 分岐 B〈起爆〉 ──
 
-    /// <summary>石抜きの毒指輪 (分岐 B): 敵の毒が 24 以上で攻撃が当たったとき、 自動で【起爆】(1 ターン 1 回)。</summary>
+    /// <summary>石抜きの毒指輪 (分岐 B): 敵の毒が 16 以上で攻撃が当たったとき、 自動で【起爆】(1 ターン 1 回)。</summary>
     public class HollowPoisonRing : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "石抜きの毒指輪";
@@ -283,17 +283,17 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.poisonKeepPct = KeepPct;
     }
 
-    /// <summary>麻痺の吹き矢 (分岐 A): 敵の毒 3 につき敵の防御を 1 無視する (OnWired・貫通)。 毒 18 以上なら全部無視 (PoisonCore の旗・Resolve の 5d)。</summary>
+    /// <summary>麻痺の吹き矢 (分岐 A): 敵の毒 2 につき敵の防御を 1 無視する (OnWired・貫通)。 毒 12 以上なら全部無視 (PoisonCore の旗・Resolve の 5d)。</summary>
     public class Blowpipe : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "麻痺の吹き矢";
-        public const int Every = 3;
+       public const int Every = 2;
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(ctx.EnemyPoison / Every);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.playerArmorPen += ctx.EnemyPoison / Every;
     }
 
-    /// <summary>劇毒の火薬庫 (分岐 B): 【起爆】の倍率が ×3 → ×4 (PoisonCore の旗)。 1 ターンに敵へ毒を合計 8 以上与えたターンの終わりに、 自動で【起爆】(1 ターン 1 回)。</summary>
+    /// <summary>劇毒の火薬庫 (分岐 B): 【起爆】の倍率が ×4 → ×5 (PoisonCore の旗)。 1 ターンに敵へ毒を合計 8 以上与えたターンの終わりに、 自動で【起爆】(1 ターン 1 回)。</summary>
     public class PoisonMagazine : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "劇毒の火薬庫";

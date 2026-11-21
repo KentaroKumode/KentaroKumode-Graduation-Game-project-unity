@@ -32,11 +32,11 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>血の滴る刃先: 敵の出血が 8 以上の間、 攻撃が当たるたび HP +2 (1 ターン最大 +6)。</summary>
+    /// <summary>血の滴る刃先: 敵の出血が 8 以上の間、 攻撃が当たるたび HP +1 (1 ターン最大 +3)。</summary>
     public class DrippingEdge : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "血の滴る刃先";
-        public const int Need = 8, Heal = 2, MaxPerTurn = 6;
+        public const int Need = 8, Heal = 1, MaxPerTurn = 3;
         private const string Key = "bld.dripping";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.enemyBleedStacks >= Need);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage };
@@ -88,11 +88,11 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>先血の腕輪: 戦闘開始時、 敵に出血 +4。 各ターン最初に攻撃が当たったとき、 敵に出血 +2 (BleedCore の旗・5f)。</summary>
+    /// <summary>先血の腕輪: 戦闘開始時、 敵に出血 +3。 各ターン最初に攻撃が当たったとき、 敵に出血 +1 (BleedCore の旗・5f)。</summary>
     public class BloodFate : IPassiveSkillEffect
     {
         public string SkillId => GameLoop.ItemIds.BleedFirstBlood;
-        public const int Opening = 4;
+       public const int Opening = 3;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.AddEnemyBleed(Opening);
     }
@@ -124,11 +124,11 @@ namespace ItemSystem.PassiveSkills.Effects
 
     // ── G: 分岐 A〈多段〉/ 分岐 B〈回収〉 ── (〈激情の刃〉〈百人切りの鉈〉は端子の解決と本体の撃の輪だけ)
 
-    /// <summary>逆綴じの止血帯 (分岐 A): ターンの終わり、 敵の出血 × 2 の軽減不可ダメージ。 このターン 3 撃以上の攻撃をしていたら × 3。</summary>
+    /// <summary>逆綴じの止血帯 (分岐 A): ターンの終わり、 敵の出血 × 1 の軽減不可ダメージ。 このターン 3 撃以上の攻撃をしていたら × 2。</summary>
     public class Wringing : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "逆綴じの止血帯";
-        public const int Mul = 2, MulMulti = 3, MultiHits = 3;
+        public const int Mul = 1, MulMulti = 2, MultiHits = 3;
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.enemyBleedStacks > 0);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)

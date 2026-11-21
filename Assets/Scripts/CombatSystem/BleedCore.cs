@@ -9,11 +9,11 @@ namespace CombatSystem
         LeadAxe = 1 << 0,     // 鉛入りの握斧: 4 以上の目を挿した攻撃の端子の撃 出血 +2
         Pendant = 1 << 1,     // 血日に澄む佩玉: 出血 6 以上なら最初の撃 出血 +3・攻撃 +3
         Surgeon = 1 << 2,     // 医家の反り刃: HP が満タンか 50% 以下の敵への撃 出血 +2 (1 ターン 3 回)
-        Clasp = 1 << 3,       // 返し刃の留め金: 攻撃の端子を 2 枚以上発動したターン 撃ごとに出血 +2
+        Clasp = 1 << 3,       // 返し刃の留め金: 攻撃の端子を 2 枚以上発動したターン 撃ごとに出血 +1
         Chipped = 1 << 4,     // 欠け刃のナイフ: 撃ごとに出血 +1
         Rift = 1 << 5,        // 裂け目の楔: 1〜3 の目を挿した攻撃の端子の撃 出血 +3
         Saw = 1 << 6,         // 鋸刃の山刀: 撃ごとに出血 +1 / +2 / +4 (敵の HP 50% 以上 / 未満 / 25% 未満)
-        FirstBlood = 1 << 7,  // 先血の腕輪: 最初の撃 出血 +2
+        FirstBlood = 1 << 7,  // 先血の腕輪: 最初の撃 出血 +1
         Needles = 1 << 8,     // 血止め知らずの針箱: 2 撃目以降の撃の出血 +1
         OpenNeedle = 1 << 9,  // 医書裏の開き針: 出血 10 につき撃ごとに攻撃 +2
         Fury = 1 << 10,       // 激情の刃: 3 撃目以降の撃に 出血の半分 (最大 +15) の攻撃
@@ -36,7 +36,7 @@ namespace CombatSystem
     {
         /// <summary>5f の量。</summary>
         public const int LeadAxeBleed = 2, LeadAxeFace = 4, PendantNeed = 6, PendantBleed = 3, PendantAtk = 3, SurgeonBleed = 2, SurgeonMax = 3,
-            ClaspBleed = 2, ClaspNeed = 2, ChippedBleed = 1, RiftBleed = 3, RiftFaceMax = 3, FirstBloodBleed = 2, NeedlesBleed = 1,
+            ClaspBleed = 1, ClaspNeed = 2, ChippedBleed = 1, RiftBleed = 3, RiftFaceMax = 3, FirstBloodBleed = 1, NeedlesBleed = 1,
             OpenNeedleEvery = 10, OpenNeedleAtk = 2, FuryFromHit = 2, FuryMax = 15, CleaverBleed = 1;
         /// <summary>〈鋸刃の山刀〉: 敵の HP 50% 以上 / 50% 未満 / 25% 未満の出血。</summary>
         public const int SawHigh = 1, SawMid = 2, SawLow = 4;

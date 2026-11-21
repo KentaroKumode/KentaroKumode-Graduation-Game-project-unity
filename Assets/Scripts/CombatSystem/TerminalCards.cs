@@ -451,23 +451,23 @@ namespace CombatSystem
 
         // ===== 山札の軸の品の数値 (2026-11-21・full-item-rework-ledger §⑦・未測定) =====
         /// <summary>〈焼き入れの挟み〉使い捨て 1 枚につき各撃 +N / 〈留め金の栞〉各撃 +N / 〈補助歯車〉ブロック・1 ターンの回数 / 〈空回りの錘〉多く引く上限 /
-        /// 〈使い切りの矜持〉各撃 +N・ブロック・1 ターンの回数 / 〈灰払いの箒〉ブロック・多く引く上限 / 〈早回しのゼンマイ〉各撃の上限・ブロック /
+        /// 〈使い切りの矜持〉各撃 +N・ブロック・1 ターンの回数 / 〈灰払いの箒〉ブロック・多く引く枚数・引くのに要る 1 ターンの使い捨ての回数 / 〈早回しのゼンマイ〉各撃の上限・ブロック /
         /// 〈仕込みの配電盤〉要る枚数・多く引く枚数 / 〈型抜きの金型〉出力・補助のブロック / 〈整理された工具箱〉山札の枚数・手札 / 〈予備の差込口〉1 ターン目に多く引く枚数。</summary>
-        public const int TongsAttack = 2, ClaspAttack = 5, AuxGearBlock = 6, AuxGearMax = 3, IdleWeightDrawMax = 2, PrideAttack = 4, PrideBlock = 5, PrideMax = 2,
-            BroomBlock = 4, BroomDrawMax = 2, RewindMax = 10, RewindBlock = 6, SwitchboardNeed = 3, SwitchboardItemDraw = 2, MoldBonus = 4, MoldSupportBlock = 6,
+        public const int TongsAttack = 1, ClaspAttack = 5, AuxGearBlock = 6, AuxGearMax = 3, IdleWeightDrawMax = 2, PrideAttack = 2, PrideBlock = 3, PrideMax = 1,
+            BroomBlock = 1, BroomDrawMax = 1, BroomDrawNeed = 2, RewindMax = 10, RewindBlock = 6, SwitchboardNeed = 4, SwitchboardItemDraw = 1, MoldBonus = 4, MoldSupportBlock = 6,
             ToolboxMaxDeck = 12, ToolboxHand = 1, SparePlugDraw = 2;
         /// <summary>〈再利用のるつぼ〉使い捨ての累計 1 回あたり・上限 / 〈継ぎ目のない導線〉補助 1 枚あたりの各撃 +N・防御の無視 / 〈解体屋の袋〉間隔・1 戦闘の上限 /
         /// 〈常設の作業台〉常設 1 枚あたりの各撃 +N・ブロック / 〈灰から組む機関〉要る回数 / 〈永久機関の主軸〉倍化の間隔・1 ターンに多く引く上限。</summary>
-        public const int CruciblePer = 4, CrucibleMax = 32, SeamlessAttack = 6, SeamlessPen = 5, BagEvery = 3, BagMax = 5,
-            WorkbenchPer = 4, AshNeed = 2, EngineEvery = 2, EngineDrawMax = 2;
+        public const int CruciblePer = 2, CrucibleMax = 16, SeamlessAttack = 6, SeamlessPen = 5, BagEvery = 4, BagMax = 5,
+            WorkbenchPer = 3, AshNeed = 2, EngineEvery = 3, EngineDrawMax = 2;
         /// <summary>〈折り目のついた札〉与ダメージ % の池 / 〈常設の作業台〉常設 1 枚あたりの最終与ダメージ / 〈灰から組む機関〉使い捨て 1 回あたりの最終与ダメージ・上限。</summary>
-        public const float FoldedPct = 0.45f, WorkbenchFinalPct = 0.15f, AshPer = 0.12f, AshMax = 1.20f;
+        public const float FoldedPct = 0.45f, WorkbenchFinalPct = 0.10f, AshPer = 0.06f, AshMax = 0.60f;
         // ===== 賽目 (役の軸) の品の数値 (2026-11-21・段 1-f・item-overhaul-spec §5・未測定) =====
         /// <summary>〈見切りの木札〉役が立ったターン 各撃の攻撃 +N・ブロック +N / 〈符丁の刻み板〉各撃の攻撃 + min(上限, 役の回数 × N) (ゾロ目・連なりなら 2 倍) /
         /// 〈欠け目の見立て〉防御の無視 / 〈血染めの歯車〉各撃 +N / 〈雷鳴のゾロ目〉ブロック (full-item-rework-ledger §⑧・未測定)。</summary>
-        public const int WoodTagAttack = 4, WoodTagBlock = 5, NotchBoardPer = 2, NotchBoardMax = 16, ChippedPen = 12, GearAttack = 6, ThunderBlock = 10;
+        public const int WoodTagAttack = 1, WoodTagBlock = 2, NotchBoardPer = 1, NotchBoardMax = 6, ChippedPen = 12, GearAttack = 6, ThunderBlock = 4;
         /// <summary>〈揃いの拍子木〉与ダメージ % の池 / 〈雷鳴のゾロ目〉最終与ダメージ / 〈血濡れの符丁〉役の回数 1 回あたりの最終与ダメージ・上限・〈追撃〉〈攻め〉の上乗せ。</summary>
-        public const float ClapperPct = 0.35f, ThunderFinalPct = 0.50f, BloodmarkPer = 0.10f, BloodmarkMax = 1.00f, BloodmarkBonus = 0.30f;
+        public const float ClapperPct = 0.12f, ThunderFinalPct = 0.20f, BloodmarkPer = 0.05f, BloodmarkMax = 0.50f, BloodmarkBonus = 0.30f;
         /// <summary>〈賽振り台〉次のターンの最初の振り直しの費用から引く上限 (min(上限, 役の回数)) / 〈役落とし〉役が成立したターン 攻撃 + 役の回数 × N。
         /// 役の回数 = この戦闘で役が成立した回数 (このターンの役を含む・役の軸の品と同じ数え方・台帳 §⑧)。 *Up = 強化した端子。</summary>
         public const int DiceTableCap = 6, DiceTableCapUp = 8, RoleDropPer = 3, RoleDropPerUp = 4;
@@ -1146,7 +1146,7 @@ namespace CombatSystem
             }
             if ((f & DeckItems.Broom) != 0 && disp > 0)                                                              // 〈灰払いの箒〉
             {
-                o.blockAdd += BroomBlock * disp; st.extraDrawNext += Math.Min(BroomDrawMax, disp);
+                o.blockAdd += BroomBlock * disp; if (disp >= BroomDrawNeed) st.extraDrawNext += BroomDrawMax;   // 2026-11-22 Phase 4 較正: 1 ターンに 2 回以上使った時だけ引く (旧 1 回から)
             }
             if ((f & DeckItems.Rewind) != 0 && st.shuffledNow > 0)                                                   // 〈早回しのゼンマイ〉: このターンに切り直した枚数
             {

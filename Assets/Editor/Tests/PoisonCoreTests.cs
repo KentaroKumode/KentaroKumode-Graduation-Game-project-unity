@@ -24,18 +24,18 @@ namespace AutoTest.EditorTests
             Assert.That(PoisonCore.Spend(25), Is.EqualTo(13));
             Assert.That(PoisonCore.Spend(24), Is.EqualTo(12));
             Assert.That(PoisonCore.Spend(0), Is.EqualTo(0));
-            Assert.That(PoisonCore.Damage(12, PoisonItems.None, 0, false), Is.EqualTo(36));                       // ×3
-            Assert.That(PoisonCore.Damage(12, PoisonItems.Magazine, 0, false), Is.EqualTo(48));                   // 〈劇毒の火薬庫〉×4
-            Assert.That(PoisonCore.Damage(12, PoisonItems.SlowBlade, 2, false), Is.EqualTo(57));                  // 〈遅効の毒刃〉+30% × 2 回 (36 × 1.6 = 57.6 → 57)
-            Assert.That(PoisonCore.Damage(12, PoisonItems.Oil, 0, true), Is.EqualTo(72));                         // 〈骨溶かしの黒油〉ダウン中 ×2
-            Assert.That(PoisonCore.Damage(12, PoisonItems.Oil, 0, false), Is.EqualTo(36));
-            Assert.That(PoisonCore.Damage(12, PoisonItems.None, 0, false, PoisonCore.MantleEchoPct), Is.EqualTo(18));   // 〈瘴気の外套〉50%
+            Assert.That(PoisonCore.Damage(12, PoisonItems.None, 0, false), Is.EqualTo(48));                       // ×4
+            Assert.That(PoisonCore.Damage(12, PoisonItems.Magazine, 0, false), Is.EqualTo(60));                   // 〈劇毒の火薬庫〉×5
+            Assert.That(PoisonCore.Damage(12, PoisonItems.SlowBlade, 2, false), Is.EqualTo(76));                  // 〈遅効の毒刃〉+30% × 2 回 (48 × 1.6 = 76.8 → 76)
+            Assert.That(PoisonCore.Damage(12, PoisonItems.Oil, 0, true), Is.EqualTo(96));                         // 〈骨溶かしの黒油〉ダウン中 ×2
+            Assert.That(PoisonCore.Damage(12, PoisonItems.Oil, 0, false), Is.EqualTo(48));
+            Assert.That(PoisonCore.Damage(12, PoisonItems.None, 0, false, PoisonCore.MantleEchoPct), Is.EqualTo(24));   // 〈瘴気の外套〉50%
         }
 
         [Test]
         public void Terminals_PoisonItemsAddToOutcome()
         {
-            // 攻撃に 5・防御に 3: 小刀 (撃 1 つ +2)・蛇血瓶 (4 以上の目の攻撃 +3)・小匙 (両方 +4・HP +2)・小盾 (ブロック +4)
+            // 攻撃に 5・防御に 3: 小刀 (撃 1 つ +2)・蛇血瓶 (4 以上の目の攻撃 +3)・小匙 (両方 +3・HP +1)・小盾 (ブロック +4)
             var all = PoisonItems.GreenKnife | PoisonItems.Serpent | PoisonItems.Taster | PoisonItems.Thorn;
             var o = Run(all, new[] { 5, 3 }, new[] { 0, 1 });
             Assert.That(o.poison, Is.EqualTo(PoisonCore.KnifePoison + PoisonCore.SerpentPoison + PoisonCore.TasterPoison));

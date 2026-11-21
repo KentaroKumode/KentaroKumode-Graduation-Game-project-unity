@@ -60,11 +60,11 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>呼雷粉: 振り直しを 1 回行うたび、 充電 +3 (1 ターン最大 2 回)。 振り直しは OnPostRoll より前に済む。</summary>
+    /// <summary>呼雷粉: 振り直しを 1 回行うたび、 充電 +4 (1 ターン最大 2 回)。 振り直しは OnPostRoll より前に済む。</summary>
     public class ThunderPowder : IPassiveSkillEffect
     {
         public string SkillId => "呼雷粉";
-        public const int Per = 3, MaxPerTurn = 2;
+        public const int Per = 4, MaxPerTurn = 2;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -208,11 +208,11 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>蓄電の小手: このターン充電を 5 消費するたび、 このターンの全攻撃の撃の基礎攻撃 +2 (累積・攻撃 +N は撃ごと)。</summary>
+    /// <summary>蓄電の小手: このターン充電を 5 消費するたび、 このターンの全攻撃の撃の基礎攻撃 +3 (累積・攻撃 +N は撃ごと)。</summary>
     public class StorageGauntlet : IPassiveSkillEffect
     {
         public string SkillId => "蓄電の小手";
-        public const int Every = 5, Atk = 2;
+        public const int Every = 5, Atk = 3;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnChargeSpend };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -274,11 +274,11 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.overloadChargeCut = true;
     }
 
-    /// <summary>焦げ導線: 充電を消費するたび、 消費した量 × 2 の防御無視ダメージを敵に与える (1 ターン最大 30)。</summary>
+    /// <summary>焦げ導線: 充電を消費するたび、 消費した量 × 3 の防御無視ダメージを敵に与える (1 ターン最大 45)。</summary>
     public class ScorchedWire : IPassiveSkillEffect
     {
         public string SkillId => "焦げ導線";
-        public const int Mul = 2, MaxPerTurn = 30;
+        public const int Mul = 3, MaxPerTurn = 45;
         private const string Key = "chg.scorch";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnChargeSpend };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
@@ -291,7 +291,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>雷壷【規則】: 充電の上限 (30) が無くなる。 代わりにターン終了時、 30 を超えている分の半分 (切り捨て) を失う (使ったことにはならない)。</summary>
+    /// <summary>雷壷【規則】: 充電の上限 (30) が無くなる。 代わりにターン終了時、 30 を超えている分の 1/4 (切り捨て) を失う (使ったことにはならない)。</summary>
     public class ThunderJar : IPassiveSkillEffect
     {
         public string SkillId => "雷壷";
@@ -300,7 +300,7 @@ namespace ItemSystem.PassiveSkills.Effects
         {
             if (t == PassiveSkillTrigger.OnBattleStart) { ctx.chargeCapRemoved = true; return; }
             int over = ctx.GetCharge() - CombatManager.ChargeMax;
-            if (over >= 2) ctx.LoseCharge(over / 2);
+            if (over >= 4) ctx.LoseCharge(over / 4);
         }
     }
 
@@ -314,11 +314,11 @@ namespace ItemSystem.PassiveSkills.Effects
 
     // ── L: 規則破壊 ──
 
-    /// <summary>雷神槍: このターン充電を 12 以上消費したとき、 このターンの全攻撃の最終与ダメージ +(このターン消費した充電 × 4)% (撃ごと・ctx.hitFinalDamagePct・12 未満では何もしない)。</summary>
+    /// <summary>雷神槍: このターン充電を 8 以上消費したとき、 このターンの全攻撃の最終与ダメージ +(このターン消費した充電 × 5)% (撃ごと・ctx.hitFinalDamagePct・8 未満では何もしない)。</summary>
     public class ThunderSpear : IPassiveSkillEffect
     {
         public string SkillId => "雷神槍";
-        public const int Need = 12, PctPer = 4;
+        public const int Need = 8, PctPer = 5;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -348,11 +348,11 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>四つ打ちの鉄芯: この戦闘で充電を消費した回数を数え、 4 回ごとに「今の充電 × 3」の防御無視ダメージと、 次の 1 撃の最終与ダメージ +50% (1 ターン最大 2 回)。</summary>
+    /// <summary>四つ打ちの鉄芯: この戦闘で充電を消費した回数を数え、 3 回ごとに「今の充電 × 3」の防御無視ダメージと、 次の 1 撃の最終与ダメージ +50% (1 ターン最大 2 回)。</summary>
     public class FourthStrikeCore : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "四つ打ちの鉄芯";
-        public const int Every = 4, ChargeMul = 3, NextPct = 50, MaxPerTurn = 2;
+        public const int Every = 3, ChargeMul = 3, NextPct = 50, MaxPerTurn = 2;
         private const string CountKey = "chg.four", PendingKey = "chg.four.next", TurnKey = "chg.four.turn";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Rw.Count(ctx, CountKey) % Every);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnChargeSpend, PassiveSkillTrigger.OnPreDealDamage };
