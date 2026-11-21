@@ -197,6 +197,8 @@ namespace CombatSystem
         public ShieldItems shieldItems;
         /// <summary>出血の品の旗 (戦闘の始めに所持品から・CombatManager.BeginTerminalDeck・<see cref="BleedCore.ItemsOf"/>・2026-11-21)。</summary>
         public BleedItems bleedItems;
+        /// <summary>臨界の品の旗 (戦闘の始めに所持品から・CombatManager.BeginTerminalDeck・<see cref="HeatCore.ItemsOf"/>・2026-11-21)。</summary>
+        public HeatItems heatItems;
         /// <summary>〈宿命の刻み目〉: このターンに立った役〈連なり〉の効果 (挿した端子がすべて 2 回働く) を次のターンにももう 1 回 (<see cref="BeginTurn"/> が <see cref="doubleAll"/> へ移す・CombatManager.ResolveRoles が立てる)。</summary>
         public bool fateDoubleNext;
 
@@ -342,6 +344,10 @@ namespace CombatSystem
         public readonly List<int> attackHitSlot = new List<int>();
         /// <summary>撃ごとに、 その撃が当たった直後に敵へ与える出血 (<see cref="attackHits"/> と同じ並び・5f = <see cref="BleedCore.ApplyToTerminals"/>・2026-11-21)。</summary>
         public readonly List<int> attackHitBleed = new List<int>();
+        /// <summary>配線で決まる臨界 (5g・<see cref="HeatCore.ApplyToTerminals"/>)。 1 つが 1 回の「臨界を得る」(本体は 1 つずつ Kw.AddHeat へ渡す・〈焚き足しの炭〉はその回数を数える)。
+        /// 端子が出す臨界 (<see cref="heat"/>) は別。 / 〈燧石の指輪〉: このターンの臨界の獲得が 2 倍 (本体が ctx へ立ててから臨界を足す)。</summary>
+        public readonly List<int> heatGains = new List<int>();
+        public bool heatDouble;
         /// <summary>このターンに発動した基本以外の端子の数。</summary>
         public int firedNonBasic;
         /// <summary>〈有効活用〉〈影写し〉〈火葬の剣〉の対象 (場の添字・−1 = なし)。 選んだ対象 (Resolve の wantTarget) が候補なら それ、
@@ -1031,6 +1037,8 @@ namespace CombatSystem
             ShieldCore.ApplyToTerminals(dice, in env, state, o);
             // ── 5f. 出血の品 (2026-11-21・BleedCore・full-item-rework-ledger §④): 撃ごとの出血と撃ごとの攻撃 +N (本体は撃が当たった直後に出血を入れる) ──
             BleedCore.ApplyToTerminals(defs, dice, in env, state, o);
+            // ── 5g. 臨界の品 (2026-11-21・HeatCore・full-item-rework-ledger §⑤): 配線で決まる臨界・〈燻りの革胸当て〉のブロック・〈燧石の指輪〉の倍 ──
+            HeatCore.ApplyToTerminals(defs, dice, state, o);
 
             // ── 5b. 〈緊急再装填〉(2026-11-20): このターンに使った他の使い捨てを 1 枚ずつ (場の右から・自分は除く・他の〈緊急再装填〉は戻せる)。 〈残響〉で 2 回働いても 1 枚 ──
             for (int s = 0; s < m; s++)

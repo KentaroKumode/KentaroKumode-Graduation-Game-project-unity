@@ -197,8 +197,8 @@ namespace AutoTest
             /// <summary>[計装 2026-11-19] このランの連鎖の深さの最大 / 同じ品が連鎖で 2 度以上働いた回数 / 不具合の網に掛かった回数。</summary>
             public int chainMaxDepth, chainRepeats, chainGuardHits;
             /// <summary>[計装 2026-11-21] このランの【再起動】/【オーバークロック】/【起爆】/【ジャスト防御】の回数 (CombatManager.RebootFired / OverclockFired / DetonateFired / JustGuardFired)。
-            /// 秘宝が出血を使った回数 / 〈百人切りの鉈〉の処刑の回数 (BleedSpendFired / BleedExecuteFired)。</summary>
-            public int rebootFired, overclockFired, detonateFired, justGuardFired, bleedSpendFired, bleedExecuteFired;
+            /// 秘宝が出血を使った回数 / 〈百人切りの鉈〉の処刑の回数 (BleedSpendFired / BleedExecuteFired)。 臨界の爆発 / 〈柱折りの発破筒〉の正規のダウン (BurstFired / BurstBreakFired)。</summary>
+            public int rebootFired, overclockFired, detonateFired, justGuardFired, bleedSpendFired, bleedExecuteFired, burstFired, burstBreakFired;
             public string chainPath = "", heatBurstInfo = "", attackSumInfo = "";
             public bool ashBaseOpened;
             /// <summary>[計装 2026-11-14] 〈徒労〉: 掛かった通常の戦闘の勝ちの数 (今の形 = 何も得られなかった戦闘 / 別の形 = 品を落とさなかった戦闘)・

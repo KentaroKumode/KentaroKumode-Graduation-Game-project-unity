@@ -351,65 +351,6 @@ namespace ItemSystem.PassiveSkills.Effects
     // (炎上系 8 種 Kindling/FlamingWeapon/InfernoOrder/Stoke/Immortalflame/InfernoManifest/FlameEdge/EverBurning は
     //  2026-07-18 削除: Burn 全廃 → 臨界 (Rinkai) 軸に置換済み)
 
-    // ============================================================
-    //  臨界系 (Rinkai) 2026-07-16 追加: メーター蓄積型 (Burn 削除後の新軸)
-    //  attackSum を毎T末に meter へ加算、閾値 (基準50) 到達で 次T の攻撃に +BurstDamage (基準50)。
-    //  ヘルパー: ctx.rinkaiThreshold/rinkaiBurstDamage/rinkaiAfterglow/rinkaiRadiationBonus 経由。
-    //  「基礎値」を確立する起点パッシブ = 発火 (Ignition) — 開始時 threshold=50, burstDamage=50 に initialise。
-    //  他パッシブは基礎値を修飾 (LowerThreshold で 35 に等)。
-    //  2026-10-31 アイテム再編で臨界の品は ReworkItemEffects.cs (出来事は Keywords.Kw) へ移った。 ここに残るのは
-    //  基礎値 (RinkaiInit) と、 効果を据え置いた〈八日目の灰燼〉(UnyieldingHeat) だけ。
-    // ============================================================
-
-    /// <summary>臨界の基礎値を初期化 (どの Rinkai パッシブでも1度呼ばれれば有効化される)。</summary>
-    internal static class RinkaiInit
-    {
-        public const int DefaultThreshold = 50;
-        /// <summary>爆発 1 回の基礎。 2026-11-07: 50 → 30 (投資しないと威力が足りない形・炉温の品で伸ばす)。</summary>
-        public const int DefaultBurstDamage = 30;
-        /// <summary>閾値は臨界の軸の深さで決まるので Kw.EnableHeat に寄せる (2026-11-06・AxisRules)。</summary>
-        public static void EnsureEnabled(CombatContext ctx) => Keywords.Kw.EnableHeat(ctx);
-    }
-
-
-
-
-
-
-
-
-
-    /// <summary>不朽の熱 (UnyieldingHeat) — 臨界メーター≥40 の間に致命ダメを受けた時、
-    /// HP=1 で踏みとどまり meter を全消費 (Burn Immortalflame の遺伝子継承)。 1戦闘1回。</summary>
-    public class UnyieldingHeat : IPassiveSkillEffect, IRelicDisplay
-    {
-        public string SkillId => "八日目の灰燼";
-        /// <summary>秘宝の列 (#320) の見え方。</summary>
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Once(ctx.rinkaiUnyieldingUsed, ctx.rinkaiMeter >= 40);
-        public PassiveSkillTrigger[] Triggers => new[] {
-            PassiveSkillTrigger.OnBattleStart,
-            PassiveSkillTrigger.OnPreReceiveDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (t == PassiveSkillTrigger.OnBattleStart)
-            {
-                RinkaiInit.EnsureEnabled(ctx);
-                ctx.rinkaiUnyieldingUsed = false;
-                return;
-            }
-            if (ctx.rinkaiUnyieldingUsed) return;
-            if (ctx.finalDamage <= 0) return;
-            if (ctx.rinkaiMeter < 40) return;
-            if (ctx.finalDamage < ctx.playerCurrentHP) return; // 致命ダメでなければ発動しない
-            int lethalDmg = ctx.finalDamage;
-            ctx.finalDamage = System.Math.Max(0, ctx.playerCurrentHP - 1);
-            int consumed = ctx.rinkaiMeter;
-            ctx.rinkaiMeter = 0;
-            ctx.rinkaiUnyieldingUsed = true;
-            UnityEngine.Debug.Log($"[不朽の熱] 致命ダメ{lethalDmg} → HP=1 踏みとどまり + メーター{consumed}全消費");
-        }
-    }
-
     /// <summary>無銘の剣舞譜 (特殊・4枚集約の変化先): 戦闘突入ごとに[剣先]スタック+1（最大99・ラン中持続）。
     /// ダイス合計に剣先スタック分を加算。与ダメージ時に剣先スタック分HP回復、被ダメージ時に剣先スタック分の
     /// 軽減不可ダメージを相手へ。スタックはランを跨がず IRunResettable でリセット。</summary>

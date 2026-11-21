@@ -16,7 +16,7 @@ namespace CombatSystem
         public bool VescaClockActive { get; private set; }
 
         /// <summary>戦闘の始め・形態の交代: 敵の目盛りを入れ直す (目盛りの無い敵・測定の口で止めた時は無し)。
-        /// **目盛りの並びを作るのはここ** (時計の目盛りもここで足す・戦闘中に動かすのは〈柱折りの発破筒〉の <see cref="RaiseBossNextNotch"/> とダウンが明けた時だけ)。 画面・BOT は <see cref="Down"/> の並びを読む。</summary>
+        /// **目盛りの並びを作るのはここ** (時計の目盛りもここで足す・戦闘中に動かすのは <see cref="RaiseBossNextNotch"/> だけ)。 画面・BOT は <see cref="Down"/> の並びを読む。</summary>
         private void ResetBossDown(EnemyData enemy, bool newCombat)
         {
             bool clock = GameLoop.VescaClock.Held(GameLoop.GameManager.Instance?.Run);
@@ -68,16 +68,7 @@ namespace CombatSystem
                     ItemSystem.PassiveSkills.Effects.RelicScholar.ClearForDownTurn(ctx);
             }
             if (!was && BossDown.ActiveNow) RaiseCue(CombatCue.BossDownStart);
-            else if (was && !BossDown.ActiveNow)
-            {
-                RaiseCue(CombatCue.BossDownEnd);
-                // 〈柱折りの発破筒〉(2026-11-20): ダウンが明けると、 HP 0 の所に新しい目盛りが 1 本できる (爆発で上がる)
-                if (_down.Enabled && ItemSystem.PassiveSkills.Effects.PillarBreakerCharge.Held(ctx))
-                {
-                    _down.AddNotch(0f);
-                    Debug.Log($"[柱折りの発破筒] ダウンが明けた → HP 0 の所に目盛りを足す (目盛り {_down.notches.Length} 本)");
-                }
-            }
+            else if (was && !BossDown.ActiveNow) RaiseCue(CombatCue.BossDownEnd);
         }
 
         /// <summary>このターン敵が大技の予告かチャージを出しているか (〈英雄の意志〉がターン開始時に読む・2026-11-20)。
@@ -96,7 +87,7 @@ namespace CombatSystem
             return _down.downNow || Escalation.IsChargeNoAttack(currentEnemy, turn) || TenyoHeavy.NoAttackAt(currentEnemy, turn);
         }
 
-        /// <summary>〈柱折りの発破筒〉〈雷鯰の棘〉〈避雷の杭〉: 次に割る目盛りを <paramref name="add"/> (HP) だけ上げる。 今の HP より上へは行かない (今の HP の 1 下まで ── 割るには通常攻撃が要る)。
+        /// <summary>〈雷鯰の棘〉〈避雷の杭〉〈鎧縫いの針〉: 次に割る目盛りを <paramref name="add"/> (HP) だけ上げる。 今の HP より上へは行かない (今の HP の 1 下まで ── 割るには通常攻撃が要る)。
         /// 目盛りの無い敵では何もしない。 ターンの解決中は CombatManager の手元の HP、 それ以外は ctx の HP の低い方を今の HP とみなす。</summary>
         public void RaiseBossNextNotch(int add)
         {

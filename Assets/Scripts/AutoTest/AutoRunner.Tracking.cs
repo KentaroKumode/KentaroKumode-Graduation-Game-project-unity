@@ -490,6 +490,8 @@ namespace AutoTest
                 _cur.justGuardFired = (int)CombatSystem.CombatManager.JustGuardFired;
                 _cur.bleedSpendFired = (int)CombatSystem.CombatManager.BleedSpendFired;
                 _cur.bleedExecuteFired = (int)CombatSystem.CombatManager.BleedExecuteFired;
+                _cur.burstFired = (int)CombatSystem.CombatManager.BurstFired;
+                _cur.burstBreakFired = (int)CombatSystem.CombatManager.BurstBreakFired;
                 _cur.chainPath = ItemSystem.PassiveSkills.PassiveSkillManager.ChainDeepestPath;
                 _cur.heatBurstInfo = ItemSystem.PassiveSkills.Keywords.Kw.HeatMaxBurstsOneAdd + "|" + ItemSystem.PassiveSkills.Keywords.Kw.HeatMaxBurstsInfo;
                 _cur.attackSumInfo = CombatSystem.CombatManager.AttackSumMaxInfo;

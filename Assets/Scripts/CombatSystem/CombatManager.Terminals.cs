@@ -39,6 +39,8 @@ namespace CombatSystem
         public static long JustGuardFired;
         /// <summary>[計装] 秘宝が敵の出血を使った回数 (Kw.ConsumeBleed・〈血桜〉〈紅の搾り具〉) / 〈百人切りの鉈〉で処刑した回数 (ランの始めに BOT が 0 へ戻す・ランの記録の bleedSpendFired / bleedExecuteFired)。</summary>
         public static long BleedSpendFired, BleedExecuteFired;
+        /// <summary>[計装] 臨界の爆発の回数 / 〈柱折りの発破筒〉が爆発のひびを正規のダウンへ割った回数 (ランの始めに BOT が 0 へ戻す・ランの記録の burstFired / burstBreakFired)。</summary>
+        public static long BurstFired, BurstBreakFired;
 
         /// <summary>〈猫の手〉がこのターン先に挿した出目 (−1 = 無し)。 BOT の挿し方の方策はこの 1 組を固定として扱う (外さない)。</summary>
         public int CatPawDie => _catDie;
@@ -71,6 +73,7 @@ namespace CombatSystem
             _deck.state.poisonItems = PoisonCore.ItemsOf(run);           // 毒の品 (端子の解決の 5d・起爆の式・2026-11-21)
             _deck.state.shieldItems = ShieldCore.ItemsOf(run);           // シールドの品 (端子の解決の 5e・ジャスト防御の許容幅・2026-11-21)
             _deck.state.bleedItems = BleedCore.ItemsOf(run);             // 出血の品 (端子の解決の 5f・撃ごとの出血・2026-11-21)
+            _deck.state.heatItems = HeatCore.ItemsOf(run);               // 臨界の品 (爆発の式・端子の解決の 5g・2026-11-21)
             if (AxisRules.Owns(run, GameLoop.ItemIds.DeckSparePlug)) _deck.state.extraDrawNext += TerminalCards.SparePlugDraw;      // 〈予備の差込口〉: 1 ターン目に多く引く
             _deck.state.extraDrawNext += MetaProgression.MetaBuffApplicator.GetSparkDeckOpeningDraw();      // 種火・山札 (2026-11-21): 1 ターン目の手札 +1
             if (AxisRules.Owns(run, GameLoop.ItemIds.DeckToolbox) && runDeck.Count <= TerminalCards.ToolboxMaxDeck)
@@ -245,7 +248,11 @@ namespace CombatSystem
                 ShieldDiag.Note("端子", o.shield);
             }
             if (o.poison > 0) ItemSystem.PassiveSkills.Effects.Rw.Poison(ctx, o.poison);
-            if (o.heat > 0) { ItemSystem.PassiveSkills.Keywords.Kw.EnableHeat(ctx); ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, o.heat, "端子"); }
+            //   臨界: 〈燧石の指輪〉の倍を立ててから、 端子の分 → 品の分 (5g) を 1 つずつ (HeatCore.Forecast と同じ順)
+            if (o.heatDouble) ctx.accumulatedValues[HeatCore.DoubleTurnKey] = ctx.currentTurn;
+            if (o.heat > 0 || o.heatGains.Count > 0) ItemSystem.PassiveSkills.Keywords.Kw.EnableHeat(ctx);
+            if (o.heat > 0) ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, o.heat, "端子");
+            foreach (int g in o.heatGains) ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, g, "臨界の品(配線)");
             for (int r = 0; r < o.retreatStage; r++) YachtRoleEffects.AddEscalationDelay(ctx, YachtRoleEffects.TurnsToRetreatOneStage(ctx));
             if (o.escalationDelay > 0)      // 時計の賽 (ADR-0015)
             {

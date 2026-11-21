@@ -26,7 +26,6 @@ namespace ItemSystem.PassiveSkills
             if (initialized) return;
             RegisterAll();
             RegisterStatSkills();
-            WrapEntries();
             initialized = true;
         }
 
@@ -63,20 +62,6 @@ namespace ItemSystem.PassiveSkills
                     registry.TryGetValue(ps.internalName, out var inner);
                     registry[ps.internalName] = new Effects.StatModifierEffect(ps.internalName, ps.stats, inner);
                 }
-            }
-        }
-
-        /// <summary>毒・臨界の軸の既存品に入り口 (決まった機会に資源を少し足す) を重ねる (2026-11-07・<see cref="Effects.EntryEffect"/>)。</summary>
-        private static void WrapEntries()
-        {
-            foreach (var e in Effects.EntryEffect.Table)
-            {
-                if (!registry.TryGetValue(e.id, out var inner))
-                {
-                    UnityEngine.Debug.LogError($"[PassiveSkillRegistry] 入り口の対象 {e.id} が登録されていない");
-                    continue;
-                }
-                registry[e.id] = new Effects.EntryEffect(inner, e.when, e.heat, e.amount, e.gate, e.gateN);
             }
         }
 
@@ -203,41 +188,32 @@ namespace ItemSystem.PassiveSkills
             Register(new CrimsonPress()); Register(new EndlessSpringCrystal()); Register(new ReturningBloodSickle()); Register(new BloodWedge());
         }
 
+        /// <summary>臨界の軸 26 品のうち効果クラスを持つ 15 品 (2026-11-21・HeatEffects.cs)。 残りの 11 品 (過熱石・燻りの革胸当て・火守りの火搔き棒・恒温の竈・二度詰めの雷管・
+        /// 焚き足しの炭・帳簿外の爆薬・火花読みの眼鏡・燧石の指輪・暴れ窯の火床・柱折りの発破筒) は HeatCore の旗 (荒砥・点火スパナ・溢れ取りの鋳型・早沸かし釜・八日目の灰燼は旗とクラスの両方)。</summary>
+        private static void RegisterHeat()
+        {
+            Register(new ArsenalCrate()); Register(new DryTinderbox()); Register(new HearthCloak()); Register(new PatchedBoots()); Register(new RoughWhetstone());
+            Register(new IgnitionSpanner()); Register(new HeatWall()); Register(new SecondStrike()); Register(new OverflowMold()); Register(new QuickKettle());
+            Register(new TenkouKaibutsu()); Register(new HopeShard()); Register(new UnyieldingHeat()); Register(new FierceBlade()); Register(new HarmlessLamp());
+        }
+
         private static void RegisterAll()
         {
             RegisterCharge();
             RegisterPoison();
             RegisterShield();
             RegisterBleed();
+            RegisterHeat();
             // ============================
             //  アイテム再編 (2026-10-31・ReworkItemEffects.cs)
             // ============================
-            Register(new OverheatStone());
-            Register(new HearthCloak());
-            Register(new DryTinderbox());
-            Register(new MorningOven());
-            Register(new OverflowMold());
-            Register(new SecondStrike());
-            Register(new OffBookChain());
-            Register(new HeatWall());
-            Register(new QuickKettle());
-            Register(new IgnitionSpanner());
-            Register(new RoughWhetstone());
-            Register(new HarmlessLamp());
-            Register(new ArsenalCrate());
-            Register(new PatchedBoots());
-            Register(new HopeShard());
-            Register(new SmolderingBreastplate());
             Register(new WeightingGauntlet());
             Register(new CoinDish());
-            Register(new TenkouKaibutsu());
             Register(new LuckyCoin());
             Register(new SpoilsScale());
             Register(new BlastPrize());
             Register(new SurveyorMonocle());
-            Register(new FierceBlade());
             Register(new LapisWhetstone());
-            Register(new FlintRing());
             Register(new Suntetsu());
             Register(new UnwhettedClub());
 
@@ -246,14 +222,12 @@ namespace ItemSystem.PassiveSkills
             // ============================
             // 研ぎ師の見立て書 はステータス化 (段 3・2026-11-11)。 千里眼の水晶は 2026-11-20 にクラスへ戻した (下の追加 34 品の並び)
             Register(new FalconerGlove());                                       Register(new LayeredCutForm());     Register(new LayeredScabbard()); Register(new PinpointEye());
-            Register(new FirekeeperPoker());  Register(new CharcoalFeeder());       Register(new SparkReadingGlasses()); Register(new RefiredPrimer());
             // 軸の品・追加 34 品 (2026-11-07・AxisItemEffects2.cs)。 各軸を 23 品にそろえた
             Register(new AimNotch());   Register(new FirstArrow());   Register(new LingeringBell()); Register(new ParryFan());
             Register(new NickAppraisal()); Register(new LosingStreakDie()); Register(new ChainedFlash()); Register(new QuickDrawArt());
             Register(new ClairvoyantCrystal()); // 2026-11-20 作り直し (旧 items.json の stats)
             // 軸の締めの LEGENDARY (2026-11-20・AxisItemEffects3.cs・GAME.md §23-32)
             Register(new HeavenEyeGuard()); Register(new DeathMaskVisor());
-            Register(new WildKilnHearth()); Register(new PillarBreakerCharge());
             // 消耗品の連動品 (2026-11-20・ConsumableLinkEffects.cs・item-overhaul-spec §7-2)
             Register(new BeltPouch()); Register(new SpentPride()); Register(new BottomlessVial()); Register(new SampleBox());
             // 嵐・店・金のマクロ秘宝の戦闘の側 (2026-11-20・MacroItemEffects.cs・item-overhaul-spec §9)
@@ -353,8 +327,6 @@ namespace ItemSystem.PassiveSkills
             // 2026-07-15 出血系 拡張 (既存3種+新6種で計9のキーワードビルド化)
             // BloodScent はステータス化
 
-            // 臨界系 (Rinkai) 2026-07-16 追加: メーター蓄積型・Burn 撤廃後の新軸
-            Register(new UnyieldingHeat());    // 不朽の熱 (meter40+ で致命耐え・meter全消費)      // 臨界 (過充電3T継続で会心確定+全消費)
 
             // ============================
             //  敵専用スキル

@@ -658,6 +658,25 @@ namespace UI.Game2D.Battle
         public bool BleedLive => BleedState(out _);
         public string BleedLabel { get { BleedState(out var l); return l; } }
 
+        // ── 臨界の爆発 (2026-11-21・HeatCore・仮置き) ── 見込み (preview) で、 本体と同じ HeatCore.Forecast を通した爆発の回数を右の列に出す (表示だけ)。
+        //   文字 = 今の臨界/閾値 (+ この配線で爆発する回数)。 爆発する見込みなら金。
+        private bool HeatState(out string label)
+        {
+            label = "";
+            var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
+            if (ctx == null || !TermInputs(out _, out _, out _)) return false;
+            var s = ItemSystem.PassiveSkills.Keywords.Kw.HeatState(ctx);
+            if (s.threshold <= 0 && (preview == null || (preview.heat <= 0 && preview.heatGains.Count == 0))) return false;
+            var f = preview != null ? HeatCore.Forecast(s, preview, preview.attackAdd) : default;
+            int n = f.burstsWired + f.burstsEnd;
+            label = "臨界 " + s.meter + "/" + (s.threshold > 0 ? s.threshold : HeatCore.StartThreshold(s.items)) + (n > 0 ? " 爆発" + n : "");
+            return n > 0;
+        }
+        /// <summary>臨界が動いている戦闘なら出す。 / 爆発の見込み (金で出す)。 / 右の列の文字 (仮)。</summary>
+        public bool HasHeat => HeatState(out var l) || l.Length > 0;
+        public bool HeatLive => HeatState(out _);
+        public string HeatLabel { get { HeatState(out var l); return l; } }
+
         /// <summary>出目 i を端子 s に挿せるか (挿せる数・払う充電・出目の条件)。 他の出目との関係を見る条件は、 そろう見込みがあれば通す
         /// (〈十字斬り〉の 1 個目を挿せるように)。 本当に発動するかは見込み (Resolve) が決める。</summary>
         public bool Accepts(int i, int s)

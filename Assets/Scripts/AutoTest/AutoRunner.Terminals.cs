@@ -42,8 +42,8 @@ namespace AutoTest
         private const float DeckPreheatDmg = 3f, DeckDrawDmg = 4f, DeckRetainDmg = 2f;
         /// <summary>〈影写し〉: 基本以外を複製 6 / 基本を複製 1。 〈火葬の剣〉: 基本を抜く 6 (山札が締まる) / 基本以外を抜く −4 (与ダメ相当)。</summary>
         private const float DeckCopyGoodDmg = 6f, DeckCopyBasicDmg = 1f, DeckBurnBasicDmg = 6f, DeckBurnGoodDmg = -4f;
-        /// <summary>別枠のダメージ (毒・臨界・出血) 1 あたり 0.5 与ダメ相当。 式は見ていない控えめな定数 (値付けの規則 4: 別枠は量を控えめに)。</summary>
-        private const float DeckPoisonDmg = 0.5f, DeckHeatDmg = 0.5f, DeckBleedDmg = 0.5f;
+        /// <summary>別枠のダメージ (毒・出血) 1 あたり 0.5 与ダメ相当。 式は見ていない控えめな定数 (値付けの規則 4: 別枠は量を控えめに)。 臨界は HeatCore.Forecast で見る。</summary>
+        private const float DeckPoisonDmg = 0.5f, DeckBleedDmg = 0.5f;
         /// <summary>使い捨ての端子を使う費用 (この戦闘ではもう使えない): 攻撃の種類は与ダメ相当 8 (出目 2 個ぶん)・それ以外は HP 相当 3。
         /// 弱い目で火薬樽を切らず、 良い目・危ないターンに回すための足切り。</summary>
         private const float DeckDisposableDmgCost = 8f, DeckDisposableHpCost = 3f;
@@ -125,8 +125,8 @@ namespace AutoTest
                     sightHp -= 0.5f * h * ItemSystem.PassiveSkills.Effects.SiegeAxe.PerHitShield * DeckFutureHpWorth(in s);
                 }
             }
-            // 〈無害灯〉: 敵の直接攻撃で失う HP を半分 (使う臨界は見ない)
-            if (sg.lamp) ws.takenMul *= 0.5f;
+            // 〈無害灯〉: 敵の直接攻撃で失う HP を無効 (1 ターン 1 回・使う臨界と返すダメージは見ない)
+            if (sg.lamp) ws.takenMul = 0f;
             // 〈石抜きの毒指輪〉の【起爆】(毒の BOT の規則・2026-11-21): 配線の後の毒 (端子の毒を足す) が 24 以上で攻撃の撃があれば、 起爆のダメージを軽減不可の分に足す
             //   (撃が当たるかは見ない・王冠の 1.5 倍は見ない)。 毒を 24 へ押し上げて殴る挿し方が選ばれる
             if (sg.ring && o.attackHits.Count > 0)
@@ -200,7 +200,7 @@ namespace AutoTest
             flat += (after.mainsUses - before.mainsUses) * TerminalCards.MainsPerUse * turns * 0.5f * DeckFutureAttackShare * dw;
             if (o.enemyStunNext) flat += DeckStunShare * Math.Max(0, s.enemyAtk) * (s.ledger ? 1f : s.wDef);
             // 別枠のダメージ
-            flat += (o.poison * DeckPoisonDmg + o.heat * DeckHeatDmg) * dw;
+            flat += o.poison * DeckPoisonDmg * dw;
             if (o.attackDice > 0) flat += (o.bleedOnHit + bleedGain) * DeckBleedDmg * dw;      // 〈鉤爪〉 + 出血の品の撃ごとの出血 (5f)
             // 〈柔軟な戦略〉: 基本以外の発動 1 回 = 与ダメ +(10% ÷ 10 回) を、 残りターンのうち〈柔軟な戦略〉を引いたターンだけ (本体 DrawTerminalHand・2026-11-20〜 引いた時だけ効く)
             if (counterPerFire > 0f)
@@ -261,6 +261,25 @@ namespace AutoTest
                 if (sg.jgSilent && o.attackDice == 0)
                     sightFlat += (ItemSystem.PassiveSkills.Effects.SilentStance.JustPct - ItemSystem.PassiveSkills.Effects.SilentStance.Pct) / 100f * per * DeckFutureAttackShare;
                 if (sg.jgHero && env.heavyTurn) sightFlat += 0.5f * per;
+            }
+            // 臨界の BOT の規則 (2026-11-21): 本体と同じ HeatCore.Forecast (端子の臨界 → 5g の品の臨界 → ターンの終わりの攻撃の端子の合計) で、
+            //   この配線で起きる爆発のダメージ (敵の防御の後) を軽減不可の分に足す。 溜まりの増減は 臨界 1 = 爆発の基礎 ÷ 閾値 × DeckGaugeShare (爆発で 0 に戻る分は負で相殺)。
+            //   配線の時に爆発する (= 攻撃の前に【過熱】) か既に【過熱】なら、 〈二度目の打金〉の撃ごとの攻撃 +6・〈烈刃〉の撃の最終与ダメ % を足す。
+            //   shortcut: 1 撃の与ダメは 1 ターンの見込み ÷ 撃の数・ボスの目盛りのひびと〈恒熱の炉壁〉のブロックは見ない
+            if (sg.heat.threshold > 0 || o.heat > 0 || o.heatGains.Count > 0)
+            {
+                var hf = HeatCore.Forecast(sg.heat, o, o.attackAdd);
+                ws.extraDmg += hf.landed;
+                int th = Math.Max(1, sg.heat.threshold > 0 ? sg.heat.threshold : HeatCore.StartThreshold(sg.heat.items));
+                flat += (hf.meterAfter - sg.heat.meter) * (HeatCore.BurstBase / (float)th) * DeckGaugeShare * dw;
+                bool hot = sg.overheated || hf.burstsWired > 0;
+                if (o.attackHits.Count > 0)
+                {
+                    if (sg.secondStrike && (hot || sg.burstLastTurn)) sightFlat += ItemSystem.PassiveSkills.Effects.SecondStrike.Atk * o.attackHits.Count;
+                    if (sg.fierceBlade && hot)
+                        sightFlat += Math.Min(ItemSystem.PassiveSkills.Effects.FierceBlade.MaxPct, ItemSystem.PassiveSkills.Effects.FierceBlade.PctPerBurst * (sg.heat.burstsTotal + hf.burstsWired)) / 100f
+                                   * DeckPerTurnDamage(in s, k);
+                }
             }
             ws.specFlat = flat + sightFlat * dw + sightHp;
 
@@ -510,8 +529,11 @@ namespace AutoTest
             public float broomPct;
             /// <summary>〈破城斧〉: シールド 15 以上のターン、 撃ごとにシールド 8 を使い その撃の最終与ダメージ +80%・防御無視。</summary>
             public bool siegeAxe;
-            /// <summary>〈無害灯〉: 臨界 15 以上なら、 敵の直接攻撃で失う HP を半分にする (1 ターン 1 回)。</summary>
+            /// <summary>〈無害灯〉: 臨界 15 以上なら、 敵の直接攻撃で失う HP を無効にする (1 ターン 1 回・HarmlessLamp.Ready)。</summary>
             public bool lamp;
+            /// <summary>臨界の盤面の写し (Kw.HeatState・HeatCore.Forecast に渡す) / 【過熱】/ 前のターンに爆発した / 〈二度目の打金〉〈烈刃〉を持つ。</summary>
+            public HeatCore.State heat;
+            public bool overheated, burstLastTurn, secondStrike, fierceBlade;
             public int axDeck;
             /// <summary>〈石抜きの毒指輪〉: このターンまだ起爆していない (持っていなければ false)。 / 毒の品の旗・この戦闘で起爆した回数 (起爆のダメージの式 PoisonCore.Damage が読む)。</summary>
             public bool ring;
@@ -533,7 +555,11 @@ namespace AutoTest
                 if (run.OwnsPassive(ItemIds.DeckTongs)) v.tongsDmg = ItemSystem.PassiveSkills.Effects.TemperTongs.Base + v.axDeck;
                 if (run.OwnsPassive(ItemIds.DeckBroom)) v.broomPct = ItemSystem.PassiveSkills.Effects.AshBroom.PctPerDepth * v.axDeck;
                 v.siegeAxe = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.SiegeAxe.Id);
-                v.lamp = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.HarmlessLamp.Id) && ctx.rinkaiMeter >= ItemSystem.PassiveSkills.Effects.HarmlessLamp.MinHeat;
+                v.lamp = ItemSystem.PassiveSkills.Effects.HarmlessLamp.Ready(ctx);
+                v.heat = ItemSystem.PassiveSkills.Keywords.Kw.HeatState(ctx);
+                v.overheated = ItemSystem.PassiveSkills.Keywords.Kw.Overheated(ctx);
+                v.burstLastTurn = ctx.currentTurn > 1 && (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.BurstTurnKey) == ctx.currentTurn - 1;
+                v.secondStrike = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.SecondStrike.Id); v.fierceBlade = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.FierceBlade.Id);
                 v.poisonItems = PoisonCore.ItemsOf(run);
                 v.detonates = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.Psn.DetonateCountKey);
                 v.bleedItems = BleedCore.ItemsOf(run);

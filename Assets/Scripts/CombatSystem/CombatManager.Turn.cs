@@ -245,36 +245,25 @@ namespace CombatSystem
         ///   - シールドは通常ダメージから先に吸い、 余れば固定ダメージも吸う。
         ///     吸収量は反射（返しの盾/不落の城盾）の原資として記録する。
         /// </summary>
-        /// <summary>臨界の爆発 1 回のダメージをその場で入れる (ADR-0016・Kw.AddHeat の中から呼ばれる)。 軽減無視 (会心・与ダメの池・防御は乗らない。
-        /// 最終与ダメージ倍率・怠惰・ダウンの ×1.5 は HpLossDiag.Lose が掛ける)。 <paramref name="burstDmg"/> = 爆発 1 回の量 (Kw.BurstBase・超臨界なら ×1.5)。
-        /// 〈火花読みの眼鏡〉(burstCritRule) なら爆発ごとに会心の判定をし、 会心なら会心倍率の半分が乗る。
+        /// <summary>臨界の爆発 1 回のダメージをその場で入れる (ADR-0016・Kw.AddHeat の中から・〈八日目の灰燼〉〈無害灯〉も)。 <paramref name="landed"/> = 敵の防御を通した後の量
+        /// (HeatCore.VsDefense・会心と与ダメの池は乗らない。 最終与ダメージ倍率・怠惰・ダウンの ×1.5 は HpLossDiag.Lose が掛ける)。
         /// 遺物 (§15-5) 臨界の「爆発時に敵の現在 HP の N%」も 1 回ごとに足す (現在 HP 比なので自己減衰し、 撃破には届かない)。
         /// ターンの解決中は手元の HP (enemyHP)、 それ以外は ctx の HP を減らす。 戻り値 = この爆発で敵が倒れた。</summary>
-        public bool LandBurst(ItemSystem.PassiveSkills.CombatContext ctx, int burstDmg)
+        public bool LandBurst(ItemSystem.PassiveSkills.CombatContext ctx, int landed)
         {
-            if (ctx == null || burstDmg <= 0 || !isCombatActive) return false;
+            if (ctx == null || landed <= 0 || !isCombatActive) return false;
             bool resolving = ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.ResolvingKey) > 0;
             int hp = resolving ? enemyHP : ctx.enemyCurrentHP;
             if (hp <= 0) return false;
-            int dmg = burstDmg;
-            bool crit = false;
-            if (ctx.burstCritRule)
-            {
-                int n = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.BurstTotalKey);
-                // 本判定と同じ優先順 (ApplyRoleExtraDamage と同じ): 封印 (無心の刃) で外れ、 forceCritical が最後に確定で上書きする
-                crit = ((!ctx.critSuppressed && GameLoop.GameRng.Chance(CritRateOf(ctx, pendingBuff: false), "combat.burstCrit", RngIdx(50 + n % 50)))
-                    || ctx.forceCritical) && !ctx.critToDamage;   // 〈銑鉄棍〉の【規則】: 会心が出なくなる
-                if (crit) dmg += Mathf.FloorToInt(burstDmg * Math.Max(0f, ctx.criticalMultiplier / 2f - 1f));
-            }
             float rinPct = MetaProgression.Relics.RelicApplicator.GetRinkaiCurrentHpPct(GameLoop.GameManager.Instance?.Run, ctx);
             int relicBurst = rinPct > 0f ? Mathf.FloorToInt(hp * rinPct) : 0;
             // [測定用の物差し 2026-11-10] 入る量だけに掛ける
-            int landed = EnemyHpLedger.ProbePassive(dmg) + EnemyHpLedger.ProbePassive(relicBurst);
+            int dmg = EnemyHpLedger.ProbePassive(landed) + EnemyHpLedger.ProbePassive(relicBurst);
             int before = hp;
-            HpLossDiag.Lose(ref hp, landed, "臨界の爆発");
+            HpLossDiag.Lose(ref hp, dmg, "臨界の爆発");
             CombatStats.DamageBreakdown[22] += before - hp;   // [計装] 臨界の爆発
             if (resolving) enemyHP = hp; else ctx.enemyCurrentHP = hp;
-            Debug.Log($"[臨界爆発] {burstDmg}{(crit ? $" 会心 → {dmg}" : "")}{(relicBurst > 0 ? $" ＋遺物 {relicBurst} (現在HP {before} の {rinPct:P0})" : "")} → 敵HP {hp}");
+            Debug.Log($"[臨界爆発] {landed}{(relicBurst > 0 ? $" ＋遺物 {relicBurst} (現在HP {before} の {rinPct:P0})" : "")} → 敵HP {hp}");
             return hp <= 0;
         }
 
@@ -1178,7 +1167,7 @@ namespace CombatSystem
                     BossDmgDiag.AddSpike(
                         $"{(currentEnemy != null ? currentEnemy.displayName : ctx.bossId)} T{ctx.currentTurn} "
                       + $"主{dealtDmg} 固{dealtFixed} | crit={isCrit} critMul={ctx.criticalMultiplier:F2} "
-                      + $"outMul={ctx.outgoingDamageMultiplier:F2} burstDmg={ctx.rinkaiBurstDamage} 脆弱={ctx.enemyVulnerabilityMultiplier:F2} "
+                      + $"outMul={ctx.outgoingDamageMultiplier:F2} 臨界={ctx.rinkaiMeter}/{ctx.rinkaiThreshold} 脆弱={ctx.enemyVulnerabilityMultiplier:F2} "
                       + $"armorPen={ctx.playerArmorPen} 敵防御={ctx.enemyDefense} 画竜={ctx.garyoProc} "
                       + $"atkDice={(int)ctx.GetAccumulated("mutualAttackDiceCount")} "
                       + $"pRoll={ctx.playerDiceTotal} 武器={GameLoop.GameManager.Instance?.Run?.equippedWeaponId}");

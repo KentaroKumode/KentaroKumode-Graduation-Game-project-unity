@@ -30,45 +30,68 @@ namespace ItemSystem.PassiveSkills.Keywords
         }
 
         // ============================================================
-        //  臨界
+        //  臨界 (式の正本は CombatSystem.HeatCore・2026-11-21・full-item-rework-ledger §⑤)
         // ============================================================
 
-        /// <summary>[persistent・戦闘開始で 0] この戦闘で爆発した回数の累計 (端子〈爆炎斬り〉が読む・ADR-0014)。</summary>
+        /// <summary>[persistent・戦闘開始で 0] この戦闘で爆発した回数の累計 (端子〈爆炎斬り〉・〈火花読みの眼鏡〉〈烈刃〉〈希望の灯片〉が読む)。</summary>
         public const string BurstTotalKey = "kw.burstTotal";
-        /// <summary>閾値を超えて溜まっていた臨界 (〈溢れ取りの鋳型〉が読む)。</summary>
+        /// <summary>いま決まった爆発で閾値を超えて溢れていた臨界 (〈溢れ取りの鋳型〉が読む・〈帳簿外の爆薬〉なら 0)。</summary>
         public const string BurstExcessKey = "kw.burstExcess";
-        /// <summary>直近に爆発したターン (〈二度目の打金〉が読む)。</summary>
+        /// <summary>直近に爆発したターン (【過熱】= このターンに爆発した・<see cref="Overheated"/>)。</summary>
         public const string BurstTurnKey = "kw.burstTurn";
         /// <summary>[persistent・戦闘開始で 0] この戦闘で、 爆発のダメージそのもので敵が倒れた (1/0・〈爆破祭の小切手〉が読む)。</summary>
         public const string BurstKilledKey = "kw.burstKilled";
-        /// <summary>いま決まった爆発が超臨界か (1/0・爆発の出来事を配っている間に読む)。 超臨界爆発 = 閾値を引く前の臨界が閾値の 2 倍以上 (2026-11-20・§23-32)。</summary>
+        /// <summary>いま決まった爆発が超臨界か (1/0・爆発の出来事を配っている間に読む)。 超臨界爆発 = 閾値の 1.5 倍以上の臨界で起きた爆発 (HeatCore.SuperAtPct)。</summary>
         public const string BurstSuperKey = "kw.burstSuper";
-        /// <summary>いま決まった爆発 1 回のダメージ (<see cref="BurstBase"/>・超臨界なら ×1.5・爆発の出来事を配っている間に読む)。</summary>
+        /// <summary>いま決まった爆発 1 回の敵の防御の後のダメージ (HeatCore.Burst.landed・爆発の出来事を配っている間に読む)。</summary>
         public const string BurstDamageNowKey = "kw.burstDamageNow";
 
-        /// <summary>臨界を有効にする (どれか 1 つの臨界の品が戦闘開始時に呼べば動き出す)。</summary>
+        /// <summary>【過熱】: このターンに爆発が起きた。</summary>
+        public static bool Overheated(CombatContext ctx) => ctx != null && ctx.currentTurn > 0 && (int)ctx.GetAccumulated(BurstTurnKey) == ctx.currentTurn;
+
+        /// <summary>臨界を有効にする (臨界の品を持つ戦闘は戦闘開始時に本体が呼ぶ・端子が臨界を出した時も)。 閾値 30 (〈早沸かし釜〉−12)・〈恒温の竈〉は閾値の半分から。</summary>
         public static void EnableHeat(CombatContext ctx)
         {
-            if (ctx.rinkaiThreshold <= 0) ctx.rinkaiThreshold = Effects.RinkaiInit.DefaultThreshold;
-            if (ctx.rinkaiBurstDamage <= 0) ctx.rinkaiBurstDamage = Effects.RinkaiInit.DefaultBurstDamage;
+            if (ctx == null || ctx.rinkaiThreshold > 0) return;
+            var f = HeatItemsNow();
+            ctx.rinkaiThreshold = CombatSystem.HeatCore.StartThreshold(f);
+            if (CombatSystem.HeatCore.Has(f, CombatSystem.HeatItems.Oven)) ctx.rinkaiMeter = System.Math.Max(ctx.rinkaiMeter, ctx.rinkaiThreshold / 2);
         }
 
-        /// <summary>爆発 1 回の基礎 (2026-11-07)。 〈炉温〉の②なら 15 + 炉温 / 2、 なければ 30。
-        /// 〈二度詰めの雷管〉の上乗せを足す。 品は ctx.rinkaiBurstDamage を直接書かない ── 書く品どうしの順番で値が変わったため。</summary>
-        public static int BurstBase(CombatContext ctx)
+        /// <summary>今の戦闘の臨界の品の旗 (端子の山札の状態・戦闘の外は None)。</summary>
+        public static CombatSystem.HeatItems HeatItemsNow() => CombatSystem.CombatManager.Instance?.TerminalDeck?.state.heatItems ?? CombatSystem.HeatItems.None;
+
+        /// <summary>ctx から爆発の盤面を作る (本体・BOT・画面の見込みの入口)。</summary>
+        public static CombatSystem.HeatCore.State HeatState(CombatContext ctx)
         {
-            int b = ctx.burstCritRule ? 15 + ctx.AxisDepth(AxisRules.Heat) / 2 : ctx.rinkaiBurstDamage;
-            return b + ctx.burstStackBonus + ctx.burstFlatBonus;   // 〈天工開物〉の上乗せ (2026-11-20)
+            return new CombatSystem.HeatCore.State
+            {
+                items = HeatItemsNow(), meter = ctx.rinkaiMeter, threshold = ctx.rinkaiThreshold,
+                kilnCut = (int)ctx.GetAccumulated(CombatSystem.HeatCore.KilnCutKey),
+                coalUsed = Effects.Psn.TurnN(ctx, CombatSystem.HeatCore.CoalKey), burstsTurn = Effects.Psn.TurnN(ctx, CombatSystem.HeatCore.TurnBurstsKey),
+                burstsTotal = (int)ctx.GetAccumulated(BurstTotalKey), stack = ctx.burstStackBonus, flat = ctx.burstFlatBonus, enemyDefense = ctx.enemyDefense,
+                doubled = ctx.currentTurn > 0 && (int)ctx.GetAccumulated(CombatSystem.HeatCore.DoubleTurnKey) == ctx.currentTurn,
+                enemyDown = CombatSystem.BossDown.ActiveNow,
+                relicPct = MetaProgression.Relics.RelicApplicator.GetHeatGainPct(),   // 遺物 炉温 2 個: 臨界の獲得量 +20% (切り上げ)
+            };
         }
 
-        /// <summary>臨界を n 溜める。 閾値をまたいだら爆発し、 その場でダメージを出して (ADR-0016)、 出来事を配る。
-        /// 〈帳簿外の爆薬〉(rinkaiMultiBurst) があれば臨界を閾値ぶんだけ減らし、 溜まっている限り何度でも爆発する。</summary>
+        private static void StoreHeat(CombatContext ctx, in CombatSystem.HeatCore.State s)
+        {
+            ctx.rinkaiMeter = s.meter; ctx.rinkaiThreshold = s.threshold; ctx.burstStackBonus = s.stack;
+            ctx.accumulatedValues[CombatSystem.HeatCore.KilnCutKey] = s.kilnCut;
+            ctx.accumulatedValues[BurstTotalKey] = s.burstsTotal;
+            Effects.Psn.AddTurnN(ctx, CombatSystem.HeatCore.CoalKey, s.coalUsed - Effects.Psn.TurnN(ctx, CombatSystem.HeatCore.CoalKey));
+            Effects.Psn.AddTurnN(ctx, CombatSystem.HeatCore.TurnBurstsKey, s.burstsTurn - Effects.Psn.TurnN(ctx, CombatSystem.HeatCore.TurnBurstsKey));
+        }
+
         /// <summary>[計装 2026-11-19] 1 回の (いちばん外側の) 足し込みで起きた爆発の回数の最大と、 その時の出どころ・量・溜まり。 BOT がランの始めに空にする。</summary>
         public static int HeatMaxBurstsOneAdd;
         public static string HeatMaxBurstsInfo = "";
         private static int _heatOuter;
 
-        /// <summary>src = 出どころの名前 (null なら働いている品の名前・品の外なら「本体」)。 計装にだけ使う。</summary>
+        /// <summary>臨界を n 溜める (<see cref="CombatSystem.HeatCore.Gain"/>)。 閾値に届いたら爆発し、 その場でダメージを出し (ADR-0016・CombatManager.LandBurst)、
+        /// ボスの次の目盛りにひびを入れ (〈柱折りの発破筒〉は即座に正規のダウン)、 出来事を配る。 src = 出どころの名前 (計装にだけ使う)。</summary>
         public static void AddHeat(CombatContext ctx, int n, string src = null)
         {
             if (ctx == null || n <= 0 || ctx.rinkaiThreshold <= 0) return;
@@ -86,7 +109,7 @@ namespace ItemSystem.PassiveSkills.Keywords
                     {
                         HeatMaxBurstsOneAdd = bursts;
                         string who = src ?? (string.IsNullOrEmpty(CombatContext.CurrentSkillId) ? "本体" : CombatContext.CurrentSkillId);
-                        HeatMaxBurstsInfo = $"{who} +{n0} (溜まり {meterBefore}・閾値 {ctx.rinkaiThreshold}・帳簿外 {(ctx.rinkaiMultiBurst ? "あり" : "なし")}・ターン {ctx.currentTurn}) → 爆発 {bursts} 回";
+                        HeatMaxBurstsInfo = $"{who} +{n0} (溜まり {meterBefore}・閾値 {ctx.rinkaiThreshold}・ターン {ctx.currentTurn}) → 爆発 {bursts} 回";
                     }
                 }
             }
@@ -94,36 +117,32 @@ namespace ItemSystem.PassiveSkills.Keywords
 
         private static void AddHeatCore(CombatContext ctx, int n)
         {
-            n += ctx.heatGainBonus;   // 〈炉温〉の①: 臨界を得るたび +1
-            float relicHeat = MetaProgression.Relics.RelicApplicator.GetHeatGainPct();   // 遺物 炉温 2 個: 臨界の獲得量 +20% (切り上げ)
-            if (relicHeat > 0f) n += (int)System.Math.Ceiling(n * relicHeat);
-            ctx.rinkaiMeter += n;
-            // 1 回の足し込みで爆発できる回数に上限は無い (2026-11-19・作者の決定で旧い「最大 50 回」を削除)。
-            //   〈帳簿外の爆薬〉でも 1 回ごとに閾値 (≥ 1) ずつ減るので必ず止まる。
-            while (ctx.rinkaiThreshold > 0 && ctx.rinkaiMeter >= ctx.rinkaiThreshold)
+            var s = HeatState(ctx);
+            CombatSystem.HeatCore.Gain(ref s, n);
+            StoreHeat(ctx, in s);
+            while (CombatSystem.HeatCore.TryBurst(ref s, out var b))
             {
-                int th = ctx.rinkaiThreshold;
-                // 超臨界爆発 (2026-11-20・§23-32): 閾値を引く前の臨界が閾値の 2 倍以上。 その爆発のダメージ ×1.5 (上乗せ = 基礎の半分・切り捨て)
-                bool super = ctx.rinkaiMeter >= 2 * th;
-                int excess = ctx.rinkaiMeter - th;
-                ctx.rinkaiMeter = ctx.rinkaiMultiBurst ? excess : 0;
-                ctx.accumulatedValues[BurstTotalKey] = ctx.GetAccumulated(BurstTotalKey) + 1;
-                ctx.accumulatedValues[BurstExcessKey] = ctx.rinkaiMultiBurst ? 0 : excess;
+                StoreHeat(ctx, in s);
+                ctx.accumulatedValues[BurstExcessKey] = b.excess;
                 ctx.accumulatedValues[BurstTurnKey] = ctx.currentTurn;
-                int burstDmg = BurstBase(ctx);
-                if (super) burstDmg += burstDmg / 2;
-                ctx.accumulatedValues[BurstSuperKey] = super ? 1 : 0;
-                ctx.accumulatedValues[BurstDamageNowKey] = burstDmg;
-                Debug.Log($"[臨界] 閾値{th} 到達 → {(super ? "超臨界" : "")}爆発 (超過 {excess}・残 {ctx.rinkaiMeter}・ダメージ {burstDmg})");
-                // ADR-0016: 閾値に届いたその場でダメージを出す (軽減無視・倍率は乗らない)。 旧: 次の攻撃の固定ダメの枠に乗せていた
+                ctx.accumulatedValues[BurstSuperKey] = b.super ? 1 : 0;
+                ctx.accumulatedValues[BurstDamageNowKey] = b.landed;
+                CombatSystem.CombatManager.BurstFired++;   // [計装]
+                Debug.Log($"[臨界] 閾値{b.threshold} 到達 → {(b.super ? "超臨界" : "")}爆発 (溜まり {b.meterAt}・超過 {b.excess}・残 {s.meter}・ダメージ {b.damage} → 防御の後 {b.landed}・この戦闘 {s.burstsTotal} 回目)");
                 var pm = PassiveSkillManager.Instance;
                 var cm = pm != null && ReferenceEquals(pm.Context, ctx) ? CombatSystem.CombatManager.Instance : null;
-                if (cm != null && cm.LandBurst(ctx, burstDmg)) ctx.accumulatedValues[BurstKilledKey] = 1;
-                Raise(ctx, PassiveSkillTrigger.OnRinkaiBurst, th);
-                if (super) Raise(ctx, PassiveSkillTrigger.OnSuperBurst, burstDmg);
+                if (cm != null)
+                {
+                    if (cm.LandBurst(ctx, b.landed)) ctx.accumulatedValues[BurstKilledKey] = 1;
+                    // 爆発はボスの次の目盛りにひびを入れる (標準)。 〈柱折りの発破筒〉はそのひびを即座に正規のダウンへ割る
+                    cm.CrackBossNotch("臨界の爆発");
+                    if (CombatSystem.HeatCore.Has(s.items, CombatSystem.HeatItems.Pillar) && cm.BreakBossCrack("柱折りの発破筒")) CombatSystem.CombatManager.BurstBreakFired++;
+                }
+                Raise(ctx, PassiveSkillTrigger.OnRinkaiBurst, b.threshold);
+                if (b.super) Raise(ctx, PassiveSkillTrigger.OnSuperBurst, b.landed);
                 int relicSh = MetaProgression.Relics.RelicApplicator.GetBurstShield();   // 遺物 炉温 3 個: 爆発のたびにシールド +6
                 if (relicSh > 0) { ctx.consShield += relicSh; ctx.shieldGainedTotal += relicSh; CombatSystem.ShieldDiag.Note("遺物〈炉温〉3", relicSh); }
-                if (!ctx.rinkaiMultiBurst) break;
+                s = HeatState(ctx);   // 出来事の品が臨界を動かしても、 続きは今の値から
             }
         }
 

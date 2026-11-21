@@ -227,11 +227,11 @@ namespace GameLoop
                     apex ? RunChronicle.ForgeApex : RunChronicle.ForgeUpgrade,
                     run.equippedWeaponId, cost);
             }
-            // 天工開物 (2026-11-20 作り直し): 武器を強化するたび、 以後の爆発のダメージ +5 (累積・このランの間・旧 以後の戦闘の開始時の臨界 +5)
+            // 天工開物: 武器を強化するたび、 このランの爆発の基礎 +12 (累積・この品を持っている間の強化・HeatEffects.TenkouKaibutsu)
             if (run != null && run.OwnsPassive(ItemIds.HeavenlyCraft))
             {
                 run.heavenlyCraftUpgrades++;
-                Debug.Log($"[天工開物] 武器強化 → 以後の爆発のダメージ +{ItemSystem.PassiveSkills.Effects.TenkouKaibutsu.PerUpgrade * run.heavenlyCraftUpgrades}");
+                Debug.Log($"[天工開物] 武器強化 → 以後の爆発の基礎 +{ItemSystem.PassiveSkills.Effects.TenkouKaibutsu.PerUpgrade * run.heavenlyCraftUpgrades}");
             }
             return true;
         }

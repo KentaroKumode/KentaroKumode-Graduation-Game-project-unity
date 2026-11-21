@@ -290,8 +290,8 @@ namespace UI.Game2D
         private static readonly string[] SideLabels = { "おまかせ", "道具", "逃げる" };
         /// <summary>k = 0〜2: おまかせ・道具・逃げる / −1: 【再起動】(〈二股の導線〉) / −2: 【オーバークロック】(〈雷鳴の太鼓〉)・仮置き (2026-11-21)。
         /// −3: 【起爆】の見込み (〈石抜きの毒指輪〉〈劇毒の火薬庫〉・押す札ではない・2026-11-21)。 −4: 【ジャスト防御】の見込み (防御/予告+許容幅・押す札ではない・2026-11-21)。
-        /// −5: 出血の見込み (今の出血 + この配線の撃ごとの出血・押す札ではない・2026-11-21)。</summary>
-        private string SideLabel(int k) => k == -1 ? _sim.RebootLabel : k == -2 ? _sim.OverclockLabel : k == -3 ? _sim.DetonateLabel : k == -4 ? _sim.JustGuardLabel : k == -5 ? _sim.BleedLabel : k == 2 && _fleeArmed ? "本当に?" : SideLabels[k];
+        /// −5: 出血の見込み (今の出血 + この配線の撃ごとの出血・押す札ではない・2026-11-21)。 −6: 臨界の爆発の見込み (今の臨界/閾値 + この配線の爆発の回数・押す札ではない・2026-11-21)。</summary>
+        private string SideLabel(int k) => k == -1 ? _sim.RebootLabel : k == -2 ? _sim.OverclockLabel : k == -3 ? _sim.DetonateLabel : k == -4 ? _sim.JustGuardLabel : k == -5 ? _sim.BleedLabel : k == -6 ? _sim.HeatLabel : k == 2 && _fleeArmed ? "本当に?" : SideLabels[k];
         private RectInt SideRect(int k)
         {
             int w = Game2DJpFont.Width(SideLabel(k)) + 2;
@@ -576,6 +576,7 @@ namespace UI.Game2D
                 if (s.HasJustGuard) { var r = SideRect(-4); Txt(SideLabel(-4), r.x + 1, r.y + 1, s.JustGuardLive ? Gold2 : DimC); }
                 // 出血の撃ごとの出血の見込み (仮): 今の出血 + この配線で与える出血。 〈血桜〉が働く見込みなら金 (表示だけ)
                 if (s.HasBleedHits) { var r = SideRect(-5); Txt(SideLabel(-5), r.x + 1, r.y + 1, s.BleedLive ? Gold2 : Bone); }
+                if (s.HasHeat) { var r = SideRect(-6); Txt(SideLabel(-6), r.x + 1, r.y + 1, s.HeatLive ? Gold2 : Bone); }
             }
             if (!GoVisible) return;
             bool en = s.ButtonEnabled;

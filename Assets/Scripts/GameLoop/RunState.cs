@@ -472,7 +472,7 @@ namespace GameLoop
         /// <summary>前の戦闘が終わってからマップで進んだ歩数。 移動で貯まる品 (継ぎ革の旅靴・聖路の白靴・毒草摘みの杖・測量師の片眼鏡) が
         /// 次の戦闘の開始時に読む。 GameManager の点に入る前のフックで +1、 戦闘終了で 0。</summary>
         public int  stepsSinceBattle;
-        /// <summary>〈天工開物〉: このランで武器・ダイスを強化した回数 (持っている間だけ数える)。 戦闘開始時の臨界 +5 × 回数。</summary>
+        /// <summary>〈天工開物〉: このランで武器を強化した回数 (持っている間だけ数える)。 爆発の基礎 +12 × 回数 (HeatEffects.TenkouKaibutsu)。</summary>
         public int  heavenlyCraftUpgrades;
         /// <summary>〈脈なしの鋼心臓〉の X: 戦闘開始時のシールド。 ランの始めに 12、 持っている間に戦闘に勝つたび +2 (2026-11-21)。</summary>
         public int  pulselessHeartShield = ItemSystem.PassiveSkills.Effects.PulselessHeart.StartShield;

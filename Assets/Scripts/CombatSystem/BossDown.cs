@@ -278,7 +278,7 @@ namespace CombatSystem
             return d;
         }
 
-        /// <summary>〈柱折りの発破筒〉(2026-11-20): 次に割る目盛りを <paramref name="add"/> (HP) だけ上げる。 <paramref name="hpCap"/> より上へは行かない。
+        /// <summary>次に割る目盛りを <paramref name="add"/> (HP) だけ上げる (〈雷鯰の棘〉〈避雷の杭〉〈鎧縫いの針〉)。 <paramref name="hpCap"/> より上へは行かない。
         /// 並びは書き換えず作り直す (<c>BossParams</c> の表を共有しているため)。 戻り値 = 上がった後の目盛りの HP (動かなければ −1)。</summary>
         public int RaiseNext(int maxHp, int hpCap, int add)
         {
@@ -290,23 +290,6 @@ namespace CombatSystem
             n[broken] = (to + 0.5f) / maxHp;   // NotchHp の切り捨てで to より下がらないよう半分足す
             notches = n;
             return BossDown.NotchHp(maxHp, notches[broken]);
-        }
-
-        /// <summary>〈柱折りの発破筒〉(2026-11-20): 目盛り <paramref name="frac"/> を 1 本足す (大きい順を保つ・<see cref="BossDown.WithExtraNotch"/> と同じ位置)。
-        /// ひびの欄も同じ位置に伸ばす。 割った目盛りより上には入れない (割った数がずれるため・使う所は HP 0 の目盛りだけ)。</summary>
-        public void AddNotch(float frac)
-        {
-            if (!Enabled) return;
-            int k = broken;
-            while (k < notches.Length && !(frac > notches[k])) k++;
-            int len = notches.Length + 1;
-            var n = new float[len]; var ct = new int[len];
-            for (int i = 0, j = 0; i < len; i++)
-            {
-                if (i == k) { n[i] = frac; ct[i] = -1; continue; }
-                n[i] = notches[j]; ct[i] = crackTurn[j]; j++;
-            }
-            notches = n; crackTurn = ct;
         }
 
         /// <summary>まだ割っていない一番上の目盛りのひびが割れるターン (そのターンの終わりに割れる・−1 = ひびなし / 猶予が負)。 画面・予告が読む。</summary>

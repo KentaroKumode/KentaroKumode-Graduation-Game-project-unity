@@ -33,7 +33,6 @@ namespace ItemSystem.PassiveSkills.Effects
             ["研ぎ師の見立て書"] = (AxisRules.Crit, Kind.Count),   [PinpointEye.Id] = (AxisRules.Crit, Kind.Rule),
             // 〈重ね斬りの型〉〈凝血の小瓶〉は 2026-11-20 (段 1-a) に【規則】の品でなくなったので、 表から外した (軸の普通の品として買う)
             ["腐れ沼の苔玉"] = (AxisRules.Poison, Kind.Rule),
-            ["焚き足しの炭"] = (AxisRules.Heat, Kind.Count),         ["火花読みの眼鏡"] = (AxisRules.Heat, Kind.Rule),
             // 追加 34 品のうち軸の品の数を読む品 (AxisItemEffects2.cs)
             ["千里眼の水晶"] = (AxisRules.Crit, Kind.Count),
             // 采配 (山札の軸・2026-11-20): ① 采配を読む・②【規則】
@@ -42,105 +41,6 @@ namespace ItemSystem.PassiveSkills.Effects
             // 賽目 (役の軸・2026-11-21): ① 賽目を読む・②【規則】
             [GameLoop.ItemIds.RoleNotchBoard] = (AxisRules.Role, Kind.Count), [GameLoop.ItemIds.RoleChipped] = (AxisRules.Role, Kind.Count),
             [GameLoop.ItemIds.RoleMirror] = (AxisRules.Role, Kind.Rule), [GameLoop.ItemIds.RoleOmni] = (AxisRules.Role, Kind.Rule),
-        };
-    }
-
-    /// <summary><b>入り口 (2026-11-07)。</b> 毒・臨界の軸の既存品に「決まった機会に資源を少し足す」効果を重ねる包み。
-    /// 毒は 1 スタックが現在 HP の 0.1% と細かいので、 高い割合を出すには入り口 (毒の品) を何個も積む ── 品の数がそのまま溜まる速さになる。
-    /// 品のクラスには手を入れず、 レジストリが登録の後で包む (<see cref="PassiveSkillRegistry"/>)。 品の本来の効果は内側でそのまま動く。</summary>
-    public sealed class EntryEffect : IPassiveSkillEffect
-    {
-        public enum When { TurnStart, PlayerHit, EnemyAttacked, PerBlockDie }
-        /// <summary>偏重の条件 (2026-11-10)。 機会の多い入り口ほど厳しく、 少ない入り口は無条件。
-        /// Free = 無条件 / AtLeast = 軸の品が n 個以上 / Top = 偏重の順位が上から n 番目まで (同数は満たす)。</summary>
-        public enum Gate { Free, AtLeast, Top }
-        private readonly IPassiveSkillEffect _inner;
-        /// <summary>包んでいる品の効果 (秘宝の列 #320 が見え方を読む)。</summary>
-        public IPassiveSkillEffect Inner => _inner;
-        private readonly When _when;
-        private readonly bool _heat;
-        private readonly int _amount;
-        private readonly Gate _gate;
-        private readonly int _gateN;
-        private readonly PassiveSkillTrigger[] _triggers;
-        private readonly PassiveSkillTrigger _entryTrigger;
-
-        public EntryEffect(IPassiveSkillEffect inner, When when, bool heat, int amount, Gate gate = Gate.Free, int gateN = 0)
-        {
-            _inner = inner; _when = when; _heat = heat; _amount = amount; _gate = gate; _gateN = gateN;
-            _entryTrigger = when switch
-            {
-                When.TurnStart   => PassiveSkillTrigger.OnTurnStart,
-                When.PlayerHit   => PassiveSkillTrigger.OnPostDealDamage,
-                When.PerBlockDie => PassiveSkillTrigger.OnWired,
-                _                => PassiveSkillTrigger.OnTurnEnd,   // 敵の攻撃の解決後
-            };
-            var list = new System.Collections.Generic.List<PassiveSkillTrigger>(inner.Triggers);
-            if (!list.Contains(_entryTrigger)) list.Add(_entryTrigger);
-            if (heat && !list.Contains(PassiveSkillTrigger.OnBattleStart)) list.Add(PassiveSkillTrigger.OnBattleStart);
-            _triggers = list.ToArray();
-        }
-
-        public string SkillId => _inner.SkillId;
-        public PassiveSkillTrigger[] Triggers => _triggers;
-
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (_heat && t == PassiveSkillTrigger.OnBattleStart) Kw.EnableHeat(ctx);
-            if (t == _entryTrigger)
-            {
-                int n = GateOpen(ctx) ? Times(ctx) : 0;
-                if (n > 0)
-                {
-                    if (_heat) Kw.AddHeat(ctx, _amount * n);
-                    else Rw.Poison(ctx, _amount * n);
-                }
-            }
-            if (System.Array.IndexOf(_inner.Triggers, t) >= 0) _inner.Execute(t, ctx);
-        }
-
-        private bool GateOpen(CombatContext ctx)
-        {
-            string axis = _heat ? AxisRules.Heat : AxisRules.Poison;
-            switch (_gate)
-            {
-                case Gate.AtLeast: return ctx.AxisDepth(axis) >= _gateN;
-                case Gate.Top:     return ctx.AxisRank(axis) < _gateN;
-                default:           return true;
-            }
-        }
-
-        private int Times(CombatContext ctx)
-        {
-            switch (_when)
-            {
-                case When.TurnStart:   return 1;
-                case When.PlayerHit:   return Rw.PlayerHit(ctx) ? 1 : 0;
-                case When.PerBlockDie: return Ax.BlockDice(ctx);
-                default: // EnemyAttacked
-                    return Ax.Count(ctx, MutualKeys.EnemyAtkPreDefense) > 0 ? 1 : 0;
-            }
-        }
-
-        /// <summary>入り口の一覧 (品の id, 機会, 臨界か, 量, 偏重の条件, 条件の数)。 説明文 (items.json) と揃えること。
-        /// <para>条件の付け方 (2026-11-10): 機会が多い (ターン開始・ブロックのダイスごと・敵の攻撃のたび) ほど厳しく、
-        /// 出目を払う (攻撃が通る) か機会が少ない (受けきり) 入り口は無条件。 数は一律にしない ── 一律だと超えた瞬間に全部が点く。
-        /// 絶対数の線は 2026-11-10 の実測 (配布なしの終了時: 瘴気 中央 5・P90 9 / 炉温 中央 6・P90 10) から置いた。</para></summary>
-        public static readonly (string id, When when, bool heat, int amount, Gate gate, int gateN)[] Table =
-        {
-            // 臨界の軸 (炉温・自分では臨界を作らない品)
-            ("工廠の材料箱", When.TurnStart,     true, 3, Gate.Top, 1),
-            ("希望の灯片", When.TurnStart,     true, 3, Gate.Top, 2),
-            ("帳簿外の爆薬", When.TurnStart,     true, 3, Gate.AtLeast, 10),
-            ("恒温の竈", When.TurnStart,     true, 3, Gate.AtLeast, 8),
-            ("無害灯", When.TurnStart,     true, 3, Gate.AtLeast, 6),
-            ("恒熱の炉壁", When.EnemyAttacked, true, 3, Gate.Top, 2),
-            ("早沸かし釜", When.EnemyAttacked, true, 3, Gate.AtLeast, 7),
-            ("八日目の灰燼", When.EnemyAttacked, true, 3, Gate.AtLeast, 5),
-            ("溢れ取りの鋳型", When.PlayerHit,     true, 3, Gate.Free, 0),
-            ("烈刃", When.PlayerHit,     true, 3, Gate.Free, 0),
-            ("二度目の打金", When.PlayerHit,     true, 3, Gate.Free, 0),
-            ("点火スパナ", When.PlayerHit,     true, 2, Gate.Free, 0),   // 2026-11-20: 旧 +3
         };
     }
 
@@ -231,63 +131,6 @@ namespace ItemSystem.PassiveSkills.Effects
         public static void ApplyCost(CombatContext ctx, GameLoop.RunState run)
         {
             if (ctx != null && AxisRules.Owns(run, Id)) ctx.accumulatedValues[NonCritCutKey] = 1;
-        }
-    }
-
-    // ============================================================
-    //  臨界 (炉温)
-    // ============================================================
-
-    /// <summary>火守りの火搔き棒 (燃料): 攻撃の端子を挿さなかったダイス 1 個につき臨界 +4。</summary>
-    public class FirekeeperPoker : IPassiveSkillEffect
-    {
-        public string SkillId => "火守りの火搔き棒";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnWired };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (t == PassiveSkillTrigger.OnBattleStart) { Kw.EnableHeat(ctx); return; }
-            int idle = Ax.DiceTotal(ctx) - Ax.AtkDice(ctx);
-            if (idle > 0) Kw.AddHeat(ctx, 4 * idle);
-        }
-    }
-
-    /// <summary>焚き足しの炭 (①・旧〈継ぎ目の鞴〉): 臨界を得るたび、 臨界 +1 (Kw.AddHeat の heatGainBonus)。 炉温の品が多いほど得る機会が増える。</summary>
-    public class CharcoalFeeder : IPassiveSkillEffect
-    {
-        public string SkillId => "焚き足しの炭";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            Kw.EnableHeat(ctx);
-            ctx.heatGainBonus = System.Math.Max(ctx.heatGainBonus, 1);
-        }
-    }
-
-    /// <summary>火花読みの眼鏡 (②【規則】): 爆発のたびに会心の判定をし、 会心なら**会心倍率の半分**が乗る (CombatManager.LandBurst・2026-11-20 ADR-0016: 旧 主攻撃の会心に合わせて乗った。
-    /// 2026-11-10: 旧 会心倍率そのまま・倍率が 2 以下なら増えない)。 代わりに爆発の基礎が 30 から「15 + 炉温の半分」になる (Kw.BurstBase)。</summary>
-    public class SparkReadingGlasses : IPassiveSkillEffect
-    {
-        public string SkillId => "火花読みの眼鏡";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            Kw.EnableHeat(ctx);
-            ctx.burstCritRule = true;
-        }
-    }
-
-    /// <summary>二度詰めの雷管: 爆発のたび、 爆発のダメージ +8 が 1 つ積もる (2026-11-20: 旧 +5・2026-11-10: 旧 +6)。 ターン開始時に積もった分の 1/8 を失う (2026-11-20: 旧 1/4・CombatContext.burstStackBonus)。</summary>
-    public class RefiredPrimer : IPassiveSkillEffect, IRelicDisplay
-    {
-        public string SkillId => "二度詰めの雷管";
-        /// <summary>秘宝の列 (#320) の見え方。</summary>
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(ctx.burstStackBonus);
-        public const int PerBurst = 8;
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnRinkaiBurst };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            Kw.EnableHeat(ctx);
-            if (t == PassiveSkillTrigger.OnRinkaiBurst) ctx.burstStackBonus += PerBurst;
         }
     }
 

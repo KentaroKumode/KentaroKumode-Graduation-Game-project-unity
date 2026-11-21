@@ -226,6 +226,11 @@ namespace GameLoop
             BleedChipped = "欠け刃のナイフ", BleedRift = "裂け目の楔", BleedSaw = "鋸刃の山刀", BleedFirstBlood = "先血の腕輪",
             BleedNeedles = "血止め知らずの針箱", BleedOpenNeedle = "医書裏の開き針", BleedFury = "激情の刃", BleedCleaver = "百人切りの鉈",
             BleedSakura = "血桜", BleedPress = "紅の搾り具", BleedCrystal = "涸れぬ血晶", BleedWedge = "血の楔";
+        // === 臨界の軸の品で、 爆発の式・端子の解決 (5g)・BOT と画面の見込みに効く 16 品 (2026-11-21・full-item-rework-ledger §⑤) = CombatSystem.HeatCore の HeatItems の旗 ===
+        public const string HeatStone = "過熱石", HeatBreastplate = "燻りの革胸当て", HeatPoker = "火守りの火搔き棒", HeatSpanner = "点火スパナ",
+            HeatWhetstone = "荒砥", HeatOven = "恒温の竈", HeatPrimer = "二度詰めの雷管", HeatCoal = "焚き足しの炭",
+            HeatMold = "溢れ取りの鋳型", HeatLedger = "帳簿外の爆薬", HeatKettle = "早沸かし釜", HeatSpark = "火花読みの眼鏡",
+            HeatAshen = "八日目の灰燼", HeatFlint = "燧石の指輪", HeatKiln = "暴れ窯の火床", HeatPillar = "柱折りの発破筒";
 
         // === 戦術の 5 品 (2026-11-21・段 1-f・item-overhaul-spec §6-2・名前は仮) = TacticItemEffects.cs ===
         public const string TacPommel = "渾身の柄頭", TacGapSpear = "隙衝きの短槍";

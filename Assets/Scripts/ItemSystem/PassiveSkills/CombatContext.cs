@@ -561,9 +561,8 @@ namespace ItemSystem.PassiveSkills
         public float shieldOnWinPct;
 
         // ==== 臨界メーター (Rinkai) 2026-07-16 追加 ====
-        /// <summary>[persistent] 臨界メーター: 攻撃配線ダイス合計 (attackSum) を毎T末に加算。
-        /// 閾値 (RinkaiThreshold 基準50、LowerThreshold で下がる) 到達で 次T の攻撃に爆発ボーナス +RinkaiBurstDamage を付与し、0リセット。
-        /// パッシブ「連鎖爆発」で爆発T会心確定、「不朽の熱」で致命耐え、「余熱」で爆発後20残し、等の派生あり。</summary>
+        /// <summary>[persistent] 臨界メーター: 攻撃の端子の合計 (attackSum) を毎ターンの終わりに足し、 品・端子の分はその時点で足す (Keywords.Kw.AddHeat)。
+        /// 閾値に届くとその場で爆発する (式は CombatSystem.HeatCore)。</summary>
         public int rinkaiMeter;
         /// <summary>[persistent] 直近ターンにプレイヤーが与えた総ダメージ。
         /// オーバーロードの発動判断 (「倍にすれば倒し切れるか」) にだけ使う。
@@ -573,16 +572,10 @@ namespace ItemSystem.PassiveSkills
         /// BeginNewTurn Phase B でリセットする。</summary>
         // [撤去 2026-09-13] overloadThisTurn ── 出力 r10 の旧極点〈オーバーロード〉。
         //   〈戦意〉(累積成長) へ差し替え。 経緯は MetaPanel.BattleSpiritUnlocked。
-        /// <summary>[persistent] 臨界の閾値。 基準 50。 〈早沸かし釜〉で 35 に下がる (最小適用)。 0 = 臨界が動いていない。</summary>
+        /// <summary>[persistent] 臨界の閾値。 既定 30 (〈早沸かし釜〉−12・〈暴れ窯の火床〉で下がる・下限 12・CombatSystem.HeatCore)。 0 = 臨界が動いていない。</summary>
         public int rinkaiThreshold;
-        /// <summary>[persistent] 臨界爆発 1 回の flat damage。 基準 50。</summary>
-        public int rinkaiBurstDamage;
-        /// <summary>[persistent] 「不朽の熱」の 1戦闘 1回消費フラグ。 true で発動済み。</summary>
-        public bool rinkaiUnyieldingUsed;
 
         // ---- 規則の品 (2026-10-31 アイテム再編)。 どれも戦闘開始時に品が立てる [persistent] ----
-        /// <summary>[persistent] 〈帳簿外の爆薬〉: 爆発で臨界を 0 にせず閾値ぶんだけ減らし、 溜まっている限り何度でも爆発する。</summary>
-        public bool rinkaiMultiBurst;
         /// <summary>[persistent] 〈雷壷〉: 充電の上限が無くなる (<see cref="AddCharge"/>)。 ターン終了時の目減りは品のクラス (ChargeEffects.ThunderJar)。</summary>
         public bool chargeCapRemoved;
         /// <summary>[persistent] 〈廃庭の霧吹き〉: 敵が攻撃した直後にも、 毒のダメージ (威力 50%・毒は減らない) が 1 回入る (1 ターン 1 回・CombatManager の敵の攻撃の解決)。</summary>
@@ -616,11 +609,7 @@ namespace ItemSystem.PassiveSkills
             => System.Math.Min(MetaProgression.Relics.RelicCatalog.PoisonKeepCap, poisonKeepPct + MetaProgression.Relics.RelicApplicator.GetPoisonKeepBonus());
         /// <summary>[persistent] 出血の比例減衰の割る数への上乗せ (AxisRules.BleedDecay)。 〈血晶〉の②。</summary>
         public int bleedDecayDivisorBonus;
-        /// <summary>[persistent] 臨界を得るたびの上乗せ (Kw.AddHeat)。 〈炉温〉の①。</summary>
-        public int heatGainBonus;
-        /// <summary>[persistent] 〈炉温〉の②: 爆発のたびに会心の判定をし、 会心なら会心倍率の半分が乗る (CombatManager.LandBurst)。 代わりに爆発の基礎が 15 + 炉温 / 2。</summary>
-        public bool burstCritRule;
-        /// <summary>[decay] 爆発への上乗せ (〈二度詰めの雷管〉が爆発のたびに積み、 ターン開始時に 1/4 を失う)。</summary>
+        /// <summary>[persistent] 爆発の基礎への上乗せ (〈二度詰めの雷管〉が爆発のたびに +10・最大 +80・減らない・CombatSystem.HeatCore)。</summary>
         public int burstStackBonus;
         /// <summary>[persistent] ターン開始の減衰で残るシールドへの上乗せ (% ポイント)。 〈油染みの盾革〉が +20 (50% → 70%)。 残る割合は最大 80%。</summary>
         public int shieldKeepBonusPct;
@@ -659,7 +648,7 @@ namespace ItemSystem.PassiveSkills
         public bool critShareOnNonCrit;
         /// <summary>[persistent] 〈銑鉄棍〉(2026-11-20 作り直し): 会心が出なくなる (強制の会心も)。 代わりに会心率 1% につき与ダメージ +1% (100% を上限に数える・与ダメ % の池へ足す・PassiveSkillManager.ProcessDamage)。</summary>
         public bool critToDamage;
-        /// <summary>[persistent] 〈天工開物〉: 爆発 1 回のダメージへの上乗せ (武器を強化した回数 × 5・<see cref="Keywords.Kw.BurstBase"/>)。</summary>
+        /// <summary>[persistent] 〈天工開物〉: 爆発の基礎への上乗せ (武器を強化した回数 × 12・CombatSystem.HeatCore.Damage)。</summary>
         public int burstFlatBonus;
         /// <summary>[persistent] 〈重装兵の隠し刃〉: ボスのダウン中のターンは、 ターン開始時にシールドが半減しない (BeginNewTurn)。</summary>
         public bool shieldKeepOnBossDown;
@@ -1164,7 +1153,6 @@ namespace ItemSystem.PassiveSkills
                 if (enemyBleedStacks == 0) Keywords.Kw.Raise(this, PassiveSkillTrigger.OnBleedZero, 1);
             }
             if (enemyPassivesDisabledTurns > 0) enemyPassivesDisabledTurns--; // 敵パッシブ無効化 残ターン
-            burstStackBonus -= (burstStackBonus + 7) / 8;   // 〈二度詰めの雷管〉の上乗せは毎ターン 1/8 を失う (2026-11-20: 旧 1/4・端数は切り上げて減らす = 7 からも 0 へ減る・2026-11-15 #320)
             // プレイヤーのシールドは毎ターン半減 (切り捨て。 1 → 0 で確実に消える)。 ヴェスカのシールド規約と同じ (GAME.md §13-4)。
             // T1 は戦闘開始時の付与 (開幕シールド等) をそのまま使うので半減しない。 そのターンの付与は OnTurnStart 以降なので「半減 → 付与」の順になる。
             // 失った分を〈半減で失った〉出来事として配る (2026-10-31)。
