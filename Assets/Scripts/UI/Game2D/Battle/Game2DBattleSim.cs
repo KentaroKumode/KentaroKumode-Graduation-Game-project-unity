@@ -619,6 +619,23 @@ namespace UI.Game2D.Battle
         public bool DetonateLive => DetonateState(out _);
         public string DetonateLabel { get { DetonateState(out var l); return l; } }
 
+        // ── シールドの【ジャスト防御】(2026-11-21・ShieldCore・仮置き) ── 見込み (preview) の防御 (ブロック + シールド) が予告ちょうど〜+許容幅なら右の列を金にする (表示だけ)。
+        //   判定は本体と同じ CombatManager.JustGuardForecast。 敵が攻撃しないターン (予告 0) は出さない。
+        private bool JustGuardState(out string label)
+        {
+            label = "";
+            var cm = CombatManager.Instance; var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
+            if (cm == null || ctx == null || preview == null || !TermInputs(out _, out var env, out var st)) return false;
+            bool live = cm.JustGuardForecast(ctx, preview, in env, out int e, out int guard);
+            if (e <= 0) return false;
+            label = "ジャスト防御 " + guard + "/" + e + "+" + ShieldCore.Width(st.shieldItems);
+            return live;
+        }
+        /// <summary>このターン敵の攻撃がある (予告 &gt; 0) なら出す。 / 成立の見込み (金で出す)。 / 右の列の文字 (仮)。</summary>
+        public bool HasJustGuard => JustGuardState(out var l) || l.Length > 0;
+        public bool JustGuardLive => JustGuardState(out _);
+        public string JustGuardLabel { get { JustGuardState(out var l); return l; } }
+
         /// <summary>出目 i を端子 s に挿せるか (挿せる数・払う充電・出目の条件)。 他の出目との関係を見る条件は、 そろう見込みがあれば通す
         /// (〈十字斬り〉の 1 個目を挿せるように)。 本当に発動するかは見込み (Resolve) が決める。</summary>
         public bool Accepts(int i, int s)

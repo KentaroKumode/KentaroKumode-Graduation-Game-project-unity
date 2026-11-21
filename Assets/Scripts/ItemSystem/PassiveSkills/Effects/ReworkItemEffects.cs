@@ -363,132 +363,6 @@ namespace ItemSystem.PassiveSkills.Effects
     //  シールド
     // ============================================================
 
-    /// <summary>擦り減った小盾: 防御の端子を挿したダイス 1 個につきシールド +1 (2026-11-06・+2 から。 シールド全体の 30% を占めていた)。</summary>
-    public class WornBuckler : IPassiveSkillEffect
-    {
-        public string SkillId => "擦り減った小盾";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-            => Rw.Shield(ctx, Rw.Count(ctx, MutualKeys.BlockDiceCount), SkillId);
-    }
-
-    /// <summary>肩当て: 出目 3 個とも防御の端子を挿したターン、 シールド +15 (2026-11-07: 旧 +8)。</summary>
-    public class Pauldron : IPassiveSkillEffect
-    {
-        public string SkillId => "肩当て";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (Fam.AllBlock(ctx)) Rw.Shield(ctx, 15, SkillId);
-        }
-    }
-
-    /// <summary>鏡返しの小盾: シールドが攻撃を吸収するたび、 吸収した量の 50% を敵に返す (2026-11-07: 旧 30%)。</summary>
-    public class MirrorBuckler : IPassiveSkillEffect
-    {
-        public string SkillId => "鏡返しの小盾";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnShieldAbsorb };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (Rw.Count(ctx, Kw.AbsorbIsAttackKey) <= 0) return;   // 敵の直接攻撃だけ返す
-            int r = Kw.EventAmount(ctx) * 50 / 100;
-            if (r > 0) Kw.Add(ctx, Kw.ReflectKey, r);
-        }
-    }
-
-    /// <summary>聖路の白靴: マップを 1 歩進むごとに、 次の戦闘の開始時のシールド +2。</summary>
-    public class HolyRoadShoes : IPassiveSkillEffect, IRelicDisplay
-    {
-        public string SkillId => "聖路の白靴";
-        /// <summary>秘宝の列 (#320) の見え方。</summary>
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Rw.Steps);
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => Rw.Shield(ctx, Rw.Steps * 2, SkillId);
-    }
-
-    /// <summary>相棒の魂: シールドが割られて 0 になったとき、 割られる前の量の半分で張り直す (1 戦闘 1 回)。</summary>
-    public class CompanionSoul : IPassiveSkillEffect, IRelicDisplay
-    {
-        public string SkillId => "相棒の魂";
-        /// <summary>秘宝の列 (#320) の見え方。</summary>
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Once(Rw.Count(ctx, "rw.companion") > 0, true);
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnShieldBreak };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            int half = Kw.EventAmount(ctx) / 2;
-            if (half <= 0 || !Rw.OncePerBattle(ctx, "rw.companion")) return;
-            Rw.Shield(ctx, half, SkillId);
-            Rw.Log($"[相棒の魂] 割られたシールドを {half} で張り直す");
-        }
-    }
-
-    /// <summary>二拍目の心臓: HP が 50% を下回った瞬間にシールド (最大 HP の 50%) (1 戦闘 1 回)。
-    /// 旧〈命脈〉から戦闘開始時の回復を外した。</summary>
-    public class SecondBeatHeart : IPassiveSkillEffect, IRelicDisplay
-    {
-        public string SkillId => "二拍目の心臓";
-        /// <summary>秘宝の列 (#320) の見え方。</summary>
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Once(Rw.Count(ctx, "rw.secondBeat") > 0, true);
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostReceiveDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (ctx.playerMaxHP <= 0 || ctx.playerCurrentHP <= 0) return;
-            if (ctx.playerCurrentHP * 100 > ctx.playerMaxHP * 50) return;
-            if (!Rw.OncePerBattle(ctx, "rw.secondBeat")) return;
-            int shield = Mathf.CeilToInt(ctx.playerMaxHP * 0.50f);
-            Rw.Shield(ctx, shield, SkillId);
-            Rw.Log($"[二拍目の心臓] HP50% を下回った → シールド +{shield}");
-        }
-    }
-
-    /// <summary>重装兵の隠し刃 (2026-11-20 作り直し): ボスのダウン中 (そのターンがダウン)、 シールドがターン開始時に半減しない (CombatContext.BeginNewTurn・ctx.shieldKeepOnBossDown)。
-    /// 旧: 敵の HP が 30% 以下になったターン、 シールドを最大 20 使い、 使った量 × 2 を攻撃に加える (1 戦闘 1 回)。</summary>
-    public class KnightsTrump : IPassiveSkillEffect, IRelicDisplay
-    {
-        public string SkillId => "重装兵の隠し刃";
-        /// <summary>秘宝の列 (#320) の見え方。</summary>
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(CombatSystem.BossDown.ActiveNow);
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.shieldKeepOnBossDown = true;
-    }
-
-    /// <summary>敗残兵の部隊章: シールドを 5 失うたび (吸収・半減とも) 刻み +1。 攻撃の端子を挿したターン、
-    /// 刻み 1 つにつき攻撃の端子を挿した出目 +10% (使い切る)。
-    /// 2026-11-06: 旧「この戦闘中の攻撃 +1」は戦闘が長いほど積み上がり、 攻撃+N の 16% を占めた。</summary>
-    public class VeteranPatch : IPassiveSkillEffect, IRelicDisplay
-    {
-        public string SkillId => "敗残兵の部隊章";
-        /// <summary>秘宝の列 (#320) の見え方。</summary>
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Rw.Count(ctx, Stk));
-        private const string Stk = "rw.veteranAtk";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnShieldAbsorb, PassiveSkillTrigger.OnShieldDecay, PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnWired };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (Rw.SpendDiceStacks(t, ctx, Stk)) return;
-            int n = Kw.Tally(ctx, "rw.veteran", Kw.EventAmount(ctx), 5);
-            if (n > 0) Kw.Add(ctx, Stk, n);
-        }
-    }
-
-    /// <summary>脈なしの鋼心臓: 戦闘開始時、 シールド +X。 戦闘に勝利するたび X +1 (このランの間)。 X の最初の値は 10。
-    /// X は <see cref="GameLoop.RunState.pulselessHeartShield"/> (ランの始めに 10)。 勝ちを数えるのは CombatManager.FinishCombat (<see cref="NoteWin"/>)。
-    /// 2026-11-20 作り直し: 旧【規則】「シールドがターン開始時に半減しなくなる」。</summary>
-    public class PulselessHeart : IPassiveSkillEffect, IRelicDisplay
-    {
-        public const string Id = "脈なしの鋼心臓";
-        public const int StartShield = 10;
-        public string SkillId => Id;
-        /// <summary>秘宝の列 (#320) の見え方。</summary>
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Rw.Run?.pulselessHeartShield ?? StartShield);
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => Rw.Shield(ctx, Rw.Run?.pulselessHeartShield ?? StartShield, SkillId);
-        /// <summary>戦闘に勝った時に呼ぶ。 持っている間の勝利だけ X +1。</summary>
-        public static void NoteWin(GameLoop.RunState run)
-        {
-            if (AxisRules.Owns(run, Id)) run.pulselessHeartShield++;
-        }
-    }
-
     /// <summary>燻りの革胸当て: ターン開始の減衰で失ったシールドの半分を臨界にする。
     /// 2026-11-06: 旧「失ったシールドを臨界に」は放っておけば毎ターン入る燃料で、 クリアしたランの 95% が持っていた。</summary>
     public class SmolderingBreastplate : IPassiveSkillEffect
@@ -503,23 +377,6 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     // 〈鎧縫いの針〉(敵の出血 1 につき貫通 +1・OnWired) は 2026-11-11 に items.json の stats へ移した (段 3・per=enemyBleed)。
-
-    /// <summary>力みの小手: シールドを合計 10 得るたび 刻み +1。 攻撃の端子を挿したターン、
-    /// 刻み 1 つにつき攻撃の端子を挿した出目 +10% (使い切る)。 2026-11-06: 旧「この戦闘中の攻撃 +1」。</summary>
-    public class StrainGauntlet : IPassiveSkillEffect, IRelicDisplay
-    {
-        public string SkillId => "力みの小手";
-        /// <summary>秘宝の列 (#320) の見え方。</summary>
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Rw.Count(ctx, Stk));
-        private const string Stk = "rw.gauntletAtk";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnShieldGain, PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnWired };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (Rw.SpendDiceStacks(t, ctx, Stk)) return;
-            int n = Kw.Tally(ctx, "rw.gauntlet", Kw.EventAmount(ctx), 10);
-            if (n > 0) Kw.Add(ctx, Stk, n);
-        }
-    }
 
     // ============================================================
     //  出血へ移った品 (効果は Phase 3 で BleedEffects.cs へ)
@@ -580,30 +437,6 @@ namespace ItemSystem.PassiveSkills.Effects
         public string SkillId => "血脈の災環";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBleedDecay };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => Kw.DamageEnemy(ctx, Kw.EventAmount(ctx) * ctx.AxisDepth(AxisRules.Bleed));
-    }
-
-    /// <summary>破城斧 (2026-11-20 作り直し): シールドが 10 以上のターン、 攻撃の端子 1 枚につき (= 撃ごと) シールドを 5 使い、 その撃の攻撃 +10。
-    /// 「10 以上のターン」は最初の 1 撃の時のシールドで決める。 撃の途中でシールドが 5 を切ったら、 その後の撃には乗らない (払えないので)。
-    /// 攻撃 +10 はこの撃の倍率の前の量 (ProcessDamage の OnPreDealDamage で finalDamage に足す)。 旧: シールドを 10 使って、 その攻撃は敵の防御を無視する。</summary>
-    public class SiegeAxe : IPassiveSkillEffect, IRelicDisplay
-    {
-        public const string Id = "破城斧";
-        public string SkillId => Id;
-        public const int MinShield = 10, PerHitShield = 5, PerHitAtk = 10;
-        /// <summary>シールドが 10 以上だったターンの番号 (最初の 1 撃で決める)。</summary>
-        private const string TurnKey = "rw.siegeAxe.turn";
-        /// <summary>秘宝の列 (#320) の見え方。</summary>
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.consShield >= MinShield);
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (!ctx.IsRealHit) return;
-            if (ctx.hitIndex == 0 && ctx.consShield >= MinShield) ctx.accumulatedValues[TurnKey] = ctx.currentTurn;
-            if (Rw.Count(ctx, TurnKey) != ctx.currentTurn || ctx.consShield < PerHitShield) return;
-            ctx.consShield -= PerHitShield;
-            ctx.finalDamage += PerHitAtk;
-            Rw.Log($"[破城斧] {ctx.hitIndex + 1} 撃目: シールド {PerHitShield} を使い 攻撃 +{PerHitAtk} (シールド 残 {ctx.consShield})");
-        }
     }
 
     /// <summary>血車 (2026-11-20 作り直し): 血晶 5 以上の時、 敵の出血が 10 減るたび (品が使う・自然に減る、 とも・端数は持ち越す)、 充電 +5。

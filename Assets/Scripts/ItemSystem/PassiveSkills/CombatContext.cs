@@ -137,6 +137,8 @@ namespace ItemSystem.PassiveSkills
         /// <summary>[perTurn] (撃ごとに CombatManager が 0 に戻す) この 1 撃だけの最終与ダメージ倍率の上乗せ (%)。 〈加重の拳套〉が OnPreDealDamage で書く。
         /// 主攻撃の最終与ダメージ倍率 (<see cref="finalDamagePct"/>) に足して掛ける (CombatManager.Damage.cs)。</summary>
         public int hitFinalDamagePct;
+        /// <summary>[perTurn] (撃ごとに CombatManager が false に戻す) この 1 撃は敵の防御を無視する (〈破城斧〉が OnPreDealDamage で立てる・CombatManager.Damage の防御の計算)。</summary>
+        public bool hitIgnoreDefense;
         /// <summary>この撃が本物の主攻撃の撃か (攻撃しないターンの空の 1 回ではない)。</summary>
         public bool IsRealHit => playerWonRoll && hitIndex < hitCount;
         public float criticalMultiplier; // [perTurn] (Phase B で基礎値 + メタ・遺物へ戻す) 会心倍率（既定 2.0。2026-07-26 に 3.0 へ上げ、2026-08-03 に 2.0 へ差し戻し）
@@ -620,7 +622,7 @@ namespace ItemSystem.PassiveSkills
         public bool burstCritRule;
         /// <summary>[decay] 爆発への上乗せ (〈二度詰めの雷管〉が爆発のたびに積み、 ターン開始時に 1/4 を失う)。</summary>
         public int burstStackBonus;
-        /// <summary>[persistent] ターン開始の減衰で残るシールドへの上乗せ (% ポイント)。 〈堅牢〉の①。 残る割合は最大 80%。</summary>
+        /// <summary>[persistent] ターン開始の減衰で残るシールドへの上乗せ (% ポイント)。 〈油染みの盾革〉が +20 (50% → 70%)。 残る割合は最大 80%。</summary>
         public int shieldKeepBonusPct;
         /// <summary>[persistent] 会心した攻撃だけに足す貫通 (〈刃毀れの見立て〉・CombatManager.Damage の防御の計算)。</summary>
         public int critArmorPen;
@@ -661,6 +663,10 @@ namespace ItemSystem.PassiveSkills
         public int burstFlatBonus;
         /// <summary>[persistent] 〈重装兵の隠し刃〉: ボスのダウン中のターンは、 ターン開始時にシールドが半減しない (BeginNewTurn)。</summary>
         public bool shieldKeepOnBossDown;
+        /// <summary>[persistent] 〈脈なしの鋼心臓〉: ターン開始時のシールドがこれ以上なら減衰しない (0 = なし・BeginNewTurn)。</summary>
+        public int shieldNoDecayAt;
+        /// <summary>[persistent] 〈二拍目の心臓〉: この戦闘のシールドの獲得量 +N% (増えた分に掛けて切り捨て・<see cref="consShield"/> の set)。</summary>
+        public int shieldGainPct;
         /// <summary>[persistent] 〈過負荷チューナー〉: 過充電の間、 充電を払う行動 (振り直し・再起動・端子・秘宝) の払う量が 2 減る (最低 1・<see cref="ChargeCostNow"/>)。</summary>
         public bool overloadChargeCut;
         /// <summary>[persistent] 〈血止め知らずの針箱〉: 出血のダメージに会心が乗る (会心倍率の半分・1 回のダメージごとに判定・CombatManager.Turn の出血)。</summary>
@@ -734,6 +740,7 @@ namespace ItemSystem.PassiveSkills
                 if (value > _consShield)
                 {
                     int asked = value;
+                    if (shieldGainPct > 0) value += (value - _consShield) * shieldGainPct / 100;   // 〈二拍目の心臓〉: この戦闘のシールドの獲得量 ×1.5
                     float sg = MetaProgression.Relics.RelicApplicator.GetShieldGainPct();
                     if (sg > 0f) value += (int)((value - _consShield) * sg);
                     // 大罪:傲慢 (挑戦カード IV): シールドの獲得 −N% (切り捨てた分を捨てる)
@@ -1070,7 +1077,7 @@ namespace ItemSystem.PassiveSkills
             isCritical = false;
             forceCritical = false;
             forceCritThisHit = false;
-            hitIndex = 0; hitCount = 0; hitFinalDamagePct = 0;
+            hitIndex = 0; hitCount = 0; hitFinalDamagePct = 0; hitIgnoreDefense = false;
             critSuppressed = false;
             lastCritAddPct = 0f;
             critRatePctAdd = 0f;
@@ -1164,9 +1171,10 @@ namespace ItemSystem.PassiveSkills
             // 失った分を〈半減で失った〉出来事として配る (2026-10-31)。
             // 〈重装兵の隠し刃〉(2026-11-20): このターンがボスのダウンなら半減しない (ダウンはこの後 CombatManager.BeginBossDownTurn が待ちから 1 つ使って立てる)
             bool keepForDown = shieldKeepOnBossDown && (CombatSystem.CombatManager.Instance?.Down?.pending ?? 0) > 0;
-            if (currentTurn > 1 && _consShield > 0 && !keepForDown)
+            bool keepForHeart = shieldNoDecayAt > 0 && _consShield >= shieldNoDecayAt;   // 〈脈なしの鋼心臓〉(2026-11-21): シールド 25 以上なら減衰しない
+            if (currentTurn > 1 && _consShield > 0 && !keepForDown && !keepForHeart)
             {
-                // 〈堅牢〉の①: 残る割合 50% + 上乗せ (最大 80%・2026-11-07)
+                // 残る割合 50% + 上乗せ (〈油染みの盾革〉+20・最大 80%)
                 // 遺物 (§15-5) 堅牢 3 個: +25%。 遺物の分だけは上限 90% まで (それ以外の上乗せは 80% のまま)
                 int relicKeep = MetaProgression.Relics.RelicApplicator.GetShieldKeepBonus();
                 int keepPct = System.Math.Min(80, 50 + shieldKeepBonusPct + MetaProgression.MetaBuffApplicator.GetShieldKeepBonusPct());

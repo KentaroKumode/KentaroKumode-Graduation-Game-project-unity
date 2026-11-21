@@ -289,8 +289,8 @@ namespace UI.Game2D
 
         private static readonly string[] SideLabels = { "おまかせ", "道具", "逃げる" };
         /// <summary>k = 0〜2: おまかせ・道具・逃げる / −1: 【再起動】(〈二股の導線〉) / −2: 【オーバークロック】(〈雷鳴の太鼓〉)・仮置き (2026-11-21)。
-        /// −3: 【起爆】の見込み (〈石抜きの毒指輪〉〈劇毒の火薬庫〉・押す札ではない・2026-11-21)。</summary>
-        private string SideLabel(int k) => k == -1 ? _sim.RebootLabel : k == -2 ? _sim.OverclockLabel : k == -3 ? _sim.DetonateLabel : k == 2 && _fleeArmed ? "本当に?" : SideLabels[k];
+        /// −3: 【起爆】の見込み (〈石抜きの毒指輪〉〈劇毒の火薬庫〉・押す札ではない・2026-11-21)。 −4: 【ジャスト防御】の見込み (防御/予告+許容幅・押す札ではない・2026-11-21)。</summary>
+        private string SideLabel(int k) => k == -1 ? _sim.RebootLabel : k == -2 ? _sim.OverclockLabel : k == -3 ? _sim.DetonateLabel : k == -4 ? _sim.JustGuardLabel : k == 2 && _fleeArmed ? "本当に?" : SideLabels[k];
         private RectInt SideRect(int k)
         {
             int w = Game2DJpFont.Width(SideLabel(k)) + 2;
@@ -571,6 +571,8 @@ namespace UI.Game2D
                 if (s.HasOverclock) { var r = SideRect(-2); Txt(SideLabel(-2), r.x + 1, r.y + 1, s.OverclockLive ? Gold2 : s.overclockOn ? Bone : DimC); }
                 // 毒の【起爆】の見込み (仮): このターン起爆するなら金・しないなら暗く (表示だけ)
                 if (s.HasDetonate) { var r = SideRect(-3); Txt(SideLabel(-3), r.x + 1, r.y + 1, s.DetonateLive ? Gold2 : DimC); }
+                // シールドの【ジャスト防御】の見込み (仮): 防御 (ブロック + シールド)/予告+許容幅。 成立するなら金・しないなら暗く (表示だけ)
+                if (s.HasJustGuard) { var r = SideRect(-4); Txt(SideLabel(-4), r.x + 1, r.y + 1, s.JustGuardLive ? Gold2 : DimC); }
             }
             if (!GoVisible) return;
             bool en = s.ButtonEnabled;

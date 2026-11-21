@@ -851,54 +851,11 @@ namespace CombatSystem
             ApplyTerminalOutcome(ctx, term, ref enemyAtkValue);
             RaiseTerminalEvents(ctx, term);   // 端子の出来事 (使い捨て・切り直し・残した端子・補助・2026-11-20)。 OnWired の前 (〈灰払いの箒〉の「次の撃」がこのターンの撃になる)
             int _diagAtkRaw = attackSum;
-            // 遺物 (§15-5) 堅牢の環: 防御の端子を挿した出目 +N% (出目の合計に掛けて切り上げ・端子調律より前)
-            {
-                float rbp = MetaProgression.Relics.RelicApplicator.GetBlockDicePct();
-                if (rbp > 0f && blockSum > 0) blockSum += Mathf.CeilToInt(blockSum * rbp);
-            }
-            // 大罪:傲慢 (挑戦カード IV・2026-11-10): 防御の端子を挿した出目 −N% (切り捨て)
-            {
-                float cut = MetaProgression.MetaDebuffApplicator.GetSinBlockCutPct();
-                if (cut > 0f && blockSum > 0) blockSum = Mathf.FloorToInt(blockSum * (1f - cut / 100f));
-            }
-
-            // 端子調律メタバフ: **接続したダイス 1 本あたり** +N (2026-07-28 に「合計 +N」から変更)。
-            // r3 で 3 本挿せば +9 ── 端子へ厚く配線するほど伸びるので、 §6-4 の配線判断と噛む。
-            // 本数ベースなので「0 配線の端子に架空の加算が乗る」問題は構造的に起きない。
+            // 端子調律メタバフ: **接続したダイス 1 本あたり** +N (2026-07-28 に「合計 +N」から変更)。 ブロックの分は FinalBlockSum の中
             int _diagAtkGhost = 0;   // (ゴースト接続は ADR-0011 で廃止)
             attackSum += attackDiceCount * MetaProgression.MetaBuffApplicator.GetAttackTerminalPerDice();
-            blockSum  += blockDiceCount  * MetaProgression.MetaBuffApplicator.GetBlockTerminalPerDice();
-            // 品のブロック +N (〈帯電の胸甲〉〈絶縁の外套〉〈避雷の杭〉・ctx.itemBlockBonus)。 充電の支払い (振り直し・ApplyTerminalOutcome) の後なので、 このターンの消費の分も入っている
-            blockSum += ctx.itemBlockBonus;
-
-            // 〈貫きの錐〉(7層ヴェスカ GOLD 遺物・2026-07-29 変更)。
-            //   旧: ブロック配線を **丸ごと 0 にする**。 防御という選択肢が消えるため、
-            //       予告があっても対処のしようがなく、 致死率が基準の 2.80 倍に達していた。
-            //   新: **敵の攻撃値 1 につきブロックを 2 削る**。 貫通量が攻撃値に比例するので、
-            //       厚く配線すれば残る ＝ 「守り切れるか」の計算問題になる。
-            //   端子調律メタの本数ボーナスも貫通対象に含めるため、 加算の **後** に処理する。
-            if (ctx != null && ctx.playerBlockIgnored && blockSum > 0)
-            {
-                int pierce = Math.Max(0, enemyAtkValue) * PierceAwlPerAttack;
-                int before = blockSum;
-                blockSum = Math.Max(0, blockSum - pierce);
-                Debug.Log($"[貫きの錐] 敵攻撃{enemyAtkValue} × {PierceAwlPerAttack} = ブロック -{pierce} "
-                        + $"({before} → {blockSum})");
-            }
-            // 〈狂暴化〉(51T〜・2026-11-21): ブロックは何も受けない (守った量も 0)
-            if (ctx != null && ctx.enemyAttackIgnoresGuard) blockSum = 0;
-            // 〈不完全な転移〉(門を不完全に起動した罰・2026-09-14)。
-            //   錐と同じ「ブロックを削る」枠だが、 <b>敵攻撃値ではなくブロック量に比例</b>する。
-            //   厚く配線した分は必ず一定割合残るので、 守りという選択肢は消えない。
-            //   錐の後に置く ── 両方掛かるときは「錐で削られた残り」へさらに貫通が乗る。
-            if (blockSum > 0)
-            {
-                var gateRun = GameLoop.GameManager.Instance?.Run;
-                int beforeGate = blockSum;
-                blockSum = GameLoop.GateFlaws.ApplyTransferPierce(gateRun, blockSum);
-                if (blockSum != beforeGate)
-                    Debug.Log($"[不完全な転移] ブロック貫通 {beforeGate} → {blockSum}");
-            }
+            // ブロックの最終値 (遺物・大罪・端子調律・品のブロック +N・貫きの錐・狂暴化・不完全な転移)。 ジャスト防御の見込み (JustGuardForecast) と同じ関数
+            blockSum = FinalBlockSum(ctx, term.blockAdd, blockDiceCount, enemyAtkValue, log: true);
             // 充電: **接続ダイスの出目合計**を獲得 (2026-07-28 に「個数」から変更)。
             //   旧: 1 本 = 1 充電。 だが消費側は 雷撃 3 / 火花 1 / 過充電閾値 7 と桁が合わず、
             //       雷撃を毎ターン撃つだけで 5 本中 3 本を充電に固定する必要があった。
@@ -1116,7 +1073,7 @@ namespace CombatSystem
             ctx.hitCount = hitBases.Count;   // 撃ごとの品が読む (攻撃しないターンは 0 ── 下の 1 回は固定ダメの枠を取り出すだけ)
             for (int h = 0; h < nHits; h++)
             {
-                ctx.hitIndex = h; ctx.forceCritThisHit = false; ctx.hitFinalDamagePct = 0;   // 撃ごとの値 (〈抜き打ちの作法〉〈加重の拳套〉など)
+                ctx.hitIndex = h; ctx.forceCritThisHit = false; ctx.hitFinalDamagePct = 0; ctx.hitIgnoreDefense = false;   // 撃ごとの値 (〈抜き打ちの作法〉〈加重の拳套〉など)
                 if (h > 0)
                 {
                     // 次の撃の前に固定ダメの枠を空にする ── 空にしないと 1 撃目の固定ダメ (毒・品が預けた分) が次の撃にも返って二重に入る。
@@ -1137,7 +1094,7 @@ namespace CombatSystem
                 hitDealt.Add(d); hitCrit.Add(c);
                 dealtDmg += d; dealtFixed += f; isCrit |= c;
             }
-            ctx.forceCritThisHit = false; ctx.hitFinalDamagePct = 0;
+            ctx.forceCritThisHit = false; ctx.hitFinalDamagePct = 0; ctx.hitIgnoreDefense = false;
             if (nHits > 1)
             {
                 // この後の処理 (計装・画面の倍率) は 1 撃目の後の値を読む前提なので、 1 撃目の後の値へ戻す
@@ -1418,6 +1375,7 @@ namespace CombatSystem
 
             int takenApplied = 0;
             bool primaryAttacked = false, secondaryAttacked = false;   // 盾〈黎明〉の「敵が放った攻撃」
+            int jgAttack = 0, jgGuard = 0;   // 【ジャスト防御】(ShieldCore): 1 体目の攻撃と、 それを受ける時の防御 (ブロック + シールド)
             int parryBlocked = 0;   // 〈後の先〉がブロックで防いだ量 (攻撃 1 回ごとに min(後の先のブロック, ブロックで止めた量))
 
             // 〈封じ・揃〉(前ターン成立) — このターン敵は攻撃しない。 予告は既に出ているので
@@ -1468,6 +1426,7 @@ namespace CombatSystem
                     BossDmgDiag.RecordTurn(ctx.bossId, currentEnemy != null ? currentEnemy.displayName : ctx.bossId);
                 //   〈狂暴化〉(51T〜): 主攻撃はシールド・被ダメの軽減の鎖 (ProcessDamage 以降) を通さない ── 鎖には 0 を流し、 HP を減らす直前に攻撃値をそのまま入れる
                 bool guardless = ctx != null && ctx.enemyAttackIgnoresGuard;
+                if (!guardless) { jgAttack = enemyAtkValue; jgGuard = blockSum + ctx.consShield; }
                 int lossBase = guardless ? 0 : Math.Max(0, enemyAtkValue - blockSum);
                 GuardDiag.Note(enemyAtkValue, enemyAtkValue, blockSum, lossBase);
                 // ラン内のブロック実績。 **GuardDiag (バッチ累計) とは別に持つ** ──
@@ -1677,6 +1636,9 @@ namespace CombatSystem
             ctx.accumulatedValues[ItemSystem.PassiveSkills.Effects.MutualKeys.EnemyAtkPreDefense] =
                 (primaryAttacked ? enemyAtkBeforeDefense : 0) + (secondaryAttacked ? secondaryAtkBeforeDefense : 0);
             ctx.accumulatedValues[ItemSystem.PassiveSkills.Effects.MutualKeys.HpLossFromEnemy] = takenApplied;
+            // 【ジャスト防御】(2026-11-21・ShieldCore): 1 体目の攻撃 E > 0・敵の攻撃で HP を 1 も失っていない・E ≤ ブロック + シールド ≤ E + 許容幅
+            if (takenApplied <= 0 && _deck != null && ShieldCore.IsJustGuard(jgAttack, jgGuard, ShieldCore.Width(_deck.state.shieldItems)))
+                ItemSystem.PassiveSkills.Effects.Shd.NoteJustGuard(ctx, jgAttack, jgGuard);
             BossDownDiag.NoteEnemyTurn(diagHeavyKind, takenApplied);   // [診断 2026-11-14] 大技 / 小技のターンの被ダメ (防御・シールドの後)
             FightEndDiag.NoteEnemyTurn(diagHeavyKind, primaryAttacked, takenApplied);   // [計装 2026-11-18] 戦闘の終わりの診断 (読むだけ)
             if ((diagHeavyKind == 0 || diagHeavyKind == 2) && primaryAttacked)   // [計装 2026-11-14] 大技の被ダメ (実際に撃った大技 / 小技のターン)

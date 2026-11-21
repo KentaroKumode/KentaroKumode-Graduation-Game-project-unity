@@ -183,10 +183,21 @@ namespace ItemSystem.PassiveSkills
             Register(new CorrosionCrown()); Register(new BoneMeltOil());
         }
 
+        /// <summary>シールドの軸 22 品のうち効果クラスを持つ 18 品 (2026-11-21・ShieldEffects.cs)。 残りの 4 品 (肩当て・当て布の籠手・鋲の胸当て・擦り減った小盾) は ShieldCore の旗。</summary>
+        private static void RegisterShield()
+        {
+            Register(new MirrorBuckler()); Register(new CatchBracer()); Register(new LayeredTagShield()); Register(new HolyRoadShoes());
+            Register(new HeroWill()); Register(new OiledShieldLeather()); Register(new BrokenShieldGrudge()); Register(new StrainGauntlet());
+            Register(new VeteranPatch()); Register(new KnightsTrump()); Register(new CompanionSoul()); Register(new ShieldPushArt());
+            Register(new SilentStance()); Register(new SiegeAxe()); Register(new SecondBeatHeart()); Register(new PulselessHeart());
+            Register(new FallenCastleCornerstone()); Register(new BorderGuardStandard());
+        }
+
         private static void RegisterAll()
         {
             RegisterCharge();
             RegisterPoison();
+            RegisterShield();
             // ============================
             //  アイテム再編 (2026-10-31・ReworkItemEffects.cs)
             // ============================
@@ -196,7 +207,6 @@ namespace ItemSystem.PassiveSkills
             Register(new MorningOven());
             Register(new OverflowMold());
             Register(new SecondStrike());
-            Register(new SecondBeatHeart());
             Register(new OffBookChain());
             Register(new HeatWall());
             Register(new QuickKettle());
@@ -206,23 +216,13 @@ namespace ItemSystem.PassiveSkills
             Register(new ArsenalCrate());
             Register(new PatchedBoots());
             Register(new HopeShard());
-            Register(new WornBuckler());
-            Register(new Pauldron());
-            Register(new MirrorBuckler());
-            Register(new HolyRoadShoes());
-            Register(new CompanionSoul());
-            Register(new KnightsTrump());
-            Register(new VeteranPatch());
-            Register(new PulselessHeart());
             Register(new SmolderingBreastplate());
             // 鎧縫いの針 はステータス化 (段 3・敵の出血 1 につき貫通 +1)
-            Register(new StrainGauntlet());
             Register(new HundredCleaver());
             Register(new WeightingGauntlet());
             // 血日に澄む佩玉 はステータス化 (段 3・敵の出血 1 につき会心率 +2%)
             Register(new SoulBloodstone());
             Register(new BloodlineRing());
-            Register(new SiegeAxe());
             Register(new BloodWheel());
             Register(new LeadHandAxe());
             Register(new FuryBlade());
@@ -241,23 +241,20 @@ namespace ItemSystem.PassiveSkills
             // ============================
             //  軸の品 (2026-11-07・AxisItemEffects.cs)。 各軸に 燃料 / ① 数を参照 / ②【規則】
             // ============================
-            // 研ぎ師の見立て書 はステータス化 (段 3・2026-11-11)。 千里眼の水晶・英雄の意志は 2026-11-20 にクラスへ戻した (下の追加 34 品の並び)
+            // 研ぎ師の見立て書 はステータス化 (段 3・2026-11-11)。 千里眼の水晶は 2026-11-20 にクラスへ戻した (下の追加 34 品の並び)
             Register(new FalconerGlove());                                       Register(new LayeredCutForm());     Register(new LayeredScabbard()); Register(new PinpointEye());
             Register(new ReturnEdgeClasp());  Register(new UnstanchedNeedles()); Register(new ClotVial());
             Register(new FirekeeperPoker());  Register(new CharcoalFeeder());       Register(new SparkReadingGlasses()); Register(new RefiredPrimer());
-            Register(new PaddedBracer());     Register(new OiledShieldLeather());Register(new ShieldPushArt());
             // 軸の品・追加 34 品 (2026-11-07・AxisItemEffects2.cs)。 各軸を 23 品にそろえた
             Register(new AimNotch());   Register(new FirstArrow());   Register(new LingeringBell()); Register(new ParryFan());
             Register(new NickAppraisal()); Register(new LosingStreakDie()); Register(new ChainedFlash()); Register(new QuickDrawArt());
-            Register(new ClairvoyantCrystal()); Register(new HeroWill());   // 2026-11-20 作り直し (旧 items.json の stats)
+            Register(new ClairvoyantCrystal()); // 2026-11-20 作り直し (旧 items.json の stats)
             Register(new ChippedKnife()); Register(new ThornGlove()); Register(new RiftWedge()); Register(new DrippingEdge());
             Register(new NoClotSalve()); Register(new CrimsonPress()); Register(new EndlessSpringCrystal());
-            Register(new RivetPlate()); Register(new CatchBracer()); Register(new LayeredTagShield()); Register(new BrokenShieldGrudge());
             // 軸の締めの LEGENDARY (2026-11-20・AxisItemEffects3.cs・GAME.md §23-32)
             Register(new HeavenEyeGuard()); Register(new DeathMaskVisor());
             Register(new ReturningBloodSickle()); Register(new BloodWedge());
             Register(new WildKilnHearth()); Register(new PillarBreakerCharge());
-            Register(new FallenCastleCornerstone()); Register(new BorderGuardStandard());
             // 消耗品の連動品 (2026-11-20・ConsumableLinkEffects.cs・item-overhaul-spec §7-2)
             Register(new BeltPouch()); Register(new SpentPride()); Register(new BottomlessVial()); Register(new SampleBox());
             // 嵐・店・金のマクロ秘宝の戦闘の側 (2026-11-20・MacroItemEffects.cs・item-overhaul-spec §9)
@@ -266,8 +263,8 @@ namespace ItemSystem.PassiveSkills
             Register(new TemperTongs()); Register(new AshBroom());
             // 賽目 (役の軸) の出来事で書く 2 品 (2026-11-21・RoleItemEffects.cs・残り 6 品は TerminalCards の RoleItems の旗と CombatManager の役の適用)
             Register(new ChippedEyeReading()); Register(new MatchedClappers());
-            // 戦術の 6 品 (2026-11-21・TacticItemEffects.cs・item-overhaul-spec §6-2)
-            Register(new HeftyPommel()); Register(new SilentStance()); Register(new GapSpear());
+            // 戦術の 5 品 (2026-11-21・TacticItemEffects.cs・item-overhaul-spec §6-2)
+            Register(new HeftyPommel()); Register(new GapSpear());
             Register(new BreakingMove()); Register(new HeavyBreakerWedge()); Register(new AdversityHourglass());
 
             // ============================

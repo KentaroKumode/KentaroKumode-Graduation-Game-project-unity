@@ -322,6 +322,24 @@ namespace CombatSystem
             return true;
         }
 
+        /// <summary>まだ割っていない一番上の目盛りを、 HP に関係なく今割る (満額のダウンを待ちに積む・〈英雄の意志〉・2026-11-21)。 割る目盛りが無ければ false。</summary>
+        public bool BreakTopNotch()
+        {
+            if (notches == null || broken >= notches.Length) return false;
+            Push(1, false);
+            crackTurn[broken] = -1; broken++;
+            return true;
+        }
+
+        /// <summary>まだ割っていない一番上の目盛りにひびを入れる (HP に関係なく・既にひびがあれば何もしない・〈落城の礎石〉・2026-11-21)。 入れたら true。
+        /// ひびは通常のひびと同じく、 猶予が切れたターンの終わりに割れる (BossDownState.NoteTurnEndCracks)。</summary>
+        public bool CrackTopNotch(int turn)
+        {
+            if (crackTurn == null || broken >= crackTurn.Length || crackTurn[broken] >= 0) return false;
+            crackTurn[broken] = turn;
+            return true;
+        }
+
         /// <summary>まだ割っていない一番上の目盛りにひびが入っているか。</summary>
         public bool TopCracked => crackTurn != null && broken < crackTurn.Length && crackTurn[broken] >= 0;
 

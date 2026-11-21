@@ -35,6 +35,8 @@ namespace CombatSystem
         public static long RebootFired, OverclockFired;
         /// <summary>[計装] 【起爆】した回数 (ランの始めに BOT が 0 へ戻す・ランの記録の detonateFired)。</summary>
         public static long DetonateFired;
+        /// <summary>[計装] 【ジャスト防御】が成立した回数 (ランの始めに BOT が 0 へ戻す・ランの記録の justGuardFired)。</summary>
+        public static long JustGuardFired;
 
         /// <summary>〈猫の手〉がこのターン先に挿した出目 (−1 = 無し)。 BOT の挿し方の方策はこの 1 組を固定として扱う (外さない)。</summary>
         public int CatPawDie => _catDie;
@@ -65,6 +67,7 @@ namespace CombatSystem
             _deck.state.roleItems = TerminalCards.RoleItemsOf(run);      // 賽目の品 (2026-11-21・段 1-f)
             _deck.state.chargeItems = ChargeCore.ItemsOf(run);           // 充電の品 (再起動・オーバークロック・2026-11-21)
             _deck.state.poisonItems = PoisonCore.ItemsOf(run);           // 毒の品 (端子の解決の 5d・起爆の式・2026-11-21)
+            _deck.state.shieldItems = ShieldCore.ItemsOf(run);           // シールドの品 (端子の解決の 5e・ジャスト防御の許容幅・2026-11-21)
             if (AxisRules.Owns(run, GameLoop.ItemIds.DeckSparePlug)) _deck.state.extraDrawNext += TerminalCards.SparePlugDraw;      // 〈予備の差込口〉: 1 ターン目に多く引く
             _deck.state.extraDrawNext += MetaProgression.MetaBuffApplicator.GetSparkDeckOpeningDraw();      // 種火・山札 (2026-11-21): 1 ターン目の手札 +1
             if (AxisRules.Owns(run, GameLoop.ItemIds.DeckToolbox) && runDeck.Count <= TerminalCards.ToolboxMaxDeck)
@@ -167,6 +170,46 @@ namespace CombatSystem
             return e;
         }
 
+        /// <summary>ブロックの最終値 (端子の防御の合計 <paramref name="raw"/>・防御の端子に挿した個数 <paramref name="blockDice"/>・このターンの敵の攻撃 <paramref name="enemyAtk"/>)。
+        /// 本体の配線の集計 (CombatManager.Turn の「5. 配線」) と、 ジャスト防御の見込み (<see cref="JustGuardForecast"/>・画面と BOT) が同じこの関数を通す。
+        /// 順: 遺物〈堅牢の環〉+% → 大罪:傲慢 −% → 端子調律 (1 本あたり) → 品のブロック +N → 〈貫きの錐〉→〈狂暴化〉(0) →〈不完全な転移〉。</summary>
+        public int FinalBlockSum(CombatContext ctx, int raw, int blockDice, int enemyAtk, bool log)
+        {
+            int b = raw;
+            float rbp = MetaProgression.Relics.RelicApplicator.GetBlockDicePct();      // 遺物 (§15-5) 堅牢の環: 防御の端子を挿した出目 +N% (切り上げ)
+            if (rbp > 0f && b > 0) b += Mathf.CeilToInt(b * rbp);
+            float cut = MetaProgression.MetaDebuffApplicator.GetSinBlockCutPct();     // 大罪:傲慢 (挑戦カード IV): −N% (切り捨て)
+            if (cut > 0f && b > 0) b = Mathf.FloorToInt(b * (1f - cut / 100f));
+            b += blockDice * MetaProgression.MetaBuffApplicator.GetBlockTerminalPerDice();   // 端子調律メタバフ: 接続したダイス 1 本あたり +N
+            if (ctx != null) b += ctx.itemBlockBonus;                                  // 品のブロック +N (〈帯電の胸甲〉〈絶縁の外套〉〈避雷の杭〉ほか)
+            //   〈貫きの錐〉(7層ヴェスカ): 敵の攻撃値 1 につきブロックを 2 削る (端子調律の本数ボーナスも削る対象なので加算の後)
+            if (ctx != null && ctx.playerBlockIgnored && b > 0)
+            {
+                int before = b;
+                b = Math.Max(0, b - Math.Max(0, enemyAtk) * PierceAwlPerAttack);
+                if (log) Debug.Log($"[貫きの錐] 敵攻撃{enemyAtk} × {PierceAwlPerAttack} → ブロック {before} → {b}");
+            }
+            if (ctx != null && ctx.enemyAttackIgnoresGuard) b = 0;      // 〈狂暴化〉(51T〜): ブロックは何も受けない
+            if (b > 0)      // 〈不完全な転移〉(門を不完全に起動した罰): ブロック量に比例して削る (錐の後)
+            {
+                int beforeGate = b;
+                b = GameLoop.GateFlaws.ApplyTransferPierce(GameLoop.GameManager.Instance?.Run, b);
+                if (log && b != beforeGate) Debug.Log($"[不完全な転移] ブロック貫通 {beforeGate} → {b}");
+            }
+            return b;
+        }
+
+        /// <summary>【ジャスト防御】の見込み (配線の見込みの画面・BOT が読む): 挿し方の結果 <paramref name="o"/> で、 敵の攻撃を受ける時の防御 (ブロック + シールド) が
+        /// <see cref="ShieldCore.IsJustGuard"/> を満たすか。 本体の判定と同じ式・同じブロックの関数 (<see cref="FinalBlockSum"/>)。
+        /// 見ないもの: 敵の攻撃までに品が足す / 使うシールド (〈破城斧〉の消費・OnWired の品のシールド)。 〈狂暴化〉の攻撃は対象外。</summary>
+        public bool JustGuardForecast(CombatContext ctx, TerminalOutcome o, in TerminalEnv env, out int enemyAttack, out int guard)
+        {
+            enemyAttack = ShieldCore.EnemyAttackAfter(o, env.enemyAttack); guard = 0;
+            if (o == null || ctx == null || ctx.enemyAttackIgnoresGuard || enemyAttack <= 0) return false;
+            guard = FinalBlockSum(ctx, o.blockAdd, o.blockDice, enemyAttack, log: false) + ShieldCore.ShieldAfterWiring(o, in env);
+            return ShieldCore.IsJustGuard(enemyAttack, guard, ShieldCore.Width(_deck?.state.shieldItems ?? ShieldItems.None));
+        }
+
         /// <summary>端子の結果のうち、 攻撃・防御・充電の合計以外を戦闘へ反映する (合計は呼び手が受け取る)。</summary>
         private void ApplyTerminalOutcome(CombatContext ctx, TerminalOutcome o, ref int enemyAtkValue)
         {
@@ -192,7 +235,7 @@ namespace CombatSystem
                 playerHP = Math.Max(1, playerHP - o.selfDamage);
                 ctx.playerCurrentHP = playerHP;
             }
-            if (o.shieldSpend > 0) ctx.consShield = Math.Max(0, ctx.consShield - o.shieldSpend);
+            if (o.shieldSpend > 0) ItemSystem.PassiveSkills.Keywords.Kw.SpendShield(ctx, o.shieldSpend);
             if (o.shield > 0)
             {
                 ctx.consShield += o.shield; ctx.shieldGainedTotal += o.shield;

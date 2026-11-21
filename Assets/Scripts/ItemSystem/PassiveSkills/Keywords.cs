@@ -131,11 +131,6 @@ namespace ItemSystem.PassiveSkills.Keywords
         //  シールド
         // ============================================================
 
-        /// <summary>吸収が敵の直接攻撃によるものか (〈鏡返しの小盾〉は攻撃のときだけ返す)。</summary>
-        public const string AbsorbIsAttackKey = "kw.absorbIsAttack";
-        /// <summary>吸収に応じて敵へ返すダメージ (品が積み、 CombatManager が敵の攻撃の解決で使って 0 に戻す)。</summary>
-        public const string ReflectKey = "kw.reflect";
-
         /// <summary>シールドで dmg を吸収し、 吸収した量を返す。 吸収と割れ (0 になった) の出来事を配る。</summary>
         public static int AbsorbShield(CombatContext ctx, int dmg, bool isAttack)
         {
@@ -143,11 +138,19 @@ namespace ItemSystem.PassiveSkills.Keywords
             int before = ctx.consShield;
             int absorbed = System.Math.Min(before, dmg);
             ctx.consShield = before - absorbed;
-            ctx.accumulatedValues[AbsorbIsAttackKey] = isAttack ? 1 : 0;
             Raise(ctx, PassiveSkillTrigger.OnShieldAbsorb, absorbed);
             if (ctx.consShield <= 0) Raise(ctx, PassiveSkillTrigger.OnShieldBreak, before);
-            ctx.accumulatedValues[AbsorbIsAttackKey] = 0;
             return absorbed;
+        }
+
+        /// <summary>品・端子の効果でシールドを n 使う (〈破城斧〉・端子〈重装突撃〉)。 使った量を返し、 出来事 OnShieldSpend を配る。 割れの出来事は配らない (割られたのではない)。</summary>
+        public static int SpendShield(CombatContext ctx, int n)
+        {
+            if (ctx == null || n <= 0 || ctx.consShield <= 0) return 0;
+            int used = System.Math.Min(n, ctx.consShield);
+            ctx.consShield -= used;
+            Raise(ctx, PassiveSkillTrigger.OnShieldSpend, used);
+            return used;
         }
 
         // ============================================================

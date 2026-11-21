@@ -222,6 +222,10 @@ namespace CombatSystem
             {
                 Debug.Log($"[急所] 会心 → 敵の防御{ctx.enemyDefense} を無視");
             }
+            else if (ctx.hitIgnoreDefense && ctx.enemyDefense > 0 && totalDmg > 0)
+            {
+                Debug.Log($"[破城斧] この撃は敵の防御{ctx.enemyDefense} を無視");
+            }
             else if (ctx.enemyDefense > 0 && totalDmg > 0)
             {
                 int effDef = DefenseFormula.Effective(ctx.enemyDefense, ctx.playerArmorPen + (isCrit ? ctx.critArmorPen : 0));
@@ -396,7 +400,7 @@ namespace CombatSystem
             int shieldAbsorbed = 0;
             if (ctx.consShield > 0 && totalDmg > 0)
             {
-                // 吸収・割れの出来事を配る (2026-10-31)。 吸収に応じて品が敵へ返す分 (〈鏡返しの小盾〉) はここで使う。
+                // 吸収・割れの出来事を配る (2026-10-31)
                 int absorbed = ItemSystem.PassiveSkills.Keywords.Kw.AbsorbShield(ctx, totalDmg, isAttack: true);
                 totalDmg -= absorbed;
                 shieldAbsorbed = absorbed;
@@ -404,13 +408,6 @@ namespace CombatSystem
                 ctx.dbgShieldToNormal += absorbed;   // [計装] チップ側との配分を見る
                 ctx.shieldAbsorbedAttackThisTurn += absorbed;   // 灰燼の王の〈烈炎〉が読む (主攻撃の肩代わりだけ・2026-11-14)
                 Debug.Log($"[CombatManager] シールド吸収 {absorbed} (残{ctx.consShield})");
-                int reflect = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.ReflectKey);
-                if (reflect > 0)
-                {
-                    HpLossDiag.Lose(ref enemyHP, reflect, "反射(シールドの返し)");
-                    ctx.accumulatedValues[ItemSystem.PassiveSkills.Keywords.Kw.ReflectKey] = 0;
-                    Debug.Log($"[シールドの返し] {reflect} → 敵HP {enemyHP}");
-                }
             }
 
             // 〈シュヴァリエのレイピア〉のコントラタック (2026-11-20 作り直し): ブロックとシールドで防いだダメージの 2 倍を敵へ軽減不可で返す。

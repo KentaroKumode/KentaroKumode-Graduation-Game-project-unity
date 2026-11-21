@@ -35,7 +35,6 @@ namespace ItemSystem.PassiveSkills.Effects
             // 〈重ね斬りの型〉〈凝血の小瓶〉は 2026-11-20 (段 1-a) に【規則】の品でなくなったので、 表から外した (軸の普通の品として買う)
             ["腐れ沼の苔玉"] = (AxisRules.Poison, Kind.Rule),
             ["焚き足しの炭"] = (AxisRules.Heat, Kind.Count),         ["火花読みの眼鏡"] = (AxisRules.Heat, Kind.Rule),
-            ["油染みの盾革"] = (AxisRules.Shield, Kind.Count),   [ShieldPushArt.Id] = (AxisRules.Shield, Kind.Rule),
             // 追加 34 品のうち軸の品の数を読む品 (AxisItemEffects2.cs)
             ["千里眼の水晶"] = (AxisRules.Crit, Kind.Count),
             ["涸れぬ血晶"] = (AxisRules.Bleed, Kind.Count),
@@ -343,47 +342,4 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    // ============================================================
-    //  シールド (堅牢)
-    // ============================================================
-
-    /// <summary>当て布の籠手 (燃料): ブロック端子に 2 個以上挿したターン、 シールド +7 (2026-11-07: 旧 +3)。</summary>
-    public class PaddedBracer : IPassiveSkillEffect, IRelicDisplay
-    {
-        public const string Id = "当て布の籠手";
-        /// <summary>秘宝の列 (#320) の見え方。</summary>
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(env.Block(ctx) >= MinBlockDice);
-        public const int MinBlockDice = 2, Shield = 7;
-        public string SkillId => Id;
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (Ax.BlockDice(ctx) >= MinBlockDice) Rw.Shield(ctx, Shield, SkillId);
-        }
-    }
-
-    /// <summary>油染みの盾革 (①): 堅牢 1 につき、 ターン開始の減衰で残るシールド +3% (残る割合は最大 80%・2026-11-20: 旧 +5%・2026-11-07: 旧 +3%)。</summary>
-    public class OiledShieldLeather : IPassiveSkillEffect
-    {
-        public string SkillId => "油染みの盾革";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-            => ctx.shieldKeepBonusPct = System.Math.Max(ctx.shieldKeepBonusPct, 3 * ctx.AxisDepth(AxisRules.Shield));
-    }
-
-    /// <summary>盾押しの心得 (②【規則】): 攻撃の端子を挿したターン、 シールドの「堅牢 × 5%」が攻撃に加わる (2026-11-11: 10% → 5%・2026-11-07: 2% → 10%)。 シールドは減らない。
-    /// 2026-11-11: ヴェスカ戦の主攻撃の基礎の 31% をこの 1 品が出していた (シールドは減らず、 毎ターン満額が乗る)。</summary>
-    public class ShieldPushArt : IPassiveSkillEffect
-    {
-        public const string Id = "盾押しの心得";
-        public const float PctPerItem = 0.05f;
-        public string SkillId => Id;
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (Ax.AtkDice(ctx) <= 0 || ctx.consShield <= 0) return;
-            int add = UnityEngine.Mathf.FloorToInt(ctx.consShield * PctPerItem * ctx.AxisDepth(AxisRules.Shield));
-            if (add > 0) ctx.AddPlayerAttackOrDiceBonus(add);
-        }
-    }
 }

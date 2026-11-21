@@ -15,12 +15,6 @@ namespace AutoTest
         public bool guardCut, undying, steadfast, daybreak;
         public float bashRate, bulwarkRate;
 
-        // ---- 配線で決まる軸の品 (2026-11-07)。 本体は OnWired で足すので ctx.attackDicePct (配線前) には入らない ----
-        /// <summary>〈当て布の籠手〉: ブロック 2 個以上でシールド +3 (敵の攻撃の前に入る)。</summary>
-        public bool paddedBracer;
-        /// <summary>〈盾押しの心得〉: 攻撃の端子を挿したターン、 シールドのこの割合が攻撃に加わる (堅牢 × 2%)。</summary>
-        public float shieldPushPct;
-
         public bool Any => guardCut || undying || steadfast || daybreak || bashRate > 0f || bulwarkRate > 0f;
 
         /// <summary>所持している段から作る。 無い段は 0 / false。</summary>
@@ -31,8 +25,7 @@ namespace AutoTest
             for (int i = 0; i < owned.Count; i++)
             {
                 string id = owned[i];
-                if (id == PaddedBracer.Id) m.paddedBracer = true;
-                else if (id == "切り返し") m.guardCut = true;
+                if (id == "切り返し") m.guardCut = true;
                 else if (id == "不滅の刃") m.undying = true;
                 else if (id == "堅守の構え") m.steadfast = true;
                 else if (id == "黎明") m.daybreak = true;

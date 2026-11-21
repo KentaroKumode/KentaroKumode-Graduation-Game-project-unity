@@ -113,15 +113,15 @@ namespace AutoTest
                     sightFlat += Math.Min(1f, o.disposedNow * sg.broomPct) * Math.Max(0f, s.critMulEff - 1f)
                                * DeckPerTurnDamage(in s, k) / Math.Max(1, o.attackHits.Count);
             }
-            // 〈破城斧〉: 最初の 1 撃の時のシールド (持ち越し + このターンの端子の分) が 10 以上なら、 撃ごとにシールド 5 を使い 攻撃 +10 (倍率の前)。
-            //   shortcut: 使ったシールドは、 半分 (毎ターン半減) を先の HP で引く。 このターンの被弾を吸えなくなる分は見ない
+            // 〈破城斧〉: 最初の 1 撃の時のシールド (持ち越し + このターンの端子の分) が 15 以上なら、 撃ごとにシールド 8 を使い その撃の最終与ダメージ +80%・防御無視。
+            //   shortcut: 1 撃の与ダメは 1 ターンの見込み ÷ 撃の数・防御無視の分は見ない。 使ったシールドは、 半分 (毎ターン半減) を先の HP で引く。 このターンの被弾を吸えなくなる分は見ない
             if (sg.siegeAxe && o.attackHits.Count > 0)
             {
                 int sh = s.myShield + ws.shield;
                 if (sh >= ItemSystem.PassiveSkills.Effects.SiegeAxe.MinShield)
                 {
                     int h = Math.Min(o.attackHits.Count, sh / ItemSystem.PassiveSkills.Effects.SiegeAxe.PerHitShield);
-                    ws.aSum += h * ItemSystem.PassiveSkills.Effects.SiegeAxe.PerHitAtk;
+                    sightFlat += h * ItemSystem.PassiveSkills.Effects.SiegeAxe.FinalPct / 100f * DeckPerTurnDamage(in s, k) / o.attackHits.Count;
                     sightHp -= 0.5f * h * ItemSystem.PassiveSkills.Effects.SiegeAxe.PerHitShield * DeckFutureHpWorth(in s);
                 }
             }
@@ -224,6 +224,19 @@ namespace AutoTest
                 //   (戦闘をまたいで HP は残るので、 先の戦闘の回復も今の HP と同じ重さ)。 小さな傷に切って捨てないための足切り。
                 if (TerminalCards.LeavesRunDeck(d) && (runNow?.terminalDeck?.Count ?? 0) > TerminalCards.MinDeckSize)
                     flat -= DeckRunLeaveHpCost * hpUnit;
+            }
+            // 【ジャスト防御】を狙う配線 (シールドの BOT の規則・2026-11-21): 本体と同じ判定 (CombatManager.JustGuardForecast) で成立するなら、 成立で働く品の得を足す。
+            //   shortcut: 先のターンの得は控えめな定数 (〈防人の軍標〉= 残りターンの半分に +35%・〈受け太刀の籠手〉+8 と〈静寂の構え〉の上乗せは次の攻撃の 7 割・〈英雄の意志〉のダウンは 1 ターンの与ダメの半分)
+            if (sg.jgCtx != null && CombatManager.Instance != null && CombatManager.Instance.JustGuardForecast(sg.jgCtx, o, in env, out int jgE, out _))
+            {
+                float per = DeckPerTurnDamage(in s, k);
+                if (sg.jgMirror) ws.extraDmg += jgE * (ItemSystem.PassiveSkills.Effects.MirrorBuckler.JustPct - ItemSystem.PassiveSkills.Effects.MirrorBuckler.Pct) / 100;
+                if (sg.jgBlade) ws.extraDmg += jgE;
+                if (sg.jgStandard) sightFlat += ItemSystem.PassiveSkills.Effects.BorderGuardStandard.PctPerGuard / 100f * per * Math.Max(0, turns - 1) * 0.5f + DeckDrawDmg;
+                if (sg.jgCatch) sightFlat += ItemSystem.PassiveSkills.Effects.CatchBracer.Atk * DeckFutureAttackShare;
+                if (sg.jgSilent && o.attackDice == 0)
+                    sightFlat += (ItemSystem.PassiveSkills.Effects.SilentStance.JustPct - ItemSystem.PassiveSkills.Effects.SilentStance.Pct) / 100f * per * DeckFutureAttackShare;
+                if (sg.jgHero && env.heavyTurn) sightFlat += 0.5f * per;
             }
             ws.specFlat = flat + sightFlat * dw + sightHp;
 
@@ -471,7 +484,7 @@ namespace AutoTest
             public int tongsDmg;
             /// <summary>〈灰払いの箒〉: 使い捨て 1 枚あたり、 次の撃の会心率 +采配 × 5%。</summary>
             public float broomPct;
-            /// <summary>〈破城斧〉: シールド 10 以上のターン、 撃ごとにシールド 5 を使い 攻撃 +10。</summary>
+            /// <summary>〈破城斧〉: シールド 15 以上のターン、 撃ごとにシールド 8 を使い その撃の最終与ダメージ +80%・防御無視。</summary>
             public bool siegeAxe;
             /// <summary>〈無害灯〉: 臨界 15 以上なら、 敵の直接攻撃で失う HP を半分にする (1 ターン 1 回)。</summary>
             public bool lamp;
@@ -480,6 +493,10 @@ namespace AutoTest
             public bool ring;
             public PoisonItems poisonItems;
             public int detonates;
+            /// <summary>【ジャスト防御】で働く品 (〈鏡返しの小盾〉〈重装兵の隠し刃〉〈防人の軍標〉〈受け太刀の籠手〉〈静寂の構え〉〈英雄の意志〉は強敵の時だけ)。
+            /// どれかを持っている時だけ <see cref="jgCtx"/> を入れる (挿し方ごとの見込みはこれが null なら飛ばす)。</summary>
+            public bool jgMirror, jgBlade, jgStandard, jgCatch, jgSilent, jgHero;
+            public ItemSystem.PassiveSkills.CombatContext jgCtx;
 
             public static ItemSight Of(RunState run, ItemSystem.PassiveSkills.CombatContext ctx)
             {
@@ -493,6 +510,10 @@ namespace AutoTest
                 v.poisonItems = PoisonCore.ItemsOf(run);
                 v.detonates = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.Psn.DetonateCountKey);
                 v.ring = (v.poisonItems & PoisonItems.Ring) != 0 && (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.HollowPoisonRing.TurnKey) != ctx.currentTurn;
+                v.jgMirror = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.MirrorBuckler.Id); v.jgBlade = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.KnightsTrump.Id);
+                v.jgStandard = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.BorderGuardStandard.Id); v.jgCatch = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.CatchBracer.Id);
+                v.jgSilent = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.SilentStance.Id); v.jgHero = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.HeroWill.Id) && ItemSystem.PassiveSkills.Effects.Rw.StrongFoe();
+                if (v.jgMirror || v.jgBlade || v.jgStandard || v.jgCatch || v.jgSilent || v.jgHero) v.jgCtx = ctx;
                 return v;
             }
         }

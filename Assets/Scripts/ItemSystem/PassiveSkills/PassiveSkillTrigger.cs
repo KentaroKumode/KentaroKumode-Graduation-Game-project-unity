@@ -90,6 +90,8 @@ namespace ItemSystem.PassiveSkills
         OnShieldDecay,
         /// <summary>シールドが吸収で 0 になった (量 = 割られる前の量)。</summary>
         OnShieldBreak,
+        /// <summary>品・端子の効果でシールドを使った (量 = 使った分・Kw.SpendShield・2026-11-21)。</summary>
+        OnShieldSpend,
         /// <summary>敵の毒が増えた (量 = 増えた分)。</summary>
         OnPoisonGain,
         /// <summary>毒のダメージが入った (量 = そのダメージ)。</summary>
@@ -128,5 +130,7 @@ namespace ItemSystem.PassiveSkills
         OnHeavyCanceled,
         /// <summary>毒の【起爆】が起きた (量 = 起爆のダメージ・2026-11-21・Effects.Psn.Detonate)。 〈瘴気の外套〉の消費しない 50% のダメージは起爆ではない (鳴らない)。</summary>
         OnPoisonDetonate,
+        /// <summary>【ジャスト防御】が成立した (量 = 敵の直接攻撃の予告 E・2026-11-21・CombatSystem.ShieldCore)。 敵の攻撃の解決の後、 ターン終了の前に配る。</summary>
+        OnJustGuard,
     }
 }

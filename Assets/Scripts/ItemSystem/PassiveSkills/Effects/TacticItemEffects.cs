@@ -4,7 +4,7 @@ using ItemSystem.PassiveSkills.Keywords;
 namespace ItemSystem.PassiveSkills.Effects
 {
     // ============================================================
-    //  戦術の 6 品 (2026-11-21・段 1-f・item-overhaul-spec §6-2・名前は仮・数値は仮)。
+    //  戦術の 5 品 (2026-11-21・段 1-f・item-overhaul-spec §6-2・名前は仮・数値は仮・〈静寂の構え〉は ShieldEffects.cs)。
     //  一撃の重さ・ボスのダウン・大技の周期・エスカレーションを読む品 (引きの悪い回を知識で乗り切る側)。
     //  〈逆境の砂時計〉の毎ターンのシールドは +8 → +4 (毎ターン働く守りは小さく・作者の方針)。
     //  品の文に無い上限・回数制限は足さない (作者の方針)。
@@ -21,25 +21,6 @@ namespace ItemSystem.PassiveSkills.Effects
             if (!ctx.IsRealHit || ctx.hitCount != 1) return;
             ctx.hitFinalDamagePct += FinalPct;
             ctx.playerArmorPen += Pen;      // 撃は 1 つなので、 このターンの貫通に足してよい (BeginNewTurn で戻る)
-        }
-    }
-
-    /// <summary>静寂の構え (シールド): 攻撃の端子に 1 つも挿さなかったターンの次のターン、 最初の 1 撃の最終与ダメージ +50% (次のターンに攻撃しなければ消える)。</summary>
-    public class SilentStance : IPassiveSkillEffect
-    {
-        public string SkillId => ItemIds.TacStill;
-        public const int FinalPct = 50;
-        /// <summary>[persistent] 最終与ダメージが乗るターンの番号。</summary>
-        private const string TurnKey = "tac.still.turn";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired, PassiveSkillTrigger.OnPreDealDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (t == PassiveSkillTrigger.OnWired)
-            {
-                if (Rw.Count(ctx, MutualKeys.AttackDiceCount) <= 0) ctx.accumulatedValues[TurnKey] = ctx.currentTurn + 1;
-                return;
-            }
-            if (ctx.IsRealHit && ctx.hitIndex == 0 && Rw.Count(ctx, TurnKey) == ctx.currentTurn) ctx.hitFinalDamagePct += FinalPct;
         }
     }
 

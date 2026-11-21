@@ -219,9 +219,11 @@ namespace GameLoop
         public const string PoisonGreenKnife = "緑染みの小刀", PoisonSerpent = "蛇血瓶", PoisonTaster = "毒見役の小匙", PoisonThorn = "毒棘の小盾",
             PoisonMantle = "瘴気の外套", PoisonBlowpipe = "麻痺の吹き矢", PoisonRing = "石抜きの毒指輪", PoisonMagazine = "劇毒の火薬庫",
             PoisonSlowBlade = "遅効の毒刃", PoisonOil = "骨溶かしの黒油";
+        // === シールドの軸の品で、 端子の解決 (5e)・ジャスト防御の許容幅に効く 4 品 (2026-11-21・full-item-rework-ledger §③) = CombatSystem.ShieldCore の ShieldItems の旗 ===
+        public const string ShieldPauldron = "肩当て", ShieldPadded = "当て布の籠手", ShieldRivet = "鋲の胸当て", ShieldWorn = "擦り減った小盾";
 
-        // === 戦術の 6 品 (2026-11-21・段 1-f・item-overhaul-spec §6-2・名前は仮) = TacticItemEffects.cs ===
-        public const string TacPommel = "渾身の柄頭", TacStill = "静寂の構え", TacGapSpear = "隙衝きの短槍";
+        // === 戦術の 5 品 (2026-11-21・段 1-f・item-overhaul-spec §6-2・名前は仮) = TacticItemEffects.cs ===
+        public const string TacPommel = "渾身の柄頭", TacGapSpear = "隙衝きの短槍";
         public const string TacBreak = "崩しの一手", TacWedge = "大技殺しの楔", TacHourglass = "逆境の砂時計";
 
         // === 航行マップで使う消耗品 (2026-09-28・2026-10-18 に囮と罠を統合) ===

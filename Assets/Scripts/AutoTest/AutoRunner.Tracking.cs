@@ -487,6 +487,7 @@ namespace AutoTest
                 _cur.rebootFired = (int)CombatSystem.CombatManager.RebootFired;
                 _cur.overclockFired = (int)CombatSystem.CombatManager.OverclockFired;
                 _cur.detonateFired = (int)CombatSystem.CombatManager.DetonateFired;
+                _cur.justGuardFired = (int)CombatSystem.CombatManager.JustGuardFired;
                 _cur.chainPath = ItemSystem.PassiveSkills.PassiveSkillManager.ChainDeepestPath;
                 _cur.heatBurstInfo = ItemSystem.PassiveSkills.Keywords.Kw.HeatMaxBurstsOneAdd + "|" + ItemSystem.PassiveSkills.Keywords.Kw.HeatMaxBurstsInfo;
                 _cur.attackSumInfo = CombatSystem.CombatManager.AttackSumMaxInfo;

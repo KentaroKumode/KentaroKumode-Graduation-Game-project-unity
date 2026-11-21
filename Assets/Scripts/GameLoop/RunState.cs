@@ -474,7 +474,7 @@ namespace GameLoop
         public int  stepsSinceBattle;
         /// <summary>〈天工開物〉: このランで武器・ダイスを強化した回数 (持っている間だけ数える)。 戦闘開始時の臨界 +5 × 回数。</summary>
         public int  heavenlyCraftUpgrades;
-        /// <summary>〈脈なしの鋼心臓〉の X: 戦闘開始時のシールド。 ランの始めに 10、 持っている間に戦闘に勝つたび +1 (2026-11-20)。</summary>
+        /// <summary>〈脈なしの鋼心臓〉の X: 戦闘開始時のシールド。 ランの始めに 12、 持っている間に戦闘に勝つたび +2 (2026-11-21)。</summary>
         public int  pulselessHeartShield = ItemSystem.PassiveSkills.Effects.PulselessHeart.StartShield;
 
         // === マクロ秘宝 (2026-11-20・item-overhaul-spec §9)。 どれも持っている間の出来事だけ数える ===

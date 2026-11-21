@@ -116,6 +116,23 @@ namespace CombatSystem
             return true;
         }
 
+        /// <summary>ボスの次の目盛りを HP に関係なく今割る (満額のダウン・〈英雄の意志〉のジャスト防御)。 目盛りの無い敵・割る目盛りが無ければ false。</summary>
+        public bool BreakBossNotch(string label)
+        {
+            if (!_down.Enabled || currentEnemy == null || enemyHP <= 0 || !_down.BreakTopNotch()) return false;
+            Debug.Log($"[{label}] ボスの目盛りを直接 1 段割った (満額のダウン・割った目盛り {_down.broken})");
+            return true;
+        }
+
+        /// <summary>ボスの次の目盛りにひびを入れる (〈落城の礎石〉)。 目盛りの無い敵・既にひびがあれば false。</summary>
+        public bool CrackBossNotch(string label)
+        {
+            int turn = PassiveSkillManager.Instance?.Context?.currentTurn ?? 0;
+            if (!_down.Enabled || currentEnemy == null || enemyHP <= 0 || !_down.CrackTopNotch(turn)) return false;
+            Debug.Log($"[{label}] ボスの次の目盛りにひびを入れた (T{turn})");
+            return true;
+        }
+
         private void BeginBossDownTurnCore(CombatContext ctx)
         {
             _diagHpTurnHead = playerHP; _diagChargeTurn = false;
