@@ -96,7 +96,7 @@ namespace CombatSystem
             return _down.downNow || Escalation.IsChargeNoAttack(currentEnemy, turn) || TenyoHeavy.NoAttackAt(currentEnemy, turn);
         }
 
-        /// <summary>〈柱折りの発破筒〉(2026-11-20): 次に割る目盛りを <paramref name="add"/> (HP) だけ上げる。 今の HP より上へは行かない (今の HP の 1 下まで ── 割るには通常攻撃が要る)。
+        /// <summary>〈柱折りの発破筒〉〈雷鯰の棘〉〈避雷の杭〉: 次に割る目盛りを <paramref name="add"/> (HP) だけ上げる。 今の HP より上へは行かない (今の HP の 1 下まで ── 割るには通常攻撃が要る)。
         /// 目盛りの無い敵では何もしない。 ターンの解決中は CombatManager の手元の HP、 それ以外は ctx の HP の低い方を今の HP とみなす。</summary>
         public void RaiseBossNextNotch(int add)
         {
@@ -105,7 +105,7 @@ namespace CombatSystem
             int hpNow = ctx != null ? System.Math.Min(enemyHP, ctx.enemyCurrentHP) : enemyHP;
             int before = _down.NextNotchHp(currentEnemy.maxHP);
             int to = _down.RaiseNext(currentEnemy.maxHP, hpNow - 1, add);
-            if (to >= 0) Debug.Log($"[柱折りの発破筒] 次の目盛り {before} → {to} (+{add}・HP {hpNow})");
+            if (to >= 0) Debug.Log($"[{CombatContext.CurrentSkillId}] 次の目盛り {before} → {to} (+{add}・HP {hpNow})");
         }
 
         /// <summary>ボスの一番上のひびを今割る (満額のダウン・<see cref="BossDownState.BreakTopCrack"/>)。 目盛りの無い敵・ひびが無ければ false。</summary>

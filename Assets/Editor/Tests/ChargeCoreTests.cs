@@ -61,6 +61,19 @@ namespace AutoTest.EditorTests
             Assert.That(o.chargeSpend, Is.EqualTo(0));
             Assert.That(Run(ChargeItems.Whip, 0, spendsBefore: 1).rebooted, Is.Empty);
         }
+
+        [Test]
+        public void Rod_CutsAndRebootsBlockOnlyWhenEnemyAttacks()
+        {
+            var st = new TerminalBattleState { chargeItems = ChargeItems.Rod };
+            var env = new TerminalEnv { charge = 10, chargeCap = 30, hp = 50, maxHp = 50, enemyAttack = 8 };
+            var o = TerminalCards.Resolve(Board, new[] { 0, 1 }, new[] { 5, 3 }, env, st);
+            Assert.That(o.takenFlatCut, Is.EqualTo(ChargeCore.RodCut));
+            Assert.That(o.rebooted, Is.EqualTo(new List<int> { 1 }));          // 防御の端子だけ
+            Assert.That(o.chargePays, Is.EqualTo(new List<int> { ChargeCore.RodCost }));
+            env.enemyAttack = 0;
+            Assert.That(TerminalCards.Resolve(Board, new[] { 0, 1 }, new[] { 5, 3 }, env, new TerminalBattleState { chargeItems = ChargeItems.Rod }).chargeSpend, Is.EqualTo(0));
+        }
     }
 }
 #endif
