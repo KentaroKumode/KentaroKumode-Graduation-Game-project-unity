@@ -1104,7 +1104,8 @@ namespace CombatSystem
         {
             st.gauge.TryGetValue(id, out int g); g += add;
             int fired = 0;
-            while (g >= need) { g -= need; fired++; }
+            // 速度 (2026-11-21・結果は同じ): 1 つずつ引くと溜まりの量に比例して回る。 〈打ち直し〉で出目が数千万まで膨らんだ戦闘で 1 回の解決が 10 ms を超え、 ワーカーが 16 分止まった
+            if (need > 0 && g >= need) { fired = g / need; g -= fired * need; }
             st.gauge[id] = g;
             return fired;
         }
