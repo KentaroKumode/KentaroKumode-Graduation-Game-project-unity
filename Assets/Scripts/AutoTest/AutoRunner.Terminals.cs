@@ -127,6 +127,13 @@ namespace AutoTest
             }
             // 〈無害灯〉: 敵の直接攻撃で失う HP を半分 (使う臨界は見ない)
             if (sg.lamp) ws.takenMul *= 0.5f;
+            // 〈石抜きの毒指輪〉の【起爆】(毒の BOT の規則・2026-11-21): 配線の後の毒 (端子の毒を足す) が 24 以上で攻撃の撃があれば、 起爆のダメージを軽減不可の分に足す
+            //   (撃が当たるかは見ない・王冠の 1.5 倍は見ない)。 毒を 24 へ押し上げて殴る挿し方が選ばれる
+            if (sg.ring && o.attackHits.Count > 0)
+            {
+                int pz = env.enemyPoison + o.poison;
+                if (pz >= PoisonCore.RingNeed) ws.extraDmg += PoisonCore.Damage(PoisonCore.Spend(pz), sg.poisonItems, sg.detonates, s.enemyDown);
+            }
 
             // ---- 先のターンに効く分の見積もり (上の定数) ----
             float dw = DeckDamageWorth(in s), fw = DeckFutureHpWorth(in s);
@@ -469,6 +476,10 @@ namespace AutoTest
             /// <summary>〈無害灯〉: 臨界 15 以上なら、 敵の直接攻撃で失う HP を半分にする (1 ターン 1 回)。</summary>
             public bool lamp;
             public int axDeck;
+            /// <summary>〈石抜きの毒指輪〉: このターンまだ起爆していない (持っていなければ false)。 / 毒の品の旗・この戦闘で起爆した回数 (起爆のダメージの式 PoisonCore.Damage が読む)。</summary>
+            public bool ring;
+            public PoisonItems poisonItems;
+            public int detonates;
 
             public static ItemSight Of(RunState run, ItemSystem.PassiveSkills.CombatContext ctx)
             {
@@ -479,6 +490,9 @@ namespace AutoTest
                 if (run.OwnsPassive(ItemIds.DeckBroom)) v.broomPct = ItemSystem.PassiveSkills.Effects.AshBroom.PctPerDepth * v.axDeck;
                 v.siegeAxe = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.SiegeAxe.Id);
                 v.lamp = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.HarmlessLamp.Id) && ctx.rinkaiMeter >= ItemSystem.PassiveSkills.Effects.HarmlessLamp.MinHeat;
+                v.poisonItems = PoisonCore.ItemsOf(run);
+                v.detonates = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.Psn.DetonateCountKey);
+                v.ring = (v.poisonItems & PoisonItems.Ring) != 0 && (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.HollowPoisonRing.TurnKey) != ctx.currentTurn;
                 return v;
             }
         }

@@ -191,6 +191,8 @@ namespace CombatSystem
         public RoleItems roleItems;
         /// <summary>充電の品の旗 (戦闘の始めに所持品から・CombatManager.BeginTerminalDeck・<see cref="ChargeCore.ItemsOf"/>・2026-11-21)。</summary>
         public ChargeItems chargeItems;
+        /// <summary>毒の品の旗 (戦闘の始めに所持品から・CombatManager.BeginTerminalDeck・<see cref="PoisonCore.ItemsOf"/>・2026-11-21)。</summary>
+        public PoisonItems poisonItems;
         /// <summary>〈宿命の刻み目〉: このターンに立った役〈連なり〉の効果 (挿した端子がすべて 2 回働く) を次のターンにももう 1 回 (<see cref="BeginTurn"/> が <see cref="doubleAll"/> へ移す・CombatManager.ResolveRoles が立てる)。</summary>
         public bool fateDoubleNext;
 
@@ -1014,6 +1016,9 @@ namespace CombatSystem
                 int tgt = Best(true, false);
                 if (tgt >= 0) Refire(tgt, "灼線鞭");
             }
+
+            // ── 5d. 毒の品 (2026-11-21・PoisonCore・full-item-rework-ledger §②): 発動・再起動が決まった後に、 毒・回復・ブロック・被ダメ・防御無視を足す ──
+            PoisonCore.ApplyToTerminals(defs, dice, in env, state, o);
 
             // ── 5b. 〈緊急再装填〉(2026-11-20): このターンに使った他の使い捨てを 1 枚ずつ (場の右から・自分は除く・他の〈緊急再装填〉は戻せる)。 〈残響〉で 2 回働いても 1 枚 ──
             for (int s = 0; s < m; s++)

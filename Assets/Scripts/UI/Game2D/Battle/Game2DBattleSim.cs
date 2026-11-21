@@ -595,6 +595,30 @@ namespace UI.Game2D.Battle
         public string RebootLabel => rebootSel < 0 || rebootSel >= board.Count ? "再起動:なし" : "再起動:" + board[rebootSel];
         public string OverclockLabel => "オーバークロック";
 
+        // ── 毒の【起爆】(2026-11-21・PoisonCore・仮置き) ── 起爆は品が自動で起こす (押す札ではない)。 見込み (preview) の毒で、 このターン起爆するかを右の列に出す。
+        //   〈石抜きの毒指輪〉= 配線の後の毒が 24 以上で攻撃の端子あり / 〈劇毒の火薬庫〉= このターンに与えた毒 (端子の分を足す) が 8 以上。
+        private PoisonItems PoisonFlags => CombatManager.Instance?.TerminalDeck?.state.poisonItems ?? PoisonItems.None;
+        public bool HasDetonate => (PoisonFlags & (PoisonItems.Ring | PoisonItems.Magazine)) != 0;
+        private bool DetonateState(out string label)
+        {
+            label = "";
+            if (!HasDetonate || !TermInputs(out _, out var env, out _)) return false;
+            int add = preview != null ? preview.poison : 0;
+            if ((PoisonFlags & PoisonItems.Ring) != 0)
+            {
+                int p = env.enemyPoison + add;
+                label = "起爆 毒" + p + "/" + PoisonCore.RingNeed;
+                return p >= PoisonCore.RingNeed && preview != null && preview.attackHits.Count > 0;
+            }
+            var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
+            int g = (ctx != null ? ItemSystem.PassiveSkills.Effects.Psn.TurnN(ctx, ItemSystem.PassiveSkills.Effects.PoisonMagazine.GivenKey) : 0) + add;
+            label = "起爆 付与" + g + "/" + PoisonCore.MagazineGiven;
+            return g >= PoisonCore.MagazineGiven;
+        }
+        /// <summary>このターン起爆する見込み (金で出す)。 / 右の列の文字 (仮)。</summary>
+        public bool DetonateLive => DetonateState(out _);
+        public string DetonateLabel { get { DetonateState(out var l); return l; } }
+
         /// <summary>出目 i を端子 s に挿せるか (挿せる数・払う充電・出目の条件)。 他の出目との関係を見る条件は、 そろう見込みがあれば通す
         /// (〈十字斬り〉の 1 個目を挿せるように)。 本当に発動するかは見込み (Resolve) が決める。</summary>
         public bool Accepts(int i, int s)

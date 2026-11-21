@@ -215,6 +215,10 @@ namespace GameLoop
 
         // === 充電の軸の品で、 端子の解決の中で効く 4 品 (2026-11-21・full-item-rework-ledger §①) = CombatSystem.ChargeCore の ChargeItems の旗 ===
         public const string ChargeFork = "二股の導線", ChargeRod = "逆さ避雷針", ChargeWhip = "灼線鞭", ChargeDrum = "雷鳴の太鼓";
+        // === 毒の軸の品で、 端子の解決・起爆の式に効く 10 品 (2026-11-21・full-item-rework-ledger §②) = CombatSystem.PoisonCore の PoisonItems の旗 ===
+        public const string PoisonGreenKnife = "緑染みの小刀", PoisonSerpent = "蛇血瓶", PoisonTaster = "毒見役の小匙", PoisonThorn = "毒棘の小盾",
+            PoisonMantle = "瘴気の外套", PoisonBlowpipe = "麻痺の吹き矢", PoisonRing = "石抜きの毒指輪", PoisonMagazine = "劇毒の火薬庫",
+            PoisonSlowBlade = "遅効の毒刃", PoisonOil = "骨溶かしの黒油";
 
         // === 戦術の 6 品 (2026-11-21・段 1-f・item-overhaul-spec §6-2・名前は仮) = TacticItemEffects.cs ===
         public const string TacPommel = "渾身の柄頭", TacStill = "静寂の構え", TacGapSpear = "隙衝きの短槍";

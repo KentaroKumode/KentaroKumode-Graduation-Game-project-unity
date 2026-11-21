@@ -94,8 +94,6 @@ namespace ItemSystem.PassiveSkills
         OnPoisonGain,
         /// <summary>毒のダメージが入った (量 = そのダメージ)。</summary>
         OnPoisonTick,
-        /// <summary>敵の毒が上限に達した。</summary>
-        OnPoisonCap,
         /// <summary>出血が自然に減った (量 = 減った分)。</summary>
         OnBleedDecay,
         /// <summary>出血を品の効果で使った (量 = 使った分)。</summary>
@@ -128,5 +126,7 @@ namespace ItemSystem.PassiveSkills
         /// <summary>敵の大技を取り消した (量 = 1): ダウンがチャージか大技のターンに重なった (ターンの頭・CombatManager.BeginBossDownTurnCore) か、
         /// 大技のターンに〈封じ・揃〉(端子の行動不能も) で敵が行動しなかった (敵の攻撃の解決)。</summary>
         OnHeavyCanceled,
+        /// <summary>毒の【起爆】が起きた (量 = 起爆のダメージ・2026-11-21・Effects.Psn.Detonate)。 〈瘴気の外套〉の消費しない 50% のダメージは起爆ではない (鳴らない)。</summary>
+        OnPoisonDetonate,
     }
 }

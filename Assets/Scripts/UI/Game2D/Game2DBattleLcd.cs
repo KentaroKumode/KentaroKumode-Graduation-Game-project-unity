@@ -288,8 +288,9 @@ namespace UI.Game2D
         private RectInt HeadRect() => new RectInt(BattleMotion.EX - 70, BattleMotion.FloorY + BattleLcdLayout.HeadNextDy - 2, 140, -BattleLcdLayout.HeadNextDy + BattleLcdLayout.HeadIntentDy + Game2DJpFont.Cell + 4);
 
         private static readonly string[] SideLabels = { "おまかせ", "道具", "逃げる" };
-        /// <summary>k = 0〜2: おまかせ・道具・逃げる / −1: 【再起動】(〈二股の導線〉) / −2: 【オーバークロック】(〈雷鳴の太鼓〉)・仮置き (2026-11-21)。</summary>
-        private string SideLabel(int k) => k == -1 ? _sim.RebootLabel : k == -2 ? _sim.OverclockLabel : k == 2 && _fleeArmed ? "本当に?" : SideLabels[k];
+        /// <summary>k = 0〜2: おまかせ・道具・逃げる / −1: 【再起動】(〈二股の導線〉) / −2: 【オーバークロック】(〈雷鳴の太鼓〉)・仮置き (2026-11-21)。
+        /// −3: 【起爆】の見込み (〈石抜きの毒指輪〉〈劇毒の火薬庫〉・押す札ではない・2026-11-21)。</summary>
+        private string SideLabel(int k) => k == -1 ? _sim.RebootLabel : k == -2 ? _sim.OverclockLabel : k == -3 ? _sim.DetonateLabel : k == 2 && _fleeArmed ? "本当に?" : SideLabels[k];
         private RectInt SideRect(int k)
         {
             int w = Game2DJpFont.Width(SideLabel(k)) + 2;
@@ -568,6 +569,8 @@ namespace UI.Game2D
                 // 充電のコアアクション (仮): 見込みで成り立つ時は金・選んだが成り立たない時は白・選んでいない時は暗く
                 if (s.HasReboot) { var r = SideRect(-1); Txt(SideLabel(-1), r.x + 1, r.y + 1, s.RebootLive ? Gold2 : s.rebootSel >= 0 ? Bone : DimC); }
                 if (s.HasOverclock) { var r = SideRect(-2); Txt(SideLabel(-2), r.x + 1, r.y + 1, s.OverclockLive ? Gold2 : s.overclockOn ? Bone : DimC); }
+                // 毒の【起爆】の見込み (仮): このターン起爆するなら金・しないなら暗く (表示だけ)
+                if (s.HasDetonate) { var r = SideRect(-3); Txt(SideLabel(-3), r.x + 1, r.y + 1, s.DetonateLive ? Gold2 : DimC); }
             }
             if (!GoVisible) return;
             bool en = s.ButtonEnabled;

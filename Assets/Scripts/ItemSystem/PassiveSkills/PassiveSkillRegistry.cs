@@ -173,9 +173,20 @@ namespace ItemSystem.PassiveSkills
         /// 全スキルを登録
         /// ★ 新スキル追加時はここに1行追加するだけ ★
         /// </summary>
+        /// <summary>毒の軸 (2026-11-21・PoisonEffects.cs・full-item-rework-ledger §②)。 〈緑染みの小刀〉〈蛇血瓶〉〈毒見役の小匙〉は端子の解決の中だけで効く (CombatSystem.PoisonCore の旗・クラスなし)。</summary>
+        private static void RegisterPoison()
+        {
+            Register(new VenomBangle()); Register(new PoisonWedge()); Register(new AcidVial()); Register(new NeedleRing()); Register(new LeafMoldBag());
+            Register(new LongCenser()); Register(new RuinedGardenSprayer()); Register(new HerbStaff()); Register(new StitchThread()); Register(new MiasmaJar());
+            Register(new ThornBuckler()); Register(new HollowPoisonRing()); Register(new Paralysis()); Register(new RotBlade()); Register(new RotMossBall());
+            Register(new Blowpipe()); Register(new PoisonMagazine()); Register(new SlowPoisonBlade()); Register(new MiasmaMantle()); Register(new PoolKeeper());
+            Register(new CorrosionCrown()); Register(new BoneMeltOil());
+        }
+
         private static void RegisterAll()
         {
             RegisterCharge();
+            RegisterPoison();
             // ============================
             //  アイテム再編 (2026-10-31・ReworkItemEffects.cs)
             // ============================
@@ -204,20 +215,10 @@ namespace ItemSystem.PassiveSkills
             Register(new VeteranPatch());
             Register(new PulselessHeart());
             Register(new SmolderingBreastplate());
-            Register(new ThornBuckler());
             // 鎧縫いの針 はステータス化 (段 3・敵の出血 1 につき貫通 +1)
             Register(new StrainGauntlet());
-            Register(new GreenKnife());
-            Register(new PoisonWedge());
-            Register(new HerbStaff());
-            Register(new StitchThread());
-            Register(new HollowPoisonRing());
             Register(new HundredCleaver());
-            Register(new RuinedGardenSprayer());
-            Register(new LongCenser());
             Register(new WeightingGauntlet());
-            Register(new VenomBangle());
-            Register(new RotBlade());
             // 血日に澄む佩玉 はステータス化 (段 3・敵の出血 1 につき会心率 +2%)
             Register(new SoulBloodstone());
             Register(new BloodlineRing());
@@ -232,7 +233,6 @@ namespace ItemSystem.PassiveSkills
             Register(new BlastPrize());
             Register(new SurveyorMonocle());
             Register(new FierceBlade());
-            Register(new SlowPoisonBlade());
             Register(new LapisWhetstone());
             Register(new FlintRing());
             Register(new Suntetsu());
@@ -241,10 +241,9 @@ namespace ItemSystem.PassiveSkills
             // ============================
             //  軸の品 (2026-11-07・AxisItemEffects.cs)。 各軸に 燃料 / ① 数を参照 / ②【規則】
             // ============================
-            // 研ぎ師の見立て書 / 麻痺の吹き矢 はステータス化 (段 3・2026-11-11)。 千里眼の水晶・英雄の意志は 2026-11-20 にクラスへ戻した (下の追加 34 品の並び)
+            // 研ぎ師の見立て書 はステータス化 (段 3・2026-11-11)。 千里眼の水晶・英雄の意志は 2026-11-20 にクラスへ戻した (下の追加 34 品の並び)
             Register(new FalconerGlove());                                       Register(new LayeredCutForm());     Register(new LayeredScabbard()); Register(new PinpointEye());
             Register(new ReturnEdgeClasp());  Register(new UnstanchedNeedles()); Register(new ClotVial());
-            Register(new TasterSpoon());      Register(new MiasmaJar());         Register(new RotMossBall());
             Register(new FirekeeperPoker());  Register(new CharcoalFeeder());       Register(new SparkReadingGlasses()); Register(new RefiredPrimer());
             Register(new PaddedBracer());     Register(new OiledShieldLeather());Register(new ShieldPushArt());
             // 軸の品・追加 34 品 (2026-11-07・AxisItemEffects2.cs)。 各軸を 23 品にそろえた
@@ -253,13 +252,10 @@ namespace ItemSystem.PassiveSkills
             Register(new ClairvoyantCrystal()); Register(new HeroWill());   // 2026-11-20 作り直し (旧 items.json の stats)
             Register(new ChippedKnife()); Register(new ThornGlove()); Register(new RiftWedge()); Register(new DrippingEdge());
             Register(new NoClotSalve()); Register(new CrimsonPress()); Register(new EndlessSpringCrystal());
-            Register(new AcidVial()); Register(new NeedleRing()); Register(new LeafMoldBag());
-            Register(new MiasmaMantle()); Register(new PoolKeeper());
             Register(new RivetPlate()); Register(new CatchBracer()); Register(new LayeredTagShield()); Register(new BrokenShieldGrudge());
             // 軸の締めの LEGENDARY (2026-11-20・AxisItemEffects3.cs・GAME.md §23-32)
             Register(new HeavenEyeGuard()); Register(new DeathMaskVisor());
             Register(new ReturningBloodSickle()); Register(new BloodWedge());
-            Register(new CorrosionCrown()); Register(new BoneMeltOil());
             Register(new WildKilnHearth()); Register(new PillarBreakerCharge());
             Register(new FallenCastleCornerstone()); Register(new BorderGuardStandard());
             // 消耗品の連動品 (2026-11-20・ConsumableLinkEffects.cs・item-overhaul-spec §7-2)
@@ -354,11 +350,6 @@ namespace ItemSystem.PassiveSkills
             // 重い一撃 / 破城槌 / 鈍器 はステータス化 (items.json の stats)
             // SingleMinded はステータス化 (非会心の連続)
             // Stubbornness はステータス化
-
-            // 2026-07-15 毒系 (新規 9 種・拘束/妨害中心のキーワードビルド)
-            Register(new SerpentBlood());     // 蛇の血 (会心で毒+2)
-            Register(new Paralysis());        // 麻痺毒 (毒スタック分 敵攻撃-N・拘束中核)
-            // VenomBlade はステータス化
 
             // 2026-07-15 炎上系 拡張 (既存 Ignite + 新 8種で計9のキーワードビルド化)
             // Burn (炎上) 系 2026-07-16 削除: Bleed と機構重複のため撤廃、「臨界」新軸に置換

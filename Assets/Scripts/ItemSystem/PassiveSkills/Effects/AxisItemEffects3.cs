@@ -123,40 +123,6 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     // ============================================================
-    //  毒
-    // ============================================================
-
-    /// <summary>腐蝕の王冠【規則】: 敵の毒の上限 (99) が無くなる (CombatContext.AddStatus)。 上限が無いので OnPoisonCap は出ない。</summary>
-    public class CorrosionCrown : IPassiveSkillEffect
-    {
-        public const string Id = "腐蝕の王冠";
-        public string SkillId => Id;
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.poisonCapRemoved = true;
-    }
-
-    /// <summary>骨溶かしの黒油: 毒のダメージが 1 以上入ったターンにボスの目盛り (§6-15) に入ったひびは、 割れた時のダウンが弱くならない (受けるダメージ ×1.5 が付く)。
-    /// 毒のダメージが入ったターンの番号をここで覚え、 CombatManager がターンの終わりにひびを入れる時に読む (<see cref="PoisonTurnNow"/>・BossDownState.NoteTurnEndCracks)。</summary>
-    public class BoneMeltOil : IPassiveSkillEffect, IRelicDisplay
-    {
-        public const string Id = "骨溶かしの黒油";
-        public string SkillId => Id;
-        /// <summary>[persistent] 毒のダメージが最後に入ったターンの番号 (この品を持っている時だけ書く)。</summary>
-        public const string PoisonTurnKey = "ax3.boneOil.poisonTurn";
-        /// <summary>秘宝の列の見え方。</summary>
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(PoisonTurnNow(ctx));
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPoisonTick };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (Kw.EventAmount(ctx) >= 1) ctx.accumulatedValues[PoisonTurnKey] = ctx.currentTurn;
-        }
-
-        /// <summary>このターンに毒のダメージが入り、 この品を持っている。</summary>
-        public static bool PoisonTurnNow(CombatContext ctx)
-            => ctx != null && ctx.currentTurn > 0 && Ax3.Count(ctx, PoisonTurnKey) == ctx.currentTurn;
-    }
-
-    // ============================================================
     //  臨界
     // ============================================================
 

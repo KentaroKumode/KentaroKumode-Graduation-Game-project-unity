@@ -31,7 +31,7 @@ namespace ItemSystem
         //   実際に乗る量は value × 単位数。 単位数が 0 のときは何もしない (旧クラスの「0 なら return」と同じ)。
 
         /// <summary>単位数の出どころ (省略 = 定量)。 <c>coinsSpent</c> (このランで使ったゴールド) /
-        /// <c>axis:軸名</c> (その軸の品の数・例 <c>axis:会心</c>) / <c>enemyBleed</c> / <c>enemyPoison</c> /
+        /// <c>axis:軸名</c> (その軸の品の数・例 <c>axis:会心</c>) / <c>enemyBleed</c> /
         /// <c>turnsElapsed</c> (経過ターン = 現在ターン − 1)。
         /// 読み方は <see cref="PassiveSkills.Effects.StatModifierEffect"/>。</summary>
         public string per;

@@ -502,17 +502,6 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>毒棘の小盾: シールドが攻撃を吸収するたび敵に毒 +1。</summary>
-    public class ThornBuckler : IPassiveSkillEffect
-    {
-        public string SkillId => "毒棘の小盾";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnShieldAbsorb };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (Rw.Count(ctx, Kw.AbsorbIsAttackKey) > 0) Rw.Poison(ctx, 1);
-        }
-    }
-
     // 〈鎧縫いの針〉(敵の出血 1 につき貫通 +1・OnWired) は 2026-11-11 に items.json の stats へ移した (段 3・per=enemyBleed)。
 
     /// <summary>力みの小手: シールドを合計 10 得るたび 刻み +1。 攻撃の端子を挿したターン、
@@ -533,85 +522,8 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     // ============================================================
-    //  毒
+    //  出血へ移った品 (効果は Phase 3 で BleedEffects.cs へ)
     // ============================================================
-
-    /// <summary>緑染みの小刀: 敵の毒 5 につき、 与ダメージ +5%。 瘴気が最も大きい偏重なら、 攻撃が通るたび、 敵に毒 +2。
-    /// 2026-11-10: 旧「攻撃が通るたび、 敵に毒 +2」から、 溜めた毒を主攻撃へ返す形に変えた (毒 1 スタックを 0.05% に下げた代わり)。
-    /// 毒 +2 は毒を最も深く積んだ時だけ残す。
-    /// 2026-11-06: 旧「戦闘開始時 毒 +2」は配線を払わない燃料で、 クリアしたランの 94% が持っていた。</summary>
-    public class GreenKnife : IPassiveSkillEffect, IRelicDisplay
-    {
-        public string SkillId => "緑染みの小刀";
-        /// <summary>秘宝の列 (#320) の見え方。</summary>
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.EnemyPoison / PerStacks > 0);
-        public const int PerStacks = 5;
-        public const float Pct = 0.05f;
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnPostDealDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (t == PassiveSkillTrigger.OnPostDealDamage)
-            {
-                if (ctx.AxisRank(AxisRules.Poison) == 0 && Rw.PlayerHit(ctx)) Rw.Poison(ctx, 2);
-                return;
-            }
-            int n = ctx.EnemyPoison / PerStacks;
-            if (n > 0) ctx.AddOutgoingPct(Pct * n);
-        }
-    }
-
-    /// <summary>毒塗りの楔: ブロック端子に 2 個以上挿したターン、 敵が攻撃してきたら毒 +4 (2026-11-07: 旧 +2)。</summary>
-    public class PoisonWedge : IPassiveSkillEffect, IRelicDisplay
-    {
-        public string SkillId => "毒塗りの楔";
-        /// <summary>秘宝の列 (#320) の見え方。</summary>
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(env.Block(ctx) >= 2);
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (Rw.Count(ctx, MutualKeys.BlockDiceCount) >= 2 && Rw.Count(ctx, MutualKeys.EnemyAtkPreDefense) > 0)
-                Rw.Poison(ctx, 4);
-        }
-    }
-
-    /// <summary>毒草摘みの杖: マップを 1 歩進むごとに、 次の戦闘の開始時の毒 +1 (2026-11-07: 旧 2 歩につき +1)。</summary>
-    public class HerbStaff : IPassiveSkillEffect, IRelicDisplay
-    {
-        public string SkillId => "毒草摘みの杖";
-        /// <summary>秘宝の列 (#320) の見え方。</summary>
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Rw.Steps);
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => Rw.Poison(ctx, Rw.Steps);
-    }
-
-    /// <summary>口縫いの毒糸: 〈封じ〉の役が成立したとき毒 +6 (2026-11-07: 旧 +3)。</summary>
-    public class StitchThread : IPassiveSkillEffect
-    {
-        public string SkillId => "口縫いの毒糸";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            var fired = ctx.firedRolesThisTurn;
-            if (fired.Contains(CombatSystem.RoleKind.Pair2) || fired.Contains(CombatSystem.RoleKind.Triple2))
-                Rw.Poison(ctx, 6);
-        }
-    }
-
-    /// <summary>石抜きの毒指輪: 毒が <see cref="Threshold"/> に達したとき、 毒を <see cref="Spend"/> 使い、 使った毒 × <see cref="PerStack"/> の軽減不可ダメージ (何度でも)。
-    /// 2026-11-07: 旧「上限に達したら最大 HP の 15%」は割合ダメージで、 上限 99 にすると発動しないか、 深い毒なら毎ターン 15% を削れた。</summary>
-    public class HollowPoisonRing : IPassiveSkillEffect
-    {
-        public string SkillId => "石抜きの毒指輪";
-        public const int Threshold = 50, Spend = 25, PerStack = 4;
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPoisonGain };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (ctx.EnemyPoison < Threshold) return;
-            ctx.AddStatus(StatusTarget.Enemy, "poison", -Spend);
-            Kw.DamageEnemy(ctx, Spend * PerStack);
-            Rw.Log($"[石抜きの毒指輪] 毒 {Threshold} に達した → 毒を {Spend} 使い {Spend * PerStack} を削る");
-        }
-    }
 
     /// <summary>百人切りの鉈: ターン終了時、 敵 HP が「毒 5 につき 1%」以下なら倒す (ボスはその半分)。</summary>
     public class HundredCleaver : IPassiveSkillEffect
@@ -627,35 +539,6 @@ namespace ItemSystem.PassiveSkills.Effects
             if (!ctx.CanExecuteEnemy()) return;
             ctx.enemyCurrentHP = 0;
             Rw.Log($"[百人切りの鉈] 敵HP {pct}% 以下 → 処刑");
-        }
-    }
-
-    /// <summary>廃庭の霧吹き【規則】: 毒のダメージが、 ターン開始に加えて敵が攻撃するたびにも入る。</summary>
-    public class RuinedGardenSprayer : IPassiveSkillEffect
-    {
-        public string SkillId => "廃庭の霧吹き";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.poisonTickOnEnemyAttack = true;
-    }
-
-    /// <summary>主より長い香炉: 毒のダメージが入るたび、 この戦闘中の与ダメージ +5% (積もる・上限なし)。
-    /// 2026-11-10: 旧「その量の半分の臨界」から作り直した (毒が爆発へ流れる口を閉じ、 主攻撃へ返す)。 以下は旧効果の経緯。
-    /// 2026-11-06: 旧「その量の臨界」は最大 HP の割合で入る毒をそのまま固定 50 の爆発にも換え、 毒を二重に数えていた
-    /// (7 層ボスで爆発のダメージ/T が香炉あり 35.4・なし 6.6、 クリアしたランの所持率 97%)。</summary>
-    public class LongCenser : IPassiveSkillEffect, IRelicDisplay
-    {
-        public string SkillId => "主より長い香炉";
-        /// <summary>秘宝の列 (#320) の見え方。</summary>
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Pct(ctx.GetAccumulated(PctKey));
-        public const float PctPerTick = 0.05f;
-        /// <summary>[persistent・戦闘開始で 0] 積もった与ダメージの率。</summary>
-        public const string PctKey = "rw.censerPct";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnPoisonTick, PassiveSkillTrigger.OnPostRoll };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (t == PassiveSkillTrigger.OnBattleStart) { ctx.accumulatedValues[PctKey] = 0f; return; }
-            if (t == PassiveSkillTrigger.OnPoisonTick) { ctx.accumulatedValues[PctKey] = ctx.GetAccumulated(PctKey) + PctPerTick; return; }
-            ctx.AddOutgoingPct(ctx.GetAccumulated(PctKey));
         }
     }
 
@@ -675,22 +558,6 @@ namespace ItemSystem.PassiveSkills.Effects
         {
             if (ctx.IsRealHit && ctx.hitIndex >= 1) ctx.hitFinalDamagePct += PctPerHit * ctx.hitIndex;
         }
-    }
-
-    /// <summary>毒固めの腕環: ターン開始時、 敵の毒 10 につきシールド +1 (2026-11-07: 旧 毒 2 につき)。</summary>
-    public class VenomBangle : IPassiveSkillEffect
-    {
-        public string SkillId => "毒固めの腕環";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => Rw.Shield(ctx, ctx.EnemyPoison / 10, SkillId);
-    }
-
-    /// <summary>腐し刃: 毒のダメージが入るたび敵に出血 +1。</summary>
-    public class RotBlade : IPassiveSkillEffect
-    {
-        public string SkillId => "腐し刃";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPoisonTick };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.AddEnemyBleed(1);
     }
 
     // ============================================================
@@ -889,28 +756,6 @@ namespace ItemSystem.PassiveSkills.Effects
         {
             if (t == PassiveSkillTrigger.OnBattleStart) { Kw.EnableHeat(ctx); return; }
             ctx.critRatePctAdd += (ctx.rinkaiMeter / 2) / 100f;
-        }
-    }
-
-    /// <summary>遅効の毒刃: 敵の毒が増えた次のターン、 増えた毒 5 につき会心率 +5% (2026-11-07: 旧 毒 1 につき)。</summary>
-    public class SlowPoisonBlade : IPassiveSkillEffect, IRelicDisplay
-    {
-        public string SkillId => "遅効の毒刃";
-        /// <summary>秘宝の列 (#320) の見え方。</summary>
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Rw.Count(ctx, Last) / 5);
-        private const string Cur = "rw.slowPoison.cur", Last = "rw.slowPoison.last";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPoisonGain, PassiveSkillTrigger.OnTurnStart, PassiveSkillTrigger.OnWired };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            switch (t)
-            {
-                case PassiveSkillTrigger.OnPoisonGain: Kw.Add(ctx, Cur, Kw.EventAmount(ctx)); break;
-                case PassiveSkillTrigger.OnTurnStart:
-                    ctx.accumulatedValues[Last] = ctx.GetAccumulated(Cur);
-                    ctx.accumulatedValues[Cur] = 0;
-                    break;
-                default: ctx.critRatePctAdd += 0.05f * (int)(Rw.Count(ctx, Last) / 5); break;
-            }
         }
     }
 

@@ -365,51 +365,6 @@ namespace ItemSystem.PassiveSkills.Effects
     //  会心特化ビルドの下位互換になっていた通常火力ビルドを独立軸化する。
     // ============================================================
 
-
-
-
-
-
-    // ============================================================
-    //  毒系 (2026-07-15 新規・4-2-2-1 テンプレで 9 種)
-    //  差別化: 拘束・妨害中心。DoT は副次 (1/stack)、主効果は「麻痺毒 = 敵攻撃-N」による攻撃力ドレイン。
-    //  減衰なし・上限5・遅効型 = 長期戦のキル手段 = 毒殺 (5到達で20%削り)。
-    //  炎上 (短期爆発) / 出血 (継戦積み) / 毒 (拘束) で三役分離。
-    // ============================================================
-
-
-    /// <summary>蛇の血 (SerpentBlood) — 会心時、敵毒+2。会心系と組んで加速。</summary>
-    public class SerpentBlood : IPassiveSkillEffect
-    {
-        public string SkillId => "蛇血瓶";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            ctx.AddStatus(StatusTarget.Enemy, "poison", 2);
-        }
-    }
-
-
-
-
-    /// <summary>麻痺毒 (Paralysis) — 敵毒スタック分、敵攻撃-N (拘束の中核)。
-    /// 5スタックで敵攻撃-5 = 拘束ビルドの主効果。CurseBind と重ねられる。</summary>
-    public class Paralysis : IPassiveSkillEffect
-    {
-        public string SkillId => "岸上げの麻痺瓶";
-        /// <summary>敵の攻撃を下げる上限 (2026-10-31)。</summary>
-        public const int MaxCut = 5;
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            int stacks = ctx.GetStatus(StatusTarget.Enemy, "poison");
-            if (stacks <= 0) return;
-            // 2026-10-31: 最大 −5。 毒が深くなるほど敵が無力化され、 伸ばすほど安全になる形を止める。
-            // 2026-11-07: 毒 5 につき −1 (旧 毒 1 につき)。 毒 1 スタックの重みが 1/5 になったため。
-            ctx.mutualEnemyAttackReduction += System.Math.Min(stacks / 5, MaxCut);
-        }
-    }
-
     // (炎上系 8 種 Kindling/FlamingWeapon/InfernoOrder/Stoke/Immortalflame/InfernoManifest/FlameEdge/EverBurning は
     //  2026-07-18 削除: Burn 全廃 → 臨界 (Rinkai) 軸に置換済み)
 

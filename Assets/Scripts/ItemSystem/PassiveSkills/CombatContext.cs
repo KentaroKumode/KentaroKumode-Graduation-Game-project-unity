@@ -583,15 +583,19 @@ namespace ItemSystem.PassiveSkills
         public bool rinkaiMultiBurst;
         /// <summary>[persistent] 〈雷壷〉: 充電の上限が無くなる (<see cref="AddCharge"/>)。 ターン終了時の目減りは品のクラス (ChargeEffects.ThunderJar)。</summary>
         public bool chargeCapRemoved;
-        /// <summary>[persistent] 〈廃庭の霧吹き〉: 毒のダメージが、 ターン開始に加えて敵が攻撃するたびにも入る。</summary>
+        /// <summary>[persistent] 〈廃庭の霧吹き〉: 敵が攻撃した直後にも、 毒のダメージ (威力 50%・毒は減らない) が 1 回入る (1 ターン 1 回・CombatManager の敵の攻撃の解決)。</summary>
         public bool poisonTickOnEnemyAttack;
+        /// <summary>[persistent] 〈毒溜まりの主〉: 敵の毒が <see cref="CombatSystem.PoisonCore.PoolNeed"/> 以上なら、 ターン開始の毒のダメージが 2 回入る (2 回目では毒が減らない・<see cref="TickStatuses"/>)。</summary>
+        public bool poisonDoubleTick;
+        /// <summary>[persistent] 〈骨溶かしの黒油〉: ダウン中の敵への毒のダメージ ×2 (<see cref="TickStatuses"/>・起爆は PoisonCore.Damage)。</summary>
+        public bool poisonDownDouble;
 
         // ---- 軸の締めの LEGENDARY (2026-11-20・GAME.md §23-32) ----
         /// <summary>[persistent・戦闘開始で 0] 最終与ダメージ倍率の上乗せ (%)。 すべての倍率 (会心・与ダメ % の池・端子の別枠) の後、
         /// 敵の軽減パッシブと防御の前に ×(100 + これ)/100 で掛ける (<see cref="Keywords.Kw.ApplyFinalDamage"/>・大罪:怠惰と同じ位置)。 〈防人の軍標〉が積む。</summary>
         public int finalDamagePct;
-        /// <summary>[persistent] 〈腐蝕の王冠〉: 敵の毒の上限 (99) が無くなる (AddStatus)。</summary>
-        public bool poisonCapRemoved;
+        /// <summary>[persistent] 〈腐蝕の王冠〉: 敵の毒の上限 (99) が無くなり、 敵へ与える毒がすべて 1.5 倍 (切り上げ・<see cref="AddStatus"/>)。 段の交代で毒の半分が次の段へ残る (CombatManager.SwapEnemy)。</summary>
+        public bool poisonCrown;
         /// <summary>[persistent] 〈血の楔〉: 敵が得るシールドと回復の量、 敵の被ダメ軽減のパッシブで減る量を 出血 ÷ (出血 + 40) だけ弱める (<see cref="WedgeEnemyGain"/>)。</summary>
         public bool bleedWedge;
         /// <summary>〈血の楔〉の割る数の足し分 (出血 ÷ (出血 + これ))。</summary>
@@ -845,10 +849,11 @@ namespace ItemSystem.PassiveSkills
                 int metaBonus = MetaProgression.MetaBuffApplicator.GetPoisonApplyBonus();
                 if (metaBonus > 0) { stacks += metaBonus; _poisonBonusTurn = currentTurn; }
             }
+            if (poisonCrown && stacks > 0 && target == StatusTarget.Enemy && id == "poison") stacks = (stacks * 3 + 1) / 2;   // 〈腐蝕の王冠〉: 1.5 倍 (切り上げ)
             var dict = target == StatusTarget.Enemy ? enemyStatusStacks : playerStatusStacks;
             int cur = dict.TryGetValue(id, out var v) ? v : 0;
             int max = StatusRegistry.Defs.TryGetValue(id, out var def) ? def.maxStacks : int.MaxValue;
-            if (poisonCapRemoved && target == StatusTarget.Enemy && id == "poison") max = int.MaxValue;   // 〈腐蝕の王冠〉(2026-11-20)
+            if (poisonCrown && target == StatusTarget.Enemy && id == "poison") max = int.MaxValue;   // 〈腐蝕の王冠〉
             int next = System.Math.Max(0, System.Math.Min(max, cur + stacks));
             dict[id] = next;
             if (target == StatusTarget.Enemy && id == "poison" && stacks > 0)   // [計装 2026-11-05] 毒の付与量を出どころ別に
@@ -858,30 +863,27 @@ namespace ItemSystem.PassiveSkills
                 int hlOver = cur + stacks - max;
                 if (hlOver > 0) CombatSystem.HpLossDiag.Add("毒溢れ:" + hlSrc, hlOver);
             }
-            // 敵の毒の増加と上限到達を配る (2026-10-31 アイテム再編)
+            // 敵の毒の増加を配る (2026-10-31 アイテム再編)
             if (target == StatusTarget.Enemy && id == "poison" && next > cur)
             {
                 Keywords.Kw.Raise(this, PassiveSkillTrigger.OnPoisonGain, next - cur);
-                if (next >= max && cur < max) Keywords.Kw.Raise(this, PassiveSkillTrigger.OnPoisonCap, 1);
             }
         }
 
         /// <summary>敵の毒の量 (読み取り用)。</summary>
         public int EnemyPoison => GetStatus(StatusTarget.Enemy, "poison");
 
-        /// <summary>毒のダメージ 1 回分 (ターン開始の分と同じ量) を数え、 出来事を配って返す。
-        /// 〈廃庭の霧吹き〉で敵の攻撃のたびに CombatManager が呼び、 返った量を敵の HP から直接引く。</summary>
-        public int TickPoisonOnce()
+        /// <summary>毒のダメージ 1 回分 (ターン開始の分の <paramref name="powerPct"/>%・下限 1) を数え、 出来事を配って返す。 毒は減らさない。
+        /// 〈廃庭の霧吹き〉で敵の攻撃の直後に CombatManager が呼び (1 ターン 1 回・威力 50%)、 返った量を敵の HP から直接引く。</summary>
+        public int TickPoisonOnce(int powerPct)
         {
             if (!StatusRegistry.Defs.TryGetValue("poison", out var def)) return 0;
             int stacks = EnemyPoison;
             if (stacks <= 0) return 0;
-            int dmg = DotDamage(def, stacks);
-            if (dmg <= 0) return 0;
+            int dmg = System.Math.Max(1, DotDamage(def, stacks) * powerPct / 100);
             CombatSystem.CombatStats.DamageBreakdown[20] += dmg;   // [計装] 毒のダメージ
             Keywords.Kw.Raise(this, PassiveSkillTrigger.OnPoisonTick, dmg);
             CombatSystem.CombatManager.RaiseDotDamage(CombatSystem.CombatManager.DotKind.Poison, dmg);
-            if (def.halveAfterTick) enemyStatusStacks["poison"] = EnemyPoison * EffectivePoisonKeepPct / 100;   // 出すたびに半減 (霧吹きの分も・〈瘴気〉の②で残る割合が上がる)
             return dmg;
         }
 
@@ -944,12 +946,18 @@ namespace ItemSystem.PassiveSkills
                 var dict = def.target == StatusTarget.Enemy ? enemyStatusStacks : playerStatusStacks;
                 if (!dict.TryGetValue(def.id, out int stacks) || stacks <= 0) continue;
                 int dmg = DotDamage(def, stacks);
-                if (def.target == StatusTarget.Enemy && def.id == "poison")     // [計装 2026-11-05] ターン開始時の毒スタック
+                bool isPoison = def.target == StatusTarget.Enemy && def.id == "poison";
+                if (isPoison)     // [計装 2026-11-05] ターン開始時の毒スタック
                 {
                     CombatSystem.HpLossDiag.Add("毒段:T" + System.Math.Min(currentTurn, 8), stacks);
                     CombatSystem.HpLossDiag.Add("毒段n:T" + System.Math.Min(currentTurn, 8), 1);
+                    // 〈骨溶かしの黒油〉: このターンがダウン (待っているダウンがある = ターンの頭でダウンになる) なら ×2
+                    if (poisonDownDouble && (CombatSystem.CombatManager.Instance?.Down?.pending ?? 0) > 0) dmg *= CombatSystem.PoisonCore.OilDownMul;
                 }
+                //   〈毒溜まりの主〉: 毒 20 以上なら 2 回 (2 回目の後には減らない ── 減るのは下の 1 回だけ)。 出来事は 1 回目だけ「減る前の毒のダメージ」(〈瘴気溜まりの壺〉)
+                int ticks = isPoison && poisonDoubleTick && stacks >= CombatSystem.PoisonCore.PoolNeed ? 2 : 1;
                 if (dmg > 0)
+                for (int tk = 0; tk < ticks; tk++)
                 {
                     if (def.target == StatusTarget.Enemy)
                     {
@@ -959,10 +967,12 @@ namespace ItemSystem.PassiveSkills
                         if (def.id == "poison") CombatSystem.EnemyHpLedger.NotePoisonIntoFixed(landed);   // [計装 2026-11-10] 固定ダメ枠の毒
                     }
                     else fixedDamageToPlayer += dmg;
-                    if (def.target == StatusTarget.Enemy && def.id == "poison")
+                    if (isPoison)
                     {
                         CombatSystem.CombatStats.DamageBreakdown[20] += dmg;   // [計装] 毒のダメージ
+                        accumulatedValues[CombatSystem.PoisonCore.DecayTickKey] = tk == 0 ? 1f : 0f;
                         Keywords.Kw.Raise(this, PassiveSkillTrigger.OnPoisonTick, dmg);
+                        accumulatedValues[CombatSystem.PoisonCore.DecayTickKey] = 0f;
                         CombatSystem.CombatManager.RaiseDotDamage(CombatSystem.CombatManager.DotKind.Poison, dmg);
                     }
                 }

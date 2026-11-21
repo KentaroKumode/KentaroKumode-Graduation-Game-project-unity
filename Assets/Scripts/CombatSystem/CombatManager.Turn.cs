@@ -1450,10 +1450,10 @@ namespace CombatSystem
             else if (enemyHP > 0)
             {
                 primaryAttacked = true;
-                // 〈廃庭の霧吹き〉: 敵が攻撃するたびにも毒のダメージが入る (2026-10-31)
+                // 〈廃庭の霧吹き〉【規則】: 敵が攻撃するときにも毒のダメージ (威力 50%・毒は減らない) が入る (1 体目の攻撃だけ = 1 ターン 1 回)
                 if (ctx.poisonTickOnEnemyAttack)
                 {
-                    int pd = ctx.TickPoisonOnce();
+                    int pd = ctx.TickPoisonOnce(ItemSystem.PassiveSkills.Effects.RuinedGardenSprayer.PowerPct);
                     if (pd > 0)
                     {
                         HpLossDiag.Lose(ref enemyHP, EnemyHpLedger.ProbePassive(pd), "毒(廃庭の霧吹き)");   // [測定用の物差し] 入る量だけ

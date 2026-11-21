@@ -212,14 +212,24 @@ namespace CombatSystem
                 return;
             }
             _downMainWouldBreak = 0;
-            // 〈骨溶かしの黒油〉(2026-11-20): このターンに毒のダメージが入っていれば、 このターンに入るひびは割れても弱いダウンにならない
-            bool strong = ItemSystem.PassiveSkills.Effects.BoneMeltOil.PoisonTurnNow(PassiveSkillManager.Instance?.Context);
-            int c = _down.NoteTurnEndCracks(enemyHP, currentEnemy.maxHP, turn, GameLoop.GameHooks.DownCrackGrace, GameLoop.GameHooks.DownCrackWeak,
-                                            out int newCracks, strong);
+            // 【起爆】したターン (〈骨溶かしの黒油〉は毒のダメージが入ったターンも・2026-11-21・PoisonCore): ひびを入れた後、 ひびを全部 正規のダウンとして割る (猶予を待たない)
+            bool shatter = ItemSystem.PassiveSkills.Effects.Psn.ShattersCracksNow(PassiveSkillManager.Instance?.Context);
+            int c = _down.NoteTurnEndCracks(enemyHP, currentEnemy.maxHP, turn, shatter ? -1 : GameLoop.GameHooks.DownCrackGrace, GameLoop.GameHooks.DownCrackWeak,
+                                            out int newCracks);
             BossDownDiag.NoteCracks(newCracks, c);
             if (newCracks > 0) Debug.Log($"[ダウン] 通常攻撃以外で目盛りを下回った: ひび {newCracks} (HP {enemyHP}/{currentEnemy.maxHP})");
             if (c > 0) Debug.Log($"[ダウン] ひびの猶予が切れて目盛りが {c} つひとりでに割れた → 次のターンからダウン {_down.pending} ターン");
             if (c > 0) RaiseBossEvent(PassiveSkillManager.Instance?.Context, PassiveSkillTrigger.OnBossDown, c, true);   // ひびで割れた (2026-11-21)
+            if (shatter)
+            {
+                int sh = 0;
+                while (_down.BreakTopCrack()) sh++;
+                if (sh > 0)
+                {
+                    Debug.Log($"[起爆] ボスの目盛りのひびを {sh} つ割った (正規のダウン) → 次のターンからダウン {_down.pending} ターン");
+                    RaiseBossEvent(PassiveSkillManager.Instance?.Context, PassiveSkillTrigger.OnBossDown, sh, false);   // 通常攻撃と同じ扱い (正規のダウン)
+                }
+            }
         }
 
         /// <summary>ボスの出来事 (OnBossDown / OnHeavyCanceled・2026-11-21) を配る。 <paramref name="crack"/> = ひびで割れた分 (<see cref="ItemSystem.PassiveSkills.Keywords.Kw.BossDownCrackKey"/>)。</summary>

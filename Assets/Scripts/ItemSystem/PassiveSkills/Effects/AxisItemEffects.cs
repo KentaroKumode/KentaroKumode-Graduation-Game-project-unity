@@ -33,12 +33,12 @@ namespace ItemSystem.PassiveSkills.Effects
             ["研ぎ師の見立て書"] = (AxisRules.Crit, Kind.Count),   [PinpointEye.Id] = (AxisRules.Crit, Kind.Rule),
             ["血止め知らずの針箱"] = (AxisRules.Bleed, Kind.Count),
             // 〈重ね斬りの型〉〈凝血の小瓶〉は 2026-11-20 (段 1-a) に【規則】の品でなくなったので、 表から外した (軸の普通の品として買う)
-            ["瘴気溜まりの壺"] = (AxisRules.Poison, Kind.Count),   ["腐れ沼の苔玉"] = (AxisRules.Poison, Kind.Rule),
+            ["腐れ沼の苔玉"] = (AxisRules.Poison, Kind.Rule),
             ["焚き足しの炭"] = (AxisRules.Heat, Kind.Count),         ["火花読みの眼鏡"] = (AxisRules.Heat, Kind.Rule),
             ["油染みの盾革"] = (AxisRules.Shield, Kind.Count),   [ShieldPushArt.Id] = (AxisRules.Shield, Kind.Rule),
             // 追加 34 品のうち軸の品の数を読む品 (AxisItemEffects2.cs)
             ["千里眼の水晶"] = (AxisRules.Crit, Kind.Count),
-            ["涸れぬ血晶"] = (AxisRules.Bleed, Kind.Count), ["瘴気の外套"] = (AxisRules.Poison, Kind.Count),
+            ["涸れぬ血晶"] = (AxisRules.Bleed, Kind.Count),
             // 采配 (山札の軸・2026-11-20): ① 采配を読む・②【規則】
             [GameLoop.ItemIds.DeckBroom] = (AxisRules.Deck, Kind.Count), [GameLoop.ItemIds.DeckSeamless] = (AxisRules.Deck, Kind.Count),
             [GameLoop.ItemIds.DeckCrucible] = (AxisRules.Deck, Kind.Rule), [GameLoop.ItemIds.DeckBlueprint] = (AxisRules.Deck, Kind.Rule),
@@ -53,7 +53,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 品のクラスには手を入れず、 レジストリが登録の後で包む (<see cref="PassiveSkillRegistry"/>)。 品の本来の効果は内側でそのまま動く。</summary>
     public sealed class EntryEffect : IPassiveSkillEffect
     {
-        public enum When { TurnStart, PlayerHit, EnemyAttacked, BlockedAll, PerBlockDie }
+        public enum When { TurnStart, PlayerHit, EnemyAttacked, PerBlockDie }
         /// <summary>偏重の条件 (2026-11-10)。 機会の多い入り口ほど厳しく、 少ない入り口は無条件。
         /// Free = 無条件 / AtLeast = 軸の品が n 個以上 / Top = 偏重の順位が上から n 番目まで (同数は満たす)。</summary>
         public enum Gate { Free, AtLeast, Top }
@@ -120,10 +120,8 @@ namespace ItemSystem.PassiveSkills.Effects
                 case When.TurnStart:   return 1;
                 case When.PlayerHit:   return Rw.PlayerHit(ctx) ? 1 : 0;
                 case When.PerBlockDie: return Ax.BlockDice(ctx);
-                case When.EnemyAttacked:
+                default: // EnemyAttacked
                     return Ax.Count(ctx, MutualKeys.EnemyAtkPreDefense) > 0 ? 1 : 0;
-                default: // BlockedAll: 敵が攻撃してきて、 HP を 1 も減らさずに受けきった
-                    return Ax.Count(ctx, MutualKeys.EnemyAtkPreDefense) > 0 && Ax.Count(ctx, MutualKeys.HpLossFromEnemy) <= 0 ? 1 : 0;
             }
         }
 
@@ -133,15 +131,8 @@ namespace ItemSystem.PassiveSkills.Effects
         /// 絶対数の線は 2026-11-10 の実測 (配布なしの終了時: 瘴気 中央 5・P90 9 / 炉温 中央 6・P90 10) から置いた。</para></summary>
         public static readonly (string id, When when, bool heat, int amount, Gate gate, int gateN)[] Table =
         {
-            // 毒の軸 (瘴気)
-            ("毒固めの腕環", When.TurnStart,     false, 1, Gate.Top, 1),
-            ("主より長い香炉", When.TurnStart,     false, 1, Gate.Top, 2),
-            ("廃庭の霧吹き", When.EnemyAttacked, false, 1, Gate.AtLeast, 8),
-            ("石抜きの毒指輪", When.EnemyAttacked, false, 1, Gate.AtLeast, 6),
-            ("岸上げの麻痺瓶", When.BlockedAll,    false, 2, Gate.Free, 0),
+            // 毒の入り口 (出血へ移った〈百人切りの鉈〉だけ残る・効果は Phase 3 で作り直す。 毒の軸の品は 2026-11-21 に PoisonEffects.cs へ)
             ("百人切りの鉈", When.PlayerHit,     false, 1, Gate.Free, 0),
-            ("腐し刃", When.PlayerHit,     false, 1, Gate.Free, 0),
-            ("遅効の毒刃", When.PlayerHit,     false, 1, Gate.Free, 0),
             // 臨界の軸 (炉温・自分では臨界を作らない品)
             ("工廠の材料箱", When.TurnStart,     true, 3, Gate.Top, 1),
             ("希望の灯片", When.TurnStart,     true, 3, Gate.Top, 2),
@@ -293,46 +284,6 @@ namespace ItemSystem.PassiveSkills.Effects
         {
             if (ctx.enemyBleedStacks >= MinBleed) ctx.enemyAtkCutPct += Cut;
         }
-    }
-
-    // ============================================================
-    //  毒 (瘴気)
-    // ============================================================
-
-    /// <summary>毒見役の小匙 (燃料): ブロックに 2 個以上挿し、 攻撃が通ったターン、 敵に毒 +3。
-    /// 2026-11-07: 旧「3 個ともブロック」は殴らずに守り続けて毒で削る形 (§24〈反攻〉の棄却理由と同じ) になり得た。</summary>
-    public class TasterSpoon : IPassiveSkillEffect, IRelicDisplay
-    {
-        public string SkillId => "毒見役の小匙";
-        /// <summary>秘宝の列 (#320) の見え方。</summary>
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(env.Block(ctx) >= 2);
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (!Rw.PlayerHit(ctx) || Ax.BlockDice(ctx) < 2) return;
-            Rw.Poison(ctx, 3);
-        }
-    }
-
-    /// <summary>瘴気溜まりの壺 (①): ターン開始時、 敵に毒 + 瘴気。 2026-11-07 に「瘴気の半分 (切り上げ)」から引き上げ。</summary>
-    public class MiasmaJar : IPassiveSkillEffect, IRelicDisplay
-    {
-        public string SkillId => "瘴気溜まりの壺";
-        /// <summary>秘宝の列 (#320) の見え方。</summary>
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.AxisDepth(AxisRules.Poison) > 0);
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-            => Rw.Poison(ctx, ctx.AxisDepth(AxisRules.Poison));
-    }
-
-    /// <summary>腐れ沼の苔玉 (②【規則】): 毒がダメージを出したあとに残る割合が 50% から「50% + 瘴気 × 2%」(最大 70%) になる。</summary>
-    public class RotMossBall : IPassiveSkillEffect
-    {
-        public string SkillId => "腐れ沼の苔玉";
-        public const int MaxKeepPct = 70;
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-            => ctx.poisonKeepPct = System.Math.Min(MaxKeepPct, 50 + 2 * ctx.AxisDepth(AxisRules.Poison));
     }
 
     // ============================================================
