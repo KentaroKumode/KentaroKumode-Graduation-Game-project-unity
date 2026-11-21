@@ -211,7 +211,7 @@ namespace CombatSystem
             //   〈連続実験〉は OnTurnEnd でしか発火しないため、 削り切りが OnTurnEnd より前に
             //   起きたターンは段移行が予約されず、 p1〜p3 を倒した時点で「7層クリア」に
             //   なっていた (実測: 完全クリア 197 件のうち 93 件 = 47% が p1〜p3 撃破)。
-            //   固定ダメージ・虚空の刻み・反射など、 敵パッシブを経由しない撃破経路が複数あるため、
+            //   固定ダメージ・反射など、 敵パッシブを経由しない撃破経路が複数あるため、
             //   パッシブの発火順に頼らずここで確定させる。
             // 端子の撃破のボーナス (#117): このターン最後の確かめ (ターン終了時の効果の削りを SyncHPFromContext で拾った後・次の形態へ移す前)
             SettleTerminalKillBonus(enemyHP, final: true);
@@ -942,7 +942,7 @@ namespace CombatSystem
                 }
             }
 
-            // 配線結果をパッシブから参照可能に (虚空 等が「攻撃端子接続0」を判定する)
+            // 配線結果をパッシブから参照可能に (武器家系の効果などが攻撃端子の本数を読む)
             ctx.accumulatedValues["mutualAttackDiceCount"] = attackDiceCount;
             // 2026-07-29: ブロック本数も記録する。 〈停滞する時間〉が「攻撃0本」ではなく
             // 「守りに寄せたか (攻撃 ≦ ブロック)」で判定できるようにするため。
@@ -1038,9 +1038,7 @@ namespace CombatSystem
             //
             //   止めるもの: 武器の素火力・パッシブの攻撃ボーナス・消費アイテムの加算・**追撃**。
             //   止めないもの: 固定ダメージ枠 (fixedDamageToEnemy)。
-            //     反撃・出血・毒は「自分が攻撃したこと」と独立に成立する別チャネルであり、
-            //     さらに〈虚空〉(sword_t3/t4) は **攻撃端子 0 の時に** そこへ最大HP5% を積む札なので、
-            //     ここを潰すと「攻撃しない」を選ぶための札そのものが死ぬ。
+            //     反撃・出血・毒は「自分が攻撃したこと」と独立に成立する別チャネル。
             bool skipAttack = attackDiceCount <= 0 || _fleeRequested;
             if (_fleeRequested)
             {
@@ -1501,9 +1499,8 @@ namespace CombatSystem
                     psm.ProcessDamage(lossBase, 0, 0f, attackerIsEnemy: true, fireEnemyDealTriggers: true);
                 takenDmg = ApplyLossDamageModifiers(takenDmg, floorMod, ctx, Math.Min(enemyAtkValue, blockSum));
                 parryBlocked += Math.Min(term.parryBlock, Math.Min(enemyAtkValue, blockSum));
-                if (ctx.nullifyAllDamage) takenDmg = 0; // 虚空 等: 双方ダメ0化
 
-                // 役 (ADR-0010) の被ダメ側。 〈虚空〉と**同じ位置・同じ対象**（敵の直接攻撃パケット）に置く。
+                // 役 (ADR-0010) の被ダメ側。 敵の直接攻撃パケットに置く。
                 //   fixedDamageToPlayer (毒・出血・反射) は別チャネルなので触らない ──
                 //   ここを含めると「攻撃していない敵の継続ダメージまで役で消える」ことになる。
                 takenDmg = ApplyRoleGuard(ctx, takenDmg, roleOutcome);
@@ -1537,7 +1534,7 @@ namespace CombatSystem
                 // 整備パネル〈装甲〉r10〈不動〉: 1 回の攻撃で受けるダメージは最大 HP の 35% まで (2026-11-10)
                 { int cap = MetaProgression.MetaBuffApplicator.GetArmorHitCap(playerMaxHP); if (cap > 0 && takenDmg > cap) takenDmg = cap; }
                 takenDmg = ItemSystem.PassiveSkills.Effects.HarmlessLamp.Apply(ctx, takenDmg);   // 〈無害灯〉【規則】: 臨界で被ダメージを半減 (1 ターン 1 回)
-                if (guardless && !ctx.nullifyAllDamage) takenDmg = enemyAtkValue;   // 〈狂暴化〉: 防御・ブロック・シールド・軽減を通さず HP へ
+                if (guardless) takenDmg = enemyAtkValue;   // 〈狂暴化〉: 防御・ブロック・シールド・軽減を通さず HP へ
                 playerHP = Math.Max(0, playerHP - takenDmg);
                 takenApplied = takenDmg;
                 diagHitMain = takenDmg;   // [計装] 大技の被ダメ: 主攻撃の分 (防御・シールドの後)
@@ -1649,7 +1646,6 @@ namespace CombatSystem
                         psm.ProcessDamage(secLossBase, 0, 0, attackerIsEnemy: true);
                     secTaken = ApplyLossDamageModifiers(secTaken, floorMod, ctx, Math.Min(secAtkValue, blockSum));
                     parryBlocked += Math.Min(term.parryBlock, Math.Min(secAtkValue, blockSum));
-                    if (ctx.nullifyAllDamage) secTaken = 0;
 
                     // 役の被ダメ側は 1 体目と**同じ扱い**にする。 片方にしか効かないと
                     //   〈守り〉の価値が 2 体戦でだけ半減してしまう。

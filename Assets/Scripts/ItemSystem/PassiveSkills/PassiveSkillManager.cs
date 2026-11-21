@@ -585,11 +585,6 @@ namespace ItemSystem.PassiveSkills
                 FireEnemyTrigger(PassiveSkillTrigger.OnPrePursuitDamage);
 
             // 4. 無効化チェック
-            if (context.nullifyAllDamage)
-            {
-                context.finalDamage = 0;
-                context.pursuitDamage = 0;
-            }
             if (context.nullifyPursuitDamage)
             {
                 context.pursuitDamage = 0;

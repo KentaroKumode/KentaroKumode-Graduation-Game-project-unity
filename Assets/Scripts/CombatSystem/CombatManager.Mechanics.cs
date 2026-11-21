@@ -511,7 +511,7 @@ namespace CombatSystem
         private const string FoundryBonusKey = "termFoundryBonus";
 
         /// <summary>ADR-0011 〈守り〉(目 5): このターンの被ダメを N% 減らす。 T4 は減らした分の半分をシールドにする。
-        /// 〈虚空〉と同じ位置・同じ対象 (敵の直接攻撃パケット) に置く ── fixedDamageToPlayer は別チャネルなので触らない。</summary>
+        /// 敵の直接攻撃パケットに置く ── fixedDamageToPlayer は別チャネルなので触らない。</summary>
         private int ApplyRoleGuard(CombatContext ctx, int takenDmg, RoleOutcome outcome)
         {
             if (outcome.damageTakenCutPct <= 0 || takenDmg <= 0) return takenDmg;

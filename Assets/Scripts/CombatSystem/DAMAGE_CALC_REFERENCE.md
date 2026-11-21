@@ -18,7 +18,6 @@
 > - `diceDifference` は `playerDiceTotal − enemyDiceTotal` の**読み取り専用プロパティ**（手動代入は全廃。視点スワップ時も両合計入替で符号が自動反転）。
 > - ダイス合計の組み立ては `PassiveSkillManager.RecomputeDiceTotals()` に集約（通常ロール／引分リロール共通）。
 > - 勝利時の与ダメ修飾チェーンは `CombatManager.ApplyWinDamageModifiers()`、敗北時は `ApplyLossDamageModifiers()` に抽出（適用順は不変・厳守）。
-> - VoidStance は OnPostRoll 中の鮮度問題回避のため自前で差を算出。
 
 ---
 
@@ -122,7 +121,7 @@ FireTrigger(OnPrePursuitDamage)
 [プレイヤーの攻撃だけ] FireEnemyTrigger(OnPrePursuitDamage)
                                          ← 追撃無効化(飛翔/不動) が nullifyPursuitDamage を立てる (2026-11-11 #104)。
                                            CombatManager がこれを見て役〈追撃〉の追加ダメージを入れない (§9.2)
-nullifyAllDamage → final=0,pursuit=0  /  nullifyPursuitDamage → pursuit=0（pursuitDamage はいま書き手が無く常に 0）
+nullifyPursuitDamage → pursuit=0（pursuitDamage はいま書き手が無く常に 0）
 total = final + pursuitDamage
 [会心] FireTrigger(OnCriticalCheck); critRatePctAdd += buff "critRatePct"
        ── 2026-09-19: 会心率を % に統一し 5% 刻みに揃えた（旧「分子 1 = 5.5%」は撤去・§2-B）──
@@ -495,7 +494,6 @@ Hermes / Bloodlust / EvenEyes / MasterworkNotes / KaleidoDice。
 | SkillId(表示) | Trigger | 効果(ctx操作) |
 |---|---|---|
 | ~~パリィ / 衛士の慣い / 復讐 / 果たし合い / 蝕夜~~ | — | **2026-10-28 削除**（武器家系の整理・GAME.md §24）。後継は §3-B2 の〈堅守の構え〉〈黎明〉〈不滅の刃〉。〈切り返し〉〈血令〉〈処刑〉は同名のまま §3-B2 で中身が変わった |
-| VoidStance(虚空) | OnPostRoll | ｜playerDiceTotal−enemyDiceTotal｜≤3 → nullifyAllDamage + fixedDamageToEnemy +=3（自前で差を算出） |
 | 重装兵の隠し刃 | OnBattleStart | **2026-11-20 作り直し**: `shieldKeepOnBossDown` を立てる。 そのターンがボスのダウンなら BeginNewTurn のシールドの半減を飛ばす（ダウンの待ちが 1 以上 = このターンはダウン）。 旧（2026-11-04〜）: 敵の HP 30% 以下のターン、シールドを最大 20 使い使った量 × 2 を攻撃に（1 戦闘 1 回） |
 | Sting(出血) | OnPostDealDamage | enemyBleedStacks++ |
 | 脆弱(契約・狩猟旅団) | OnBattleStart (Apply) + 防御後最終ダメ | armed状態で会心ダメ時 ×(1+0.15/0.30/0.45) 倍率→consumed / 非会心ロール勝利で再armed。 戦闘終了で剥がれる。 仕様: docs/GAME.md §12 |
@@ -755,7 +753,7 @@ ProcessDamage の中の OnPreDealDamage は「その陣営が攻撃している�
 | IntimidatePlus(威圧+) | OnBattleStart | **[#104 修正]** この敵の攻撃 +3（戦闘を通して・ボスの威圧+は BossParam.IntimidateThreat）。足し先は `enemyDiceTotalBonus`（Escalation.EnemyAttackValue で基礎攻撃と同じく倍率が掛かる＝基礎攻撃 +N と同値・予告に出る）。「脅威」はいま基礎攻撃値の代わり（baseAttack 未指定時）としてしか使われないので、§9.6 の宿題どおり基礎攻撃値への加算と読んだ。旧: `ctx.enemyThreat` に足して読む処理が無かった（いまは enemyThreat へ書かない） |
 | GreedyMerchant(貪欲商人) | OnBattleStart | no-op(スケーリングは GameManager.StartFalseMerchantCombat: HP +2/個・攻撃 +1/3個) |
 | Storm(嵐・2026-11-13) | OnBattleStart | 航行の地図で**嵐の中の点に居る時に始まった戦闘**だけ、 1 体目の敵に付く（`CombatManager.StartCombatInternal` が付ける・ボスには付かない）。この敵の攻撃 +`FreeMapParams.StormEnemyAttack`（3・戦闘を通して）。足し先は威圧+ と同じ `enemyDiceTotalBonus`（基礎攻撃 +N と同値・予告に出る）。仕様は GAME.md §5-12 |
-| Berserk(狂暴化・全部の戦闘の敵に付与・2026-11-21〜) | OnTurnStart | T>50: healBlocked, enemyDamageTakenMultiplier=3, enemyAttackIgnoresGuard=true, enemyDiceTotalBonus を `Berserk.AttackBonusAt(T)` = 10 + 10×⌊(T−51)/5⌋ まで積む (差分だけ足す)。 enemyAttackIgnoresGuard の間、 敵の主攻撃は ApplyPlayerDefense を通さず (予告もその値)・blockSum=0・ProcessDamage 以降の鎖 (シールド・被ダメの軽減・役の守り・仕込み刃・古い手紙・〈不動〉・〈無害灯〉) に 0 を流し、 HP を減らす直前に攻撃値をそのまま入れる (〈虚空〉の両者 0 だけは残す)。 2 体目・〈連撃〉の 2 回目は今までどおり |
+| Berserk(狂暴化・全部の戦闘の敵に付与・2026-11-21〜) | OnTurnStart | T>50: healBlocked, enemyDamageTakenMultiplier=3, enemyAttackIgnoresGuard=true, enemyDiceTotalBonus を `Berserk.AttackBonusAt(T)` = 10 + 10×⌊(T−51)/5⌋ まで積む (差分だけ足す)。 enemyAttackIgnoresGuard の間、 敵の主攻撃は ApplyPlayerDefense を通さず (予告もその値)・blockSum=0・ProcessDamage 以降の鎖 (シールド・被ダメの軽減・役の守り・仕込み刃・古い手紙・〈不動〉・〈無害灯〉) に 0 を流し、 HP を減らす直前に攻撃値をそのまま入れる。 2 体目・〈連撃〉の 2 回目は今までどおり |
 
 （FlawlessRobe 天衣無縫は 2026-10-17 にクラスごと削除。）
 
@@ -986,7 +984,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
 攻撃しないターン (攻撃端子 0 本 / 逃げる・2026-11-04 修正)
          atkBase = 0・追撃 0 に加えて、 ApplyWinDamageModifiers の後で **主攻撃 dealtDmg = 0・会心なし**。
          (旧: ProcessDamage の damageBonus バフと OnPreDealDamage のパッシブが主攻撃へ加算し、 攻撃しないターンに 1 以上入っていた)
-         役の追撃も乗せない。 攻撃端子 0 本のターンは固定ダメ枠 (反撃・出血・毒・〈虚空〉など) を通す。
+         役の追撃も乗せない。 攻撃端子 0 本のターンは固定ダメ枠 (反撃・出血・毒など) を通す。
          **逃げるターンは固定ダメ枠も 0** (品が預けた分を含む)。 出血の DOT は別の段なので入る。 臨界の爆発はその場で入る (下の「臨界」) ので逃げるターンも入る。
 
 自攻撃   **攻撃の端子 1 枚につき 1 撃 (ADR-0016・2026-11-20)**。 撃 h の攻撃値 hitBases[h]:
@@ -1041,7 +1039,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
            ・敵の攻撃 (予告値) = 0 ・〈連撃〉の 2 回目も 0。 敵の出目は振る (乱数の消費は変えない)。 攻撃の枝は〈封じ・揃〉と同じ (下の「敵攻撃」)
            ・受けるダメージ ×1.5 (切り捨て・BossDown.ApplyTaken・満額のダウンだけ = BossDown.TakenMulNow)。 掛ける口は 4 つで、 大罪:怠惰と同じ所:
                主攻撃 = ApplyWinDamageModifiers の怠惰の直後 (CombatManager.Damage.cs)
-               主攻撃以外 = HpLossDiag.Lose (channel ≠ "通常攻撃") ── 固定ダメの枠 (毒の tick・臨界の爆発・品が預けた分・〈虚空〉など)・出血・役〈極〉・反射・仕込み刃・反撃固定・品の直接 (攻撃後)
+               主攻撃以外 = HpLossDiag.Lose (channel ≠ "通常攻撃") ── 固定ダメの枠 (毒の tick・臨界の爆発・品が預けた分など)・出血・役〈極〉・反射・仕込み刃・反撃固定・品の直接 (攻撃後)
                〈逆綴じの止血帯〉(ターン終了・ctx の HP を直接減らす) = AllPassiveSkillEffects.Wringing
                品の直接 (ターンの解決の外) = Kw.DamageEnemy
            ・敵のパッシブ・エスカレーション・敵の回復は普段どおり動く (止まるのは攻撃だけ)。 例外は「ダウン中は発動しない」を名乗ったパッシブ
@@ -1058,7 +1056,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
          (敵の OnPreDealDamage / OnPostDealDamage・〈廃庭の霧吹き〉の毒・〈多頭攻撃〉の 2 回目・プレイヤーの状態の固定ダメ fixedDamageToPlayer の適用は、 攻撃の枝の中にあるので鳴らない)
          (currentBuffs["roleEnemyStun"])。 予告は既に出ているので「見えている一撃を踏み倒す」形。
          〈封じ・対〉は予告値そのものを −40% する (currentBuffs["roleEnemyAtkCut"]・予告にも反映される)。
-         被ダメ側の役は〈守り〉(ApplyRoleGuard)。 〈虚空〉と同じ位置・同じ対象 (敵の直接攻撃パケット) に置く。
+         被ダメ側の役は〈守り〉(ApplyRoleGuard)。 敵の直接攻撃パケットに置く。
 
          enemyAtk  = Escalation.EnemyAttackValue(e, escTurn, enemyDiceTotal, currentTurn)
                     = round(段階倍率(escTurn) × (baseAttack + enemyDiceTotal) × 大技倍率(currentTurn) × ボス倍率)
@@ -1102,9 +1100,8 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
              (剛力/闇技/研ぎ澄まし/反撃態勢・§1 ②)。 2 体目・〈連撃〉の 2 回目は false。
              (旧: この直前で敵の OnPreDealDamage を鳴らしていた ── 2026-11-11 #104 で撤去)
          → ApplyLossDamageModifiers（旧敗北分岐と同一）
-         → nullifyAllDamage (虚空)
-         → **役の被ダメ側**: 大階・相殺(0) / 束(防)(半減)。 虚空と**同じ位置・同じ対象**
-           (敵の直接攻撃パケットのみ)。 fixedDamageToPlayer は別チャネルなので触らない
+         → **役の被ダメ側**: 大階・相殺(0) / 束(防)(半減)。 対象は
+           敵の直接攻撃パケットのみ。 fixedDamageToPlayer は別チャネルなので触らない
          → 仕込み刃（旧法と同一）
          → プレイヤーHP -= takenDmg (+ fixedDamageToPlayer)
          → 痛覚遮断剤 post-clamp / Counter 固定ダメ
@@ -1195,8 +1192,7 @@ ADR-0009 パイプラインでのパッシブ挙動のリワーク記録 (2026-0
 | A2. 追撃 (Pursuit) の役割分離 | PursuitI-IV | 新: 与ダメ+15%/+30%/+50%/+40% (outgoing 加算・IV は 2026-09-20 に +100% から)。筋力=加算・追撃=乗算で意味論分離 |
 | A3. 反撃 (Counter) のトリガー変更 | CounterI-IV | 新: OnPreReceiveDamage で発火 (被ダメ発生時)。完全防御/シールド吸収で不発 |
 | A 特殊 | EspadaPasodoble | 新: 自攻撃+5 のみ (敵ダイス+5 は「ダイス合計」概念消失で除去、+20%outgoing は維持) |
-| C. 差分依存の解消 | VoidStance | 新: 「配線ダイスの過半が同値ペアなら双方0+固定3」に置換 |
-|  | Judgement (天命) | 新: 「被ダメ≥現HPの50%かつHP≥30%で HP-2 上限」に置換 |
+| C. 差分依存の解消 | Judgement (天命) | 新: 「被ダメ≥現HPの50%かつHP≥30%で HP-2 上限」に置換 |
 | D. 敵ダイス操作 | CurseBind (呪縛) | 新: `mutualEnemyAttackReduction += debuff` (敵攻撃値-N) |
 | E. 特殊機構の再設計 | GaryoTensei (画竜点睛) | 新: 「即勝利」廃止 → 出目最大なら `mutualAttackBonus += 出目+10` + `forceCritical=true` |
 |  | BloodDecree (血令) | 新: ゾロ目時 `max(finalDamage, playerDiceTotal) × 2.5` を軽減不能に置換 |

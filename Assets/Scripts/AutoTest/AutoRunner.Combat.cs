@@ -501,8 +501,8 @@ namespace AutoTest
             public float wAtk, wDef, wChg;     // 端子の重み (ペルソナ・ボス別プレイブック・予兆ターン込み)
             public float critMul;
             public int eDefNow, myPen;
-            public bool stepGuardCut, stepUndying, steadfastReady, stepDaybreak, hasVoidStance;
-            public int undyingStreak, myShield, enemyMaxHpNow, voidStacks;
+            public bool stepGuardCut, stepUndying, steadfastReady, stepDaybreak;
+            public int undyingStreak, myShield, enemyMaxHpNow;
             public float bashRate, bulwarkRate;
             public float diceAtkPct;           // 攻撃に挿した出目への上乗せ率 (ctx.attackDicePct・2026-11-06)
             public BossPlaybook play;
@@ -797,7 +797,7 @@ namespace AutoTest
         private struct OptimalTurnOutcome
         {
             public int effDmg;      // 敵 HP を減らす量の見積もり (撃破判定に使う値と同じ)
-            public int mainDmg;     // [2026-11-14] そのうち主攻撃 (目盛りを割れる分・黎明・虚空の削りを除く)
+            public int mainDmg;     // [2026-11-14] そのうち主攻撃 (目盛りを割れる分・黎明の削りを除く)
             public int taken;       // 自 HP の減少の見積もり
             public int block;
             public int aCount, bCount;
@@ -881,9 +881,9 @@ namespace AutoTest
             float wAtk = s.wAtk, wDef = s.wDef, wChg = s.wChg;
             var play = s.play; var atkGrowth = s.atkGrowth;
             int eDefNow = s.eDefNow, myPen = s.myPen, undyingStreak = s.undyingStreak, myShield = s.myShield;
-            int enemyMaxHpNow = s.enemyMaxHpNow, voidStacks = s.voidStacks;
+            int enemyMaxHpNow = s.enemyMaxHpNow;
             bool stepGuardCut = s.stepGuardCut, stepUndying = s.stepUndying, steadfastReady = s.steadfastReady;
-            bool stepDaybreak = s.stepDaybreak, hasVoidStance = s.hasVoidStance;
+            bool stepDaybreak = s.stepDaybreak;
             float bashRate = s.bashRate, bulwarkRate = s.bulwarkRate;
             int aCount = ws.aCount, bCount = ws.bCount, aSum = ws.aSum, blockRaw = ws.blockRaw, chargeRaw = ws.chargeRaw, maxBlockDie = ws.maxBlockDie;
             float c = ws.chargeUnits, specFlat = ws.specFlat;
@@ -920,7 +920,7 @@ namespace AutoTest
 
             // 攻撃の端子に 1 つも挿さない手は主攻撃をしない (本体 CombatManager.Turn の skipAttack = attackDiceCount <= 0)。
             //   2026-11-13 まで旧の式はこの手でも武器の素火力 (atkBase) を与ダメに数えていた (新しい式 ReadOutMainDamage は 0)。
-            //   攻撃なしでも通る削り (〈黎明〉〈虚空〉) は下で effDmg / noAtkDmg へ別に足すので、 ここで 0 にしても消えない。
+            //   攻撃なしでも通る削り (〈黎明〉など) は下で effDmg / noAtkDmg へ別に足すので、 ここで 0 にしても消えない。
             //   v3.oldNoAttackBaseDmg = true で旧い挙動 (素火力を数える) に戻す (測定の口)。
             //   ADR-0016: 素の攻撃力は撃の数だけ乗る (攻撃の端子 1 枚につき 1 撃・端子の外の攻撃は毎回)。
             int dmg = (aCount > 0 || v3.oldNoAttackBaseDmg) ? atkBase * System.Math.Max(1, ws.aHits) + aSum : 0;
@@ -957,7 +957,7 @@ namespace AutoTest
             if (s.mainCorr > 0f && dmg > 0) dmg = Mathf.RoundToInt(dmg * s.mainCorr);
             // damageCapped ボス: 与ダメが閾値超えたら超過分を半減した見積もりで探索 (実挙動と一致)
             int effDmg = dmg;
-            // 攻撃の端子なしでも通る削りの見積もり (〈黎明〉・〈虚空〉)。 端子の撃破のボーナスを攻撃なしのターンに見る時に使う (#117)。
+            // 攻撃の端子なしでも通る削りの見積もり (〈黎明〉・品の軽減不可ダメージ)。 端子の撃破のボーナスを攻撃なしのターンに見る時に使う (#117)。
             //   旧い挙動 (v3.oldNoAttackBaseDmg) では effDmg が攻撃なしでも武器の素火力 (atkBase) を含むので、 攻撃なしの撃破にはこちらを使う。
             int noAtkDmg = 0;
             if (play.damageCapped && play.damageCapThreshold > 0 && dmg > play.damageCapThreshold)
@@ -988,7 +988,7 @@ namespace AutoTest
                 }
             }
 
-            int mainEff = aCount > 0 ? System.Math.Max(0, effDmg) : 0;   // [2026-11-14] 目盛りを割れる主攻撃の見込み (黎明・虚空の削りは入れない)
+            int mainEff = aCount > 0 ? System.Math.Max(0, effDmg) : 0;   // [2026-11-14] 目盛りを割れる主攻撃の見込み (黎明の削りは入れない)
             if (ws.extraDmg > 0) { effDmg = System.Math.Max(0, effDmg) + ws.extraDmg; noAtkDmg += ws.extraDmg; }   // 品の軽減不可ダメージ (主攻撃ではない)
             int block = blockRaw;
             // 〈貫きの錐〉: 敵攻撃値 1 につきブロックを 2 削る (予告済み)。
@@ -1026,22 +1026,6 @@ namespace AutoTest
             if (tele.executeArmed && TurnRules.ExecuteKills(myHpEff - taken, myMaxHp))
                 taken = myHpEff;
 
-            // 〈虚空〉: 攻撃 0 本のターンだけ発動。 殻で被ダメを削り、 現在 HP 割合を刻む。
-            float shellKeep = 1f;   // [#107] 殻で残る割合 (収支の見積もりで敵の攻撃に掛ける)
-            if (aCount == 0 && hasVoidStance)
-            {
-                int n = System.Math.Min(
-                    ItemSystem.PassiveSkills.Effects.VoidStance.StackCap, voidStacks);
-                int chip = UnityEngine.Mathf.CeilToInt(
-                    enemyHp * (ItemSystem.PassiveSkills.Effects.VoidStance.ChipBase
-                             + ItemSystem.PassiveSkills.Effects.VoidStance.ChipPerStack * n) / 100f);
-                effDmg += chip;   // 殴らない代わりに通る軽減不可ダメージ
-                noAtkDmg += chip;
-                float shell = System.Math.Max(0,
-                    90 - ItemSystem.PassiveSkills.Effects.VoidStance.ReducePerStack * n) / 100f;
-                if (shell > 0f) { taken = System.Math.Max(0, (int)(taken * (1f - shell))); shellKeep = 1f - shell; }
-            }
-
             // ===== 敵のパッシブ: 収支で決まる効果と〈吸血〉(#107・2026-11-12) =====
             //   本体: 収支 = (与ダメ + 固定) − 敵の攻撃で減った HP (CombatManager.Turn.cs の `int balance = (dealtDmg + dealtFixed) - takenApplied`)。
             //   収支プラス → 敵の OnRollLose (〈尾撃〉〈重甲〉の反射・〈反撃態勢〉〈暴走〉を次のターンへ) / マイナス → OnRollWin (〈地獄の業火〉)。
@@ -1055,8 +1039,8 @@ namespace AutoTest
                 int h1 = 0, hAll = 0;
                 if (enemyAttacks)
                 {
-                    h1 = (int)(Mathf.RoundToInt(hit1Raw * tm) * shellKeep);
-                    hAll = (int)(Mathf.RoundToInt((hit1Raw + hit2Raw) * tm) * shellKeep);
+                    h1 = Mathf.RoundToInt(hit1Raw * tm);
+                    hAll = Mathf.RoundToInt((hit1Raw + hit2Raw) * tm);
                 }
                 int pool = (bashSpent ? 0 : myShield) + ws.shield;   // シールドは敵の攻撃で先に減り、 残りが軽減無視を肩代わりする (③-C)
                 int hp1 = System.Math.Max(0, h1 - pool);
@@ -1186,8 +1170,6 @@ namespace AutoTest
 
             // 2026-07-28: 攻撃端子 0 本 = **攻撃を行わない** (素火力も追撃も出ない)。
             //   よって「攻撃 0 本」は、 その 1 本を防御へ回さないと死ぬ場合にのみ選ぶ。
-            //   ※〈虚空〉持ちもこの抑止の対象 (2026-07-29)。 刻みの価値は effDmg に足してあるので、
-            //     本当に得なら抑止を越えて選ばれる。
             if (aCount == 0 && !s.noAttackForced)
             {
                 // 「ブロックの最大目を 1 本だけ攻撃へ回す」場合の被弾と比較する。
@@ -1540,17 +1522,7 @@ namespace AutoTest
             // wDef×min(block,enemyAtk) が ~3〜40) に対し、 ttk が 1 増える不利がブロック 1 本の
             // 利得を上回るように置いた初期値。
 
-            // 〈虚空〉所持判定 (2026-07-29 改訂)。
-            //   旧: 虚空は「攻撃 0 本で双方 0 ダメ」だったため、 攻撃 0 本の抑止から **除外**していた。
-            //   新: リワークで双方 0 ダメは撤去され、「殻が剥がれる / 現在 HP 割合を刻む」に変わった。
-            //       除外条項だけが残った結果、 剣ビルドは攻撃 0 本を無条件で選び放題になり、
-            //       7 層で 15.3 ターン中 3.2 回しか殴らない状態を作っていた。
-            //   → 除外をやめ、 **刻みの価値と殻の軽減を効用へ入れて天秤にかける**。
-            var runForVoid = GameLoop.GameManager.Instance?.Run;
-            bool hasVoidStance = runForVoid?.equippedWeaponId != null
-                                 && (runForVoid.equippedWeaponId == "銀の長剣"
-                                     || runForVoid.equippedWeaponId == "デュランダル");
-            int voidStacks = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context?.voidStanceStacks ?? 0;
+            var runNow = GameLoop.GameManager.Instance?.Run;
 
             var play = BossPlaybook.From(cm?.CurrentEnemy);
             // ボス側 HP 比 (Phase 判定に必要): CombatManager から取得 (敵ID・敵HP・敵MaxHP)
@@ -1601,7 +1573,7 @@ namespace AutoTest
                 eDefNow = eDefNow, myPen = myPen, stepGuardCut = stepGuardCut, stepUndying = stepUndying,
                 undyingStreak = undyingStreak, bashRate = bashRate, bulwarkRate = bulwarkRate,
                 steadfastReady = steadfastReady, stepDaybreak = stepDaybreak, myShield = myShield,
-                enemyMaxHpNow = enemyMaxHpNow, hasVoidStance = hasVoidStance, voidStacks = voidStacks,
+                enemyMaxHpNow = enemyMaxHpNow,
                 play = play, atkGrowth = atkGrowth,
                 diceAtkPct = ctxRoles?.attackDicePct ?? 0f,
             };
@@ -1686,10 +1658,10 @@ namespace AutoTest
             if ((readOutNow || predTrace) && ctxRoles != null)
             {
                 st.readOut = readOutNow; st.traceBoth = predTrace;
-                FillReadOut(ref st, cm, ctxRoles, runForVoid, tele.playerAttackPenalty);
+                FillReadOut(ref st, cm, ctxRoles, runNow, tele.playerAttackPenalty);
             }
             // [#122] 旧の式でも〈不滅の刃〉の伸びを池との比で見るので、 池だけは読む (st.outMul を読むのは新しい式と〈不滅の刃〉だけ)
-            else if (st.stepUndying && ctxRoles != null) st.outMul = OutgoingPoolNow(ctxRoles, runForVoid);
+            else if (st.stepUndying && ctxRoles != null) st.outMul = OutgoingPoolNow(ctxRoles, runNow);
             // [V3 mainCorr] 主攻撃の見積もりに実績の比を掛ける。 下の dFull (HP の帳簿の撃破までの見込み) の計算より前に入れる
             if (v3.mainCorr && EffectiveWiringSkill != WiringSkill.Naive) st.mainCorr = _mcRatioNow;
             // [V3 hpLedger] 先のターンの 1 ターンの与ダメの見込み: 今の手を全部攻撃に挿した時の値を、 面の平均で均す
