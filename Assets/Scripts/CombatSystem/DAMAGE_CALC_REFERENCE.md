@@ -187,7 +187,7 @@ outgoingDamageMultiplier += メタ% + 遺物% + 研磨剤1.5 + consDmgMultPct/10
   ※ 旧: effRate = max(0, enemyDamageReductionPct − armorPenPct) の割合軽減と、
     余剰貫通 (armorPen − 防御率) を与ダメ ×(1+余剰) へ転用する段 J。 どちらも撤去
 ↑ 勝利時最低保証【新】: total = max(total, winMinDamage[既定1, 利刃で1〜4])
-× enemyDamageTakenMultiplier       ← 狂暴化(50T後 ×3・2026-11-21〜 全部の戦闘)
+× enemyDamageTakenMultiplier       ← 狂暴化(50T後 ×2・2026-11-21〜 全部の戦闘)
 メタデバフ俊敏: 各戦闘の初撃を total=0,fixedDmg=0
 → enemyHP −= total + fixedDamageToEnemy
   鋼の皮膚(メタデバフ): 敵初回致命を1HPで耐える
@@ -330,7 +330,7 @@ ShieldBash の空振り（盾 0）が 34.2% → 66.1%、1 機会あたりの攻�
 | `enemyHealReductionPct`【新】 | 敵回復の減衰率(治癒阻害0.5/遮断1.0)。`ReduceEnemyHeal()`経由で敵自己回復に適用 | 戦闘保持 |
 | `fixedDamageMultiplier`【新】 | 軽減無視ダメ倍率(蒼白の槍騎士1.5)。ProcessDamage末＆引分分岐で fixedDamageToEnemy に乗算 | 戦闘保持(既定1.0) |
 | `outgoingDamageMultiplier` | プレイヤー与ダメ倍率(激情の刃) | 毎T1.0 |
-| `enemyDamageTakenMultiplier` | 敵被ダメ倍率(狂暴化×3) | 毎T1.0 |
+| `enemyDamageTakenMultiplier` | 敵被ダメ倍率(狂暴化×2) | 毎T1.0 |
 | `healBlocked`/`lifestealPct` | 回復封印/与ダメ回復% | 毎T |
 | `playerFlatDamageReduction` | 被ダメ定額減(不屈の鎧/苦難の刻印) | BeginNewTurn |
 | `receivedDamageBonus` | 被ダメ増(亡者の招待+30%) | — |
