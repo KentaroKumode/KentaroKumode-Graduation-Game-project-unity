@@ -534,13 +534,15 @@ namespace CombatSystem
         /// 同じ式を <c>OnCriticalCheck</c> の加算とバフの後に組むので、 配線を決める前の値には
         /// <paramref name="pendingBuff"/> = true でまだ乗っていない戦闘中バフ (月蝕/レイピア) を足す。
         /// 本判定の後 (バフは <c>critRatePctAdd</c> に取り込み済み) では false にすること ── 二重に数えない。</summary>
-        private float CritRateOf(CombatContext ctx, bool pendingBuff)
+        private float CritRateOf(CombatContext ctx, bool pendingBuff) => ItemSystem.PassiveSkills.CombatContext.ResolveCritRate(CritAddOf(ctx, pendingBuff));
+
+        /// <summary>合算した会心率 (100% を超えた分もそのまま・超過会心率の変換 CritCore.ExcessMul と画面の表示が読む)。</summary>
+        private float CritAddOf(CombatContext ctx, bool pendingBuff)
         {
             float add = playerCritBaseRate + ctx.critRatePctAdd
                       + MetaProgression.MetaBuffApplicator.GetCritRatePctBonus();
             if (pendingBuff) add += ctx.GetBuff(ItemSystem.PassiveSkills.CombatContext.CritRateBuffKey);
-            add = Mathf.Max(0f, add);
-            return ItemSystem.PassiveSkills.CombatContext.ResolveCritRate(add);
+            return Mathf.Max(0f, add);
         }
 
         /// <summary>HUD に出すプレイヤーのステータス (2026-11-05)。 <b>配線を決める前に呼ぶ</b>こと
@@ -557,8 +559,9 @@ namespace CombatSystem
             var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
             var s = new HudStats { attack = playerAttackPower, toilCutPct = MetaProgression.MetaDebuffApplicator.GetToilDamageCutPct() };
             if (ctx == null) return s;
-            s.critRate = CritRateOf(ctx, pendingBuff: true);
-            s.critMul = ctx.criticalMultiplier;
+            //   会心率は 100% を超えた分も出す (超えた分は会心倍率へ変わる・CritCore.EffectiveMul と同じ式で倍率に入れる)
+            s.critRate = CritAddOf(ctx, pendingBuff: true);
+            s.critMul = CritCore.EffectiveMul(ctx.criticalMultiplier, ctx.enemyCritMultReduction, s.critRate, ctx.critExcessDouble, false);
             float mul = ctx.outgoingDamageMultiplier <= 0f ? 1f : ctx.outgoingDamageMultiplier;
             int metaPct = MetaProgression.MetaBuffApplicator.GetOutgoingDamagePct()
                         + MetaProgression.MetaBuffApplicator.GetBattleSpiritPct(GameLoop.GameManager.Instance?.Run);
@@ -586,7 +589,7 @@ namespace CombatSystem
                 float rate = CritRateOf(ctx, pendingBuff: false);
                 // 本判定と同じ優先順: 封印 (無心の刃) で外れ、 forceCritical が最後に確定で上書きする。
                 crit = ((!ctx.critSuppressed && GameLoop.GameRng.Chance(rate, "combat.roleExtraCrit", RngIdx(3)))
-                    || ctx.forceCritical) && !ctx.critToDamage;   // 〈銑鉄棍〉の【規則】: 会心が出なくなる
+                    || ctx.forceCritical);
                 if (crit) extra *= ctx.criticalMultiplier;
             }
             int add = Mathf.Max(1, Mathf.RoundToInt(extra));

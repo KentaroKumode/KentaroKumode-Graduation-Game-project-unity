@@ -197,7 +197,7 @@ namespace ItemSystem.PassiveSkills.Keywords
 
         /// <summary>この戦闘で出した会心の回数 (〈戦果の天秤〉が読む)。</summary>
         public const string CritCountKey = "kw.critCount";
-        /// <summary>直近の会心した主攻撃に実際に掛かった会心倍率 (敵の会心耐性・〈寸鉄〉〈心眼〉の② 込み・PassiveSkillManager.ProcessDamage が書く)。 〈天眼の鍔〉が読む。</summary>
+        /// <summary>直近の会心した主攻撃に実際に掛かった会心倍率 (敵の会心耐性・超過会心率・〈天眼の鍔〉の ×1.25 込み・PassiveSkillManager.ProcessDamage が書く)。 〈天眼の鍔〉が読む。</summary>
         public const string LastCritMulKey = "kw.lastCritMul";
 
         // ============================================================

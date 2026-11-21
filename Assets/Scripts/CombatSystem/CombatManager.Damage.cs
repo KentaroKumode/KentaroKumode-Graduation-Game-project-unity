@@ -377,7 +377,7 @@ namespace CombatSystem
                 Debug.Log("[CombatManager] 共助発動: 敵の最初の攻撃を半減");
             }
 
-            // 〈死相の面頬〉(2026-11-20・§23-32): 会心したターン、 そのターンの敵の攻撃を (会心倍率 − 1) × 20% 減らす (最大 −50%・切り捨てで減らす)
+            // 〈死相の面頬〉: 会心したターン、 そのターンの敵の攻撃を (会心倍率 − 1) × 25% 減らす (最大 −60%・切り捨てで減らす)
             {
                 float maskCut = ItemSystem.PassiveSkills.Effects.DeathMaskVisor.CutNow(ctx);
                 if (maskCut > 0f && totalDmg > 0)

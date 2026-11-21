@@ -79,6 +79,9 @@ namespace CombatSystem
             return Escalation.IsHeavyTurn(currentEnemy, turn) || Escalation.IsChargeTurn(currentEnemy, turn);
         }
 
+        /// <summary>このターン敵がダウン中か (〈抜き打ちの作法〉が撃の中で読む)。</summary>
+        public bool EnemyDownNow => currentEnemy != null && enemyHP > 0 && _down.downNow;
+
         /// <summary>このターン敵がチャージ中 (大技の前で攻撃しない・天与の盾と指輪も) かダウン中か (〈隙衝きの短槍〉が配線の後に読む・2026-11-21)。
         /// 予告の「チャージ」の印 (<see cref="FillDownTelegraph"/>)・敵の攻撃の解決の「攻撃しない」の枝と同じ判定。</summary>
         public bool EnemyChargingOrDownNow(int turn)

@@ -197,6 +197,15 @@ namespace ItemSystem.PassiveSkills
             Register(new TenkouKaibutsu()); Register(new HopeShard()); Register(new UnyieldingHeat()); Register(new FierceBlade()); Register(new HarmlessLamp());
         }
 
+        /// <summary>会心の軸 21 品のうち効果クラスを持つ 20 品 (2026-11-21・CritEffects.cs)。 〈必殺の照準器〉は本体の撃の輪の旗 (CombatManager.Turn)。 超過会心率の変換は CritCore (全員の規則)。</summary>
+        private static void RegisterCrit()
+        {
+            Register(new FalconerGlove()); Register(new AimNotch()); Register(new FirstArrow()); Register(new LingeringBell()); Register(new ParryFan());
+            Register(new UnwhettedClub()); Register(new SurveyorMonocle()); Register(new WhetAppraisal()); Register(new NickAppraisal()); Register(new HeftyPommel());
+            Register(new LapisWhetstone()); Register(new LayeredScabbard()); Register(new LayeredCutForm()); Register(new ChainedFlash()); Register(new QuickDrawArt());
+            Register(new Suntetsu()); Register(new PinpointEye()); Register(new ClairvoyantCrystal()); Register(new HeavenEyeGuard()); Register(new DeathMaskVisor());
+        }
+
         private static void RegisterAll()
         {
             RegisterCharge();
@@ -204,6 +213,7 @@ namespace ItemSystem.PassiveSkills
             RegisterShield();
             RegisterBleed();
             RegisterHeat();
+            RegisterCrit();
             // ============================
             //  アイテム再編 (2026-10-31・ReworkItemEffects.cs)
             // ============================
@@ -212,22 +222,9 @@ namespace ItemSystem.PassiveSkills
             Register(new LuckyCoin());
             Register(new SpoilsScale());
             Register(new BlastPrize());
-            Register(new SurveyorMonocle());
-            Register(new LapisWhetstone());
-            Register(new Suntetsu());
-            Register(new UnwhettedClub());
 
-            // ============================
-            //  軸の品 (2026-11-07・AxisItemEffects.cs)。 各軸に 燃料 / ① 数を参照 / ②【規則】
-            // ============================
-            // 研ぎ師の見立て書 はステータス化 (段 3・2026-11-11)。 千里眼の水晶は 2026-11-20 にクラスへ戻した (下の追加 34 品の並び)
-            Register(new FalconerGlove());                                       Register(new LayeredCutForm());     Register(new LayeredScabbard()); Register(new PinpointEye());
-            // 軸の品・追加 34 品 (2026-11-07・AxisItemEffects2.cs)。 各軸を 23 品にそろえた
-            Register(new AimNotch());   Register(new FirstArrow());   Register(new LingeringBell()); Register(new ParryFan());
-            Register(new NickAppraisal()); Register(new LosingStreakDie()); Register(new ChainedFlash()); Register(new QuickDrawArt());
-            Register(new ClairvoyantCrystal()); // 2026-11-20 作り直し (旧 items.json の stats)
-            // 軸の締めの LEGENDARY (2026-11-20・AxisItemEffects3.cs・GAME.md §23-32)
-            Register(new HeavenEyeGuard()); Register(new DeathMaskVisor());
+            // 〈負け越しの賽〉(役の軸へ移った・新しい効果は Phase 3e・AxisItemEffects2.cs)
+            Register(new LosingStreakDie());
             // 消耗品の連動品 (2026-11-20・ConsumableLinkEffects.cs・item-overhaul-spec §7-2)
             Register(new BeltPouch()); Register(new SpentPride()); Register(new BottomlessVial()); Register(new SampleBox());
             // 嵐・店・金のマクロ秘宝の戦闘の側 (2026-11-20・MacroItemEffects.cs・item-overhaul-spec §9)
@@ -237,7 +234,7 @@ namespace ItemSystem.PassiveSkills
             // 賽目 (役の軸) の出来事で書く 2 品 (2026-11-21・RoleItemEffects.cs・残り 6 品は TerminalCards の RoleItems の旗と CombatManager の役の適用)
             Register(new ChippedEyeReading()); Register(new MatchedClappers());
             // 戦術の 5 品 (2026-11-21・TacticItemEffects.cs・item-overhaul-spec §6-2)
-            Register(new HeftyPommel()); Register(new GapSpear());
+            Register(new GapSpear());
             Register(new BreakingMove()); Register(new HeavyBreakerWedge()); Register(new AdversityHourglass());
 
             // ============================

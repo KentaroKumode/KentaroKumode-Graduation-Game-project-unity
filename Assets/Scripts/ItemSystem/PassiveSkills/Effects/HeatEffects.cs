@@ -98,7 +98,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>恒熱の炉壁: 爆発するたび、 その爆発のダメージ (敵の防御の後) の 25% (最大 14) をそのターンのブロックとして得る (配線より後の爆発の分は、 そのターンの敵の攻撃に間に合わない)。</summary>
+    /// <summary>恒熱の炉壁: 爆発するたび、 その爆発のダメージ (敵の防御の後) の 25% (最大 14) をそのターンのブロックとして得る (配線より後の爆発の分は CombatManager.Turn が敵の攻撃の前に足す)。</summary>
     public class HeatWall : IPassiveSkillEffect
     {
         public string SkillId => "恒熱の炉壁";

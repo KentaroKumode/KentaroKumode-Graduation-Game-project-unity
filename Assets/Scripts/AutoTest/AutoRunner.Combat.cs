@@ -531,12 +531,16 @@ namespace AutoTest
             public float igCut;                // 〈不完全な起動〉の攻撃カット率
             public int dmgBonus;               // バフ damageBonus (ProcessDamage の 1.)
             public float critP, critMulEff;    // 会心率 (配線前に分かる分) / 実効の会心倍率 (敵の会心耐性込み)
-            /// <summary>[2026-11-20] このターンの最初の 1 撃の会心率 (〈抜き打ちの作法〉の確定・〈千里眼の水晶〉の上乗せ込み。 無ければ critP と同じ)。</summary>
+            /// <summary>[2026-11-20] このターンの最初の 1 撃の会心率 (〈抜き打ちの作法〉・〈急所突きの針〉の確定。 無ければ critP と同じ)。</summary>
             public float critP1;
             /// <summary>[2026-11-21] 〈急所突きの針〉が仕込んである: 攻撃のある最初の 1 撃は必ず会心・敵の防御を無視 (本体 CombatManager.TakeTacticNeedle)。</summary>
             public bool needleFirst;
-            /// <summary>[2026-11-20] 〈寸鉄〉: 会心しなかった撃に掛かる上乗せ (会心倍率の上乗せ分 × 会心率 (100% まで)・0 = 持っていない)。</summary>
-            public float nonCritShare;
+            /// <summary>[会心の軸 2026-11-21・CritCore] 配線の前に分かる合算の会心率 (100% 超えもそのまま) / 会心倍率 (敵の会心耐性の前) / 敵の会心耐性 /
+            /// 〈寸鉄〉(超過の変換 2 倍) /〈天眼の鍔〉(確定会心 ×1.25) /〈銑鉄棍〉(会心しなかった撃に会心率 1% につき +1%) / 会心が出ない (封印) / 必ず会心 (forceCritical)。</summary>
+            public float critAdd, critMulBase, critRed;
+            public bool critDouble, critHeaven, ironClub, critOff, critOn;
+            /// <summary>[会心の軸] 配線で決まる品: 〈鷹匠の革手袋〉〈狙い目の刻み〉/ 攻撃の端子 1 枚の撃の〈一の矢〉〈渾身の柄頭〉〈必殺の照準器〉/ 最初の 1 撃が〈抜き打ちの作法〉で確定会心。</summary>
+            public bool falconer, aim, firstArrow, pommel, sniper, quickDrawFirst;
             /// <summary>[2026-11-20] 〈加重の拳套〉: 撃の番号 (0 から) 1 につき足す最終与ダメージ倍率 (%・0 = 持っていない)。</summary>
             public int lateHitFinalPct;
             public float nonCritMul;           // 鈍器: 非会心だけ ×(1+x)
@@ -626,26 +630,37 @@ namespace AutoTest
             outMul += ws.outPctAdd;
             float termMul = ws.damageMul;
             int fpct = s.finalPct + s.lateHitFinalPct * hitNo;   // ローカル関数は in の引数を捕まえられないので写す (〈加重の拳套〉: 2 撃目以降の上乗せ)
-            float nonCritShare = s.nonCritShare;
             int minDmg = s.minDmg, consBurst = s.consBurst, eDef = ws.ignoreDefense || (hitNo == 0 && s.needleFirst) ? 0 : s.eDefNow, pen = s.myPen, critPen = s.critPen;
-            float critMulEff = s.critMulEff + ws.critMultAdd, nonCritMul = s.nonCritMul, berserk = s.berserkMul;
+            float nonCritMul = s.nonCritMul, berserk = s.berserkMul;
+            // 会心 (CritCore・本体の ProcessDamage と同じ式): 撃ごとの会心率と会心倍率。 配線で決まる品はこの撃の目・撃の数で足す
+            float add = s.critAdd, mulAdd = ws.critMultAdd;
+            bool force = ws.forceCrit || (hitNo == 0 && s.critP1 >= 1f);
+            if (hitNo == 0 && s.quickDrawFirst) mulAdd += ItemSystem.PassiveSkills.Effects.QuickDrawArt.Mul;
+            if (s.falconer && ws.atkFaceMax >= ItemSystem.PassiveSkills.Effects.FalconerGlove.MinFace) { add += ItemSystem.PassiveSkills.Effects.FalconerGlove.Rate; mulAdd += ItemSystem.PassiveSkills.Effects.FalconerGlove.Mul; }
+            if (s.aim && ws.hitFace != null && hitNo < ws.hitFace.Length) { add += CombatSystem.CritCore.AimRate(ws.hitFace[hitNo]); force |= CombatSystem.CritCore.AimForce(ws.hitFace[hitNo]); }
+            bool solo = ws.aHits == 1;
+            if (solo && s.firstArrow) { add += ItemSystem.PassiveSkills.Effects.FirstArrow.Rate; mulAdd += ItemSystem.PassiveSkills.Effects.FirstArrow.Mul; }
+            float critMulEff = CombatSystem.CritCore.EffectiveMul(s.critMulBase + mulAdd, s.critRed, add, s.critDouble, s.critHeaven);
+            float sniperMul = CombatSystem.CritCore.EffectiveMul(s.critMulBase + mulAdd + (add >= 1f ? CombatSystem.CritCore.SniperMulAdd : 0f), s.critRed, add, s.critDouble, s.critHeaven);
+            float ironOut = s.ironClub ? System.Math.Min(1f, add) : 0f;
+            int critFpct = solo && s.pommel ? ItemSystem.PassiveSkills.Effects.HeftyPommel.FinalPct : 0;
             bool pinpoint = s.pinpointCut, vital = s.vitalIgnore, down = s.enemyDown && !s.enemyDownWeak;   // ひびの弱いダウン (2026-11-14) は ×1.5 なし
-            float D(bool crit)
+            float D(bool crit, float cmul)
             {
                 int d = raw;
                 if (d <= 0) return System.Math.Max(0, minDmg);
-                if (crit) d = (int)(d * critMulEff);
+                if (crit) d = (int)(d * cmul);
                 else
                 {
                     if (nonCritMul > 0f) d = (int)(d * (1f + nonCritMul));
-                    if (nonCritShare > 0f) d = (int)(d * (1f + nonCritShare));   // 〈寸鉄〉: 本体と同じ位置 (鈍器の後・一点読みの前)
                     if (pinpoint) d = d * ItemSystem.PassiveSkills.Effects.PinpointEye.NonCritKeepPct / 100;
                 }
-                if (outMul > 0f && System.Math.Abs(outMul - 1f) > 0.001f) d = Mathf.CeilToInt(d * outMul);
+                float om = crit ? outMul : outMul + ironOut;   // 〈銑鉄棍〉: 会心しなかった撃だけ池へ足す
+                if (om > 0f && System.Math.Abs(om - 1f) > 0.001f) d = Mathf.CeilToInt(d * om);
                 d += consBurst;
                 if (termMul != 1f && d > 0) d = System.Math.Max(1, Mathf.RoundToInt(d * termMul));   // 〈激昂〉〈共鳴〉: 本体と同じ位置 (攻撃バーストの後・物差しの前)
                 d = CombatSystem.EnemyHpLedger.ProbeMain(d);   // [測定用の物差し 2026-11-10] 本体と同じ位置 (攻撃バーストの後・防御の前)
-                d = ApplyFinalPct(d, fpct);                             // 最終与ダメージ倍率: 本体と同じ位置 (物差しの直後・怠惰の前)
+                d = ApplyFinalPct(d, fpct + (crit ? critFpct : 0));     // 最終与ダメージ倍率: 本体と同じ位置 (物差しの直後・怠惰の前・〈渾身の柄頭〉は会心した撃だけ)
                 d = MetaProgression.MetaDebuffApplicator.ApplyOutgoingCut(d);   // [#121] 〈大罪:怠惰〉: 本体と同じ位置 (物差しの直後・防御の前・CombatManager.Damage.cs)
                 d = CombatSystem.BossDown.ApplyTaken(d, down);               // ボスのダウン ×1.5: 本体と同じ位置 (怠惰の直後)
                 if (eDef > 0 && d > 0 && !(crit && vital))
@@ -657,8 +672,10 @@ namespace AutoTest
                 if (berserk > 1f && d > 0) d = Mathf.CeilToInt(d * berserk);
                 return d;
             }
-            float p = ws.forceCrit ? 1f : hitNo == 0 ? s.critP1 : s.critP;
-            return p >= 1f ? D(true) : p <= 0f ? D(false) : p * D(true) + (1f - p) * D(false);
+            float p = s.critOff ? 0f : force || s.critOn ? 1f : ItemSystem.PassiveSkills.CombatContext.ResolveCritRate(add);
+            float v = p >= 1f ? D(true, critMulEff) : p <= 0f ? D(false, critMulEff) : p * D(true, critMulEff) + (1f - p) * D(false, critMulEff);
+            if (solo && s.sniper && p > 0f) v += p * D(true, sniperMul);   // 〈必殺の照準器〉: 会心した撃をもう 1 回 (確定会心)
+            return v;
         }
 
         /// <summary>与ダメ倍率の池: ApplyWinDamageModifiers と同じ足し方 (加算の池)。 読むだけ。
@@ -694,32 +711,39 @@ namespace AutoTest
             // 会心率: 本体の CritRateOf(pendingBuff: true) と同じ (武器 + このターンの加算 + 整備パネル + 戦闘中バフ)。 OnCriticalCheck の条件付きは入らない。
             float add = (cm?.PlayerCritBaseRate ?? 0f) + ctx.critRatePctAdd + MetaProgression.MetaBuffApplicator.GetCritRatePctBonus()
                       + ctx.GetBuff(ItemSystem.PassiveSkills.CombatContext.CritRateBuffKey);
-            add = System.Math.Max(0f, add);
-            float p = ItemSystem.PassiveSkills.CombatContext.ResolveCritRate(add);
-            if (ctx.critSuppressed || ctx.critToDamage) p = 0f;
-            if (ctx.forceCritical && !ctx.critToDamage) p = 1f;
+            //   配線の前に分かる会心の品 (〈余韻の鈴〉〈瑠璃砥石〉〈一点読みの片眼〉ほか・Crit.ForecastTurn) を足す
+            ItemSystem.PassiveSkills.Effects.Crit.ForecastTurn(ctx, run, out float itemRate, out float itemMul);
+            add = System.Math.Max(0f, add + itemRate);
+            st.critAdd = add;
+            st.critMulBase = ctx.criticalMultiplier + itemMul;
+            st.critRed = ctx.enemyCritMultReduction;
+            st.critDouble = ctx.critExcessDouble || (run != null && run.OwnsPassive(ItemIds.CritSuntetsu));
+            st.critHeaven = ItemSystem.PassiveSkills.Effects.HeavenEyeGuard.Held(ctx) || (run != null && run.OwnsPassive(ItemIds.CritHeaven));
+            st.ironClub = ctx.critToDamage || (run != null && run.OwnsPassive(ItemIds.CritIronClub));
+            st.critOff = ctx.critSuppressed;
+            st.critOn = !st.critOff && ctx.forceCritical;
+            st.falconer = run != null && run.OwnsPassive("鷹匠の革手袋");
+            st.aim = run != null && run.OwnsPassive(ItemIds.CritAim);
+            st.firstArrow = run != null && run.OwnsPassive(ItemIds.CritFirstArrow);
+            st.pommel = run != null && run.OwnsPassive(ItemIds.CritPommel);
+            st.sniper = run != null && run.OwnsPassive(ItemIds.CritSniper);
+            float p = st.critOff ? 0f : st.critOn ? 1f : ItemSystem.PassiveSkills.CombatContext.ResolveCritRate(add);
             st.critP = p;
-            // 最初の 1 撃 (2026-11-20): 〈千里眼の水晶〉の会心率の上乗せ・〈抜き打ちの作法〉の確定 (配線の時点では ctx.hitIndex = 0)
+            // 最初の 1 撃: 〈抜き打ちの作法〉(1 ターン目とダウン中)・〈急所突きの針〉の確定 (配線の時点では ctx.hitIndex = 0)
             {
                 float p1 = p;
-                if (run != null && run.OwnsPassive(ItemSystem.PassiveSkills.Effects.ClairvoyantCrystal.Id) && !(ctx.critSuppressed || ctx.critToDamage) && p < 1f)
-                    p1 = ItemSystem.PassiveSkills.CombatContext.ResolveCritRate(add + ItemSystem.PassiveSkills.Effects.ClairvoyantCrystal.FirstHitBonus(ctx));
-                if (run != null && run.OwnsPassive(ItemSystem.PassiveSkills.Effects.QuickDrawArt.Id) && !ctx.critToDamage
-                    && ItemSystem.PassiveSkills.Effects.QuickDrawArt.FirstHitForced(ctx)) p1 = 1f;
+                st.quickDrawFirst = run != null && run.OwnsPassive(ItemIds.CritQuickDraw)
+                    && ItemSystem.PassiveSkills.Effects.QuickDrawArt.FirstHitForced(ctx, cm != null && cm.EnemyDownNow);
+                if (st.quickDrawFirst) p1 = 1f;
                 st.needleFirst = ctx.GetAccumulated(CombatSystem.CombatManager.TacticNeedleKey) > 0f;
                 if (st.needleFirst) p1 = 1f;      // 〈急所突きの針〉: 本体は forceCritThisHit (撃の会心の判定を確定にする)
                 st.critP1 = p1;
             }
-            float cmul = ctx.criticalMultiplier;
-            if (ctx.enemyCritMultReduction > 0f) cmul = System.Math.Max(1f, cmul - ctx.enemyCritMultReduction);
-            st.critMulEff = cmul;
-            // 〈寸鉄〉【規則】: 会心しなかった撃にも 会心倍率の上乗せ分 × 会心率 (100% まで) が乗る (本体 PassiveSkillManager.ProcessDamage と同じ式)
-            st.nonCritShare = ctx.critShareOnNonCrit ? System.Math.Max(0f, (cmul - 1f) * System.Math.Min(1f, add)) : 0f;
+            st.critMulEff = CombatSystem.CritCore.EffectiveMul(st.critMulBase, st.critRed, add, st.critDouble, st.critHeaven);
             st.lateHitFinalPct = run != null && run.OwnsPassive(ItemSystem.PassiveSkills.Effects.WeightingGauntlet.Id) ? ItemSystem.PassiveSkills.Effects.WeightingGauntlet.PctPerHit : 0;
             st.nonCritMul = ctx.nonCritOutgoingMultiplier;
             st.pinpointCut = ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.PinpointEye.NonCritCutKey) > 0f;
             st.outMul = OutgoingPoolNow(ctx, run);
-            if (ctx.critToDamage && add > 0f) st.outMul += System.Math.Min(1f, add);   // 〈銑鉄棍〉【規則】: 会心率 1% につき与ダメージ +1% (100% まで・与ダメ % の池)
             st.finalPct = ctx.finalDamagePct;
             st.consBurst = ctx.consAtkBurst;
             st.critPen = ctx.critArmorPen;
@@ -829,6 +853,9 @@ namespace AutoTest
             public float outPctAdd;      // 与ダメ% の池へ足す分
             public float critMultAdd;    // このターンの会心倍率 +N
             public bool forceCrit;       // このターンは必ず会心
+            /// <summary>攻撃に挿した目の一番大きい値 (〈鷹匠の革手袋〉) / 撃ごとの挿した目の一番大きい値 (〈狙い目の刻み〉を持つ時だけ・CritCore.HitFaceMax)。</summary>
+            public int atkFaceMax;
+            public int[] hitFace;
             public bool ignoreDefense;   // 敵の防御を無視
             public float takenMul;       // このターンの被ダメに掛ける (1 = なし)
             public float enemyAtkMul;    // このターンの敵の攻撃に掛ける (1 = なし)

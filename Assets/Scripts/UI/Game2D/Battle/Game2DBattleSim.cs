@@ -677,6 +677,20 @@ namespace UI.Game2D.Battle
         public bool HeatLive => HeatState(out _);
         public string HeatLabel { get { HeatState(out var l); return l; } }
 
+        // ── 会心の超過会心率 (2026-11-21・CritCore・仮置き) ── 会心の品を持つ戦闘で、 配線の前に分かる会心率と会心倍率 (100% を超えた分は倍率に入る・PreviewHudStats) を右の列に出す (表示だけ)。
+        //   100% 以上 (超えた分が倍率へ変わる) なら金。 配線で決まる品 (〈鷹匠の革手袋〉〈一の矢〉ほか) と撃ごとの分は入らない。
+        public bool HasCrit => ItemSystem.PassiveSkills.AxisRules.Count(GameLoop.GameManager.Instance?.Run, ItemSystem.PassiveSkills.AxisRules.Crit) > 0 && CombatManager.Instance != null;
+        public bool CritLive => HasCrit && CombatManager.Instance.PreviewHudStats().critRate >= 1f;
+        public string CritLabel
+        {
+            get
+            {
+                if (!HasCrit) return "";
+                var hs = CombatManager.Instance.PreviewHudStats();
+                return "会心 " + Mathf.RoundToInt(hs.critRate * 100f) + "% ×" + hs.critMul.ToString("0.00");
+            }
+        }
+
         /// <summary>出目 i を端子 s に挿せるか (挿せる数・払う充電・出目の条件)。 他の出目との関係を見る条件は、 そろう見込みがあれば通す
         /// (〈十字斬り〉の 1 個目を挿せるように)。 本当に発動するかは見込み (Resolve) が決める。</summary>
         public bool Accepts(int i, int s)

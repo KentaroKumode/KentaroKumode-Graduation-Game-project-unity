@@ -85,7 +85,16 @@ namespace AutoTest
             ws.aCount = o.attackDice; ws.bCount = o.blockDice; ws.aHits = o.attackHits.Count;
             ws.aSum = o.attackAdd; ws.blockRaw = o.blockAdd; ws.chargeRaw = o.chargeAdd;
             for (int i = 0; i < k && i < o.kindOfDie.Length; i++)
+            {
                 if (o.kindOfDie[i] == DiceTerminal.Block && rolls[i] > ws.maxBlockDie) ws.maxBlockDie = rolls[i];
+                if (o.kindOfDie[i] == DiceTerminal.Attack && rolls[i] > ws.atkFaceMax) ws.atkFaceMax = rolls[i];   // 〈鷹匠の革手袋〉(本体は MutualKeys.AttackDiceMax)
+            }
+            //   〈狙い目の刻み〉: 撃ごとの挿した目 (本体の撃の輪と同じ CritCore.HitFaceMax)
+            if (s.aim && o.attackHits.Count > 0)
+            {
+                ws.hitFace = new int[o.attackHits.Count];
+                for (int h = 0; h < ws.hitFace.Length; h++) ws.hitFace[h] = CritCore.HitFaceMax(o, rolls, h);
+            }
             // 充電: 本体の順 (払う → 満たす → 足す・上限で止まる) で、 実際に増える量を出目の平均で割って「本数」に換える
             int cap = (env.chargeCap > 0 ? env.chargeCap : 9999) + o.chargeCapAdd;      // 〈大導電＋〉は満たす前に上限を足す
             int ch = Math.Max(0, env.charge - o.chargeSpend);

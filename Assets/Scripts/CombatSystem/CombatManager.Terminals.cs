@@ -41,6 +41,9 @@ namespace CombatSystem
         public static long BleedSpendFired, BleedExecuteFired;
         /// <summary>[計装] 臨界の爆発の回数 / 〈柱折りの発破筒〉が爆発のひびを正規のダウンへ割った回数 (ランの始めに BOT が 0 へ戻す・ランの記録の burstFired / burstBreakFired)。</summary>
         public static long BurstFired, BurstBreakFired;
+        /// <summary>[計装] 超過会心率 (100% 超え) が会心倍率になった会心の回数 / 〈天眼の鍔〉で処刑した回数 / 〈必殺の照準器〉がもう 1 回発火した回数
+        /// (ランの始めに BOT が 0 へ戻す・ランの記録の critOverflowFired / critExecuteFired / critRefireFired)。</summary>
+        public static long CritOverflowFired, CritExecuteFired, CritRefireFired;
 
         /// <summary>〈猫の手〉がこのターン先に挿した出目 (−1 = 無し)。 BOT の挿し方の方策はこの 1 組を固定として扱う (外さない)。</summary>
         public int CatPawDie => _catDie;

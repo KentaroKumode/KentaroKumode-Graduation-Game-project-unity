@@ -267,8 +267,9 @@ namespace CombatSystem
             return hp <= 0;
         }
 
+        /// <param name="unabsorbable">主攻撃のうちシールドに吸われない量 (〈死相の面頬〉の会心した撃)。</param>
         private void ApplyVescaDefense(ItemSystem.PassiveSkills.CombatContext ctx,
-                                       ref int dealtDmg, ref int dealtFixed)
+                                       ref int dealtDmg, ref int dealtFixed, int unabsorbable = 0)
         {
             if (ctx == null) return;
 
@@ -300,7 +301,7 @@ namespace CombatSystem
             // --- シールド吸収 ---
             if (ctx.vescaShield <= 0) return;
             int absorbed = 0;
-            int take = Math.Min(ctx.vescaShield, dealtDmg);
+            int take = Math.Min(ctx.vescaShield, Math.Max(0, dealtDmg - unabsorbable));
             dealtDmg -= take; ctx.vescaShield -= take; absorbed += take;
             if (ctx.vescaShield > 0 && dealtFixed > 0)
             {
@@ -845,6 +846,7 @@ namespace CombatSystem
             attackSum += attackDiceCount * MetaProgression.MetaBuffApplicator.GetAttackTerminalPerDice();
             // ブロックの最終値 (遺物・大罪・端子調律・品のブロック +N・貫きの錐・狂暴化・不完全な転移)。 ジャスト防御の見込み (JustGuardForecast) と同じ関数
             blockSum = FinalBlockSum(ctx, term.blockAdd, blockDiceCount, enemyAtkValue, log: true);
+            int itemBlockAtWiring = ctx.itemBlockBonus;   // これより後 (OnWired・攻撃の中の会心・爆発) に品が足したブロックは、 敵の攻撃の前に足す
             // 充電: **接続ダイスの出目合計**を獲得 (2026-07-28 に「個数」から変更)。
             //   旧: 1 本 = 1 充電。 だが消費側は 雷撃 3 / 火花 1 / 過充電閾値 7 と桁が合わず、
             //       雷撃を毎ターン撃つだけで 5 本中 3 本を充電に固定する必要があった。
@@ -1060,10 +1062,14 @@ namespace CombatSystem
             var hitDealt = new List<int>(); var hitCrit = new List<bool>();
             int nHits = Math.Max(1, hitBases.Count);
             ctx.hitCount = hitBases.Count;   // 撃ごとの品が読む (攻撃しないターンは 0 ── 下の 1 回は固定ダメの枠を取り出すだけ)
+            //   〈必殺の照準器〉(CritCore): 攻撃の端子が 1 枚だけのターン、 その撃が会心なら同じ撃をもう 1 回発火する (1 ターン 1 回・会心は確定・乱数は引かない)
+            bool sniper = hitBases.Count == 1 && GameLoop.GameManager.Instance?.Run?.OwnsPassive(GameLoop.ItemIds.CritSniper) == true;
+            bool refire = false; float sniperAdd = 0f;
             for (int h = 0; h < nHits; h++)
             {
-                ctx.hitIndex = h; ctx.forceCritThisHit = false; ctx.hitFinalDamagePct = 0; ctx.hitIgnoreDefense = false;   // 撃ごとの値 (〈抜き打ちの作法〉〈加重の拳套〉など)
-                if (h > 0)
+                ctx.hitIndex = h; ctx.forceCritThisHit = refire; ctx.critSkipRoll = refire; ctx.hitFinalDamagePct = 0; ctx.hitIgnoreDefense = false;   // 撃ごとの値 (〈抜き打ちの作法〉〈加重の拳套〉など)
+                ctx.hitFaceMax = CritCore.HitFaceMax(term, playerDice, h);   // 〈狙い目の刻み〉が読む
+                if (h > 0 || refire)
                 {
                     // 次の撃の前に固定ダメの枠を空にする ── 空にしないと 1 撃目の固定ダメ (毒・品が預けた分) が次の撃にも返って二重に入る。
                     ctx.fixedDamageToEnemy = 0;
@@ -1074,7 +1080,8 @@ namespace CombatSystem
                 int needlePen = ctx.playerArmorPen;
                 if (needle) { ctx.forceCritThisHit = true; ctx.playerArmorPen += DefenseFormula.IgnoreAll; Debug.Log("[急所突きの針] この撃は必ず会心・敵の防御を無視"); }
                 //   【オーバークロック】(〈雷鳴の太鼓〉・ChargeCore): 最初の 1 撃の最終与ダメージ +60%・敵の防御を全部無視 (この撃だけ・貫通は撃の後に戻す)
-                bool oc = term.overclock && h == 0 && h < hitBases.Count;
+                bool oc = term.overclock && h == 0 && h < hitBases.Count && !refire;
+                if (refire && sniperAdd >= 1f) ctx.criticalMultiplier += CritCore.SniperMulAdd;   // 〈必殺の照準器〉: 会心率 100% 以上なら、 もう 1 回の撃の会心倍率 +1.0
                 if (oc) { ctx.hitFinalDamagePct += ChargeCore.OverclockFinalPct; if (!needle) ctx.playerArmorPen += DefenseFormula.IgnoreAll; }
                 var (d, f, c) = psm.ProcessDamage(h < hitBases.Count ? hitBases[h] : 0, h == 0 ? ctx.pursuitDamage : 0, playerCritBaseRate);
                 d = ApplyWinDamageModifiers(d, ref f, ref c, lbStage, psm, ctx);
@@ -1084,8 +1091,10 @@ namespace CombatSystem
                 if (h == 0) { afterPool = ctx.outgoingDamageMultiplier; afterCritMul = ctx.criticalMultiplier; afterCritAdd = ctx.critRatePctAdd; }
                 hitDealt.Add(d); hitCrit.Add(c);
                 dealtDmg += d; dealtFixed += f; isCrit |= c;
+                if (refire) { refire = false; CritRefireFired++; Debug.Log($"[必殺の照準器] 会心の撃をもう 1 回発火 → {d}"); }
+                else if (sniper && c && h == 0) { refire = true; sniperAdd = ctx.lastCritAddPct; h--; }
             }
-            ctx.forceCritThisHit = false; ctx.hitFinalDamagePct = 0; ctx.hitIgnoreDefense = false;
+            ctx.forceCritThisHit = false; ctx.critSkipRoll = false; ctx.hitFinalDamagePct = 0; ctx.hitIgnoreDefense = false;
             if (nHits > 1)
             {
                 // この後の処理 (計装・画面の倍率) は 1 撃目の後の値を読む前提なので、 1 撃目の後の値へ戻す
@@ -1153,7 +1162,13 @@ namespace CombatSystem
 
             // 7層ヴェスカ: 〈解析演算〉の回避 → 〈真守/革の手甲/不落の城盾〉のシールド吸収 の順に通す。
             EnemyHpLedger.NoteFixedPreDefense(dealtFixed);   // [計装] 固定ダメ枠の要求 (毒・爆発・その他に按分する)
-            ApplyVescaDefense(ctx, ref dealtDmg, ref dealtFixed);
+            {
+                //   〈死相の面頬〉: 会心した撃は敵のシールド (ヴェスカの守り) に吸われない
+                int critPierce = 0;
+                if (ItemSystem.PassiveSkills.Effects.DeathMaskVisor.Pierces(ctx))
+                    for (int h = 0; h < hitDealt.Count; h++) if (hitCrit[h]) critPierce += hitDealt[h];
+                ApplyVescaDefense(ctx, ref dealtDmg, ref dealtFixed, Math.Min(critPierce, dealtDmg));
+            }
             result.totalDamage = dealtDmg;
             result.fixedDamage = dealtFixed;
             // [計測] ボス戦のみ、 プレイヤーの主攻撃と固定ダメを分けて実測する
@@ -1200,7 +1215,7 @@ namespace CombatSystem
                 int hitDmg = h == hitDealt.Count - 1 ? hitLeft : Math.Min(hitDealt[h], hitLeft);
                 hitLeft -= hitDmg;
                 HpLossDiag.Lose(ref enemyHP, hitDmg, "通常攻撃");
-                // 〈天眼の鍔〉(2026-11-20・§23-32): 会心の一撃のあと、 敵の HP が「会心倍率 × 5%」以下なら倒す (ボスはその半分)。 〈百人切りの鉈〉と同じく CanExecuteEnemy で止まる
+                // 〈天眼の鍔〉: 会心の一撃のあと、 敵の HP が「会心倍率 × 6%」(最大 30%・ボスはその半分) 以下なら倒す。 〈百人切りの鉈〉と同じく CanExecuteEnemy で止まる
                 if (hitCrit[h] && hitDmg > 0 && enemyHP > 0)
                 {
                     int line = ItemSystem.PassiveSkills.Effects.HeavenEyeGuard.KillLine(ctx);
@@ -1208,6 +1223,7 @@ namespace CombatSystem
                     {
                         int left = enemyHP;
                         enemyHP = 0;
+                        CritExecuteFired++;
                         HpLossDiag.Add("経路:処刑(天眼の鍔)", left);
                         EnemyHpLedger.Land("処刑(天眼の鍔)", left, left);
                         Debug.Log($"[天眼の鍔] 会心のあと敵 HP {left} ≤ {line} → 倒す");
@@ -1362,6 +1378,17 @@ namespace CombatSystem
                     ShieldDiag.Note("与ダメのシールド化", sh);
                     ctx.consShield += sh;
                     ctx.shieldGainedTotal += sh;
+                }
+            }
+
+            //   配線の後に品が足したブロック (OnWired・会心のたび・爆発のたび) を、 このターンの敵の攻撃に間に合わせる (〈狂暴化〉ならブロックは何も受けない)
+            //   shortcut: 遺物・大罪・〈貫きの錐〉・〈不完全な転移〉は配線の時の分 (FinalBlockSum) にだけ掛かる。 後から足す量が大きくなったら FinalBlockSum を通し直す
+            {
+                int lateBlock = ctx.itemBlockBonus - itemBlockAtWiring;
+                if (lateBlock > 0 && !ctx.enemyAttackIgnoresGuard)
+                {
+                    blockSum += lateBlock; ctx.blockSumThisTurn = blockSum;
+                    Debug.Log($"[品のブロック] 配線の後に +{lateBlock} → ブロック {blockSum}");
                 }
             }
 

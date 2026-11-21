@@ -139,6 +139,11 @@ namespace ItemSystem.PassiveSkills
         public int hitFinalDamagePct;
         /// <summary>[perTurn] (撃ごとに CombatManager が false に戻す) この 1 撃は敵の防御を無視する (〈破城斧〉が OnPreDealDamage で立てる・CombatManager.Damage の防御の計算)。</summary>
         public bool hitIgnoreDefense;
+        /// <summary>[perTurn] (撃ごとに CombatManager が書く) この撃 (攻撃の端子 1 枚) に挿した目の一番大きい値 (CombatSystem.CritCore.HitFaceMax・0 = 目なし)。 〈狙い目の刻み〉が読む。 BeginNewTurn で 0。</summary>
+        public int hitFaceMax;
+        /// <summary>[perTurn] (撃ごとに CombatManager が false に戻す) この撃は会心の乱数を引かない (〈必殺の照準器〉がもう 1 回発火した撃・会心は forceCritThisHit で決まる)。
+        /// 乱数のキーの並びを崩さないため (発火した撃の分だけ引く数が増えないように)。</summary>
+        public bool critSkipRoll;
         /// <summary>この撃が本物の主攻撃の撃か (攻撃しないターンの空の 1 回ではない)。</summary>
         public bool IsRealHit => playerWonRoll && hitIndex < hitCount;
         public float criticalMultiplier; // [perTurn] (Phase B で基礎値 + メタ・遺物へ戻す) 会心倍率（既定 2.0。2026-07-26 に 3.0 へ上げ、2026-08-03 に 2.0 へ差し戻し）
@@ -644,9 +649,9 @@ namespace ItemSystem.PassiveSkills
             foreach (var a in AxisRules.Ranked) if (a != axis && AxisDepth(a) > d) above++;
             return above;
         }
-        /// <summary>[persistent] 〈寸鉄〉(2026-11-20 作り直し): 会心しなかった撃にも、 会心倍率の上乗せ分 × (会心率 ÷ 100) が乗る (会心率は 100% を上限に数える・PassiveSkillManager.ProcessDamage)。</summary>
-        public bool critShareOnNonCrit;
-        /// <summary>[persistent] 〈銑鉄棍〉(2026-11-20 作り直し): 会心が出なくなる (強制の会心も)。 代わりに会心率 1% につき与ダメージ +1% (100% を上限に数える・与ダメ % の池へ足す・PassiveSkillManager.ProcessDamage)。</summary>
+        /// <summary>[persistent] 〈寸鉄〉: 超過会心率の会心倍率への変換が 2 倍 (CombatSystem.CritCore.ExcessMul・PassiveSkillManager.ProcessDamage)。</summary>
+        public bool critExcessDouble;
+        /// <summary>[persistent] 〈銑鉄棍〉: 会心しなかった撃に、 会心率 1% につき与ダメージ +1% (100% を上限に数える・与ダメ % の池へ足す・PassiveSkillManager.ProcessDamage)。 会心は普通に出る。</summary>
         public bool critToDamage;
         /// <summary>[persistent] 〈天工開物〉: 爆発の基礎への上乗せ (武器を強化した回数 × 12・CombatSystem.HeatCore.Damage)。</summary>
         public int burstFlatBonus;
@@ -666,7 +671,7 @@ namespace ItemSystem.PassiveSkills
         public int itemBlockBonus;
         /// <summary>[perTurn] このターンの最初の 1 撃の攻撃 +N (〈引き直しの撃鉄〉・攻撃しないターンは消える)。 BeginNewTurn の Phase B で 0。</summary>
         public int firstHitAttackBonus;
-        /// <summary>[perTurn] 直近のプレイヤーの攻撃で合算した会心率 (%・100 超えもそのまま)。 〈寸鉄〉〈銑鉄棍〉が読む。
+        /// <summary>[perTurn] 直近のプレイヤーの攻撃で合算した会心率 (%・100 超えもそのまま)。 超過会心率の変換 (CritCore)・〈銑鉄棍〉が読む。
         /// ProcessDamage が書き、 BeginNewTurn の Phase B で 0。</summary>
         public float lastCritAddPct;
 
@@ -1065,7 +1070,7 @@ namespace ItemSystem.PassiveSkills
             isCritical = false;
             forceCritical = false;
             forceCritThisHit = false;
-            hitIndex = 0; hitCount = 0; hitFinalDamagePct = 0; hitIgnoreDefense = false;
+            hitIndex = 0; hitCount = 0; hitFinalDamagePct = 0; hitIgnoreDefense = false; hitFaceMax = 0; critSkipRoll = false;
             critSuppressed = false;
             lastCritAddPct = 0f;
             critRatePctAdd = 0f;

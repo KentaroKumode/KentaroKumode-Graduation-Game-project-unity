@@ -232,8 +232,12 @@ namespace GameLoop
             HeatMold = "溢れ取りの鋳型", HeatLedger = "帳簿外の爆薬", HeatKettle = "早沸かし釜", HeatSpark = "火花読みの眼鏡",
             HeatAshen = "八日目の灰燼", HeatFlint = "燧石の指輪", HeatKiln = "暴れ窯の火床", HeatPillar = "柱折りの発破筒";
 
+        // === 会心の軸の品で、 会心の式 (CombatSystem.CritCore)・本体の撃の輪・BOT の見積もりが読む品 (2026-11-21・full-item-rework-ledger §⑥) ===
+        public const string CritFirstArrow = "一の矢", CritPommel = "渾身の柄頭", CritSniper = "必殺の照準器", CritHeaven = "天眼の鍔",
+            CritSuntetsu = "寸鉄", CritIronClub = "銑鉄棍", CritPinpoint = "一点読みの片眼", CritQuickDraw = "抜き打ちの作法",
+            CritClairvoyant = "千里眼の水晶", CritMask = "死相の面頬", CritAim = "狙い目の刻み";
         // === 戦術の 5 品 (2026-11-21・段 1-f・item-overhaul-spec §6-2・名前は仮) = TacticItemEffects.cs ===
-        public const string TacPommel = "渾身の柄頭", TacGapSpear = "隙衝きの短槍";
+        public const string TacGapSpear = "隙衝きの短槍";
         public const string TacBreak = "崩しの一手", TacWedge = "大技殺しの楔", TacHourglass = "逆境の砂時計";
 
         // === 航行マップで使う消耗品 (2026-09-28・2026-10-18 に囮と罠を統合) ===

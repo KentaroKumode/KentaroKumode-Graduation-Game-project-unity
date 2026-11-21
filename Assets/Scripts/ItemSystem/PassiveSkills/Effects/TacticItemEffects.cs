@@ -4,25 +4,11 @@ using ItemSystem.PassiveSkills.Keywords;
 namespace ItemSystem.PassiveSkills.Effects
 {
     // ============================================================
-    //  戦術の 5 品 (2026-11-21・段 1-f・item-overhaul-spec §6-2・名前は仮・数値は仮・〈静寂の構え〉は ShieldEffects.cs)。
+    //  戦術の品 (2026-11-21・段 1-f・item-overhaul-spec §6-2・名前は仮・数値は仮・〈静寂の構え〉は ShieldEffects.cs・〈渾身の柄頭〉は CritEffects.cs)。
     //  一撃の重さ・ボスのダウン・大技の周期・エスカレーションを読む品 (引きの悪い回を知識で乗り切る側)。
     //  〈逆境の砂時計〉の毎ターンのシールドは +8 → +4 (毎ターン働く守りは小さく・作者の方針)。
     //  品の文に無い上限・回数制限は足さない (作者の方針)。
     // ============================================================
-
-    /// <summary>渾身の柄頭 (会心): 攻撃の端子を 1 枚だけ挿したターン (撃が 1 つ)、 その 1 撃の最終与ダメージ +25% (ctx.hitFinalDamagePct)・敵の防御を 8 無視 (貫通に足す)。</summary>
-    public class HeftyPommel : IPassiveSkillEffect
-    {
-        public string SkillId => ItemIds.TacPommel;
-        public const int FinalPct = 25, Pen = 8;
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (!ctx.IsRealHit || ctx.hitCount != 1) return;
-            ctx.hitFinalDamagePct += FinalPct;
-            ctx.playerArmorPen += Pen;      // 撃は 1 つなので、 このターンの貫通に足してよい (BeginNewTurn で戻る)
-        }
-    }
 
     /// <summary>隙衝きの短槍 (軸なし): 敵がチャージ中 (大技の前で攻撃しない) かダウン中のターン、 攻撃の与ダメージ +40% (与ダメ % の池・撃ごとに乗る)。</summary>
     public class GapSpear : IPassiveSkillEffect
