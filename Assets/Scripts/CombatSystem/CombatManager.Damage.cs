@@ -203,7 +203,7 @@ namespace CombatSystem
             int ledgerBeforeRed = totalDmg;   // [計装] 敵の軽減パッシブで削られた量
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnPreReceiveDamage);
             totalDmg = System.Math.Max(0, ctx.finalDamage);
-            // 〈血の楔〉(2026-11-20・§23-32): 敵の軽減パッシブで減った量のうち 出血 ÷ (出血 + 40) を戻す (効き目を弱める)
+            // 〈血の楔〉(2026-11-20・§23-32): 敵の軽減パッシブで減った量のうち 出血 ÷ (出血 + 30) を戻す (効き目を弱める)
             if (ctx.bleedWedge && ledgerBeforeRed > totalDmg)
             {
                 int cut = ledgerBeforeRed - totalDmg;

@@ -157,7 +157,7 @@ namespace ItemSystem.PassiveSkills.Keywords
         //  出血
         // ============================================================
 
-        /// <summary>この戦闘の出血の最大値 (〈血車〉が読む)。</summary>
+        /// <summary>この戦闘の出血の最大値 (実績〈大出血〉が読む)。</summary>
         public const string BleedMaxKey = "kw.bleedMax";
 
         /// <summary>品の効果で出血を n 使う。 使った分を返す。</summary>
@@ -166,6 +166,7 @@ namespace ItemSystem.PassiveSkills.Keywords
             if (ctx == null || n <= 0 || ctx.enemyBleedStacks <= 0) return 0;
             int used = System.Math.Min(n, ctx.enemyBleedStacks);
             ctx.enemyBleedStacks -= used;
+            CombatSystem.CombatManager.BleedSpendFired++;   // [計装]
             Raise(ctx, PassiveSkillTrigger.OnBleedConsume, used);
             if (ctx.enemyBleedStacks == 0) Raise(ctx, PassiveSkillTrigger.OnBleedZero, 1);
             return used;

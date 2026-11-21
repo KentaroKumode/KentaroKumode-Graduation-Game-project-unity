@@ -134,6 +134,30 @@ namespace AutoTest
                 int pz = env.enemyPoison + o.poison;
                 if (pz >= PoisonCore.RingNeed) ws.extraDmg += PoisonCore.Damage(PoisonCore.Spend(pz), sg.poisonItems, sg.detonates, s.enemyDown);
             }
+            // 出血の BOT の規則 (2026-11-21): 撃を順に追い、 撃の前の出血 (配線の時点 + それより前の撃の出血) で〈血の楔〉+40%・〈血桜〉(2 撃目から・出血 2 を使う) の撃の最終与ダメを、
+            //   撃の後の出血で〈紅の搾り具〉(15 以上・1/3 を使う × 8・1 ターン 1 回) を足す。 〈涸れぬ血晶〉の倍は本体と同じ BleedCore.CrystalGain。
+            //   shortcut: 1 撃の与ダメは 1 ターンの見込み ÷ 撃の数・撃が当たるかは見ない・使った出血が先のターンの出血のダメージから減る分は見ない
+            int bleedGain = 0;
+            if (sg.bleedItems != BleedItems.None && o.attackHits.Count > 0)
+            {
+                bool crystal = (sg.bleedItems & BleedItems.Crystal) != 0, pressed = sg.pressed;
+                float perHit = DeckPerTurnDamage(in s, k) / o.attackHits.Count;
+                int b = env.enemyBleed;
+                for (int h = 0; h < o.attackHits.Count; h++)
+                {
+                    int pct = 0;
+                    if ((sg.bleedItems & BleedItems.Wedge) != 0 && b >= BleedCore.WedgeNeed) pct += BleedCore.WedgePct;
+                    if ((sg.bleedItems & BleedItems.Sakura) != 0 && h >= 1 && b >= BleedCore.SakuraNeed) { pct += BleedCore.SakuraPct(b); b -= BleedCore.SakuraSpend; }
+                    sightFlat += pct / 100f * perHit;
+                    int g = h < o.attackHitBleed.Count ? BleedCore.CrystalGain(o.attackHitBleed[h], b, crystal) : 0;
+                    b += g; bleedGain += g;
+                    if ((sg.bleedItems & BleedItems.Press) != 0 && !pressed && b >= BleedCore.PressNeed)
+                    {
+                        int u = BleedCore.PressSpend(b);
+                        ws.extraDmg += u * BleedCore.PressMul; b -= u; pressed = true;
+                    }
+                }
+            }
 
             // ---- 先のターンに効く分の見積もり (上の定数) ----
             float dw = DeckDamageWorth(in s), fw = DeckFutureHpWorth(in s);
@@ -177,7 +201,7 @@ namespace AutoTest
             if (o.enemyStunNext) flat += DeckStunShare * Math.Max(0, s.enemyAtk) * (s.ledger ? 1f : s.wDef);
             // 別枠のダメージ
             flat += (o.poison * DeckPoisonDmg + o.heat * DeckHeatDmg) * dw;
-            if (o.attackDice > 0) flat += o.bleedOnHit * DeckBleedDmg * dw;
+            if (o.attackDice > 0) flat += (o.bleedOnHit + bleedGain) * DeckBleedDmg * dw;      // 〈鉤爪〉 + 出血の品の撃ごとの出血 (5f)
             // 〈柔軟な戦略〉: 基本以外の発動 1 回 = 与ダメ +(10% ÷ 10 回) を、 残りターンのうち〈柔軟な戦略〉を引いたターンだけ (本体 DrawTerminalHand・2026-11-20〜 引いた時だけ効く)
             if (counterPerFire > 0f)
                 flat += o.firedNonBasic * counterPerFire * DeckPerTurnDamage(in s, k) * turns * dw;
@@ -493,6 +517,9 @@ namespace AutoTest
             public bool ring;
             public PoisonItems poisonItems;
             public int detonates;
+            /// <summary>出血の品の旗 (撃ごとの出血は Resolve の 5f が書く・〈血桜〉〈血の楔〉〈紅の搾り具〉〈涸れぬ血晶〉はここで見積もる) / 〈紅の搾り具〉をこのターンもう使った。</summary>
+            public BleedItems bleedItems;
+            public bool pressed;
             /// <summary>【ジャスト防御】で働く品 (〈鏡返しの小盾〉〈重装兵の隠し刃〉〈防人の軍標〉〈受け太刀の籠手〉〈静寂の構え〉〈英雄の意志〉は強敵の時だけ)。
             /// どれかを持っている時だけ <see cref="jgCtx"/> を入れる (挿し方ごとの見込みはこれが null なら飛ばす)。</summary>
             public bool jgMirror, jgBlade, jgStandard, jgCatch, jgSilent, jgHero;
@@ -509,6 +536,8 @@ namespace AutoTest
                 v.lamp = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.HarmlessLamp.Id) && ctx.rinkaiMeter >= ItemSystem.PassiveSkills.Effects.HarmlessLamp.MinHeat;
                 v.poisonItems = PoisonCore.ItemsOf(run);
                 v.detonates = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.Psn.DetonateCountKey);
+                v.bleedItems = BleedCore.ItemsOf(run);
+                v.pressed = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.CrimsonPress.TurnKey) == ctx.currentTurn;
                 v.ring = (v.poisonItems & PoisonItems.Ring) != 0 && (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.HollowPoisonRing.TurnKey) != ctx.currentTurn;
                 v.jgMirror = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.MirrorBuckler.Id); v.jgBlade = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.KnightsTrump.Id);
                 v.jgStandard = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.BorderGuardStandard.Id); v.jgCatch = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.CatchBracer.Id);

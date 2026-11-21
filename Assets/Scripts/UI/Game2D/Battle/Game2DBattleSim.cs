@@ -636,6 +636,28 @@ namespace UI.Game2D.Battle
         public bool JustGuardLive => JustGuardState(out _);
         public string JustGuardLabel { get { JustGuardState(out var l); return l; } }
 
+        // ── 出血の撃ごとの出血 (2026-11-21・BleedCore・仮置き) ── 見込み (preview) の 5f が書いた撃ごとの出血の合計を右の列に出す (表示だけ)。
+        //   〈血桜〉を持っていて 2 撃目以降に出血 12 以上が届く見込みなら金。
+        private BleedItems BleedFlags => CombatManager.Instance?.TerminalDeck?.state.bleedItems ?? BleedItems.None;
+        public bool HasBleedHits => BleedFlags != BleedItems.None;
+        private bool BleedState(out string label)
+        {
+            label = "";
+            if (!HasBleedHits || !TermInputs(out _, out var env, out _)) return false;
+            int sum = 0, b = env.enemyBleed; bool sakura = false;
+            if (preview != null)
+                for (int h = 0; h < preview.attackHitBleed.Count; h++)
+                {
+                    if (h >= 1 && b >= BleedCore.SakuraNeed && (BleedFlags & BleedItems.Sakura) != 0) sakura = true;
+                    sum += preview.attackHitBleed[h]; b += preview.attackHitBleed[h];
+                }
+            label = "出血 " + env.enemyBleed + "+" + sum;
+            return sakura;
+        }
+        /// <summary>〈血桜〉が働く見込み (金で出す)。 / 右の列の文字 (仮・今の出血 + この配線の撃ごとの出血)。</summary>
+        public bool BleedLive => BleedState(out _);
+        public string BleedLabel { get { BleedState(out var l); return l; } }
+
         /// <summary>出目 i を端子 s に挿せるか (挿せる数・払う充電・出目の条件)。 他の出目との関係を見る条件は、 そろう見込みがあれば通す
         /// (〈十字斬り〉の 1 個目を挿せるように)。 本当に発動するかは見込み (Resolve) が決める。</summary>
         public bool Accepts(int i, int s)

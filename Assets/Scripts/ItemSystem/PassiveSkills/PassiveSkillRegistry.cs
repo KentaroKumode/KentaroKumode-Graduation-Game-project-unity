@@ -193,11 +193,22 @@ namespace ItemSystem.PassiveSkills
             Register(new FallenCastleCornerstone()); Register(new BorderGuardStandard());
         }
 
+        /// <summary>出血の軸 26 品のうち効果クラスを持つ 16 品 (2026-11-21・BleedEffects.cs)。 残りの 10 品 (鉛入りの握斧・血日に澄む佩玉・医家の反り刃・返し刃の留め金・
+        /// 欠け刃のナイフ・裂け目の楔・鋸刃の山刀・血止め知らずの針箱・激情の刃・百人切りの鉈) は BleedCore の旗。 〈鎧縫いの針〉は stats の内側。</summary>
+        private static void RegisterBleed()
+        {
+            Register(new ThornGlove()); Register(new DrippingEdge()); Register(new SoulBloodstone()); Register(new BloodFate());
+            Register(new ArmorStitchNeedle()); Register(new NoClotSalve()); Register(new Wringing()); Register(new AntiClotting());
+            Register(new BloodWheel()); Register(new ClotVial()); Register(new BloodStrike()); Register(new BloodlineRing());
+            Register(new CrimsonPress()); Register(new EndlessSpringCrystal()); Register(new ReturningBloodSickle()); Register(new BloodWedge());
+        }
+
         private static void RegisterAll()
         {
             RegisterCharge();
             RegisterPoison();
             RegisterShield();
+            RegisterBleed();
             // ============================
             //  アイテム再編 (2026-10-31・ReworkItemEffects.cs)
             // ============================
@@ -217,15 +228,7 @@ namespace ItemSystem.PassiveSkills
             Register(new PatchedBoots());
             Register(new HopeShard());
             Register(new SmolderingBreastplate());
-            // 鎧縫いの針 はステータス化 (段 3・敵の出血 1 につき貫通 +1)
-            Register(new HundredCleaver());
             Register(new WeightingGauntlet());
-            // 血日に澄む佩玉 はステータス化 (段 3・敵の出血 1 につき会心率 +2%)
-            Register(new SoulBloodstone());
-            Register(new BloodlineRing());
-            Register(new BloodWheel());
-            Register(new LeadHandAxe());
-            Register(new FuryBlade());
             Register(new CoinDish());
             Register(new TenkouKaibutsu());
             Register(new LuckyCoin());
@@ -243,17 +246,13 @@ namespace ItemSystem.PassiveSkills
             // ============================
             // 研ぎ師の見立て書 はステータス化 (段 3・2026-11-11)。 千里眼の水晶は 2026-11-20 にクラスへ戻した (下の追加 34 品の並び)
             Register(new FalconerGlove());                                       Register(new LayeredCutForm());     Register(new LayeredScabbard()); Register(new PinpointEye());
-            Register(new ReturnEdgeClasp());  Register(new UnstanchedNeedles()); Register(new ClotVial());
             Register(new FirekeeperPoker());  Register(new CharcoalFeeder());       Register(new SparkReadingGlasses()); Register(new RefiredPrimer());
             // 軸の品・追加 34 品 (2026-11-07・AxisItemEffects2.cs)。 各軸を 23 品にそろえた
             Register(new AimNotch());   Register(new FirstArrow());   Register(new LingeringBell()); Register(new ParryFan());
             Register(new NickAppraisal()); Register(new LosingStreakDie()); Register(new ChainedFlash()); Register(new QuickDrawArt());
             Register(new ClairvoyantCrystal()); // 2026-11-20 作り直し (旧 items.json の stats)
-            Register(new ChippedKnife()); Register(new ThornGlove()); Register(new RiftWedge()); Register(new DrippingEdge());
-            Register(new NoClotSalve()); Register(new CrimsonPress()); Register(new EndlessSpringCrystal());
             // 軸の締めの LEGENDARY (2026-11-20・AxisItemEffects3.cs・GAME.md §23-32)
             Register(new HeavenEyeGuard()); Register(new DeathMaskVisor());
-            Register(new ReturningBloodSickle()); Register(new BloodWedge());
             Register(new WildKilnHearth()); Register(new PillarBreakerCharge());
             // 消耗品の連動品 (2026-11-20・ConsumableLinkEffects.cs・item-overhaul-spec §7-2)
             Register(new BeltPouch()); Register(new SpentPride()); Register(new BottomlessVial()); Register(new SampleBox());
@@ -330,7 +329,6 @@ namespace ItemSystem.PassiveSkills
             // EvenEyes / MasterworkNotes / KaleidoDice はステータス化
 
             // 2026-06-05 会心バリエーション（OnCriticalDamage / OnCriticalCheck）
-            Register(new LacerationCore());   // 裂傷の刃心（会心→出血+2、会心倍率連動）
 
             // 2026-06-04 [剣の舞] セット（4枚集約→無銘の剣舞譜に変化）
             Register(new SaberWaltz());       // サーベル・ワルツ（ダイス+1／孤剣時HP半減）
@@ -354,11 +352,6 @@ namespace ItemSystem.PassiveSkills
 
             // 2026-07-15 出血系 拡張 (既存3種+新6種で計9のキーワードビルド化)
             // BloodScent はステータス化
-            Register(new CrimsonBlade());    // 紅蓮の刃 (HP割合で出血付与)
-            Register(new Wringing());        // 絞り出し (T終了時 出血×2 追加ダメ)
-            Register(new BloodStrike());     // 血の一撃 (出血1消費で×3ダメ)
-            Register(new AntiClotting());    // 止血阻害 (出血減衰無効化)
-            Register(new BloodFate());       // 血の宿命 (開幕 出血+2)
 
             // 臨界系 (Rinkai) 2026-07-16 追加: メーター蓄積型・Burn 撤廃後の新軸
             Register(new UnyieldingHeat());    // 不朽の熱 (meter40+ で致命耐え・meter全消費)      // 臨界 (過充電3T継続で会心確定+全消費)

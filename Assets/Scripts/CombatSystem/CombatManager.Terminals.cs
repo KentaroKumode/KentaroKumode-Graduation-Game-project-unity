@@ -37,6 +37,8 @@ namespace CombatSystem
         public static long DetonateFired;
         /// <summary>[計装] 【ジャスト防御】が成立した回数 (ランの始めに BOT が 0 へ戻す・ランの記録の justGuardFired)。</summary>
         public static long JustGuardFired;
+        /// <summary>[計装] 秘宝が敵の出血を使った回数 (Kw.ConsumeBleed・〈血桜〉〈紅の搾り具〉) / 〈百人切りの鉈〉で処刑した回数 (ランの始めに BOT が 0 へ戻す・ランの記録の bleedSpendFired / bleedExecuteFired)。</summary>
+        public static long BleedSpendFired, BleedExecuteFired;
 
         /// <summary>〈猫の手〉がこのターン先に挿した出目 (−1 = 無し)。 BOT の挿し方の方策はこの 1 組を固定として扱う (外さない)。</summary>
         public int CatPawDie => _catDie;
@@ -68,6 +70,7 @@ namespace CombatSystem
             _deck.state.chargeItems = ChargeCore.ItemsOf(run);           // 充電の品 (再起動・オーバークロック・2026-11-21)
             _deck.state.poisonItems = PoisonCore.ItemsOf(run);           // 毒の品 (端子の解決の 5d・起爆の式・2026-11-21)
             _deck.state.shieldItems = ShieldCore.ItemsOf(run);           // シールドの品 (端子の解決の 5e・ジャスト防御の許容幅・2026-11-21)
+            _deck.state.bleedItems = BleedCore.ItemsOf(run);             // 出血の品 (端子の解決の 5f・撃ごとの出血・2026-11-21)
             if (AxisRules.Owns(run, GameLoop.ItemIds.DeckSparePlug)) _deck.state.extraDrawNext += TerminalCards.SparePlugDraw;      // 〈予備の差込口〉: 1 ターン目に多く引く
             _deck.state.extraDrawNext += MetaProgression.MetaBuffApplicator.GetSparkDeckOpeningDraw();      // 種火・山札 (2026-11-21): 1 ターン目の手札 +1
             if (AxisRules.Owns(run, GameLoop.ItemIds.DeckToolbox) && runDeck.Count <= TerminalCards.ToolboxMaxDeck)

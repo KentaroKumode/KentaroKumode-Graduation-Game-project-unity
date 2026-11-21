@@ -376,29 +376,6 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    // 〈鎧縫いの針〉(敵の出血 1 につき貫通 +1・OnWired) は 2026-11-11 に items.json の stats へ移した (段 3・per=enemyBleed)。
-
-    // ============================================================
-    //  出血へ移った品 (効果は Phase 3 で BleedEffects.cs へ)
-    // ============================================================
-
-    /// <summary>百人切りの鉈: ターン終了時、 敵 HP が「毒 5 につき 1%」以下なら倒す (ボスはその半分)。</summary>
-    public class HundredCleaver : IPassiveSkillEffect
-    {
-        public string SkillId => "百人切りの鉈";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (ctx.enemyCurrentHP <= 0 || ctx.enemyMaxHP <= 0) return;
-            int pct = ctx.EnemyPoison / 5;   // 2026-11-07: 毒 5 につき 1% (旧 毒 × 2%・毒 1 スタックの重みが 1/5 になったため ×1/10 で天井を据え置き)
-            if (BountyHunterHelper.IsBoss(ctx)) pct /= 2;
-            if (pct <= 0 || ctx.enemyCurrentHP * 100 > ctx.enemyMaxHP * pct) return;
-            if (!ctx.CanExecuteEnemy()) return;
-            ctx.enemyCurrentHP = 0;
-            Rw.Log($"[百人切りの鉈] 敵HP {pct}% 以下 → 処刑");
-        }
-    }
-
     /// <summary>加重の拳套 (2026-11-20 作り直し): 同じターンに 2 撃目以降の攻撃が通るたび、 その撃の最終与ダメージ +15% (2 撃目 +15%・3 撃目 +30%・撃の番号 − 1 につき +15%)。
     /// この撃だけの最終与ダメージ倍率 (ctx.hitFinalDamagePct) を OnPreDealDamage で書く (CombatManager が撃ごとに 0 に戻す)。 軸なし。
     /// 旧: 攻撃が通るたび (1 ターンに 1 回) 刻み +1・刻み 1 つにつき与ダメージ +2% (戦闘の間)。
@@ -414,71 +391,6 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (ctx.IsRealHit && ctx.hitIndex >= 1) ctx.hitFinalDamagePct += PctPerHit * ctx.hitIndex;
-        }
-    }
-
-    // ============================================================
-    //  出血
-    // ============================================================
-
-    // 〈血日に澄む佩玉〉(敵の出血 1 につき会心率 +2%・OnWired) は 2026-11-11 に items.json の stats へ移した (段 3・per=enemyBleed)。
-
-    /// <summary>魂喰らいの血石: 出血を消費・減衰で失うたび、 失った分だけシールド。</summary>
-    public class SoulBloodstone : IPassiveSkillEffect
-    {
-        public string SkillId => "魂喰らいの血石";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBleedDecay, PassiveSkillTrigger.OnBleedConsume };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => Rw.Shield(ctx, Kw.EventAmount(ctx), SkillId);
-    }
-
-    /// <summary>血脈の災環 (2026-11-20): 出血が自然に減るたび、 減った量 × 血晶 の軽減不可ダメージ。 旧: 出血が自然に 1 減るたび、 軽減不可ダメージ 3。</summary>
-    public class BloodlineRing : IPassiveSkillEffect
-    {
-        public string SkillId => "血脈の災環";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBleedDecay };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => Kw.DamageEnemy(ctx, Kw.EventAmount(ctx) * ctx.AxisDepth(AxisRules.Bleed));
-    }
-
-    /// <summary>血車 (2026-11-20 作り直し): 血晶 5 以上の時、 敵の出血が 10 減るたび (品が使う・自然に減る、 とも・端数は持ち越す)、 充電 +5。
-    /// 旧: 敵の出血が 0 になったとき、 その戦闘の出血の最大値だけ充電。</summary>
-    public class BloodWheel : IPassiveSkillEffect, IRelicDisplay
-    {
-        public string SkillId => "血車";
-        public const int MinDepth = 5, Every = 10, Charge = 5;
-        /// <summary>[persistent] この戦闘で減った出血の累計 (Kw.Tally の端数)。</summary>
-        private const string Key = "rw.bloodWheel";
-        /// <summary>秘宝の列 (#320) の見え方。</summary>
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.AxisDepth(AxisRules.Bleed) >= MinDepth);
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBleedDecay, PassiveSkillTrigger.OnBleedConsume };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (ctx.AxisDepth(AxisRules.Bleed) < MinDepth) return;
-            int n = Kw.Tally(ctx, Key, Kw.EventAmount(ctx), Every);
-            if (n > 0) ctx.AddCharge(Charge * n);
-        }
-    }
-
-    /// <summary>鉛入りの握斧: 非会心の攻撃が通るたび敵に出血 +2。</summary>
-    public class LeadHandAxe : IPassiveSkillEffect
-    {
-        public string SkillId => "鉛入りの握斧";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (Rw.PlayerHit(ctx) && !ctx.isCritical) ctx.AddEnemyBleed(2);
-        }
-    }
-
-    /// <summary>激情の刃: HP が 50% 以下の間、 攻撃が通るたび敵に出血 +2。</summary>
-    public class FuryBlade : IPassiveSkillEffect, IRelicDisplay
-    {
-        public string SkillId => "激情の刃";
-        /// <summary>秘宝の列 (#320) の見え方。</summary>
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.playerMaxHP > 0 && ctx.playerCurrentHP * 2 <= ctx.playerMaxHP);
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (Rw.PlayerHit(ctx) && ctx.playerCurrentHP * 2 <= ctx.playerMaxHP) ctx.AddEnemyBleed(2);
         }
     }
 

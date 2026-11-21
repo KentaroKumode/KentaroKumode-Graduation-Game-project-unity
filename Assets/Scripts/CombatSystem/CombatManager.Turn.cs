@@ -1089,6 +1089,8 @@ namespace CombatSystem
                 if (oc) { ctx.hitFinalDamagePct += ChargeCore.OverclockFinalPct; if (!needle) ctx.playerArmorPen += DefenseFormula.IgnoreAll; }
                 var (d, f, c) = psm.ProcessDamage(h < hitBases.Count ? hitBases[h] : 0, h == 0 ? ctx.pursuitDamage : 0, playerCritBaseRate);
                 d = ApplyWinDamageModifiers(d, ref f, ref c, lbStage, psm, ctx);
+                //   出血の品 (5f・BleedCore・2026-11-21): その撃が当たった直後に、 撃ごとの出血を入れる (次の撃は増えた出血を見る)
+                if (d > 0 && h < hitBases.Count && h < term.attackHitBleed.Count && term.attackHitBleed[h] > 0) ctx.AddEnemyBleed(term.attackHitBleed[h]);
                 if (needle || oc) ctx.playerArmorPen = needlePen;
                 if (h == 0) { afterPool = ctx.outgoingDamageMultiplier; afterCritMul = ctx.criticalMultiplier; afterCritAdd = ctx.critRatePctAdd; }
                 hitDealt.Add(d); hitCrit.Add(c);
@@ -1222,6 +1224,20 @@ namespace CombatSystem
                         Debug.Log($"[天眼の鍔] 会心のあと敵 HP {left} ≤ {line} → 倒す");
                     }
                 }
+                // 〈百人切りの鉈〉(2026-11-21・BleedCore): 撃が当たったあと、 敵の出血が 12 以上で HP が「出血 × 1.2%」(ボスは半分・最大 25%) 以下なら倒す。 CanExecuteEnemy で止まる
+                if (hitDmg > 0 && enemyHP > 0 && _deck != null && (_deck.state.bleedItems & BleedItems.Cleaver) != 0 && currentEnemy != null)
+                {
+                    int line = BleedCore.CleaverKillLine(ctx.enemyBleedStacks, ctx.enemyMaxHP, GameLoop.BossIds.IsBoss(currentEnemy.id));
+                    if (line >= 0 && enemyHP <= line && ctx.CanExecuteEnemy())
+                    {
+                        int left = enemyHP;
+                        enemyHP = 0;
+                        BleedExecuteFired++;
+                        HpLossDiag.Add("経路:処刑(百人切りの鉈)", left);
+                        EnemyHpLedger.Land("処刑(百人切りの鉈)", left, left);
+                        Debug.Log($"[百人切りの鉈] 出血 {ctx.enemyBleedStacks} の敵 HP {left} ≤ {line} → 倒す");
+                    }
+                }
                 int broke = NoteBossDownMainHit(hitDmg, ctx.currentTurn);   // ボスのダウン (2026-11-14): 目盛りを割れるのは通常攻撃だけ (固定ダメの枠より前の HP で判定)
                 // 端子〈崩し斬り〉(2026-11-20): この撃 (撃 h = 攻撃の端子 h 枚目) で目盛りを割ったら、 最大 HP の 5% の軽減不可 (預かり・ターンの最後に通る。 通常攻撃ではないので次の目盛りは割らない)
                 if (broke > 0 && h < term.attackHitIds.Count && TerminalCards.BaseOf(term.attackHitIds[h]) == TerminalIds.Crush && currentEnemy != null)
@@ -1311,19 +1327,6 @@ namespace CombatSystem
             if (ctx.enemyBleedStacks > 0)
             {
                 int bleedDmg = BattleModifierManager.ApplyBleedModifiers(ctx, ctx.enemyBleedStacks);
-                // 〈血止め知らずの針箱〉(2026-11-20): 血晶 5 以上なら、 出血のダメージに会心が乗る (会心倍率の半分・1 回のダメージごとに判定)。
-                //   判定の優先順は爆発の会心 (LandBurst) と同じ: 封印 (無心の刃) で外れ、 forceCritical が確定で上書きし、 〈銑鉄棍〉の【規則】が止める
-                if (ctx.bleedCritRule && bleedDmg > 0)
-                {
-                    bool bc = ((!ctx.critSuppressed && GameLoop.GameRng.Chance(CritRateOf(ctx, pendingBuff: false), "combat.bleedCrit", RngIdx(5)))
-                               || ctx.forceCritical) && !ctx.critToDamage;
-                    if (bc)
-                    {
-                        int add = Mathf.FloorToInt(bleedDmg * Math.Max(0f, ctx.criticalMultiplier / 2f - 1f));
-                        Debug.Log($"[血止め知らずの針箱] 出血 {bleedDmg} が会心 → +{add}");
-                        bleedDmg += add;
-                    }
-                }
                 if (_diagKind == SkillDiag.Boss && currentEnemy != null)
                     SkillDiag.BossDmgOf(currentEnemy.id)[5] += Math.Min(bleedDmg, enemyHP);
                 RaiseDotDamage(DotKind.Bleed, Math.Min(bleedDmg, enemyHP));      // 入った分だけ (攻撃で倒れていれば 0 = 鳴らない)

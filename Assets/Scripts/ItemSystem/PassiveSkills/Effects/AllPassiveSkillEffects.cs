@@ -133,23 +133,6 @@ namespace ItemSystem.PassiveSkills.Effects
     //  発火: OnCriticalDamage（会心成立後・×criticalMultiplier 適用前）／一部 OnCriticalCheck（会心判定前）
     // ============================================================
 
-    /// <summary>裂傷の刃心 (BRONZE) — 会心時、敵に出血+2。会心倍率の+100%ごとに+1（×2.0で+1, ×3.0で+2）。血路の旗と相乗。</summary>
-    public class LacerationCore : IPassiveSkillEffect
-    {
-        public string SkillId => "医家の反り刃";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalDamage };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
-        {
-            int bonus = UnityEngine.Mathf.FloorToInt(UnityEngine.Mathf.Max(0f, ctx.criticalMultiplier - 1f));
-            ctx.AddEnemyBleed(2 + bonus);
-        }
-    }
-
-
-
-
-
-
     // 武器Tier段階補正 (旧: ダイス合計 / 新: 攻撃力・自動分岐)
 
     // ============================================================
@@ -367,97 +350,6 @@ namespace ItemSystem.PassiveSkills.Effects
 
     // (炎上系 8 種 Kindling/FlamingWeapon/InfernoOrder/Stoke/Immortalflame/InfernoManifest/FlameEdge/EverBurning は
     //  2026-07-18 削除: Burn 全廃 → 臨界 (Rinkai) 軸に置換済み)
-
-    // ============================================================
-    //  出血系 拡張 (2026-07-15 追加・充電系と同じ 4-2-2-1 テンプレ)
-    //  既存: Sting (Gen) / LacerationCore (Gen) / BloodPathBanner (状態バフ)
-    //  新規 6 種で合計 9 種のキーワードビルド化
-    // ============================================================
-
-    /// <summary>紅蓮の刃 (CrimsonBlade) — 与ダメ時、敵HP割合で出血付与
-    /// (≥50%: +1 / <50%: +2 / <25%: +3)。追い込み時ほど加速する出血ジェネレータ。</summary>
-    public class CrimsonBlade : IPassiveSkillEffect
-    {
-        public string SkillId => "鋸刃の山刀";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (ctx.finalDamage <= 0 || ctx.enemyMaxHP <= 0) return;
-            int add;
-            if (ctx.enemyCurrentHP * 4 <= ctx.enemyMaxHP) add = 3;         // <25%
-            else if (ctx.enemyCurrentHP * 2 <= ctx.enemyMaxHP) add = 2;    // <50%
-            else add = 1;                                                    // ≥50%
-            ctx.AddEnemyBleed(add);
-        }
-    }
-
-    /// <summary>絞り出し (Wringing) — ターン終了時、敵出血スタック×2 の追加固定ダメ (軽減無視)。
-    /// 通常の出血DoT (BattleModifierManager) と二段構えで削る。</summary>
-    public class Wringing : IPassiveSkillEffect, IRelicDisplay
-    {
-        public string SkillId => "逆綴じの止血帯";
-        /// <summary>秘宝の列 (#320) の見え方。</summary>
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.enemyBleedStacks > 0);
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (ctx.enemyBleedStacks <= 0 || ctx.enemyCurrentHP <= 0) return;
-            int dmg = MetaProgression.MetaDebuffApplicator.ApplyOutgoingCut(Keywords.Kw.ApplyFinalDamage(ctx, CombatSystem.EnemyHpLedger.ProbePassive(ctx.enemyBleedStacks * 2)));   // [測定用の物差し 2026-11-10] 既定 1 = 素通し・最終与ダメージ倍率 (§23-32)
-            dmg = CombatSystem.BossDown.ApplyTakenNow(dmg);   // ボスのダウン (2026-11-13): 受けるダメージ ×1.5
-            ctx.enemyCurrentHP = System.Math.Max(0, ctx.enemyCurrentHP - dmg);
-            UnityEngine.Debug.Log($"[絞り出し] 敵出血×2 = {dmg} 追加ダメ (軽減無視) → 敵HP={ctx.enemyCurrentHP}");
-        }
-    }
-
-    /// <summary>血の一撃 (BloodStrike) — 攻撃時、敵出血1消費で 与ダメ+スタック値×2 (消費前スタック数×2・2026-11-20: 旧 ×3・ITT +24.7pp で 1 品で決まる強さだった)。
-    /// 積んだ出血を火力に変換するバースト。スタック多いほど爆発力大。</summary>
-    public class BloodStrike : IPassiveSkillEffect, IRelicDisplay
-    {
-        public string SkillId => "血桜";
-        /// <summary>秘宝の列 (#320) の見え方。</summary>
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.enemyBleedStacks > 0);
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (ctx.finalDamage <= 0 || ctx.enemyBleedStacks <= 0) return;
-            int stacks = ctx.enemyBleedStacks; // 消費前の値で計算
-            Keywords.Kw.ConsumeBleed(ctx, 1);   // 出血を使った出来事を配る (〈魂喰らいの血石〉など・2026-10-31)
-            int bonus = stacks * 2;
-            ctx.finalDamage += bonus;
-            UnityEngine.Debug.Log($"[血の一撃] 出血-1 (残{ctx.enemyBleedStacks}) → 与ダメ+{bonus} (基{stacks}×2)");
-        }
-    }
-
-    /// <summary>止血阻害 (AntiClotting) — 敵出血の自然減衰 (-1/T) を無効化。永続蓄積型ビルドの中核。</summary>
-    public class AntiClotting : IPassiveSkillEffect
-    {
-        public string SkillId => "医書裏の開き針";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            ctx.bleedDecayDisabled = true;
-            UnityEngine.Debug.Log("[止血阻害] 敵出血の自然減衰を無効化 (永続蓄積)");
-        }
-    }
-
-    /// <summary>血の宿命 (BloodFate) — 戦闘開始時、敵に出血+2。無料の初撃・出血起点。</summary>
-    /// <summary>血の宿命 (2026-09-05 増補) — 戦闘開始時 出血+2、 <b>以降 毎ターン +1</b>。
-    ///
-    /// <para>出血は毎ターン 1 減衰するので、 開幕 +2 だけでは 2 ターンで消える一発ものだった
-    /// (実測 準パワー -0.66 / regβ -0.005 ＝ ほぼ無効)。 毎ターン +1 は減衰と釣り合うので、
-    /// <b>戦闘のあいだ 2 スタックを維持し続ける</b>形になる。</para></summary>
-    public class BloodFate : IPassiveSkillEffect
-    {
-        public string SkillId => "先血の腕輪";
-        public PassiveSkillTrigger[] Triggers => new[]
-        { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnTurnStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            ctx.AddEnemyBleed(t == PassiveSkillTrigger.OnBattleStart ? 2 : 1);
-        }
-    }
-
-
 
     // ============================================================
     //  臨界系 (Rinkai) 2026-07-16 追加: メーター蓄積型 (Burn 削除後の新軸)

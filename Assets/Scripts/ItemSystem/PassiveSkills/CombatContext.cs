@@ -598,11 +598,13 @@ namespace ItemSystem.PassiveSkills
         public int finalDamagePct;
         /// <summary>[persistent] 〈腐蝕の王冠〉: 敵の毒の上限 (99) が無くなり、 敵へ与える毒がすべて 1.5 倍 (切り上げ・<see cref="AddStatus"/>)。 段の交代で毒の半分が次の段へ残る (CombatManager.SwapEnemy)。</summary>
         public bool poisonCrown;
-        /// <summary>[persistent] 〈血の楔〉: 敵が得るシールドと回復の量、 敵の被ダメ軽減のパッシブで減る量を 出血 ÷ (出血 + 40) だけ弱める (<see cref="WedgeEnemyGain"/>)。</summary>
+        /// <summary>[persistent] 〈血の楔〉: 敵が得るシールドと回復の量、 敵の被ダメ軽減のパッシブで減る量を 出血 ÷ (出血 + 30) だけ弱める (<see cref="WedgeEnemyGain"/>)。</summary>
         public bool bleedWedge;
+        /// <summary>[persistent] 〈涸れぬ血晶〉: 敵の出血が既に <see cref="CombatSystem.BleedCore.CrystalNeed"/> 以上ある時、 与える出血が 2 倍 (<see cref="AddEnemyBleed"/>)。</summary>
+        public bool bleedDouble;
         /// <summary>〈血の楔〉の割る数の足し分 (出血 ÷ (出血 + これ))。</summary>
-        public const int BleedWedgeK = 40;
-        /// <summary>〈血の楔〉: 敵の得る量 n を 40 ÷ (出血 + 40) 倍にする (切り捨て)。 品が無い・出血 0 なら素通し。</summary>
+        public const int BleedWedgeK = 30;
+        /// <summary>〈血の楔〉: 敵の得る量 n を 30 ÷ (出血 + 30) 倍にする (切り捨て)。 品が無い・出血 0 なら素通し。</summary>
         public int WedgeEnemyGain(int n)
             => bleedWedge && n > 0 && enemyBleedStacks > 0 ? (int)((long)n * BleedWedgeK / (enemyBleedStacks + BleedWedgeK)) : n;
 
@@ -614,8 +616,6 @@ namespace ItemSystem.PassiveSkills
             => System.Math.Min(MetaProgression.Relics.RelicCatalog.PoisonKeepCap, poisonKeepPct + MetaProgression.Relics.RelicApplicator.GetPoisonKeepBonus());
         /// <summary>[persistent] 出血の比例減衰の割る数への上乗せ (AxisRules.BleedDecay)。 〈血晶〉の②。</summary>
         public int bleedDecayDivisorBonus;
-        /// <summary>[persistent] 出血のダメージへの上乗せ率 (0.03 = +3%)。 〈血晶〉の①。</summary>
-        public float bleedDamagePct;
         /// <summary>[persistent] 臨界を得るたびの上乗せ (Kw.AddHeat)。 〈炉温〉の①。</summary>
         public int heatGainBonus;
         /// <summary>[persistent] 〈炉温〉の②: 爆発のたびに会心の判定をし、 会心なら会心倍率の半分が乗る (CombatManager.LandBurst)。 代わりに爆発の基礎が 15 + 炉温 / 2。</summary>
@@ -669,8 +669,6 @@ namespace ItemSystem.PassiveSkills
         public int shieldGainPct;
         /// <summary>[persistent] 〈過負荷チューナー〉: 過充電の間、 充電を払う行動 (振り直し・再起動・端子・秘宝) の払う量が 2 減る (最低 1・<see cref="ChargeCostNow"/>)。</summary>
         public bool overloadChargeCut;
-        /// <summary>[persistent] 〈血止め知らずの針箱〉: 出血のダメージに会心が乗る (会心倍率の半分・1 回のダメージごとに判定・CombatManager.Turn の出血)。</summary>
-        public bool bleedCritRule;
         /// <summary>充電を払う量から今引く量 (〈過負荷チューナー〉の過充電の間 <see cref="CombatSystem.ChargeCore.TunerCut"/>・それ以外 0)。 端子の解決には TerminalEnv.chargeCostCut で渡す。</summary>
         public int ChargeCostCut => overloadChargeCut && IsOvercharged() ? CombatSystem.ChargeCore.TunerCut : 0;
         /// <summary>充電を n 払う時に実際に払う量 (<see cref="CombatSystem.ChargeCore.CostNow"/>・最低 1)。 振り直しの支払いが通す。</summary>
@@ -901,9 +899,10 @@ namespace ItemSystem.PassiveSkills
         public void AddEnemyBleed(int stacks)
         {
             if (stacks <= 0) return;
+            stacks = CombatSystem.BleedCore.CrystalGain(stacks, enemyBleedStacks, bleedDouble);   // 〈涸れぬ血晶〉
             enemyBleedStacks += stacks;
             if (enemyBleedStacks > GetAccumulated(Keywords.Kw.BleedMaxKey))
-                accumulatedValues[Keywords.Kw.BleedMaxKey] = enemyBleedStacks;   // 〈血車〉が読む
+                accumulatedValues[Keywords.Kw.BleedMaxKey] = enemyBleedStacks;   // 実績が読む
         }
 
         /// <summary>〈回帰性真理〉: 敵に乗っている毒・出血の**蓄積を半減**する (切り捨て)。

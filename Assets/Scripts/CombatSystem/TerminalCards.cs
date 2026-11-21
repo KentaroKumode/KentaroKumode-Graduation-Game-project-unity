@@ -195,6 +195,8 @@ namespace CombatSystem
         public PoisonItems poisonItems;
         /// <summary>シールドの品の旗 (戦闘の始めに所持品から・CombatManager.BeginTerminalDeck・<see cref="ShieldCore.ItemsOf"/>・2026-11-21)。</summary>
         public ShieldItems shieldItems;
+        /// <summary>出血の品の旗 (戦闘の始めに所持品から・CombatManager.BeginTerminalDeck・<see cref="BleedCore.ItemsOf"/>・2026-11-21)。</summary>
+        public BleedItems bleedItems;
         /// <summary>〈宿命の刻み目〉: このターンに立った役〈連なり〉の効果 (挿した端子がすべて 2 回働く) を次のターンにももう 1 回 (<see cref="BeginTurn"/> が <see cref="doubleAll"/> へ移す・CombatManager.ResolveRoles が立てる)。</summary>
         public bool fateDoubleNext;
 
@@ -336,6 +338,10 @@ namespace CombatSystem
         public readonly List<int> attackHits = new List<int>(), attackHitDice = new List<int>();
         /// <summary>攻撃の端子 1 枚ごとの名前 (<see cref="attackHits"/> と同じ並び・2026-11-20)。 本体の撃の輪が「この撃が〈崩し斬り〉か」を読む。</summary>
         public readonly List<string> attackHitIds = new List<string>();
+        /// <summary>攻撃の端子 1 枚ごとの場の添字 (<see cref="attackHits"/> と同じ並び・【再起動】の撃は元の端子・2026-11-21)。 5f が挿した目を読む。</summary>
+        public readonly List<int> attackHitSlot = new List<int>();
+        /// <summary>撃ごとに、 その撃が当たった直後に敵へ与える出血 (<see cref="attackHits"/> と同じ並び・5f = <see cref="BleedCore.ApplyToTerminals"/>・2026-11-21)。</summary>
+        public readonly List<int> attackHitBleed = new List<int>();
         /// <summary>このターンに発動した基本以外の端子の数。</summary>
         public int firedNonBasic;
         /// <summary>〈有効活用〉〈影写し〉〈火葬の剣〉の対象 (場の添字・−1 = なし)。 選んだ対象 (Resolve の wantTarget) が候補なら それ、
@@ -953,7 +959,7 @@ namespace CombatSystem
                     }
                 if ((state.deckItems & DeckItems.AuxGear) != 0 && d.kind == TerminalKind.Support && !d.basic) o.shield += AuxGearShield;   // 〈補助歯車〉 (基本の〈時計〉は数えない)
                 foundryNow += state.foundryBonus - fBefore;
-                if (d.kind == TerminalKind.Attack) { o.attackHits.Add(o.attackAdd - atkBefore); o.attackHitDice.Add(num); o.attackHitIds.Add(board[s]); }
+                if (d.kind == TerminalKind.Attack) { o.attackHits.Add(o.attackAdd - atkBefore); o.attackHitDice.Add(num); o.attackHitIds.Add(board[s]); o.attackHitSlot.Add(s); }
                 if (o.logAttack && o.attackAdd != atkBefore) o.attackLog.Add($"{board[s]}(目{sum}{(times > 1 ? "・倍化" : "")}{(chgBefore != charge ? "・充電" + chgBefore + "→" + charge : "")}):+{o.attackAdd - atkBefore}");
                 fSum[s] = sum; fRaw[s] = raw; fNum[s] = num; atkD[s] = o.attackAdd - atkBefore; blkD[s] = o.blockAdd - blkBefore;
             }
@@ -965,7 +971,7 @@ namespace CombatSystem
             {
                 var d = defs[s]; int a0 = o.attackAdd, b0 = o.blockAdd;
                 Effect(d.baseId, d.upgraded, board[s], s, fSum[s], fRaw[s], fNum[s], 0, env, state, o, ref charge, Empty);
-                if (d.kind == TerminalKind.Attack) { o.attackHits.Add(o.attackAdd - a0); o.attackHitDice.Add(0); o.attackHitIds.Add(board[s]); }
+                if (d.kind == TerminalKind.Attack) { o.attackHits.Add(o.attackAdd - a0); o.attackHitDice.Add(0); o.attackHitIds.Add(board[s]); o.attackHitSlot.Add(s); }
                 atkD[s] += o.attackAdd - a0; blkD[s] += o.blockAdd - b0;
                 o.rebooted.Add(s);
                 if (o.logAttack && o.attackAdd != a0) o.attackLog.Add($"{board[s]}({tag}):+{o.attackAdd - a0}");
@@ -1023,6 +1029,8 @@ namespace CombatSystem
             PoisonCore.ApplyToTerminals(defs, dice, in env, state, o);
             // ── 5e. シールドの品 (2026-11-21・ShieldCore・full-item-rework-ledger §③): 防御の端子の個数・敵の予告で決まるシールドを足す ──
             ShieldCore.ApplyToTerminals(dice, in env, state, o);
+            // ── 5f. 出血の品 (2026-11-21・BleedCore・full-item-rework-ledger §④): 撃ごとの出血と撃ごとの攻撃 +N (本体は撃が当たった直後に出血を入れる) ──
+            BleedCore.ApplyToTerminals(defs, dice, in env, state, o);
 
             // ── 5b. 〈緊急再装填〉(2026-11-20): このターンに使った他の使い捨てを 1 枚ずつ (場の右から・自分は除く・他の〈緊急再装填〉は戻せる)。 〈残響〉で 2 回働いても 1 枚 ──
             for (int s = 0; s < m; s++)

@@ -221,6 +221,11 @@ namespace GameLoop
             PoisonSlowBlade = "遅効の毒刃", PoisonOil = "骨溶かしの黒油";
         // === シールドの軸の品で、 端子の解決 (5e)・ジャスト防御の許容幅に効く 4 品 (2026-11-21・full-item-rework-ledger §③) = CombatSystem.ShieldCore の ShieldItems の旗 ===
         public const string ShieldPauldron = "肩当て", ShieldPadded = "当て布の籠手", ShieldRivet = "鋲の胸当て", ShieldWorn = "擦り減った小盾";
+        // === 出血の軸の品で、 端子の解決 (5f)・本体の撃の輪・BOT の見積もりに効く 16 品 (2026-11-21・full-item-rework-ledger §④) = CombatSystem.BleedCore の BleedItems の旗 ===
+        public const string BleedLeadAxe = "鉛入りの握斧", BleedPendant = "血日に澄む佩玉", BleedSurgeon = "医家の反り刃", BleedClasp = "返し刃の留め金",
+            BleedChipped = "欠け刃のナイフ", BleedRift = "裂け目の楔", BleedSaw = "鋸刃の山刀", BleedFirstBlood = "先血の腕輪",
+            BleedNeedles = "血止め知らずの針箱", BleedOpenNeedle = "医書裏の開き針", BleedFury = "激情の刃", BleedCleaver = "百人切りの鉈",
+            BleedSakura = "血桜", BleedPress = "紅の搾り具", BleedCrystal = "涸れぬ血晶", BleedWedge = "血の楔";
 
         // === 戦術の 5 品 (2026-11-21・段 1-f・item-overhaul-spec §6-2・名前は仮) = TacticItemEffects.cs ===
         public const string TacPommel = "渾身の柄頭", TacGapSpear = "隙衝きの短槍";

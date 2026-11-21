@@ -31,13 +31,11 @@ namespace ItemSystem.PassiveSkills.Effects
             = new System.Collections.Generic.Dictionary<string, (string, Kind)>
         {
             ["研ぎ師の見立て書"] = (AxisRules.Crit, Kind.Count),   [PinpointEye.Id] = (AxisRules.Crit, Kind.Rule),
-            ["血止め知らずの針箱"] = (AxisRules.Bleed, Kind.Count),
             // 〈重ね斬りの型〉〈凝血の小瓶〉は 2026-11-20 (段 1-a) に【規則】の品でなくなったので、 表から外した (軸の普通の品として買う)
             ["腐れ沼の苔玉"] = (AxisRules.Poison, Kind.Rule),
             ["焚き足しの炭"] = (AxisRules.Heat, Kind.Count),         ["火花読みの眼鏡"] = (AxisRules.Heat, Kind.Rule),
             // 追加 34 品のうち軸の品の数を読む品 (AxisItemEffects2.cs)
             ["千里眼の水晶"] = (AxisRules.Crit, Kind.Count),
-            ["涸れぬ血晶"] = (AxisRules.Bleed, Kind.Count),
             // 采配 (山札の軸・2026-11-20): ① 采配を読む・②【規則】
             [GameLoop.ItemIds.DeckBroom] = (AxisRules.Deck, Kind.Count), [GameLoop.ItemIds.DeckSeamless] = (AxisRules.Deck, Kind.Count),
             [GameLoop.ItemIds.DeckCrucible] = (AxisRules.Deck, Kind.Rule), [GameLoop.ItemIds.DeckBlueprint] = (AxisRules.Deck, Kind.Rule),
@@ -130,8 +128,6 @@ namespace ItemSystem.PassiveSkills.Effects
         /// 絶対数の線は 2026-11-10 の実測 (配布なしの終了時: 瘴気 中央 5・P90 9 / 炉温 中央 6・P90 10) から置いた。</para></summary>
         public static readonly (string id, When when, bool heat, int amount, Gate gate, int gateN)[] Table =
         {
-            // 毒の入り口 (出血へ移った〈百人切りの鉈〉だけ残る・効果は Phase 3 で作り直す。 毒の軸の品は 2026-11-21 に PoisonEffects.cs へ)
-            ("百人切りの鉈", When.PlayerHit,     false, 1, Gate.Free, 0),
             // 臨界の軸 (炉温・自分では臨界を作らない品)
             ("工廠の材料箱", When.TurnStart,     true, 3, Gate.Top, 1),
             ("希望の灯片", When.TurnStart,     true, 3, Gate.Top, 2),
@@ -235,53 +231,6 @@ namespace ItemSystem.PassiveSkills.Effects
         public static void ApplyCost(CombatContext ctx, GameLoop.RunState run)
         {
             if (ctx != null && AxisRules.Owns(run, Id)) ctx.accumulatedValues[NonCritCutKey] = 1;
-        }
-    }
-
-    // ============================================================
-    //  出血 (血晶)
-    // ============================================================
-
-    /// <summary>返し刃の留め金 (燃料): 攻撃に 2 個以上挿したターン、 攻撃が通ると敵に出血 +2。</summary>
-    public class ReturnEdgeClasp : IPassiveSkillEffect, IRelicDisplay
-    {
-        public string SkillId => "返し刃の留め金";
-        /// <summary>秘宝の列 (#320) の見え方。</summary>
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(env.Atk(ctx) >= 2);
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (!Rw.PlayerHit(ctx) || Ax.AtkDice(ctx) < 2) return;
-            ctx.AddEnemyBleed(2);
-        }
-    }
-
-    /// <summary>血止め知らずの針箱 (①・2026-11-20 作り直し): 血晶 5 以上なら、 出血のダメージに会心が乗る (会心倍率の半分・会心の判定は 1 回のダメージごと)。
-    /// 判定と乗せるのは CombatManager の出血 (ctx.bleedCritRule)。 旧: 血晶 1 につき、 出血のダメージ +3%。</summary>
-    public class UnstanchedNeedles : IPassiveSkillEffect
-    {
-        public string SkillId => "血止め知らずの針箱";
-        public const int MinDepth = 5;
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (ctx.AxisDepth(AxisRules.Bleed) >= MinDepth) ctx.bleedCritRule = true;
-        }
-    }
-
-    /// <summary>凝血の小瓶 (2026-11-20 作り直し・【規則】を外した): 敵の出血が 20 以上の間、 敵の攻撃 −20% (ctx.enemyAtkCutPct・予告の前に掛かる。 判定はターン開始時)。
-    /// 旧【規則】: 出血の減り方が「1 + 出血 / 10」から「1 + 出血 / (10 + 血晶の半分)」になる。</summary>
-    public class ClotVial : IPassiveSkillEffect, IRelicDisplay
-    {
-        public string SkillId => "凝血の小瓶";
-        public const int MinBleed = 20;
-        public const float Cut = 0.20f;
-        /// <summary>秘宝の列 (#320) の見え方。</summary>
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.enemyBleedStacks >= MinBleed);
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (ctx.enemyBleedStacks >= MinBleed) ctx.enemyAtkCutPct += Cut;
         }
     }
 
