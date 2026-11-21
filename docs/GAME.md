@@ -1207,8 +1207,9 @@ A = 崩れ始めたら終点へ / B = 輪の中で粘る（行って終点まで
 - **軸を持たない**（作者 2026-11-18）。軸は秘宝の仕上げが受け持つ（`docs/experience-goal.md` の「蹂躙の作り方」）。
 - **釣り合いの線**: 平均 5 以上の賽は置かない・面の種類は 4 以上（軽石だけ例外）・LEGENDARY も 1 個で蹂躙が起きる形にしない。
 - 20 種（5-5-5-5）の面と効果の一覧は [ADR-0015](adr/0015-equipped-die.md)。**正本は実コード**: items.json（面・説明）・
-  [DiePassives.cs](../Assets/Scripts/CombatSystem/DiePassives.cs)（挿した目に効く物・金）・CombatManager（目利き=振り直し / 賭場 / 墓標）・呪物=店とイベントの秘宝の LEGENDARY の重み ×3・秘宝を手に入れるたび最大 HP −3（DiePassives・ShopManager・EventEffectExecutor・PassiveAddHelper）・Escalation（逆巻き=段階を下げる StageOffset・マイナスの段階は自分の与ダメの得）・
-  TerminalCards（時計の端子・繋ぎの残す印）・YachtRoles（連なり）。数値はすべて仮・未測定。
+  [DiePassives.cs](../Assets/Scripts/CombatSystem/DiePassives.cs)（挿した目に効く物・金）・CombatManager（目利き=振り直し / 賭場 / 墓標）・呪物=店とイベントの秘宝の LEGENDARY の重み ×3・LEGENDARY の秘宝を手に入れるたび最大 HP −5（DiePassives・ShopManager・EventEffectExecutor・PassiveAddHelper）・Escalation（逆巻き=段階を下げる StageOffset・マイナスの段階は自分の与ダメの得）・
+  TerminalCards（時計の端子・繋ぎの残す印）・YachtRoles（連なり）・YachtRoleEffects（古銭の〈癒し〉+3）。数値はすべて仮・未測定。
+- **フルリワーク Phase 3g（2026-11-21・台帳 §⑪）**: 〈錆釘の賽〉を 4 面 1,2,5,6 → 5 面 1,2,4,5,6（ITT +17.04 の 4 面の役の抜け道を塞ぐ・効果は据え置き）・〈拾い物の賽〉1G → 2G・〈鈍色の賽〉+1 → +2・〈古銭の賽〉+2G → +4G とそのターンの〈癒し〉の回復量 +3。ほかの 16 種は据え置き（Phase 4 の ITT で突出・底辺の物だけ直す）。
 
 ### 6-15. ボスのダウン（HP の目盛り・2026-11-13）
 
@@ -6109,6 +6110,7 @@ BOT の払い方（`AutoRunner.Terminals` の `ChooseGoldPunch`）は実装済�
 
 | 対象 | 時期 | 理由 |
 |---|---|---|
+| **賽の旧い数値（Phase 3g）: 〈錆釘の賽〉の 4 面 1,2,5,6・〈拾い物の賽〉1G・〈鈍色の賽〉±1・〈古銭の賽〉+2G** | 2026-11-21 | フルリワーク（台帳 §⑪）。4 面の錆釘は役の出やすさと高い目を両取りして ITT +17.04（全体 2 位）。面の少ない賽は出目の期待値を下げる（高役率と高出目のトレードオフ） |
 | **金・汎用の旧い効果（Phase 3f）: 〈銭皿〉シールドを残して勝つと 2G・〈戦果の天秤〉会心の回数だけ金（`Kw.CritCountKey`）・〈爆破祭の小切手〉爆発でとどめ +4G（`Kw.BurstKilledKey`）・〈相場師の算盤〉充電 +3・臨界 +5（店の最初のリロールだけ）・〈溶金の領主剣〉秘宝・賽・イベントの金 1G につき +2%（`swordWindfallGold`・`GoldIncome.CountWindfall`・`GoldOrigin`）・stats の `per: coinsSpent`・〈加重の拳套〉の最終与ダメ +15% × (撃の番号 − 1)・〈崩しの一手〉の充電 +10・〈帯革の薬嚢〉〈大技殺しの楔〉〈逆境の砂時計〉のシールド・〈古物商の交換帳〉の偏重 ×4 の寄せ・`ReworkItemEffects.cs` / `ConsumableLinkEffects.cs` / `TacticItemEffects.cs` / `MacroItemEffects.cs`** | 2026-11-21 | フルリワーク（full-item-rework-spec §3 枠外・台帳 §⑨ §⑩）。金の品が特定の軸の出来事を読むと枠外の品が軸の橋になる。金は見送り換金・店・報酬の純経済、汎用の守りはブロック（シールドはシールドの軸の領域）、加算は与ダメ % の池へ |
 | **役の旧い効果（Phase 3e）: 賽目（偏重）を読む効果（〈符丁の刻み板〉賽目 × 2・〈欠け目の見立て〉防御を賽目 × 2 無視・〈万象のゾロ目〉確率 賽目 × 8%）・〈負け越しの賽〉の会心率 +15%（会心の軸の効果）・〈底抜けの小瓶〉の役の軸（汎用へ）・AxisCatalog の役 4 行・`RoleItemEffects.cs`・`AxisItemEffects2.cs`** | 2026-11-21 | フルリワーク（full-item-rework-spec §3 軸8・台帳 §⑧）。品の数でなく、この戦闘で役が成立した回数・続いたターン・振り直しを数える純役の 2 分岐へ |
 | **山札の旧い効果（Phase 3d）: 〈使い切りの矜持〉の消耗品の効果（消耗品を使ったターン 与ダメージ +25%・`SpentPride`）・〈灰払いの箒〉の会心率（次の撃 +采配 × 5%・異軸）・〈灰から組む機関〉の使い捨ての戻り（`ashReturned`・〈解体屋の袋〉〈緊急再装填〉と重複）・〈焼き入れの挟み〉〈再利用のるつぼ〉〈継ぎ目のない導線〉の采配（偏重）の読み・〈補助歯車〉〈型抜きの金型〉のシールド（ブロックへ）・〈型抜きの金型〉の充電 +3・〈永久機関の主軸〉の 3 回ごと・AxisCatalog の山札 4 行・`DeckItemEffects.cs`** | 2026-11-21 | フルリワーク（full-item-rework-spec §3 軸7・台帳 §⑦）。消耗品・会心のクロスと効果の重複を外し、使い捨ての回数・切り直し・残す印・常設を数える純山札の 2 分岐へ。シールドはシールドの軸の領域なので山札の守りはブロック |
