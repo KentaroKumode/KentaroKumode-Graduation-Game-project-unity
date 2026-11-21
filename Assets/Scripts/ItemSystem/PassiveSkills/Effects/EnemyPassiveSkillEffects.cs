@@ -633,7 +633,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public const int DiceBonus = 10;
         /// <summary>狂暴化してから、 この間隔 (ターン) ごとに敵の攻撃 +<see cref="StepBonus"/> をさらに足す (51・56・61… ターン目に +10・+20・+30…・2026-11-21)。</summary>
         public const int StepTurns = 5, StepBonus = 10;
-        public const float EnemyDamageTakenMult = 3f;
+        public const float EnemyDamageTakenMult = 2f;
         private const string AppliedKey = "berserk_dice_applied";
 
         /// <summary>そのターンの狂暴化の攻撃の上乗せ (狂暴化の前は 0)。</summary>
