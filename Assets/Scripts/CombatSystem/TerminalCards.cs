@@ -309,6 +309,8 @@ namespace CombatSystem
         public readonly List<int> reloadTargets = new List<int>();
         /// <summary>[計装 2026-11-19] 攻撃の合計 (attackAdd) を増やした所ごとの量 (「端子名:+N」)。 判断には使わない。</summary>
         public readonly List<string> attackLog = new List<string>();
+        /// <summary><see cref="attackLog"/> を書くか (本体の実ターンの解決だけ・BOT の写しと画面の見込みは書かない・2026-11-21 速度: 1 撃ごとの文字列が BOT の評価で毎回組まれていた)。</summary>
+        public bool logAttack;
         /// <summary>攻撃の端子 1 枚ごとの攻撃の量と挿した出目の数 (場の順・ADR-0016: 攻撃は端子 1 枚につき 1 回当たる)。
         /// attackAdd のうちここに入らない分 (連係・変圧・溜めた攻撃・賽の加算) は、 本体が最初の 1 撃に入れる。</summary>
         public readonly List<int> attackHits = new List<int>(), attackHitDice = new List<int>();
@@ -745,10 +747,10 @@ namespace CombatSystem
         /// <param name="state">戦闘の間の端子の状態。 <b>書き換える</b> (見積もりなら写しを渡す)。</param>
         /// <param name="wantTarget">〈影写し〉〈火葬の剣〉〈有効活用〉の対象 (添字 = その端子の場の位置・値 = 対象の場の位置・−1 / null = 選ばない)。
         /// 対象が候補でなければ (挿した・常設・自分) 左端の候補になる。</param>
-        public static TerminalOutcome Resolve(List<string> board, int[] wantSlot, int[] dice, TerminalEnv env, TerminalBattleState state, int[] wantTarget = null)
+        public static TerminalOutcome Resolve(List<string> board, int[] wantSlot, int[] dice, TerminalEnv env, TerminalBattleState state, int[] wantTarget = null, bool logAttack = false)
         {
             int n = dice.Length, m = board.Count;
-            var o = new TerminalOutcome { slotOfDie = new int[n], kindOfDie = new DiceTerminal[n] };
+            var o = new TerminalOutcome { slotOfDie = new int[n], kindOfDie = new DiceTerminal[n], logAttack = logAttack };
             o.stopped = state.stopped != null ? (bool[])state.stopped.Clone() : null;
             var v = new int[n];
             for (int i = 0; i < n; i++) { v[i] = dice[i]; o.slotOfDie[i] = wantSlot != null && i < wantSlot.Length && wantSlot[i] >= 0 && wantSlot[i] < m ? wantSlot[i] : -1; }
@@ -909,7 +911,7 @@ namespace CombatSystem
                 if ((state.deckItems & DeckItems.AuxGear) != 0 && d.kind == TerminalKind.Support && !d.basic) o.shield += AuxGearShield;   // 〈補助歯車〉 (基本の〈時計〉は数えない)
                 foundryNow += state.foundryBonus - fBefore;
                 if (d.kind == TerminalKind.Attack) { o.attackHits.Add(o.attackAdd - atkBefore); o.attackHitDice.Add(num); o.attackHitIds.Add(board[s]); }
-                if (o.attackAdd != atkBefore) o.attackLog.Add($"{board[s]}(目{sum}{(times > 1 ? "・倍化" : "")}{(chgBefore != charge ? "・充電" + chgBefore + "→" + charge : "")}):+{o.attackAdd - atkBefore}");
+                if (o.logAttack && o.attackAdd != atkBefore) o.attackLog.Add($"{board[s]}(目{sum}{(times > 1 ? "・倍化" : "")}{(chgBefore != charge ? "・充電" + chgBefore + "→" + charge : "")}):+{o.attackAdd - atkBefore}");
             }
 
             // ── 5b. 〈緊急再装填〉(2026-11-20): このターンに使った他の使い捨てを 1 枚ずつ (場の右から・自分は除く・他の〈緊急再装填〉は戻せる)。 〈残響〉で 2 回働いても 1 枚 ──
@@ -937,12 +939,12 @@ namespace CombatSystem
             // 次に攻撃するターンの攻撃に足す分
             int atk6 = o.attackAdd;
             if (o.attackDice > 0 && state.storedAttack > 0) { o.attackAdd += state.storedAttack; state.storedAttack = 0; }
-            if (o.attackAdd != atk6) o.attackLog.Add($"連係・溜めた攻撃:+{o.attackAdd - atk6}");
+            if (o.logAttack && o.attackAdd != atk6) o.attackLog.Add($"連係・溜めた攻撃:+{o.attackAdd - atk6}");
 
             // ── 6b. 装備中の賽のパッシブ (ADR-0015): 挿した目ごとに効く・残り火の持ち越し ──
             int atkDie = o.attackAdd;
             DiePassives.ApplyToTerminals(env, state, o, defs, v);
-            if (o.attackAdd != atkDie) o.attackLog.Add($"賽:+{o.attackAdd - atkDie}");
+            if (o.logAttack && o.attackAdd != atkDie) o.attackLog.Add($"賽:+{o.attackAdd - atkDie}");
 
             // ── 6c. 采配の品 (2026-11-20・段 1-e)。 攻撃 +N は攻撃の端子の撃 1 つずつに足す (ADR-0016・品の攻撃 +N と同じく全部の撃へ・攻撃しないターンは入らない) ──
             ApplyDeckItems(board, defs, env, state, o);
@@ -982,7 +984,7 @@ namespace CombatSystem
             {
                 for (int h = 0; h < o.attackHits.Count; h++) o.attackHits[h] += each;
                 o.attackAdd += each * o.attackHits.Count;
-                o.attackLog.Add($"采配の品:+{each}×{o.attackHits.Count}撃");
+                if (o.logAttack) o.attackLog.Add($"采配の品:+{each}×{o.attackHits.Count}撃");
             }
             if ((f & DeckItems.Folded) != 0 && st.keptStreak >= 2) o.outgoingPctAdd += FoldedPct;                     // 〈折り目のついた札〉
             if ((f & DeckItems.Switchboard) != 0 && o.firedNonBasic >= SwitchboardNeed) st.extraDrawNext += SwitchboardItemDraw;   // 〈仕込みの配電盤〉
@@ -1006,7 +1008,7 @@ namespace CombatSystem
             {
                 for (int h = 0; h < o.attackHits.Count; h++) o.attackHits[h] += each;
                 o.attackAdd += each * o.attackHits.Count;
-                o.attackLog.Add($"賽目の品:+{each}×{o.attackHits.Count}撃");
+                if (o.logAttack) o.attackLog.Add($"賽目の品:+{each}×{o.attackHits.Count}撃");
             }
         }
 

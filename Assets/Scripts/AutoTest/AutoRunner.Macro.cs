@@ -104,7 +104,8 @@ namespace AutoTest
                 : Mathf.Max(0, Mathf.FloorToInt(((hpFrac >= 0f ? hpFrac * run.playerMaxHP : run.playerHP) - reserve) / FreeMapParams.HpPerSupply));   // HpWalkSteps と同じ式
             var candNode = new MapNode[cands.Count];
             var candDist = new int[cands.Count][];
-            for (int i = 0; i < cands.Count; i++) { candNode[i] = map.GetNode(map.NodeIdAt(cands[i])); candDist[i] = dist[cands[i]]; }
+            var candKey = new string[cands.Count];   // 速度 (2026-11-21): 戦闘名の鍵 (文字列を組む) を候補ごとに 1 回だけ
+            for (int i = 0; i < cands.Count; i++) { candNode[i] = map.GetNode(map.NodeIdAt(cands[i])); candDist[i] = dist[cands[i]]; candKey[i] = MacroKeyOf(candNode[i], run); }
             var shopCi = new int[shops.Count];
             for (int k = 0; k < shops.Count; k++) shopCi[k] = cands.IndexOf(shops[k]);
             // 持ち越す物資の値 (2026-11-21・段 3): 物資は層をまたいで残る (RunState.provision はランの頭でしか満たさない) ので、
@@ -142,7 +143,7 @@ namespace AutoTest
                     if (storm != null && !storm.Walk(from, c, candNode[i], ref ns, out stormWalk)) continue;
                     // [測定 2026-11-18・第 4 層の踏み込み過ぎの検証] 控えの口 (既定は全部切 = 何もしない)
                     if (d6 && D6Skips(candNode[i], c, ns, storm)) continue;
-                    float gain = MacroGain(candNode[i], layer, run, ref ns) - steps * MacroStepCost - stormWalk;
+                    float gain = MacroGain(candNode[i], layer, run, ref ns, candKey[i]) - steps * MacroStepCost - stormWalk;
                     if (storm != null)
                     {
                         float pts0 = ns.pts;
@@ -330,7 +331,15 @@ namespace AutoTest
         }
 
         /// <summary>点を 1 つ踏んだ時の対数オッズの増減。 <paramref name="s"/> を踏んだ後の状態へ動かす。</summary>
-        private float MacroGain(MapNode n, int layer, RunState run, ref MacroSim s)
+        /// <summary><see cref="MacroGain"/> が読む戦闘名の鍵 (見えている通常・精鋭の戦闘だけ・それ以外は null)。</summary>
+        private static string MacroKeyOf(MapNode n, RunState run)
+            => n != null && n.revealed && n.encounterRevealed && (n.EffectiveType == TileType.Battle || n.EffectiveType == TileType.EliteBattle)
+               ? EncounterDangerStats.KeyOf(n, run.Depth) : null;
+
+        private float MacroGain(MapNode n, int layer, RunState run, ref MacroSim s) => MacroGain(n, layer, run, ref s, MacroKeyOf(n, run));
+
+        /// <summary><paramref name="key"/> = <see cref="MacroKeyOf"/> の値 (呼ぶ側が作り置きする)。</summary>
+        private float MacroGain(MapNode n, int layer, RunState run, ref MacroSim s, string key)
         {
             if (n == null) return 0f;
             float wHp = MacroHpPer10[layer] * 10f * (layer == D6Layer ? navD6HpWeightMul : 1f);   // [測定 2026-11-18] 第 4 層の HP の重みの口 (既定 1)
@@ -346,7 +355,6 @@ namespace AutoTest
             {
                 case TileType.Battle:
                 {
-                    string key = n.encounterRevealed ? EncounterDangerStats.KeyOf(n, run.Depth) : null;
                     // 〈徒労〉(2026-11-14): 報酬が止まっていれば報酬のゴールドの見込みを 0 にする (被ダメ・死の見込みは残す = 正味で損)
                     bool noReward = s.toil > 0;
                     if (noReward) s.toil = ToilNavRule.AfterNormalWin(s.toil, GameHooks.ToilMode);
@@ -354,7 +362,6 @@ namespace AutoTest
                 }
                 case TileType.EliteBattle:
                 {
-                    string key = n.encounterRevealed ? EncounterDangerStats.KeyOf(n, run.Depth) : null;
                     return MacroFight(layer, 'E', key, wHp, wGold, CombatRewards.EliteDropRate * wItem, ref s) + VaneWin(run, wGold, 1f, ref s);
                 }
                 case TileType.Rest:

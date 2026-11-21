@@ -820,7 +820,7 @@ namespace CombatSystem
                 // 猫の 1 組は答えに関わらず入れる (外した答え・同じ口に挿しすぎた答えは、 猫の組を残して直す)
                 if (_catDie >= 0) slots = TerminalWiring.WithPair(slots, playerDice.Length, _deck.board, _catDie, _catSlot);
                 // 〈影写し〉〈火葬の剣〉〈有効活用〉の対象: 人 = 画面で選んだ端子 / BOT = 方策 / どちらも無ければ左端の候補
-                term = TerminalCards.Resolve(_deck.board, slots, playerDice, tenv, _deck.state, targets);
+                term = TerminalCards.Resolve(_deck.board, slots, playerDice, tenv, _deck.state, targets, logAttack: true);
                 _termWanted = (int[])slots.Clone();   // [計装 #106] 直す前の挿し方 (挿したが不発の数え)
                 mutualWiring = term.kindOfDie;
                 _termOutcome = term;

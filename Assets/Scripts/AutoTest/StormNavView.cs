@@ -203,6 +203,17 @@ namespace AutoTest
         /// 着けなければ hops = -1。</summary>
         public int WalkCost(int from, int to, int pts, bool exemptLast, out int ptsEnd, out int hops)
         {
+            // 速度 (2026-11-21・結果は変えない): 計画の探索が同じ (from, to, 累計) を何度も歩く。 見方は判断ごとに作り直すので、 中身は判断の間変わらない
+            long key = (((long)from * 4096 + to) * 2 + (exemptLast ? 1 : 0)) * 1048576 + (pts & 0xFFFFF);
+            if (pts >= 0 && pts < 0x100000 && _walkMemo.TryGetValue(key, out var m)) { ptsEnd = m.ptsEnd; hops = m.hops; return m.hp; }
+            int hp0 = WalkCostCore(from, to, pts, exemptLast, out ptsEnd, out hops);
+            if (pts >= 0 && pts < 0x100000) _walkMemo[key] = (hp0, ptsEnd, hops);
+            return hp0;
+        }
+        private readonly Dictionary<long, (int hp, int ptsEnd, int hops)> _walkMemo = new Dictionary<long, (int, int, int)>();
+
+        private int WalkCostCore(int from, int to, int pts, bool exemptLast, out int ptsEnd, out int hops)
+        {
             int cur = from, p = pts, hp = 0; hops = 0;
             for (int guard = 0; guard < 200 && cur != to; guard++)
             {
