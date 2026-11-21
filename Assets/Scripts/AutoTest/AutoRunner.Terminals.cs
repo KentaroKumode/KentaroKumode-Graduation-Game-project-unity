@@ -602,17 +602,20 @@ namespace AutoTest
         private float EvalDeckWiring(in DeckEval ev, int[] rolls, int[] cand, out OptimalTurnOutcome outc, out TerminalOutcome o, out int[] tgts,
                                      out TerminalBattleState after)
         {
-            after = ev.deck.state.Clone();
-            o = TerminalCards.Resolve(ev.board, cand, rolls, ev.env, after, reboot: BotReboot, overclock: true);
-            // 〈影写し〉〈火葬の剣〉〈有効活用〉が発動する挿し方なら、 対象を方策で選び直して解き直す (対象は今ターンの攻防を変えない)
-            tgts = ChooseDeckTargets(ev.board, o, ev.run, _recallPrefer);
-            if (tgts != null)
+            using (BotTiming.Enter(BotTiming.Cat.EvalResolve))
             {
                 after = ev.deck.state.Clone();
-                o = TerminalCards.Resolve(ev.board, cand, rolls, ev.env, after, tgts, reboot: BotReboot, overclock: true);
+                o = TerminalCards.Resolve(ev.board, cand, rolls, ev.env, after, reboot: BotReboot, overclock: true);
+                // 〈影写し〉〈火葬の剣〉〈有効活用〉が発動する挿し方なら、 対象を方策で選び直して解き直す (対象は今ターンの攻防を変えない)
+                tgts = ChooseDeckTargets(ev.board, o, ev.run, _recallPrefer);
+                if (tgts != null)
+                {
+                    after = ev.deck.state.Clone();
+                    o = TerminalCards.Resolve(ev.board, cand, rolls, ev.env, after, tgts, reboot: BotReboot, overclock: true);
+                }
             }
-            var ws = DeckSums(in ev.st, rolls, ev.board, o, ev.deck.state, after, in ev.env, ev.counterPerFire);
-            return OptimalUtilityCore(in ev.st, rolls.Length, in ws, out outc);
+            WiredSums ws; using (BotTiming.Enter(BotTiming.Cat.EvalSums)) ws = DeckSums(in ev.st, rolls, ev.board, o, ev.deck.state, after, in ev.env, ev.counterPerFire);
+            using (BotTiming.Enter(BotTiming.Cat.EvalUtil)) return OptimalUtilityCore(in ev.st, rolls.Length, in ws, out outc);
         }
 
         /// <summary>挑戦カード〈猫の手〉(#5) の評価 (<see cref="GameHooks.CatPawPick"/> の中身・<see cref="CatPawAdvisor"/> が Super の設定の写しで呼ぶ)。
@@ -1508,14 +1511,18 @@ namespace AutoTest
                 bool dup = false;
                 for (int i = 1; i < k && !dup; i++) if (dice[i] == dice[i - 1] && w[i] < w[i - 1]) dup = true;
                 if (dup) continue;
-                var after = state.Clone();
-                var o = TerminalCards.Resolve(board, w, dice, env, after, reboot: BotReboot, overclock: true);
-                var tg = ChooseDeckTargets(board, o, ev.run, _recallPrefer);
-                if (tg != null) { after = state.Clone(); o = TerminalCards.Resolve(board, w, dice, env, after, tg, reboot: BotReboot, overclock: true); }
-                var ws = DeckSums(in ns, dice, board, o, state, after, in env, ev.counterPerFire);
+                TerminalBattleState after; TerminalOutcome o;
+                using (BotTiming.Enter(BotTiming.Cat.EvalResolve))
+                {
+                    after = state.Clone();
+                    o = TerminalCards.Resolve(board, w, dice, env, after, reboot: BotReboot, overclock: true);
+                    var tg = ChooseDeckTargets(board, o, ev.run, _recallPrefer);
+                    if (tg != null) { after = state.Clone(); o = TerminalCards.Resolve(board, w, dice, env, after, tg, reboot: BotReboot, overclock: true); }
+                }
+                WiredSums ws; using (BotTiming.Enter(BotTiming.Cat.EvalSums)) ws = DeckSums(in ns, dice, board, o, state, after, in env, ev.counterPerFire);
                 if (ws.aCount > 0) anyAttack = true;
                 sums.Add(ws);
-                float u = OptimalUtilityCore(in ns, k, in ws, out _);
+                float u; using (BotTiming.Enter(BotTiming.Cat.EvalUtil)) u = OptimalUtilityCore(in ns, k, in ws, out _);
                 if (u > best) best = u;
             }
             if (sums.Count == 0) return 0f;

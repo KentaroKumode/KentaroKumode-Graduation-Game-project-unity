@@ -159,25 +159,64 @@ namespace AutoTest
         public static float TierGainTriple = 40f;
 
         /// <summary>賽 1 個の素の値 (出目換算・ADR-0015・暫定)。 面の平均の素の賽 (平均 3.5) との差 × 3 回 と、
-        /// 3 回振って役が出る見込み (面 n が等確率: 2 個そろい 3(n−1)/n²・ゾロ目 1/n²・全部の面で役が効く) を足す。
-        /// <b>賽のパッシブはまだ数えない</b> (手順 4 で入れる)。 学習が乗れば学習の値が優先される。</summary>
+        /// 3 回振って役が出る見込み (面 n が等確率: 2 個そろい 3(n−1)/n²・ゾロ目 1/n²・全部の面で役が効く) と、
+        /// 賽のパッシブの 1 ターンの見込み (<see cref="DiePassiveRaw"/>) を足す。</summary>
         public static float DieRaw(string dieId)
         {
             var faces = GameLoop.EquippedDie.FacesOf(dieId);
             if (faces == null || faces.Length == 0) return 0f;
             float n = faces.Length, sum = 0f;
             for (int i = 0; i < faces.Length; i++) sum += faces[i];
-            const int Rolls = 3;   // 毎ターン 3 回振る (ADR-0015)
             float gain = (sum / n - 3.5f) * Rolls;
             float pair = 3f * (n - 1f) / (n * n), triple = 1f / (n * n);
-            return gain + pair * TierGainPair + triple * TierGainTriple;
+            return gain + pair * TierGainPair + triple * TierGainTriple + DiePassiveRaw(dieId, faces);
+        }
+
+        private const int Rolls = 3;   // 毎ターン 3 回振る (ADR-0015)
+        /// <summary>賽のパッシブの見込みで使う、 目 1 つが攻撃 / 防御に挿される割合と、 1G を出目いくつに数えるか (暫定・実測ではない)。</summary>
+        public static float AttackShare = 0.5f, DefenseShare = 0.4f, PipPerGold = 0.5f;
+
+        /// <summary>賽のパッシブの 1 ターンの見込み (出目換算・暫定)。 量は CombatSystem.DiePassives の定数から引くので、 調整に付いてくる。
+        /// 目の分布で決まる物は等確率の面から数え、 盤面しだいの物 (繋ぎ・目利き・時計・逆巻き・賭場・墓標) は 1 つの置き値。
+        /// shortcut: 置き値は手で決めた暫定値、 Phase 4 の ITT で賽の学習値が乗ったら学習値と突き合わせて直す。</summary>
+        public static float DiePassiveRaw(string dieId, int[] faces)
+        {
+            float n = faces.Length;
+            float P(System.Func<int, bool> f) { int c = 0; foreach (var x in faces) if (f(x)) c++; return c / n; }
+            float Mean(System.Func<int, float> f) { float s = 0f; foreach (var x in faces) s += f(x); return s / n; }
+            switch (dieId)
+            {
+                case GameLoop.DieIds.RustyNail: return Rolls * AttackShare * P(x => x >= CombatSystem.DiePassives.RustyNailMin);
+                case GameLoop.DieIds.Scavenger: { float p1 = P(x => x == 1); return (1f - (1f - p1) * (1f - p1) * (1f - p1)) * CombatSystem.DiePassives.ScavengerGold * PipPerGold; }
+                case GameLoop.DieIds.Dull: return Rolls * 0.5f * (AttackShare + DefenseShare) * CombatSystem.DiePassives.DullBonus;
+                case GameLoop.DieIds.Ferry: return 1f * AttackShare * CombatSystem.DiePassives.FerryAttack;   // 振り直す目は 1 ターンにおよそ 1 つ
+                case GameLoop.DieIds.NightWatch: return Rolls * DefenseShare * 0.2f * Mean(x => x) * CombatSystem.DiePassives.NightWatchShieldPerPip;   // 敵の出目の最大を超えるのは 2 割
+                case GameLoop.DieIds.Scale: return (n * (n - 1f) * (n - 2f) / (n * n * n)) * CombatSystem.DiePassives.ScaleBonus;   // 3 つの目が全部違えば真ん中の 1 つ
+                case GameLoop.DieIds.Reverse: return Rolls * AttackShare * Mean(x => System.Math.Max(0, 7 - x) / 2);
+                case GameLoop.DieIds.OldCoin: return Rolls * P(x => x == CombatSystem.DiePassives.OldCoinFace) * CombatSystem.DiePassives.OldCoinGold * PipPerGold;
+                case GameLoop.DieIds.HeavyRead: return Rolls * 0.15f * Mean(x => x / 2);   // 大技の予告はおよそ 15% のターン
+                case GameLoop.DieIds.Ember: return 0.5f;
+                case GameLoop.DieIds.Straight: return 24f / 216f * Rolls * 3.5f;   // 連番のターン (6 面で 1/9) は挿した端子が全部 2 回
+                case GameLoop.DieIds.Link: case GameLoop.DieIds.Appraiser: case GameLoop.DieIds.Gamble: return 1f;
+                case GameLoop.DieIds.Clock: case GameLoop.DieIds.Rewind: return 1.5f;
+                case GameLoop.DieIds.Gravestone: return 2f;
+                default: return 0f;   // 角の取れた賽・軽石・呪物 (LEGENDARY の重みと最大 HP は差し引き 0 と見る)
+            }
         }
 
         /// <summary>その賽に替えた時の Power の増分 (負もありうる)。 BOT の「今の賽より良い時だけ買う」(WouldBuyDie) が読む。</summary>
         public static int DiePowerDelta(RunState run, string dieId)
         {
-            if (string.IsNullOrEmpty(dieId) || dieId == GameLoop.EquippedDie.IdOf(run)) return 0;
-            return UnityEngine.Mathf.RoundToInt((DieRaw(dieId) - DieRaw(GameLoop.EquippedDie.IdOf(run))) / PowerCalibration);
+            string cur = GameLoop.EquippedDie.IdOf(run);
+            if (string.IsNullOrEmpty(dieId) || dieId == cur) return 0;
+            // 学習 (ITT) の値があればそれで比べる。 ITT は最初の賽と入れ替えた効果なので、 最初の賽は 0 と見る
+            if (LearnedPriorityProvider.HasLearned(dieId) && (cur == GameLoop.ItemIds.StartingDie || LearnedPriorityProvider.HasLearned(cur)))
+            {
+                float d = LearnedPriorityProvider.PowerScore(dieId) - (cur == GameLoop.ItemIds.StartingDie ? 0f : LearnedPriorityProvider.PowerScore(cur));
+                int steps = UnityEngine.Mathf.RoundToInt(d / LearnedPriorityProvider.StepPerTier);
+                return d > 0f ? System.Math.Max(1, steps) : System.Math.Min(0, steps);
+            }
+            return UnityEngine.Mathf.RoundToInt((DieRaw(dieId) - DieRaw(cur)) / PowerCalibration);
         }
 
         /// <summary>Power 換算値 (0〜6) を**準パワースケール**へ写す (2026-08-17b)。

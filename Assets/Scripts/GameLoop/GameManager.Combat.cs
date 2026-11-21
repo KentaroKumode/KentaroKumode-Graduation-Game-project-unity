@@ -111,6 +111,7 @@ namespace GameLoop
                             if (data.category == ItemCategory.Consumable)
                                 got = Run.TryAddConsumable(id);
                             else if (Loadout.IsWeapon(id)) { Loadout.Gain(Run, id); got = true; }   // 武器は 1 本だけ (入れ替えるかを聞く)
+                            else if (EquippedDie.IsDie(id)) { EquippedDie.Equip(Run, id); got = true; }   // 賽は店で買った時と同じく今の賽と入れ替わる
                             else
                             {
                                 got = ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, id);

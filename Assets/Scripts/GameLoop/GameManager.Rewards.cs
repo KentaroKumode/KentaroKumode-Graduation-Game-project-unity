@@ -598,6 +598,7 @@ namespace GameLoop
                 if (it == null) continue;
                 if (it.category == ItemCategory.Weapon) continue;
                 if (it.category == ItemCategory.Quest) continue;
+                if (it.category == ItemCategory.Dice) continue;   // 賽は店とイベントの交換で装備する物 (所持の一覧に入れても働かない)
                 if (!ItemSystem.Shop.EventOnlyItemFilter.IsAllowed(it)) continue;
                 if (dedup.Contains(it.internalName)) continue;   // ラン重複排除
                 pool.Add(it);
@@ -644,6 +645,7 @@ namespace GameLoop
                 if (it == null) continue;
                 if (it.category == ItemCategory.Weapon) continue;
                 if (it.category == ItemCategory.Quest) continue;
+                if (it.category == ItemCategory.Dice) continue;   // 賽は店とイベントの交換で装備する物 (所持の一覧に入れても働かない)
                 if (!ItemSystem.Shop.EventOnlyItemFilter.IsAllowed(it)) continue;
                 if (dedup.Contains(it.internalName)) continue;   // ラン重複排除
                 pool.Add(it);

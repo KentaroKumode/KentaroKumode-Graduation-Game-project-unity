@@ -8,13 +8,14 @@ namespace AutoTest
     internal static class BotTiming
     {
         public enum Cat { Other, Frame, Nav, Shop, Event, Rest, CombatBot, Wiring, Tactics, Reroll, Resolve,
-            NavStorm, NavPlan, NavStep, NavBody, WirePrep, WireChoose, WireGold, WireKeep, Count }
+            NavStorm, NavPlan, NavStep, NavBody, WirePrep, WireChoose, WireGold, WireKeep, EvalResolve, EvalSums, EvalUtil, Count }
 
         private static readonly string[] Labels =
         {
             "その他 (ランの準備・記録)", "フレーム待ち", "航行: その他", "店", "イベント", "休憩・報酬ほか",
             "戦闘の BOT (回復判断ほか)", "配線: その他", "戦術消耗品", "振り直し", "本体の戦闘の解決",
             "航行: 嵐の見方", "航行: 行き先選び", "航行: 1 歩の道", "航行: 本体の移動", "配線: 頭の判断", "配線: 挿し方の選択", "配線: 金で殴る", "配線: 手札",
+            "挿し方 1 つ: 端子の解決", "挿し方 1 つ: 集計", "挿し方 1 つ: 効用",
         };
 
         private static readonly long[] _ticks = new long[(int)Cat.Count];

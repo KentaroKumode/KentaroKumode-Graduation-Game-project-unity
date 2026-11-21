@@ -346,7 +346,7 @@ namespace CombatSystem
         /// <summary>〈緊急再装填〉が次のターンの手札に戻す使い捨て (場の添字・<see cref="TerminalDeckState.DisposeFired"/> が読む)。</summary>
         public readonly List<int> reloadTargets = new List<int>();
         /// <summary>[計装 2026-11-19] 攻撃の合計 (attackAdd) を増やした所ごとの量 (「端子名:+N」)。 判断には使わない。</summary>
-        public readonly List<string> attackLog = new List<string>();
+        public List<string> attackLog = TerminalCards.NoLog;
         /// <summary><see cref="attackLog"/> を書くか (本体の実ターンの解決だけ・BOT の写しと画面の見込みは書かない・2026-11-21 速度: 1 撃ごとの文字列が BOT の評価で毎回組まれていた)。</summary>
         public bool logAttack;
         /// <summary>攻撃の端子 1 枚ごとの攻撃の量と挿した出目の数 (場の順・ADR-0016: 攻撃は端子 1 枚につき 1 回当たる)。
@@ -823,20 +823,33 @@ namespace CombatSystem
         /// <param name="reboot">〈二股の導線〉【再起動】の対象 (場の添字・<see cref="ChargeCore.RebootNone"/> = しない・<see cref="ChargeCore.RebootAuto"/> = おまかせ)。
         /// このターンに発動した攻撃か防御の端子でなければ再起動しない (充電も払わない)。</param>
         /// <param name="overclock">〈雷鳴の太鼓〉【オーバークロック】を使う (条件を満たさなければ使わない・充電も払わない)。</param>
+        /// <summary>attackLog を取らない解決の共有の空の一覧 (書くのは logAttack の時だけ)。</summary>
+        public static readonly List<string> NoLog = new List<string>();
+
+        // 速度 (Phase 3i・結果は変えない): Resolve の中だけで使う作業用の配列を使い回す (外へ出さない・Resolve は入れ子に呼ばれない)。 スレッドごと。
+        [ThreadStatic] private static int[] _sV, _sCnt, _sSum, _sRaw, _sNum, _sAtk, _sBlk;
+        [ThreadStatic] private static TerminalDef[] _sDefs;
+        private static int[] Scratch(ref int[] buf, int len)
+        {
+            if (buf == null || buf.Length != len) buf = new int[len]; else Array.Clear(buf, 0, len);
+            return buf;
+        }
+
         public static TerminalOutcome Resolve(List<string> board, int[] wantSlot, int[] dice, TerminalEnv env, TerminalBattleState state, int[] wantTarget = null, bool logAttack = false,
                                               int reboot = ChargeCore.RebootNone, bool overclock = false)
         {
             int n = dice.Length, m = board.Count;
             var o = new TerminalOutcome { slotOfDie = new int[n], kindOfDie = new DiceTerminal[n], logAttack = logAttack };
+            if (logAttack) o.attackLog = new List<string>();
             o.stopped = state.stopped != null ? (bool[])state.stopped.Clone() : null;
-            var v = new int[n];
+            var v = Scratch(ref _sV, n);
             for (int i = 0; i < n; i++) { v[i] = dice[i]; o.slotOfDie[i] = wantSlot != null && i < wantSlot.Length && wantSlot[i] >= 0 && wantSlot[i] < m ? wantSlot[i] : -1; }
-            var defs = new TerminalDef[m];
+            var defs = _sDefs != null && _sDefs.Length == m ? _sDefs : (_sDefs = new TerminalDef[m]);
             for (int s = 0; s < m; s++) defs[s] = Get(board[s]);
 
             // ── 0. 止まった端子 (ヴェスカ〈停滞する時間〉) と、 挿せる数を超えた分を外す ──
             //   止まった端子に挿した出目は挿さなかった扱い。 本体も BOT も画面もここを通るので、 同じ計算になる。
-            var cnt = new int[m];
+            var cnt = Scratch(ref _sCnt, m);
             for (int i = 0; i < n; i++)
             {
                 int s = o.slotOfDie[i]; if (s < 0) continue;
@@ -884,15 +897,14 @@ namespace CombatSystem
 
             // ── 3. 充電の支払い (場の順)。 足りなければ不発 ──
             int charge = env.charge;
-            var paid = new bool[m];
             for (int s = 0; s < m; s++)
             {
                 if (defs[s] == null || !Plugged(o.slotOfDie, s)) continue;
                 int cost = ChargeCore.CostNow(defs[s].chargeCost, env.chargeCostCut);   // 〈過負荷チューナー〉
-                if (defs[s].baseId == TerminalIds.BigDischarge) { if (charge <= 0) { Unplug(o.slotOfDie, s); continue; } paid[s] = true; continue; }      // 全部払う (量は効果の所で)
-                if (cost <= 0) { paid[s] = true; continue; }
+                if (defs[s].baseId == TerminalIds.BigDischarge) { if (charge <= 0) Unplug(o.slotOfDie, s); continue; }      // 全部払う (量は効果の所で)
+                if (cost <= 0) continue;
                 if (charge < cost) { Unplug(o.slotOfDie, s); continue; }
-                Pay(o, ref charge, cost); paid[s] = true;
+                Pay(o, ref charge, cost);
             }
 
             // ── 4. 空けた手札の端子 (〈有効活用〉〈影写し〉〈火葬の剣〉の対象)。 選んだ対象が候補ならそれ、 でなければ左端の候補 ──
@@ -938,7 +950,8 @@ namespace CombatSystem
             int gearPip = 0; bool gearUsed = false;
             for (int s = 0; s < m; s++) if (defs[s]?.baseId == TerminalIds.Gear && !state.IsStopped(s)) gearPip += defs[s].upgraded ? GearPipUp : GearPip;
             //   【再起動】(5c) が同じ量でもう 1 回走らせるための控え (場の添字ごと)
-            var fSum = new int[m]; var fRaw = new int[m]; var fNum = new int[m]; var atkD = new int[m]; var blkD = new int[m];
+            Func<int, int> emptyF = Empty;      // 速度: 端子ごとに委譲を作り直さない
+            var fSum = Scratch(ref _sSum, m); var fRaw = Scratch(ref _sRaw, m); var fNum = Scratch(ref _sNum, m); var atkD = Scratch(ref _sAtk, m); var blkD = Scratch(ref _sBlk, m);
             for (int s = 0; s < m; s++)
             {
                 if (defs[s] == null || !Plugged(o.slotOfDie, s)) continue;
@@ -977,7 +990,7 @@ namespace CombatSystem
                 int times = doubler && id != TerminalIds.Doubler ? 2 : 1;
                 int atkBefore = o.attackAdd, chgBefore = charge, blkBefore = o.blockAdd;
                 int fBefore = state.foundryBonus;
-                for (int t = 0; t < times; t++) Effect(id, d.upgraded, board[s], s, sum, raw, num, paidAll, env, state, o, ref charge, Empty);
+                for (int t = 0; t < times; t++) Effect(id, d.upgraded, board[s], s, sum, raw, num, paidAll, env, state, o, ref charge, emptyF);
                 //   采配の品 (2026-11-20): 端子 1 枚の発動につき 1 回 (〈残響〉で効果が 2 回走っても 1 回)
                 if (d.disposable) o.disposedNow++;
                 if ((state.deckItems & DeckItems.Mold) != 0 && d.cond != TerminalCond.None)      // 〈型抜きの金型〉: 条件のある端子の攻撃・ブロック +4・補助はブロック +6 (条件を無視したターンも条件のある端子に数える)
@@ -999,7 +1012,7 @@ namespace CombatSystem
             void Refire(int s, string tag)
             {
                 var d = defs[s]; int a0 = o.attackAdd, b0 = o.blockAdd;
-                Effect(d.baseId, d.upgraded, board[s], s, fSum[s], fRaw[s], fNum[s], 0, env, state, o, ref charge, Empty);
+                Effect(d.baseId, d.upgraded, board[s], s, fSum[s], fRaw[s], fNum[s], 0, env, state, o, ref charge, emptyF);
                 if (d.kind == TerminalKind.Attack) { o.attackHits.Add(o.attackAdd - a0); o.attackHitDice.Add(0); o.attackHitIds.Add(board[s]); o.attackHitSlot.Add(s); }
                 atkD[s] += o.attackAdd - a0; blkD[s] += o.blockAdd - b0;
                 o.rebooted.Add(s);

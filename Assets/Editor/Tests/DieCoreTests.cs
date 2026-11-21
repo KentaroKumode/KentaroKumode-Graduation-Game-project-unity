@@ -38,6 +38,17 @@ namespace AutoTest.EditorTests
             var rusty = ItemSystem.ItemDatabase.Instance?.GetItem(DieIds.RustyNail);
             if (rusty != null) Assert.That(rusty.diceFaces, Is.EqualTo(new[] { 1, 2, 4, 5, 6 }));
         }
+
+        /// <summary>BOT の賽の見積もり (InventoryPower.DieRaw) は賽のパッシブを数える (Phase 3i)。 効果なしの賽は 0、 面だけ同じ賽はパッシブの分だけ高い。</summary>
+        [Test]
+        public void BotDieValueCountsPassives()
+        {
+            int[] six = { 1, 2, 3, 4, 5, 6 };
+            Assert.That(AutoTest.InventoryPower.DiePassiveRaw(DieIds.Starting, new[] { 2, 3, 4, 5 }), Is.EqualTo(0f));
+            Assert.That(AutoTest.InventoryPower.DiePassiveRaw(DieIds.Dull, six), Is.GreaterThan(0f));
+            Assert.That(AutoTest.InventoryPower.DiePassiveRaw(DieIds.Scale, six), Is.EqualTo(120f / 216f * DiePassives.ScaleBonus).Within(1e-4));
+            Assert.That(AutoTest.InventoryPower.DiePassiveRaw(DieIds.Reverse, six), Is.EqualTo(3 * AutoTest.InventoryPower.AttackShare * 1.5f).Within(1e-4));
+        }
     }
 }
 #endif

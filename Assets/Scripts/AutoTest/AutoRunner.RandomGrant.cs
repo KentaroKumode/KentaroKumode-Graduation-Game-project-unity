@@ -171,11 +171,10 @@ namespace AutoTest
             if (data != null && data.category == ItemSystem.ItemCategory.Consumable)
             { NoteGrant(1, run.TryAddConsumable(id)); return; }
 
-            // パッシブと武器は同じ経路 (ShopManager も同じ 2 行を呼ぶ)。
-            bool added = ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(run, id);
+            // 武器は本体の入手と同じ Loadout.Gain (BOT は期待値で選んで 1 本だけ残す・家系ロックなら他の家系は装備しない)。 パッシブは所持へ足すだけ。
             bool weapon = data != null && data.category == ItemSystem.ItemCategory.Weapon;
-            if (weapon) GameLoop.Loadout.TryAutoEquip(run, id);
-            NoteGrant(weapon ? 2 : 3, added);
+            if (weapon) { GameLoop.Loadout.Gain(run, id); NoteGrant(2, run.equippedWeaponId == id); return; }
+            NoteGrant(3, ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(run, id));
         }
 
         /// <summary>[計装 2026-09-17] <b>割り当てではなく「実際に届いたか」を数える。</b>
