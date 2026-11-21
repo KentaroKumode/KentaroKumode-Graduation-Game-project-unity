@@ -21,9 +21,6 @@ namespace ItemSystem.PassiveSkills.Effects
             = new System.Collections.Generic.Dictionary<string, (string, Kind)>
         {
             ["腐れ沼の苔玉"] = (AxisRules.Poison, Kind.Rule),
-            // 賽目 (役の軸・2026-11-21): ① 賽目を読む・②【規則】
-            [GameLoop.ItemIds.RoleNotchBoard] = (AxisRules.Role, Kind.Count), [GameLoop.ItemIds.RoleChipped] = (AxisRules.Role, Kind.Count),
-            [GameLoop.ItemIds.RoleMirror] = (AxisRules.Role, Kind.Rule), [GameLoop.ItemIds.RoleOmni] = (AxisRules.Role, Kind.Rule),
         };
     }
 

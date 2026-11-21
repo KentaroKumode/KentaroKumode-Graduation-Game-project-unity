@@ -699,6 +699,13 @@ namespace UI.Game2D.Battle
         public string DeckLabel => !HasDeckItems ? "" : "使い捨て " + DeckSt.disposedTotal + (DeckLive ? "+" + preview.disposedNow : "")
                                    + (preview != null && preview.damageMul != 1f ? " ×" + preview.damageMul.ToString("0.00") : "");
 
+        // ── 役の軸の品 (2026-11-21・仮置き) ── 役の品を持つ戦闘で、 この戦闘で役が成立した回数 (+ このターンに立つ役)・続いたターンを右の列に出す (表示だけ)。
+        //   このターンに役が立つなら金。 〈符丁の刻み板〉〈血濡れの符丁〉〈万象のゾロ目〉が回数を、 〈揃いの拍子木〉が続いたターンを読む。
+        public bool HasRoleItems => DeckSt != null && ItemSystem.PassiveSkills.AxisRules.Count(GameLoop.GameManager.Instance?.Run, ItemSystem.PassiveSkills.AxisRules.Role) > 0;
+        public bool RoleLive => HasRoleItems && preview != null && preview.roleNow > 0;
+        public string RoleLabel => !HasRoleItems ? "" : "役 " + DeckSt.roleCount + (RoleLive ? "+1" : "") + "回" + (DeckSt.roleStreak > 0 ? " 続" + DeckSt.roleStreak : "")
+                                   + (preview != null && preview.damageMul != 1f && RoleLive ? " ×" + preview.damageMul.ToString("0.00") : "");
+
         /// <summary>出目 i を端子 s に挿せるか (挿せる数・払う充電・出目の条件)。 他の出目との関係を見る条件は、 そろう見込みがあれば通す
         /// (〈十字斬り〉の 1 個目を挿せるように)。 本当に発動するかは見込み (Resolve) が決める。</summary>
         public bool Accepts(int i, int s)

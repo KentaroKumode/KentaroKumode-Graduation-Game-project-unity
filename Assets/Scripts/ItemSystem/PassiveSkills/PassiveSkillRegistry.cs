@@ -213,6 +213,14 @@ namespace ItemSystem.PassiveSkills
             Register(new TemperTongs()); Register(new PrimedSwitchboard());
         }
 
+        /// <summary>役の軸 13 品のうち効果クラスを持つ 4 品 (2026-11-21・RoleEffects.cs)。 端子の解決の中の分 (見切りの木札・符丁の刻み板・欠け目の見立ての防御の無視・
+        /// 血染めの歯車・揃いの拍子木の与ダメージ・雷鳴のゾロ目・血濡れの符丁) は CombatSystem.TerminalCards の RoleItems の旗、
+        /// 擦り切れた賽袋・鏡合わせの盤・宿命の刻み目・万象のゾロ目は CombatManager の役の適用 (FreeRerollsLeft / ResolveRoles / DecideOmniPair)。</summary>
+        private static void RegisterRole()
+        {
+            Register(new ChippedEyeReading()); Register(new MatchedClappers()); Register(new LosingStreakDie()); Register(new LowFaceConduit());
+        }
+
         private static void RegisterAll()
         {
             RegisterCharge();
@@ -222,6 +230,7 @@ namespace ItemSystem.PassiveSkills
             RegisterHeat();
             RegisterCrit();
             RegisterDeck();
+            RegisterRole();
             // ============================
             //  アイテム再編 (2026-10-31・ReworkItemEffects.cs)
             // ============================
@@ -231,14 +240,10 @@ namespace ItemSystem.PassiveSkills
             Register(new SpoilsScale());
             Register(new BlastPrize());
 
-            // 〈負け越しの賽〉(役の軸へ移った・新しい効果は Phase 3e・AxisItemEffects2.cs)
-            Register(new LosingStreakDie());
             // 消耗品の連動品 (2026-11-20・ConsumableLinkEffects.cs・item-overhaul-spec §7-2)
             Register(new BeltPouch()); Register(new BottomlessVial()); Register(new SampleBox());
             // 嵐・店・金のマクロ秘宝の戦闘の側 (2026-11-20・MacroItemEffects.cs・item-overhaul-spec §9)
             Register(new MacroBarometer()); Register(new MacroReceipt()); Register(new MacroAbacus());
-            // 賽目 (役の軸) の出来事で書く 2 品 (2026-11-21・RoleItemEffects.cs・残り 6 品は TerminalCards の RoleItems の旗と CombatManager の役の適用)
-            Register(new ChippedEyeReading()); Register(new MatchedClappers());
             // 戦術の 5 品 (2026-11-21・TacticItemEffects.cs・item-overhaul-spec §6-2)
             Register(new GapSpear());
             Register(new BreakingMove()); Register(new HeavyBreakerWedge()); Register(new AdversityHourglass());

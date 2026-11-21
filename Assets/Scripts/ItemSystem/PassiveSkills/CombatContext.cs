@@ -1134,7 +1134,8 @@ namespace ItemSystem.PassiveSkills
             blockSumThisTurn = 0;
             accumulatedValues[ChargeSpentThisTurnKey] = 0f;   // 充電の品が読む [perTurn] 値
             accumulatedValues[ChargeSpendsThisTurnKey] = 0f;
-            itemBlockBonus = 0;
+            // 前のターンに役の軸の品が積んだ「次のターンのブロック +N」(Phase A で currentBuffs へ移った分)
+            itemBlockBonus = currentBuffs.TryGetValue(CombatSystem.YachtRoleEffects.BlockNextKey, out float roleBlockNext) ? (int)roleBlockNext : 0;
             firstHitAttackBonus = 0;
 
             // ADR-0010: このターン切った役の記録。 usedRoles は [persistent] なのでここでは触らない。

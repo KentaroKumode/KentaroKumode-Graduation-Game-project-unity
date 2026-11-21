@@ -208,11 +208,12 @@ namespace GameLoop
         public const string DeckPride = "使い切りの矜持";
         public const string DeckBag = "解体屋の袋", DeckWorkbench = "常設の作業台", DeckAsh = "灰から組む機関", DeckEngine = "永久機関の主軸";
 
-        // === 賽目 (役の軸) の 8 品 (2026-11-21・段 1-f・item-overhaul-spec §5 / §12-2・名前は仮) ===
-        //   出来事で書く品 (欠け目の見立て・揃いの拍子木) = RoleItemEffects.cs。 見切りの木札・符丁の刻み板 = CombatSystem.TerminalCards の RoleItems の旗。
+        // === 役の軸の 13 品 (2026-11-21・full-item-rework-ledger §⑧) ===
+        //   出来事で書く品 (欠け目の見立て・揃いの拍子木・負け越しの賽・雷毒の導管) = RoleEffects.cs。 端子の解決の中の分 = CombatSystem.TerminalCards の RoleItems の旗。
         //   擦り切れた賽袋 = CombatManager.FreeRerollsLeft。 鏡合わせの盤・宿命の刻み目・万象のゾロ目 = CombatManager.ResolveRoles / DecideOmniPair。
         public const string RoleBag = "擦り切れた賽袋", RoleWoodTag = "見切りの木札", RoleNotchBoard = "符丁の刻み板", RoleChipped = "欠け目の見立て";
         public const string RoleClapper = "揃いの拍子木", RoleMirror = "鏡合わせの盤", RoleFate = "宿命の刻み目", RoleOmni = "万象のゾロ目";
+        public const string RoleLosing = "負け越しの賽", RoleConduit = "雷毒の導管", RoleGear = "血染めの歯車", RoleThunder = "雷鳴のゾロ目", RoleBloodmark = "血濡れの符丁";
 
         // === 充電の軸の品で、 端子の解決の中で効く 4 品 (2026-11-21・full-item-rework-ledger §①) = CombatSystem.ChargeCore の ChargeItems の旗 ===
         public const string ChargeFork = "二股の導線", ChargeRod = "逆さ避雷針", ChargeWhip = "灼線鞭", ChargeDrum = "雷鳴の太鼓";

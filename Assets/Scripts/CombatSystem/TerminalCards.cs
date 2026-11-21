@@ -58,7 +58,7 @@ namespace CombatSystem
         Broom = 1 << 16,       // 灰払いの箒
     }
 
-    /// <summary>賽目 (役の軸) の品のうち、 端子の解決 (<see cref="TerminalCards.Resolve"/>) の中で効く物 (2026-11-21・段 1-f・item-overhaul-spec §5 / §12-2)。
+    /// <summary>役の軸の品のうち、 端子の解決 (<see cref="TerminalCards.Resolve"/> の 6d) の中で効く物 (2026-11-21・full-item-rework-ledger §⑧)。
     /// 戦闘の始めに所持品から <see cref="TerminalBattleState.roleItems"/> へ入れる (CombatManager.BeginTerminalDeck・<see cref="TerminalCards.RoleItemsOf"/>)。
     /// 役は振った 3 つの目で決まるので、 Resolve が同じ判定 (<see cref="TerminalCards.RoleOf"/>) で立つ役を出して効かせる (本体・画面の見込み・BOT の配線と先読みが一致する)。</summary>
     [Flags]
@@ -67,6 +67,11 @@ namespace CombatSystem
         None = 0,
         WoodTag = 1 << 0,      // 見切りの木札
         NotchBoard = 1 << 1,   // 符丁の刻み板
+        Chipped = 1 << 2,      // 欠け目の見立て (防御の無視の分・目盛りの削りは RoleEffects.cs)
+        Gear = 1 << 3,         // 血染めの歯車
+        Clapper = 1 << 4,      // 揃いの拍子木 (与ダメージの分・手札と無料の振り直しは RoleEffects.cs)
+        Thunder = 1 << 5,      // 雷鳴のゾロ目
+        Bloodmark = 1 << 6,    // 血濡れの符丁
     }
 
     /// <summary>端子の名前 (id = 表示名・品と同じ規則)。 **文字列を直書きしない** ── ここを経由する。</summary>
@@ -206,6 +211,9 @@ namespace CombatSystem
         public HeatItems heatItems;
         /// <summary>〈宿命の刻み目〉: このターンに立った役〈連なり〉の効果 (挿した端子がすべて 2 回働く) を次のターンにももう 1 回 (<see cref="BeginTurn"/> が <see cref="doubleAll"/> へ移す・CombatManager.ResolveRoles が立てる)。</summary>
         public bool fateDoubleNext;
+        /// <summary>この戦闘で役が成立した回数 / 直前のターンまで役が続いて成立したターンの数 (CombatManager.ResolveRoles がターンの役の後に書く・2026-11-21)。
+        /// 〈符丁の刻み板〉〈血濡れの符丁〉〈揃いの拍子木〉〈万象のゾロ目〉が読む。 Resolve の中では、 このターンの役はまだ入っていない。</summary>
+        public int roleCount, roleStreak;
 
         /// <summary>場の s がこのターン止まっているか。</summary>
         public bool IsStopped(int s) => stopped != null && s >= 0 && s < stopped.Length && stopped[s];
@@ -455,8 +463,11 @@ namespace CombatSystem
         /// <summary>〈折り目のついた札〉与ダメージ % の池 / 〈常設の作業台〉常設 1 枚あたりの最終与ダメージ / 〈灰から組む機関〉使い捨て 1 回あたりの最終与ダメージ・上限。</summary>
         public const float FoldedPct = 0.45f, WorkbenchFinalPct = 0.15f, AshPer = 0.12f, AshMax = 1.20f;
         // ===== 賽目 (役の軸) の品の数値 (2026-11-21・段 1-f・item-overhaul-spec §5・未測定) =====
-        /// <summary>〈見切りの木札〉役が立ったターン 各撃の攻撃 +N・ブロック +N / 〈符丁の刻み板〉各撃の攻撃 + 賽目 × N (ゾロ目・連なりなら 2 倍)。</summary>
-        public const int WoodTagBonus = 4, NotchBoardPer = 2;
+        /// <summary>〈見切りの木札〉役が立ったターン 各撃の攻撃 +N・ブロック +N / 〈符丁の刻み板〉各撃の攻撃 + min(上限, 役の回数 × N) (ゾロ目・連なりなら 2 倍) /
+        /// 〈欠け目の見立て〉防御の無視 / 〈血染めの歯車〉各撃 +N / 〈雷鳴のゾロ目〉ブロック (full-item-rework-ledger §⑧・未測定)。</summary>
+        public const int WoodTagAttack = 4, WoodTagBlock = 5, NotchBoardPer = 2, NotchBoardMax = 16, ChippedPen = 12, GearAttack = 6, ThunderBlock = 10;
+        /// <summary>〈揃いの拍子木〉与ダメージ % の池 / 〈雷鳴のゾロ目〉最終与ダメージ / 〈血濡れの符丁〉役の回数 1 回あたりの最終与ダメージ・上限・〈追撃〉〈攻め〉の上乗せ。</summary>
+        public const float ClapperPct = 0.35f, ThunderFinalPct = 0.50f, BloodmarkPer = 0.10f, BloodmarkMax = 1.00f, BloodmarkBonus = 0.30f;
         /// <summary>〈賽振り台〉次のターンの最初の振り直しの費用から引く上限 (min(上限, 賽目)) / 〈役落とし〉役が成立したターン 攻撃 + 賽目 × N。 *Up = 強化した端子。</summary>
         public const int DiceTableCap = 6, DiceTableCapUp = 8, RoleDropPer = 3, RoleDropPerUp = 4;
         // ===== 采配と共通の端子 (2026-11-20・段 1-e・未測定) =====
@@ -906,7 +917,8 @@ namespace CombatSystem
 
             // ── 5. 効果 ──
             //   このターンに立つ役 (振った目で決まる・CombatManager.ResolveRoles と同じ判定)。 〈役落とし〉と賽目の品 (6d) が読む
-            { var rk = RoleOf(dice, env); o.roleNow = rk == null ? 0 : YachtRoles.IsBig(rk.Value) ? 2 : 1; }
+            var roleKind = RoleOf(dice, env);
+            o.roleNow = roleKind == null ? 0 : YachtRoles.IsBig(roleKind.Value) ? 2 : 1;
             bool doubler = false;
             for (int s = 0; s < m; s++) if (defs[s]?.baseId == TerminalIds.Doubler && Plugged(o.slotOfDie, s)) doubler = true;
             // 連なりの賽 (2026-11-20): 3 つの目が連番のターン (役〈連なり〉)、 挿した端子がすべて倍化する (〈残響〉と同じ)
@@ -1084,7 +1096,7 @@ namespace CombatSystem
             ApplyDeckItems(board, defs, env, state, o);
 
             // ── 6d. 賽目の品 (2026-11-21・段 1-f)。 役が立ったターン、 攻撃 +N は撃 1 つずつに (6c と同じ形) ──
-            ApplyRoleItems(env, state, o);
+            ApplyRoleItems(env, state, o, roleKind, dice);
 
             for (int i = 0; i < n; i++)
                 o.kindOfDie[i] = o.slotOfDie[i] >= 0 ? LegacyKind(defs[o.slotOfDie[i]].kind) : DiceTerminal.None;
@@ -1149,20 +1161,39 @@ namespace CombatSystem
             }
         }
 
-        /// <summary>賽目の品のうち、 端子の解決の中で効く物 (Resolve の 6d)。 旗は <see cref="TerminalBattleState.roleItems"/>。</summary>
-        private static void ApplyRoleItems(TerminalEnv env, TerminalBattleState st, TerminalOutcome o)
+        /// <summary>役の軸の品のうち、 端子の解決の中で効く物 (Resolve の 6d)。 旗は <see cref="TerminalBattleState.roleItems"/>。 役の回数はこのターンの役を足して数える。</summary>
+        private static void ApplyRoleItems(TerminalEnv env, TerminalBattleState st, TerminalOutcome o, RoleKind? rk, int[] dice)
         {
             var f = st.roleItems;
-            if (f == RoleItems.None || o.roleNow <= 0) return;
-            int each = 0;
-            if ((f & RoleItems.WoodTag) != 0) { each += WoodTagBonus; o.blockAdd += WoodTagBonus; }      // 〈見切りの木札〉
-            if ((f & RoleItems.NotchBoard) != 0) each += env.axRole * NotchBoardPer * (o.roleNow >= 2 ? 2 : 1);   // 〈符丁の刻み板〉
+            if (f == RoleItems.None || rk == null) return;
+            var k = rk.Value;
+            bool big = YachtRoles.IsBig(k);
+            int count = st.roleCount + 1, each = 0;
+            if ((f & RoleItems.WoodTag) != 0) { each += WoodTagAttack; o.blockAdd += WoodTagBlock; }                          // 〈見切りの木札〉
+            if ((f & RoleItems.Gear) != 0 && env.diceRerolled) each += GearAttack;                                           // 〈血染めの歯車〉
+            if ((f & RoleItems.NotchBoard) != 0) each += Math.Min(NotchBoardMax, NotchBoardPer * count) * (big ? 2 : 1);     // 〈符丁の刻み板〉
+            if ((f & RoleItems.Chipped) != 0 && HasLowFace(k, dice)) o.armorPen += ChippedPen;                               // 〈欠け目の見立て〉
+            if ((f & RoleItems.Clapper) != 0 && st.roleStreak >= 1) o.outgoingPctAdd += ClapperPct;                          // 〈揃いの拍子木〉
+            if ((f & RoleItems.Thunder) != 0 && big) { o.damageMul *= 1f + ThunderFinalPct; o.blockAdd += ThunderBlock; }    // 〈雷鳴のゾロ目〉
+            if ((f & RoleItems.Bloodmark) != 0)                                                                              // 〈血濡れの符丁〉
+            {
+                int face = k == RoleKind.Straight ? 0 : YachtRoles.FaceOf(k);
+                o.damageMul *= 1f + Math.Min(BloodmarkMax, BloodmarkPer * count) + (face == 3 || face == 4 ? BloodmarkBonus : 0f);
+            }
             if (each > 0 && o.attackHits.Count > 0)
             {
                 for (int h = 0; h < o.attackHits.Count; h++) o.attackHits[h] += each;
                 o.attackAdd += each * o.attackHits.Count;
-                if (o.logAttack) o.attackLog.Add($"賽目の品:+{each}×{o.attackHits.Count}撃");
+                if (o.logAttack) o.attackLog.Add($"役の品:+{each}×{o.attackHits.Count}撃");
             }
+        }
+
+        /// <summary>役 <paramref name="k"/> が 1・2・3 の目を含むか (2 個そろい・ゾロ目は目、 連なりは振った目で見る)。 〈欠け目の見立て〉〈雷毒の導管〉。</summary>
+        public static bool HasLowFace(RoleKind k, int[] dice)
+        {
+            if (k != RoleKind.Straight) return YachtRoles.FaceOf(k) <= 3;
+            if (dice != null) foreach (int d in dice) if (d >= 1 && d <= 3) return true;
+            return false;
         }
 
         /// <summary>このターンに立つ役 (立たなければ null)。 CombatManager.ResolveRoles と同じ判定: 振った 3 つの目 (<see cref="YachtRoles.Evaluate"/>)・
@@ -1196,6 +1227,11 @@ namespace CombatSystem
             var f = RoleItems.None;
             if (ItemSystem.PassiveSkills.AxisRules.Owns(run, GameLoop.ItemIds.RoleWoodTag)) f |= RoleItems.WoodTag;
             if (ItemSystem.PassiveSkills.AxisRules.Owns(run, GameLoop.ItemIds.RoleNotchBoard)) f |= RoleItems.NotchBoard;
+            if (ItemSystem.PassiveSkills.AxisRules.Owns(run, GameLoop.ItemIds.RoleChipped)) f |= RoleItems.Chipped;
+            if (ItemSystem.PassiveSkills.AxisRules.Owns(run, GameLoop.ItemIds.RoleGear)) f |= RoleItems.Gear;
+            if (ItemSystem.PassiveSkills.AxisRules.Owns(run, GameLoop.ItemIds.RoleClapper)) f |= RoleItems.Clapper;
+            if (ItemSystem.PassiveSkills.AxisRules.Owns(run, GameLoop.ItemIds.RoleThunder)) f |= RoleItems.Thunder;
+            if (ItemSystem.PassiveSkills.AxisRules.Owns(run, GameLoop.ItemIds.RoleBloodmark)) f |= RoleItems.Bloodmark;
             return f;
         }
 

@@ -46,6 +46,8 @@ namespace CombatSystem
         public static long CritOverflowFired, CritExecuteFired, CritRefireFired;
         /// <summary>[計装] 使い捨ての端子を使った回数 / 山札を切り直した回数 (ランの始めに BOT が 0 へ戻す・ランの記録の deckDisposeFired / deckShuffleFired)。</summary>
         public static long DeckDisposeFired, DeckShuffleFired;
+        /// <summary>[計装] 役が成立した回数 / 〈万象のゾロ目〉が 2 個そろいをゾロ目として扱った回数 (ランの始めに BOT が 0 へ戻す・ランの記録の roleFormedFired / roleOmniFired)。</summary>
+        public static long RoleFormedFired, RoleOmniFired;
 
         /// <summary>〈猫の手〉がこのターン先に挿した出目 (−1 = 無し)。 BOT の挿し方の方策はこの 1 組を固定として扱う (外さない)。</summary>
         public int CatPawDie => _catDie;

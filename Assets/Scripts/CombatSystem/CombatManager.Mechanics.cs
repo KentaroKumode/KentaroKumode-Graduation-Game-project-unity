@@ -457,6 +457,14 @@ namespace CombatSystem
                 // 役が立った (2026-11-21・段 1-f): 量 = 強さ (2 個そろい 1 / ゾロ目・連なり 2)。 OnWired の前なので、 品の攻撃 +N は撃ごとに乗る
                 ItemSystem.PassiveSkills.Keywords.Kw.Raise(ctx, PassiveSkillTrigger.OnRoleFired, YachtRoles.Strength(k));
             }
+            // 役の回数と続いたターン (役の軸の品が読む・TerminalBattleState)。 〈宿命の刻み目〉〈鏡合わせの盤〉の重ねた効果は数えない
+            if (_deck != null)
+            {
+                int formed = ctx.firedRolesThisTurn.Count;
+                _deck.state.roleCount += formed;
+                _deck.state.roleStreak = formed > 0 ? _deck.state.roleStreak + 1 : 0;
+                RoleFormedFired += formed;      // [計装]
+            }
 
             if (ctx.firedRolesThisTurn.Count > 0)
             {
@@ -469,34 +477,48 @@ namespace CombatSystem
 
         /// <summary>〈宿命の刻み目〉(2026-11-21): 前のターンに立った役 ((int)RoleKind + 1・0 = なし・ctx.accumulatedValues)。</summary>
         private const string FateRoleKey = "role.fate";
-        /// <summary>〈万象のゾロ目〉(2026-11-21): 2 個そろいをゾロ目として扱うと決めたターンの番号 (ctx.accumulatedValues) / 乱数のキー (専用) / 賽目 1 つあたりの確率。</summary>
+        /// <summary>〈万象のゾロ目〉(2026-11-21): 2 個そろいをゾロ目として扱うと決めたターンの番号 (ctx.accumulatedValues) / 乱数のキー (専用) /
+        /// この戦闘の役の回数がこれ以上なら確率 <see cref="OmniPctMid"/>・<see cref="OmniNeedFull"/> 以上なら 100%。</summary>
         private const string OmniTurnKey = "role.omniTurn";
         public const string OmniRngKey = "role.omni";
-        public const float OmniPctPerDepth = 0.08f;
+        public const int OmniNeedMid = 3, OmniNeedFull = 5;
+        public const float OmniPctMid = 0.5f;
+
+        /// <summary>〈万象のゾロ目〉: この戦闘の役の回数 <paramref name="roles"/> での、 2 個そろいをゾロ目として扱う確率。</summary>
+        public static float OmniPairChance(int roles) => roles >= OmniNeedFull ? 1f : roles >= OmniNeedMid ? OmniPctMid : 0f;
 
         /// <summary>〈万象のゾロ目〉: このターン 2 個そろいをゾロ目として扱う (<see cref="DecideOmniPair"/> が決めた)。 端子の盤面 (TerminalEnv.pairAsTriple) と ResolveRoles が読む。</summary>
         public static bool OmniPairNow(CombatContext ctx)
             => ctx != null && ctx.currentTurn > 0 && (int)ctx.GetAccumulated(OmniTurnKey) == ctx.currentTurn;
 
         /// <summary>〈万象のゾロ目〉(2026-11-21): 出目が決まった所 (振り直しと出目を書き換える効果の後・配線の前) で、 立つ役が 2 個そろいなら、
-        /// 確率 min(100%, 賽目 × 8%) でこのターンそれをゾロ目として扱う。 配線の前に決めるので、 配線の判断 (人・BOT) はその結果を見て挿せる。</summary>
-        private static void DecideOmniPair(CombatContext ctx, int[] dice)
+        /// この戦闘で役が 3 回以上成立した後は確率 50%・5 回以上なら 100% でこのターンそれをゾロ目として扱う。 配線の前に決めるので、 配線の判断 (人・BOT) はその結果を見て挿せる。
+        /// 100% の時は乱数を引かない。</summary>
+        private void DecideOmniPair(CombatContext ctx, int[] dice)
         {
-            if (ctx == null || !AxisRules.Owns(GameLoop.GameManager.Instance?.Run, GameLoop.ItemIds.RoleOmni)) return;
+            if (ctx == null || _deck == null || !AxisRules.Owns(GameLoop.GameManager.Instance?.Run, GameLoop.ItemIds.RoleOmni)) return;
             var k = TerminalCards.RoleOf(dice, new TerminalEnv { sealedRoleMask = ctx.sealedRoleMask });
             if (k == null || YachtRoles.IsBig(k.Value)) return;
-            float p = Mathf.Min(1f, OmniPctPerDepth * ctx.AxisDepth(AxisRules.Role));
-            if (p <= 0f || !GameLoop.GameRng.Chance(p, OmniRngKey)) return;
+            float p = OmniPairChance(_deck.state.roleCount);
+            if (p <= 0f || (p < 1f && !GameLoop.GameRng.Chance(p, OmniRngKey))) return;
+            RoleOmniFired++;      // [計装]
             ctx.accumulatedValues[OmniTurnKey] = ctx.currentTurn;
             Debug.Log($"[万象のゾロ目] 〈{YachtRoles.NameOf(k.Value)}〉をゾロ目として扱う ({p * 100f:0}%)");
         }
 
         /// <summary>〈鏡合わせの盤〉(2026-11-21): 2 個そろい <paramref name="k"/> の、 1 つ小さい目の 2 個そろいの効果を働かせる (役が立ったのではない ── 数えない)。
-        /// 1 の 2 個そろいなら、 次のターンの無料の振り直し +1。 1 つ小さい目の役が〈凶運〉で封じられていれば働かない。</summary>
+        /// 1 の 2 個そろいなら、 次のターンの無料の振り直し +1・次のターンのブロック +<see cref="MirrorOneBlock"/>。 1 つ小さい目の役が〈凶運〉で封じられていれば働かない。</summary>
+        public const int MirrorOneBlock = 6;
         private static void MirrorPair(RoleKind k, CombatContext ctx, GameLoop.DiceFaceParts.Tier tier, ref RoleOutcome outcome)
         {
             int face = YachtRoles.FaceOf(k);
-            if (face <= 1) { YachtRoleEffects.AddNextTurn(ctx, YachtRoleEffects.FreeRerollKey, 1); Debug.Log("[鏡合わせの盤] 特別・対 → 次のターンの無料の振り直し +1"); return; }
+            if (face <= 1)
+            {
+                YachtRoleEffects.AddNextTurn(ctx, YachtRoleEffects.FreeRerollKey, 1);
+                YachtRoleEffects.AddNextTurn(ctx, YachtRoleEffects.BlockNextKey, MirrorOneBlock);
+                Debug.Log($"[鏡合わせの盤] 特別・対 → 次のターンの無料の振り直し +1・ブロック +{MirrorOneBlock}");
+                return;
+            }
             var m = YachtRoles.Of(face - 1, false);
             if ((ctx.sealedRoleMask & (1 << (int)m)) != 0) return;
             YachtRoleEffects.Apply(m, tier, ctx, ref outcome);

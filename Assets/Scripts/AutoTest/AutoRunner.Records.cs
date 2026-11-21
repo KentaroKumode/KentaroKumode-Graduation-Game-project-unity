@@ -199,9 +199,9 @@ namespace AutoTest
             /// <summary>[計装 2026-11-21] このランの【再起動】/【オーバークロック】/【起爆】/【ジャスト防御】の回数 (CombatManager.RebootFired / OverclockFired / DetonateFired / JustGuardFired)。
             /// 秘宝が出血を使った回数 / 〈百人切りの鉈〉の処刑の回数 (BleedSpendFired / BleedExecuteFired)。 臨界の爆発 / 〈柱折りの発破筒〉の正規のダウン (BurstFired / BurstBreakFired)。
             /// 超過会心率が倍率になった会心 / 〈天眼の鍔〉の処刑 / 〈必殺の照準器〉のもう 1 回 (CritOverflowFired / CritExecuteFired / CritRefireFired)。
-            /// 使い捨ての端子を使った回数 / 山札の切り直し (DeckDisposeFired / DeckShuffleFired)。</summary>
+            /// 使い捨ての端子を使った回数 / 山札の切り直し (DeckDisposeFired / DeckShuffleFired)。 役の成立 / 〈万象のゾロ目〉の格上げ (RoleFormedFired / RoleOmniFired)。</summary>
             public int rebootFired, overclockFired, detonateFired, justGuardFired, bleedSpendFired, bleedExecuteFired, burstFired, burstBreakFired, critOverflowFired, critExecuteFired, critRefireFired,
-                deckDisposeFired, deckShuffleFired;
+                deckDisposeFired, deckShuffleFired, roleFormedFired, roleOmniFired;
             public string chainPath = "", heatBurstInfo = "", attackSumInfo = "";
             public bool ashBaseOpened;
             /// <summary>[計装 2026-11-14] 〈徒労〉: 掛かった通常の戦闘の勝ちの数 (今の形 = 何も得られなかった戦闘 / 別の形 = 品を落とさなかった戦闘)・
