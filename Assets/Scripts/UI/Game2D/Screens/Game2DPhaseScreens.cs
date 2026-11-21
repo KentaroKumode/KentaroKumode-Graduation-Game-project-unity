@@ -667,7 +667,7 @@ namespace UI.Game2D
                     int at = deck.IndexOf(names[first + sel]);
                     bool ok = _termPick == TermPick.Shop ? gm.ShopRemoveTerminal(at) : evRemove ? gm.ResolveEventTerminalRemoval(at) : gm.RestRemoveTerminal(at);
                     if (ok) { Game2DSfx.Play("ui_confirm"); _termPick = TermPick.None; }
-                    else modal.ShowError("抜けない (所持金が足りない・山札が手札の枚数を下回る)");
+                    else modal.ShowError("抜けない (所持金が足りない・山札が手札の枚数を下回る・最後の攻撃の端子)");
                 }
                 Refresh();
             };

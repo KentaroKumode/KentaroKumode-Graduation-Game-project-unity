@@ -157,7 +157,12 @@ namespace AutoTest
                 {
                     case TerminalIds.Capacitor: perPip = TerminalCards.CapacitorAttack / (float)need * DeckFutureAttackShare * dw; break;
                     case TerminalIds.Arrester:  perPip = 0.5f * Math.Max(0, s.enemyAtk) / need * fw; break;
-                    case TerminalIds.Foundry:   perPip = k * turns / (float)need * DeckFutureAttackShare * dw; break;
+                    case TerminalIds.Foundry:      // 1 ターンに FoundryMaxPerTurn 回しか出目に変わらない (本体と同じ規則・2026-11-21): 残りターンで変えきれない溜まりは数えない
+                    {
+                        int fCap = need * TerminalCards.FoundryMaxPerTurn * Math.Max(0, turns);
+                        d = Math.Min(kv.Value, fCap) - Math.Min(g0, fCap);
+                        perPip = k * turns / (float)need * DeckFutureAttackShare * dw; break;
+                    }
                     case TerminalIds.Coolant:   perPip = DeckRetreatTurns * escDelayWorth / need; break;
                 }
                 flat += d * perPip * DeckGaugeShare;
@@ -1359,8 +1364,8 @@ namespace AutoTest
             // ---- FinishTurn: 残す 1 枚・影写し (次のターンの手札へ・引いた後に足す)・使い捨てと火葬の剣 (この戦闘から外す) ----
             string retain = o.retainTarget >= 0 && o.retainTarget < board.Count ? board[o.retainTarget] : null;
             string copy = o.copyTarget >= 0 && o.copyTarget < board.Count ? board[o.copyTarget] : null;
-            TerminalDeckState.DisposeFired(board, o, hand, exiled, ret, st);      // 本体の FinishTurn と同じ関数 (戻る使い捨ては ret へ)
-            if (o.burnTarget >= 0 && o.burnTarget < board.Count) hand.Remove(board[o.burnTarget]);
+            TerminalDeckState.DisposeFired(board, o, hand, exiled, ret, st, draw, discard, perm);      // 本体の FinishTurn と同じ関数 (戻る使い捨ては ret へ)
+            TerminalDeckState.Burn(o.burnTarget >= 0 && o.burnTarget < board.Count ? board[o.burnTarget] : null, hand, exiled, draw, discard, perm, ret);      // 本体と同じ関数
             // ---- DrawTurn: 本体と同じ関数 (TerminalDeckState.SplitHand) で、 残す端子と捨て札へ送る端子に分ける ----
             //   Pick (既定): 旧い規則 + 残す印 (keep) の付いた端子 / All: 今ターンに挿した端子だけを捨て札へ / Off: 止まっていた手札と旧い〈保持器〉の 1 枚だけ残す。
             var kept = new List<string>();
@@ -1383,7 +1388,7 @@ namespace AutoTest
                 if (draw.Count == 0)
                 {
                     if (discard.Count == 0) break;
-                    size += TerminalDeckState.BeforeShuffle(discard, exiled, draw.Count + discard.Count + hand.Count + perm.Count, st);      // 本体の DrawOne と同じ関数
+                    size += TerminalDeckState.BeforeShuffle(discard, exiled, draw.Count + discard.Count + hand.Count + perm.Count, st, hand, perm, ret);      // 本体の DrawOne と同じ関数
                     draw.AddRange(discard); discard.Clear();
                     if (draw.Count == 0) continue;
                 }

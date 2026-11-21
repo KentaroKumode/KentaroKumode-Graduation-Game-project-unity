@@ -621,16 +621,28 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx) { }
     }
 
-    /// <summary>狂暴化: 全ボスに付与される時限エンレイジ。
-    /// 50ターン経過後、エネミーのダイス合計+10、プレイヤーの回復を完全封印、
-    /// エネミーが受けるダメージ3倍（プレイヤーが押し切る窓は残す）。</summary>
+    /// <summary>狂暴化: 全部の戦闘の敵に付与される時限エンレイジ (2026-11-21〜 ボス以外にも・あらゆる膠着の最後の受け皿)。
+    /// <see cref="EnrageTurn"/> ターン経過後 (51 ターン目から): 敵の攻撃 +<see cref="DiceBonus"/> (さらに <see cref="StepTurns"/> ターンごとに +<see cref="StepBonus"/>・上限なし)、
+    /// プレイヤーの回復を完全封印、 敵が受けるダメージ ×<see cref="EnemyDamageTakenMult"/> (プレイヤーが押し切る窓は残す)、
+    /// 敵の攻撃はプレイヤーの防御・ブロック・シールド・被ダメの軽減をすべて通さず HP に入る (<see cref="CombatContext.enemyAttackIgnoresGuard"/>)。</summary>
     public class Berserk : IPassiveSkillEffect
     {
-        /// <summary>スキル id。 ボスのマスの敵に CombatManager が足す (enemies.json には書かない)。</summary>
+        /// <summary>スキル id。 全部の戦闘の敵に CombatManager が足す (enemies.json には書かない)。</summary>
         public const string Id = "Berserk";
         public const int EnrageTurn = 50;
         public const int DiceBonus = 10;
+        /// <summary>狂暴化してから、 この間隔 (ターン) ごとに敵の攻撃 +<see cref="StepBonus"/> をさらに足す (51・56・61… ターン目に +10・+20・+30…・2026-11-21)。</summary>
+        public const int StepTurns = 5, StepBonus = 10;
         public const float EnemyDamageTakenMult = 3f;
+        private const string AppliedKey = "berserk_dice_applied";
+
+        /// <summary>そのターンの狂暴化の攻撃の上乗せ (狂暴化の前は 0)。</summary>
+        public static int AttackBonusAt(int turn)
+            => turn <= EnrageTurn ? 0 : DiceBonus + StepBonus * ((turn - EnrageTurn - 1) / StepTurns);
+
+        /// <summary>説明文 (CombatManager が敵のパッシブ一覧に載せる)。 数値はこのクラスの定数から組む。</summary>
+        public static string Description
+            => $"{EnrageTurn}ターン経過後、攻撃+{DiceBonus} (以後 {StepTurns} ターンごとにさらに +{StepBonus})・攻撃は防御・ブロック・シールド・軽減を無視して HP に入る・相手の回復を封じる・受ける攻撃のダメージ{(int)EnemyDamageTakenMult}倍";
 
         public string SkillId => Id;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
@@ -638,16 +650,18 @@ namespace ItemSystem.PassiveSkills.Effects
         {
             if (ctx.currentTurn <= EnrageTurn) return;
 
-            // 回復封印・敵被ダメ倍化は毎ターン再適用 (BeginNewTurn でリセットされるため)
+            // 回復封印・敵被ダメ倍化・守りの無視は毎ターン再適用 (BeginNewTurn でリセットされるため)
             ctx.healBlocked = true;
             ctx.enemyDamageTakenMultiplier = EnemyDamageTakenMult;
+            ctx.enemyAttackIgnoresGuard = true;
 
-            // ダイス合計+10 は一度だけ積む (enemyDiceTotalBonus は累積でリセットされない)
-            if (ctx.GetAccumulated("berserk_dice_applied") == 0)
+            // 攻撃の上乗せは、 積んだ量との差だけ足す (enemyDiceTotalBonus は累積でリセットされない)。 51 ターン目に +10、 以後 5 ターンごとに +10
+            int want = AttackBonusAt(ctx.currentTurn), had = (int)ctx.GetAccumulated(AppliedKey);
+            if (want > had)
             {
-                ctx.enemyDiceTotalBonus += DiceBonus;
-                ctx.accumulatedValues["berserk_dice_applied"] = 1;
-                UnityEngine.Debug.Log($"[Berserk] 狂暴化発動 (T{ctx.currentTurn}): 敵ダイス+{DiceBonus}, 回復封印, 敵被ダメ×{EnemyDamageTakenMult}");
+                ctx.enemyDiceTotalBonus += want - had;
+                ctx.accumulatedValues[AppliedKey] = want;
+                UnityEngine.Debug.Log($"[Berserk] 狂暴化 (T{ctx.currentTurn}): 敵の攻撃 +{want} (計), 守りの無視, 回復封印, 敵被ダメ×{EnemyDamageTakenMult}");
             }
         }
     }

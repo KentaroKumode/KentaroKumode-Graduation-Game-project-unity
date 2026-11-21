@@ -235,6 +235,9 @@ namespace ItemSystem.PassiveSkills
         public bool healBlocked;
         /// <summary>[perTurn] 狂暴化(ボス50T後): エネミーが受けるダメージ倍率（1.0=等倍, 狂暴化中3.0）。BeginNewTurn でリセット。</summary>
         public float enemyDamageTakenMultiplier = 1f;
+        /// <summary>[perTurn] 狂暴化(51T〜・2026-11-21): 敵の主攻撃はプレイヤーの防御・ブロック・シールド・被ダメの軽減をすべて通さず HP に入る
+        /// (CombatManager の敵の攻撃の解決・予告の <c>MutualTurnTelegraph.enemyAttackIgnoresGuard</c>)。 毎ターン狂暴化パッシブが再set。BeginNewTurn でリセット。</summary>
+        public bool enemyAttackIgnoresGuard;
         // (回復・シールドの減衰 healShieldReduction は、 書き手の〈天衣無縫〉が 2026-10-17 に消えたので 2026-11-12 に削除。 #128)
 
         // ===== 7層 ヴェスカ（遺物学者）。 正本: docs/GAME.md §13-4 =====
@@ -1116,6 +1119,7 @@ namespace ItemSystem.PassiveSkills
             winMinDamage = 1;
             healBlocked = false;            // 狂暴化系
             enemyDamageTakenMultiplier = 1f;
+            enemyAttackIgnoresGuard = false;
             playerFlatDamageReduction = 0;  // 被ダメ固定減算
             enemyAtkCutPct = 0f;            // 敵の攻撃の割合減 (軸の品・2026-11-07)
 

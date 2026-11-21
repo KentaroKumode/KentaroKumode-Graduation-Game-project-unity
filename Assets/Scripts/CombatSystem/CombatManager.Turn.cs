@@ -702,7 +702,8 @@ namespace CombatSystem
             // ADR-0013: プレイヤーの防御は**ブロックの前**に敵の攻撃値へ掛ける。 予告にもこの値が出る (柱3)。
             //   〈貫きの錐〉は敵の攻撃値に比例してブロックを削るので、 防御で減った後の値を使う。
             int enemyAtkBeforeDefense = enemyAtkValue;
-            enemyAtkValue = ApplyPlayerDefense(ctx, enemyAtkValue, ctx.enemyArmorPen);
+            //   〈狂暴化〉(51T〜・2026-11-21): 防御を掛けない (ブロック・シールド・被ダメの軽減も下の解決で通さない)。 予告にも防御の前の値が出る
+            if (!ctx.enemyAttackIgnoresGuard) enemyAtkValue = ApplyPlayerDefense(ctx, enemyAtkValue, ctx.enemyArmorPen);
 
             // 2 体戦: 2 体目の攻撃も**配線前に**確定させて予告へ載せる (柱3 完全情報テレグラフ)。
             //   解決時に振ると「見えていない一撃」ができ、 ADR-0009 の思想に正面から反する。
@@ -767,6 +768,7 @@ namespace CombatSystem
                 playerAttackPenalty = ctx.playerAttackPowerPenalty,
                 playerHighDiceCrushed = ctx.playerHighDiceCrushed,
                 playerBlockIgnored = ctx.playerBlockIgnored,
+                enemyAttackIgnoresGuard = ctx.enemyAttackIgnoresGuard,
                 blazeStacks = ctx.accumulatedValues.TryGetValue(
                         ItemSystem.PassiveSkills.Effects.BlazeBrand.StackKey, out var _bz)
                     ? (int)_bz : 0,
@@ -794,6 +796,7 @@ namespace CombatSystem
                         + (tele.executeArmed ? "  【処刑】" : "")
                         + (tele.playerHighDiceCrushed ? "  【出目3以上を再抽選】" : "")
                         + (tele.playerBlockIgnored ? "  【ブロック無効】" : ""));
+            if (tele.enemyAttackIgnoresGuard) Debug.Log($"[予告] 狂暴化: 敵の攻撃 {enemyAtkValue} は防御・ブロック・シールド・軽減を通さず HP に入る");
 
             // --- 5. 配線 ---
             //   端子の山札 (ADR-0014): 場の端子 (常設 + 手札) へ出目を挿す。 結果は TerminalCards.Resolve が 1 か所で計算する。
@@ -879,6 +882,8 @@ namespace CombatSystem
                 Debug.Log($"[貫きの錐] 敵攻撃{enemyAtkValue} × {PierceAwlPerAttack} = ブロック -{pierce} "
                         + $"({before} → {blockSum})");
             }
+            // 〈狂暴化〉(51T〜・2026-11-21): ブロックは何も受けない (守った量も 0)
+            if (ctx != null && ctx.enemyAttackIgnoresGuard) blockSum = 0;
             // 〈不完全な転移〉(門を不完全に起動した罰・2026-09-14)。
             //   錐と同じ「ブロックを削る」枠だが、 <b>敵攻撃値ではなくブロック量に比例</b>する。
             //   厚く配線した分は必ず一定割合残るので、 守りという選択肢は消えない。
@@ -1459,7 +1464,9 @@ namespace CombatSystem
                 //   立っても ProcessDamage の finalDamage = lossBase に上書きされていた。
                 if (ctx != null && !string.IsNullOrEmpty(ctx.bossId))
                     BossDmgDiag.RecordTurn(ctx.bossId, currentEnemy != null ? currentEnemy.displayName : ctx.bossId);
-                int lossBase = Math.Max(0, enemyAtkValue - blockSum);
+                //   〈狂暴化〉(51T〜): 主攻撃はシールド・被ダメの軽減の鎖 (ProcessDamage 以降) を通さない ── 鎖には 0 を流し、 HP を減らす直前に攻撃値をそのまま入れる
+                bool guardless = ctx != null && ctx.enemyAttackIgnoresGuard;
+                int lossBase = guardless ? 0 : Math.Max(0, enemyAtkValue - blockSum);
                 GuardDiag.Note(enemyAtkValue, enemyAtkValue, blockSum, lossBase);
                 // ラン内のブロック実績。 **GuardDiag (バッチ累計) とは別に持つ** ──
                 //   航行の危険度見積りが読むので、 ラン跨ぎの値を混ぜると決定性が壊れる。
@@ -1530,6 +1537,7 @@ namespace CombatSystem
                 // 整備パネル〈装甲〉r10〈不動〉: 1 回の攻撃で受けるダメージは最大 HP の 35% まで (2026-11-10)
                 { int cap = MetaProgression.MetaBuffApplicator.GetArmorHitCap(playerMaxHP); if (cap > 0 && takenDmg > cap) takenDmg = cap; }
                 takenDmg = ItemSystem.PassiveSkills.Effects.HarmlessLamp.Apply(ctx, takenDmg);   // 〈無害灯〉【規則】: 臨界で被ダメージを半減 (1 ターン 1 回)
+                if (guardless && !ctx.nullifyAllDamage) takenDmg = enemyAtkValue;   // 〈狂暴化〉: 防御・ブロック・シールド・軽減を通さず HP へ
                 playerHP = Math.Max(0, playerHP - takenDmg);
                 takenApplied = takenDmg;
                 diagHitMain = takenDmg;   // [計装] 大技の被ダメ: 主攻撃の分 (防御・シールドの後)

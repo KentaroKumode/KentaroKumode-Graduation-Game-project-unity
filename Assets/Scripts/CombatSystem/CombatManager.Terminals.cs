@@ -378,8 +378,9 @@ namespace CombatSystem
                 string id = _deck.board[s];
                 if (!TerminalCards.LeavesRunDeck(TerminalCards.Get(id))) continue;
                 if (deck.Count <= TerminalCards.MinDeckSize) { Debug.Log($"[端子/{id}] 山札が {deck.Count} 枚なので、ランの山札からは抜かない"); continue; }
-                if (deck.Remove(id)) TerminalDiag.NoteRemoved(id, TerminalDiag.LeftRunDeck);   // [計装 #106]
-                else continue;
+                int at = deck.IndexOf(id);
+                if (!GameLoop.GameManager.CanRemoveTerminalAt(GameLoop.GameManager.Instance.Run, at)) continue;      // 最後の攻撃の端子は抜かない (at < 0 = 山札に無い)
+                deck.RemoveAt(at); TerminalDiag.NoteRemoved(id, TerminalDiag.LeftRunDeck);   // [計装 #106]
                 Debug.Log($"[端子/{id}] 使ったので、ランの山札から抜いた (山札 {deck.Count} 枚)");
             }
         }

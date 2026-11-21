@@ -996,7 +996,8 @@ namespace AutoTest
                 block = System.Math.Max(0, block - enemyAtk * CombatSystem.CombatManager.PierceAwlPerAttack);
 
             // 端子の山札: このターンに得たシールド (〈二重障壁〉〈装甲板〉) はこのターンの被弾から吸う / 被ダメ −N% (〈受け流し〉〈防御陣〉〈身代わり札〉)
-            int taken = System.Math.Max(0, enemyAtk - block - ws.shield);
+            if (tele.enemyAttackIgnoresGuard) block = 0;      // 〈狂暴化〉: ブロックもシールドも受けない (本体と同じ)
+            int taken = System.Math.Max(0, enemyAtk - block - (tele.enemyAttackIgnoresGuard ? 0 : ws.shield));
             // 敵の攻撃が通った時の上乗せ (〈剛力〉〈闇技〉〈研ぎ澄まし〉・2026-11-12)。 本体はブロックの後に 1 以上残る時だけ、 プレイヤーの軽減の前に足す
             if (s.enemyHitBonus > 0 && enemyAtk - block > 0) taken += s.enemyHitBonus;
             // [#107] 収支の見積もりに使う、 シールドの前の 1 回目 / 2 回目の攻撃 (本体の takenDmg / secTaken のシールドの前)
@@ -1009,7 +1010,7 @@ namespace AutoTest
                 taken += System.Math.Max(0, enemyAtk - block - shieldLeft);
                 hit2Raw = System.Math.Max(0, enemyAtk - block);   // 2 回目には通った時の上乗せが乗らない (本体: 2 回目の ProcessDamage は OnPreDealDamage を鳴らさない)
             }
-            if (ws.takenMul < 1f) taken = Mathf.RoundToInt(taken * ws.takenMul);
+            if (ws.takenMul < 1f && !tele.enemyAttackIgnoresGuard) taken = Mathf.RoundToInt(taken * ws.takenMul);
             taken += (int)reflectPenalty;
             // 盾〈黎明〉: 無傷で受け切ったら、 敵の攻撃 10 につき敵の最大 HP の 5% を削る
             if (stepDaybreak && taken == 0)
@@ -1248,6 +1249,7 @@ namespace AutoTest
             tele.enemyShieldReflectRate = 0f;
             tele.playerAttackPenalty = 0;
             tele.playerBlockIgnored = false;
+            tele.enemyAttackIgnoresGuard = nt > ItemSystem.PassiveSkills.Effects.Berserk.EnrageTurn;   // 〈狂暴化〉は全部の敵が持つ (2026-11-21)・一度立てば続く
             tele.sealedTerminal = -1;
             plan.nextBlazeBase = tele.blazeStacks;
             // [2026-11-14] 王の〈業火〉: このターンが業火 (ダウンでない) なら撃った後の烈炎は 0。 次のターンの大技までも数え直す (旧い形では通らない)

@@ -188,7 +188,7 @@ outgoingDamageMultiplier += メタ% + 遺物% + 研磨剤1.5 + consDmgMultPct/10
   ※ 旧: effRate = max(0, enemyDamageReductionPct − armorPenPct) の割合軽減と、
     余剰貫通 (armorPen − 防御率) を与ダメ ×(1+余剰) へ転用する段 J。 どちらも撤去
 ↑ 勝利時最低保証【新】: total = max(total, winMinDamage[既定1, 利刃で1〜4])
-× enemyDamageTakenMultiplier       ← 狂暴化(50T後 ×3)
+× enemyDamageTakenMultiplier       ← 狂暴化(50T後 ×3・2026-11-21〜 全部の戦闘)
 メタデバフ俊敏: 各戦闘の初撃を total=0,fixedDmg=0
 → enemyHP −= total + fixedDamageToEnemy
   鋼の皮膚(メタデバフ): 敵初回致命を1HPで耐える
@@ -755,7 +755,7 @@ ProcessDamage の中の OnPreDealDamage は「その陣営が攻撃している�
 | IntimidatePlus(威圧+) | OnBattleStart | **[#104 修正]** この敵の攻撃 +3（戦闘を通して・ボスの威圧+は BossParam.IntimidateThreat）。足し先は `enemyDiceTotalBonus`（Escalation.EnemyAttackValue で基礎攻撃と同じく倍率が掛かる＝基礎攻撃 +N と同値・予告に出る）。「脅威」はいま基礎攻撃値の代わり（baseAttack 未指定時）としてしか使われないので、§9.6 の宿題どおり基礎攻撃値への加算と読んだ。旧: `ctx.enemyThreat` に足して読む処理が無かった（いまは enemyThreat へ書かない） |
 | GreedyMerchant(貪欲商人) | OnBattleStart | no-op(スケーリングは GameManager.StartFalseMerchantCombat: HP +2/個・攻撃 +1/3個) |
 | Storm(嵐・2026-11-13) | OnBattleStart | 航行の地図で**嵐の中の点に居る時に始まった戦闘**だけ、 1 体目の敵に付く（`CombatManager.StartCombatInternal` が付ける・ボスには付かない）。この敵の攻撃 +`FreeMapParams.StormEnemyAttack`（3・戦闘を通して）。足し先は威圧+ と同じ `enemyDiceTotalBonus`（基礎攻撃 +N と同値・予告に出る）。仕様は GAME.md §5-12 |
-| Berserk(狂暴化・全ボス付与) | OnTurnStart | T>50: healBlocked, enemyDamageTakenMultiplier=3, enemyDiceTotalBonus +=10(1回) |
+| Berserk(狂暴化・全部の戦闘の敵に付与・2026-11-21〜) | OnTurnStart | T>50: healBlocked, enemyDamageTakenMultiplier=3, enemyAttackIgnoresGuard=true, enemyDiceTotalBonus を `Berserk.AttackBonusAt(T)` = 10 + 10×⌊(T−51)/5⌋ まで積む (差分だけ足す)。 enemyAttackIgnoresGuard の間、 敵の主攻撃は ApplyPlayerDefense を通さず (予告もその値)・blockSum=0・ProcessDamage 以降の鎖 (シールド・被ダメの軽減・役の守り・仕込み刃・古い手紙・〈不動〉・〈無害灯〉) に 0 を流し、 HP を減らす直前に攻撃値をそのまま入れる (〈虚空〉の両者 0 だけは残す)。 2 体目・〈連撃〉の 2 回目は今までどおり |
 
 （FlawlessRobe 天衣無縫は 2026-10-17 にクラスごと削除。）
 
@@ -876,7 +876,8 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
            5. 効果 (場の順)。 〈残響〉が発動していれば他の端子の効果を 2 回走らせる (撃破のボーナス・段階を戻す数も 2 回分)。
               払う物は 1 回だけ (2026-11-20〜): 充電は 3. で 1 回・〈諸刃の剣〉の HP = ceil(sum/2) は 5. の頭で 1 回 (払うと HP が 0 になるなら不発・旧: HP−1 までに切って攻撃は全部入った)・
               〈裁きの雷〉は今の充電をすべて 1 回払い、 2 回目も払った量で攻撃に足す (旧: 2 回目は充電 0)
-              〈打ち直し〉(2026-11-20〜): 溜まりが届いたら、 場の順で後ろの (まだ効果を出していない) 端子の出目 1 個ずつ +届いた回数 (sum に入る量だけ・条件は変えない)
+              〈打ち直し〉(2026-11-20〜): 溜まりが届いたら、 場の順で後ろの (まだ効果を出していない) 端子の出目 1 個ずつ +1 (sum に入る量だけ・条件は変えない)。
+              届くのは 1 ターンに FoundryMaxPerTurn (=1) 回まで (2026-11-21〜・何枚・〈残響〉でも合わせて・溜まりの余りは持ち越す・foundryFiredTurn は BeginTurn で 0)
               〈剛腕〉(2026-11-20〜): **攻撃の種類の端子**に挿した出目の合計を、 その端子の効果に入れる前に ×2 (〈剛腕〉の効果 1 回につき ×2 ── 2 枚・〈残響〉で ×4)。
               条件 (2.) は 2 倍にする前の目で見る。 〈反復突き〉の「同じ目」も 2 倍にする前の目。 〈剛腕〉自身に挿した出目は使わない
               〈歯車の軸〉(2026-11-20・挿せない常設 capacity 0): 場にあれば (止まっていない)、 場の順で最初に発動した基本以外の端子の sum += (2 または強化 3) × 挿した出目の数 (何枚でも足す・
@@ -943,6 +944,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
                             → ApplyRoleGuard で takenDmg = round(takenDmg × (1 − cut/100)) (敵の直接攻撃パケットだけ・固定ダメの枠は触らない)
            bleedOnHit     → 主攻撃の dealtDmg > 0 のとき ctx.AddEnemyBleed(量) (〈鉤爪〉)
          ターンの頭 (DrawTerminalHand): 〈打ち直し〉の出目 +N を accumulatedValues[termFoundryBonus] へ置き、 自ロールの後 (大罪:怠惰の後) に全部の出目へ足す。
+         N は 1 ターンに最大 +1 しか増えない (2026-11-21〜・FoundryMaxPerTurn) ので、 戦闘の T ターン目で N ≤ T (int のあふれは起きない)。
            〈柔軟な戦略〉をこのターンに引いて場にあれば ctx.AddOutgoingPct(CounterPct × floor(基本以外の発動の累計 ÷ CounterEvery))
            (2026-11-20〜。 旧: ランの山札に入っていれば引かなくても。 累計は引いていない間も数える)
          ターンの終わり (FinishTerminalTurn): 発動した端子の撃破のボーナス (量は TerminalOutcome.killMaxHp / killWhet / killGold / killChoices・〈残響〉の 2 回目も足す)
