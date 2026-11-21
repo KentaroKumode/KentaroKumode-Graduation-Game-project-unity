@@ -118,7 +118,7 @@ namespace GameLoop
         /// 〈研ぎ代の領収書〉(店・休憩で抜くたび) には数えない。</summary>
         private string RemoveTerminalForEvent(int deckIndex)
         {
-            if (!CanRemoveTerminal || deckIndex < 0 || deckIndex >= Run.terminalDeck.Count) return null;
+            if (!CanRemoveTerminalAt(Run, deckIndex)) return null;
             string id = Run.terminalDeck[deckIndex];
             Run.terminalDeck.RemoveAt(deckIndex);
             Log($"イベント: 山札から抜いた: {id} (山札 {Run.terminalDeck.Count} 枚)");
@@ -240,6 +240,15 @@ namespace GameLoop
         /// <summary>同上 (ランを渡す版・イベントの「山札から端子を抜く」が選べるかの判定も読む)。</summary>
         public static bool CanRemoveTerminalOf(RunState run) => run?.terminalDeck != null && run.terminalDeck.Count > TerminalCards.MinDeckSize;
 
+        /// <summary>山札の deckIndex 枚目を抜けるか (下限 <see cref="CanRemoveTerminalOf"/> に加えて、 最後の攻撃の端子は抜けない ── <see cref="TerminalCards.KeepsLastAttack"/>・2026-11-21)。
+        /// 店・休憩・イベントで抜く所と、 戦闘で使ってランの山札から抜ける端子 (CombatManager.RemoveUsedFromRunDeck) が通す。</summary>
+        public static bool CanRemoveTerminalAt(RunState run, int deckIndex)
+        {
+            if (!CanRemoveTerminalOf(run) || deckIndex < 0 || deckIndex >= run.terminalDeck.Count) return false;
+            var rest = new List<string>(run.terminalDeck); rest.RemoveAt(deckIndex);
+            return !TerminalCards.KeepsLastAttack(run.terminalDeck[deckIndex], rest);
+        }
+
         /// <summary>店で山札から 1 枚抜く値段 (店で抜くたびに上がる)。 整備パネル〈圧縮の心得〉ならランで最初の 1 回は 0 (2 回目からは今までどおり 2 回目の値段)。</summary>
         public int TerminalRemovePrice
             => Run != null && Run.terminalShopRemovals == 0 && MetaProgression.MetaBuffApplicator.IsFirstShopRemovalFree() ? 0
@@ -248,7 +257,7 @@ namespace GameLoop
         /// <summary>店のサービス: 山札の deckIndex 枚目を抜く (払えない・抜けないなら false)。</summary>
         public bool ShopRemoveTerminal(int deckIndex)
         {
-            if (CurrentPhase != GamePhase.ShopVisit || !CanRemoveTerminal || deckIndex < 0 || deckIndex >= Run.terminalDeck.Count) return false;
+            if (CurrentPhase != GamePhase.ShopVisit || !CanRemoveTerminalAt(Run, deckIndex)) return false;
             int price = TerminalRemovePrice;
             if (Run.coins < price || !ProvisionPayment.TryPay(Run, price, "端子を抜く")) return false;
             string id = Run.terminalDeck[deckIndex];
@@ -271,7 +280,7 @@ namespace GameLoop
         /// <summary>休憩: 回復の代わりに、 山札の deckIndex 枚目を抜く (無料・休憩の行動を使う)。 抜けなければ false (休憩は続く)。</summary>
         public bool RestRemoveTerminal(int deckIndex)
         {
-            if (CurrentPhase != GamePhase.RestStop || !CanRemoveTerminal || deckIndex < 0 || deckIndex >= Run.terminalDeck.Count) return false;
+            if (CurrentPhase != GamePhase.RestStop || !CanRemoveTerminalAt(Run, deckIndex)) return false;
             string id = Run.terminalDeck[deckIndex];
             Run.terminalDeck.RemoveAt(deckIndex);
             TerminalDiag.NoteRemoved(id, TerminalDiag.RemovedRest);   // [計装 #106]

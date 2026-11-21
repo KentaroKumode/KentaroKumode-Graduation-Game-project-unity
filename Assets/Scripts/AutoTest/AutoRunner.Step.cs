@@ -409,7 +409,8 @@ namespace AutoTest
                 bool finished = false;
                 try
                 {
-                    finished = Step(phase);
+                    using (BotTiming.Enter(TimingCatOf(phase)))   // [計装 2026-11-21] 所要の内訳
+                        finished = Step(phase);
                 }
                 catch (Exception e)
                 {
@@ -425,12 +426,26 @@ namespace AutoTest
                 if (_innerStepCount >= Mathf.Max(1, stepsPerYield))
                 {
                     _innerStepCount = 0;
+                    BotTiming.Enter(BotTiming.Cat.Frame);
                     yield return null;
+                    BotTiming.Exit();
                 }
             }
         }
 
         private int _innerStepCount;
+
+        private static BotTiming.Cat TimingCatOf(GameManager.GamePhase phase)
+        {
+            switch (phase)
+            {
+                case GameManager.GamePhase.MapNavigation: return BotTiming.Cat.Nav;
+                case GameManager.GamePhase.Combat: return BotTiming.Cat.CombatBot;
+                case GameManager.GamePhase.ShopVisit: return BotTiming.Cat.Shop;
+                case GameManager.GamePhase.EventEncounter: return BotTiming.Cat.Event;
+                default: return BotTiming.Cat.Rest;
+            }
+        }
 
         /// <summary>現フェーズに対する1アクション。ラン終了時 true。</summary>
         private bool Step(GameManager.GamePhase phase)

@@ -110,41 +110,42 @@ namespace AutoTest
         public static bool TryGetKind(int layer, char kind, out double mean, out double loseRate)
         {
             mean = loseRate = 0;
-            string prefix = layer + "|" + kind + "|";
-            if (!_kindCache.TryGetValue(prefix, out var c))
+            if (!_kindCache.TryGetValue(KindKey(layer, kind), out var c))   // 速度 (2026-11-21): 計画の探索が 1 判断に数万回読む ── 鍵を文字列で作らない
             {
+                string prefix = layer + "|" + kind + "|";
                 double sum = 0, lost = 0; int n = 0;
                 foreach (var kv in _byKey)
                     if (kv.Key.StartsWith(prefix, StringComparison.Ordinal)) { sum += kv.Value.sum; lost += kv.Value.lost; n += kv.Value.n; }
                 c = (n, n > 0 ? sum / n : 0.0, n > 0 ? lost / n : 0.0);
-                _kindCache[prefix] = c;
+                _kindCache[KindKey(layer, kind)] = c;
             }
             if (c.Item1 < MinSamples) return false;
             mean = c.Item2; loseRate = c.Item3;
             return true;
         }
-        private static readonly Dictionary<string, (int, double, double)> _kindCache = new Dictionary<string, (int, double, double)>();
+        private static readonly Dictionary<int, (int, double, double)> _kindCache = new Dictionary<int, (int, double, double)>();
+        private static int KindKey(int layer, char kind) => layer * 65536 + kind;
 
         /// <summary>[2026-11-14・嵐の航行] 層と種類の、 1 戦の HP の損 (最大 HP の割合) の標準偏差 (全戦闘名を合わせた散らばり)。
         /// 「この HP で次の戦闘・出口までの道を越えられるか」の確率の見込み (BOT の嵐の航行・口 navStormExitDeath / navStormFightDeath) に使う。 戦闘数が足りなければ false。</summary>
         public static bool TryGetKindSd(int layer, char kind, out double sd)
         {
             sd = 0;
-            string prefix = layer + "|" + kind + "|";
-            if (!_kindSdCache.TryGetValue(prefix, out var c))
+            if (!_kindSdCache.TryGetValue(KindKey(layer, kind), out var c))
             {
+                string prefix = layer + "|" + kind + "|";
                 double sum = 0, sumSq = 0; int n = 0;
                 foreach (var kv in _byKey)
                     if (kv.Key.StartsWith(prefix, StringComparison.Ordinal)) { sum += kv.Value.sum; sumSq += kv.Value.sumSq; n += kv.Value.n; }
                 double m = n > 0 ? sum / n : 0.0;
                 c = (n, n > 0 ? Math.Sqrt(Math.Max(0.0, sumSq / n - m * m)) : 0.0);
-                _kindSdCache[prefix] = c;
+                _kindSdCache[KindKey(layer, kind)] = c;
             }
             if (c.Item1 < MinSamples) return false;
             sd = c.Item2;
             return true;
         }
-        private static readonly Dictionary<string, (int, double)> _kindSdCache = new Dictionary<string, (int, double)>();
+        private static readonly Dictionary<int, (int, double)> _kindSdCache = new Dictionary<int, (int, double)>();
 
         public static bool TryGet(string key, out int n, out double mean, out double sd, out double loseRate)
         {

@@ -210,8 +210,6 @@ namespace ItemSystem.PassiveSkills
 
         // ===== ダメージ無効化フラグ =====
         /// <summary>[perTurn]</summary>
-        public bool nullifyAllDamage;
-        /// <summary>[perTurn]</summary>
         public bool nullifyPursuitDamage;
 
         // ===== オーバーダメージ蓄積 =====
@@ -235,6 +233,9 @@ namespace ItemSystem.PassiveSkills
         public bool healBlocked;
         /// <summary>[perTurn] 狂暴化(ボス50T後): エネミーが受けるダメージ倍率（1.0=等倍, 狂暴化中3.0）。BeginNewTurn でリセット。</summary>
         public float enemyDamageTakenMultiplier = 1f;
+        /// <summary>[perTurn] 狂暴化(51T〜・2026-11-21): 敵の主攻撃はプレイヤーの防御・ブロック・シールド・被ダメの軽減をすべて通さず HP に入る
+        /// (CombatManager の敵の攻撃の解決・予告の <c>MutualTurnTelegraph.enemyAttackIgnoresGuard</c>)。 毎ターン狂暴化パッシブが再set。BeginNewTurn でリセット。</summary>
+        public bool enemyAttackIgnoresGuard;
         // (回復・シールドの減衰 healShieldReduction は、 書き手の〈天衣無縫〉が 2026-10-17 に消えたので 2026-11-12 に削除。 #128)
 
         // ===== 7層 ヴェスカ（遺物学者）。 正本: docs/GAME.md §13-4 =====
@@ -293,13 +294,6 @@ namespace ItemSystem.PassiveSkills
         /// <summary>[perTurn] このターンのプレイヤー攻撃力減算。 実効攻撃力は 0 で床を引く。
         /// 書き手: 7層ヴェスカ〈麻痺毒の小瓶〉/ 敵〈罠師〉〈呪縛〉(前のターンに収支で勝った分・OnTurnStart・2026-11-11 #104)。</summary>
         public int playerAttackPowerPenalty;
-        /// <summary>[persistent] 〈虚空〉のスタック。 攻撃端子に 0 本置いたターンごとに +1（戦闘中は戻らない）。
-        /// 積むほど被ダメ軽減が薄れ、 敵への刻みが増える ＝「殻が剥がれる」。
-        /// 軽減 = max(0, 90 − 15n)% / 刻み = 現在 HP の (5 + 2n)%（上限 n=8）。</summary>
-        public int voidStanceStacks;
-        /// <summary>[perTurn] 〈虚空〉によるこのターンの被ダメ倍率（1=軽減なし / 0.10=90%軽減）。
-        /// **1.0 未満でも 0 にはならない** ── 完全無敵を作らないための下限。 BeginNewTurn で 1 に戻す。</summary>
-        public float voidStanceDamageMul = 1f;
 
         /// <summary>[perTurn] 〈貫きの錐〉: このターン、 プレイヤーのブロック端子配線を無視する
         /// (blockSum を 0 として被ダメを計算)。 端子調律メタの本数ボーナスも巻き込んで無効化する。
@@ -389,7 +383,6 @@ namespace ItemSystem.PassiveSkills
         ///   3. **最大 HP の変更**を拒否
         ///   4. **処刑** (HP 閾値による即死) を発動させない
         /// 3・4 は「一撃で決着する近道」を塞ぐためのもので、 デバフ排除とは別の話なので残す。
-        /// 2026-07-29: HP 割合ダメージの免疫は撤去済み（〈虚空〉が現在 HP 基準になり近道にならないため）。
         /// 戦闘開始時にパッシブが立て、 戦闘終了まで持続する (p4 は最終段なので段 swap は起きない)。</summary>
         public bool enemyRecurrentTruth;
 
@@ -415,11 +408,6 @@ namespace ItemSystem.PassiveSkills
         /// 会心倍率が実際に乗る 1 箇所 (PassiveSkillManager の isCritical 分岐) で引く。</para></summary>
         public float enemyCritMultReduction = 0f;
 
-        /// <summary>敵へ与える「**現在** HP の割合」ダメージ量。 〈虚空〉が使う。
-        /// 現在 HP 基準なので指数的に減衰し、 **これ単独では敵を倒し切れない**（漸近するだけ）。
-        /// 最後は必ず通常攻撃で仕留める必要がある、 という設計上の制約になる。</summary>
-        public int CurrentHpRatioDamageToEnemy(float pct)
-            => System.Math.Max(1, UnityEngine.Mathf.CeilToInt(enemyCurrentHP * pct));
 
         /// <summary>敵の処刑 (HP 閾値による即死) が通るか。 〈回帰性真理〉持ちには通らない。</summary>
         public bool CanExecuteEnemy()
@@ -1041,7 +1029,6 @@ namespace ItemSystem.PassiveSkills
 
             // ダメージ処理の単ターンフラグ
             shieldAbsorbedAttackThisTurn = 0;   // 〈烈炎〉が読む: このターンに主攻撃をシールドが肩代わりした量 (2026-11-14)
-            nullifyAllDamage = false;
             nullifyPursuitDamage = false;
             nullifyScratchDamage = false;
             fixedDamageToEnemy = 0;
@@ -1060,7 +1047,6 @@ namespace ItemSystem.PassiveSkills
             vescaHalvesDamageThisTurn = false;
             playerAttackPowerPenalty = 0;
             playerBlockIgnored = false;
-            voidStanceDamageMul = 1f;
             lightningRodArmed = false;
             vescaBleedOnHit = 0;
             vescaMaxHpBiteOnHit = 0;
@@ -1116,6 +1102,7 @@ namespace ItemSystem.PassiveSkills
             winMinDamage = 1;
             healBlocked = false;            // 狂暴化系
             enemyDamageTakenMultiplier = 1f;
+            enemyAttackIgnoresGuard = false;
             playerFlatDamageReduction = 0;  // 被ダメ固定減算
             enemyAtkCutPct = 0f;            // 敵の攻撃の割合減 (軸の品・2026-11-07)
 

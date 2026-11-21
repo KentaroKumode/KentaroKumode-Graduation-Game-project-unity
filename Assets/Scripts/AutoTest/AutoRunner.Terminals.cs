@@ -157,7 +157,12 @@ namespace AutoTest
                 {
                     case TerminalIds.Capacitor: perPip = TerminalCards.CapacitorAttack / (float)need * DeckFutureAttackShare * dw; break;
                     case TerminalIds.Arrester:  perPip = 0.5f * Math.Max(0, s.enemyAtk) / need * fw; break;
-                    case TerminalIds.Foundry:   perPip = k * turns / (float)need * DeckFutureAttackShare * dw; break;
+                    case TerminalIds.Foundry:      // 1 ターンに FoundryMaxPerTurn 回しか出目に変わらない (本体と同じ規則・2026-11-21): 残りターンで変えきれない溜まりは数えない
+                    {
+                        int fCap = need * TerminalCards.FoundryMaxPerTurn * Math.Max(0, turns);
+                        d = Math.Min(kv.Value, fCap) - Math.Min(g0, fCap);
+                        perPip = k * turns / (float)need * DeckFutureAttackShare * dw; break;
+                    }
                     case TerminalIds.Coolant:   perPip = DeckRetreatTurns * escDelayWorth / need; break;
                 }
                 flat += d * perPip * DeckGaugeShare;
@@ -264,8 +269,18 @@ namespace AutoTest
             var tgts = new int[n][];
             var touts = new TerminalOutcome[n];
             var afters = new TerminalBattleState[n];
+            // 速度 (2026-11-21・判断は変えない): 同じ目の出目どうしを入れ替えただけの挿し方は、 端子ごとに入る目が同じなので解決も効用も同じ
+            //   (Resolve は端子ごとに挿した目を数える・出目の添字は見ない)。 先に出た方の結果を写す (配列は全部埋める = 後ろの選び方・計装はそのまま)。
+            var seen = SameDiceSignatures(rolls) ? new Dictionary<long, int>() : null;
             for (int i = 0; i < n; i++)
             {
+                if (seen != null)
+                {
+                    long sig = WiringSignature(rolls, cands[i]);
+                    if (seen.TryGetValue(sig, out int j))
+                    { us[i] = us[j]; outs[i] = outs[j]; touts[i] = touts[j]; tgts[i] = tgts[j]; afters[i] = afters[j]; continue; }
+                    seen[sig] = i;
+                }
                 us[i] = EvalDeckWiring(ev, rolls, cands[i], out outs[i], out touts[i], out tgts[i], out afters[i]);
             }
             var st = ev.st;
@@ -351,6 +366,27 @@ namespace AutoTest
             if (mayMistake) NoteDeckPolicyDiag(in ev, k, board, deck, cands, us, touts, best, bestPre);   // [計装 #106] 実際の配線の判断だけ
             if (mayMistake) NoteDownBreakDiag(in ev, tele, k, outs, best);                                // [診断 2026-11-14] 目盛りの割り時 (方策に関係なく数える)
             return cands[best];
+        }
+
+        /// <summary>出目に同じ目があって、 挿し方の鍵 (<see cref="WiringSignature"/>) で畳めるか (3 個まで・目と場の添字が鍵に収まる時だけ)。</summary>
+        private static bool SameDiceSignatures(int[] rolls)
+        {
+            int k = rolls.Length;
+            if (k < 2 || k > 3) return false;
+            foreach (int r in rolls) if (r < 0 || r >= 1024) return false;
+            for (int i = 0; i < k; i++) for (int j = i + 1; j < k; j++) if (rolls[i] == rolls[j]) return true;
+            return false;
+        }
+
+        /// <summary>挿し方の鍵: (出目, 挿す場) の組の多重集合 (並べ替えて詰める)。 同じ鍵の挿し方は端子ごとに入る目が同じ。 場の添字は 1022 まで。</summary>
+        private static long WiringSignature(int[] rolls, int[] slots)
+        {
+            int k = rolls.Length;
+            long a = rolls[0] * 1024L + (slots[0] + 1), b = rolls[1] * 1024L + (slots[1] + 1), c = k > 2 ? rolls[2] * 1024L + (slots[2] + 1) : 0;
+            if (a > b) { var t = a; a = b; b = t; }
+            if (b > c) { var t = b; b = c; c = t; }
+            if (a > b) { var t = a; a = b; b = t; }
+            return (a << 40) | (b << 20) | c;
         }
 
         /// <summary>[計装 #106] 場の端子ごとに、 選んだ手で発動したか・しなかった理由 (<see cref="TerminalPolicyDiag"/> の [10〜22])。
@@ -984,16 +1020,22 @@ namespace AutoTest
         /// <summary>山札で戦う戦闘の配線方策 (<see cref="CombatManager.WiringPolicy"/> へ差す)。 前のターンの観測・計装の包みもここで持つ (旧い配線の包み MutualWiringPlanPolicy は 2026-11-12 に削除)。</summary>
         private WiringPlan DeckWiringPlanPolicy(int[] rolls, MutualTurnTelegraph tele)
         {
+            using (BotTiming.Enter(BotTiming.Cat.Wiring)) return DeckWiringPlanPolicyCore(rolls, tele);
+        }
+
+        private WiringPlan DeckWiringPlanPolicyCore(int[] rolls, MutualTurnTelegraph tele)
+        {
             RefreshMainCorr();   // [V3 mainCorr]
-            PrepareSuperTurn(rolls, tele);
-            UseTacticsThisTurn(rolls, ref tele);   // 戦術消耗品 (2026-11-21・§12-6)。 盤面を変えるので配線の判断の前
+            using (BotTiming.Enter(BotTiming.Cat.WirePrep)) PrepareSuperTurn(rolls, tele);
+            using (BotTiming.Enter(BotTiming.Cat.Tactics)) UseTacticsThisTurn(rolls, ref tele);   // 戦術消耗品 (2026-11-21・§12-6)。 盤面を変えるので配線の判断の前
             int hpNow = CombatManager.Instance != null ? CombatManager.Instance.PlayerHP : -1;
             if (_fbPrevHp >= 0 && hpNow >= 0 && _fbPrevHp - hpNow > _fbPrevExpTaken) _fbUnavoidSeen = true;
             _lastFreeBlock = _lastKillsNow = false;
             _lastChosenA = -1; _lastAttackCandExists = false;
-            var slots = ChooseDeckWiring(rolls, tele, out _, out var targets, lookahead: true, mayMistake: true);
+            int[] slots, targets;
+            using (BotTiming.Enter(BotTiming.Cat.WireChoose)) slots = ChooseDeckWiring(rolls, tele, out _, out targets, lookahead: true, mayMistake: true);
             // 挑戦カード〈金で殴る〉(#6): 払う金額 (札が無ければ 0・とどめに合わせて挿し方を替えることがある)。 計装の見積もり (_lastPred*) も金の分で上書きする
-            int gold = slots != null ? ChooseGoldPunch(rolls, tele, ref slots, ref targets) : 0;
+            int gold; using (BotTiming.Enter(BotTiming.Cat.WireGold)) gold = slots != null ? ChooseGoldPunch(rolls, tele, ref slots, ref targets) : 0;
             // [計装 2026-11-13] 攻撃の端子に挿さない手を選んだ割合 (素朴版は効用で選ばないので数えない)
             if (_lastChosenA >= 0)
             {
@@ -1002,7 +1044,7 @@ namespace AutoTest
             }
             // 手札の規則 Pick (2026-11-13): 次のターンも手札に残す印 (方策 handKeepPolicy・Off / All では null)
             if (slots != null) slots = AddClockDiePlug(slots, rolls);
-            bool[] keep = slots != null ? ChooseHandKeep(rolls, tele, slots) : null;
+            bool[] keep; using (BotTiming.Enter(BotTiming.Cat.WireKeep)) keep = slots != null ? ChooseHandKeep(rolls, tele, slots) : null;
             if (slots != null) keep = AddLinkDieKeep(keep, rolls, tele, slots);
             if (predTrace) BeginPredTrace(tele.turn);
             BeginMainCorrTurn(_lastPredA);
@@ -1322,8 +1364,8 @@ namespace AutoTest
             // ---- FinishTurn: 残す 1 枚・影写し (次のターンの手札へ・引いた後に足す)・使い捨てと火葬の剣 (この戦闘から外す) ----
             string retain = o.retainTarget >= 0 && o.retainTarget < board.Count ? board[o.retainTarget] : null;
             string copy = o.copyTarget >= 0 && o.copyTarget < board.Count ? board[o.copyTarget] : null;
-            TerminalDeckState.DisposeFired(board, o, hand, exiled, ret, st);      // 本体の FinishTurn と同じ関数 (戻る使い捨ては ret へ)
-            if (o.burnTarget >= 0 && o.burnTarget < board.Count) hand.Remove(board[o.burnTarget]);
+            TerminalDeckState.DisposeFired(board, o, hand, exiled, ret, st, draw, discard, perm);      // 本体の FinishTurn と同じ関数 (戻る使い捨ては ret へ)
+            TerminalDeckState.Burn(o.burnTarget >= 0 && o.burnTarget < board.Count ? board[o.burnTarget] : null, hand, exiled, draw, discard, perm, ret);      // 本体と同じ関数
             // ---- DrawTurn: 本体と同じ関数 (TerminalDeckState.SplitHand) で、 残す端子と捨て札へ送る端子に分ける ----
             //   Pick (既定): 旧い規則 + 残す印 (keep) の付いた端子 / All: 今ターンに挿した端子だけを捨て札へ / Off: 止まっていた手札と旧い〈保持器〉の 1 枚だけ残す。
             var kept = new List<string>();
@@ -1346,7 +1388,7 @@ namespace AutoTest
                 if (draw.Count == 0)
                 {
                     if (discard.Count == 0) break;
-                    size += TerminalDeckState.BeforeShuffle(discard, exiled, draw.Count + discard.Count + hand.Count + perm.Count, st);      // 本体の DrawOne と同じ関数
+                    size += TerminalDeckState.BeforeShuffle(discard, exiled, draw.Count + discard.Count + hand.Count + perm.Count, st, hand, perm, ret);      // 本体の DrawOne と同じ関数
                     draw.AddRange(discard); discard.Clear();
                     if (draw.Count == 0) continue;
                 }

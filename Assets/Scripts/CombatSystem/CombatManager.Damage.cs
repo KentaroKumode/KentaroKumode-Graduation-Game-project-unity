@@ -425,15 +425,6 @@ namespace CombatSystem
                 }
             }
 
-            // 〈虚空〉の殻: 攻撃端子 0 本のターンだけ立つ。 積むほど薄くなり n=6 で消える。
-            // **下限を 0 にしないので完全無敵にはならない** (旧 nullifyAllDamage の抜け穴対策)。
-            if (ctx != null && ctx.voidStanceDamageMul < 1f && totalDmg > 0)
-            {
-                int before = totalDmg;
-                totalDmg = Mathf.Max(1, Mathf.CeilToInt(totalDmg * ctx.voidStanceDamageMul));
-                Debug.Log($"[虚空] 殻が受け止めた {before}→{totalDmg} (×{ctx.voidStanceDamageMul:F2})");
-            }
-
             // 2026-06-28: 痛覚遮断剤 (狂戦士スターター): 使用ターン中の致命ダメは HP=1 で踏みとどまる
             // (シールド/軽減すべての後の最終値で判定。 fixedDamageToPlayer 等の別経路は別途処理されるが
             //  メインダメで死なせない最低保証として機能)

@@ -116,12 +116,14 @@ namespace AutoTest
 
         public static int LegacyCostOf(MetaPanelKind kind, int rank) => System.Math.Max(0, rank) * LegacyRankCost(kind);
 
-        /// <summary>枠を既定で埋める時のモジュール (仮)。 主方針〈ラストスタンド〉(安全網)・補助 攻撃端子調律 (どのビルドにも効く)・種火 出血 (旧 SparkBuild の軸)。</summary>
-        public static MetaModule DefaultModule(MetaSlot slot) => slot switch
+        /// <summary>枠を既定で埋める時のモジュール = 測定の標準 (旧 Standard と同じく軸に寄せない)。 主方針〈ラストスタンド〉(安全網)・補助 攻撃端子調律 (どのビルドにも効く)・
+        /// 種火は空 (<see cref="MetaLoadout.Empty"/>)。 2026-11-21: 種火 出血を既定にしていたら、 どの腕でも店が出血へ傾き、 軸どうしの比較が出血に有利に偏った。
+        /// 種火を測る時は spark:&lt;キーワード&gt; を明示する。</summary>
+        public static int DefaultModule(MetaSlot slot) => slot switch
         {
-            MetaSlot.Main => MetaModule.LastStand,
-            MetaSlot.Support => MetaModule.AttackTune,
-            _ => MetaModule.SparkBleed,
+            MetaSlot.Main => (int)MetaModule.LastStand,
+            MetaSlot.Support => (int)MetaModule.AttackTune,
+            _ => MetaLoadout.Empty,
         };
 
         /// <summary>旧いプリセットの配分表 (合計は <see cref="LegacyMaxPoints"/>)。 当てる時は <see cref="MetaLoadout.FromLegacy"/> で読み替わる。</summary>
@@ -175,7 +177,7 @@ namespace AutoTest
             foreach (MetaSlot sl in System.Enum.GetValues(typeof(MetaSlot)))
             {
                 int m = lo.modules[(int)sl];
-                if (m == MetaLoadout.Default) m = st.IsSlotOpen(sl) ? (int)DefaultModule(sl) : MetaLoadout.Empty;
+                if (m == MetaLoadout.Default) m = st.IsSlotOpen(sl) ? DefaultModule(sl) : MetaLoadout.Empty;
                 if (m < 0) { st.Unequip(sl); continue; }
                 if (!st.IsSlotOpen(sl))
                     UnityEngine.Debug.LogWarning($"[MetaAllocationPresets] {label}: {(MetaModule)m} の枠 ({sl}) が閉じている (枠 {st.slotsOpen}) ので効かない");

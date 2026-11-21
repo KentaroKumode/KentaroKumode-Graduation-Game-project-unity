@@ -91,6 +91,7 @@ namespace CombatSystem
         public int playerAttackPenalty;     // このターンのプレイヤー攻撃力減算 (麻痺毒)
         public bool playerHighDiceCrushed;  // 3 以上の出目が 1〜2 へ再抽選される (天与の指輪)
         public bool playerBlockIgnored;     // このターンのブロック配線が無視される (貫きの錐)
+        public bool enemyAttackIgnoresGuard; // 〈狂暴化〉(51T〜): 敵の攻撃値 (防御の前) がブロック・シールド・軽減を通さずそのまま HP に入る
         public bool executeArmed;
 
         /// <summary>〈綻び〉このターン封印される端子。 -1 = 封印なし。 配線前に開示される。</summary>

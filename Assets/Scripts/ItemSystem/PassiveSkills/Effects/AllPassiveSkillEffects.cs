@@ -69,59 +69,6 @@ namespace ItemSystem.PassiveSkills.Effects
     //   5 層以降の大技 (T3・T6・T9) と一度も重ならなかった (GAME.md §24)。
 
     // ============================================================
-    //  ユニークパッシブ — 剣系
-    // ============================================================
-
-    /// <summary>虚空 (2026-07-29 リワーク) — 攻撃端子に接続したダイスが 0 本のターン、
-    /// **殻が 1 枚剥がれる**。 積むほど被ダメ軽減が薄れ、 敵への刻みが増える。
-    ///
-    ///   軽減 = max(0, 90 − 15n)%      n=0:90% … n=6:0%
-    ///   刻み = **現在 HP** の (5 + 2n)%  n=0:5% … n=8:21%（上限）
-    ///
-    /// 旧実装は `nullifyAllDamage` で双方のダメージを 0 にしており、
-    /// **攻めなければ無敵**という無条件・無制限のロックだった (実測: 7層 p4 戦の 88.8% のターンで発動し、
-    /// 敵攻撃 506 が 8.5 まで潰れていた)。 敵の火力調整が原理的に無効化されるため撤去。
-    /// 刻みを現在 HP 基準にしたので指数的に減衰し、 **これ単独では敵を倒し切れない** ──
-    /// 守り続けても最後は殴る必要がある。
-    /// 旧々: ダイス差≤3で双方ダメ0+固定3。「拮抗の間合い」の意味論を配線判断で再定義。
-    /// 旧: ダイス差≤3で双方ダメ0+固定3。「拮抗の間合い」の意味論を配線判断で再定義。
-    /// 新: 配線集計後の OnPreDealDamage で発火し、attackDiceCount==0 なら発動。
-    /// ExecuteTurnMutual が nullifyAllDamage フラグを敵攻撃側にも波及させる。</summary>
-    public class VoidStance : IPassiveSkillEffect
-    {
-        /// <summary>殻の初期軽減率(%)からスタックごとに引く量。 90 → 0 まで 6 段。</summary>
-        public const int ReducePerStack = 15;
-        /// <summary>刻み(現在HP%)の初期値とスタックごとの増分。</summary>
-        public const int ChipBase = 5;
-        public const int ChipPerStack = 2;
-        /// <summary>スタック上限。 n=8 で 軽減0% / 刻み21%。</summary>
-        public const int StackCap = 8;
-
-        public string SkillId => "VoidStance";
-        public PassiveSkillTrigger[] Triggers => new[]
-        {
-            PassiveSkillTrigger.OnPreDealDamage,   // 配線集計後・自攻撃前
-        };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
-        {
-            if (trigger != PassiveSkillTrigger.OnPreDealDamage) return;
-            int atkDice = (int)ctx.GetAccumulated("mutualAttackDiceCount");
-            if (atkDice != 0) return;
-
-            int n = System.Math.Min(StackCap, ctx.voidStanceStacks);
-            // 殻: 積むほど薄くなる。 **0 にはできない**ので完全無敵は成立しない。
-            ctx.voidStanceDamageMul = System.Math.Max(0f, 90 - ReducePerStack * n) / 100f;
-            // 刻み: 積むほど増えるが **現在 HP 基準**なので漸近するだけ。 単独では倒し切れない。
-            int chip = ctx.CurrentHpRatioDamageToEnemy((ChipBase + ChipPerStack * n) / 100f);
-            ctx.fixedDamageToEnemy += chip;
-            if (ctx.voidStanceStacks < StackCap) ctx.voidStanceStacks++;
-            UnityEngine.Debug.Log($"[虚空] 攻撃端子0 → 殻{n}枚目: 被ダメ×{ctx.voidStanceDamageMul:F2} "
-                                + $"/ 現在HP{ChipBase + ChipPerStack * n}% = {chip} 軽減不能 "
-                                + $"(次スタック {ctx.voidStanceStacks})");
-        }
-    }
-
-    // ============================================================
     //  ユニークパッシブ — 斧系
     // ============================================================
 

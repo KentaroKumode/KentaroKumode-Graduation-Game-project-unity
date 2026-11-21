@@ -323,9 +323,6 @@ namespace ItemSystem.PassiveSkills
             //  ユニークパッシブ
             // ============================
 
-            // 剣系
-            Register(new VoidStance());
-
             // Ignite / CurseBind / Abyss は 2026-07-18 に class ごと削除 (dead_staff / curse 系列全廃)
 
             // ============================

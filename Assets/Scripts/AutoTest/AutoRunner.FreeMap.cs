@@ -432,7 +432,7 @@ namespace AutoTest
             FreeNavDecisions[mode]++;
             var hopsFromMe = sim.HopsFrom(at);
             // ── 嵐の見方 (2026-11-14・口 navStormAware・回避ありの方策の嵐の層だけ。 null = 今までと同じ動き) ──
-            StormNavView sv = StormNavFor(map, sim, avoid);
+            StormNavView sv; using (BotTiming.Enter(BotTiming.Cat.NavStorm)) sv = StormNavFor(map, sim, avoid);
             StormNavObserve(map, sim);   // [計装] ボスの点が見えた手番 (読むだけ)
             //   出口までの歩数: 嵐の見方ではボスの点を読まない (見えていなければ候補の平均)
             int exitHopsAt = sv != null ? sv.ExitHops[at] : hopsFromMe[L.goal];
@@ -550,10 +550,11 @@ namespace AutoTest
             else if (!toExit && v3.macroPlan)
             {
                 choosing = true;
-                target = MacroTarget(gm, mm, sim, L, at, hopsFromMe, run, sv);
+                using (BotTiming.Enter(BotTiming.Cat.NavPlan)) target = MacroTarget(gm, mm, sim, L, at, hopsFromMe, run, sv);
                 if (target < 0) toExit = true;
             }
             else if (!toExit)
+            using (BotTiming.Enter(BotTiming.Cat.NavPlan))
             {
                 choosing = true;
                 int fearR = navFear > 0f ? FearRange() : 0;
@@ -635,6 +636,7 @@ namespace AutoTest
 
             // ── 次の 1 歩 ──
             //   嵐の見方: 嵐の中の 1 歩の HP を道の費用に入れる (外を回る道と中を突っ切る道を比べる)
+            var stepScope = BotTiming.Enter(BotTiming.Cat.NavStep);
             int hop = sv != null ? sv.StormStep(at, target) : sim.StepToward(at, target);
             // 行動の上限 (の手前) を過ぎたら避けるのをやめて出口へ真っ直ぐ歩く ── 避け道の往復で層に閉じ込められない
             if (avoid && _freeMapActions <= MaxFreeMapActionsPerFloor)
@@ -665,12 +667,14 @@ namespace AutoTest
                 if (battleish)
                     _cur.lowHpRiskSteps[hop == L.goal ? 3 : toExit ? 2 : hop == target ? 0 : 1]++;
             }
+            stepScope.Dispose();
             if (hop < 0 || hop == at || !sim.CanMoveTo(hop))
             {
                 Finish(Outcome.Deadlock, $"航行マップの層で行き先 {target} へ動けない (Me={at})");
                 return true;
             }
-            if (!gm.MoveStep(map.NodeIdAt(hop)))
+            bool moved; using (BotTiming.Enter(BotTiming.Cat.NavBody)) moved = gm.MoveStep(map.NodeIdAt(hop));
+            if (!moved)
             {
                 Finish(Outcome.Deadlock, $"航行マップの層で {hop} へ動けない");
                 return true;
