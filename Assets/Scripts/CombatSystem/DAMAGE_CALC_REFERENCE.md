@@ -217,7 +217,7 @@ playerDamageNegateCharges>0 → total=0(獣の絆)
 痛覚遮断剤【職業/狂戦士 2026-06-28】: painkillerArmedThisTurn && total≥playerHP → total=playerHP−1（HP=1踏みとどまり・チェーン**最後**）
 → (ダメージ適用直前) 仕込み刃【職業/暗殺者 2026-06-28・2026-09-22 に倍率 1→5】: daggerArmed && total>0 → total=0 ＋ **その 5 倍**を enemyHP へ軽減不能で返す（`CombatManager` の仕込み刃の反撃倍率）。使ったターン限りで、被弾しなくても失効
 → 古い手紙【消耗品 2026-10-31】: accumulatedValues[Consumables.OldLetterGuardKey] > 0 → total=0（反撃なし）。仕込み刃の直後・同じく使ったターン限り。1 枚で 3 回使える
-→ (整備パネル〈不動〉の一撃の上限 = 最大 HP の 35% の後) 〈無害灯〉【規則】(2026-11-20): 臨界 ≥ 15 なら 1 ターン 1 回 total −= floor(total / 2)・臨界を同じ量 (足りなければあるだけ) 使う
+→ (整備パネル〈不動〉の一撃の上限 = 最大 HP の 35% の後) 〈無害灯〉【規則】(2026-11-21・§3-M): 臨界 ≥ 15 なら 1 ターン 1 回 total = 0・臨界 −10・爆発の 50% を敵へ (HarmlessLamp.Apply)
 → playerHP −= total (+ fixedDamageToPlayer)
   fixedDamageToEnemy>0 は敗北時も敵へ(反撃/Counter/Riposte) / 出血
   痛覚遮断剤 post-clamp: メイン+固定ダメ適用後も painkillerArmedThisTurn 中は playerHP≤0 → 1 に復帰
@@ -503,7 +503,7 @@ Hermes / Bloodlust / EvenEyes / MasterworkNotes / KaleidoDice。
 | Resonance(共鳴・LEG) | OnPreDealDamage | 発動中パッシブ数 × 0.01 を outgoing 加算 (2026-09-20: 旧 over5 × 0.05) |
 | Greed(貪欲・ダイス) | OnTurnStart | lifestealPct = 0.1 |
 | Eternal(永劫・ダイス) | OnPostRoll/OnBattleEnd | playerDiceTotal += min(5, eternalStacks/10)、勝利でstack++保存(ラン跨ぎ) |
-| TenkouKaibutsu(天工開物) | OnBattleStart | **2026-11-20**: `burstFlatBonus += 5 × RunState.heavenlyCraftUpgrades`（この品を持っている間に武器を強化した回数・GameManager.Rest）→ `Kw.BurstBase` に足す。 旧: 戦闘開始時の臨界 +5 × 回数 |
+| TenkouKaibutsu(天工開物) | OnBattleStart / OnWired | 2026-11-21 (§3-M): `burstFlatBonus += 12 × RunState.heavenlyCraftUpgrades`・【過熱】のターン `playerArmorPen += 12` |
 | Bloodlust(背水の狂刃) | OnPreDealDamage | HP≤50% → outgoing+=0.3、≤25% → +=0.8 (2026-05-31 outgoing移行) |
 | Hermes(ヘルメスの靴) | OnPostRoll | 初回ロール `AddPlayerAttackOrDiceBonus(5)`（攻撃+5・ステータス化 §2-C） |
 | GoldKingBlade(溶金の領主剣) | OnPreDealDamage | 攻撃が通る時 outgoing += 0.02×swordWindfallGold (2026-11-19 作り直し・作者: 持っている間に秘宝・賽・イベントから得た金 1G につき +2%・戦闘の報酬と売却は数えない・上限なし。 数えるのは GoldIncome.CountWindfall と出どころの種類 GoldOrigin。 旧: 0.005×coinsSpent = ラン全体で使った金) |
@@ -646,7 +646,7 @@ s = `SwordDanceSet.SoloScale`（2026-11-20）: 持っている[剣の舞]（昇�
 | 出来事 (トリガー) | 出る場所 | 量 |
 |---|---|---|
 | OnRinkaiBurst | Kw.AddHeat が閾値をまたいだとき | その爆発で使った臨界 |
-| OnSuperBurst | 同じ爆発が超臨界のとき (OnRinkaiBurst の直後・2026-11-20) | その爆発のダメージ (基礎 ×1.5) |
+| OnSuperBurst | 同じ爆発が超臨界のとき (OnRinkaiBurst の直後・閾値の 1.5 倍以上・2026-11-21) | その爆発のダメージ (敵の防御の後) |
 | OnTerminalDispose | 使い捨ての端子を使ったとき (2026-11-20・`CombatManager.RaiseTerminalEvents`・配線の解決 `ApplyTerminalOutcome` の直後・OnWired の前・1 枚につき 1 回) | 1 |
 | OnDeckShuffle | 端子の捨て札を切り直したとき (ターンの頭に引く所 = `DrawTerminalHand` の直後 / 判断の間に消耗品・品で引いた分は `RaiseTerminalEvents` の頭) | 切り直した枚数 |
 | OnKeptTerminalUse | 残す印で前のターンから残した端子を発動したとき (`RaiseTerminalEvents`・名前で数える) | 挿した出目の合計 (最低 1) |
@@ -702,13 +702,11 @@ CombatManager に預け、 プレイヤーの攻撃の直前に固定ダメ枠�
 
 | 計算の位置 | 式 |
 |---|---|
-| 爆発 1 回の基礎 (`Kw.BurstBase`) | `burstCritRule ? 15 + 炉温 / 2 : rinkaiBurstDamage (既定 30)` → `+ burstStackBonus` (〈二度詰めの雷管〉が爆発のたび +8 (2026-11-20: 旧 +5・2026-11-10: 旧 +6)・ターン開始時に 1/8 を失う (切り上げで減らす・旧 1/4)) `+ burstFlatBonus` (〈天工開物〉5 × 武器を強化した回数・2026-11-20)。 2026-11-07: 既定 50 → 30 |
-| 爆発に会心 (〈火花読みの眼鏡〉) | 爆発のたびに会心の判定をし (CombatManager.LandBurst・2026-11-20)、 会心なら `+ floor(爆発 × max(0, criticalMultiplier / 2 − 1))` (2026-11-10: 会心倍率の半分で乗る・旧 `criticalMultiplier − 1`。 2026-11-20 まで主攻撃の会心に合わせて乗った) |
-| 臨界を得る (`Kw.AddHeat`) | `n + heatGainBonus` (〈焚き足しの炭〉で +1)。 閾値は 50 固定 (〈早沸かし釜〉は −15) |
+| 臨界 | 2026-11-21 に式を `CombatSystem.HeatCore` へ移した (§3-M)。 旧: 基礎 `15 + 炉温 / 2` (〈火花読みの眼鏡〉)・爆発の会心・〈焚き足しの炭〉+1・閾値 50 は削除 |
 | 重ね会心 (〈重ね斬りの型〉) | 2026-11-20 作り直し: 同じターンに直前の 2 撃が会心なら、 次の撃の OnCriticalCheck で会心倍率 +1.0 (その撃だけ)。 旧: 会心率の加算合計 > 100% の超過分の確率で会心倍率 +1.0 |
 | 出血のダメージ | `ApplyBleedModifiers`: 出血の量そのまま (戦場の変調〈血潮〉で ×2)。 2026-11-21: `bleedDamagePct` と〈血止め知らずの針箱〉の出血の会心 (`bleedCritRule`) は削除 (§3-L) |
 | シールドの減衰 | 残る割合 `min(80, 50 + shieldKeepBonusPct)`% (〈油染みの盾革〉が +20・2026-11-21 に 堅牢 × 3 から。 盾押しは §3-K) |
-| 入り口 (`EntryEffect`) | 臨界の軸の既存品に・毒の軸の 7 行と〈百人切りの鉈〉の毒 +1 は 2026-11-21 に外した (PoisonEffects.cs・§3-L)。 旧: 毒・臨界の軸の既存品 22 品に、 決まった機会 (ターン開始 / 攻撃が通る / 敵の攻撃 / 受けきり / ブロックのダイス 1 個) で毒 +1〜2・臨界 +3 を重ねる。 表は `EntryEffect.Table`。 2026-11-10 から 13 品に**偏重の条件**が付く: `AtLeast n` (軸の品が n 個以上) / `Top n` (`CombatContext.AxisRank` < n ＝ その軸より品の多い軸が n 未満・同数は満たす・比べるのは金を除く 6 軸)。 条件を満たさない機会は何も足さない (品の本来の効果は動く) |
+| 入り口 (`EntryEffect`) | 2026-11-21 に削除 (毒の行は Phase 2b・臨界の 12 行は Phase 3b・§3-M) |
 | 種火・毒 r2 | 2026-11-07: 毒を与えるたび +1 → 1 ターンに最初の 1 回だけ +2 |
 
 ### 3-J. 毒の軸 (2026-11-21・`PoisonEffects.cs`・`PoisonCore.cs`・full-item-rework-ledger §②)
@@ -759,6 +757,25 @@ CombatManager に預け、 プレイヤーの攻撃の直前に固定ダメ枠�
 | 計装 | `CombatManager.BleedSpendFired` (Kw.ConsumeBleed の回数) / `BleedExecuteFired` (鉈の処刑) → ランの記録 `bleedSpendFired` / `bleedExecuteFired` |
 
 個々の品の数値は `BleedEffects.cs` / `BleedCore.cs` の定数と XML コメントが正本。
+
+### 3-M. 臨界の軸 (2026-11-21・`HeatEffects.cs`・`HeatCore.cs`・full-item-rework-ledger §⑤)
+
+| 計算の位置 | 式 |
+|---|---|
+| 有効化 | 臨界の品を 1 つ以上持つ戦闘は戦闘開始時 (品の OnBattleStart の前) に `Kw.EnableHeat`: 閾値 = `max(12, 30 − (〈早沸かし釜〉? 12 : 0))`・〈恒温の竈〉は臨界 = 閾値の半分から。 端子が臨界を出した戦闘も同じ |
+| 臨界を得る (`HeatCore.Gain`) | `n` → 〈焚き足しの炭〉+2 (1 ターン 6 回まで) → 〈燧石の指輪〉の倍のターンは ×2 → 遺物〈炉温〉2 個 +20% (切り上げ)。 1 回の `Kw.AddHeat` が 1 回の「得る」 |
+| 爆発 (`HeatCore.TryBurst`) | 臨界 ≥ 閾値で 1 回。 超臨界 = 臨界 ≥ 閾値 × 1.5。 臨界 → 0 (〈帳簿外の爆薬〉は 閾値ぶんだけ減らし、 届けば続けて・そのターン 5 回まで)。 〈恒温の竈〉は爆発の後 `max(残り, 8)`。 〈二度詰めの雷管〉爆発の後 `stack = min(80, stack + 10)` (減らない)。 〈暴れ窯の火床〉超臨界の後 閾値 −4 (この戦闘で −16 まで・下限 12) |
+| 爆発のダメージ (`HeatCore.Damage`) | `30 + stack + burstFlatBonus (〈天工開物〉12 × 強化) + 〈溢れ取りの鋳型〉3 × 溢れ (閾値を超えた臨界・帳簿外は 0)` → 超臨界 ×1.5 (〈暴れ窯の火床〉×2.0) → 〈火花読みの眼鏡〉×(1 + 0.15 × この戦闘の爆発の回数 (この爆発を含む)) → 〈燧石の指輪〉の倍のターン ×(1 + 0.25 × このターンのそれより前の爆発) → 〈八日目の灰燼〉臨界 ≥ 40 で起きた爆発 ×1.6 → 〈柱折りの発破筒〉ダウン中の敵 ×2.0 (各段 切り捨て) |
+| 敵の防御 (`HeatCore.VsDefense`) | `DefenseFormula.Apply(ダメージ, 敵の防御 − floor(敵の防御 × 50 / 100))` (防御の 50% を無視)。 〈火花読みの眼鏡〉は防御を全部無視。 会心・与ダメの池は乗らない。 その後 `CombatManager.LandBurst` → HpLossDiag.Lose が最終与ダメ倍率・怠惰・ダウンの ×1.5・遺物〈炉温〉の現在 HP の % を掛ける |
+| ボスのひび | 爆発のたび `CrackBossNotch` (次の目盛りにひび・既にあれば何もしない)。 〈柱折りの発破筒〉はその後 `BreakBossCrack` (満額のダウン) |
+| 端子の解決の 5g (`HeatCore.ApplyToTerminals`) | `heatGains` (1 つ = 1 回の得る) に: 〈過熱石〉攻撃に挿した目 ≥ 2 で 10・3 個とも攻撃なら 18 / 〈燻りの革胸当て〉防御の端子の発動 (再起動も) 1 回ごとに 4 (と `blockAdd += 2`) / 〈火守りの火搔き棒〉`6 × (防御 + 充電 + 補助に挿した目)` / 〈点火スパナ〉撃ごとに 4 / 〈荒砥〉撃ごとに 2。 `heatDouble` = 〈燧石の指輪〉かつ攻撃の端子の発動 ≥ 2 枚 |
+| 本体の順 | 配線を反映する所 (`ApplyTerminalOutcome`・OnWired と撃より前): 倍のターンを立てる → 端子の `heat` → `heatGains` を 1 つずつ `Kw.AddHeat`。 ここでの爆発はそのターンの撃より前 (【過熱】がそのターンの撃に間に合う)。 ターンの終わりに攻撃の端子の合計 (attackSum) を `Kw.AddHeat` |
+| 【過熱】 | このターンに爆発した (`Kw.Overheated`・`BurstTurnKey == currentTurn`) |
+| 品 (出来事) | 〈工廠の材料箱〉爆発で `playerDefense +2` (この戦闘 +10 まで・毎ターン積み直す) / 〈乾き火口箱〉開始時 +14 / 〈炉番の外套〉ターンの終わり `min(12, floor(EnemyAtkPreDefense / 2))` / 〈継ぎ革の旅靴〉開始時 `min(20, 歩数 × 2)` / 〈荒砥〉爆発で与ダメの池 +8% (この戦闘 48% まで・OnPostRoll で足す = 次のターンから) / 〈点火スパナ〉爆発したターン 次のターンの手札 +1 (1 ターン 1 回) / 〈恒熱の炉壁〉爆発で `itemBlockBonus += min(14, floor(防御の後のダメージ × 25 / 100))` / 〈二度目の打金〉【過熱】と次のターン OnWired で `AddPlayerAttackOrDiceBonus(6)` (撃ごと) / 〈溢れ取りの鋳型〉爆発で `3 × 溢れ` % を溜め、 次の本物の撃の OnPreDealDamage で与ダメの池へ (その撃だけ) / 〈早沸かし釜〉敵が攻撃したターンの終わり +5 / 〈天工開物〉上の表 / 〈希望の灯片〉爆発 ≥ 2 回で勝つと最大 HP +3・【過熱】のターンの終わり HP +3 / 〈八日目の灰燼〉OnPreReceiveDamage で致死・臨界 ≥ 25 なら HP 1 で止め、 臨界を全部使って `使った量 × 3` を `LandBurst` (防御を通さない・1 戦闘 1 回) / 〈烈刃〉【過熱】の本物の撃の `hitFinalDamagePct += min(150, 15 × この戦闘の爆発の回数)` / 〈無害灯〉臨界 ≥ 15 なら敵の直接攻撃で失う HP を 0 にし臨界 −10・`VsDefense(floor((30 + stack + flat) / 2))` を `LandBurst` (1 ターン 1 回・CombatManager の敵の攻撃・`HarmlessLamp.Apply`) |
+| BOT・画面 | 配線の見積もり (AutoRunner.DeckSums) と戦闘の右の列 (`Game2DBattleSim.HeatState`) は `Kw.HeatState(ctx)` の写しで `HeatCore.Forecast(写し, 端子の結果, 攻撃の端子の合計)` (本体と同じ順で Gain / TryBurst)。 BOT: 爆発のダメージを軽減不可の分へ・溜まりの増減を `臨界 × 30 / 閾値 × DeckGaugeShare`・配線の時の爆発か【過熱】なら〈二度目の打金〉+6 × 撃・〈烈刃〉の % × 1 ターンの見込み・〈無害灯〉が使えるターンは被ダメ 0 |
+| 計装 | `CombatManager.BurstFired` (爆発の回数) / `BurstBreakFired` (〈柱折りの発破筒〉の正規のダウン) → ランの記録 `burstFired` / `burstBreakFired` |
+
+個々の品の数値は `HeatEffects.cs` / `HeatCore.cs` の定数と XML コメントが正本。
 
 ## 4. 敵/汎用パッシブ一覧（`EnemyPassiveSkillEffects.cs`・視点は§0参照）
 
@@ -1181,27 +1198,13 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
          過充電: charge >= ChargeCore.OverchargeAt (=10) で IsOvercharged()=true (2026-11-21〜・旧 7)
          品の式は ChargeEffects.cs (26 品・full-item-rework-ledger §①) の各クラスの XML コメント
 
-臨界     (Rinkai メーター・2026-07-16 追加。rinkaiThreshold>0 = いずれかの臨界の品を持つときだけ・Kw.EnableHeat)
-         **溜める処理は Kw.AddHeat の 1 か所** (2026-10-31 アイテム再編)。 ターン終わりに meter += attackSum、
-           品が溜める分 (被弾・充電・会心・毒のダメージ・移動・開幕) はその出来事の時点で同じ関数を通る。
-         meter >= rinkaiThreshold (基準50 /〈早沸かし釜〉で35) をまたいだ瞬間に爆発が決まる
-           → **その場でダメージを出す (ADR-0016・2026-11-20・CombatManager.LandBurst)**、 meter = 0、 OnRinkaiBurst を配る。
-             旧: 次の攻撃の固定ダメの枠に乗せる予約 (rinkaiBurstActive・BurstCountKey) ── 2026-08-03 の修正の名残で理由は残っていなかった。
-           〈帳簿外の爆薬〉(rinkaiMultiBurst): meter を閾値ぶんだけ減らし、 溜まっている限り同じ処理で何度でも爆発する (1 回ごとにその場で入る)。
-         爆発 1 回の量 = Kw.BurstBase (既定 30・その時の〈二度詰めの雷管〉〈天工開物〉の上乗せ込み)、 超臨界なら + floor(BurstBase / 2)。
-           **軽減無視・倍率は乗らない** (会心・与ダメの池・敵の防御を通さない)。 最終与ダメージ倍率・大罪:怠惰・ダウンの ×1.5 は HpLossDiag.Lose (channel "臨界の爆発") が掛ける。
-           〈火花読みの眼鏡〉(burstCritRule): 爆発のたびに会心の判定 (CritRateOf・封印で外れ・forceCritical で確定) をし、 会心なら
-             + floor(爆発 × max(0, criticalMultiplier / 2 − 1)) (会心倍率の半分が乗る)。
-           遺物 (§15-5) の臨界軸: 爆発 1 回ごとに + floor(その時の敵の現在HP × N%)。
-           ターンの解決中は CombatManager の手元の HP を減らす (ターンの終わりの meter += attackSum も、 手元の HP を ctx へ書き戻す前に置く)。 解決の外は ctx の HP。
-         **超臨界爆発 (2026-11-20・GAME.md §23-32)**: 爆発が決まった時、 閾値を引く前の meter が閾値の 2 倍以上なら超臨界。 その爆発のダメージ ×1.5。
-           OnRinkaiBurst の直後に OnSuperBurst を配る。 出来事の間は Kw.BurstSuperKey (1/0) と Kw.BurstDamageNowKey (その爆発 1 回のダメージ) が読める。
-         **爆発を読む品** (爆発そのものは増やさない・与ダメージ +% = outgoingDamageMultiplier の加算プール):
-           〈溢れ取りの鋳型〉: 爆発のとき、 閾値を超えた臨界 1 につき次の攻撃の与ダメージ +2% (攻撃したら使い切る・旧: 爆発 +2)。
-           〈二度目の打金〉: 爆発した (Kw.BurstTurnKey) 次のターン、 与ダメージ +30%。
-           〈荒砥〉: 爆発のたび敵に出血 +2 (2026-11-20・旧: 爆発した攻撃が通ると出血 +4)。 爆発 1 回につき、 この戦闘中の与ダメージ +5% (積もる)。
-           〈爆破祭の小切手〉: 爆発のダメージそのもので敵が倒れた戦闘 (Kw.BurstKilledKey) に勝つと +4G。
-           〈柱折りの発破筒〉: 「爆発のダメージ」= その場の 1 回の量 (Kw.BurstDamageNowKey)。
+臨界     (Rinkai メーター・2026-07-16 追加。 2026-11-21 フルリワークで式を CombatSystem.HeatCore へ・詳細は §3-M)
+         溜める処理は Kw.AddHeat の 1 か所 (中で HeatCore.Gain / TryBurst)。 ターン終わりに meter += attackSum、 品・端子の分はその出来事の時点。
+         meter >= 閾値 (既定 30・〈早沸かし釜〉−12・〈暴れ窯の火床〉で下がる・下限 12) でその場で爆発 → CombatManager.LandBurst、 OnRinkaiBurst を配る。
+         爆発 1 回 = HeatCore.Damage (基礎 30 + 上乗せ → 超臨界 ×1.5 ほか) を HeatCore.VsDefense (敵の防御の 50% を無視) に通した量。
+           会心・与ダメの池は乗らない。 最終与ダメージ倍率・大罪:怠惰・ダウンの ×1.5 は HpLossDiag.Lose (channel "臨界の爆発") が掛ける。 遺物 (§15-5) の臨界軸: 爆発 1 回ごとに + floor(その時の敵の現在HP × N%)。
+         爆発のたびボスの次の目盛りにひび (CrackBossNotch)。
+         超臨界爆発: 閾値を引く前の meter が閾値の 1.5 倍以上 (2026-11-21・旧 2 倍)。 OnRinkaiBurst の直後に OnSuperBurst。 出来事の間は Kw.BurstSuperKey / BurstDamageNowKey (防御の後の量) / BurstExcessKey が読める。
 ```
 
 ### 9.3 収支トリガー（柱2 の再定義・§0 の敵視点は変わらない）
