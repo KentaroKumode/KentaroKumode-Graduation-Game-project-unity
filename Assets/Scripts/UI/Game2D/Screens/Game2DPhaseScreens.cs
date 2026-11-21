@@ -471,8 +471,7 @@ namespace UI.Game2D
         private ScreenDef ShopBuy(GameManager gm)
         {
             var run = gm.Run; var sm = ShopManager.Instance; var inv = sm != null ? sm.Current : null;
-            var d = New(_shopSupply ? "ショップ ― 補給" : "ショップ", "所持金 " + run.coins + "G  物資 " + run.provision + "/" + run.provisionCap + "  武器 " + WeaponLabel(run.equippedWeaponId)
-                + "  出現 " + ItemSystem.AxisPool.SlotsLabel(run) + (ItemSystem.AxisPool.IsLocked(run) ? "ロック" : ""), 460); d.cols = 2;
+            var d = New(_shopSupply ? "ショップ ― 補給" : "ショップ", "所持金 " + run.coins + "G  物資 " + run.provision + "/" + run.provisionCap + "  武器 " + WeaponLabel(run.equippedWeaponId), 460); d.cols = 2;
             int n = 0;
             if (inv != null && !_shopSupply)
             {
@@ -513,7 +512,7 @@ namespace UI.Game2D
             if (robOk) d.buttons.Add(B(_robArmed ? "本当に強盗" : "強盗", "rob"));
             d.buttons.Add(B("出る", "leave"));
             d.footer = _robArmed ? "強盗: 商人と戦う。 勝てば棚の品を奪う。 以降の店は値段 ×" + ShopManager.RobberySurcharge.ToString("0.#") + "。 もう一度押すと実行"
-                     : _weaponArmed >= 0 ? "武器の乗り換え: 「" + WeaponLabel(run.equippedWeaponId) + "」を下取りに出す。 もう一度「買う」で買う" : "品を選んで「買う」";
+                     : _weaponArmed >= 0 ? "武器の乗り換え: 「" + WeaponLabel(run.equippedWeaponId) + "」を下取りに出す。 もう一度「買う」で買う" : "品を選んで「買う」　出現 " + ItemSystem.AxisPool.SlotsLabel(run) + (ItemSystem.AxisPool.IsLocked(run) ? " ロック" : "");
             d.onAction = (a, sel) =>
             {
                 if (a != "rob") _robArmed = false;
