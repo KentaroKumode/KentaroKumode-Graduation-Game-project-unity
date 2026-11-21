@@ -75,8 +75,8 @@ OnTurnEnd の 4 か所。これ以外の位置で敵パッシブが ctx の HP �
 - 〈賽振り台〉（端子・2026-11-21）: 挿した次のターンの最初の振り直し（`rerollsThisTurn = 0`）の費用 −min(6, 賽目)（強化 8・下限 0・複数挿せば足す）。
   `TerminalOutcome.rerollDiscountNext` → nextTurnBuffs `roleRerollDiscount` → `RerollCostNow(ctx, 個数, 回目)` が引く（本体・画面・BOT の同じ関数・〈過負荷チューナー〉の −1 の後）。
 - 振るかどうかは `RerollPolicy`（BOT / UI が差す）。人が操作するターンは `TurnPauseKind.Reroll` で止まって答えを待つ。
-- 〈過負荷チューナー〉（2026-11-20）: 過充電（充電 7 以上）の間、費用 −1（最低 1・`CombatContext.ChargeCostNow` を `RerollCostNow` が最後に通す）。
-  同じ口を充電を払う端子（`TerminalEnv.chargeCostCut`・「全部払う」端子は除く）と秘宝（〈避雷の杭〉〈逆さ避雷針〉）も通す。
+- 〈過負荷チューナー〉（2026-11-21〜）: 過充電（充電 10 以上・`ChargeCore.OverchargeAt`）の間、費用 −2（2 以上の物だけ・最低 1・`ChargeCore.CostNow` を `CombatContext.ChargeCostNow` 経由で `RerollCostNow` が最後に通す）。
+  同じ口を充電を払う端子（`TerminalEnv.chargeCostCut`・「全部払う」端子は除く）と【再起動】・【オーバークロック】・〈逆さ避雷針〉（Resolve の 5c）も通す。
 - （旧: 〈シュヴァリエのレイピア〉のコントラタック中〔`player_contre`〕は振り直さない ── 2026-11-20 に「1d1 強制」が消えたので外した）
 - 旧規則（物資 30 を払う・毎ターン最大 1 回・期待値割れだけ振り直す自動ポリシー）は廃止。`ProvisionSystem.RerollCost` の定数は参照されていない。
 
@@ -162,7 +162,7 @@ outgoingDamageMultiplier += メタ% + 遺物% + 研磨剤1.5 + consDmgMultPct/10
 + メタ会心ボーナス(会心時)
 − メタデバフ向かい風(最低1)
 × (100 + finalDamagePct + hitFinalDamagePct)/100      ← 最終与ダメージ倍率【2026-11-20・GAME.md §23-32】(Kw.ApplyFinalDamage・切り捨て・既定 0 = 素通し)。 〈防人の軍標〉がシールドを得るたび +5 (この戦闘・上限なし)。
-                                     hitFinalDamagePct = 主攻撃のこの 1 撃だけの上乗せ (〈加重の拳套〉: 撃の番号 (0 から) × 15・撃ごとに 0 に戻す・主攻撃以外の口には無い)。
+                                     hitFinalDamagePct = 主攻撃のこの 1 撃だけの上乗せ (〈加重の拳套〉: 撃の番号 (0 から) × 15・撃ごとに 0 に戻す・主攻撃以外の口には無い)。 【オーバークロック】(TerminalOutcome.overclock) は撃 0 に +60・その撃だけ playerArmorPen += IgnoreAll (撃の後に戻す)。 〈雷神槍〉〈四つ打ちの鉄芯〉は OnPreDealDamage で本物の撃に足す。
                                      怠惰の直前 = すべての倍率 (会心・与ダメ% の池・端子の別枠・物差し) の後・敵の軽減パッシブと防御の前。 与ダメ% の池には足さない。
                                      掛ける口は怠惰と同じ 4 つ (主攻撃 = ApplyWinDamageModifiers / HpLossDiag.Lose (channel ≠ "通常攻撃") / 〈逆綴じの止血帯〉/ Kw.DamageEnemy の直接)。 BOT の見積もりも同じ位置 (AutoRunner.ApplyFinalPct)
 × (100 − 30)/100                  ← 大罪:怠惰 (挑戦カード IV) を受けている時だけ・与えるダメージ −30%【2026-11-11】(主攻撃はすべての倍率の後・敵の防御の前・切り捨て。 毒・出血・爆発・固定ダメ・反射・品の直接は敵の HP を減らす口 HpLossDiag.Lose で同じく −30%)
@@ -425,7 +425,7 @@ SwordReachII・III / BulwarkII・III。 置き換え前と同一シード 10,000
 
 **可変量 (`stats[].per`・段 3・2026-11-11)。** 量が実行時の状態で変わる効果は `per`（単位数の出どころ: `coinsSpent` / `swordWindfall` (2026-11-19・溶金の領主剣) / `axis:軸名` / `enemyBleed` / `enemyPoison` / `chargeSpent` / `turnsElapsed`）・`perEvery`（N につき・整数の割り算）・`perMax`（単位数の頭打ち）・`on`（乗せるトリガーの上書き）で書き、`StatModifierEffect.ApplyScaled` が「生成時に確定した float の量 × 単位数」を旧クラスと同じ形で足す。単位数が 0 なら何もしない。
 段 3 でステータス化済み（9 件）: 溶金の領主剣 / 研ぎ師の見立て書 / 千里眼の水晶 / 血日に澄む佩玉 / 鎧縫いの針 / 麻痺の吹き矢 / 雷神槍 / 猛りII・III。 同一シードのダイジェストは未測定。
-2026-11-20: 〈千里眼の水晶〉〈英雄の意志〉〈過負荷チューナー〉は作り直してクラスへ戻した（`AxisItemEffects2.cs`）。 〈雷神槍〉は `atk` 1 / `per: chargeSpent` / `perEvery: 5` / `on: OnWired`（使った充電 5 につき攻撃 +1・攻撃 +N は撃ごとに乗る・端子の払いも数えるため配線の後）。
+2026-11-20: 〈千里眼の水晶〉〈英雄の意志〉は作り直してクラスへ戻した（`AxisItemEffects2.cs`）。 2026-11-21: 充電の軸の 26 品は `ChargeEffects.cs` のクラス (〈雷神槍〉の stats と `per: chargeSpent` は削除)。
 
 **条件 (`stats[].when`・段 2)。** 書いた項目はすべて AND。判定は**そのステータスのトリガーの時点**（旧クラスと同じ）。
 
@@ -705,7 +705,6 @@ CombatManager に預け、 プレイヤーの攻撃の直前に固定ダメ枠�
 | 重ね会心 (〈重ね斬りの型〉) | 2026-11-20 作り直し: 同じターンに直前の 2 撃が会心なら、 次の撃の OnCriticalCheck で会心倍率 +1.0 (その撃だけ)。 旧: 会心率の加算合計 > 100% の超過分の確率で会心倍率 +1.0 |
 | 出血のダメージ | `ApplyBleedModifiers`: `floor(出血 × (1 + bleedDamagePct))` (bleedDamagePct の書き手は 2026-11-20 から無い)。 〈血止め知らずの針箱〉(血晶 5 以上・`bleedCritRule`・2026-11-20): その後、 1 回の出血のダメージごとに会心の判定 (CritRateOf・封印で外れ・forceCritical で確定・〈銑鉄棍〉で止まる・鍵 combat.bleedCrit) をし、 会心なら `+ floor(出血のダメージ × max(0, criticalMultiplier / 2 − 1))` |
 | シールドの減衰 | 残る割合 `min(80, 50 + shieldKeepBonusPct)`% (〈油染みの盾革〉が 堅牢 × 3・2026-11-20 に × 5 から) |
-| 充電端子 → 攻撃 (〈二股の導線〉) | 配線集計で `attackSum += floor(充電端子の出目の合計 × chargeToAttackPct)` (上乗せ率の前・電流 × 12%・最大 80%) |
 | 盾押し (〈盾押しの心得〉) | OnWired・攻撃の端子を挿したターン: 攻撃 + `floor(シールド × 堅牢 × 5%)`（2026-11-11 に 10% から） |
 | 入り口 (`EntryEffect`) | 毒・臨界の軸の既存品 22 品に、 決まった機会 (ターン開始 / 攻撃が通る / 敵の攻撃 / 受けきり / ブロックのダイス 1 個) で毒 +1〜2・臨界 +3 を重ねる。 表は `EntryEffect.Table`。 2026-11-10 から 13 品に**偏重の条件**が付く: `AtLeast n` (軸の品が n 個以上) / `Top n` (`CombatContext.AxisRank` < n ＝ その軸より品の多い軸が n 未満・同数は満たす・比べるのは金を除く 6 軸)。 条件を満たさない機会は何も足さない (品の本来の効果は動く) |
 | 種火・毒 r2 | 2026-11-07: 毒を与えるたび +1 → 1 ターンに最初の 1 回だけ +2 |
@@ -915,6 +914,13 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
               判定は ResolveRoles と同じ (YachtRoles.Evaluate・〈凶運〉で封じた役は立たない env.sealedRoleMask・〈万象のゾロ目〉の格上げ env.pairAsTriple)。
               BOT の先読みの次のターンは引いた出目で決まる (格上げは見込まない)。
               〈役落とし〉: 出目 + (役が立てば 賽目 × 3 (強化 × 4)・ゾロ目か連なりなら 2 倍) を攻撃に / 〈賽振り台〉: 充電 +出目・rerollDiscountNext += min(6 (強化 8), 賽目)
+           5c. 充電のコアアクション (2026-11-21・ChargeCore・旗は TerminalBattleState.chargeItems・Resolve の引数 reboot / overclock = 人の画面 / BOT の方策):
+              控え = 5. で各端子に入れた sum / raw / num と、 その端子が足した攻撃 atkD・ブロック blkD。 支払いは Pay (o.chargePays に 1 回ずつ・合計 chargeSpend)
+              【再起動】〈二股の導線〉: reboot ≠ RebootNone・このターン発動した攻撃か防御の端子 (〈裁きの雷〉〈残響〉は除く)・充電 ≥ CostNow(6) → 払って、 その端子の効果を控えの量で 1 回走らせる
+                (〈残響〉の倍化なし・ダイスは足さない・攻撃の端子なら attackHits に撃が 1 つ増える (attackHitDice は 0))。 おまかせ (RebootAuto) の対象 = max(ChargeCore.AutoValue = atkD + min(blkD, max(0, 敵攻撃 − blockAdd)))
+              〈逆さ避雷針〉: 敵攻撃 > 0 かつ 充電 ≥ CostNow(5) → 払って takenFlatCut += 6・blkD 最大の防御の端子を再起動 (1 ターン 1 回)
+              【オーバークロック】〈雷鳴の太鼓〉: overclock かつ 攻撃の撃がある かつ (ここまで払った後の) 充電 ≥ 15 → CostNow(12) を払い overclock = true (掛けるのは本体の撃の輪・下の自攻撃)
+              〈灼線鞭〉: env.chargeSpendsTurn (配線より前に充電を使った回数・振り直し) + この解決の支払いの回数 ≥ 2 → atkD 最大の攻撃の端子を無料で再起動 (1 ターン 1 回)
            6d. 賽目の品 (旗は TerminalBattleState.roleItems・役が立ったターンだけ・攻撃 +N は 6c と同じく撃 1 つずつ):
               〈見切りの木札〉各撃 +4・blockAdd += 4 / 〈符丁の刻み板〉各撃 + 賽目 × 2 (ゾロ目か連なりなら 2 倍)
          〈影写し〉〈火葬の剣〉〈保持器〉の対象: Resolve の wantTarget (人 = 画面で選んだ端子 / BOT = WiringPlan.targets)。
@@ -926,7 +932,8 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
            kindOfDie   → mutualWiring (出目ごとの種類・DiceTerminal。 補助は Special・挿さないは None)
          ApplyTerminalOutcome (配線の時点・堅牢の環/傲慢/端子調律より前) が戦闘へ配る:
            damageMul      → _termDamageMul (主攻撃の別枠の掛け算・下の自攻撃を参照)。 毎ターン 1 に戻す
-           chargeSpend    → ctx.ConsumeCharge(min(払う量, 今の充電))     chargeFill → ctx.AddCharge(ChargeCap)
+           chargePays     → 1 回ずつ ctx.ConsumeCharge(min(払う量, 今の充電)) (「充電を使うたび」の品 = OnChargeSpend が回数と量を数える)     chargeFill → ctx.AddCharge(ChargeCap)
+           takenFlatCut   → ctx.playerFlatDamageReduction += 量 (〈逆さ避雷針〉)
            heal           → HealPlayer        selfDamage → playerHP = max(1, playerHP − 量)  (〈諸刃の剣〉は払えなければ Resolve が不発にする)
            shieldSpend    → ctx.consShield = max(0, consShield − 量) (〈重装突撃〉が攻撃に足した分・shield より先に引く)
            shield         → ctx.consShield += 量 (shieldGainedTotal にも足す)
@@ -994,7 +1001,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
                              + ceil(その撃の端子の出力 × ctx.attackDicePct) (2026-11-06 の出目 +%・1 撃ごとに掛ける)
              端子の外の攻撃 = playerAttackPower + ctx.mutualAttackBonus (品の攻撃 +N) + consAtk (消耗品) + relicAtk (遺物)
            端子に紐づかない攻撃の加算は **最初の 1 撃 (h = 0) だけ** に入る:
-             連係・変圧・溜めた攻撃 (〈力溜め〉〈後の先〉)・賽の加算 (attackAdd − Σ attackHits) と floor(chargeSum × ctx.chargeToAttackPct) (〈電流〉の②)・
+             連係・変圧・溜めた攻撃 (〈力溜め〉〈後の先〉)・賽の加算 (attackAdd − Σ attackHits)・ctx.firstHitAttackBonus (〈引き直しの撃鉄〉)・
              挑戦カード〈金で殴る〉(#6) の GoldPunchAttack(G) (攻撃するターンだけ・払った金 G・所持金まで)
            (品は OnPostRoll までに AddAttackDicePct で率を積む。 攻撃端子 0 本なら 0。 ステータス `atkDicePct` / 〈間合〉〈一対一〉〈猛り〉など武器の段。
             [剣の舞] 4 種・刻みを使い切る 3 品・充電/出血/シールドの 5 品は 2026-11-10 に与ダメージ +% (`AddOutgoingPct` → outgoingDamageMultiplier) へ移した)
@@ -1090,6 +1097,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
          配線確定  → accumulatedValues に端子ごとの本数・予告の敵攻撃を書いて **OnWired** (2026-10-28)
                        ── 剣〈切り返し〉〈不滅の刃〉・盾〈シールドバッシュ〉〈堅守の構え〉が読む。 atkBase の確定より前
          blockSum  = 端子の結果の blockAdd → 遺物〈堅牢の環〉+ceil(×率) → 大罪:傲慢 floor(×(1 − 率)) → + 端子調律メタ(ブロックの個数×N)
+                     → + ctx.itemBlockBonus (品のブロック +N・〈帯電の胸甲〉〈絶縁の外套〉〈避雷の杭〉・perTurn)
                      → 〈貫きの錐〉: blockSum −= enemyAtk × PierceAwlPerAttack   (enemyAtk は防御を引いた後の値)
                      → 〈不完全な転移〉(門・§4-3): blockSum −= floor(blockSum × 0.50)
          lossBase  = max(0, enemyAtk − blockSum)
@@ -1113,9 +1121,10 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
          ※ ChargeMax は ADR-0010 で 10→30。 充電が**リロールの原資**になったため
          ※ chargeDiceCount(個数) も併算されるが AddCharge には渡らない
            (2026-08-03 確認: CombatManager.cs の `if (chargeSum > 0) ctx.AddCharge(chargeSum);`)
-         消費: Spark(1消費→+5) / LightningStrike(3消費→与ダメ+30%) がパッシブ側で ConsumeCharge
-         過充電: charge >= CombatContext.OverchargeThreshold (=7) で IsOvercharged()=true
-                 (Overload: 過充電中 outgoing+30% / ShortCircuit: 過充電3T継続で会心確定+全消費)
+         消費 (2026-11-21〜・充電 = 戦闘のマナ): 振り直し (⓪)・充電を払う端子・【再起動】・【オーバークロック】・〈逆さ避雷針〉 (Resolve の 5c)。
+               どれも ctx.ConsumeCharge を 1 回ずつ通り、 OnChargeSpend (量 = 払った量) と perTurn の ChargeSpentThisTurnKey (量) / ChargeSpendsThisTurnKey (回数) を積む
+         過充電: charge >= ChargeCore.OverchargeAt (=10) で IsOvercharged()=true (2026-11-21〜・旧 7)
+         品の式は ChargeEffects.cs (26 品・full-item-rework-ledger §①) の各クラスの XML コメント
 
 臨界     (Rinkai メーター・2026-07-16 追加。rinkaiThreshold>0 = いずれかの臨界の品を持つときだけ・Kw.EnableHeat)
          **溜める処理は Kw.AddHeat の 1 か所** (2026-10-31 アイテム再編)。 ターン終わりに meter += attackSum、
