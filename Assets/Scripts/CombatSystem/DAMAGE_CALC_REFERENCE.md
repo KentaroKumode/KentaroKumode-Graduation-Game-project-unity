@@ -157,13 +157,14 @@ total = ProcessDamage結果
 (画竜点睛) total = ceil((garyoDieValue+10) × criticalMultiplier)   ※発動時上書き・会心確定
 outgoingDamageMultiplier += メタ% + 遺物% + 研磨剤1.5 + consDmgMultPct/100   （全部同じプールへ加算）
                                      ※メタ% = 整備パネル (2026-11-20〜): 基礎整備 5 段目 +10% / 〈戦意〉勝利ごと +1.5% / 〈剛胆〉エリートに +10% + 挑戦カード
-× outgoingDamageMultiplier        ← パッシブ(OnPreDealDamage で加算済み)/メタ/遺物/研磨剤/鬼火の油 を 1 回だけ掛ける
+× (outgoingDamageMultiplier + hitOutgoingPct/100)   ← パッシブ(OnPreDealDamage で加算済み)/メタ/遺物/研磨剤/鬼火の油 を 1 回だけ掛ける
+                                     hitOutgoingPct = この 1 撃だけ池に足す % (〈加重の拳套〉: 2 撃目以降 +20・撃ごとに 0 に戻す・池そのものは書き換えない・2026-11-21 §3-Q)
                                      ※鬼火の油は 2026-09-19 まで倍率適用後に ×(1+X%) を別掛けしていた
 + consAtkBurst                     ← 消費:攻撃バースト(単発)
 + メタ会心ボーナス(会心時)
 − メタデバフ向かい風(最低1)
 × (100 + finalDamagePct + hitFinalDamagePct)/100      ← 最終与ダメージ倍率【2026-11-20・GAME.md §23-32】(Kw.ApplyFinalDamage・切り捨て・既定 0 = 素通し)。 〈防人の軍標〉が【ジャスト防御】のたび +35 (この戦闘・累積・2026-11-21・旧: シールドを得るたび +5)。
-                                     hitFinalDamagePct = 主攻撃のこの 1 撃だけの上乗せ (〈加重の拳套〉: 撃の番号 (0 から) × 15・撃ごとに 0 に戻す・主攻撃以外の口には無い)。 【オーバークロック】(TerminalOutcome.overclock) は撃 0 に +60・その撃だけ playerArmorPen += IgnoreAll (撃の後に戻す)。 〈雷神槍〉〈四つ打ちの鉄芯〉は OnPreDealDamage で本物の撃に足す。 〈破城斧〉は撃ごとに +80 と `hitIgnoreDefense` (その撃だけ敵の防御を飛ばす・撃ごとに false へ戻す・2026-11-21)。
+                                     hitFinalDamagePct = 主攻撃のこの 1 撃だけの上乗せ (〈血桜〉〈血の楔〉・撃ごとに 0 に戻す・主攻撃以外の口には無い)。 【オーバークロック】(TerminalOutcome.overclock) は撃 0 に +60・その撃だけ playerArmorPen += IgnoreAll (撃の後に戻す)。 〈雷神槍〉〈四つ打ちの鉄芯〉は OnPreDealDamage で本物の撃に足す。 〈破城斧〉は撃ごとに +80 と `hitIgnoreDefense` (その撃だけ敵の防御を飛ばす・撃ごとに false へ戻す・2026-11-21)。
                                      怠惰の直前 = すべての倍率 (会心・与ダメ% の池・端子の別枠・物差し) の後・敵の軽減パッシブと防御の前。 与ダメ% の池には足さない。
                                      掛ける口は怠惰と同じ 4 つ (主攻撃 = ApplyWinDamageModifiers / HpLossDiag.Lose (channel ≠ "通常攻撃") / 〈逆綴じの止血帯〉/ Kw.DamageEnemy の直接)。 BOT の見積もりも同じ位置 (AutoRunner.ApplyFinalPct)
 × (100 − 30)/100                  ← 大罪:怠惰 (挑戦カード IV) を受けている時だけ・与えるダメージ −30%【2026-11-11】(主攻撃はすべての倍率の後・敵の防御の前・切り捨て。 毒・出血・爆発・固定ダメ・反射・品の直接は敵の HP を減らす口 HpLossDiag.Lose で同じく −30%)
@@ -247,13 +248,7 @@ fixedDamageToPlayer ≥ 999 → playerHP = 0（死の宣告）
 | 無銘の潤滑油 | `TerminalBattleState.ignoreCond = true`（このターン・〈無形の構え〉と同じ旗） |
 | 使い切りの矜持（秘宝） | OnConsumableUse: そのターン 1 回 `AddOutgoingPct(0.25)`（与ダメ % の池・最終与ダメージ倍率ではない） |
 
-#### マクロ秘宝の与ダメに入る分（2026-11-20・item-overhaul-spec §9・`MacroItemEffects.cs`）
-
-| 品 | 効果と適用点 |
-|---|---|
-| 気圧計のペンダント | OnBattleStart: 嵐のフェーズ（`FreeMapSim.StormPhase`・開始時の値を `accumulatedValues["macro.barometer.phase"]`）× 5 をシールドへ。 OnPostRoll: 毎ターン `AddPlayerAttackOrDiceBonus(2 × フェーズ)`（攻撃 +N・ステータスの `atk` と同じ口） |
-| 研ぎ代の領収書 | OnPostRoll: 毎ターン `AddPlayerAttackOrDiceBonus(2 × RunState.receiptRemovals)` |
-| 相場師の算盤 | OnBattleStart: `AddCharge(3 × RunState.abacusStacks)`・`Kw.EnableHeat` の後 `Kw.AddHeat(5 × abacusStacks)`（閾値を越えれば開始時に爆発する・爆発のダメージは §3-H のとおり） |
+#### 金・軸なし汎用の与ダメに入る分は §3-Q
 
 ### ③-C 「軽減無視」ダメージとシールドの関係【2026-08-15 確定】
 
@@ -425,7 +420,7 @@ ResolveCritRate(addTotal):
 DoubleStruck / BackingPlate / GatewardStance / LifestealII / HeavyStrike / BatteringRam / BluntWeapon /
 SwordReachII・III / BulwarkII・III。 置き換え前と同一シード 10,000 ランで決定性ダイジェスト 10,000/10,000 一致。
 
-**可変量 (`stats[].per`・段 3・2026-11-11)。** 量が実行時の状態で変わる効果は `per`（単位数の出どころ: `coinsSpent` / `swordWindfall` (2026-11-19・溶金の領主剣) / `axis:軸名` / `enemyBleed` / `turnsElapsed`）・`perEvery`（N につき・整数の割り算）・`perMax`（単位数の頭打ち）・`on`（乗せるトリガーの上書き）で書き、`StatModifierEffect.ApplyScaled` が「生成時に確定した float の量 × 単位数」を旧クラスと同じ形で足す。単位数が 0 なら何もしない。
+**可変量 (`stats[].per`・段 3・2026-11-11)。** 量が実行時の状態で変わる効果は `per`（単位数の出どころ: `coins` (今の所持ゴールド) / `swordShopSpent` (〈溶金の領主剣〉を持って店で使った額・ShopManager.Close) / `axis:軸名` / `enemyBleed` / `turnsElapsed`）・`perEvery`（N につき・整数の割り算）・`perMax`（単位数の頭打ち）・`on`（乗せるトリガーの上書き）で書き、`StatModifierEffect.ApplyScaled` が「生成時に確定した float の量 × 単位数」を旧クラスと同じ形で足す。単位数が 0 なら何もしない。
 段 3 でステータス化済み（9 件）: 溶金の領主剣 / 研ぎ師の見立て書 / 千里眼の水晶 / 血日に澄む佩玉 / 鎧縫いの針 / 麻痺の吹き矢 / 雷神槍 / 猛りII・III。 同一シードのダイジェストは未測定。
 2026-11-20: 〈千里眼の水晶〉〈英雄の意志〉は作り直してクラスへ戻した（`AxisItemEffects2.cs`）。 2026-11-21: 充電の軸の 26 品は `ChargeEffects.cs` のクラス (〈雷神槍〉の stats と `per: chargeSpent` は削除)。 同日: 毒の軸の 25 品は `PoisonEffects.cs` のクラスと `PoisonCore` の旗 (〈麻痺の吹き矢〉の stats と `per: enemyPoison` は削除)。 同日: シールドの軸の 22 品は `ShieldEffects.cs` のクラスと `ShieldCore` の旗 (§3-K)。 同日: 出血の軸の 26 品は `BleedEffects.cs` のクラスと `BleedCore` の旗 (§3-L・〈血日に澄む佩玉〉の stats は削除・〈鎧縫いの針〉は stats の pen を残しクラスを内側に)。
 
@@ -507,7 +502,7 @@ Hermes / Bloodlust / EvenEyes / MasterworkNotes / KaleidoDice。
 | TenkouKaibutsu(天工開物) | OnBattleStart / OnWired | 2026-11-21 (§3-M): `burstFlatBonus += 12 × RunState.heavenlyCraftUpgrades`・【過熱】のターン `playerArmorPen += 12` |
 | Bloodlust(背水の狂刃) | OnPreDealDamage | HP≤50% → outgoing+=0.3、≤25% → +=0.8 (2026-05-31 outgoing移行) |
 | Hermes(ヘルメスの靴) | OnPostRoll | 初回ロール `AddPlayerAttackOrDiceBonus(5)`（攻撃+5・ステータス化 §2-C） |
-| GoldKingBlade(溶金の領主剣) | OnPreDealDamage | 攻撃が通る時 outgoing += 0.02×swordWindfallGold (2026-11-19 作り直し・作者: 持っている間に秘宝・賽・イベントから得た金 1G につき +2%・戦闘の報酬と売却は数えない・上限なし。 数えるのは GoldIncome.CountWindfall と出どころの種類 GoldOrigin。 旧: 0.005×coinsSpent = ラン全体で使った金) |
+| 溶金の領主剣 | stats | §3-Q |
 | MugaMushin(無我無心) | OnBattleStart | rollPurity=true(消費アイテムの攻撃補正・瞬間研磨剤を拒否) |
 | GaryoTensei(画竜点睛) | OnPostRoll | 出目が最大面 → garyoProc=true,garyoDieValue。即勝利+(出目+10)×criticalMultiplier会心確定 |
 
@@ -578,7 +573,7 @@ OnPreDealDamage で `mutualAttackBonus` を足しても**一切乗らない**。
 | 佯狂者の杖・衣・冠 | — | OnRoll | 発狂中のセット効果（物資・ADR-0002） |
 
 > **2026-10-31 アイテム再編で移した品**: 巡礼の杖・希望の灯片・旅靴/白靴・天秤・鋼の心臓・災厄の指輪・無害灯・幸運の硬貨・相棒の魂は
-> パッシブスキル側 (`ReworkItemEffects.cs`・下の §3-H) へ移り、 ここからは class ごと削除した。
+> パッシブスキル側 (軸別の効果ファイル) へ移り、 ここからは class ごと削除した。
 > 2026-07-18 削除済み: 記憶の砂時計 / 死神の数珠 / 嵐の徽章 / 沈黙の剣帯 / 狂乱のメダリオン / 静寂のローブ / 黒煙の符 / 蒼穹の眼 / 守護天使の鈴。
 
 ### 3-D. 2026-06-03 追加の汎用パッシブ（`AllPassiveSkillEffects.cs`・PassiveSkillRegistry 登録）
@@ -638,7 +633,7 @@ s = `SwordDanceSet.SoloScale`（2026-11-20）: 持っている[剣の舞]（昇�
 
 ---
 
-### 3-H. アイテム再編 (2026-10-31・`ReworkItemEffects.cs`・`Keywords.cs`)
+### 3-H. キーワードの出来事 (2026-10-31〜・`Keywords.cs`)
 
 **キーワードの出来事。** 量の変化は `Keywords.Kw` と `CombatContext` の 1 か所を通り、 品へ出来事として配られる
 (`PassiveSkillManager.RaiseKeyword`)。 量は `Kw.EventAmount(ctx)`。
@@ -671,18 +666,13 @@ s = `SwordDanceSet.SoloScale`（2026-11-20）: 持っている[剣の舞]（昇�
 端子の出力を変える品 (山札の軸の多く) は出来事でなく `TerminalCards.Resolve` の中で効かせる (`TerminalBattleState.deckItems`・BOT と自動で一致・§3-O)。
 
 役の軸の品は §3-P。
-戦術 (`TacticItemEffects.cs`): (〈渾身の柄頭〉は 2026-11-21 に会心の軸へ・§3-N) / (〈静寂の構え〉は 2026-11-21 にシールドの軸へ・§3-K) /
-〈隙衝きの短槍〉OnWired で敵がチャージ中かダウン中 (`CombatManager.EnemyChargingOrDownNow`) なら `AddOutgoingPct(0.40)` / 〈崩しの一手〉OnBossDown (ターン 1 回) で 次のターン 手札 +2・充電 +10 /
-〈大技殺しの楔〉OnHeavyCanceled で `Kw.DamageEnemy(最大 HP × 10%)`・シールド +15 / 〈逆境の砂時計〉段階 (`CombatManager.EscalationStageNow`) 2 以上で OnTurnStart にシールド +4・OnWired に `AddOutgoingPct(0.25)`。
+軸なし汎用の戦術の品 (〈隙衝きの短槍〉〈崩しの一手〉〈大技殺しの楔〉〈逆境の砂時計〉) は §3-Q。
 
 **敵への軽減不可ダメージ (Kw.DamageEnemy)。** ターンの解決中 (`ExecuteTurnMutual` の頭〜最後の HP 同期) は
 CombatManager に預け、 プレイヤーの攻撃の直前に固定ダメ枠へ、 攻撃の後の分はターン最後の HP 同期 (踏みとどまりの clamp より前) で通す。
 
 **会心の規則。** 2026-11-21 に会心の軸へ移した (§3-N)。 撃ごとの会心 (ADR-0016): `ctx.hitIndex` (0 = そのターンの最初の 1 撃)・`ctx.hitCount` (攻撃しないターンは 0)・
 `ctx.forceCritThisHit` (この撃だけ確定)。 会心率・会心倍率・与ダメの池は撃ごとに 1 撃目の前の値へ戻すので、 OnCriticalCheck で足した分はその撃だけに乗る。
-会心の回数は `Kw.CritCountKey` に積む (〈戦果の天秤〉)。
-
-**個々の品の数値は `ReworkItemEffects.cs` の XML コメントが正本** (再記述しない)。
 
 ### 3-I. 軸の品 (2026-11-07・`AxisItemEffects.cs`・`AxisRules.cs`)
 
@@ -822,6 +812,28 @@ S = 直前のターンまで役が続いたターン数 (`roleStreak`)。 どち
 | 計装 | `CombatManager.RoleFormedFired` (役の成立) / `RoleOmniFired` (万象の格上げ) → ランの記録 `roleFormedFired` / `roleOmniFired` |
 
 個々の品の数値は `TerminalCards.cs` の役の定数と `RoleEffects.cs` の XML コメントが正本。 役そのものの効果の表 (`YachtRoleEffects.cs`) は変えていない。
+
+### 3-Q. 金・軸なし汎用 (2026-11-21・`GoldEffects.cs` / `GeneralEffects.cs`・full-item-rework-ledger §⑨ §⑩)
+
+枠外 (動的 4 枠ロックの対象外)。 金は戦闘の外の経済だけで、 与ダメに入る金の品は〈研ぎ代の領収書〉〈相場師の算盤〉〈溶金の領主剣〉の 3 品。
+
+| 品 | 式・適用点 |
+|---|---|
+| 加重の拳套 | OnPreDealDamage: 本物の撃で `hitIndex ≥ 1` なら `hitOutgoingPct += 20` (その撃だけ与ダメ % の池へ・③-A) |
+| 隙衝きの短槍 | OnWired: 敵がチャージ中かダウン中 (`CombatManager.EnemyChargingOrDownNow`) なら `AddOutgoingPct(0.40)` |
+| 崩しの一手 | OnBossDown (ターン 1 回): 次のターンの手札 +2 (`extraDrawNext`)。 次のターンの OnPostRoll で `AddPlayerAttackOrDiceBonus(6)` (攻撃 +N = 全撃) |
+| 大技殺しの楔 | OnHeavyCanceled: `Kw.DamageEnemy(最大 HP × 10%)`・次のターンのブロック +15 (`roleBlockNext`・取り消したターンは敵が攻撃しない) |
+| 逆境の砂時計 | 段階 (`CombatManager.EscalationStageNow`) 2 以上: OnTurnStart で `itemBlockBonus += 4`・OnWired で `AddOutgoingPct(0.25)` |
+| 帯革の薬嚢 | OnConsumableUse: `DrawIntoHand(1)`・`itemBlockBonus += 6` |
+| 気圧計のペンダント | OnBattleStart: 嵐のフェーズ × 5 をシールドへ (開幕のバリア・台帳 §⑩ の「維持可」)。 OnPostRoll: `AddPlayerAttackOrDiceBonus(2 × フェーズ)` |
+| 研ぎ代の領収書 | OnPostRoll: `AddPlayerAttackOrDiceBonus(2 × RunState.receiptRemovals)` (攻撃 +N は撃ごとに乗る = 全攻撃ヒット) |
+| 相場師の算盤 | 1 ターン目の OnTurnStart: `itemBlockBonus += 2 × abacusStacks`・`firstHitAttackBonus += abacusStacks` (abacusStacks = 店のリロール 1 回ごとに +1・最大 10・ShopManager.TryReroll) |
+| 溶金の領主剣 | stats: `dmgPct` 10 × ⌊所持ゴールド / 50⌋ (最大 8 = +80%・与ダメ % の池・攻撃が通る時) / `atk` 2 × ⌊swordShopSpent / 100⌋ |
+| 経済 (与ダメに入らない) | 見送り換金 ×1.5 切り上げ (〈銭皿〉`CoinDish.Apply`・`AxisPool.SkipGoldFor`) / 勝利の報酬 ×1.3 切り上げ + 強敵 15 (〈戦果の天秤〉`SpoilsScale.Apply`・GameManager.Rewards の〈富〉の後) / 〈幸運の硬貨〉同じ目 2 個以上で +3 (1 戦闘 12 まで) / 〈爆破祭の小切手〉3 ターン以内の勝利 +12 / 〈黄金色の封蝋〉層 +18 / 〈合札〉2 品目以降 −10 (下限 1) / 〈黄金の通行手形〉店で 80G ごと / 〈目利きの紹介状〉軸指定 −3 |
+| BOT | 与ダメに入る分は ctx の口 (攻撃 +N・`itemBlockBonus`・池) なので配線の見積もりに自動で入る。 〈加重の拳套〉は `AutoRunner.ReadOutOneHit` で 2 撃目以降の池に +0.20。 〈銭皿〉を持つと一番の軸でない BRONZE を見送る (`BotHooks.WantsPassive`)。 乱数は引かない |
+| 計装 | 見送り換金の回数 / 額 → ランの記録 `skipFired` / `skipGold` (`AxisPool.RunSkips` / `RunSkipGold`) |
+
+個々の品の数値は `GoldEffects.cs` / `GeneralEffects.cs` の定数と XML コメントが正本。
 
 ## 4. 敵/汎用パッシブ一覧（`EnemyPassiveSkillEffects.cs`・視点は§0参照）
 
