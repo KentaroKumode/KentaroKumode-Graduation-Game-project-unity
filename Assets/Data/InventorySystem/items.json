@@ -3269,12 +3269,12 @@
       "category": "Dice",
       "rarity": "BRONZE",
       "basePrice": 7,
-      "diceFaces": [1, 2, 5, 6]
+      "diceFaces": [1, 2, 4, 5, 6]
     },
     {
       "id": "拾い物の賽",
       "name": "拾い物の賽",
-      "description": "①が出たターンの終わりに 1G。",
+      "description": "①が出たターンの終わりに 2G。",
       "flavorText": "",
       "category": "Dice",
       "rarity": "BRONZE",
@@ -3284,7 +3284,7 @@
     {
       "id": "鈍色の賽",
       "name": "鈍色の賽",
-      "description": "偶数なら防御 +1、奇数なら攻撃 +1（挿した先が合えば）。",
+      "description": "偶数なら防御 +2、奇数なら攻撃 +2（挿した先が合えば）。",
       "flavorText": "",
       "category": "Dice",
       "rarity": "BRONZE",
@@ -3344,7 +3344,7 @@
     {
       "id": "古銭の賽",
       "name": "古銭の賽",
-      "description": "⑧が出るたび、ゴールド +2。",
+      "description": "⑧が出るたび、ゴールド +4。そのターンの役〈癒し〉（⑧の役）の回復量 +3。",
       "flavorText": "",
       "category": "Dice",
       "rarity": "GOLD",

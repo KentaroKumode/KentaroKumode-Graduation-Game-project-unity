@@ -143,8 +143,8 @@ namespace CombatSystem
                     break;
                 }
 
-                case 8:   // 癒し: HP +2 / +6
-                    outcome.healAmount += triple ? HealTriple : HealPair;
+                case 8:   // 癒し: HP +2 / +6 (古銭の賽は +3)
+                    outcome.healAmount += (triple ? HealTriple : HealPair) + DiePassives.RoleHealBonus(GameManager.Instance?.Run);
                     break;
 
                 case 9:   // 富: ゴールド報酬 +5% / +30% (9 の面を持つ賽は今は無い)
