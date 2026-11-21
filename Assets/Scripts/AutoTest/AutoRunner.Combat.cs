@@ -1800,8 +1800,8 @@ namespace AutoTest
         /// <summary>全部振り直した後に立つ役が、 役の品 (端子の解決の外の分も含む) で生む得の期待値 (攻撃相当の量・出目の和と同じ単位)。 持っていなければ 0。
         /// 面の出方を全部数える (<see cref="ExpectedBestUtilityAfterReroll"/> と同じ)。 役は本体と同じ関数 (<see cref="CombatSystem.TerminalCards.RoleOf"/>・封じ・格上げ込み)。
         /// 量: 〈見切りの木札〉攻撃 +4・ブロック +4 / 〈符丁の刻み板〉賽目 × 2 (ゾロ目・連なりは 2 倍) / 〈欠け目の見立て〉1〜3 の目の役で防御を賽目 × 2 無視 (敵の防御まで) /
-        /// 〈血濡れの符丁〉(賽目 5 以上) 3・4 の役で 出血 × 2 / 〈雷鳴のゾロ目〉(電流 5 以上) ゾロ目で (充電 + 賽目 × 2) × 2。 どれも 1 撃ぶん (撃の数は見ない)。
-        /// shortcut: 瑠璃砥石 (会心率)・揃いの拍子木 (次のターン)・雷鳴の充電の分・役そのものの効果は数えない。</summary>
+        /// どれも 1 撃ぶん (撃の数は見ない)。
+        /// shortcut: 瑠璃砥石 (会心率)・揃いの拍子木 (次のターン)・役そのものの効果は数えない。</summary>
         private static float RoleRerollPips(ItemSystem.PassiveSkills.CombatContext ctx, int[] faces, int k, CombatSystem.MutualTurnTelegraph tele)
         {
             var run = GameLoop.GameManager.Instance?.Run;
@@ -1809,9 +1809,7 @@ namespace AutoTest
             if (run == null || cm == null || k <= 0) return 0f;
             int ax = ctx.AxisDepth(ItemSystem.PassiveSkills.AxisRules.Role);
             bool wood = run.OwnsPassive(ItemIds.RoleWoodTag), notch = run.OwnsPassive(ItemIds.RoleNotchBoard) && ax > 0, chip = run.OwnsPassive(ItemIds.RoleChipped) && ax > 0;
-            bool code = run.OwnsPassive(ItemIds.CrossBloodCode) && ItemSystem.PassiveSkills.Effects.Cross.On(ctx, ItemSystem.PassiveSkills.AxisRules.Role) && ctx.enemyBleedStacks > 0;
-            bool thunder = run.OwnsPassive(ItemIds.CrossThunderDice) && ItemSystem.PassiveSkills.Effects.Cross.On(ctx, ItemSystem.PassiveSkills.AxisRules.Charge);
-            if (!wood && !notch && !chip && !code && !thunder) return 0f;
+            if (!wood && !notch && !chip) return 0f;
             var env = cm.TerminalEnvNow(ctx, tele.enemyAttackValue);
             var fv = (faces != null && faces.Length > 0) ? faces : new[] { 1, 2, 3, 4, 5, 6 };
             int fc = fv.Length;
@@ -1825,7 +1823,7 @@ namespace AutoTest
                 var rk = CombatSystem.TerminalCards.RoleOf(buf, in env);
                 if (rk == null) continue;
                 var r = rk.Value;
-                bool big = CombatSystem.YachtRoles.IsBig(r), triple = r != CombatSystem.RoleKind.Straight && CombatSystem.YachtRoles.IsTriple(r);
+                bool big = CombatSystem.YachtRoles.IsBig(r);
                 int face = r == CombatSystem.RoleKind.Straight ? 0 : CombatSystem.YachtRoles.FaceOf(r);
                 float v = 0f;
                 if (wood) v += 2 * CombatSystem.TerminalCards.WoodTagBonus;
@@ -1835,8 +1833,6 @@ namespace AutoTest
                     bool low = face > 0 ? face <= 3 : System.Array.Exists(buf, d => d >= 1 && d <= 3);
                     if (low) v += System.Math.Min(ax * ItemSystem.PassiveSkills.Effects.ChippedEyeReading.PerDepth, System.Math.Max(0, ctx.enemyDefense));
                 }
-                if (code && (face == 3 || face == 4)) v += ctx.enemyBleedStacks * 2;
-                if (thunder && triple) v += (ctx.GetCharge() + ax * 2) * 2;
                 acc += v;
             }
             return (float)(acc / total);

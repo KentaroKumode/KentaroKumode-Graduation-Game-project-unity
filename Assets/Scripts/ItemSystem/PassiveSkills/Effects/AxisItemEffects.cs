@@ -46,10 +46,6 @@ namespace ItemSystem.PassiveSkills.Effects
             // 賽目 (役の軸・2026-11-21): ① 賽目を読む・②【規則】
             [GameLoop.ItemIds.RoleNotchBoard] = (AxisRules.Role, Kind.Count), [GameLoop.ItemIds.RoleChipped] = (AxisRules.Role, Kind.Count),
             [GameLoop.ItemIds.RoleMirror] = (AxisRules.Role, Kind.Rule), [GameLoop.ItemIds.RoleOmni] = (AxisRules.Role, Kind.Rule),
-            // クロス軸 (2026-11-21): 品の軸の偏重 5 以上で働く = その軸を深く組んだ時だけ買う
-            [GameLoop.ItemIds.CrossVenomPowder] = (AxisRules.Poison, Kind.Count), [GameLoop.ItemIds.CrossBloodGear] = (AxisRules.Bleed, Kind.Count),
-            [GameLoop.ItemIds.CrossThunderDice] = (AxisRules.Charge, Kind.Count), [GameLoop.ItemIds.CrossSniper] = (AxisRules.Crit, Kind.Count),
-            [GameLoop.ItemIds.CrossBloodCode] = (AxisRules.Role, Kind.Count), [GameLoop.ItemIds.CrossVenomConduit] = (AxisRules.Poison, Kind.Count),
         };
     }
 

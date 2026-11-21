@@ -273,9 +273,6 @@ namespace ItemSystem.PassiveSkills
             Register(new TemperTongs()); Register(new AshBroom());
             // 賽目 (役の軸) の出来事で書く 2 品 (2026-11-21・RoleItemEffects.cs・残り 6 品は TerminalCards の RoleItems の旗と CombatManager の役の適用)
             Register(new ChippedEyeReading()); Register(new MatchedClappers());
-            // クロス軸の 6 品 (2026-11-21・CrossItemEffects.cs・品の軸の偏重 5 以上で働く)
-            Register(new VenomPowderStore()); Register(new BloodstainedGear()); Register(new ThunderTriple());
-            Register(new FatalSight()); Register(new BloodCipher()); Register(new VenomConduit());
             // 戦術の 6 品 (2026-11-21・TacticItemEffects.cs・item-overhaul-spec §6-2)
             Register(new HeftyPommel()); Register(new SilentStance()); Register(new GapSpear());
             Register(new BreakingMove()); Register(new HeavyBreakerWedge()); Register(new AdversityHourglass());
