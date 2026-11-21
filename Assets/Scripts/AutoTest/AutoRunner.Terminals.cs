@@ -264,8 +264,18 @@ namespace AutoTest
             var tgts = new int[n][];
             var touts = new TerminalOutcome[n];
             var afters = new TerminalBattleState[n];
+            // 速度 (2026-11-21・判断は変えない): 同じ目の出目どうしを入れ替えただけの挿し方は、 端子ごとに入る目が同じなので解決も効用も同じ
+            //   (Resolve は端子ごとに挿した目を数える・出目の添字は見ない)。 先に出た方の結果を写す (配列は全部埋める = 後ろの選び方・計装はそのまま)。
+            var seen = SameDiceSignatures(rolls) ? new Dictionary<long, int>() : null;
             for (int i = 0; i < n; i++)
             {
+                if (seen != null)
+                {
+                    long sig = WiringSignature(rolls, cands[i]);
+                    if (seen.TryGetValue(sig, out int j))
+                    { us[i] = us[j]; outs[i] = outs[j]; touts[i] = touts[j]; tgts[i] = tgts[j]; afters[i] = afters[j]; continue; }
+                    seen[sig] = i;
+                }
                 us[i] = EvalDeckWiring(ev, rolls, cands[i], out outs[i], out touts[i], out tgts[i], out afters[i]);
             }
             var st = ev.st;
@@ -351,6 +361,27 @@ namespace AutoTest
             if (mayMistake) NoteDeckPolicyDiag(in ev, k, board, deck, cands, us, touts, best, bestPre);   // [計装 #106] 実際の配線の判断だけ
             if (mayMistake) NoteDownBreakDiag(in ev, tele, k, outs, best);                                // [診断 2026-11-14] 目盛りの割り時 (方策に関係なく数える)
             return cands[best];
+        }
+
+        /// <summary>出目に同じ目があって、 挿し方の鍵 (<see cref="WiringSignature"/>) で畳めるか (3 個まで・目と場の添字が鍵に収まる時だけ)。</summary>
+        private static bool SameDiceSignatures(int[] rolls)
+        {
+            int k = rolls.Length;
+            if (k < 2 || k > 3) return false;
+            foreach (int r in rolls) if (r < 0 || r >= 1024) return false;
+            for (int i = 0; i < k; i++) for (int j = i + 1; j < k; j++) if (rolls[i] == rolls[j]) return true;
+            return false;
+        }
+
+        /// <summary>挿し方の鍵: (出目, 挿す場) の組の多重集合 (並べ替えて詰める)。 同じ鍵の挿し方は端子ごとに入る目が同じ。 場の添字は 1022 まで。</summary>
+        private static long WiringSignature(int[] rolls, int[] slots)
+        {
+            int k = rolls.Length;
+            long a = rolls[0] * 1024L + (slots[0] + 1), b = rolls[1] * 1024L + (slots[1] + 1), c = k > 2 ? rolls[2] * 1024L + (slots[2] + 1) : 0;
+            if (a > b) { var t = a; a = b; b = t; }
+            if (b > c) { var t = b; b = c; c = t; }
+            if (a > b) { var t = a; a = b; b = t; }
+            return (a << 40) | (b << 20) | c;
         }
 
         /// <summary>[計装 #106] 場の端子ごとに、 選んだ手で発動したか・しなかった理由 (<see cref="TerminalPolicyDiag"/> の [10〜22])。
