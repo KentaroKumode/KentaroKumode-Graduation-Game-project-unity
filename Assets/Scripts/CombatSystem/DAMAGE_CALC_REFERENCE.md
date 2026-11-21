@@ -161,8 +161,8 @@ outgoingDamageMultiplier += メタ% + 遺物% + 研磨剤1.5 + consDmgMultPct/10
 + consAtkBurst                     ← 消費:攻撃バースト(単発)
 + メタ会心ボーナス(会心時)
 − メタデバフ向かい風(最低1)
-× (100 + finalDamagePct + hitFinalDamagePct)/100      ← 最終与ダメージ倍率【2026-11-20・GAME.md §23-32】(Kw.ApplyFinalDamage・切り捨て・既定 0 = 素通し)。 〈防人の軍標〉がシールドを得るたび +5 (この戦闘・上限なし)。
-                                     hitFinalDamagePct = 主攻撃のこの 1 撃だけの上乗せ (〈加重の拳套〉: 撃の番号 (0 から) × 15・撃ごとに 0 に戻す・主攻撃以外の口には無い)。 【オーバークロック】(TerminalOutcome.overclock) は撃 0 に +60・その撃だけ playerArmorPen += IgnoreAll (撃の後に戻す)。 〈雷神槍〉〈四つ打ちの鉄芯〉は OnPreDealDamage で本物の撃に足す。
+× (100 + finalDamagePct + hitFinalDamagePct)/100      ← 最終与ダメージ倍率【2026-11-20・GAME.md §23-32】(Kw.ApplyFinalDamage・切り捨て・既定 0 = 素通し)。 〈防人の軍標〉が【ジャスト防御】のたび +35 (この戦闘・累積・2026-11-21・旧: シールドを得るたび +5)。
+                                     hitFinalDamagePct = 主攻撃のこの 1 撃だけの上乗せ (〈加重の拳套〉: 撃の番号 (0 から) × 15・撃ごとに 0 に戻す・主攻撃以外の口には無い)。 【オーバークロック】(TerminalOutcome.overclock) は撃 0 に +60・その撃だけ playerArmorPen += IgnoreAll (撃の後に戻す)。 〈雷神槍〉〈四つ打ちの鉄芯〉は OnPreDealDamage で本物の撃に足す。 〈破城斧〉は撃ごとに +80 と `hitIgnoreDefense` (その撃だけ敵の防御を飛ばす・撃ごとに false へ戻す・2026-11-21)。
                                      怠惰の直前 = すべての倍率 (会心・与ダメ% の池・端子の別枠・物差し) の後・敵の軽減パッシブと防御の前。 与ダメ% の池には足さない。
                                      掛ける口は怠惰と同じ 4 つ (主攻撃 = ApplyWinDamageModifiers / HpLossDiag.Lose (channel ≠ "通常攻撃") / 〈逆綴じの止血帯〉/ Kw.DamageEnemy の直接)。 BOT の見積もりも同じ位置 (AutoRunner.ApplyFinalPct)
 × (100 − 30)/100                  ← 大罪:怠惰 (挑戦カード IV) を受けている時だけ・与えるダメージ −30%【2026-11-11】(主攻撃はすべての倍率の後・敵の防御の前・切り捨て。 毒・出血・爆発・固定ダメ・反射・品の直接は敵の HP を減らす口 HpLossDiag.Lose で同じく −30%)
@@ -288,6 +288,7 @@ ShieldBash の空振り（盾 0）が 34.2% → 66.1%、1 機会あたりの攻�
 
 - **順番は「半減 → 付与」**。`PassiveSkillManager.BeginTurn` は `BeginNewTurn` のあとに `OnTurnStart` を撃つので、
   そのターンに入る盾（ターン頭の付与）は半減されない。ヴェスカのシールド規約（GAME.md §13-4）と同じ。
+- **減衰しない例外**: 〈重装兵の隠し刃〉はボスのダウンのターン、 〈脈なしの鋼心臓〉はターン頭のシールドが 25 以上 (2026-11-21)。 残る割合は〈油染みの盾革〉で 70% (§3-I)。
 - **T1 は半減しない**。戦闘開始時の付与（開幕シールド・持ち越し `carriedShield`・消費アイテムの持ち込み）は、最初のターンにそのまま使える。
 - 期限付きの盾（`consShieldExpireTurn`）の失効は従来どおり（ターン終了時に残ターンを減らし、0 で `consShield = 0`）。
 - 整備パネル〈剛胆〉（主方針の枠・2026-11-20〜。旧 Guard r10）の持ち越しは従来どおり「**勝った**戦闘の終了時の残量 × 30%（切り上げ）」（`CombatManager` の戦闘終了処理・2026-09-13 に 50% → 30%）。
@@ -425,7 +426,7 @@ SwordReachII・III / BulwarkII・III。 置き換え前と同一シード 10,000
 
 **可変量 (`stats[].per`・段 3・2026-11-11)。** 量が実行時の状態で変わる効果は `per`（単位数の出どころ: `coinsSpent` / `swordWindfall` (2026-11-19・溶金の領主剣) / `axis:軸名` / `enemyBleed` / `turnsElapsed`）・`perEvery`（N につき・整数の割り算）・`perMax`（単位数の頭打ち）・`on`（乗せるトリガーの上書き）で書き、`StatModifierEffect.ApplyScaled` が「生成時に確定した float の量 × 単位数」を旧クラスと同じ形で足す。単位数が 0 なら何もしない。
 段 3 でステータス化済み（9 件）: 溶金の領主剣 / 研ぎ師の見立て書 / 千里眼の水晶 / 血日に澄む佩玉 / 鎧縫いの針 / 麻痺の吹き矢 / 雷神槍 / 猛りII・III。 同一シードのダイジェストは未測定。
-2026-11-20: 〈千里眼の水晶〉〈英雄の意志〉は作り直してクラスへ戻した（`AxisItemEffects2.cs`）。 2026-11-21: 充電の軸の 26 品は `ChargeEffects.cs` のクラス (〈雷神槍〉の stats と `per: chargeSpent` は削除)。 同日: 毒の軸の 25 品は `PoisonEffects.cs` のクラスと `PoisonCore` の旗 (〈麻痺の吹き矢〉の stats と `per: enemyPoison` は削除)。
+2026-11-20: 〈千里眼の水晶〉〈英雄の意志〉は作り直してクラスへ戻した（`AxisItemEffects2.cs`）。 2026-11-21: 充電の軸の 26 品は `ChargeEffects.cs` のクラス (〈雷神槍〉の stats と `per: chargeSpent` は削除)。 同日: 毒の軸の 25 品は `PoisonEffects.cs` のクラスと `PoisonCore` の旗 (〈麻痺の吹き矢〉の stats と `per: enemyPoison` は削除)。 同日: シールドの軸の 22 品は `ShieldEffects.cs` のクラスと `ShieldCore` の旗 (§3-K)。
 
 **条件 (`stats[].when`・段 2)。** 書いた項目はすべて AND。判定は**そのステータスのトリガーの時点**（旧クラスと同じ）。
 
@@ -494,7 +495,7 @@ Hermes / Bloodlust / EvenEyes / MasterworkNotes / KaleidoDice。
 | SkillId(表示) | Trigger | 効果(ctx操作) |
 |---|---|---|
 | ~~パリィ / 衛士の慣い / 復讐 / 果たし合い / 蝕夜~~ | — | **2026-10-28 削除**（武器家系の整理・GAME.md §24）。後継は §3-B2 の〈堅守の構え〉〈黎明〉〈不滅の刃〉。〈切り返し〉〈血令〉〈処刑〉は同名のまま §3-B2 で中身が変わった |
-| 重装兵の隠し刃 | OnBattleStart | **2026-11-20 作り直し**: `shieldKeepOnBossDown` を立てる。 そのターンがボスのダウンなら BeginNewTurn のシールドの半減を飛ばす（ダウンの待ちが 1 以上 = このターンはダウン）。 旧（2026-11-04〜）: 敵の HP 30% 以下のターン、シールドを最大 20 使い使った量 × 2 を攻撃に（1 戦闘 1 回） |
+| 重装兵の隠し刃 | OnBattleStart / OnJustGuard | **2026-11-21**: 【ジャスト防御】のたび予告 E の軽減不可ダメージ (§3-K)。 **2026-11-20 作り直し**: `shieldKeepOnBossDown` を立てる。 そのターンがボスのダウンなら BeginNewTurn のシールドの半減を飛ばす（ダウンの待ちが 1 以上 = このターンはダウン）。 旧（2026-11-04〜）: 敵の HP 30% 以下のターン、シールドを最大 20 使い使った量 × 2 を攻撃に（1 戦闘 1 回） |
 | Sting(出血) | OnPostDealDamage | enemyBleedStacks++ |
 | 脆弱(契約・狩猟旅団) | OnBattleStart (Apply) + 防御後最終ダメ | armed状態で会心ダメ時 ×(1+0.15/0.30/0.45) 倍率→consumed / 非会心ロール勝利で再armed。 戦闘終了で剥がれる。 仕様: docs/GAME.md §12 |
 | ApexCrit(天極) | OnCriticalCheck | ゾロ目(全同値)なら **forceCritical=true**(会心確定)＋criticalMultiplier+1.0 |
@@ -658,6 +659,8 @@ s = `SwordDanceSet.SoloScale`（2026-11-20）: 持っている[剣の舞]（昇�
 | OnShieldGain | consShield の setter (増えたときだけ) | 増えた分 |
 | OnShieldAbsorb / OnShieldBreak | Kw.AbsorbShield (敵の直接攻撃と軽減無視の肩代わり) | 吸収した分 / 割られる前の量 |
 | OnShieldDecay | BeginNewTurn Phase C の半減 | 失った分 |
+| OnShieldSpend | Kw.SpendShield (品・端子の効果でシールドを使う: 〈破城斧〉・端子〈重装突撃〉の shieldSpend・2026-11-21) | 使った分 (割れの出来事は配らない) |
+| OnJustGuard | 【ジャスト防御】の成立 (`Shd.NoteJustGuard`・敵の攻撃の解決の後・ターン終了の前・2026-11-21) | 予告 E |
 | OnPoisonGain | CombatContext.AddStatus (敵の毒) | 増えた分 (上限到達の出来事 OnPoisonCap は 2026-11-21 に削除・読む品が無くなった) |
 | OnPoisonDetonate | 【起爆】(`Psn.Detonate`・2026-11-21) | 起爆のダメージ |
 | OnPoisonTick | TickStatuses と〈廃庭の霧吹き〉(敵の攻撃のとき・1 ターン 1 回・`TickPoisonOnce(50)` = 威力 50%・毒を減らさない・2026-11-21) | 毒のダメージ = `floor(毒 × enemyMaxHP × 10 / 10000)` (**2026-11-20: 1 スタック = 最大 HP の 0.1%**・旧 0.05%〔2026-11-10 に 0.1% から〕)・下限 1・`fixedDamageToEnemy` 経由 (両経路とも `CombatContext.DotDamage`)。 **2026-11-07: 1 スタック = 敵の最大 HP の 0.1% (旧 0.5%)・上限 99 (旧 10)**。 同日に一度「現在 HP」基準にしたが、 毒を積んでも与ダメの 13% しか出ず最大 HP に戻した。 ダメージを出すたびに、 残っているスタックを `poisonKeepPct`% に減らす (切り捨て・基準 50 = 半減・〈腐れ沼の苔玉〉で 75・2026-11-21)。 ターン開始の分だけ減らす (霧吹き・〈毒溜まりの主〉の 2 回目は減らさない)。 〈骨溶かしの黒油〉: 待っているダウンがある (このターンがダウン) なら ×2 |
@@ -671,7 +674,7 @@ s = `SwordDanceSet.SoloScale`（2026-11-20）: 持っている[剣の舞]（昇�
 クロス軸 (`CrossItemEffects.cs`・品の軸の偏重 5 以上・毒の 2 品は 2026-11-21 に外した: 〈劇毒の火薬庫〉は毒の軸の品・〈雷毒の導管〉は役へ移り効果は Phase 3):
 〈血染めの歯車〉OnTerminalDispose で `Kw.DamageEnemy(出血 × 2)`・出血 +采配 / 〈雷鳴のゾロ目〉OnRoleFired で 充電 +賽目 × 2・ゾロ目なら `Kw.DamageEnemy(充電 × 2)` (払わない) /
 〈必殺の照準器〉OnTerminalDispose (ターン 1 回) で forceCritical・`criticalMultiplier += 采配 × 0.15` / 〈血濡れの符丁〉OnRoleFired の追撃・攻めで `Kw.DamageEnemy(出血 × 2)` (使わない)。
-戦術 (`TacticItemEffects.cs`): 〈渾身の柄頭〉hitCount = 1 の撃で `hitFinalDamagePct += 25`・`playerArmorPen += 8` / 〈静寂の構え〉攻撃に挿さなかったターンの次のターンの hitIndex 0 の撃で `hitFinalDamagePct += 50` /
+戦術 (`TacticItemEffects.cs`): 〈渾身の柄頭〉hitCount = 1 の撃で `hitFinalDamagePct += 25`・`playerArmorPen += 8` / (〈静寂の構え〉は 2026-11-21 にシールドの軸へ・§3-K) /
 〈隙衝きの短槍〉OnWired で敵がチャージ中かダウン中 (`CombatManager.EnemyChargingOrDownNow`) なら `AddOutgoingPct(0.40)` / 〈崩しの一手〉OnBossDown (ターン 1 回) で 次のターン 手札 +2・充電 +10 /
 〈大技殺しの楔〉OnHeavyCanceled で `Kw.DamageEnemy(最大 HP × 10%)`・シールド +15 / 〈逆境の砂時計〉段階 (`CombatManager.EscalationStageNow`) 2 以上で OnTurnStart にシールド +4・OnWired に `AddOutgoingPct(0.25)`。
 
@@ -704,8 +707,7 @@ CombatManager に預け、 プレイヤーの攻撃の直前に固定ダメ枠�
 | 臨界を得る (`Kw.AddHeat`) | `n + heatGainBonus` (〈焚き足しの炭〉で +1)。 閾値は 50 固定 (〈早沸かし釜〉は −15) |
 | 重ね会心 (〈重ね斬りの型〉) | 2026-11-20 作り直し: 同じターンに直前の 2 撃が会心なら、 次の撃の OnCriticalCheck で会心倍率 +1.0 (その撃だけ)。 旧: 会心率の加算合計 > 100% の超過分の確率で会心倍率 +1.0 |
 | 出血のダメージ | `ApplyBleedModifiers`: `floor(出血 × (1 + bleedDamagePct))` (bleedDamagePct の書き手は 2026-11-20 から無い)。 〈血止め知らずの針箱〉(血晶 5 以上・`bleedCritRule`・2026-11-20): その後、 1 回の出血のダメージごとに会心の判定 (CritRateOf・封印で外れ・forceCritical で確定・〈銑鉄棍〉で止まる・鍵 combat.bleedCrit) をし、 会心なら `+ floor(出血のダメージ × max(0, criticalMultiplier / 2 − 1))` |
-| シールドの減衰 | 残る割合 `min(80, 50 + shieldKeepBonusPct)`% (〈油染みの盾革〉が 堅牢 × 3・2026-11-20 に × 5 から) |
-| 盾押し (〈盾押しの心得〉) | OnWired・攻撃の端子を挿したターン: 攻撃 + `floor(シールド × 堅牢 × 5%)`（2026-11-11 に 10% から） |
+| シールドの減衰 | 残る割合 `min(80, 50 + shieldKeepBonusPct)`% (〈油染みの盾革〉が +20・2026-11-21 に 堅牢 × 3 から。 盾押しは §3-K) |
 | 入り口 (`EntryEffect`) | 臨界の軸の既存品 (と出血へ移った〈百人切りの鉈〉の毒 +1) に・毒の軸の 7 行は 2026-11-21 に外した (PoisonEffects.cs)。 旧: 毒・臨界の軸の既存品 22 品に、 決まった機会 (ターン開始 / 攻撃が通る / 敵の攻撃 / 受けきり / ブロックのダイス 1 個) で毒 +1〜2・臨界 +3 を重ねる。 表は `EntryEffect.Table`。 2026-11-10 から 13 品に**偏重の条件**が付く: `AtLeast n` (軸の品が n 個以上) / `Top n` (`CombatContext.AxisRank` < n ＝ その軸より品の多い軸が n 未満・同数は満たす・比べるのは金を除く 6 軸)。 条件を満たさない機会は何も足さない (品の本来の効果は動く) |
 | 種火・毒 r2 | 2026-11-07: 毒を与えるたび +1 → 1 ターンに最初の 1 回だけ +2 |
 
@@ -723,6 +725,22 @@ CombatManager に預け、 プレイヤーの攻撃の直前に固定ダメ枠�
 | BOT | 配線の見積もり (AutoRunner.DeckSums の ItemSight): 〈石抜きの毒指輪〉を持ち、 このターンまだ起爆していなければ、 攻撃の撃があり 配線の後の毒 (env.enemyPoison + o.poison) ≥ 24 の挿し方に `PoisonCore.Damage` を軽減不可の分 (extraDmg) として足す。 ボスのひびの割れは見込みに入れない |
 
 個々の品の数値は `PoisonEffects.cs` / `PoisonCore.cs` の定数と XML コメントが正本。
+
+### 3-K. シールドの軸 (2026-11-21・`ShieldEffects.cs`・`ShieldCore.cs`・full-item-rework-ledger §③)
+
+| 計算の位置 | 式 |
+|---|---|
+| 【ジャスト防御】(`ShieldCore.IsJustGuard`) | E = 1 体目の敵の直接攻撃 (防御・〈大結界〉の後の予告の値・`enemyAtkValue`)。 D = 敵の攻撃を受ける時の `blockSum + consShield` (シールドの吸収の前)。 成立 = `E > 0 && E ≤ D ≤ E + 許容幅` かつ敵の攻撃で失った HP (`takenApplied`・2 体目・〈連撃〉・固定ダメも含む) が 0。 許容幅 2 (〈擦り減った小盾〉で 4)。 攻撃しないターン (ダウン・チャージ・行動不能)・〈狂暴化〉の攻撃は E = 0。 成立で `Shd.NoteJustGuard` → OnJustGuard |
+| ブロックの最終値 (`CombatManager.FinalBlockSum`) | 端子の blockAdd → 遺物〈堅牢の環〉`+ceil(× %)` → 大罪:傲慢 `floor(× (1 − %))` → 端子調律 `+ 個数 × N` → `+ itemBlockBonus` → 〈貫きの錐〉`− 敵の攻撃 × 2` → 〈狂暴化〉0 → 〈不完全な転移〉。 本体の配線の集計と見込み (`JustGuardForecast`) が同じ関数 |
+| 見込み (`CombatManager.JustGuardForecast`) | E = `ShieldCore.EnemyAttackAfter(o, 予告)`・D = `FinalBlockSum(o.blockAdd, o.blockDice, E) + ShieldCore.ShieldAfterWiring(o, env)` (= `max(0, 今のシールド + 〈応急箱＋〉の溢れ − o.shieldSpend) + o.shield`)。 敵の攻撃までに品が足す・使うシールド (OnWired の品・〈破城斧〉の消費) は見ない |
+| 5e (`ShieldCore.ApplyToTerminals`) | `o.shield +=` 〈肩当て〉防御の端子に出目全部 16 / 〈当て布の籠手〉2 個以上 8 / 〈擦り減った小盾〉個数 × 3 / 〈鋲の胸当て〉予告 ≥ 12 で 5・未満 2 |
+| 反撃 | 〈鏡返しの小盾〉OnTurnEnd: `floor((min(EnemyAtk, blockSumThisTurn) + shieldAbsorbedAttackThisTurn) × (ジャスト防御 ? 100 : 40) / 100)` / 〈重装兵の隠し刃〉OnJustGuard: E / 〈割れ盾の仕返し〉OnShieldBreak: 割られる前の量 / 〈落城の礎石〉OnShieldAbsorb・OnShieldDecay: 減った量 × 2 と `CrackBossNotch` (次の目盛りにひび・既にあれば何もしない)。 どれも `Kw.DamageEnemy` (軽減不可・防御無視) |
+| 攻撃へ | 〈盾押しの心得〉OnWired・攻撃の端子あり: `AddPlayerAttackOrDiceBonus(floor(シールド × 35 / 100))` (撃ごとに乗る) / 〈力みの小手〉OnShieldGain の累計 12 ごとに力み +1・OnWired で 4 × 力み を攻撃 +N にして 0 / 〈相棒の魂〉張り直した次のターンの OnWired で +10 / 〈受け太刀の籠手〉ジャスト防御の次のターンの OnTurnStart で `firstHitAttackBonus += 8` |
+| 倍率 | 〈破城斧〉OnPreDealDamage: 最初の撃でシールド ≥ 15 ならそのターン、 シールド ≥ 8 の撃ごとに `Kw.SpendShield(8)`・`hitFinalDamagePct += 80`・`hitIgnoreDefense` / 〈静寂の構え〉攻撃の端子なしで受け切った (`Psn.Shutout`) 次のターンの本物の撃に `hitFinalDamagePct += 60` (ジャスト防御なら 100) / 〈防人の軍標〉OnJustGuard: `finalDamagePct += 35`・次のターンの手札 +1 / 〈敗残兵の部隊章〉OnShieldAbsorb・Decay・Spend の累計 8 ごとに反骨 +1 (最大 10)・OnPostRoll で `AddOutgoingPct(0.12 × 反骨)` / 〈割れ盾の仕返し〉割られた次のターン `AddOutgoingPct(0.35)` |
+| 守り | 〈重ね札の盾〉シールド ≥ 10 で OnPreReceiveDamage −3 / 〈油染みの盾革〉`shieldKeepBonusPct = 20` / 〈脈なしの鋼心臓〉戦闘開始時 X (12・勝つたび +2) と `shieldNoDecayAt = 25` (ターン頭のシールド ≥ 25 なら減衰しない) / 〈二拍目の心臓〉HP ≤ 50% で `ceil(最大 HP × 60%)`・`shieldGainPct += 50` (consShield の setter で増えた分に `× (100 + これ) / 100`・遺物の上乗せより前) / 〈相棒の魂〉割られたら `floor(前の量 × 70%)` (1 戦闘 1 回) / 〈聖路の白靴〉戦闘開始時 `min(20, 歩数)` / 〈英雄の意志〉強敵の大技かチャージのターンの頭 +18・そのターンのジャスト防御で `BreakBossNotch` (HP に関係なく次の目盛りを満額のダウンで割る) |
+| BOT | 配線の見積もり (AutoRunner.DeckSums の ItemSight): ジャスト防御で働く 6 品のどれかを持てば、 挿し方ごとに `JustGuardForecast` を見て、 成立するなら 鏡返し +E × 60%・隠し刃 +E を軽減不可の分 (extraDmg) に、 軍標・受け太刀・静寂・英雄の先の得を控えめな定数で足す。 〈破城斧〉は 1 撃あたりの見込み × 80% × 払える撃の数 |
+
+個々の品の数値は `ShieldEffects.cs` / `ShieldCore.cs` の定数と XML コメントが正本。
 
 ## 4. 敵/汎用パッシブ一覧（`EnemyPassiveSkillEffects.cs`・視点は§0参照）
 
