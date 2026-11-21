@@ -484,6 +484,8 @@ namespace AutoTest
                 _cur.chainMaxDepth = ItemSystem.PassiveSkills.PassiveSkillManager.ChainMaxDepth;
                 _cur.chainRepeats = ItemSystem.PassiveSkills.PassiveSkillManager.ChainRepeats;
                 _cur.chainGuardHits = ItemSystem.PassiveSkills.PassiveSkillManager.ChainGuardHits;
+                _cur.rebootFired = (int)CombatSystem.CombatManager.RebootFired;
+                _cur.overclockFired = (int)CombatSystem.CombatManager.OverclockFired;
                 _cur.chainPath = ItemSystem.PassiveSkills.PassiveSkillManager.ChainDeepestPath;
                 _cur.heatBurstInfo = ItemSystem.PassiveSkills.Keywords.Kw.HeatMaxBurstsOneAdd + "|" + ItemSystem.PassiveSkills.Keywords.Kw.HeatMaxBurstsInfo;
                 _cur.attackSumInfo = CombatSystem.CombatManager.AttackSumMaxInfo;
