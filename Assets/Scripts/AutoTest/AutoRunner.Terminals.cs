@@ -984,16 +984,22 @@ namespace AutoTest
         /// <summary>山札で戦う戦闘の配線方策 (<see cref="CombatManager.WiringPolicy"/> へ差す)。 前のターンの観測・計装の包みもここで持つ (旧い配線の包み MutualWiringPlanPolicy は 2026-11-12 に削除)。</summary>
         private WiringPlan DeckWiringPlanPolicy(int[] rolls, MutualTurnTelegraph tele)
         {
+            using (BotTiming.Enter(BotTiming.Cat.Wiring)) return DeckWiringPlanPolicyCore(rolls, tele);
+        }
+
+        private WiringPlan DeckWiringPlanPolicyCore(int[] rolls, MutualTurnTelegraph tele)
+        {
             RefreshMainCorr();   // [V3 mainCorr]
-            PrepareSuperTurn(rolls, tele);
-            UseTacticsThisTurn(rolls, ref tele);   // 戦術消耗品 (2026-11-21・§12-6)。 盤面を変えるので配線の判断の前
+            using (BotTiming.Enter(BotTiming.Cat.WirePrep)) PrepareSuperTurn(rolls, tele);
+            using (BotTiming.Enter(BotTiming.Cat.Tactics)) UseTacticsThisTurn(rolls, ref tele);   // 戦術消耗品 (2026-11-21・§12-6)。 盤面を変えるので配線の判断の前
             int hpNow = CombatManager.Instance != null ? CombatManager.Instance.PlayerHP : -1;
             if (_fbPrevHp >= 0 && hpNow >= 0 && _fbPrevHp - hpNow > _fbPrevExpTaken) _fbUnavoidSeen = true;
             _lastFreeBlock = _lastKillsNow = false;
             _lastChosenA = -1; _lastAttackCandExists = false;
-            var slots = ChooseDeckWiring(rolls, tele, out _, out var targets, lookahead: true, mayMistake: true);
+            int[] slots, targets;
+            using (BotTiming.Enter(BotTiming.Cat.WireChoose)) slots = ChooseDeckWiring(rolls, tele, out _, out targets, lookahead: true, mayMistake: true);
             // 挑戦カード〈金で殴る〉(#6): 払う金額 (札が無ければ 0・とどめに合わせて挿し方を替えることがある)。 計装の見積もり (_lastPred*) も金の分で上書きする
-            int gold = slots != null ? ChooseGoldPunch(rolls, tele, ref slots, ref targets) : 0;
+            int gold; using (BotTiming.Enter(BotTiming.Cat.WireGold)) gold = slots != null ? ChooseGoldPunch(rolls, tele, ref slots, ref targets) : 0;
             // [計装 2026-11-13] 攻撃の端子に挿さない手を選んだ割合 (素朴版は効用で選ばないので数えない)
             if (_lastChosenA >= 0)
             {
@@ -1002,7 +1008,7 @@ namespace AutoTest
             }
             // 手札の規則 Pick (2026-11-13): 次のターンも手札に残す印 (方策 handKeepPolicy・Off / All では null)
             if (slots != null) slots = AddClockDiePlug(slots, rolls);
-            bool[] keep = slots != null ? ChooseHandKeep(rolls, tele, slots) : null;
+            bool[] keep; using (BotTiming.Enter(BotTiming.Cat.WireKeep)) keep = slots != null ? ChooseHandKeep(rolls, tele, slots) : null;
             if (slots != null) keep = AddLinkDieKeep(keep, rolls, tele, slots);
             if (predTrace) BeginPredTrace(tele.turn);
             BeginMainCorrTurn(_lastPredA);

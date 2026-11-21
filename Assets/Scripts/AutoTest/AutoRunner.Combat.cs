@@ -138,7 +138,8 @@ namespace AutoTest
                 if (cm.CurrentCombatTurn <= 1 && ShouldFleePursuer(run, GameManager.Instance) && cm.RequestFlee())
                     FreeMapPursuerFlees++;
                 BeginTurnDealt();   // [計装 2026-11-17] 1 ターンの与ダメ
-                var tr = cm.ExecuteTurn();
+                CombatSystem.TurnResult tr;
+                using (BotTiming.Enter(BotTiming.Cat.Resolve)) tr = cm.ExecuteTurn();
                 NoteTurnDealt();
                 if (tr.isDraw) _cwDraw++;
                 else if (tr.playerWon) _cwWin++;
@@ -1758,6 +1759,11 @@ namespace AutoTest
         /// <see cref="CombatSystem.CombatManager.RerollCostNow"/> を読む (2026-11-16)。 **充電を使い切らない** ──
         /// 充電は端子へ挿さなかったダイスの対価なので、 全部リロールへ流すと配線の判断そのものが消える。</summary>
         private int[] MutualRerollPolicy(int[] dice, CombatSystem.MutualTurnTelegraph tele, int attempt)
+        {
+            using (BotTiming.Enter(BotTiming.Cat.Reroll)) return MutualRerollPolicyCore(dice, tele, attempt);
+        }
+
+        private int[] MutualRerollPolicyCore(int[] dice, CombatSystem.MutualTurnTelegraph tele, int attempt)
         {
             if (dice == null || dice.Length == 0) return null;
             RefreshMainCorr();   // [V3 mainCorr] リロールの効用 (配線の評価) も同じ比で見る

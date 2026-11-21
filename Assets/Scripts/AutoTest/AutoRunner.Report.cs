@@ -220,6 +220,7 @@ namespace AutoTest
             //   印字が無いと「遺物なしのつもりだった」を後から検証できない。
             //   2026-08-10 に同じ穴で 0pt 基準値が 53.3% / 16.6% に割れている。
             sb.AppendLine(EffectiveStateLine());
+            sb.AppendLine(BotTiming.Describe(_records.Count)); BotTiming.Reset();   // [計装 2026-11-21] ラン速度
             sb.AppendLine(AshBaseLine());
             sb.AppendLine(StormInstabilityLine());   // [計装 2026-11-13] 不安定化の内訳・激化の段
             // **BOT が読んだ学習を必ず印字する** (2026-11-12・#118)。 帯のフォルダが無いと手書きの序列へ黙って落ち、
