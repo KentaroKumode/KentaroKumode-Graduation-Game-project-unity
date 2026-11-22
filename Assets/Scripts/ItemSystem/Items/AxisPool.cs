@@ -146,6 +146,8 @@ namespace ItemSystem
         public static long Skips, SkipGoldTotal, LocksCompleted, LockFloorSum;
         /// <summary>今のランの見送り換金の回数と額 (ランの頭で BOT が 0 に戻す・ランの記録の skipFired / skipGold)。</summary>
         public static int RunSkips, RunSkipGold;
+        /// <summary>今のランの店の軸指定リロールの回数 (GameManager.ShopReroll・ランの頭で BOT が 0 に戻す・ランの記録の axisRerollFired)。</summary>
+        public static int RunAxisRerolls;
         public static void ResetStats() { Drawn.Clear(); Skips = SkipGoldTotal = LocksCompleted = LockFloorSum = 0; }
 
         /// <summary>計装を経路の集計 (PassiveSourceAudit.Counts) へ「軸抽選:」「見送り:」「ロック:」付きで混ぜる (並列ワーカーの返し・通常バッチのサマリー)。</summary>

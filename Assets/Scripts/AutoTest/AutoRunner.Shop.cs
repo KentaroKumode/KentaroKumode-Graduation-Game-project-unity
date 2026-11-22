@@ -467,6 +467,10 @@ namespace AutoTest
             // 〈目利きの紹介状〉: この店の最初の通常のリロールは無料 ── 軸指定にすると無料が使えないので、 先に無料の 1 回を通常で回す
             var shop = ItemSystem.Shop.ShopManager.Instance?.Current;
             if (shop != null && !shop.freeRerollUsed && run.OwnsPassive(ItemIds.MacroLetter)) return null;
+            // 寄せの軸 (buyAxisFocus) が出現の枠にあれば、 所持数に関わらずそれを指定する (2026-11-22・一番多い軸を掘ると寄せの腕で別の軸を掘っていた)
+            if (!string.IsNullOrEmpty(buyAxisFocus))
+                foreach (var a in buyAxisFocus.Split(',', '、'))
+                    if (run.lockedAxes.Contains(a.Trim())) return a.Trim();
             string best = null; int bestD = 0;
             foreach (var ax in run.lockedAxes)
             {

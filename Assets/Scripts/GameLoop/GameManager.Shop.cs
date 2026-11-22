@@ -70,7 +70,7 @@ namespace GameLoop
             if (focusAxis != null && !ShopManager.AxisRerollAllowed(Run, focusAxis)) focusAxis = null;   // 出現の枠に無い軸は指定なし
             bool ok = sm.TryReroll(Run, focusAxis);
             RunStats.RerollOutcome[ok ? 3 : 2]++;
-            if (ok && focusAxis != null) RerollTerminalShop(focusAxis);
+            if (ok && focusAxis != null) { RerollTerminalShop(focusAxis); ItemSystem.AxisPool.RunAxisRerolls++; }
             return ok;
         }
 

@@ -202,7 +202,7 @@ namespace AutoTest
             /// 見送り換金の回数 / 額 (AxisPool.RunSkips / RunSkipGold・額は〈銭皿〉込み・金の出入りは goldKeys の「見送り(…)」と totalCoinsSpent)。
             /// 武器の〈連刃〉の追撃 /〈処刑〉/〈画竜点睛〉/〈シールドバッシュ〉(CombatManager.WeaponChainFired ほか)。</summary>
             public int rebootFired, overclockFired, detonateFired, justGuardFired, bleedSpendFired, bleedExecuteFired, burstFired, burstBreakFired, critOverflowFired, critExecuteFired, critRefireFired,
-                deckDisposeFired, deckShuffleFired, roleFormedFired, roleOmniFired, skipFired, skipGold,
+                deckDisposeFired, deckShuffleFired, roleFormedFired, roleOmniFired, skipFired, skipGold, axisRerollFired,
                 weaponChainFired, weaponExecuteFired, weaponGaryoFired, weaponBashFired;
             public string chainPath = "", heatBurstInfo = "", attackSumInfo = "";
             public bool ashBaseOpened;
