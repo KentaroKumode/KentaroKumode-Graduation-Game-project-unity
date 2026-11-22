@@ -1253,7 +1253,7 @@ namespace ItemSystem.PassiveSkills.Effects
 
         /// <summary>宣告ダメージの倍率。 **定数**であって、 プレイヤーの会心倍率ではない。
         /// 2.0 は <see cref="MetaProgression.MetaBuffApplicator.GetCriticalMultiplier"/> の
-        /// 基準値と同じ ＝ 会心倍率を積んでいないプレイヤーに対する従来の実挙動を保つ値。</summary>
+        /// 旧基準値 (2026-11-22 final5 でプレイヤーの基準は 1.6 へ下げた・敵の宣告は据え置き)。</summary>
         private const float DecreeMultiplier = 2.0f;
 
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)

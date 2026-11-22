@@ -162,10 +162,17 @@ namespace ItemSystem.Shop
         /// <summary>通常のリロールで払う額 (画面の表示用・〈目利きの紹介状〉の無料なら 0)。 BOT の「まだ回せる」の判定は 0 にならない <see cref="ShopInventory.CurrentRerollPrice"/> を読む。</summary>
         public int RerollPrice => Current == null ? 0 : LetterFreeReroll(GameLoop.GameManager.Instance?.Run) ? 0 : Current.CurrentRerollPrice;
 
-        /// <summary>〈黄金の通行手形〉: 店で使ったゴールド 40G ごとに、 次の店 1 軒の秘宝の棚が 1 段上のレア度で並ぶ。</summary>
-        public const int PassSpendStep = 40;   // 2026-11-22 neon 収束: 80 → 50 → final4 40
-        /// <summary>この店の秘宝の棚を 1 段上のレア度で並べるか (入店で決める・リロールにも効く)。</summary>
-        private bool _passRarityUp;
+        /// <summary>〈黄金の通行手形〉(2026-11-22 final5 で作り直し・旧: 店で 40G 使うたび次の店 1 軒の秘宝の棚が 1 段上): 所持中、 店の商品 (秘宝・消耗品・武器・賽) の値段 ×0.75
+        /// (切り上げ・下限 1G・強化素材・物資・リロールには掛けない)。 店に入るたび・リロールのたび、 秘宝の棚の最初の <see cref="PassUpgradeSlots"/> 枠はレア度が 1 段上 (LEGENDARY は据え置き)。</summary>
+        public const float PassPriceMul = 0.75f;
+        public const int PassUpgradeSlots = 2;
+        /// <summary>この棚の作り (入店・リロール) で、 あと何枠の秘宝を 1 段上のレア度で引くか。</summary>
+        private int _passUpSlotsLeft;
+        /// <summary>〈黄金の通行手形〉の値引き (秘宝・消耗品・武器・賽の枠の値段に掛ける)。</summary>
+        private static int PassPrice(int price)
+            => price > 0 && ItemSystem.PassiveSkills.AxisRules.Owns(GameLoop.GameManager.Instance?.Run, GameLoop.ItemIds.MacroPass)
+                ? Mathf.Max(1, Mathf.CeilToInt(price * PassPriceMul)) : price;
+        private static int PassUpSlotsFor(RunState run) => run != null && run.OwnsPassive(GameLoop.ItemIds.MacroPass) ? PassUpgradeSlots : 0;
         /// <summary>入店した時の run.coinsSpent (店を出る時に、 この店で使った額を出す)。</summary>
         private int _spentAtOpen;
         /// <summary>いま振り直している秘宝の枠の指定の軸 (null = 指定なし)。 TryReroll の間だけ立つ。</summary>
@@ -301,15 +308,9 @@ namespace ItemSystem.Shop
                 if (Debug.unityLogger.logEnabled) Debug.Log($"[ShopManager] イベントの値引き: 全価格 ×{rsCons.nextShopPriceMul:F2}");
                 rsCons.nextShopPriceMul = 1f;
             }
-            // 〈黄金の通行手形〉: 前の店までに使った PassSpendStep (40G) ごとに 1 軒、 秘宝の棚が 1 段上のレア度で並ぶ
-            _passRarityUp = false;
             _spentAtOpen = rsCons != null ? rsCons.coinsSpent : 0;
-            if (rsCons != null && rsCons.passShopsUp > 0)
-            {
-                rsCons.passShopsUp--;
-                _passRarityUp = true;
-                if (Debug.unityLogger.logEnabled) Debug.Log($"[ShopManager] {GameLoop.ItemIds.MacroPass}: 秘宝の棚が 1 段上のレア度 (残り {rsCons.passShopsUp} 軒)");
-            }
+            // 〈黄金の通行手形〉: 秘宝の棚の最初の 2 枠が 1 段上のレア度 (秘宝の 5 枠を並べ終えたら 0 に戻す)
+            _passUpSlotsLeft = PassUpSlotsFor(rsCons);
             _apprMinRarity = null;
             if (rsCons != null && rsCons.nextLootMinRarity >= 0)
             {
@@ -328,6 +329,7 @@ namespace ItemSystem.Shop
             //   (旧測定: 7.30 → 9.37 個で 57.8% → 68.3%)。 死に枠を主力枠へ振り替える。
             for (int i = 0; i < 5; i++)
                 inv.slots.Add(BuildSlot(ShopSlotKind.Passive, inv.priceMultiplier));
+            _passUpSlotsLeft = 0;
 
             // 消費 ×3 (2026-11-20・item-overhaul-spec §2-4): 枠 0 = 回復 (固定) / 枠 1 = シールドか攻撃強化から 1 系統を抽選 / 枠 2 = 戦術消耗品から 1 種。
             //   回復が並ばない店があると消費で耐久を賄う設計が成立しないので 1 枠目は固定。 Tier は T1〜4 から一様。 物資は棚ではなく「物資の包」で買う。
@@ -472,7 +474,7 @@ namespace ItemSystem.Shop
                     basePrice = GameLoop.GameRng.Range(item.buyPrice.min, item.buyPrice.max + 1, "shop.price");
                 else
                     basePrice = 10;
-                price = Mathf.CeilToInt(basePrice * ItemPriceScale * RarityPriceMul(item.rarity) * priceMultiplier) + ItemPriceAdd;
+                price = PassPrice(Mathf.CeilToInt(basePrice * ItemPriceScale * RarityPriceMul(item.rarity) * priceMultiplier) + ItemPriceAdd);
             }
             if (id != null) _shelfIds.Add(id);
             return new ShopSlot { kind = kind, itemId = id, price = price, sold = false };
@@ -538,6 +540,7 @@ namespace ItemSystem.Shop
             if (item != null && item.consFamily == GameLoop.ItemIds.ConsTacticFamily
                 && ItemSystem.PassiveSkills.AxisRules.Owns(GameLoop.GameManager.Instance?.Run, GameLoop.ItemIds.LinkSampleBox))
                 price = Mathf.Max(1, Mathf.CeilToInt(price * ItemSystem.PassiveSkills.Effects.SampleBox.PriceMul));
+            price = PassPrice(price);   // 〈黄金の通行手形〉(見本箱と重なれば掛け算)
             return new ShopSlot
             {
                 kind = ShopSlotKind.Consumable,
@@ -650,11 +653,12 @@ namespace ItemSystem.Shop
                     if (weights[i].rarity == ItemRarity.LEGENDARY) weights[i].weight *= legMul;
             }
             ItemRarity targetRarity = RollTier(pool, weights);
-            // 〈黄金の通行手形〉: 引いたレア度の 1 段上 (LEGENDARY は据え置き・その段の品が棚に出せなければ引いた段のまま)。 乱数は引き足さない
-            if (kind == ShopSlotKind.Passive && _passRarityUp && targetRarity < ItemRarity.LEGENDARY)
+            // 〈黄金の通行手形〉: 棚の最初の 2 枠は引いたレア度の 1 段上 (LEGENDARY は据え置き・その段の品が棚に出せなければ引いた段のまま)。 乱数は引き足さない
+            if (kind == ShopSlotKind.Passive && _passUpSlotsLeft > 0)
             {
+                _passUpSlotsLeft--;
                 var up = targetRarity + 1;
-                if (pool.Exists(it => it.rarity == up)) targetRarity = up;
+                if (targetRarity < ItemRarity.LEGENDARY && pool.Exists(it => it.rarity == up)) targetRarity = up;
             }
             var byTier = pool.FindAll(it => it.rarity == targetRarity);
 
@@ -877,6 +881,7 @@ namespace ItemSystem.Shop
             int rerolled = 0;
             _focusAxis = focusAxis;
             _focusForceLeft = focusAxis != null ? AxisRerollGuaranteed : 0;
+            _passUpSlotsLeft = PassUpSlotsFor(run);   // 〈黄金の通行手形〉: 振り直す秘宝の枠の最初の 2 枠
             try {
             for (int i = 0; i < Current.slots.Count; i++)
             {
@@ -908,7 +913,7 @@ namespace ItemSystem.Shop
                 Current.slots[i] = fresh;
                 rerolled++;
             }
-            } finally { _focusAxis = null; _focusForceLeft = 0; }
+            } finally { _focusAxis = null; _focusForceLeft = 0; _passUpSlotsLeft = 0; }
 
             // **リロールは特売を消していた** (2026-09-17 発見)。 ApplySaleDiscounts は棚生成時に
             //   1 回だけ呼ばれ、 TryReroll は BuildSlot で作り直すだけなので割引が失われる。
@@ -1114,19 +1119,10 @@ namespace ItemSystem.Shop
 
         public void Close()
         {
-            // 〈黄金の通行手形〉: この店で使った額を足し、 PassSpendStep (40G) ごとに次の店 1 軒 (持っている時に出た店だけ)
             var run = GameLoop.GameManager.Instance?.Run;
             // 〈溶金の領主剣〉: この店で使った額を積む (100G につき基礎攻撃 +2・items.json の stats・per = swordShopSpent)
             if (Current != null && run != null && run.OwnsPassive(GameLoop.ItemIds.GoldenKingSword))
                 run.swordShopSpent += System.Math.Max(0, run.coinsSpent - _spentAtOpen);
-            if (Current != null && run != null && run.OwnsPassive(GameLoop.ItemIds.MacroPass))
-            {
-                run.passShopSpent += System.Math.Max(0, run.coinsSpent - _spentAtOpen);
-                int add = run.passShopSpent / PassSpendStep;
-                run.passShopSpent -= add * PassSpendStep;
-                run.passShopsUp += add;
-                if (add > 0) Log($"〈{GameLoop.ItemIds.MacroPass}〉: 次の店から {run.passShopsUp} 軒、 秘宝の棚が 1 段上");
-            }
             Current = null;
             OnShopClosed?.Invoke();
         }

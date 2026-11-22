@@ -62,6 +62,9 @@ namespace AutoTest.EditorTests
             int[] pair = { 2, 2, 5 };
             Assert.That(Run(RoleItems.Bloodmark, pair, roleCount: 1).damageMul, Is.EqualTo(Run(RoleItems.None, pair).damageMul * (1f + 2 * TerminalCards.BloodmarkPer)).Within(1e-4));
             Assert.That(Run(RoleItems.Bloodmark, triple, roleCount: 1).damageMul, Is.EqualTo(b.damageMul).Within(1e-4));
+            // final5: × 7%・上限なし ── 役 10 回目のペアで ×1.70
+            Assert.That(Run(RoleItems.Bloodmark, pair, roleCount: 9).damageMul, Is.EqualTo(Run(RoleItems.None, pair).damageMul * 1.70f).Within(1e-4));
+            Assert.That(Run(RoleItems.Bloodmark, triple, roleCount: 9).damageMul, Is.EqualTo(b.damageMul).Within(1e-4));
             Assert.That(Run(RoleItems.Bloodmark, t5, roleCount: 1).damageMul, Is.EqualTo(Run(RoleItems.None, t5).damageMul).Within(1e-4));
             Assert.That(Run(RoleItems.Bloodmark, new[] { 1, 3, 5 }, roleCount: 1).damageMul, Is.EqualTo(Run(RoleItems.None, new[] { 1, 3, 5 }).damageMul).Within(1e-4));   // 役なし
             // 拍子木: 前のターンに同じ目の役が立っていれば与ダメージ +N%

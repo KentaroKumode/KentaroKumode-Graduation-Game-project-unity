@@ -20,16 +20,16 @@ namespace AutoTest.EditorTests
         [Test]
         public void Disposal_HitsBlockAndAshMultiplier()
         {
-            var b = Run(DeckItems.None, 1);
-            var o = Run(DeckItems.Tongs | DeckItems.Pride | DeckItems.Crucible | DeckItems.Ash, 1);
+            var b = Run(DeckItems.None, 2);
+            var o = Run(DeckItems.Tongs | DeckItems.Pride | DeckItems.Crucible | DeckItems.Ash, 2);
             Assert.That(o.disposedNow, Is.EqualTo(1));
-            // 撃ごとに 挟み + 矜持 + るつぼ (CruciblePer × 累計 2・上限なし)・攻撃の撃は 2 つ
-            int each = TerminalCards.TongsAttack + TerminalCards.PrideAttack + TerminalCards.CruciblePer * 2;
+            // 撃ごとに 挟み + 矜持 + るつぼ (CruciblePer × 累計 3・上限なし)・攻撃の撃は 2 つ
+            int each = TerminalCards.TongsAttack + TerminalCards.PrideAttack + TerminalCards.CruciblePer * 3;
             Assert.That(o.attackAdd - b.attackAdd, Is.EqualTo(each * 2));
             Assert.That(o.blockAdd - b.blockAdd, Is.EqualTo(TerminalCards.PrideBlock));
-            Assert.That(o.damageMul, Is.EqualTo(b.damageMul * (1f + TerminalCards.AshPer * 2)).Within(1e-4));
-            // 〈灰から組む機関〉は累計 2 回から (1 回なら倍率なし)
-            Assert.That(Run(DeckItems.Ash, 0).damageMul, Is.EqualTo(b.damageMul).Within(1e-4));
+            Assert.That(o.damageMul, Is.EqualTo(b.damageMul * (1f + TerminalCards.AshPer * 3)).Within(1e-4));
+            // 〈灰から組む機関〉は累計 3 回から (2 回なら倍率なし・final5: 旧 2 回)
+            Assert.That(Run(DeckItems.Ash, 1).damageMul, Is.EqualTo(b.damageMul).Within(1e-4));
         }
 
         [Test]

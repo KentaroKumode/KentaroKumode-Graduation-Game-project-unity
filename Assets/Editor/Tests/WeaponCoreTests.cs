@@ -31,9 +31,9 @@ namespace AutoTest.EditorTests
             Assert.That(CombatRules.ExecutionBoostOn(41, 100), Is.False);
             Assert.That(CombatRules.MugaBonus(7), Is.EqualTo(11));               // 10.5 → 11
             Assert.That(CombatRules.MugaBlock(2), Is.EqualTo(6));                // 防御の出目 2 個 × 3 (2026-11-22)
-            // 〈画竜点睛〉(2026-11-22): 振った目の最大 (タイ含む) で +60%・装備ダイスの最大の目で +150%・最大でなければ 0
-            Assert.That(CombatRules.GaryoPct(5, 5, 6), Is.EqualTo(60));
-            Assert.That(CombatRules.GaryoPct(6, 6, 6), Is.EqualTo(150));
+            // 〈画竜点睛〉(2026-11-22 final5): 振った目の最大 (タイ含む) で +100%・装備ダイスの最大の目で +200%・最大でなければ 0
+            Assert.That(CombatRules.GaryoPct(5, 5, 6), Is.EqualTo(100));
+            Assert.That(CombatRules.GaryoPct(6, 6, 6), Is.EqualTo(200));
             Assert.That(CombatRules.GaryoPct(4, 5, 6), Is.EqualTo(0));
         }
 

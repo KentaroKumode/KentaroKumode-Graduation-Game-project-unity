@@ -124,17 +124,17 @@ namespace ItemSystem.PassiveSkills.Effects
 
     // ── G: 分岐 A〈多段〉/ 分岐 B〈回収〉 ── (〈激情の刃〉〈百人切りの鉈〉は端子の解決と本体の撃の輪だけ)
 
-    /// <summary>逆綴じの止血帯 (分岐 A): ターンの終わり、 敵の出血 × 1 の軽減不可ダメージ。 このターン 3 撃以上の攻撃をしていたら × 2。</summary>
+    /// <summary>逆綴じの止血帯 (分岐 A): ターンの終わり、 このターン 2 撃以上の攻撃をしていたら敵の出血 × 1 の軽減不可ダメージ。 3 撃以上なら × 2 (final5: 0〜1 撃のターンは働かない)。</summary>
     public class Wringing : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "逆綴じの止血帯";
-        public const int Mul = 1, MulMulti = 2, MultiHits = 3;
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.enemyBleedStacks > 0);
+        public const int Mul = 1, MulMulti = 2, MinHits = 2, MultiHits = 3;
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.enemyBleedStacks > 0 && ctx.hitCount >= MinHits);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             int b = ctx.enemyBleedStacks;
-            if (b <= 0 || ctx.enemyCurrentHP <= 0) return;
+            if (b <= 0 || ctx.enemyCurrentHP <= 0 || ctx.hitCount < MinHits) return;
             int mul = ctx.hitCount >= MultiHits ? MulMulti : Mul;
             Kw.DamageEnemy(ctx, b * mul);
             Rw.Log($"[逆綴じの止血帯] 出血 {b} × {mul} = {b * mul} の軽減不可 (撃 {ctx.hitCount})");
@@ -164,12 +164,12 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>凝血の小瓶: 敵の出血が 16 以上の間、 敵の攻撃 −25%。 30 以上なら、 さらにボスの大技の倍率 −0.5 (大技のターンの攻撃 × (倍率 − 0.5) / 倍率・ターン開始時の出血で見る)。</summary>
+    /// <summary>凝血の小瓶: 敵の出血が 20 以上の間、 敵の攻撃 −20% (final5: 旧 16・−25%)。 30 以上なら、 さらにボスの大技の倍率 −0.5 (大技のターンの攻撃 × (倍率 − 0.5) / 倍率・ターン開始時の出血で見る)。</summary>
     public class ClotVial : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "凝血の小瓶";
-        public const int Need = 16, HeavyNeed = 30;
-        public const float Cut = 0.25f, HeavyMulCut = 0.5f;
+        public const int Need = 20, HeavyNeed = 30;
+        public const float Cut = 0.20f, HeavyMulCut = 0.5f;
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.enemyBleedStacks >= Need);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)

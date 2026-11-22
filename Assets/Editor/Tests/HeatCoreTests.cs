@@ -30,7 +30,7 @@ namespace AutoTest.EditorTests
         [Test]
         public void Burst_SuperKilnLedger()
         {
-            // 超臨界 (閾値の 1.5 倍以上) ×1.5・〈暴れ窯の火床〉×KilnSuperMulPct (2.5・final4) と閾値 −4
+            // 超臨界 (閾値の 1.5 倍以上) ×1.5・〈暴れ窯の火床〉×KilnSuperMulPct (2.0・final5) と閾値 −4
             var s = S(HeatItems.None, HeatCore.Threshold * 3 / 2);
             HeatCore.TryBurst(ref s, out var b);
             Assert.That(b.super && b.damage == 45, Is.True);   // 基礎 30 × 1.5

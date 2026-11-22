@@ -4,14 +4,14 @@ namespace CombatSystem
     /// 会心の軸 (2026-11-21・full-item-rework-spec §3 軸6・full-item-rework-ledger §⑥) の式の<b>正本</b>。
     /// 本体 (PassiveSkillManager.ProcessDamage・CombatManager の撃の輪)・BOT の配線の見積もり・画面の表示は同じ関数を通る。
     ///
-    /// <para><b>超過会心率</b>: 会心率が 100% を超えた分は、 1% ごとに会心倍率 +0.01 (〈寸鉄〉で +0.02) になる (会心した撃だけ)。</para>
+    /// <para><b>超過会心率</b>: 会心率が 100% を超えた分は、 1% ごとに会心倍率 +0.02 (〈寸鉄〉で +0.04) になる (2026-11-22 final5: 旧 +0.01 / +0.02) (会心した撃だけ)。</para>
     /// <para><b>確定会心の撃</b> (〈天眼の鍔〉): 会心率 100% 以上の撃が会心したら、 会心倍率 ×1.25 (超過の変換の後)。</para>
     /// <para>このファイルは UnityEngine に依存しない。</para>
     /// </summary>
     public static class CritCore
     {
-        /// <summary>超過会心率 1 (= 100%) あたりの会心倍率 (1% につき +0.01) / 〈寸鉄〉の倍。</summary>
-        public const float ExcessPerRate = 1f, SuntetsuExcessMul = 2f;
+        /// <summary>超過会心率 1 (= 100%) あたりの会心倍率 (1% につき +0.02・final5: 旧 +0.01) / 〈寸鉄〉の倍。</summary>
+        public const float ExcessPerRate = 2f, SuntetsuExcessMul = 2f;
         /// <summary>〈天眼の鍔〉: 確定会心の撃の会心倍率 ×1.25。</summary>
         public const float HeavenSureMul = 1.25f;
 
@@ -43,9 +43,9 @@ namespace CombatSystem
             return mx;
         }
 
-        /// <summary>〈狙い目の刻み〉: この撃に挿した目が 5 以上なら会心率 +20%、 6 なら確定会心。</summary>
+        /// <summary>〈狙い目の刻み〉: この撃に挿した目が 5 以上なら会心率 +20% (final5: final4 の +30% から戻す)、 6 なら確定会心。</summary>
         public const int AimNeed = 5, AimSure = 6;
-        public const float AimPct = 0.30f;
+        public const float AimPct = 0.20f;
         public static float AimRate(int faceMax) => faceMax >= AimNeed ? AimPct : 0f;
         public static bool AimForce(int faceMax) => faceMax >= AimSure;
 

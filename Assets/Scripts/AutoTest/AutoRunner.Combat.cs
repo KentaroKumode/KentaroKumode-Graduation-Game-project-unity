@@ -541,7 +541,7 @@ namespace AutoTest
             /// <summary>〈加重の拳套〉: 2 撃目以降の撃で与ダメ % の池に足す割合 (0 = 持っていない・本体 ctx.hitOutgoingPct)。</summary>
             public float lateHitOutPct;
             public float nonCritMul;           // 鈍器: 非会心だけ ×(1+x)
-            public bool pinpointCut;           // 〈一点読みの片眼〉の代価: 非会心 ×0.7
+            public bool pinpointCut;           // 〈一点読みの片眼〉の代価: 非会心 × PinpointEye.NonCritKeepPct%
             public float outMul;               // 与ダメ倍率の池 (ctx.outgoing + 整備パネル + 戦意 + 剛胆 + 遺物 + 研磨剤 + 油・膏薬)
             public int consBurst;              // 消費: 攻撃バースト (倍率の後に足す)
             public int critPen;                // 会心した攻撃だけに足す貫通
@@ -633,7 +633,7 @@ namespace AutoTest
             outMul += ws.outPctAdd;
             if (hitNo >= 1) outMul += s.lateHitOutPct;   // 〈加重の拳套〉
             float termMul = ws.damageMul;
-            //   武器の最終与ダメ +% (一対一・捨て身・処刑・鎧砕き・不滅の刃) / 竜閃〈画竜点睛〉(攻撃の端子 1 枚・最大の目 → 確定会心・+150%)
+            //   武器の最終与ダメ +% (一対一・捨て身・処刑・鎧砕き・不滅の刃) / 竜閃〈画竜点睛〉(攻撃の端子 1 枚・最大の目 → 確定会心・+100% / +200%)
             int fpct = s.finalPct + s.rung.FinalPct(s.solo, 1, bCount, s.execBoost, s.shattered, s.undyingStreak + 1);   // ローカル関数は in の引数を捕まえられないので写す
             int garyoPct = s.rung.garyo && ws.aHits == 1 && hitNo == 0 && rawOverride < 0 ? CombatSystem.CombatRules.GaryoPct(ws.atkFaceMax, ws.rolledMax, s.dieMaxFace) : 0;
             bool garyo = garyoPct > 0;
@@ -644,7 +644,7 @@ namespace AutoTest
             // 会心 (CritCore・本体の ProcessDamage と同じ式): 撃ごとの会心率と会心倍率。 配線で決まる品はこの撃の目・撃の数で足す
             float add = s.critAdd, mulAdd = ws.critMultAdd;
             bool force = ws.forceCrit || (hitNo == 0 && s.critP1 >= 1f) || garyo;
-            if (hitNo == 0 && s.quickDrawFirst) mulAdd += ItemSystem.PassiveSkills.Effects.QuickDrawArt.Mul;
+            if (hitNo == 0 && s.quickDrawFirst) add += ItemSystem.PassiveSkills.Effects.QuickDrawArt.Rate;   // final5: 倍率 +1.0 → 会心率 +50% (超過で倍率になる)
             if (s.falconer && ws.atkFaceMax >= ItemSystem.PassiveSkills.Effects.FalconerGlove.MinFace) { add += ItemSystem.PassiveSkills.Effects.FalconerGlove.Rate; mulAdd += ItemSystem.PassiveSkills.Effects.FalconerGlove.Mul; }
             if (s.aim && ws.hitFace != null && hitNo < ws.hitFace.Length) { add += CombatSystem.CritCore.AimRate(ws.hitFace[hitNo]); force |= CombatSystem.CritCore.AimForce(ws.hitFace[hitNo]); }
             if (s.bell) add += ItemSystem.PassiveSkills.Effects.LingeringBell.Rate;
@@ -1869,7 +1869,7 @@ namespace AutoTest
                 if ((f & CombatSystem.RoleItems.Clapper) != 0 && face != 0 && face == st.roleLastFace) mul += CombatSystem.TerminalCards.ClapperPct;
                 if ((f & CombatSystem.RoleItems.Thunder) != 0 && big) { mul *= 1f + CombatSystem.TerminalCards.ThunderFinalPct; v += CombatSystem.TerminalCards.ThunderBlock; }
                 if ((f & CombatSystem.RoleItems.Bloodmark) != 0 && CombatSystem.TerminalCards.BloodmarkFires(r))
-                    mul *= 1f + System.Math.Min(CombatSystem.TerminalCards.BloodmarkMax, CombatSystem.TerminalCards.BloodmarkPer * count);
+                    mul *= 1f + CombatSystem.TerminalCards.BloodmarkPer * count;
                 acc += v + (mul - 1f) * sum;
             }
             return (float)(acc / total);

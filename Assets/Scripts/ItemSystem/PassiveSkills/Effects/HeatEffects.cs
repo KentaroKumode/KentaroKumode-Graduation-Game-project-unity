@@ -67,11 +67,11 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => Kw.AddHeat(ctx, Stored);
     }
 
-    /// <summary>荒砥: 爆発するたび、 この戦闘中の与ダメージ +7% (次のターンの振り直しの後から・2026-11-22 final4: +5%・最大 +30% → +7%・上限なし)。 撃ごとの臨界 +2 は HeatCore の旗 (5g)。</summary>
+    /// <summary>荒砥: 爆発するたび、 この戦闘中の与ダメージ +4% (次のターンの振り直しの後から・2026-11-22 final4: +5%・最大 +30% → +7%・上限なし → final5: +4%)。 撃ごとの臨界 +2 は HeatCore の旗 (5g)。</summary>
     public class RoughWhetstone : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => GameLoop.ItemIds.HeatWhetstone;
-        public const int PctPerBurst = 7;
+        public const int PctPerBurst = 4;
         /// <summary>[persistent] 積もった与ダメージの % 。</summary>
         private const string Key = "heat.whet";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Pct(Rw.Count(ctx, Key) / 100f);

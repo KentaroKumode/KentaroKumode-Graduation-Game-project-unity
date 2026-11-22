@@ -479,9 +479,9 @@ namespace GameLoop
         public int  receiptRemovals;
         /// <summary>〈相場師の算盤〉: 持っている間に店でリロールした回数 (最大 10・戦闘開始時のブロック +2・最初の 1 撃 +1 × 回数)。</summary>
         public int  abacusStacks;
-        /// <summary>〈黄金の通行手形〉: 店で使ったゴールドの PassSpendStep (40G) に満たない端数 (店を出る時に足す)。</summary>
+        /// <summary>[使っていない・セーブ互換で残す] 旧〈黄金の通行手形〉(40G ごと・2026-11-22 final5 で作り直し) の端数。 読み書きしない。</summary>
         public int  passShopSpent;
-        /// <summary>〈黄金の通行手形〉: 秘宝の棚が 1 段上のレア度で並ぶ店の残り軒数 (店に入るたび 1 つ使う)。</summary>
+        /// <summary>[使っていない・セーブ互換で残す] 旧〈黄金の通行手形〉の残り軒数。 読み書きしない。</summary>
         public int  passShopsUp;
         /// <summary>〈避雷の天幕〉: 数えている層の深さ (違う層に入ったら数え直す) と、 その層で半分にした回数。</summary>
         public int  tentDepth = -1, tentUses;

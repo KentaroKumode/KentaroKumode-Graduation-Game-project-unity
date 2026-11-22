@@ -452,12 +452,12 @@ namespace ItemSystem.PassiveSkills.Effects
     //  竜閃 — 一刀両断・極大単撃
     // ============================================================
 
-    /// <summary>画竜点睛: 攻撃の端子を 1 枚だけ発動し、 そこにこのターン振った目の最大 (タイ含む) を挿したとき、 その 1 撃は確定会心・最終与ダメージ ×1.6 (+60%)。
-    /// その目が装備ダイスの最大の目なら ×2.5 (+150%) で、 ボスの次の目盛りをその場で割る (満額のダウン・1 ターン 1 回)。 攻撃の端子を 2 枚以上発動したターンは不発 (〈無我無心〉)。
+    /// <summary>画竜点睛: 攻撃の端子を 1 枚だけ発動し、 そこにこのターン振った目の最大 (タイ含む) を挿したとき、 その 1 撃は確定会心・最終与ダメージ ×2.0 (+100%)。
+    /// その目が装備ダイスの最大の目なら ×3.0 (+200%) で、 ボスの次の目盛りをその場で割る (満額のダウン・1 ターン 1 回)。 攻撃の端子を 2 枚以上発動したターンは不発 (〈無我無心〉)。
     /// 式は <see cref="CombatRules.GaryoPct"/> (2026-11-22・旧: 装備ダイスの最大の目だけ)。</summary>
     public class GaryoTensei : IPassiveSkillEffect
     {
-        public const int FinalPct = 150, RollMaxPct = 60;
+        public const int FinalPct = 200, RollMaxPct = 100;   // final5: 150 / 60 → 200 / 100 (会心倍率 2.0 → 1.6 の巻き添えを戻す)
         public const string TurnKey = "ryusen.garyoTurn", BrokeKey = "ryusen.garyoBroke";
         public string SkillId => "画竜点睛";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage, PassiveSkillTrigger.OnPostDealDamage };
