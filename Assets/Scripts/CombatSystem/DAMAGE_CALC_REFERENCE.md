@@ -331,7 +331,7 @@ ShieldBash の空振り（盾 0）が 34.2% → 66.1%、1 機会あたりの攻�
 | `healBlocked`/`lifestealPct` | 回復封印/与ダメ回復% | 毎T |
 | `playerFlatDamageReduction` | 被ダメ定額減(不屈の鎧/苦難の刻印) | BeginNewTurn |
 | `receivedDamageBonus` | 被ダメ増(亡者の招待+30%) | — |
-| `halveFirstEnemyAttack`/`playerDamageNegateCharges`/`nullifyFirstEnemyRoll` | 共助/獣の絆/獣の恩義 | フラグ消費 |
+| `halveFirstEnemyAttack`/`playerDamageNegateCharges` | 共助/獣の絆 | フラグ消費 (〈獣の恩義〉`nullifyFirstEnemyRoll` は 2026-11-22 に削除・GAME.md §24) |
 | `truceThisTurn` | 停戦協定ターン(他効果抑止) | 毎T |
 | `consShield`/`consDmgMultPct`/`consAtkBurst`/`consDiceRoll` | 消費アイテム由来 (`consAtkBurst`/`consDiceRoll` を書くのは〈痛覚遮断剤〉だけ) | 各種 |
 | buff `damageBonus`/`critRatePct`(小数)/`enemyDiceDebuff` | currentBuffs/nextTurnBuffs経由 | nextTurn→current移行 |

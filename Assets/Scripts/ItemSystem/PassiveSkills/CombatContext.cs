@@ -221,8 +221,6 @@ namespace ItemSystem.PassiveSkills
         public bool halveFirstEnemyAttack;
         /// <summary>[persistent] (残り回数・被弾で減る) 獣の絆: 被弾を回数分無効化（>0時、被弾時にデクリメント）</summary>
         public int playerDamageNegateCharges;
-        /// <summary>[persistent] (戦闘開始で立てる) 獣の恩義: 1ターン目の敵ロールを0扱いに（適用後にfalse）</summary>
-        public bool nullifyFirstEnemyRoll;
         /// <summary>[persistent] 呪いの渇き: HP回復効果半減</summary>
         public bool healHalved;
         /// <summary>[perTurn] 狂暴化(ボス50T後): プレイヤーの回復を完全に封じる。毎ターン狂暴化パッシブが再set。BeginNewTurn でリセット。</summary>
