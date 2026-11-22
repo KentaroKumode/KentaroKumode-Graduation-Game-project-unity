@@ -45,7 +45,7 @@ namespace ItemSystem
             if (run.lockedAxes.Contains(axis) || run.lockedAxes.Count >= LockSlots) return;
             run.lockedAxes.Add(axis);
             if (run.lockedAxes.Count == LockSlots) { LocksCompleted++; LockFloorSum += run.currentFloor; }
-            UnityEngine.Debug.Log($"[出現の枠] {axis} を登録 ({run.lockedAxes.Count}/{LockSlots}{(run.lockedAxes.Count == LockSlots ? "・ロック成立" : "")})");
+            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[出現の枠] {axis} を登録 ({run.lockedAxes.Count}/{LockSlots}{(run.lockedAxes.Count == LockSlots ? "・ロック成立" : "")})");
         }
 
         /// <summary>主軸: ロック成立後、 4 枠の軸のうち所持数 (<see cref="AxisRules.Count"/>) が単独 1 位の軸。 ロック前・同率 1 位・所持 0 なら null。</summary>
@@ -103,7 +103,7 @@ namespace ItemSystem
         {
             int gold = GoldIncome.Gain(run, SkipGoldFor(ids, run), "見送り(" + source + ")");
             Skips++; SkipGoldTotal += gold; RunSkips++; RunSkipGold += gold;
-            UnityEngine.Debug.Log($"[見送り] {source}: +{gold}G");
+            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[見送り] {source}: +{gold}G");
             return gold;
         }
 

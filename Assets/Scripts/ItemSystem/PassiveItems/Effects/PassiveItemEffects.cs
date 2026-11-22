@@ -28,7 +28,7 @@ namespace ItemSystem.PassiveItems.Effects
         {
             if (run == null) return;
             GameLoop.GoldIncome.Gain(run, Gain, "黄金色の封蝋");
-            Debug.Log($"[PassiveItem] 黄金色の封蝋: 層突入 ゴールド+{Gain} (所持 {run.coins})");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[PassiveItem] 黄金色の封蝋: 層突入 ゴールド+{Gain} (所持 {run.coins})");
         }
     }
 
@@ -72,7 +72,7 @@ namespace ItemSystem.PassiveItems.Effects
             int n = YokyoSet.OtherCount(run, Id);
             if (n <= 0) return;
             ctx.playerDiceTotal += n;
-            Debug.Log($"[佯狂者の杖] 発狂中: ダイス合計+{n}");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[佯狂者の杖] 発狂中: ダイス合計+{n}");
         }
     }
 
@@ -88,7 +88,7 @@ namespace ItemSystem.PassiveItems.Effects
             if (n <= 0) return;
             if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
             ctx.outgoingDamageMultiplier += 0.30f * n;
-            Debug.Log($"[佯狂者の衣] 発狂中: 与ダメ+{30 * n}%");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[佯狂者の衣] 発狂中: 与ダメ+{30 * n}%");
         }
     }
 
@@ -106,7 +106,7 @@ namespace ItemSystem.PassiveItems.Effects
             if (stack <= 0) return;
             if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
             ctx.outgoingDamageMultiplier += 0.04f * stack;
-            Debug.Log($"[佯狂者の冠] 発狂スタック{stack}: 与ダメ+{stack * 4}%");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[佯狂者の冠] 発狂スタック{stack}: 与ダメ+{stack * 4}%");
         }
     }
 

@@ -95,7 +95,7 @@ namespace CombatSystem
                 if (secondaryEnemy != null && secondaryHP > 0 && dbDealt > 0f)
                 {
                     secondaryHP = Math.Max(0, secondaryHP - (int)dbDealt);
-                    Debug.Log($"[黎明] 2体目 {secondaryEnemy.displayName} にも −{(int)dbDealt} (HP {secondaryHP})");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[黎明] 2体目 {secondaryEnemy.displayName} にも −{(int)dbDealt} (HP {secondaryHP})");
                 }
             }
 
@@ -138,7 +138,7 @@ namespace CombatSystem
                 {
                     playerHP = Math.Max(0, playerHP - drain);
                     ctx.playerCurrentHP = playerHP;
-                    Debug.Log($"[不完全な修復] 身体が保たない -{drain} (HP: {playerHP}/{playerMaxHP})");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[不完全な修復] 身体が保たない -{drain} (HP: {playerHP}/{playerMaxHP})");
                 }
             }
 
@@ -148,7 +148,7 @@ namespace CombatSystem
                 int dmg = floorMod.perTurnSelfDamage;
                 playerHP = Math.Max(0, playerHP - dmg);
                 ctx.playerCurrentHP = playerHP;
-                Debug.Log($"[CombatManager] フロアデバフ: 自傷-{dmg} (HP: {playerHP}/{playerMaxHP})");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[CombatManager] フロアデバフ: 自傷-{dmg} (HP: {playerHP}/{playerMaxHP})");
             }
 
             // ターン終了スキルによるHP変動をCombatManagerに反映（剣鎧等）
@@ -191,7 +191,7 @@ namespace CombatSystem
             // （オーバーキル消失バグの修正：致死ダメージは回復で帳消しにできない）。
             if (combatLethalThisTurn && playerHP > 0)
             {
-                Debug.Log($"[CombatManager] 戦闘致死確定: ターン終了回復による蘇生を無効化 (HP {playerHP}→0)");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[CombatManager] 戦闘致死確定: ターン終了回復による蘇生を無効化 (HP {playerHP}→0)");
                 playerHP = 0;
                 ctx.playerCurrentHP = 0;
                 result.playerHPAfter = 0;
@@ -200,7 +200,7 @@ namespace CombatSystem
             // 2026-06-28: 痛覚遮断剤 (狂戦士スターター): proc 後の攻撃終了時に死亡確定
             if (ctx.painkillerProcced && playerHP > 0)
             {
-                Debug.Log($"[痛覚遮断剤] 強化攻撃終了 → 死亡 (HP {playerHP}→0)");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[痛覚遮断剤] 強化攻撃終了 → 死亡 (HP {playerHP}→0)");
                 playerHP = 0;
                 ctx.playerCurrentHP = 0;
                 ctx.painkillerProcced = false;
@@ -263,7 +263,7 @@ namespace CombatSystem
             HpLossDiag.Lose(ref hp, dmg, "臨界の爆発");
             CombatStats.DamageBreakdown[22] += before - hp;   // [計装] 臨界の爆発
             if (resolving) enemyHP = hp; else ctx.enemyCurrentHP = hp;
-            Debug.Log($"[臨界爆発] {landed}{(relicBurst > 0 ? $" ＋遺物 {relicBurst} (現在HP {before} の {rinPct:P0})" : "")} → 敵HP {hp}");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[臨界爆発] {landed}{(relicBurst > 0 ? $" ＋遺物 {relicBurst} (現在HP {before} の {rinPct:P0})" : "")} → 敵HP {hp}");
             return hp <= 0;
         }
 
@@ -278,7 +278,7 @@ namespace CombatSystem
                 && (dealtDmg > 0 || dealtFixed > 0)
                 && GameLoop.GameRng.Chance(ctx.enemyDodgeChance, "combat.dodge", RngIdx(3)))
             {
-                Debug.Log($"[解析演算] 回避 {ctx.enemyDodgeChance:P0} 成功 — 与ダメ {dealtDmg}+{dealtFixed} を無効化"
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[解析演算] 回避 {ctx.enemyDodgeChance:P0} 成功 — 与ダメ {dealtDmg}+{dealtFixed} を無効化"
                         + " (次ターンは回避不能)");
                 EnemyHpLedger.NoteVescaDefense(0, dealtDmg, dealtFixed);   // [計装] 回避で消えた量
                 dealtDmg = 0; dealtFixed = 0;
@@ -295,7 +295,7 @@ namespace CombatSystem
                 dealtDmg   = (dealtDmg   + 1) / 2;
                 dealtFixed = (dealtFixed + 1) / 2;
                 EnemyHpLedger.NoteVescaDefense(1, beforeDmg - dealtDmg, beforeFixed - dealtFixed);   // [計装] 半減で消えた量
-                Debug.Log($"[天与の盾] 与ダメ {beforeDmg}+{beforeFixed} → {dealtDmg}+{dealtFixed} (半減)");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[天与の盾] 与ダメ {beforeDmg}+{beforeFixed} → {dealtDmg}+{dealtFixed} (半減)");
             }
 
             // --- シールド吸収 ---
@@ -312,7 +312,7 @@ namespace CombatSystem
             if (absorbed > 0)
             {
                 ctx.vescaShieldAbsorbedThisTurn += absorbed;
-                Debug.Log($"[ヴェスカ] シールドが {absorbed} 吸収 (残 {ctx.vescaShield})");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[ヴェスカ] シールドが {absorbed} 吸収 (残 {ctx.vescaShield})");
             }
         }
 
@@ -333,7 +333,7 @@ namespace CombatSystem
             if (ctx.vescaBleedOnHit > 0 && takenApplied > 0)
             {
                 ctx.massiveBleedStacks += ctx.vescaBleedOnHit;
-                Debug.Log($"[大出血] +{ctx.vescaBleedOnHit} (計 {ctx.massiveBleedStacks}・解除不可/減衰なし)");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[大出血] +{ctx.vescaBleedOnHit} (計 {ctx.massiveBleedStacks}・解除不可/減衰なし)");
             }
 
             if (ctx.vescaMaxHpBiteOnHit > 0 && takenApplied > 0)
@@ -345,14 +345,14 @@ namespace CombatSystem
                 ctx.playerCurrentHP = playerHP;
                 var run = GameLoop.GameManager.Instance?.Run;
                 if (run != null) { run.playerMaxHP = playerMaxHP; run.playerHP = playerHP; }
-                Debug.Log($"[天与の剣] 最大HP -{bite} → {playerMaxHP}");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[天与の剣] 最大HP -{bite} → {playerMaxHP}");
             }
 
             // 処刑は「攻撃終了時」判定なので、 このターンに被弾していなくても閾値を割っていれば発動する。
             if (ctx.vescaExecuteArmed && playerHP > 0
                 && CombatRules.ExecuteKills(playerHP, playerMaxHP))
             {
-                Debug.Log($"[処刑人の烙印] HP {playerHP}/{playerMaxHP} が 20% 以下 — 9999 の軽減不可ダメージ");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[処刑人の烙印] HP {playerHP}/{playerMaxHP} が 20% 以下 — 9999 の軽減不可ダメージ");
                 playerHP = 0;
                 ctx.playerCurrentHP = 0;
                 // 通常被ダメと区別する (§13-3 の死因診断は「総被ダメに占める支配率」で本命レバーを選ぶため、
@@ -391,7 +391,7 @@ namespace CombatSystem
             if (fleeAfterTurns > 0 && ctx != null && ctx.currentTurn >= fleeAfterTurns
                 && playerHP > 0 && enemyHP > 0)
             {
-                Debug.Log($"[CombatManager] 偽の商人: {fleeAfterTurns}ターン経過 → 逃走（戦闘強制終了）");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[CombatManager] 偽の商人: {fleeAfterTurns}ターン経過 → 逃走（戦闘強制終了）");
                 FinishCombat();
                 _stepResult = new TurnResult
                 {
@@ -454,7 +454,7 @@ namespace CombatSystem
                         ctx.AddPlayerDamageSource(ItemSystem.PassiveSkills.DeathCause.Erosion, dmg);
                         if (playerHP <= 0) ctx.lastDamageCause = ItemSystem.PassiveSkills.DeathCause.Erosion;
                     }
-                    Debug.Log($"[蝕み] {raw} (シールド {absorbed} 肩代わり) → HP {playerHP}");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[蝕み] {raw} (シールド {absorbed} 肩代わり) → HP {playerHP}");
                 }
             }
             // T4-E〈最後の審判〉: ラン累計ターンの刻限。 **ターン開始時に清算する**。
@@ -525,7 +525,7 @@ namespace CombatSystem
                     enemyHP += heal;
                     ctx.enemyCurrentHP = enemyHP;
                     EnemyHpLedger.NoteHeal(heal); EnemyHpLedger.CtxOverwritten();   // [計装]
-                    Debug.Log($"[CombatManager] フロアデバフ: 敵HP+{heal} ({enemyHP}/{currentEnemy.maxHP})");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[CombatManager] フロアデバフ: 敵HP+{heal} ({enemyHP}/{currentEnemy.maxHP})");
                 }
             }
             // 挑戦カード〈再生〉: 敵が毎ターン最大 HP の N% を回復する / 〈敵のシールド〉: 最大 HP の N% までシールドを張り直す。
@@ -540,7 +540,7 @@ namespace CombatSystem
                     enemyHP += heal;
                     ctx.enemyCurrentHP = enemyHP;
                     EnemyHpLedger.NoteHeal(heal); EnemyHpLedger.CtxOverwritten();   // [計装]
-                    Debug.Log($"[再生] 敵HP+{heal} ({enemyHP}/{eMax})");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[再生] 敵HP+{heal} ({enemyHP}/{eMax})");
                 }
                 float esh = MetaProgression.MetaDebuffApplicator.GetEnemyShieldPct();
                 if (esh > 0f)
@@ -590,7 +590,7 @@ namespace CombatSystem
                     playerDice[i] = top >= 0 ? faces[top] : playerDiceMax;
                     if (playerFaceIdx != null && i < playerFaceIdx.Length) playerFaceIdx[i] = top;
                 }
-                Debug.Log($"[{MetaProgression.PermanentDebuffIds.Wrath}] 1T目: 自ダイスを全て最大値 {(top >= 0 ? faces[top] : playerDiceMax)} に");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[{MetaProgression.PermanentDebuffIds.Wrath}] 1T目: 自ダイスを全て最大値 {(top >= 0 ? faces[top] : playerDiceMax)} に");
             }
 
 
@@ -620,7 +620,7 @@ namespace CombatSystem
                         playerDice[i] = GameLoop.GameRng.Range(1, 3, "vesca.divineRing", RngIdx(i));
                         crushed++;
                     }
-                Debug.Log($"[天与の指輪] 3 以上の出目 {crushed} 本を 1〜2 へ再抽選 ({playerDice.Length} 本中)");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[天与の指輪] 3 以上の出目 {crushed} 本を 1〜2 へ再抽選 ({playerDice.Length} 本中)");
             }
             // 7層ヴェスカ〈落雷の避雷針〉: ダイス 1 本 (ランダム) を **そのダイスの最小面**に固定。
             // どの目が潰れるか読めない圧にするためランダム選択 (§13-4)。
@@ -636,7 +636,7 @@ namespace CombatSystem
                     for (int i = 1; i < faces.Length; i++) if (faces[i] < minFace) minFace = faces[i];
                 }
                 int idx = GameLoop.GameRng.Range(0, playerDice.Length, "combat.lightning", RngIdx(4));
-                Debug.Log($"[落雷の避雷針] ダイス{idx + 1} を {playerDice[idx]} → {minFace} (最小面) に固定");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[落雷の避雷針] ダイス{idx + 1} を {playerDice[idx]} → {minFace} (最小面) に固定");
                 playerDice[idx] = minFace;
                 // 上書き系なので面から降ろす (見放された運と同じ扱い)。
                 if (playerFaceIdx != null && idx < playerFaceIdx.Length) playerFaceIdx[idx] = -1;
@@ -774,11 +774,11 @@ namespace CombatSystem
                                    ctx.vescaMaxHpBiteOnHit, ctx.vescaDrawnRelics);
             if (!string.IsNullOrEmpty(ctx.bossId) && ctx.bossId.StartsWith(GameLoop.BossIds.Layer7Prefix))
                 BossDmgDiag.V7Turn(ctx.vescaDrawnRelics);
-            Debug.Log($"[相互攻撃] T{tele.turn} 予告: 敵攻撃 {enemyAtkValue} (段階{tele.escalationStage}" +
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[相互攻撃] T{tele.turn} 予告: 敵攻撃 {enemyAtkValue} (段階{tele.escalationStage}" +
                       $"{(tele.nextThresholdTurn > 0 ? $"・次段階T{tele.nextThresholdTurn}" : "・最終段階")})" +
                       $" 防御前{enemyAtkBeforeDefense}・自防御{ctx.playerDefense}−削り{ctx.enemyArmorPen}");
             if (tele.drawnRelics != null && tele.drawnRelics.Length > 0)
-                Debug.Log($"[予告] 遺物学者: {string.Join(" / ", tele.drawnRelics)}"
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[予告] 遺物学者: {string.Join(" / ", tele.drawnRelics)}"
                         + (tele.enemyShield > 0 ? $"  シールド{tele.enemyShield}" : "")
                         + (tele.enemyShieldReflectRate > 0f ? $"  反射×{tele.enemyShieldReflectRate:F1}" : "")
                         + (tele.enemyDodgeChance > 0f ? $"  回避{tele.enemyDodgeChance:P0}" : "")
@@ -1002,7 +1002,7 @@ namespace CombatSystem
             if (skipAttack)
             {
                 if (atkBase > 0 || ctx.pursuitDamage > 0)
-                    Debug.Log($"[配線] 攻撃端子が空 → **攻撃を行わない** "
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[配線] 攻撃端子が空 → **攻撃を行わない** "
                             + $"(素火力{playerAttackPower} 込み {atkBase} / 追撃 {ctx.pursuitDamage} を破棄)");
                 atkBase = 0;
                 hitBases.Clear();
@@ -1021,7 +1021,7 @@ namespace CombatSystem
                     hitBases[0] += goldAtk;   // 端子に紐づかない攻撃の加算なので最初の 1 撃へ (攻撃するターンは攻撃の端子が 1 枚以上ある)
                     atkBase += goldAtk;
                     GoldPunchPaidTotal += paid; GoldPunchTurnsTotal++;   // [計装]
-                    Debug.Log($"[金で殴る] {paid}G を払って攻撃 +{goldAtk} (残り {goldRun.coins}G)");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[金で殴る] {paid}G を払って攻撃 +{goldAtk} (残り {goldRun.coins}G)");
                 }
             }
             // 7層ヴェスカ〈麻痺毒の小瓶〉・敵〈罠師〉〈呪縛〉: このターンのプレイヤー攻撃力を減算 (0 で床)。
@@ -1032,7 +1032,7 @@ namespace CombatSystem
                 int before = atkBase;
                 for (int h = 0; h < hitBases.Count; h++) hitBases[h] = Math.Max(0, hitBases[h] - ctx.playerAttackPowerPenalty);
                 atkBase = hitBases.Sum();
-                Debug.Log($"[攻撃力の減算] 攻撃力 {before} → {atkBase} (-{ctx.playerAttackPowerPenalty}, 0で床)");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[攻撃力の減算] 攻撃力 {before} → {atkBase} (-{ctx.playerAttackPowerPenalty}, 0で床)");
             }
             // 〈不完全な起動〉(門を不完全に起動した罰・2026-09-14)。
             //   回路が繋がりきらず出力が出ない。 **atkBase への割合**で掛ける ──
@@ -1047,7 +1047,7 @@ namespace CombatSystem
                 for (int h = 0; h < hitBases.Count; h++) hitBases[h] = GameLoop.GateFlaws.ApplyIgnitionCut(igRun, hitBases[h]);
                 atkBase = hitBases.Sum();
                 if (atkBase != beforeIg)
-                    Debug.Log($"[不完全な起動] 出力不足 atkBase {beforeIg} → {atkBase}");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[不完全な起動] 出力不足 atkBase {beforeIg} → {atkBase}");
             }
 
             // (臨界の爆発は閾値に届いたその場でダメージを出す ── ADR-0016・LandBurst。 旧: ここで次の攻撃の固定ダメの枠へ入れていた)
@@ -1109,7 +1109,7 @@ namespace CombatSystem
             {
                 // この後の処理 (計装・画面の倍率) は 1 撃目の後の値を読む前提なので、 1 撃目の後の値へ戻す
                 ctx.outgoingDamageMultiplier = afterPool; ctx.criticalMultiplier = afterCritMul; ctx.critRatePctAdd = afterCritAdd;
-                Debug.Log($"[攻撃] 端子ごとに {nHits} 撃: 攻撃 {string.Join("/", hitBases)} → 与ダメ {string.Join("/", hitDealt)}");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[攻撃] 端子ごとに {nHits} 撃: 攻撃 {string.Join("/", hitBases)} → 与ダメ {string.Join("/", hitDealt)}");
             }
             // 攻撃しないターン (攻撃端子 0 本・逃げる) は主攻撃を 0 にする (2026-11-04)。
             //   atkBase を 0 にしても、 ProcessDamage の中でバフ (damageBonus) と OnPreDealDamage のパッシブが
@@ -1236,7 +1236,7 @@ namespace CombatSystem
                         CritExecuteFired++;
                         HpLossDiag.Add("経路:処刑(天眼の鍔)", left);
                         EnemyHpLedger.Land("処刑(天眼の鍔)", left, left);
-                        Debug.Log($"[天眼の鍔] 会心のあと敵 HP {left} ≤ {line} → 倒す");
+                        if (Debug.unityLogger.logEnabled) Debug.Log($"[天眼の鍔] 会心のあと敵 HP {left} ≤ {line} → 倒す");
                     }
                 }
                 // 〈百人切りの鉈〉(2026-11-21・BleedCore): 撃が当たったあと、 敵の出血が 12 以上で HP が「出血 × 1.2%」(ボスは半分・最大 25%) 以下なら倒す。 CanExecuteEnemy で止まる
@@ -1250,7 +1250,7 @@ namespace CombatSystem
                         BleedExecuteFired++;
                         HpLossDiag.Add("経路:処刑(百人切りの鉈)", left);
                         EnemyHpLedger.Land("処刑(百人切りの鉈)", left, left);
-                        Debug.Log($"[百人切りの鉈] 出血 {ctx.enemyBleedStacks} の敵 HP {left} ≤ {line} → 倒す");
+                        if (Debug.unityLogger.logEnabled) Debug.Log($"[百人切りの鉈] 出血 {ctx.enemyBleedStacks} の敵 HP {left} ≤ {line} → 倒す");
                     }
                 }
                 // 短剣〈処刑〉: 撃が当たったあと、 敵の残り HP が 15% 以下 (ボス 10% 以下) なら倒す。 CanExecuteEnemy で止まる
@@ -1262,7 +1262,7 @@ namespace CombatSystem
                     WeaponExecuteFired++;
                     HpLossDiag.Add("経路:処刑(短剣)", left);
                     EnemyHpLedger.Land("処刑(短剣)", left, left);
-                    Debug.Log($"[処刑] 敵 HP {left}/{ctx.enemyMaxHP} → 倒す");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[処刑] 敵 HP {left}/{ctx.enemyMaxHP} → 倒す");
                 }
                 int broke = NoteBossDownMainHit(hitDmg, ctx.currentTurn);   // ボスのダウン (2026-11-14): 目盛りを割れるのは通常攻撃だけ (固定ダメの枠より前の HP で判定)
                 // 端子〈崩し斬り〉(2026-11-20): この撃 (撃 h = 攻撃の端子 h 枚目) で目盛りを割ったら、 最大 HP の 5% の軽減不可 (預かり・ターンの最後に通る。 通常攻撃ではないので次の目盛りは割らない)
@@ -1271,7 +1271,7 @@ namespace CombatSystem
                     int pct = TerminalCards.Get(term.attackHitIds[h])?.upgraded == true ? TerminalCards.CrushPctUp : TerminalCards.CrushPct;
                     int extra = currentEnemy.maxHP * pct / 100;
                     ItemSystem.PassiveSkills.Keywords.Kw.DamageEnemy(ctx, extra);
-                    Debug.Log($"[崩し斬り] 目盛りを割った → 軽減不可 {extra} (最大 HP の {pct}%)");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[崩し斬り] 目盛りを割った → 軽減不可 {extra} (最大 HP の {pct}%)");
                 }
             }
             HpLossDiag.Lose(ref enemyHP, dealtFixed, "固定ダメ");
@@ -1320,7 +1320,7 @@ namespace CombatSystem
                     reflect = reflect;
                     playerHP = Math.Max(0, playerHP - reflect);
                     ctx.playerCurrentHP = playerHP;
-                    Debug.Log($"[ヴェスカ] シールド反射 {ctx.vescaShieldAbsorbedThisTurn}×{ctx.vescaShieldReflectRate:F1} = {reflect} ダメージ");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[ヴェスカ] シールド反射 {ctx.vescaShieldAbsorbedThisTurn}×{ctx.vescaShieldReflectRate:F1} = {reflect} ダメージ");
                 }
             }
 
@@ -1345,7 +1345,7 @@ namespace CombatSystem
                 if (_diagKind == SkillDiag.Boss && currentEnemy != null)
                     SkillDiag.BossDmgOf(currentEnemy.id)[4] += Math.Min(chunk, enemyHP);
                 HpLossDiag.Lose(ref enemyHP, chunk, "役〈極〉");
-                Debug.Log($"[役] 極: 最大HP {ctx.enemyMaxHP} の {roleOutcome.yachtChunkPct:F1}% "
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[役] 極: 最大HP {ctx.enemyMaxHP} の {roleOutcome.yachtChunkPct:F1}% "
                         + $"= {chunk} を軽減無視で削る → 残 {enemyHP}");
             }
 
@@ -1406,7 +1406,7 @@ namespace CombatSystem
                 if (lateBlock > 0 && !ctx.enemyAttackIgnoresGuard)
                 {
                     blockSum += lateBlock; ctx.blockSumThisTurn = blockSum;
-                    Debug.Log($"[品のブロック] 配線の後に +{lateBlock} → ブロック {blockSum}");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[品のブロック] 配線の後に +{lateBlock} → ブロック {blockSum}");
                 }
             }
 
@@ -1437,7 +1437,7 @@ namespace CombatSystem
             bool chargeThisTurn = !downThisTurn && currentEnemy != null && (Escalation.IsChargeNoAttack(currentEnemy, ctx.currentTurn) || TenyoHeavy.NoAttackAt(currentEnemy, ctx.currentTurn));      // 天与の盾・指輪も攻撃しない (2026-11-15)
             if (enemyHP > 0 && (enemyStunnedThisTurn || downThisTurn || chargeThisTurn))
             {
-                Debug.Log(downThisTurn ? "[ダウン] 敵は行動不能 (攻撃しない)" : enemyStunnedThisTurn ? $"[役] 封じ・揃: 敵は行動不能 (予告されていた攻撃 {enemyAtkValue} は不発)"
+                if (Debug.unityLogger.logEnabled) Debug.Log(downThisTurn ? "[ダウン] 敵は行動不能 (攻撃しない)" : enemyStunnedThisTurn ? $"[役] 封じ・揃: 敵は行動不能 (予告されていた攻撃 {enemyAtkValue} は不発)"
                         : "[大技] チャージ: 敵は攻撃しない (次のターンが大技)");
                 ctx.daggerArmed = false;   // 仕込み刃はこのターン限り ── 攻撃が来なくても失効
                 ctx.accumulatedValues.Remove(GameLoop.Consumables.OldLetterGuardKey);   // 古い手紙も同じ
@@ -1452,7 +1452,7 @@ namespace CombatSystem
                     if (pd > 0)
                     {
                         HpLossDiag.Lose(ref enemyHP, EnemyHpLedger.ProbePassive(pd), "毒(廃庭の霧吹き)");   // [測定用の物差し] 入る量だけ
-                        Debug.Log($"[廃庭の霧吹き] 敵の攻撃に合わせて毒 {pd} → 敵HP {enemyHP}");
+                        if (Debug.unityLogger.logEnabled) Debug.Log($"[廃庭の霧吹き] 敵の攻撃に合わせて毒 {pd} → 敵HP {enemyHP}");
                     }
                 }
                 // --- 敵攻撃: 基礎×段階倍率 + β×ロール − ブロック (下限0) → 被ダメ修飾チェーン ---
@@ -1514,7 +1514,7 @@ namespace CombatSystem
                     if (takenDmg > 0)
                     {
                         int reflect = takenDmg * DaggerReflectMultiplier;
-                        Debug.Log($"[仕込み刃] 被ダメ {takenDmg} を無効化 + 軽減不可 {reflect} (×{DaggerReflectMultiplier}) で反撃");
+                        if (Debug.unityLogger.logEnabled) Debug.Log($"[仕込み刃] 被ダメ {takenDmg} を無効化 + 軽減不可 {reflect} (×{DaggerReflectMultiplier}) で反撃");
                         takenDmg = 0;
                         HpLossDiag.Lose(ref enemyHP, reflect, "仕込み刃");
                     }
@@ -1615,7 +1615,7 @@ namespace CombatSystem
                 _secondaryAtkThisTurn = enemyAtkValue;
                 secondaryAtkBeforeDefense = enemyAtkBeforeDefense;
                 _twinStrikeThisTurn = true;
-                Debug.Log($"[多頭攻撃] ブロックの個数が攻撃より多い ── {currentEnemy.displayName} が 2 回攻撃 ({enemyAtkValue} × 2)");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[多頭攻撃] ブロックの個数が攻撃より多い ── {currentEnemy.displayName} が 2 回攻撃 ({enemyAtkValue} × 2)");
             }
             if ((secondaryEnemy != null && secondaryHP > 0) || (_twinStrikeThisTurn && primaryAttacked))
             {
@@ -1628,7 +1628,7 @@ namespace CombatSystem
                 {
                     secondaryHP = Math.Max(0, secondaryHP - mirrored);
                     if (secondaryHP == 0)
-                        Debug.Log($"[2体戦] {secondaryEnemy.displayName} 撃破 (相殺ダメージ {mirrored})");
+                        if (Debug.unityLogger.logEnabled) Debug.Log($"[2体戦] {secondaryEnemy.displayName} 撃破 (相殺ダメージ {mirrored})");
                 }
 
                 // --- (b) 2 体目の攻撃 = 独立した 2 つ目のパケット ---
@@ -1663,7 +1663,7 @@ namespace CombatSystem
                         ctx.playerDamageThisTurn += secTaken;
                         ctx.AddPlayerDamageSource(ctx.lastDamageCause, secTaken);
                     }
-                    Debug.Log($"[{(twinOnly ? "連撃" : "2体戦")}] {(twinOnly ? currentEnemy.displayName : secondaryEnemy.displayName)} 攻撃 {secAtkValue} − ブロック {blockSum} "
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[{(twinOnly ? "連撃" : "2体戦")}] {(twinOnly ? currentEnemy.displayName : secondaryEnemy.displayName)} 攻撃 {secAtkValue} − ブロック {blockSum} "
                             + $"→ 被ダメ {secTaken} (HP {playerHP})");
                 }
             }
@@ -1732,7 +1732,7 @@ namespace CombatSystem
             ctx.playerLostRoll = balance < 0;
             result.playerWon = balance > 0;
             result.isDraw = balance == 0;
-            Debug.Log($"[相互攻撃] T{ctx.currentTurn} 収支 {(balance >= 0 ? "+" : "")}{balance} " +
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[相互攻撃] T{ctx.currentTurn} 収支 {(balance >= 0 ? "+" : "")}{balance} " +
                       $"(与 {dealtDmg + dealtFixed} / 被 {takenApplied})");
 
             // 収支トリガーの中で敵のパッシブが動かす HP (〈尾撃〉〈地獄の業火〉〈重甲〉の固定ダメージ・シュヴァリエの反撃と「ボスへ 15」) を残す (2026-11-11 #104)。
@@ -1765,7 +1765,7 @@ namespace CombatSystem
                 if (isCombatActive && playerHP > 0 && enemyHP > 0)
                 {
                     LastCombatFled = true;
-                    Debug.Log($"[逃げる] 戦闘から離脱 (HP {playerHP})");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[逃げる] 戦闘から離脱 (HP {playerHP})");
                     FinishCombat();
                 }
             }

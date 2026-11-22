@@ -87,7 +87,7 @@ namespace EventSystem
             LastPostFlavor = null;
             LastResult = null;
             OnEventStarted?.Invoke(ev);
-            Debug.Log($"[EventEncounter] 開始: {ev.name} (id={ev.id})");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[EventEncounter] 開始: {ev.name} (id={ev.id})");
             return true;
         }
 
@@ -140,7 +140,7 @@ namespace EventSystem
             // 不安定化 (2026-11-13・GAME.md §5-12): 秘宝 +3 ずつ・ほかの得だけなら +1。 結果の行に「不安定 +N（累計 M）」を足してから画面へ流す
             GameManager.Instance?.SettleEventInstability(execResult, postCombat: false);
             OnEventResolved?.Invoke(choice, execResult);
-            Debug.Log($"[EventEncounter] 選択: {choice.text} → 効果{choice.effects.Count}個適用");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[EventEncounter] 選択: {choice.text} → 効果{choice.effects.Count}個適用");
             return execResult;
         }
 

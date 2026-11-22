@@ -17,7 +17,7 @@ namespace EventSystem.TimedEffects.Effects
             if (combat == null) return;
             int dmg = 2;
             combat.DamagePlayerDirect(dmg);
-            Debug.Log($"[TimedEffect] 中毒: HP-{dmg}");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[TimedEffect] 中毒: HP-{dmg}");
         }
     }
 }

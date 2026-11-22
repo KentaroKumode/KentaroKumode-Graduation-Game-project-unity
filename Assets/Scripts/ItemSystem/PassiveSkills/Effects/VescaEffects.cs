@@ -125,7 +125,7 @@ namespace ItemSystem.PassiveSkills.Effects
                 {
                     int stolen = ctx.ConsumeHalfCharge();
                     if (stolen > 0) AddDice(ctx, stolen);
-                    UnityEngine.Debug.Log($"[刻] 充電の半分 {stolen} を没収 → 出目+{stolen}");
+                    if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[刻] 充電の半分 {stolen} を没収 → 出目+{stolen}");
                 }),
 
             // ---------- DIVINE ----------
@@ -270,7 +270,7 @@ namespace ItemSystem.PassiveSkills.Effects
             //   このダメージが残差として **Normal に化けて** いた ── p4 の「主死因 Normal 98%」は
             //   通常攻撃を指していない可能性がある。 ダメージ量は変わらず、 帰属先が増えるだけ。
             ctx.EnemyDealUnmitigable(dmg, DeathCause.MassiveBleed);   // 軽減は無視・シールドは肩代わりする
-            UnityEngine.Debug.Log($"[大出血] スタック{ctx.massiveBleedStacks} → プレイヤーへ {dmg} ダメージ (軽減不可・盾は貫かない)");
+            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[大出血] スタック{ctx.massiveBleedStacks} → プレイヤーへ {dmg} ダメージ (軽減不可・盾は貫かない)");
         }
 
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
@@ -301,7 +301,7 @@ namespace ItemSystem.PassiveSkills.Effects
                 ctx.accumulatedValues[VescaRelicPool.KeyChargedFistPending] = 0f;
                 int s = System.Math.Min(5, (int)ctx.GetAccumulated(VescaRelicPool.KeyChargedFistStacks) + 1);
                 ctx.accumulatedValues[VescaRelicPool.KeyChargedFistStacks] = s;
-                UnityEngine.Debug.Log($"[溜め打ちの拳套] 永続 出目+1 (計 +{s}/5)");
+                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[溜め打ちの拳套] 永続 出目+1 (計 +{s}/5)");
             }
 
             // --- 天与 (2026-11-15・3・4 段目の大技): チャージのターンは天与を抽選し、 大技のターンは天与の効果を入れる。 この 2 つのターンは、 ほかの遺物を使わない
@@ -363,7 +363,7 @@ namespace ItemSystem.PassiveSkills.Effects
             {
                 r.apply(ctx);
                 ctx.vescaDrawnRelics.Add(r.name);
-                UnityEngine.Debug.Log($"[遺物学者] T{ctx.currentTurn} 段{stage} 使用: {r.name} ({r.rarity}/{r.role})");
+                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[遺物学者] T{ctx.currentTurn} 段{stage} 使用: {r.name} ({r.rarity}/{r.role})");
             }
 
             // --- 敵出目ボーナスの一括代入 ---
@@ -374,7 +374,7 @@ namespace ItemSystem.PassiveSkills.Effects
                           + (int)ctx.GetAccumulated(VescaRelicPool.KeyChargedFistStacks);
             ctx.enemyDiceTotalBonus = diceBonus;
             if (diceBonus > 0)
-                UnityEngine.Debug.Log($"[遺物学者] 敵攻撃への加算 合計 +{diceBonus}"
+                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[遺物学者] 敵攻撃への加算 合計 +{diceBonus}"
                     + $" (遺物 {(int)ctx.GetAccumulated(VescaRelicPool.KeyDiceBonusThisTurn)}"
                     + $" / 溜め打ち {(int)ctx.GetAccumulated(VescaRelicPool.KeyChargedFistStacks)})");
         }
@@ -437,7 +437,7 @@ namespace ItemSystem.PassiveSkills.Effects
             if (ctx == null) return;
             if (ctx.enemyDodgeChance >= Cap) return;
             ctx.enemyDodgeChance = System.Math.Min(Cap, ctx.enemyDodgeChance + PerWin);
-            UnityEngine.Debug.Log($"[解析演算] プレイヤー収支プラス → 回避率 {ctx.enemyDodgeChance:P0}");
+            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[解析演算] プレイヤー収支プラス → 回避率 {ctx.enemyDodgeChance:P0}");
         }
     }
 
@@ -479,7 +479,7 @@ namespace ItemSystem.PassiveSkills.Effects
             {
                 int loss = UnityEngine.Mathf.CeilToInt(ctx.playerMaxHP * LossRate);
                 ctx.playerCurrentHP = System.Math.Max(0, ctx.playerCurrentHP - loss);
-                UnityEngine.Debug.Log($"[裂け目] ヴェスカ -{loss} (最大HPの{LossRate:P0}) → {ctx.playerCurrentHP}/{ctx.playerMaxHP}");
+                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[裂け目] ヴェスカ -{loss} (最大HPの{LossRate:P0}) → {ctx.playerCurrentHP}/{ctx.playerMaxHP}");
             }
 
             // --- プレイヤー側 ---
@@ -489,7 +489,7 @@ namespace ItemSystem.PassiveSkills.Effects
                 int loss = UnityEngine.Mathf.CeilToInt(ctx.enemyMaxHP * PlayerLossRate);
                 int dealt = ctx.EnemyDealUnmitigable(loss, DeathCause.Rift);
                 if (dealt > 0)
-                    UnityEngine.Debug.Log($"[裂け目] プレイヤー -{dealt} (最大HPの{PlayerLossRate:P0}) → {ctx.enemyCurrentHP}/{ctx.enemyMaxHP}");
+                    if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[裂け目] プレイヤー -{dealt} (最大HPの{PlayerLossRate:P0}) → {ctx.enemyCurrentHP}/{ctx.enemyMaxHP}");
             }
         }
     }
@@ -518,7 +518,7 @@ namespace ItemSystem.PassiveSkills.Effects
             {
                 ctx.enemyRecurrentTruth = true;
                 ctx.enemyCritMultReduction = CritMultReduction;
-                UnityEngine.Debug.Log($"[回帰性真理] 毒/出血を毎ターン半減・受ける会心倍率 −{CritMultReduction:F2}"
+                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[回帰性真理] 毒/出血を毎ターン半減・受ける会心倍率 −{CritMultReduction:F2}"
                                     + $" ・臨界メーター毎ターン −{RinkaiDrainPerTurn} ・処刑/最大HP変更を拒否");
             }
             if (trigger != PassiveSkillTrigger.OnTurnStart) return;
@@ -537,7 +537,7 @@ namespace ItemSystem.PassiveSkills.Effects
             {
                 int before = ctx.rinkaiMeter;
                 ctx.rinkaiMeter = System.Math.Max(0, ctx.rinkaiMeter - RinkaiDrainPerTurn);
-                UnityEngine.Debug.Log($"[回帰性真理] 臨界メーター {before} → {ctx.rinkaiMeter}");
+                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[回帰性真理] 臨界メーター {before} → {ctx.rinkaiMeter}");
             }
         }
 
@@ -572,7 +572,7 @@ namespace ItemSystem.PassiveSkills.Effects
             if (!string.IsNullOrEmpty(ctx.pendingEnemySwapId)) return; // 既に予約済み
             ctx.pendingEnemySwapId = nextId;
             ctx.pendingEnemySwapLabel = logLabel;
-            UnityEngine.Debug.Log($"[ヴェスカ連戦] HP=0検知 → 次段 {logLabel} を予約");
+            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[ヴェスカ連戦] HP=0検知 → 次段 {logLabel} を予約");
         }
 
         public string SkillId => "ContinuousExperiment";
@@ -649,7 +649,7 @@ namespace ItemSystem.PassiveSkills.Effects
             if (i >= Thresholds.Length) return hp;   // 全閾値を通過済み ＝ もう止めない
             int floorHp = ThresholdHP(maxHP, i);
             if (hp >= floorHp) return hp;
-            UnityEngine.Debug.Log($"[天与の才] 踏みとどまり: HP {hp} → {floorHp} "
+            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[天与の才] 踏みとどまり: HP {hp} → {floorHp} "
                                 + $"(閾値 {Thresholds[i]:P0} / 通過 {i}/{Thresholds.Length})");
             return floorHp;
         }
@@ -670,7 +670,7 @@ namespace ItemSystem.PassiveSkills.Effects
             if (passed <= ctx.vescaThresholdsPassed) return;
             ctx.vescaThresholdsPassed = passed;
             ctx.vescaDoubleDrawNextTurn = true;
-            UnityEngine.Debug.Log($"[天与の才] HP {hp}/{maxHP} が閾値 {Thresholds[passed - 1]:P0} を割った "
+            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[天与の才] HP {hp}/{maxHP} が閾値 {Thresholds[passed - 1]:P0} を割った "
                                 + $"→ 次ターンは遺物 2 枚 (通過 {passed}/{Thresholds.Length})");
         }
     }

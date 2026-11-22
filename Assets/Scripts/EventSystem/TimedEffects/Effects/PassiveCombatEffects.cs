@@ -34,7 +34,7 @@ namespace EventSystem.TimedEffects.Effects
         {
             if (ctx == null) return;
             ctx.receivedDamageBonus = 0.3f;
-            Debug.Log("[TimedEffect] 亡者の招待: 被ダメ+30%");
+            if (Debug.unityLogger.logEnabled) Debug.Log("[TimedEffect] 亡者の招待: 被ダメ+30%");
         }
     }
 }

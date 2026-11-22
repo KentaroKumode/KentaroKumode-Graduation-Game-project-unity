@@ -44,7 +44,7 @@ namespace CombatSystem
         {
             var ctx = PassiveSkillManager.Instance?.Context; if (!isCombatActive || ctx == null) return;
             enemyHP = Math.Max(1, Math.Min(hp, EnemyMaxHP)); ctx.enemyCurrentHP = enemyHP;
-            Debug.Log($"[QaBattle] 敵の HP を {enemyHP} にした (確認専用)");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[QaBattle] 敵の HP を {enemyHP} にした (確認専用)");
         }
 
         /// <summary>[実機の確認用・2026-11-14] 今の戦闘を、 決着の処理 (OnCombatEnd・報酬・計装) を通さずに打ち切る。</summary>
@@ -114,7 +114,7 @@ namespace CombatSystem
                     {
                         // 〈恒温の竈〉も同じ枠へ持ち越す (OnBattleEnd)。 大きい方を残す。
                         runEnd.pendingRinkaiCarryover = Math.Max(runEnd.pendingRinkaiCarryover, carry);
-                        Debug.Log($"[MetaBuff] 臨界保温炉: メーター {psmCtx.rinkaiMeter} × {ratio:P0} → 次戦闘へ {carry}");
+                        if (Debug.unityLogger.logEnabled) Debug.Log($"[MetaBuff] 臨界保温炉: メーター {psmCtx.rinkaiMeter} × {ratio:P0} → 次戦闘へ {carry}");
                     }
                 }
             }
@@ -201,7 +201,7 @@ namespace CombatSystem
                         // **持ち越すのは残量の 30% (切り上げ)。** 割合の正本と経緯は MetaPanel.GuardShieldCarryRatio。
                         chRun.carriedShield = Mathf.CeilToInt(Math.Max(0, ctxAtEnd.consShield) * MetaProgression.MetaPanel.GuardShieldCarryRatio);
                         if (chRun.carriedShield > 0)
-                            Debug.Log($"[MetaBuff] シールド持ち越し保存 {chRun.carriedShield} (防御r10)");
+                            if (Debug.unityLogger.logEnabled) Debug.Log($"[MetaBuff] シールド持ち越し保存 {chRun.carriedShield} (防御r10)");
                     }
                     if (ctxAtEnd != null)
                         GameLoop.RunChronicle.NoteShieldSplit(
@@ -235,11 +235,11 @@ namespace CombatSystem
                         + $"{result.totalTurns}T)");
             }
 
-            Debug.Log($"[CombatManager] ===== COMBAT END =====");
-            Debug.Log($"  Result: {(result.playerWon ? "PLAYER WIN" : "PLAYER LOSE")}");
-            Debug.Log($"  Player HP: {playerHP}/{playerMaxHP}");
-            Debug.Log($"  Enemy  HP: {enemyHP}/{currentEnemy.maxHP}");
-            Debug.Log($"  Total Turns: {result.totalTurns}");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[CombatManager] ===== COMBAT END =====");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"  Result: {(result.playerWon ? "PLAYER WIN" : "PLAYER LOSE")}");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"  Player HP: {playerHP}/{playerMaxHP}");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"  Enemy  HP: {enemyHP}/{currentEnemy.maxHP}");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"  Total Turns: {result.totalTurns}");
         }
 
         private CombatResult GetLastCombatResult()

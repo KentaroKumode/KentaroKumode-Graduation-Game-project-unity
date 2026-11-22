@@ -377,7 +377,7 @@ namespace ItemSystem.PassiveSkills.Effects
         {
             int seed = System.Math.Min(99, System.Math.Max(0, floor) * 5);
             if (seed > kensaki) kensaki = seed;
-            UnityEngine.Debug.Log($"[無銘の剣舞譜] 取得時シード: floor={floor} → kensaki={kensaki}");
+            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[無銘の剣舞譜] 取得時シード: floor={floor} → kensaki={kensaki}");
         }
 
         public PassiveSkillTrigger[] Triggers => new[]
@@ -393,7 +393,7 @@ namespace ItemSystem.PassiveSkills.Effects
             {
                 case PassiveSkillTrigger.OnBattleStart:
                     kensaki = System.Math.Min(99, kensaki + 1);
-                    UnityEngine.Debug.Log($"[無銘の剣舞譜] 戦闘突入: 剣先スタック → {kensaki}");
+                    if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[無銘の剣舞譜] 戦闘突入: 剣先スタック → {kensaki}");
                     break;
                 case PassiveSkillTrigger.OnPostRoll:
                     // 旧: ダイス合計+剣先 / 新: 攻撃+剣先

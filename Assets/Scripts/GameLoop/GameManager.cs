@@ -373,7 +373,7 @@ namespace GameLoop
         /// <para>8 層は離散のまま、 1 手で隣へ動く。</para></summary>
         public void MoveToNode(string nodeId)
         {
-            Debug.Log($"[GameManager] MoveToNode: {nodeId} (phase={CurrentPhase})");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[GameManager] MoveToNode: {nodeId} (phase={CurrentPhase})");
             if (CurrentPhase != GamePhase.MapNavigation) return;
 
             var mm = MapManager.Instance;
@@ -441,7 +441,7 @@ namespace GameLoop
             OnPhaseChanged?.Invoke(newPhase);
 
             if (logPhaseChanges)
-                Debug.Log($"[GameManager] Phase: {prev} → {newPhase}");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[GameManager] Phase: {prev} → {newPhase}");
 
             // ボスなし層 (2/4) は「前へ進める先が無くなった時点」が層クリア。
             // 2026-07-29: 抜け口ごとに差し込む方式は漏れがあり、 移動先なしで
@@ -462,7 +462,7 @@ namespace GameLoop
         private void Log(string msg)
         {
             if (logPhaseChanges)
-                Debug.Log($"[GameManager] {msg}");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[GameManager] {msg}");
         }
 
         /// <summary>タイルタイプの日本語名</summary>
@@ -515,7 +515,7 @@ namespace GameLoop
 
             if (Input.GetKeyDown(KeyCode.G))
             {
-                Debug.Log($"[GameManager] G pressed (phase={CurrentPhase})");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[GameManager] G pressed (phase={CurrentPhase})");
                 if (CurrentPhase == GamePhase.Title)
                     StartNewRun();
                 else

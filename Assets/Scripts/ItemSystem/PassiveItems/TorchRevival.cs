@@ -21,7 +21,7 @@ namespace ItemSystem.PassiveItems
             int idx = run.ownedPassiveItems.IndexOf(TorchId);
             ItemSystem.Helpers.PassiveAddHelper.RemoveAt(run, idx);
             run.playerHP = run.playerMaxHP;
-            Debug.Log($"[ちいさな灯火] 致命傷を受ける直前に発動: HP全回復 ({run.playerMaxHP}) + アイテム消滅");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[ちいさな灯火] 致命傷を受ける直前に発動: HP全回復 ({run.playerMaxHP}) + アイテム消滅");
             return true;
         }
     }

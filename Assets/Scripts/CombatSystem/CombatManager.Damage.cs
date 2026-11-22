@@ -125,7 +125,7 @@ namespace CombatSystem
                 DmgSourceDiag.Note("消費〈瞬間研磨剤〉", DmgSourceDiag.Out, 1.5f);
                 ctx.polishArmed = false;   // 1 撃限り
                 if (CombatStats.DiagWinAttack) CombatStats.Stage(19, 1);
-                Debug.Log("[瞬間研磨剤] 与ダメージ+150%");
+                if (Debug.unityLogger.logEnabled) Debug.Log("[瞬間研磨剤] 与ダメージ+150%");
             }
 
             // 消費: 鬼火の油 与ダメ+X%（全戦闘）。 **他の与ダメ% と同じプールへ加算** (2026-09-19)。
@@ -144,7 +144,7 @@ namespace CombatSystem
             {
                 int orig = totalDmg;
                 totalDmg = Mathf.CeilToInt(totalDmg * outMul);
-                Debug.Log($"[CombatManager] 与ダメ補正 ×{outMul:F2}: {orig}→{totalDmg}");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[CombatManager] 与ダメ補正 ×{outMul:F2}: {orig}→{totalDmg}");
             }
             if (CombatStats.DiagWinAttack)
             {
@@ -156,7 +156,7 @@ namespace CombatSystem
             if (ctx.consAtkBurst > 0)
             {
                 totalDmg += ctx.consAtkBurst;
-                Debug.Log($"[CombatManager] 攻撃バースト +{ctx.consAtkBurst}");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[CombatManager] 攻撃バースト +{ctx.consAtkBurst}");
                 ctx.consAtkBurst = 0;
             }
             if (CombatStats.DiagWinAttack) CombatStats.Stage(6, totalDmg);   // 段 F
@@ -212,11 +212,11 @@ namespace CombatSystem
             if (ctx.enemyDefense > 0 && totalDmg > 0 && isCrit
                 && ItemSystem.PassiveSkills.Effects.VitalStrike.IgnoresDefense(ctx))
             {
-                Debug.Log($"[急所] 会心 → 敵の防御{ctx.enemyDefense} を無視");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[急所] 会心 → 敵の防御{ctx.enemyDefense} を無視");
             }
             else if (ctx.hitIgnoreDefense && ctx.enemyDefense > 0 && totalDmg > 0)
             {
-                Debug.Log($"[防御の無視] この撃は敵の防御{ctx.enemyDefense} を無視 (破城斧・急所の 2 撃目以降・連刃の追撃)");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[防御の無視] この撃は敵の防御{ctx.enemyDefense} を無視 (破城斧・急所の 2 撃目以降・連刃の追撃)");
             }
             else if (ctx.enemyDefense > 0 && totalDmg > 0)
             {
@@ -226,7 +226,7 @@ namespace CombatSystem
                     int beforeDef = totalDmg;
                     totalDmg = DefenseFormula.Apply(totalDmg, effDef);
                     EnemyHpLedger.NoteMainDefense(beforeDef, totalDmg);   // [計装] 防御値で削られた量
-                    Debug.Log($"[敵の防御] 防御{ctx.enemyDefense}−貫通{ctx.playerArmorPen}→{effDef}"
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[敵の防御] 防御{ctx.enemyDefense}−貫通{ctx.playerArmorPen}→{effDef}"
                             + $"（軽減{DefenseFormula.Reduction(effDef):P0}）{beforeDef}→{totalDmg}");
                 }
             }
@@ -248,7 +248,7 @@ namespace CombatSystem
                     int beforeVul = totalDmg;
                     totalDmg = Mathf.CeilToInt(totalDmg * vulMult);
                     DmgSourceDiag.Note("契約〈脆弱〉", DmgSourceDiag.Vul, vulMult - 1f);
-                    Debug.Log($"[狩猟旅団] 脆弱発動 ×{vulMult:F2} {beforeVul}→{totalDmg}");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[狩猟旅団] 脆弱発動 ×{vulMult:F2} {beforeVul}→{totalDmg}");
                     if (CombatStats.DiagWinAttack) CombatStats.Stage(20, 1);
                 }
             }
@@ -269,7 +269,7 @@ namespace CombatSystem
             {
                 int orig = totalDmg;
                 totalDmg = Mathf.CeilToInt(totalDmg * ctx.enemyDamageTakenMultiplier);
-                Debug.Log($"[CombatManager] 狂暴化: 敵被ダメ ×{ctx.enemyDamageTakenMultiplier:F1} ({orig}→{totalDmg})");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[CombatManager] 狂暴化: 敵被ダメ ×{ctx.enemyDamageTakenMultiplier:F1} ({orig}→{totalDmg})");
                 if (CombatStats.DiagWinAttack) CombatStats.Stage(21, 1);
             }
             if (CombatStats.DiagWinAttack) CombatStats.Stage(14, totalDmg);   // 段 N
@@ -329,18 +329,18 @@ namespace CombatSystem
                 if (playerHP * 5 < playerMaxHP * 4)
                 {
                     ctx.oathBroken = true;
-                    Debug.Log($"[不抜の聖紋] HP 80% 割れにより破棄 (HP {playerHP}/{playerMaxHP})");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[不抜の聖紋] HP 80% 割れにより破棄 (HP {playerHP}/{playerMaxHP})");
                 }
                 else if (totalDmg > 0)
                 {
                     int reduced = Mathf.CeilToInt(totalDmg * 0.4f);
                     totalDmg = Mathf.Max(0, totalDmg - reduced);
-                    Debug.Log($"[不抜の聖紋] 被ダメ -{reduced} → {totalDmg} (HP {playerHP}/{playerMaxHP})");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[不抜の聖紋] 被ダメ -{reduced} → {totalDmg} (HP {playerHP}/{playerMaxHP})");
                     // この被ダメ適用後に 80% を割るなら次回以降は無効化
                     if ((playerHP - totalDmg) * 5 < playerMaxHP * 4)
                     {
                         ctx.oathBroken = true;
-                        Debug.Log($"[不抜の聖紋] この被ダメで HP 80% 割れ予定 → 破棄");
+                        if (Debug.unityLogger.logEnabled) Debug.Log($"[不抜の聖紋] この被ダメで HP 80% 割れ予定 → 破棄");
                     }
                 }
             }
@@ -350,7 +350,7 @@ namespace CombatSystem
             {
                 int reduced = Mathf.Min(totalDmg, floorMod.defeatDamageReduction);
                 totalDmg -= reduced;
-                Debug.Log($"[CombatManager] フロアデバフ: 敗北時被ダメ-{reduced} → {totalDmg}");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[CombatManager] フロアデバフ: 敗北時被ダメ-{reduced} → {totalDmg}");
             }
 
             // 亡者の招待: 被ダメ +30%
@@ -358,7 +358,7 @@ namespace CombatSystem
             {
                 int bonusDmg = Mathf.CeilToInt(totalDmg * ctx.receivedDamageBonus);
                 totalDmg += bonusDmg;
-                Debug.Log($"[CombatManager] 亡者の招待: 被ダメ+{bonusDmg} (合計{totalDmg})");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[CombatManager] 亡者の招待: 被ダメ+{bonusDmg} (合計{totalDmg})");
             }
 
             // 共助: 1ターン目のメインダメージ半減
@@ -376,7 +376,7 @@ namespace CombatSystem
                 {
                     int reduced = (int)(totalDmg * maskCut);
                     totalDmg -= reduced;
-                    Debug.Log($"[死相の面頬] 会心したターン: 敵の攻撃 −{maskCut:P0} (−{reduced}) → {totalDmg}");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[死相の面頬] 会心したターン: 敵の攻撃 −{maskCut:P0} (−{reduced}) → {totalDmg}");
                 }
             }
 
@@ -384,7 +384,7 @@ namespace CombatSystem
             if (ctx.playerDamageNegateCharges > 0 && totalDmg > 0)
             {
                 ctx.playerDamageNegateCharges--;
-                Debug.Log($"[CombatManager] 獣の絆発動: 被弾{totalDmg}を無効化（残チャージ{ctx.playerDamageNegateCharges}）");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[CombatManager] 獣の絆発動: 被弾{totalDmg}を無効化（残チャージ{ctx.playerDamageNegateCharges}）");
                 totalDmg = 0;
             }
 
@@ -399,7 +399,7 @@ namespace CombatSystem
                 if (GuardDiag.InVesca()) GuardDiag.Cut7F[7] += absorbed;   // [計装 2026-11-11]
                 ctx.dbgShieldToNormal += absorbed;   // [計装] チップ側との配分を見る
                 ctx.shieldAbsorbedAttackThisTurn += absorbed;   // 灰燼の王の〈烈炎〉が読む (主攻撃の肩代わりだけ・2026-11-14)
-                Debug.Log($"[CombatManager] シールド吸収 {absorbed} (残{ctx.consShield})");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[CombatManager] シールド吸収 {absorbed} (残{ctx.consShield})");
             }
 
             // 〈シュヴァリエのレイピア〉のコントラタック (2026-11-20 作り直し): ブロックとシールドで防いだダメージの 2 倍を敵へ軽減不可で返す。
@@ -410,7 +410,7 @@ namespace CombatSystem
                 if (reflect > 0)
                 {
                     HpLossDiag.Lose(ref enemyHP, reflect, "反射(コントラタック)");
-                    Debug.Log($"[コントラタック] ブロック {blocked}・シールド {shieldAbsorbed} で防いだ → ×2 = {reflect} を返す → 敵HP{enemyHP}");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[コントラタック] ブロック {blocked}・シールド {shieldAbsorbed} で防いだ → ×2 = {reflect} を返す → 敵HP{enemyHP}");
                 }
             }
 
@@ -420,7 +420,7 @@ namespace CombatSystem
             if (ctx != null && ctx.painkillerArmedThisTurn && totalDmg >= playerHP && playerHP > 0)
             {
                 int clamp = playerHP - 1;
-                Debug.Log($"[痛覚遮断剤] 致命ダメ {totalDmg} → {clamp} (HP=1 踏みとどまり)");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[痛覚遮断剤] 致命ダメ {totalDmg} → {clamp} (HP=1 踏みとどまり)");
                 totalDmg = clamp;
             }
 

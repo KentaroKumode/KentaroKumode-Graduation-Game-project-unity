@@ -604,7 +604,7 @@ namespace EventSystem
             GameLoop.GoldIncome.Gain(run, 60, "観測所の写し");
             run.playerHP = run.playerMaxHP;
 
-            UnityEngine.Debug.Log($"[観測所] 写しの上乗せ: パッシブ{(string.IsNullOrEmpty(id) ? "なし" : ResolveLabel(id))}"
+            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[観測所] 写しの上乗せ: パッシブ{(string.IsNullOrEmpty(id) ? "なし" : ResolveLabel(id))}"
                                 + " / 素材+8 / ゴールド+60 / 全回復");
         }
 

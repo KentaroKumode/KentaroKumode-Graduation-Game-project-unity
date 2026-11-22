@@ -115,7 +115,7 @@ namespace CombatSystem
             {
                 GuardDiag.NoteStag7F(currentEnemy?.id, _deck.LastDrawnCount, _deck.LastStoppedCount, _deck.LastStoppedMains, _deck.LastHeldCount);   // [計装]
                 if (_deck.LastStoppedCount > 0)
-                    Debug.Log($"[停滞する時間] 引いた {_deck.LastDrawnCount} 枚のうち {_deck.LastStoppedCount} 枚が止まった (確率 {stop:P0})");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[停滞する時間] 引いた {_deck.LastDrawnCount} 枚のうち {_deck.LastStoppedCount} 枚が止まった (確率 {stop:P0})");
             }
             _termRetain = null; _termOutcome = null; _termDamageMul = 1f;
             if (ctx == null) return;
@@ -151,7 +151,7 @@ namespace CombatSystem
             if (pick == null) pick = TerminalWiring.CatPawFallback(_deck.board, dice, env, _deck.state);
             if (pick == null || pick.Length < 2 || pick[0] < 0 || pick[0] >= dice.Length || pick[1] < 0 || pick[1] >= _deck.board.Count) return;
             _catDie = pick[0]; _catSlot = pick[1];
-            Debug.Log($"[猫の手] 出目 {dice[_catDie]} → 〈{_deck.board[_catSlot]}〉");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[猫の手] 出目 {dice[_catDie]} → 〈{_deck.board[_catSlot]}〉");
         }
 
         /// <summary>端子の見積もりに要る盤面を、 今の戦闘から作る。</summary>
@@ -242,7 +242,7 @@ namespace CombatSystem
             if (o.rebooted.Count > 0 || o.overclock)
             {
                 RebootFired += o.rebooted.Count; if (o.overclock) OverclockFired++;      // [計装] BOT のサマリー
-                Debug.Log($"[充電] 再起動 {string.Join(" / ", o.rebooted.ConvertAll(i => _deck != null && i < _deck.board.Count ? _deck.board[i] : i.ToString()))}"
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[充電] 再起動 {string.Join(" / ", o.rebooted.ConvertAll(i => _deck != null && i < _deck.board.Count ? _deck.board[i] : i.ToString()))}"
                         + (o.overclock ? "・オーバークロック" : ""));
             }
             if (o.chargeCapAdd > 0) ctx.chargeCapBonus += o.chargeCapAdd;      // 〈大導電＋〉: この戦闘の充電の上限 (満たす前に)
@@ -273,7 +273,7 @@ namespace CombatSystem
             if (o.escalationDelay > 0)      // 時計の賽 (ADR-0015)
             {
                 YachtRoleEffects.AddEscalationDelay(ctx, o.escalationDelay);
-                Debug.Log($"[賽] 時計の賽: エスカレーションの次の段階を {o.escalationDelay} ターン先へ");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[賽] 時計の賽: エスカレーションの次の段階を {o.escalationDelay} ターン先へ");
             }
             if (o.enemyStunNext) ctx.nextTurnBuffs[YachtRoleEffects.EnemyStunKey] = 1f;
             if (o.ignoreDefense) ctx.playerArmorPen += DefenseFormula.IgnoreAll;
@@ -434,7 +434,7 @@ namespace CombatSystem
                 // ターン終了時の撃破では FinishTurnCommon の SyncHPFromContext が ctx から最大 HP を拾い直すので、 ctx にも入れる
                 var hctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
                 if (hctx != null) hctx.playerMaxHP = playerMaxHP;
-                Debug.Log($"[端子/魂狩り] 最大 HP +{kb.maxHp}");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[端子/魂狩り] 最大 HP +{kb.maxHp}");
             }
             if (kb.whetOn) { TerminalDiag.Note(TerminalIds.Whet, TerminalDiag.KillBonus); run.terminalWhetBonus += kb.whet; Debug.Log($"[端子/処刑の刃] 攻撃 +{kb.whet} (計 {run.terminalWhetBonus})"); }
             if (kb.loot) { TerminalDiag.Note(TerminalIds.LootBox, TerminalDiag.KillBonus); run.coins += kb.gold; Debug.Log($"[端子/賞金狩り] ゴールド +{kb.gold}"); }
@@ -444,7 +444,7 @@ namespace CombatSystem
                 playerHP = Math.Min(playerMaxHP, playerHP + kb.refundHp);
                 var rctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
                 if (rctx != null) rctx.playerCurrentHP = playerHP;
-                Debug.Log($"[端子/諸刃の剣＋] 払った HP が戻る +{kb.refundHp}");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[端子/諸刃の剣＋] 払った HP が戻る +{kb.refundHp}");
             }
             if (kb.stripper) { TerminalDiag.Note(TerminalIds.Stripper, TerminalDiag.KillBonus); run.terminalExtraChoices += kb.choices; Debug.Log($"[端子/剥ぎ取り] 戦闘後の端子の選択肢 +{kb.choices} (計 +{run.terminalExtraChoices})"); }
         }
@@ -466,7 +466,7 @@ namespace CombatSystem
                 int at = deck.IndexOf(id);
                 if (!GameLoop.GameManager.CanRemoveTerminalAt(GameLoop.GameManager.Instance.Run, at)) continue;      // 最後の攻撃の端子は抜かない (at < 0 = 山札に無い)
                 deck.RemoveAt(at); TerminalDiag.NoteRemoved(id, TerminalDiag.LeftRunDeck);   // [計装 #106]
-                Debug.Log($"[端子/{id}] 使ったので、ランの山札から抜いた (山札 {deck.Count} 枚)");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[端子/{id}] 使ったので、ランの山札から抜いた (山札 {deck.Count} 枚)");
             }
         }
     }

@@ -205,7 +205,7 @@ namespace ItemSystem.Shop
             ProvisionPacksLeft--;
             GameLoop.ProvisionSystem.Supply(run, ProvisionPackAmount);
             MetaProgression.Achievements.AchievementService.NoteShopPurchase(run.coins, countsAsItem: false, surcharged: false);   // 物資の包は品ではない (清貧に数えない)
-            Debug.Log($"[ShopManager] 物資を買った +{ProvisionPackAmount} (-{ProvisionPackPrice}G / 残り {ProvisionPacksLeft} 包)");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[ShopManager] 物資を買った +{ProvisionPackAmount} (-{ProvisionPackPrice}G / 残り {ProvisionPacksLeft} 包)");
             return true;
         }
 
@@ -227,7 +227,7 @@ namespace ItemSystem.Shop
             if (!run.TryAddConsumable(id)) return false;   // 〈穴の空いた鞄〉の上限
             run.coins -= price;
             run.coinsSpent += price;
-            Debug.Log($"[ShopManager] {id} を買った (-{price}G)");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[ShopManager] {id} を買った (-{price}G)");
             return true;
         }
 
@@ -283,7 +283,7 @@ namespace ItemSystem.Shop
             if (rsRob != null && rsRob.shopRobberyDone && RobberySurcharge != 1f)
             {
                 inv.priceMultiplier *= RobberySurcharge;
-                Debug.Log($"[ShopManager] 値下げ交渉の代償: 全価格 ×{RobberySurcharge:F2}");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[ShopManager] 値下げ交渉の代償: 全価格 ×{RobberySurcharge:F2}");
             }
 
             // 消費: 商人の鈴（次ショップ全価格半額）/ 鑑定の眼鏡（最低レア保証）
@@ -298,7 +298,7 @@ namespace ItemSystem.Shop
             if (rsCons != null && rsCons.nextShopPriceMul != 1f)
             {
                 inv.priceMultiplier *= rsCons.nextShopPriceMul;
-                Debug.Log($"[ShopManager] イベントの値引き: 全価格 ×{rsCons.nextShopPriceMul:F2}");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[ShopManager] イベントの値引き: 全価格 ×{rsCons.nextShopPriceMul:F2}");
                 rsCons.nextShopPriceMul = 1f;
             }
             // 〈黄金の通行手形〉: 前の店までに使った 80G ごとに 1 軒、 秘宝の棚が 1 段上のレア度で並ぶ
@@ -308,14 +308,14 @@ namespace ItemSystem.Shop
             {
                 rsCons.passShopsUp--;
                 _passRarityUp = true;
-                Debug.Log($"[ShopManager] {GameLoop.ItemIds.MacroPass}: 秘宝の棚が 1 段上のレア度 (残り {rsCons.passShopsUp} 軒)");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[ShopManager] {GameLoop.ItemIds.MacroPass}: 秘宝の棚が 1 段上のレア度 (残り {rsCons.passShopsUp} 軒)");
             }
             _apprMinRarity = null;
             if (rsCons != null && rsCons.nextLootMinRarity >= 0)
             {
                 _apprMinRarity = (ItemRarity)rsCons.nextLootMinRarity;
                 rsCons.nextLootMinRarity = -1; // ショップで消費
-                Debug.Log($"[ShopManager] 鑑定の眼鏡: 最低レア {_apprMinRarity}");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[ShopManager] 鑑定の眼鏡: 最低レア {_apprMinRarity}");
             }
 
             // パッシブ ×5 (2026-09-03: 3 → 5)
@@ -384,7 +384,7 @@ namespace ItemSystem.Shop
             Current = inv;
             MetaProgression.Achievements.AchievementService.BeginShop();
             OnShopOpened?.Invoke(inv);
-            Debug.Log($"[ShopManager] 入店: フロア{floor}, スロット{inv.slots.Count}");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[ShopManager] 入店: フロア{floor}, スロット{inv.slots.Count}");
 
             return inv;
         }
@@ -430,7 +430,7 @@ namespace ItemSystem.Shop
                 s.discountPct = discount;
                 s.price = Mathf.Max(1, Mathf.CeilToInt(s.price * (1f - discount / 100f)));
                 SaleDiscountSum += s.originalPrice - s.price;   // 実際に浮いたゴールド
-                Debug.Log($"[ShopManager] 特売 slot={candidates[i]} {s.itemId} -{discount}% ({s.originalPrice}G→{s.price}G)");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[ShopManager] 特売 slot={candidates[i]} {s.itemId} -{discount}% ({s.originalPrice}G→{s.price}G)");
             }
         }
 
@@ -754,7 +754,7 @@ namespace ItemSystem.Shop
                 run.weaponMaterials++;
                 Current.materialPurchaseCount++;
                 slot.price = Current.CurrentMaterialPrice; // 表示価格を更新
-                Debug.Log($"[ShopManager] 強化素材購入: -{price}G (次回 {Current.CurrentMaterialPrice}G)");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[ShopManager] 強化素材購入: -{price}G (次回 {Current.CurrentMaterialPrice}G)");
                 OnShopUpdated?.Invoke();
                 return true;
             }
@@ -794,7 +794,7 @@ namespace ItemSystem.Shop
                     break;
                 case ShopSlotKind.Dice:
                     // 持つ賽は 1 個 (ADR-0015)。 買うと装備が替わり、 前の賽は手元に残らない。
-                    Debug.Log($"[ShopManager] 賽を替えた: {GameLoop.EquippedDie.Label(GameLoop.EquippedDie.IdOf(run))} → {GameLoop.EquippedDie.Label(slot.itemId)}");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[ShopManager] 賽を替えた: {GameLoop.EquippedDie.Label(GameLoop.EquippedDie.IdOf(run))} → {GameLoop.EquippedDie.Label(slot.itemId)}");
                     GameLoop.EquippedDie.Equip(run, slot.itemId);
                     break;
                 case ShopSlotKind.Consumable:
@@ -828,7 +828,7 @@ namespace ItemSystem.Shop
 
             var data = ItemDatabase.Instance?.GetItem(slot.itemId);
             string label = data != null ? data.displayName : slot.itemId;
-            Debug.Log($"[ShopManager] 購入: {label} -{slot.price}G");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[ShopManager] 購入: {label} -{slot.price}G");
             OnShopUpdated?.Invoke();
             return true;
         }
@@ -917,7 +917,7 @@ namespace ItemSystem.Shop
             //   **塩を変える** ── 同じ塩だと毎回同じ枠に同じ割引が出る。
             if (RerollKeepsSale) ApplySaleDiscounts(Current, Current.rerollCount * 64);
 
-            Debug.Log($"[ShopManager] リロール#{Current.rerollCount}{(focusAxis != null ? " (軸: " + focusAxis + ")" : "")}: -{price}G / {rerolled}枠更新 / 次回{Current.CurrentRerollPrice}G");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[ShopManager] リロール#{Current.rerollCount}{(focusAxis != null ? " (軸: " + focusAxis + ")" : "")}: -{price}G / {rerolled}枠更新 / 次回{Current.CurrentRerollPrice}G");
             OnShopUpdated?.Invoke();
             return true;
         }
@@ -1005,7 +1005,7 @@ namespace ItemSystem.Shop
                 RobberyByFloor[f]++;
             }
 
-            Debug.Log($"[ShopManager] 値下げ交渉(強盗): 物資-{GameLoop.ProvisionSystem.EvilChoiceCost}, "
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[ShopManager] 値下げ交渉(強盗): 物資-{GameLoop.ProvisionSystem.EvilChoiceCost}, "
                     + $"在庫{loot.Count}件をスナップ, 以降のショップ価格 ×{RobberySurcharge:F2}");
             // ショップを閉じる (呼び出し側がエリート戦闘を開始する)
             Close();
@@ -1030,7 +1030,7 @@ namespace ItemSystem.Shop
                 run.weaponMaterials--;
                 int gain = GameLoop.GoldIncome.GainExempt(run, WeaponMaterialSellPrice, "強化素材売却");
                 MetaProgression.Achievements.AchievementService.NoteShopSale();
-                Debug.Log($"[ShopManager] 強化素材売却: +{gain}G");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[ShopManager] 強化素材売却: +{gain}G");
                 OnShopUpdated?.Invoke();
                 return true;
             }
@@ -1054,7 +1054,7 @@ namespace ItemSystem.Shop
                 run.shopPurchasedCounts[id] = shopStock - 1;
             int gainPrice = GameLoop.GoldIncome.GainExempt(run, price, "売却");
             MetaProgression.Achievements.AchievementService.NoteShopSale();
-            Debug.Log($"[ShopManager] 売却: {id} +{gainPrice}G");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[ShopManager] 売却: {id} +{gainPrice}G");
             OnShopUpdated?.Invoke();
             return true;
         }

@@ -152,7 +152,7 @@ namespace ItemSystem.PassiveSkills
                     skillDisplayNames[c.id] = c.display;
             }
 
-            Debug.Log($"[PassiveSkillManager] Active skills refreshed: {activeSkillNames.Count} skills (収集{collected.Count}, 同名抑制後{uniqueIds.Count})");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[PassiveSkillManager] Active skills refreshed: {activeSkillNames.Count} skills (収集{collected.Count}, 同名抑制後{uniqueIds.Count})");
         }
 
         /// <summary>効果 (スキルの internalName) → その効果を持つ品の id (最初に見つけた品・<see cref="RefreshActiveSkills"/> が作る)。 秘宝の発動の表示 (#320) が読む。</summary>
@@ -234,8 +234,8 @@ namespace ItemSystem.PassiveSkills
             
             triggeredPlayerSkills.Clear();
             triggeredEnemySkills.Clear();
-            Debug.Log($"[PassiveSkillManager] Combat started. Player skills: {activeSkillNames.Count}, Enemy skills: {enemySkillNames.Count}");
-            Debug.Log($"[PassiveSkillManager] Dice setup - Player: d{playerDiceMax}, Enemy: d{enemyDiceMax}, Threat: {enemyThreat}");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[PassiveSkillManager] Combat started. Player skills: {activeSkillNames.Count}, Enemy skills: {enemySkillNames.Count}");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[PassiveSkillManager] Dice setup - Player: d{playerDiceMax}, Enemy: d{enemyDiceMax}, Threat: {enemyThreat}");
         }
 
         /// <summary>

@@ -68,7 +68,7 @@ namespace ItemSystem.PassiveSkills.Effects
             int down = (int)ctx.GetBuff(key);
             if (down <= 0) return;
             ctx.playerAttackPowerPenalty += down;
-            UnityEngine.Debug.Log($"[{label}] このターンのプレイヤーの攻撃 −{down}");
+            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[{label}] このターンのプレイヤーの攻撃 −{down}");
         }
     }
 
@@ -233,7 +233,7 @@ namespace ItemSystem.PassiveSkills.Effects
             int up = (int)ctx.GetBuff(NextTurnKey);
             if (up <= 0) return;
             ctx.playerDiceTotal += up;
-            UnityEngine.Debug.Log($"[暴走] このターンの攻撃 +{up}");
+            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[暴走] このターンの攻撃 +{up}");
         }
     }
 
@@ -307,7 +307,7 @@ namespace ItemSystem.PassiveSkills.Effects
             int up = (int)ctx.GetBuff(NextTurnKey);
             if (up <= 0) return;
             ctx.finalDamage += up;
-            UnityEngine.Debug.Log($"[反撃態勢] 攻撃のダメージ +{up}");
+            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[反撃態勢] 攻撃のダメージ +{up}");
         }
     }
 
@@ -330,7 +330,7 @@ namespace ItemSystem.PassiveSkills.Effects
             int bonus = System.Math.Max(0, ctx.currentTurn) / 3; // 3ターンごとに+1
             if (bonus <= 0) return;
             ctx.finalDamage += bonus;
-            UnityEngine.Debug.Log($"[研ぎ澄まし] T{ctx.currentTurn} 攻撃のダメージ +{bonus}");
+            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[研ぎ澄まし] T{ctx.currentTurn} 攻撃のダメージ +{bonus}");
         }
     }
 
@@ -437,7 +437,7 @@ namespace ItemSystem.PassiveSkills.Effects
             {
                 int dmg = will;
                 ctx.EnemyDealUnmitigable(dmg, null);   // シールドは肩代わりする (計上は従来どおり無し)
-                UnityEngine.Debug.Log($"[精鋭ゴーレム・巌の意志] 撃破時反撃 意志{will} → プレイヤー残HP={ctx.enemyCurrentHP}");
+                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[精鋭ゴーレム・巌の意志] 撃破時反撃 意志{will} → プレイヤー残HP={ctx.enemyCurrentHP}");
             }
         }
     }
@@ -593,7 +593,7 @@ namespace ItemSystem.PassiveSkills.Effects
             // ボスの数値 (BossParams): 威圧の加算をボス別に直接調整 (基準3)。
             int add = UnityEngine.Mathf.Max(0, CombatSystem.BossParams.ParamInt(ctx.bossId, CombatSystem.BossParam.IntimidateThreat));
             ctx.enemyDiceTotalBonus += add;
-            UnityEngine.Debug.Log($"[威圧+] 攻撃 +{add} (戦闘を通して)");
+            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[威圧+] 攻撃 +{add} (戦闘を通して)");
         }
     }
 
@@ -661,7 +661,7 @@ namespace ItemSystem.PassiveSkills.Effects
             {
                 ctx.enemyDiceTotalBonus += want - had;
                 ctx.accumulatedValues[AppliedKey] = want;
-                UnityEngine.Debug.Log($"[Berserk] 狂暴化 (T{ctx.currentTurn}): 敵の攻撃 +{want} (計), 守りの無視, 回復封印, 敵被ダメ×{EnemyDamageTakenMult}");
+                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[Berserk] 狂暴化 (T{ctx.currentTurn}): 敵の攻撃 +{want} (計), 守りの無視, 回復封印, 敵被ダメ×{EnemyDamageTakenMult}");
             }
         }
     }
@@ -711,7 +711,7 @@ namespace ItemSystem.PassiveSkills.Effects
         {
             if (ctx == null || !ctx.accumulatedValues.TryGetValue(Key, out var stack) || stack <= 0f) return;
             ctx.accumulatedValues[Key] = System.Math.Max(0, (int)stack - 2);
-            UnityEngine.Debug.Log($"[毒の侵蝕] ダウン: 毒 {(int)stack} → {(int)ctx.accumulatedValues[Key]}");
+            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[毒の侵蝕] ダウン: 毒 {(int)stack} → {(int)ctx.accumulatedValues[Key]}");
         }
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
@@ -721,7 +721,7 @@ namespace ItemSystem.PassiveSkills.Effects
             int s = System.Math.Min(cap, (int)stack + 1);
             ctx.accumulatedValues[Key] = s;
             ctx.EnemyDealUnmitigable(s, DeathCause.Chip);   // 軽減は無視・シールドは肩代わりする
-            UnityEngine.Debug.Log($"[毒の侵蝕] 毒×{s} ダメ (上限{cap}, 軽減無視) → プレイヤー残HP={ctx.enemyCurrentHP}");
+            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[毒の侵蝕] 毒×{s} ダメ (上限{cap}, 軽減無視) → プレイヤー残HP={ctx.enemyCurrentHP}");
         }
     }
 
@@ -814,7 +814,7 @@ namespace ItemSystem.PassiveSkills.Effects
                     int reflect = System.Math.Min(reflectCap, Thr - dmg);
                     Fires++; ReflectDamage += reflect;
                     ctx.accumulatedValues[Key] = reflect;
-                    UnityEngine.Debug.Log($"[鏡映の応答] 蓄積: 次ターン{reflect}反射 (与ダメ{dmg}<{Thr}＝小突きを罰す, 上限{reflectCap})");
+                    if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[鏡映の応答] 蓄積: 次ターン{reflect}反射 (与ダメ{dmg}<{Thr}＝小突きを罰す, 上限{reflectCap})");
                 }
             }
             else if (trigger == PassiveSkillTrigger.OnTurnStart)
@@ -823,7 +823,7 @@ namespace ItemSystem.PassiveSkills.Effects
                 int dmg = (int)pending;
                 ctx.EnemyDealUnmitigable(dmg, DeathCause.Reflect);   // 軽減は無視・シールドは肩代わりする
                 ctx.accumulatedValues[Key] = 0f;
-                UnityEngine.Debug.Log($"[鏡映の応答] 反射 {dmg}ダメ → プレイヤー残HP={ctx.enemyCurrentHP}");
+                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[鏡映の応答] 反射 {dmg}ダメ → プレイヤー残HP={ctx.enemyCurrentHP}");
             }
         }
     }
@@ -854,7 +854,7 @@ namespace ItemSystem.PassiveSkills.Effects
             int turnTerm = UnityEngine.Mathf.CeilToInt(System.Math.Max(1, ctx.currentTurn) / 3f);
             int dmg = System.Math.Min(cap, 1 + turnTerm + sin);
             ctx.EnemyDealUnmitigable(dmg, DeathCause.Chip);   // 軽減は無視・シールドは肩代わりする
-            UnityEngine.Debug.Log($"[審判の炎] {dmg}ダメ (1+経過T{ctx.currentTurn}+罪{sin}, 上限{cap}, 軽減無視) → プレイヤー残HP={ctx.enemyCurrentHP}");
+            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[審判の炎] {dmg}ダメ (1+経過T{ctx.currentTurn}+罪{sin}, 上限{cap}, 軽減無視) → プレイヤー残HP={ctx.enemyCurrentHP}");
         }
     }
 
@@ -907,7 +907,7 @@ namespace ItemSystem.PassiveSkills.Effects
                 if (dmg > 0)
                 {
                     ctx.EnemyDealUnmitigable(dmg, DeathCause.Chip);   // 軽減は無視・シールドは肩代わりする
-                    UnityEngine.Debug.Log($"[烈炎] ×{dmg} ダメ (軽減無視) → プレイヤー残HP={ctx.enemyCurrentHP}");
+                    if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[烈炎] ×{dmg} ダメ (軽減無視) → プレイヤー残HP={ctx.enemyCurrentHP}");
                 }
             }
             else if (trigger == PassiveSkillTrigger.OnTurnEnd)
@@ -922,7 +922,7 @@ namespace ItemSystem.PassiveSkills.Effects
                     ctx.accumulatedValues[StackKey] = stack + gain;
                     ctx.accumulatedValues.TryGetValue(GainedKey, out var tot);
                     ctx.accumulatedValues[GainedKey] = tot + gain;
-                    UnityEngine.Debug.Log(GameLoop.GameHooks.BlazeStack == CombatSystem.BlazeStackRule.Guard2
+                    if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log(GameLoop.GameHooks.BlazeStack == CombatSystem.BlazeStackRule.Guard2
                         ? $"[烈炎] ブロック{(int)blk}本 → スタック {(int)stack}→{(int)stack + gain}"
                         : $"[烈炎] シールドで {ctx.shieldAbsorbedAttackThisTurn} 受けた ({perShield} ごとに +1) → スタック {(int)stack}→{(int)stack + gain}");
                 }
@@ -982,7 +982,7 @@ namespace ItemSystem.PassiveSkills.Effects
                         // 断罪Tの累積回数 (この戦闘で何回目か) をカウント
                         int n = (int)ctx.GetAccumulated("judg_counter") + 1;
                         ctx.accumulatedValues["judg_counter"] = n;
-                        UnityEngine.Debug.Log($"[灰の予兆] 業火の断罪 第{n}回（T{ctx.currentTurn}・周期{EmberKing.Period(ctx)}）—敵ダイス+{jdice}、ロール勝利で間一髪回避");
+                        if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[灰の予兆] 業火の断罪 第{n}回（T{ctx.currentTurn}・周期{EmberKing.Period(ctx)}）—敵ダイス+{jdice}、ロール勝利で間一髪回避");
                     }
                     break;
 
@@ -1001,7 +1001,7 @@ namespace ItemSystem.PassiveSkills.Effects
                         int before = ctx.finalDamage;
                         ctx.finalDamage = ctx.finalDamage * coef + coef;
                         ctx.lastDamageCause = DeathCause.Judgment; // 死因タグ
-                        UnityEngine.Debug.Log($"[業火の断罪] 致命の一撃 第{n}回 {before}→{ctx.finalDamage}（×{coef}+{coef}）");
+                        if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[業火の断罪] 致命の一撃 第{n}回 {before}→{ctx.finalDamage}（×{coef}+{coef}）");
                     }
                     break;
                 case PassiveSkillTrigger.OnRollLose:
@@ -1015,7 +1015,7 @@ namespace ItemSystem.PassiveSkills.Effects
                         int dmg = (int)c;
                         ctx.playerCurrentHP = System.Math.Max(0, ctx.playerCurrentHP - dmg);
                         ctx.accumulatedValues[CtrKey] = 0f;
-                        UnityEngine.Debug.Log($"[業火の断罪] 間一髪回避→反撃 {dmg} → 灰燼残HP={ctx.playerCurrentHP}");
+                        if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[業火の断罪] 間一髪回避→反撃 {dmg} → 灰燼残HP={ctx.playerCurrentHP}");
                     }
                     break;
             }
@@ -1065,7 +1065,7 @@ namespace ItemSystem.PassiveSkills.Effects
             if (ctx.finalDamage <= Threshold) return;
             int excess = ctx.finalDamage - Threshold;
             int reduced = Threshold + excess / 2;
-            UnityEngine.Debug.Log($"[灰塵の外殻] 被ダメ {ctx.finalDamage}→{reduced} ({Threshold}超は半減)");
+            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[灰塵の外殻] 被ダメ {ctx.finalDamage}→{reduced} ({Threshold}超は半減)");
             ctx.finalDamage = reduced;
         }
     }
@@ -1101,19 +1101,19 @@ namespace ItemSystem.PassiveSkills.Effects
             if (!GameLoop.GameHooks.AshKingHeavyDisabled)
             {
                 EmberBonus.SetApplied(ctx, KeyApplied, 0);
-                UnityEngine.Debug.Log(omen ? $"[業火] T{ctx.currentTurn} 業火のターン (周期{EmberOmenTiming.PeriodFor(hpRatio)}T)"
+                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log(omen ? $"[業火] T{ctx.currentTurn} 業火のターン (周期{EmberOmenTiming.PeriodFor(hpRatio)}T)"
                                            : $"[業火] T{ctx.currentTurn} 次の業火はT{EmberOmenTiming.NextOmen(ctx.currentTurn, hpRatio)} (周期{EmberOmenTiming.PeriodFor(hpRatio)}T)");
                 return;
             }
             EmberBonus.SetApplied(ctx, KeyApplied, omen ? bonus : 0);
             if (omen)
             {
-                UnityEngine.Debug.Log($"[業火の予兆] T{ctx.currentTurn} 発動 → このターンの攻撃 +{bonus} (周期{EmberOmenTiming.PeriodFor(hpRatio)}T)");
+                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[業火の予兆] T{ctx.currentTurn} 発動 → このターンの攻撃 +{bonus} (周期{EmberOmenTiming.PeriodFor(hpRatio)}T)");
             }
             else
             {
                 int next = EmberOmenTiming.NextOmen(ctx.currentTurn, hpRatio);
-                UnityEngine.Debug.Log($"[業火の予兆] T{ctx.currentTurn} 予告: 次はT{next} (周期{EmberOmenTiming.PeriodFor(hpRatio)}T)");
+                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[業火の予兆] T{ctx.currentTurn} 予告: 次はT{next} (周期{EmberOmenTiming.PeriodFor(hpRatio)}T)");
             }
         }
     }
@@ -1148,7 +1148,7 @@ namespace ItemSystem.PassiveSkills.Effects
             int after = System.Math.Min(ctx.playerMaxHP, ctx.playerCurrentHP + heal);
             if (after > ctx.playerCurrentHP)
             {
-                UnityEngine.Debug.Log($"[灰の再生] Phase1 +{after - ctx.playerCurrentHP} ({ctx.playerCurrentHP}→{after})");
+                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[灰の再生] Phase1 +{after - ctx.playerCurrentHP} ({ctx.playerCurrentHP}→{after})");
                 ctx.playerCurrentHP = after;
             }
         }
@@ -1173,7 +1173,7 @@ namespace ItemSystem.PassiveSkills.Effects
             int bonus = CombatSystem.BossParams.ParamInt(ctx.bossId, CombatSystem.BossParam.FuryAttack);
             EmberBonus.SetApplied(ctx, KeyApplied, phase2 ? bonus : 0);
             if (phase2)
-                UnityEngine.Debug.Log($"[憤怒の残滓] Phase2 このターンの攻撃 +{bonus} (HP {ctx.playerCurrentHP}/{ctx.playerMaxHP})");
+                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[憤怒の残滓] Phase2 このターンの攻撃 +{bonus} (HP {ctx.playerCurrentHP}/{ctx.playerMaxHP})");
         }
     }
 
@@ -1226,13 +1226,13 @@ namespace ItemSystem.PassiveSkills.Effects
                         ctx.accumulatedValues[KeyApplied] = now;
                     }
                     if (now > 0)
-                        UnityEngine.Debug.Log($"[焦土契約] T{ctx.currentTurn} スタック{stack}/{StackCap} → 敵攻撃+{now} (累積ではなく現在値)");
+                        if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[焦土契約] T{ctx.currentTurn} スタック{stack}/{StackCap} → 敵攻撃+{now} (累積ではなく現在値)");
                     break;
                 case PassiveSkillTrigger.OnRollWin:
                     // 敵視点 OnRollWin = 収支トリガーで敵勝利 = プレイヤーの収支マイナス
                     int s = System.Math.Min(StackCap, (int)ctx.GetAccumulated(Key) + 1);
                     ctx.accumulatedValues[Key] = s;
-                    UnityEngine.Debug.Log($"[焦土契約] プレイヤー収支負け → スタック={s}/{StackCap}");
+                    if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[焦土契約] プレイヤー収支負け → スタック={s}/{StackCap}");
                     break;
             }
         }
@@ -1266,7 +1266,7 @@ namespace ItemSystem.PassiveSkills.Effects
                 if (GameLoop.GameRng.Value("enemy.decree13") < 1f / 13f)
                 {
                     ctx.currentBuffs[FlagKey] = 1f;
-                    UnityEngine.Debug.Log($"[Decree13th] 死神の声が響く...（T{ctx.currentTurn}）");
+                    if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[Decree13th] 死神の声が響く...（T{ctx.currentTurn}）");
                 }
                 return;
             }
@@ -1296,7 +1296,7 @@ namespace ItemSystem.PassiveSkills.Effects
 
                 // 軽減フックは全バイパスするが、 シールドは肩代わりとして機能する (2026-08-15)
                 ctx.EnemyDealUnmitigable(dmg, null);   // 計上は従来どおり無し
-                UnityEngine.Debug.Log(
+                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log(
                     $"[Decree13th] 成就: ({ctx.playerDiceTotal}+{ctx.enemyDiceTotal})×{DecreeMultiplier:F1} = {dmg} ダメ → プレイヤー残HP={ctx.enemyCurrentHP}");
 
                 ctx.currentBuffs.Remove(FlagKey);
@@ -1367,7 +1367,7 @@ namespace ItemSystem.PassiveSkills.Effects
                     ctx.accumulatedValues[KPrioriteStacks] = 1;
                     int initShield = System.Math.Max(MinShield, BaseShield - PrioriteShieldDecPer);
                     ctx.accumulatedValues[KShield] = initShield;
-                    UnityEngine.Debug.Log($"[サン=ジョリオラ] 戦闘開始: コントラタック構え シールド{initShield} (プリオリテ初期+1)");
+                    if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[サン=ジョリオラ] 戦闘開始: コントラタック構え シールド{initShield} (プリオリテ初期+1)");
                     break;
 
                 case PassiveSkillTrigger.OnTurnStart:
@@ -1386,7 +1386,7 @@ namespace ItemSystem.PassiveSkills.Effects
                             ctx.accumulatedValues[KP2RewardActive] = 1;
                             ctx.accumulatedValues[KP2RewardPending] = 0;
                             ctx.enemyDiceTotalBonus += 4;
-                            UnityEngine.Debug.Log("[サン=ジョリオラ・オポジション] 報酬ターン突入: ボスダイス合計+4");
+                            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log("[サン=ジョリオラ・オポジション] 報酬ターン突入: ボスダイス合計+4");
                         }
                     }
                     break;
@@ -1416,11 +1416,11 @@ namespace ItemSystem.PassiveSkills.Effects
                         // シールド破壊ターン: 残ダメを全て無効化、次T形態2へ
                         ctx.finalDamage = 0;
                         ctx.accumulatedValues[KPendingP1ToP2] = 1;
-                        UnityEngine.Debug.Log($"[サン=ジョリオラ] シールド破壊! 吸収{absorbed} + 超過分は無敵で無効化 / 次T 形態2");
+                        if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[サン=ジョリオラ] シールド破壊! 吸収{absorbed} + 超過分は無敵で無効化 / 次T 形態2");
                     }
                     else
                     {
-                        UnityEngine.Debug.Log($"[サン=ジョリオラ] シールド吸収{absorbed} → 残{shield}");
+                        if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[サン=ジョリオラ] シールド吸収{absorbed} → 残{shield}");
                     }
                     break;
                 }
@@ -1439,7 +1439,7 @@ namespace ItemSystem.PassiveSkills.Effects
                         if (counter > 0)
                         {
                             ctx.EnemyDealUnmitigable(counter, null);   // 軽減は無視・シールドは肩代わりする
-                            UnityEngine.Debug.Log($"[サン=ジョリオラ・コントラタック] 反撃{counter} (素{playerTotal}+プリオリテ{stacks}×{PrioriteCounterPer}, 不可避) → プレイヤーHP={ctx.enemyCurrentHP}");
+                            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[サン=ジョリオラ・コントラタック] 反撃{counter} (素{playerTotal}+プリオリテ{stacks}×{PrioriteCounterPer}, 不可避) → プレイヤーHP={ctx.enemyCurrentHP}");
                         }
                         // シールドへ +25 確定ダメ
                         float s = ctx.GetAccumulated(KShield);
@@ -1447,7 +1447,7 @@ namespace ItemSystem.PassiveSkills.Effects
                         {
                             float newS = System.Math.Max(0, s - 25);
                             ctx.accumulatedValues[KShield] = newS;
-                            UnityEngine.Debug.Log($"[サン=ジョリオラ・コントラタック] +25確定ダメ シールド{s}→{newS}");
+                            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[サン=ジョリオラ・コントラタック] +25確定ダメ シールド{s}→{newS}");
                             if (newS <= 0)
                                 ctx.accumulatedValues[KPendingP1ToP2] = 1;
                         }
@@ -1459,7 +1459,7 @@ namespace ItemSystem.PassiveSkills.Effects
                         {
                             // 敵視点: ctx.playerCurrentHP = ボス自身のHP
                             ctx.playerCurrentHP = System.Math.Max(0, ctx.playerCurrentHP - 15);
-                            UnityEngine.Debug.Log($"[サン=ジョリオラ・連勝報酬] +15ダメ → ボスHP={ctx.playerCurrentHP}");
+                            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[サン=ジョリオラ・連勝報酬] +15ダメ → ボスHP={ctx.playerCurrentHP}");
                         }
                         // 次ターン分の報酬予約
                         ctx.accumulatedValues[KP2RewardPending] = 1;
@@ -1475,7 +1475,7 @@ namespace ItemSystem.PassiveSkills.Effects
                     if ((int)ctx.GetAccumulated(KPhase) != 2) break;
                     int wins = (int)ctx.GetAccumulated(KBossWins) + 1;
                     ctx.accumulatedValues[KBossWins] = wins;
-                    UnityEngine.Debug.Log($"[サン=ジョリオラ・オポジション] ボス勝利 累計{wins}/3");
+                    if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[サン=ジョリオラ・オポジション] ボス勝利 累計{wins}/3");
                     if (wins >= 3)
                     {
                         if (ctx.GetAccumulated(KP2ExtendPending) > 0)
@@ -1530,7 +1530,7 @@ namespace ItemSystem.PassiveSkills.Effects
                 ctx.accumulatedValues[KP2RewardPending] = 0;
                 ctx.accumulatedValues[KP2RewardActive] = 0;
                 ctx.accumulatedValues[KP2ExtendPending] = 0;
-                UnityEngine.Debug.Log($"[サン=ジョリオラ] プリオリテ{newStacks} 主張! 形態2→1 移行: シールド{newShield} (反撃+{newStacks * PrioriteCounterPer})");
+                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[サン=ジョリオラ] プリオリテ{newStacks} 主張! 形態2→1 移行: シールド{newShield} (反撃+{newStacks * PrioriteCounterPer})");
             }
         }
     }

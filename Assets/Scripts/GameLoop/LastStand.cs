@@ -138,7 +138,7 @@ namespace GameLoop
             run.playerHP = Mathf.Max(1, Mathf.CeilToInt(run.playerMaxHP * RevivalHpPct));
             RevivalCount[1]++;
             RevivalHpRestored += run.playerHP;
-            Debug.Log($"[ラストスタンド] その場で蘇生(外殻r10): 最大HP {before} → {run.playerMaxHP} へ半減、 "
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[ラストスタンド] その場で蘇生(外殻r10): 最大HP {before} → {run.playerMaxHP} へ半減、 "
                     + $"HP {run.playerHP} ({RevivalHpPct:P0}) で戦闘続行" + (isBossFight ? " (ボス戦)" : ""));
             return true;
         }
