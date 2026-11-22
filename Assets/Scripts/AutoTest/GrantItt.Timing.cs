@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -184,7 +184,13 @@ namespace AutoTest
         public static double TimingMul(string id, int t)
         {
             if (!TimingLoaded || t < 0 || t > 2) return 1.0;
-            return _timingApplied.TryGetValue(TimingGroupOf(id), out double[] m) ? m[t] : 1.0;
+            string g = TimingGroupOf(id);
+            if (!_timingApplied.TryGetValue(g, out double[] m)) return 1.0;
+            // 寄せの軸 (buyAxisFocus) の秘宝は上げる側だけ効かせる (1 未満は 1): 寄せた軸を序盤に捨てないため (2026-11-22・作者の決定)
+            return FocusAxes.Contains(g) ? System.Math.Max(1.0, m[t]) : m[t];
         }
+
+        /// <summary>倍率を「上げる側だけ」にする群 (<c>秘宝・&lt;軸&gt;</c>)。 AutoRunner が buyAxisFocus から流し込む。</summary>
+        public static readonly HashSet<string> FocusAxes = new HashSet<string>(StringComparer.Ordinal);
     }
 }
