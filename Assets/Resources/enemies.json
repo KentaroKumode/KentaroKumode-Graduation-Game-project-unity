@@ -1,4 +1,4 @@
-{
+﻿{
   "enemies": [
     {
       "id": "farm_crate",
@@ -263,7 +263,7 @@
       "displayName": "鉄砕きの剛鬼",
       "description": "五層の岩棚をうろつく巨大な鬼人。大岩を素手で砕きながら歩き、その縄張りには真っ二つに折れた盾がいくつも転がっている。",
       "floor": 5,
-      "maxHP": 525,
+      "maxHP": 682,
       "criticalNumerator": 0,
       "threat": 6,
       "passiveSkills": [
@@ -274,7 +274,7 @@
           "flavorText": "「当たっただけじゃ終わらんのか」「終わってたら苦労してない」"
         }
       ],
-      "baseAttack": 7,
+      "baseAttack": 9,
       "attackRollMin": 1,
       "attackRollMax": 6,
       "danger": 66,
@@ -286,7 +286,7 @@
       "description": "折れた大剣やつるはしを針金で束ねて担ぐ大柄な個体。歩くたびに鉄の塊が擦れ合い、通路の奥から鈍い音が響いてくる。",
       "floor": 5,
       "elite": true,
-      "maxHP": 675,
+      "maxHP": 878,
       "criticalNumerator": 0,
       "threat": 9,
       "passiveSkills": [
@@ -297,7 +297,7 @@
           "flavorText": "「当たっただけじゃ終わらんのか」「終わってたら苦労してない」"
         }
       ],
-      "baseAttack": 7,
+      "baseAttack": 9,
       "attackRollMin": 1,
       "attackRollMax": 7,
       "danger": 88,
@@ -308,7 +308,7 @@
       "displayName": "風乗りの鳥人",
       "description": "深層から吹き上げる気流に乗り、縦穴を滑空する鳥人。羽ばたきひとつせず風を捉え、切り立った崖の裂け目に巣を作る。",
       "floor": 5,
-      "maxHP": 335,
+      "maxHP": 436,
       "criticalNumerator": 0,
       "threat": 4,
       "passiveSkills": [
@@ -319,7 +319,7 @@
           "flavorText": "「逃げたぞ、追え」「上です」「……上か」"
         }
       ],
-      "baseAttack": 7,
+      "baseAttack": 9,
       "attackRollMin": 0,
       "attackRollMax": 3,
       "danger": 28,
@@ -331,7 +331,7 @@
       "description": "墜落した探検家の声色を真似て崖下から助けを呼ぶ個体。足を止めて下をのぞき込んだ者の背へ、音もなく垂直に降りてくる。",
       "floor": 5,
       "elite": true,
-      "maxHP": 415,
+      "maxHP": 540,
       "criticalNumerator": 0,
       "threat": 7,
       "passiveSkills": [
@@ -342,7 +342,7 @@
           "flavorText": "「逃げたぞ、追え」「上です」「……上か」"
         }
       ],
-      "baseAttack": 8,
+      "baseAttack": 10,
       "attackRollMin": 0,
       "attackRollMax": 3,
       "danger": 39,
@@ -353,7 +353,7 @@
       "displayName": "硬皮の蛇兵",
       "description": "地下の古い水路を縄張りにする、分厚いうろこ肌の兵士。ぬかるみに太い尾を引きずりながら、さびた曲刀を手に巡回している。",
       "floor": 3,
-      "maxHP": 165,
+      "maxHP": 214,
       "criticalNumerator": 0,
       "threat": 6,
       "passiveSkills": [
@@ -370,7 +370,7 @@
           "flavorText": "傷は背中にあった。逃げたわけではない。"
         }
       ],
-      "baseAttack": 8,
+      "baseAttack": 10,
       "attackRollMin": 1,
       "attackRollMax": 3,
       "danger": 20,
@@ -382,7 +382,7 @@
       "description": "脱皮せずに固まった古皮の上から、旧帝国の青銅板を金具で留めた個体。動くたびにさびた装甲と分厚いうろこが擦れて鈍くきしむ。",
       "floor": 3,
       "elite": true,
-      "maxHP": 205,
+      "maxHP": 266,
       "criticalNumerator": 0,
       "threat": 9,
       "passiveSkills": [
@@ -404,7 +404,7 @@
           "description": "防御さらに+4（硬鱗と合わせて8）。受けたダメージが与えたダメージより多かったターン、相手に1の軽減不可ダメージ"
         }
       ],
-      "baseAttack": 7,
+      "baseAttack": 9,
       "attackRollMin": 1,
       "attackRollMax": 5,
       "danger": 28,
@@ -415,7 +415,7 @@
       "displayName": "双角の暴牛",
       "description": "かつて荷運びの牛が三層のゆがみにのまれ、二本足で立ち上がった末裔。通路の岩壁には、やつが角を研いだ深い溝が幾筋も刻まれている。",
       "floor": 3,
-      "maxHP": 150,
+      "maxHP": 195,
       "criticalNumerator": 0,
       "threat": 7,
       "passiveSkills": [
@@ -432,7 +432,7 @@
           "flavorText": "「当たっただけじゃ終わらんのか」「終わってたら苦労してない」"
         }
       ],
-      "baseAttack": 5,
+      "baseAttack": 7,
       "attackRollMin": 1,
       "attackRollMax": 6,
       "defense": 6,
@@ -445,7 +445,7 @@
       "description": "ちぎれた鼻環の鎖を垂らし、白い泡を吹いて通路を駆け回る狂乱個体。折れた片角の断面には、乾いた血と岩くずがこびりついている。",
       "floor": 3,
       "elite": true,
-      "maxHP": 210,
+      "maxHP": 273,
       "criticalNumerator": 0,
       "threat": 10,
       "passiveSkills": [
@@ -467,7 +467,7 @@
           "description": "毎ターン、攻撃+1"
         }
       ],
-      "baseAttack": 5,
+      "baseAttack": 7,
       "attackRollMin": 1,
       "attackRollMax": 6,
       "defense": 6,
@@ -479,7 +479,7 @@
       "displayName": "凍てつく怨影",
       "description": "六層の時空のずれに取り残され、輪郭だけになったなれの果て。通り過ぎた跡の石畳には、白い霜が足跡の形に張りついている。",
       "floor": 6,
-      "maxHP": 350,
+      "maxHP": 612,
       "criticalNumerator": 0,
       "threat": 7,
       "passiveSkills": [
@@ -502,7 +502,7 @@
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         }
       ],
-      "baseAttack": 9,
+      "baseAttack": 15,
       "attackRollMin": 1,
       "attackRollMax": 6,
       "danger": 108,
@@ -514,7 +514,7 @@
       "description": "時空の裂け目で、過去と現在を行き来している濃い影。古い装束の輪郭が浮かんだかと思えば、次の瞬間には煙のように透けて消える。",
       "floor": 6,
       "elite": true,
-      "maxHP": 445,
+      "maxHP": 779,
       "criticalNumerator": 0,
       "threat": 10,
       "passiveSkills": [
@@ -542,7 +542,7 @@
           "description": "偶数ターンは霊体になり、受ける攻撃のダメージを1に減らす。霊体でないターンは攻撃の出目を1つ多く振る"
         }
       ],
-      "baseAttack": 9,
+      "baseAttack": 15,
       "attackRollMin": 1,
       "attackRollMax": 6,
       "danger": 259,
@@ -553,7 +553,7 @@
       "displayName": "刻印の石巨人",
       "description": "読めない古い文字が刻まれた、六層の岩盤そのものが歩く塊。継ぎ目のない巨石の体から、乾いた石の粉が絶えずこぼれ落ちている。",
       "floor": 6,
-      "maxHP": 625,
+      "maxHP": 1094,
       "criticalNumerator": 0,
       "threat": 7,
       "passiveSkills": [
@@ -576,7 +576,7 @@
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         }
       ],
-      "baseAttack": 10,
+      "baseAttack": 16,
       "attackRollMin": 1,
       "attackRollMax": 5,
       "danger": 121,
@@ -588,7 +588,7 @@
       "description": "長い歳月を経て全身に深い亀裂が走った、崩れかけの石巨人。ひび割れの奥から青白い光が漏れており、一歩ごとに岩片をまき散らす。",
       "floor": 6,
       "elite": true,
-      "maxHP": 800,
+      "maxHP": 1400,
       "criticalNumerator": 0,
       "threat": 10,
       "passiveSkills": [
@@ -616,7 +616,7 @@
           "description": "毎ターン意志+1、撃破時にスタック分の確定ダメージ"
         }
       ],
-      "baseAttack": 11,
+      "baseAttack": 18,
       "attackRollMin": 1,
       "attackRollMax": 6,
       "danger": 169,
@@ -627,7 +627,7 @@
       "displayName": "薄明の騎士",
       "description": "旧ストレリツ守備騎士団の装束を、穴の底で今も曇りなく磨き上げている不死者。滅びた詰所の前に立ち、通りかかる者を無言で見据えている。",
       "floor": 5,
-      "maxHP": 240,
+      "maxHP": 312,
       "criticalNumerator": 0,
       "threat": 6,
       "passiveSkills": [
@@ -656,7 +656,7 @@
           "flavorText": "立会人は三合目で目を離せなくなった、と後に書いている。"
         }
       ],
-      "baseAttack": 5,
+      "baseAttack": 7,
       "attackRollMin": 1,
       "attackRollMax": 7,
       "defense": 8,
@@ -669,7 +669,7 @@
       "description": "騎士団の礼通りに一礼して剣を抜く、黒ずんだ鉄甲の騎士。生前の美しい型はそのままに、刃先から暗い影が煙のように糸を引いている。",
       "floor": 5,
       "elite": true,
-      "maxHP": 305,
+      "maxHP": 396,
       "criticalNumerator": 0,
       "threat": 9,
       "passiveSkills": [
@@ -703,7 +703,7 @@
           "description": "攻撃がブロックを抜けた時、ダメージ+2"
         }
       ],
-      "baseAttack": 6,
+      "baseAttack": 8,
       "attackRollMin": 1,
       "attackRollMax": 8,
       "defense": 8,
@@ -715,7 +715,7 @@
       "displayName": "癒着の多頭獣",
       "description": "三層のゆがみで複数の獣が溶け合い、一つの胴に押し込まれた異形。癒着した皮膚が絶えずひきつれ、別々の首が勝手な方角へほえている。",
       "floor": 3,
-      "maxHP": 100,
+      "maxHP": 130,
       "criticalNumerator": 0,
       "threat": 7,
       "passiveSkills": [
@@ -732,7 +732,7 @@
           "flavorText": "傷跡が無い。無いから、何度やられたのか誰にも分からない。"
         }
       ],
-      "baseAttack": 4,
+      "baseAttack": 5,
       "attackRollMin": 1,
       "attackRollMax": 4,
       "danger": 9,
@@ -744,7 +744,7 @@
       "description": "幾度も切り裂かれた傷が盛り上がり、縄のように全身を覆う古株。折れた剣先を肉に埋めたまま、二つの頭で息を合わせて迫ってくる。",
       "floor": 3,
       "elite": true,
-      "maxHP": 110,
+      "maxHP": 143,
       "criticalNumerator": 0,
       "threat": 10,
       "passiveSkills": [
@@ -766,7 +766,7 @@
           "description": "防御+2／3ターンごとに攻撃+1（累積）"
         }
       ],
-      "baseAttack": 4,
+      "baseAttack": 5,
       "attackRollMin": 1,
       "attackRollMax": 3,
       "danger": 10,
@@ -839,7 +839,7 @@
       "displayName": "吸血の貴人",
       "description": "陽の届かない五層で、古風な礼服のまま生き長らえる夜の貴人。青白い顔に穏やかな笑みを浮かべ、血の乾いた細剣を杖代わりに突いている。",
       "floor": 5,
-      "maxHP": 660,
+      "maxHP": 858,
       "criticalNumerator": 0,
       "threat": 6,
       "passiveSkills": [
@@ -862,7 +862,7 @@
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         }
       ],
-      "baseAttack": 9,
+      "baseAttack": 11,
       "attackRollMin": 1,
       "attackRollMax": 4,
       "danger": 138,
@@ -874,7 +874,7 @@
       "description": "「あいつは獣のように襲ってはこない。晩餐の席へ招くように一礼し、気づいた時にはもう喉元が冷たくなっている」——五層生還者の手記。",
       "floor": 5,
       "elite": true,
-      "maxHP": 610,
+      "maxHP": 793,
       "criticalNumerator": 0,
       "threat": 9,
       "passiveSkills": [
@@ -902,7 +902,7 @@
           "description": "防御+2／3ターンごとに攻撃+1（累積）"
         }
       ],
-      "baseAttack": 8,
+      "baseAttack": 10,
       "attackRollMin": 1,
       "attackRollMax": 5,
       "danger": 136,
@@ -913,7 +913,7 @@
       "displayName": "落日の騎士",
       "description": "滅びた王国の紋章を胸に刻み、六層の廃道をさまよう亡霊騎士。さびついた大剣を地面に引きずり、擦れる金属音だけが暗い通路に響く。",
       "floor": 6,
-      "maxHP": 405,
+      "maxHP": 709,
       "criticalNumerator": 0,
       "threat": 7,
       "passiveSkills": [
@@ -942,7 +942,7 @@
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         }
       ],
-      "baseAttack": 8,
+      "baseAttack": 13,
       "attackRollMin": 1,
       "attackRollMax": 5,
       "defense": 16,
@@ -955,7 +955,7 @@
       "description": "六層へ落とされた罪人たちが最も恐れる首切り役。ひび割れた鉄仮面の奥は空洞になっており、処刑場の跡地から今も離れようとしない。",
       "floor": 6,
       "elite": true,
-      "maxHP": 505,
+      "maxHP": 884,
       "criticalNumerator": 0,
       "threat": 10,
       "passiveSkills": [
@@ -989,7 +989,7 @@
           "description": "防御+2／3ターンごとに攻撃+1（累積）"
         }
       ],
-      "baseAttack": 9,
+      "baseAttack": 14,
       "attackRollMin": 1,
       "attackRollMax": 5,
       "defense": 16,
@@ -1001,7 +1001,7 @@
       "displayName": "十三番目の死",
       "description": "三層の霧で隊の人数を数え直した時、最後に混じっている細長い影。誰の松明にも照らされないまま、隊列のすぐ後ろを同じ歩調でついてくる。",
       "floor": 3,
-      "maxHP": 35,
+      "maxHP": 46,
       "criticalNumerator": 0,
       "threat": 4,
       "passiveSkills": [
@@ -1012,7 +1012,7 @@
           "flavorText": "「十二番目までは名前がついてる」「じゃあコイツは」「……番号だけだ」"
         }
       ],
-      "baseAttack": 4,
+      "baseAttack": 6,
       "attackRollMin": 0,
       "attackRollMax": 10,
       "danger": 10,
@@ -1024,7 +1024,7 @@
       "description": "ぼろ布の下から異様に長い手足を伸ばす、三層の古い怪異。背丈を超える大鎌を音もなく引きずり、霧の濃い日にだけ姿を現す。",
       "floor": 3,
       "elite": true,
-      "maxHP": 50,
+      "maxHP": 65,
       "criticalNumerator": 0,
       "threat": 7,
       "passiveSkills": [
@@ -1040,7 +1040,7 @@
           "description": "13番目の宣告が灯ったターン、攻撃+13"
         }
       ],
-      "baseAttack": 4,
+      "baseAttack": 6,
       "attackRollMin": 0,
       "attackRollMax": 10,
       "danger": 11,
@@ -1051,10 +1051,10 @@
       "displayName": "甲殻の這い虫",
       "description": "遺物の破片が混じる土を食い、背の殻だけがいびつに厚くなった虫。通路の隅で泥をすすり、驚くと頭と足を殻の内側へ引っ込める。",
       "floor": 3,
-      "maxHP": 70,
+      "maxHP": 91,
       "criticalNumerator": 0,
       "threat": 6,
-      "baseAttack": 6,
+      "baseAttack": 8,
       "attackRollMin": 1,
       "attackRollMax": 4,
       "defense": 16,
@@ -1067,10 +1067,10 @@
       "displayName": "古殻の這い虫",
       "description": "何年もの脱皮をやり過ごし、殻に泥と鉱石がこびりついた老成個体。じっと足を折り畳んでいると、通路を塞ぐただの岩塊にしか見えない。",
       "floor": 3,
-      "maxHP": 80,
+      "maxHP": 104,
       "criticalNumerator": 0,
       "threat": 9,
-      "baseAttack": 6,
+      "baseAttack": 8,
       "attackRollMin": 1,
       "attackRollMax": 4,
       "defense": 20,
@@ -1090,10 +1090,10 @@
       "displayName": "継ぎはぎの脱走兵",
       "description": "軍法会議を逃れて六層まで降りてきた元兵士。死体から集めた大きさの違う鉄板を、さびた針金で無理やり胴に縛りつけている。",
       "floor": 6,
-      "maxHP": 345,
+      "maxHP": 604,
       "criticalNumerator": 0,
       "threat": 7,
-      "baseAttack": 8,
+      "baseAttack": 13,
       "attackRollMin": 1,
       "attackRollMax": 5,
       "defense": 20,
@@ -1113,10 +1113,10 @@
       "displayName": "古参の脱走兵",
       "description": "何十年前に逃げたのか本人も忘れたまま、六層をさまよう老兵。色あせた軍服に雑多な鉄板を巻きつけ、くぼんだ目で通路をにらんでいる。",
       "floor": 6,
-      "maxHP": 415,
+      "maxHP": 726,
       "criticalNumerator": 0,
       "threat": 10,
-      "baseAttack": 9,
+      "baseAttack": 14,
       "attackRollMin": 1,
       "attackRollMax": 5,
       "defense": 24,
@@ -1142,10 +1142,10 @@
       "displayName": "石食いの虫",
       "description": "六層の岩壁をかみ砕き、溶かした鉱石を背中に塗り重ねていく甲虫。通り過ぎた後の壁には、大顎でえぐられた丸い穴がいくつも残る。",
       "floor": 6,
-      "maxHP": 455,
+      "maxHP": 796,
       "criticalNumerator": 0,
       "threat": 7,
-      "baseAttack": 8,
+      "baseAttack": 13,
       "attackRollMin": 1,
       "attackRollMax": 6,
       "defense": 0,
@@ -1165,10 +1165,10 @@
       "displayName": "鉱脈食いの虫",
       "description": "遺物の鉱脈ごと飲み込んで育った大型個体。背中に幾重もの結晶が突き出しており、松明の火をかざすと鈍い七色の光を返す。",
       "floor": 6,
-      "maxHP": 580,
+      "maxHP": 1015,
       "criticalNumerator": 0,
       "threat": 10,
-      "baseAttack": 10,
+      "baseAttack": 16,
       "attackRollMin": 1,
       "attackRollMax": 6,
       "defense": 0,
@@ -1194,10 +1194,10 @@
       "displayName": "大盾の番兵",
       "description": "とうに隊列が失われた五層の通路で、ひとり号令を唱え続ける番兵。身の丈ほどもある鉄の大盾を石床に据え、一歩も退かずに道を塞いでいる。",
       "floor": 5,
-      "maxHP": 590,
+      "maxHP": 767,
       "criticalNumerator": 0,
       "threat": 7,
-      "baseAttack": 8,
+      "baseAttack": 10,
       "attackRollMin": 1,
       "attackRollMax": 5,
       "guardPeriod": 3,
@@ -1212,10 +1212,10 @@
       "displayName": "古参の盾番兵",
       "description": "交代の来ない通路に立ち続け、盾の裏に仲間の認識票を幾つも下げた古参兵。一歩踏み出すたびに、乾いた金属の札が触れ合って小さく鳴る。",
       "floor": 5,
-      "maxHP": 680,
+      "maxHP": 884,
       "criticalNumerator": 0,
       "threat": 10,
-      "baseAttack": 9,
+      "baseAttack": 11,
       "attackRollMin": 1,
       "attackRollMax": 5,
       "guardPeriod": 3,
@@ -1271,7 +1271,7 @@
       "displayName": "ゴブリン王",
       "description": "討ち取った探検隊長の鉄帽を冠代わりに被る、異様に肥え太った群れの主。荷箱を積んだ玉座にふんぞり返り、奪った軍用笛を吹き鳴らす。",
       "floor": 3,
-      "maxHP": 750,
+      "maxHP": 975,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 4,
@@ -1283,7 +1283,7 @@
           "flavorText": "号令の内容は誰にも聞き取れなかった。それでも全員が、同時に、強くなった。"
         }
       ],
-      "baseAttack": 16,
+      "baseAttack": 20,
       "attackRollMin": 1,
       "attackRollMax": 4
     },
@@ -1292,7 +1292,7 @@
       "displayName": "毒沼の主",
       "description": "三層の底にたまった腐水と毒霧の中で育った巨大な両生獣。紫色の粘液に覆われた背を泥から浮かせ、ぬるい沼の底で獲物を待っている。",
       "floor": 3,
-      "maxHP": 750,
+      "maxHP": 975,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 4,
@@ -1304,7 +1304,7 @@
           "flavorText": "沼は急がない。急ぐ理由が、沼の側には無い。"
         }
       ],
-      "baseAttack": 17,
+      "baseAttack": 21,
       "attackRollMin": 1,
       "attackRollMax": 4
     },
@@ -1313,7 +1313,7 @@
       "displayName": "鏡の双子",
       "description": "四層の空間のゆがみが生んだ、寸分違わぬ二つの人影。向かい合わせの鏡のように同じ歩幅で進み、瞬きの間合いまで完全に重なっている。",
       "floor": 3,
-      "maxHP": 750,
+      "maxHP": 975,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 6,
@@ -1331,7 +1331,7 @@
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         }
       ],
-      "baseAttack": 14,
+      "baseAttack": 18,
       "attackRollMin": 4,
       "attackRollMax": 4
     },
@@ -1341,7 +1341,7 @@
       "displayName": "審判官",
       "description": "管轄の果てである五層の底に立ち、降りてきた者の罪を量る執行者。白い法衣の背に日輪を負い、手にした天秤は一度も揺れたことがない。",
       "floor": 5,
-      "maxHP": 1835,
+      "maxHP": 2386,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 6,
@@ -1359,7 +1359,7 @@
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         }
       ],
-      "baseAttack": 13,
+      "baseAttack": 16,
       "attackRollMin": 2,
       "attackRollMax": 4,
       "heavyPeriod": 5,
@@ -1372,7 +1372,7 @@
       "displayName": "シュヴァリエ・サン=ジョリオラ",
       "description": "資格ある者の前にだけ現れる、古き決闘術の幻影。透き通る細剣を胸元に掲げて礼をとり、足音ひとつ立てずに石畳の上を滑るように踏み込む。",
       "floor": 5,
-      "maxHP": 1150,
+      "maxHP": 1495,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 8,
@@ -1390,7 +1390,7 @@
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         }
       ],
-      "baseAttack": 13,
+      "baseAttack": 16,
       "attackRollMin": 2,
       "attackRollMax": 3,
       "heavyPeriod": 5,
@@ -1403,7 +1403,7 @@
       "displayName": "灰燼の王",
       "description": "六層の最奥で、降り積もる灰に埋もれた玉座を守る古き王。炭化した外套の隙間から暗い残り火がのぞき、立ち上がるたびに熱い灰が舞い散る。",
       "floor": 6,
-      "maxHP": 2200,
+      "maxHP": 3850,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 10,
@@ -1439,7 +1439,7 @@
           "flavorText": "盾を構えるほど、灰は厚く積もる。焼かれているのは腕ではなく、迷っている時間の方だ。"
         }
       ],
-      "baseAttack": 16,
+      "baseAttack": 25,
       "attackRollMin": 2,
       "attackRollMax": 6,
       "heavyPeriod": 4,
@@ -1452,7 +1452,7 @@
       "floor": 7,
       "displayName": "ヴェスカ・小手調べ",
       "description": "最深部の裂け目を背に、値踏みするような目で歩み寄る遺物学者。浅層でも見かけるありふれた品を、自分の指先のように造作もなく操る。",
-      "maxHP": 1605,
+      "maxHP": 4012,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 10,
@@ -1489,7 +1489,7 @@
           "flavorText": "「開けたのは私だ。だが閉じ方は誰も知らない」"
         }
       ],
-      "baseAttack": 10,
+      "baseAttack": 23,
       "attackRollMin": 2,
       "attackRollMax": 6,
       "heavyPeriod": 0,
@@ -1501,7 +1501,7 @@
       "floor": 7,
       "displayName": "ヴェスカ・遺物学者",
       "description": "外套の裏から深層の危険な遺物を次々と取り出し、構えを改めるヴェスカ。止まった時の中で百年繰り返した、手慣れた手順で力を重ねていく。",
-      "maxHP": 1605,
+      "maxHP": 4012,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 10,
@@ -1538,7 +1538,7 @@
           "flavorText": "「開けたのは私だ。だが閉じ方は誰も知らない」"
         }
       ],
-      "baseAttack": 10,
+      "baseAttack": 22,
       "attackRollMin": 2,
       "attackRollMax": 5,
       "heavyPeriod": 0,
@@ -1550,7 +1550,7 @@
       "floor": 7,
       "displayName": "ヴェスカ・神話",
       "description": "地上の鑑定所には一度も届いたことのない、神話級の遺物が宙に浮かぶ。裂け目から漏れる異界の光を浴びて、眠っていた品々が次々と目を覚ます。",
-      "maxHP": 1425,
+      "maxHP": 3562,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 12,
@@ -1587,7 +1587,7 @@
           "flavorText": "「開けたのは私だ。だが閉じ方は誰も知らない」"
         }
       ],
-      "baseAttack": 10,
+      "baseAttack": 23,
       "attackRollMin": 2,
       "attackRollMax": 7,
       "heavyPeriod": 5,
@@ -1599,7 +1599,7 @@
       "floor": 7,
       "displayName": "ヴェスカ・天与",
       "description": "学者の落ち着きをかなぐり捨て、傷つくことすら楽しむように笑うヴェスカ。未知の強さを解き明かそうと、天変地異を呼ぶ異界の品を振るう。",
-      "maxHP": 2915,
+      "maxHP": 4664,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 12,
@@ -1608,7 +1608,7 @@
         {
           "internalName": "RecurrentTruth",
           "skillName": "回帰性真理",
-          "description": "毒と出血の蓄積を毎ターン半減する。受ける会心の倍率−0.5（下限1.0）。毎ターン、プレイヤーの臨界メーターを5減らす。最大HPの変更を受けず、処刑も成立しない。",
+          "description": "毒と出血の蓄積を毎ターン半減する。受ける会心の倍率−0.5（下限1.0）。毎ターン、プレイヤーの臨界メーターを10減らす。最大HPの変更を受けず、処刑も成立しない。",
           "flavorText": "「すべては真理へと回帰する」"
         },
         {
@@ -1636,7 +1636,7 @@
           "flavorText": "「開けたのは私だ。だが閉じ方は誰も知らない」"
         }
       ],
-      "baseAttack": 10,
+      "baseAttack": 24,
       "attackRollMin": 2,
       "attackRollMax": 9,
       "heavyPeriod": 5,

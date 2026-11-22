@@ -760,7 +760,7 @@ namespace CombatSystem
             // 2026-07-25 v6: 種火 (充電/臨界/毒/出血) の r2 効果 - 戦闘開始時に適用
             if (ctx != null)
             {
-                // 臨界の品を 1 つ以上持つ戦闘は臨界が動く (閾値 30・〈早沸かし釜〉〈恒温の竈〉は HeatCore の旗・品の OnBattleStart より前)
+                // 臨界の品を 1 つ以上持つ戦闘は臨界が動く (閾値 36・〈早沸かし釜〉〈恒温の竈〉は HeatCore の旗・品の OnBattleStart より前)
                 if (ctx.AxisDepth(ItemSystem.PassiveSkills.AxisRules.Heat) > 0) ItemSystem.PassiveSkills.Keywords.Kw.EnableHeat(ctx);
                 // 臨界 r2 保温炉: 前戦闘のメーターを持ち越し (RunState.pendingRinkaiCarryover 経由)
                 var runR = GameLoop.GameManager.Instance?.Run;

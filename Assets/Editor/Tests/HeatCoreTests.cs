@@ -15,34 +15,34 @@ namespace AutoTest.EditorTests
         [Test]
         public void Burst_BaseAndDefensePen()
         {
-            var s = S(HeatItems.None, 30, 10);
+            var s = S(HeatItems.None, HeatCore.Threshold, 10);
             Assert.That(HeatCore.TryBurst(ref s, out var b), Is.True);
             Assert.That(b.damage, Is.EqualTo(30));
             Assert.That(b.landed, Is.EqualTo(DefenseFormula.Apply(30, 5)));   // 防御 10 の半分を無視
             Assert.That(s.meter, Is.EqualTo(0));
             Assert.That(HeatCore.TryBurst(ref s, out _), Is.False);
-            // 〈火花読みの眼鏡〉: 防御を全部無視・1 回目 ×1.15
-            var g = S(HeatItems.Spark, 30, 10);
+            // 〈火花読みの眼鏡〉: 防御を全部無視・1 回目 ×1.08
+            var g = S(HeatItems.Spark, HeatCore.Threshold, 10);
             HeatCore.TryBurst(ref g, out var bg);
-            Assert.That(bg.landed, Is.EqualTo(30 * 115 / 100));
+            Assert.That(bg.landed, Is.EqualTo(30 * 108 / 100));
         }
 
         [Test]
         public void Burst_SuperKilnLedger()
         {
             // 超臨界 (閾値の 1.5 倍以上) ×1.5・〈暴れ窯の火床〉×2.0 と閾値 −4
-            var s = S(HeatItems.None, 45);
+            var s = S(HeatItems.None, HeatCore.Threshold * 3 / 2);
             HeatCore.TryBurst(ref s, out var b);
-            Assert.That(b.super && b.damage == 45, Is.True);
-            var k = S(HeatItems.Kiln, 45);
+            Assert.That(b.super && b.damage == 45, Is.True);   // 基礎 30 × 1.5
+            var k = S(HeatItems.Kiln, HeatCore.Threshold * 3 / 2);
             HeatCore.TryBurst(ref k, out var bk);
             Assert.That(bk.damage, Is.EqualTo(60));
-            Assert.That(k.threshold, Is.EqualTo(26));
+            Assert.That(k.threshold, Is.EqualTo(HeatCore.Threshold - 4));
             // 〈帳簿外の爆薬〉: 閾値ぶんだけ減らして続けて・1 ターン 5 回まで
             var l = S(HeatItems.Ledger, 300);
             int landed = 0;
             Assert.That(HeatCore.Step(ref l, 0, ref landed) + CountBursts(ref l), Is.EqualTo(HeatCore.LedgerMax));
-            Assert.That(l.meter, Is.EqualTo(300 - 30 * HeatCore.LedgerMax));
+            Assert.That(l.meter, Is.EqualTo(300 - HeatCore.Threshold * HeatCore.LedgerMax));
         }
 
         private static int CountBursts(ref HeatCore.State s) { int n = 0; while (HeatCore.TryBurst(ref s, out _)) n++; return n; }

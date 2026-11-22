@@ -144,11 +144,11 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>早沸かし釜 (分岐 A): 敵が攻撃したターンの終わり、 臨界 +3。 閾値 −8 (下限 12) は HeatCore の旗。</summary>
+    /// <summary>早沸かし釜 (分岐 A): 敵が攻撃したターンの終わり、 臨界 +2。 閾値 −6 (下限 12) は HeatCore の旗 (2026-11-22 段 3 の較正 2: +3・−8 → +2・−6)。</summary>
     public class QuickKettle : IPassiveSkillEffect
     {
         public string SkillId => GameLoop.ItemIds.HeatKettle;
-       public const int Heat = 3;
+       public const int Heat = 2;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {

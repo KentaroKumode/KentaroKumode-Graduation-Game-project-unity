@@ -13,11 +13,11 @@ namespace CombatSystem
         Whetstone = 1 << 4,    // 荒砥: 撃ごとに 臨界 +2
         Oven = 1 << 5,         // 恒温の竈: 戦闘開始時 閾値の半分から・爆発の後は 8 から
         Primer = 1 << 6,       // 二度詰めの雷管: 爆発のたび この戦闘の爆発の基礎 +6 (最大 +48)
-        Coal = 1 << 7,         // 焚き足しの炭: 臨界を得るたび +2 (1 ターン 6 回)
+        Coal = 1 << 7,         // 焚き足しの炭: 臨界を得るたび +1 (1 ターン 6 回)
         Mold = 1 << 8,         // 溢れ取りの鋳型: 溢れた臨界 1 につき爆発 +3
         Ledger = 1 << 9,       // 帳簿外の爆薬: 閾値ぶんだけ減らして続けて爆発 (1 ターン 5 回)
-        Kettle = 1 << 10,      // 早沸かし釜: 閾値 −12
-        Spark = 1 << 11,       // 火花読みの眼鏡: 爆発は敵の防御を全部無視・爆発の回数 × 15% を掛ける
+        Kettle = 1 << 10,      // 早沸かし釜: 閾値 −6
+        Spark = 1 << 11,       // 火花読みの眼鏡: 爆発は敵の防御を全部無視・爆発の回数 × 8% を掛ける
         Ashen = 1 << 12,       // 八日目の灰燼: 臨界 40 以上で起きた爆発 ×1.6
         Flint = 1 << 13,       // 燧石の指輪: 攻撃の端子 2 枚以上のターン 臨界の獲得 ×2・爆発のたび次の爆発 +25%
         Kiln = 1 << 14,        // 暴れ窯の火床: 超臨界爆発 ×2.0・超臨界のたび閾値 −4 (最大 −16)
@@ -35,11 +35,13 @@ namespace CombatSystem
     /// </summary>
     public static class HeatCore
     {
-        public const int Threshold = 30, ThresholdFloor = 12, BurstBase = 30, DefensePenPct = 50;
+        // 閾値 30 → 36 (2026-11-22 段 3 の較正 4・臨界の腕が寄せなしの約 2 倍 / ターンの終わりの攻撃の合計が毎ターン溜まる)
+        public const int Threshold = 36, ThresholdFloor = 12, BurstBase = 30, DefensePenPct = 50;
         public const int SuperAtPct = 150, SuperMulPct = 150, KilnSuperMulPct = 200;
         public const int StoneTwo = 6, StoneAll = 12, BreastHeat = 4, BreastBlock = 2, PokerPerDie = 6, SpannerPerHit = 2, WhetPerHit = 1;
-        public const int OvenRestart = 8, PrimerAdd = 6, PrimerMax = 48, CoalAdd = 2, CoalMax = 6, MoldPerExcess = 3, LedgerMax = 5, KettleCut = 8;
-        public const int SparkPctPerBurst = 15, AshenNeed = 40, AshenMulPct = 160, FlintPctPerBurst = 25, KilnStep = 4, KilnMax = 16, PillarDownMulPct = 200;
+        public const int OvenRestart = 8, PrimerAdd = 6, PrimerMax = 48, CoalAdd = 1, CoalMax = 6, MoldPerExcess = 3, LedgerMax = 5, KettleCut = 6;   // 炭 +2 → +1・釜 −8 → −6 (2026-11-22 段 3 の較正 2)
+        public const int SparkPctPerBurst = 8,   // 2026-11-22 段 3 の較正 2: 15 → 8 (長い戦闘で伸び続ける)
+                          AshenNeed = 40, AshenMulPct = 160, FlintPctPerBurst = 25, KilnStep = 4, KilnMax = 16, PillarDownMulPct = 200;
         /// <summary>〈燧石の指輪〉: 攻撃の端子をこの枚数以上発動したターン。</summary>
         public const int FlintAttackTerminals = 2;
 
@@ -81,10 +83,10 @@ namespace CombatSystem
             return f;
         }
 
-        /// <summary>戦闘の始めの閾値 (〈早沸かし釜〉−8・下限 <see cref="ThresholdFloor"/>)。</summary>
+        /// <summary>戦闘の始めの閾値 (〈早沸かし釜〉−6・下限 <see cref="ThresholdFloor"/>)。</summary>
         public static int StartThreshold(HeatItems f) => System.Math.Max(ThresholdFloor, Threshold - (Has(f, HeatItems.Kettle) ? KettleCut : 0));
 
-        /// <summary>臨界を n 得る (〈焚き足しの炭〉+2 → 〈燧石の指輪〉×2 → 遺物 +%)。 戻り値 = 実際に足した量。</summary>
+        /// <summary>臨界を n 得る (〈焚き足しの炭〉+1 → 〈燧石の指輪〉×2 → 遺物 +%)。 戻り値 = 実際に足した量。</summary>
         public static int Gain(ref State s, int n)
         {
             if (n <= 0 || s.threshold <= 0) return 0;

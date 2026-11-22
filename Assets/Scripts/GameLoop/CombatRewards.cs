@@ -53,8 +53,8 @@ namespace GameLoop
         /// <summary>エリート戦の報酬ゴールド倍率。
         /// 1.8 → 2.6 (2026-09-15) → <b>2.0 (2026-09-20)</b>。 航行がエリートの戦闘コストを見積もるようになり、
         /// 稼ぎがエリートに偏りすぎていたため。 <b>航行スコアもこの値を読む</b> (<c>AutoRunner.Rank</c> の goldPull)。</summary>
-        public static float EliteRewardMul = 1.5f;   // 2026-11-22: 2.0 → 1.5 (エリートが確定の秘宝 3 択になり踏み得が大きいので金を控えめに・neon 最終仕上げ §1-4)
-        public const float EliteRewardMulDefault = 1.5f;
+        public static float EliteRewardMul = 1.2f;   // 2026-11-22: 2.0 → 1.5 → 1.2 (段 3 の較正 1) (エリートが確定の秘宝 3 択になり踏み得が大きいので金を控えめに・neon 最終仕上げ §1-4)
+        public const float EliteRewardMulDefault = 1.2f;
 
         /// <summary>[計装] 落ちた回数 / 抽選した回数。 エリートと通常を分けて数える
         /// ── 合算だと「どちらの経路が供給しているか」が読めない。</summary>

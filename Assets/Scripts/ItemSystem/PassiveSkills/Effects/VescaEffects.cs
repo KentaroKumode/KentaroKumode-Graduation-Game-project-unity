@@ -531,7 +531,7 @@ namespace ItemSystem.PassiveSkills.Effects
             //   「臨界を全没収」を、 **抽選 1 枚の全損からパッシブの定常減衰へ**移したもの。
             //   `rinkaiMeter` は視点反転の対象外なので、 敵パッシブから読んでも
             //   常にプレイヤーのメーターを指す (本ファイル冒頭の remarks 参照)。
-            //   閾値に届かせるには毎ターン 5 を上回るペースで積む必要がある ＝
+            //   閾値に届かせるには毎ターン 10 を上回るペースで積む必要がある ＝
             //   「溜めるか、 諦めて別の勝ち筋へ回すか」の判断がターンごとに立つ。
             if (ctx.rinkaiMeter > 0)
             {
@@ -542,7 +542,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
 
         /// <summary>毎ターン削る臨界メーター量。 遺物〈刻〉から移設 (2026-08-16)。</summary>
-        public const int RinkaiDrainPerTurn = 5;
+        public const int RinkaiDrainPerTurn = 10;   // 2026-11-22 段 3 の較正 3: 5 → 10 (毒・出血の半減と会心 −0.5 に比べて臨界への備えが軽かった)
 
         /// <summary>受ける会心の**倍率からの減算量**。 会心倍率 2.0 なら 1.5 になる (下限 1.0)。
         /// **乗算にしないこと。** ×0.5 だと 2.0 が 1.0 になって会心が無意味になり、
