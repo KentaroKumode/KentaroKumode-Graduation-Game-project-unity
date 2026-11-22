@@ -718,6 +718,7 @@ namespace UI.Game2D.Battle
             if (used >= d.capacity) return false;
             if (d.chargeCost > 0 && env.charge < d.chargeCost) return false;
             if (d.baseId == TerminalIds.BigDischarge && env.charge <= 0) return false;
+            if (!TerminalCards.SituationOk(d, in env, st)) return false;      // 発動の条件 (〈応急箱〉〈身代わり札〉〈焼却斬り〉・条件の無視でも外れない)
             if (st.ignoreCond) return true;
             // 〈号令の剣〉: 他の出目が号令の剣に挿さっていれば、 その数だけ +1 (強化した〈号令の剣＋〉は挿した出目も +1・TerminalCards.Resolve の 1.)
             int v = dice[i];

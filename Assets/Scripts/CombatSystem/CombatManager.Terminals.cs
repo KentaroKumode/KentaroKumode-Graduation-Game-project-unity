@@ -168,9 +168,12 @@ namespace CombatSystem
             e.charge = ctx.GetCharge(); e.chargeCap = ctx.ChargeCap; e.shield = ctx.consShield;
             e.enemyPoison = ctx.EnemyPoison; e.enemyBleed = ctx.enemyBleedStacks;
             e.bursts = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.BurstTotalKey);
-            e.axCrit = ctx.AxisDepth(AxisRules.Crit); e.axBleed = ctx.AxisDepth(AxisRules.Bleed); e.axPoison = ctx.AxisDepth(AxisRules.Poison);
-            e.axHeat = ctx.AxisDepth(AxisRules.Heat); e.axCharge = ctx.AxisDepth(AxisRules.Charge); e.axShield = ctx.AxisDepth(AxisRules.Shield);
-            e.axDeck = ctx.AxisDepth(AxisRules.Deck);
+            // 軸の端子が読む戦闘の状態 (2026-11-22・旧: 偏重 = 軸の品の数)
+            e.critsBattle = ItemSystem.PassiveSkills.Effects.Crit.Count(ctx, ItemSystem.PassiveSkills.Effects.Crit.TotalKey);
+            e.justGuardLast = ItemSystem.PassiveSkills.Effects.Shd.LastTurn(ctx, ItemSystem.PassiveSkills.Effects.Shd.JustGuardTurnKey);
+            int burstTurn = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.BurstTurnKey);
+            e.heatHot = burstTurn > 0 && (burstTurn == ctx.currentTurn || burstTurn == ctx.currentTurn - 1);
+            e.hpLostBattle = _hpAtCombatStart - playerHP + ctx.healAppliedTotal > 0;      // CombatResult.HpLostThisCombat と同じ数え方 (〈応急箱〉)
             // 賽のパッシブ (ADR-0015・DiePassives)
             e.dieId = GameLoop.EquippedDie.IdOf(run);
             e.diceRerolled = ctx.rerollsThisTurn > 0;

@@ -16,6 +16,8 @@ namespace ItemSystem.PassiveSkills.Effects
     {
         /// <summary>[persistent・戦闘で 0 から] このターンの会心の数 (Psn.TurnN) / 会心を出した直近のターン / その前に会心を出したターン。</summary>
         public const string TurnNKey = "crit.n", LastKey = "crit.last", PrevKey = "crit.prev";
+        /// <summary>[persistent・戦闘で 0 から] この戦闘の会心の回数 (端子〈一閃〉〈弱点看破〉・2026-11-22) / 会心を出した直近のターンの会心の数 (〈余韻の鈴〉〈連なる閃き〉の「前のターンに 2 回以上」)。</summary>
+        public const string TotalKey = "crit.total", LastNKey = "crit.lastN", PrevNKey = "crit.prevN";
 
         public static int Count(CombatContext ctx, string key) => (int)ctx.GetAccumulated(key);
 
@@ -24,8 +26,24 @@ namespace ItemSystem.PassiveSkills.Effects
         {
             if (ctx == null) return;
             int last = Count(ctx, LastKey);
-            if (last != ctx.currentTurn) { ctx.accumulatedValues[PrevKey] = last; ctx.accumulatedValues[LastKey] = ctx.currentTurn; }
+            if (last != ctx.currentTurn)
+            {
+                ctx.accumulatedValues[PrevKey] = last; ctx.accumulatedValues[LastKey] = ctx.currentTurn;
+                ctx.accumulatedValues[PrevNKey] = Count(ctx, LastNKey); ctx.accumulatedValues[LastNKey] = 0;
+            }
             Psn.AddTurnN(ctx, TurnNKey, 1);
+            ctx.accumulatedValues[LastNKey] = Count(ctx, LastNKey) + 1;
+            ctx.accumulatedValues[TotalKey] = Count(ctx, TotalKey) + 1;
+        }
+
+        /// <summary>前のターンに出した会心の数 (このターンに会心が出た後でも前のターンの数を返す)。</summary>
+        public static int LastTurnCount(CombatContext ctx)
+        {
+            int cur = ctx.currentTurn;
+            if (cur <= 1) return 0;
+            if (Count(ctx, LastKey) == cur - 1) return Count(ctx, LastNKey);
+            if (Count(ctx, LastKey) == cur && Count(ctx, PrevKey) == cur - 1) return Count(ctx, PrevNKey);
+            return 0;
         }
 
         /// <summary>このターンに出した会心の数。</summary>
