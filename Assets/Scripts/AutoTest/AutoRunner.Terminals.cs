@@ -338,12 +338,15 @@ namespace AutoTest
             var afters = new TerminalBattleState[n];
             // 速度 (2026-11-21・判断は変えない): 同じ目の出目どうしを入れ替えただけの挿し方は、 端子ごとに入る目が同じなので解決も効用も同じ
             //   (Resolve は端子ごとに挿した目を数える・出目の添字は見ない)。 先に出た方の結果を写す (配列は全部埋める = 後ろの選び方・計装はそのまま)。
-            var seen = SameDiceSignatures(rolls) ? new Dictionary<long, int>() : null;
+            //   速度 (2026-11-22・判断は変えない): 必ず外れる組 (<see cref="SureMiss"/>) を「挿さない」に直した挿し方どうしも、 解決は同じ。 直してから同じ鍵で写す
+            var miss = SignatureOk(rolls) ? SureMiss(board, rolls, deck.state) : null;
+            var seen = SameDiceSignatures(rolls) || miss != null ? new Dictionary<long, int>() : null;
+            var canon = miss != null ? new int[k] : null;
             for (int i = 0; i < n; i++)
             {
                 if (seen != null)
                 {
-                    long sig = WiringSignature(rolls, cands[i]);
+                    long sig = WiringSignature(rolls, miss != null ? Canonical(cands[i], miss, canon) : cands[i]);
                     if (seen.TryGetValue(sig, out int j))
                     { us[i] = us[j]; outs[i] = outs[j]; touts[i] = touts[j]; tgts[i] = tgts[j]; afters[i] = afters[j]; continue; }
                     seen[sig] = i;
@@ -436,6 +439,46 @@ namespace AutoTest
         }
 
         /// <summary>出目に同じ目があって、 挿し方の鍵 (<see cref="WiringSignature"/>) で畳めるか (3 個まで・目と場の添字が鍵に収まる時だけ)。</summary>
+        /// <summary><see cref="WiringSignature"/> で鍵を作れる出目か (2〜3 個・0〜1023)。</summary>
+        private static bool SignatureOk(int[] rolls)
+        {
+            if (rolls == null || rolls.Length < 2 || rolls.Length > 3) return false;
+            foreach (int r in rolls) if (r < 0 || r >= 1024) return false;
+            return true;
+        }
+
+        /// <summary>速度 (2026-11-22・判断は変えない): 出目 i を場の s に挿すと<b>必ず外れる</b>か (<c>[i, s]</c>)。 外れる組が無いか、 下の前提が立たなければ null。
+        /// 前提 = 場に〈号令の剣〉が無い (Resolve の 2. 条件の前に出目が変わらない)・他の出目を見る条件 (〈共鳴〉SameElsewhere・対 PairSame) が無い・条件無視でない。
+        /// その時 Resolve の 2. 条件は出目ごとに <see cref="TerminalCards.CondOk"/> だけで外すので、 外れる組を「挿さない」に直した挿し方とは 2. の後の挿し方が同じ
+        /// (0. の挿せる数は列挙が守る)。 3. より後は直した後の挿し方しか読まないので、 結果も同じ。</summary>
+        private static bool[,] SureMiss(List<string> board, int[] rolls, TerminalBattleState state)
+        {
+            if (board == null || state == null || state.ignoreCond) return null;
+            int m = board.Count, k = rolls.Length;
+            for (int s = 0; s < m; s++)
+            {
+                var d = TerminalCards.Get(board[s]);
+                if (d == null) continue;
+                if (d.baseId == TerminalIds.Grinder || d.cond == TerminalCond.SameElsewhere || d.cond == TerminalCond.PairSame) return null;
+            }
+            bool[,] res = null;
+            for (int s = 0; s < m; s++)
+            {
+                var d = TerminalCards.Get(board[s]);
+                if (d == null || d.cond == TerminalCond.None) continue;
+                for (int i = 0; i < k; i++)
+                    if (!TerminalCards.CondOk(d.cond, rolls[i])) (res ??= new bool[k, m])[i, s] = true;
+            }
+            return res;
+        }
+
+        /// <summary><paramref name="slots"/> の必ず外れる組を −1 に直した写し (<paramref name="buf"/> に書いて返す)。</summary>
+        private static int[] Canonical(int[] slots, bool[,] miss, int[] buf)
+        {
+            for (int i = 0; i < slots.Length; i++) buf[i] = slots[i] >= 0 && miss[i, slots[i]] ? -1 : slots[i];
+            return buf;
+        }
+
         private static bool SameDiceSignatures(int[] rolls)
         {
             int k = rolls.Length;
@@ -1514,10 +1557,13 @@ namespace AutoTest
             var sums = new List<WiredSums>(cands.Count);
             float best = float.NegativeInfinity;
             bool anyAttack = false;
+            // 速度 (2026-11-22・結果は変えない): 必ず外れる組を含む挿し方は、 それを「挿さない」に直した挿し方 (列挙にある) と同じ結果なので解かない (最良と anyAttack は変わらない)
+            var miss = SureMiss(board, dice, state);
             foreach (var w in cands)
             {
                 bool dup = false;
                 for (int i = 1; i < k && !dup; i++) if (dice[i] == dice[i - 1] && w[i] < w[i - 1]) dup = true;
+                if (miss != null) for (int i = 0; i < k && !dup; i++) if (w[i] >= 0 && miss[i, w[i]]) dup = true;
                 if (dup) continue;
                 TerminalBattleState after; TerminalOutcome o;
                 using (BotTiming.Enter(BotTiming.Cat.EvalResolve))
