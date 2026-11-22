@@ -203,7 +203,7 @@ namespace AutoTest
             /// 見送り換金の回数 / 額 (AxisPool.RunSkips / RunSkipGold・額は〈銭皿〉込み・金の出入りは goldKeys の「見送り(…)」と totalCoinsSpent)。
             /// 武器の〈連刃〉の追撃 /〈処刑〉/〈画竜点睛〉/〈シールドバッシュ〉(CombatManager.WeaponChainFired ほか)。
             /// [2026-11-22] 戦闘報酬の択を取った / 見送った回数 (rewardPicks / rewardSkips)・主軸 (所持が単独 1 位の軸) を引いた回数 (AxisPool.RunMainAxisPicks・2026-11-22 neon 収束で主軸共鳴の重みは撤去 = 今は供給の集中の計装)。</summary>
-            public int rebootFired, overclockFired, detonateFired, justGuardFired, bleedSpendFired, bleedExecuteFired, burstFired, burstBreakFired, critOverflowFired, critExecuteFired, critRefireFired,
+            public int rebootFired, overclockFired, detonateFired, justGuardFired, bleedSpendFired, bleedExecuteFired, burstFired, burstBreakFired, critOverflowFired, critExecuteFired, critRefireFired, focusAttempted, focusCritted, renkiSpentTotal,
                 deckDisposeFired, deckShuffleFired, roleFormedFired, roleOmniFired, skipFired, skipGold, axisRerollFired,
                 rewardPicks, rewardSkips, mainAxisPicks,
                 weaponChainFired, weaponExecuteFired, weaponGaryoFired, weaponBashFired, guardEchoFired;

@@ -140,6 +140,15 @@ namespace ItemSystem.PassiveSkills
         /// <summary>[perTurn] (撃ごとに CombatManager が false に戻す) この撃は会心の乱数を引かない (〈必殺の照準器〉がもう 1 回発火した撃・会心は forceCritThisHit で決まる)。
         /// 乱数のキーの並びを崩さないため (発火した撃の分だけ引く数が増えないように)。</summary>
         public bool critSkipRoll;
+        /// <summary>[perTurn] (撃ごとに CombatManager が 0 に戻す) この 1 撃の会心率への乗算の上乗せ (小数・0.25 = 合算した会心率 ×1.25・〈測量師の片眼鏡〉が OnCriticalCheck で書く・2026-11-23)。
+        /// PassiveSkillManager.ProcessDamage が加算の合計に (1 + これ) を掛ける。 BeginNewTurn で 0。</summary>
+        public float hitCritRateMulAdd;
+        /// <summary>[perTurn] (撃ごとに CombatManager が false に戻す) この撃は【集中】の撃 (CritCore.FocusedRate・PassiveSkillManager.ProcessDamage が書く・2026-11-23)。 BeginNewTurn で false。</summary>
+        public bool hitIsFocused;
+        /// <summary>[perTurn] (撃ごとに CombatManager が 0 に戻す) この撃の集中会心で使った【練気】(集中会心でなければ 0・PassiveSkillManager.ProcessDamage が書く)。 BeginNewTurn で 0。</summary>
+        public int hitFocusSpentRenki;
+        /// <summary>[perTurn] (撃ごとに CombatManager が書く) この撃は〈必殺の照準器〉のもう 1 回の撃 (もう一度集中にならない・【練気】を使わない)。 BeginNewTurn で false。</summary>
+        public bool isRefireHit;
         /// <summary>この撃が本物の主攻撃の撃か (攻撃しないターンの空の 1 回ではない)。</summary>
         public bool IsRealHit => playerWonRoll && hitIndex < hitCount;
         public float criticalMultiplier; // [perTurn] (Phase B で基礎値 + メタ・遺物へ戻す) 会心倍率（既定 2.0。2026-07-26 に 3.0 へ上げ、2026-08-03 に 2.0 へ差し戻し）
@@ -1040,7 +1049,7 @@ namespace ItemSystem.PassiveSkills
             isCritical = false;
             forceCritical = false;
             forceCritThisHit = false;
-            hitIndex = 0; hitCount = 0; hitFinalDamagePct = 0; hitOutgoingPct = 0; hitIgnoreDefense = false; hitArmorPen = 0; hitFaceMax = 0; critSkipRoll = false;
+            hitIndex = 0; hitCount = 0; hitFinalDamagePct = 0; hitOutgoingPct = 0; hitIgnoreDefense = false; hitArmorPen = 0; hitFaceMax = 0; critSkipRoll = false; hitCritRateMulAdd = 0f; hitIsFocused = false; hitFocusSpentRenki = 0; isRefireHit = false;
             critSuppressed = false;
             lastCritAddPct = 0f;
             critRatePctAdd = 0f;

@@ -495,6 +495,7 @@ namespace AutoTest
                 _cur.critOverflowFired = (int)CombatSystem.CombatManager.CritOverflowFired;
                 _cur.critExecuteFired = (int)CombatSystem.CombatManager.CritExecuteFired;
                 _cur.critRefireFired = (int)CombatSystem.CombatManager.CritRefireFired;
+                _cur.focusAttempted = (int)CombatSystem.CombatManager.FocusAttempted; _cur.focusCritted = (int)CombatSystem.CombatManager.FocusCritted; _cur.renkiSpentTotal = (int)CombatSystem.CombatManager.RenkiSpentTotal;
                 _cur.deckDisposeFired = (int)CombatSystem.CombatManager.DeckDisposeFired;
                 _cur.deckShuffleFired = (int)CombatSystem.CombatManager.DeckShuffleFired;
                 _cur.roleFormedFired = (int)CombatSystem.CombatManager.RoleFormedFired;

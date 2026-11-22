@@ -191,13 +191,14 @@ namespace ItemSystem.PassiveSkills
             Register(new TenkouKaibutsu()); Register(new HopeShard()); Register(new UnyieldingHeat()); Register(new FierceBlade()); Register(new HarmlessLamp());
         }
 
-        /// <summary>会心の軸 21 品のうち効果クラスを持つ 20 品 (2026-11-21・CritEffects.cs)。 〈必殺の照準器〉は本体の撃の輪の旗 (CombatManager.Turn)。 超過会心率の変換は CritCore (全員の規則)。</summary>
+        /// <summary>会心の軸 27 品のうち効果クラスを持つ 26 品 (2026-11-21・2026-11-23 に 6 品足した・CritEffects.cs)。 〈必殺の照準器〉は本体の撃の輪の旗 (CombatManager.Turn)。 超過会心率の変換・【練気】・【集中】は CritCore。</summary>
         private static void RegisterCrit()
         {
             Register(new FalconerGlove()); Register(new AimNotch()); Register(new FirstArrow()); Register(new LingeringBell()); Register(new ParryFan());
             Register(new UnwhettedClub()); Register(new SurveyorMonocle()); Register(new WhetAppraisal()); Register(new NickAppraisal()); Register(new HeftyPommel());
             Register(new LapisWhetstone()); Register(new LayeredScabbard()); Register(new LayeredCutForm()); Register(new ChainedFlash()); Register(new QuickDrawArt());
             Register(new Suntetsu()); Register(new PinpointEye()); Register(new ClairvoyantCrystal()); Register(new HeavenEyeGuard()); Register(new DeathMaskVisor());
+            Register(new PulseNeedle()); Register(new ReadMark()); Register(new WhiteBladeMirror()); Register(new FirstStrokePin()); Register(new NarrowSpyglass()); Register(new OneFlashMastery());
         }
 
         /// <summary>山札の軸 19 品のうち効果クラスを持つ 2 品 (2026-11-21・DeckEffects.cs)。 残りの 17 品と〈焼き入れの挟み〉の撃の分・〈仕込みの配電盤〉の手札の分は

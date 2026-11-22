@@ -268,8 +268,8 @@ namespace ItemSystem
                 };
             }
             
-            // 会心率 (%)。 5% 刻み・上限 50%
-            item.critRatePct = Mathf.Clamp(jsonItem.critRatePct, 0f, GameLoop.GameManager.MaxWeaponCritPct);
+            // 会心率 (%)。 上限なし (2026-11-23: 上限 50% を撤去・〈竜閃〉は 100%)
+            item.critRatePct = Mathf.Max(0f, jsonItem.critRatePct);
 
             // 武器の素火力（#2 案A'）
             item.attackPower = Mathf.Max(0, jsonItem.attackPower);

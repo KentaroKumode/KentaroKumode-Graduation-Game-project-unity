@@ -582,7 +582,7 @@ namespace CombatSystem
             if (ctx == null) return s;
             //   会心率は 100% を超えた分も出す (超えた分は会心倍率へ変わる・CritCore.EffectiveMul と同じ式で倍率に入れる)
             s.critRate = CritAddOf(ctx, pendingBuff: true);
-            s.critMul = CritCore.EffectiveMul(ctx.criticalMultiplier, ctx.enemyCritMultReduction, s.critRate, ctx.critExcessDouble, false);
+            s.critMul = CritCore.EffectiveMul(ctx.criticalMultiplier, ctx.enemyCritMultReduction, s.critRate, ctx.critExcessDouble);
             float mul = ctx.outgoingDamageMultiplier <= 0f ? 1f : ctx.outgoingDamageMultiplier;
             int metaPct = MetaProgression.MetaBuffApplicator.GetOutgoingDamagePct()
                         + MetaProgression.MetaBuffApplicator.GetBattleSpiritPct(GameLoop.GameManager.Instance?.Run);

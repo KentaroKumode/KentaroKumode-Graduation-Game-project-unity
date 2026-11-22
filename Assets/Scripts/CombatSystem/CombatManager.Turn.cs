@@ -993,17 +993,19 @@ namespace CombatSystem
             int lbStage = GameLoop.GameManager.Instance?.Run?.limitBreakStage ?? 0;
             int dealtDmg = 0, dealtFixed = 0; bool isCrit = false;
             var hitDealt = new List<int>(); var hitCrit = new List<bool>();
+            var hitFocus = new List<bool>(); var hitSpent = new List<int>(); var hitRenki = new List<int>();   // 撃ごとの集中会心・使った【練気】・会心で +1 した後の【練気】(〈死相の面頬〉〈天眼の鍔〉が読む・2026-11-23)
             int nHits = Math.Max(1, hitBases.Count);
             ctx.hitCount = hitBases.Count;   // 撃ごとの品が読む (攻撃しないターンは 0 ── 下の 1 回は固定ダメの枠を取り出すだけ)
-            //   〈必殺の照準器〉(CritCore): 攻撃の端子が 1 枚だけのターン、 その撃が会心なら同じ撃をもう 1 回発火する (1 ターン 1 回・会心は確定・乱数は引かない)
+            //   〈必殺の照準器〉(CritCore・2026-11-23): 攻撃の端子が 1 枚だけのターン、 その撃が集中会心なら同じ撃をもう 1 回発火する (1 ターン 1 回・会心は実際の会心率で振る・
+            //   もう一度集中にならない・【練気】を使わない・会心倍率 +(0.50 ＋ 元の撃で使った【練気】× 0.25))
             bool sniper = hitBases.Count == 1 && GameLoop.GameManager.Instance?.Run?.OwnsPassive(GameLoop.ItemIds.CritSniper) == true;
-            bool refire = false; float sniperAdd = 0f;
+            bool refire = false; int sniperSpent = 0;
             //   〈防人の軍標〉(2026-11-22): 2 回目以降 (BorderGuardStandard.EchoNeed) のジャスト防御の次のターン、 全部の撃がもう 1 回ずつ発火する (同じ撃をすぐもう 1 回・会心は振り直す)。
             //   shortcut: 〈必殺の照準器〉がもう 1 回発火した撃には重ねない (照準器は攻撃の端子 1 枚のターンだけ)
             bool echoAll = hitBases.Count > 0 && ItemSystem.PassiveSkills.Effects.BorderGuardStandard.EchoNow(ctx), echoing = false;
             for (int h = 0; h < nHits; h++)
             {
-                ctx.hitIndex = h; ctx.forceCritThisHit = refire; ctx.critSkipRoll = refire; ctx.hitFinalDamagePct = 0; ctx.hitOutgoingPct = 0; ctx.hitIgnoreDefense = h == chainHit; ctx.hitArmorPen = 0;   // 撃ごとの値 (〈抜き打ちの作法〉〈加重の拳套〉・〈連刃〉の追撃は防御を無視)
+                ctx.hitIndex = h; ctx.forceCritThisHit = false; ctx.critSkipRoll = false; ctx.isRefireHit = refire; ctx.hitCritRateMulAdd = 0f; ctx.hitIsFocused = false; ctx.hitFocusSpentRenki = 0; ctx.hitFinalDamagePct = 0; ctx.hitOutgoingPct = 0; ctx.hitIgnoreDefense = h == chainHit; ctx.hitArmorPen = 0;   // 撃ごとの値 (〈抜き打ちの作法〉〈加重の拳套〉・〈連刃〉の追撃は防御を無視)
                 ctx.hitFaceMax = CritCore.HitFaceMax(term, playerDice, h);   // 〈狙い目の刻み〉が読む
                 if (h > 0 || refire || echoing)
                 {
@@ -1017,7 +1019,7 @@ namespace CombatSystem
                 if (needle) { ctx.forceCritThisHit = true; ctx.playerArmorPen += DefenseFormula.IgnoreAll; Debug.Log("[急所突きの針] この撃は必ず会心・敵の防御を無視"); }
                 //   【オーバークロック】(〈雷鳴の太鼓〉・ChargeCore): 最初の 1 撃の最終与ダメージ +60%・敵の防御を全部無視 (この撃だけ・貫通は撃の後に戻す)
                 bool oc = term.overclock && h == 0 && h < hitBases.Count && !refire && !echoing;
-                if (refire && sniperAdd >= 1f) ctx.criticalMultiplier += CritCore.SniperMulAdd;   // 〈必殺の照準器〉: 会心率 100% 以上なら、 もう 1 回の撃の会心倍率 +1.0
+                if (refire) ctx.criticalMultiplier += CritCore.SniperMulAdd(sniperSpent);   // 〈必殺の照準器〉: もう 1 回の撃の会心倍率 +(0.50 ＋ 元の撃で使った【練気】× 0.25)
                 if (oc) { ctx.hitFinalDamagePct += ChargeCore.OverclockFinalPct; if (!needle) ctx.playerArmorPen += DefenseFormula.IgnoreAll; }
                 var (d, f, c) = psm.ProcessDamage(h < hitBases.Count ? hitBases[h] : 0, h == 0 ? ctx.pursuitDamage : 0, playerCritBaseRate);
                 d = ApplyWinDamageModifiers(d, ref f, ref c, lbStage, psm, ctx);
@@ -1027,13 +1029,15 @@ namespace CombatSystem
                 if (d > 0 && h < hitBases.Count) ItemSystem.PassiveSkills.Effects.ArmorBreak.OnHit(ctx);   // 斧〈鎧砕き〉: 撃が当たったら敵の防御 −N (この撃の防御の計算の後)
                 if (h == 0) { afterPool = ctx.outgoingDamageMultiplier; afterCritMul = ctx.criticalMultiplier; afterCritAdd = ctx.critRatePctAdd; }
                 hitDealt.Add(d); hitCrit.Add(c);
+                hitFocus.Add(c && ctx.hitIsFocused); hitSpent.Add(ctx.hitFocusSpentRenki); hitRenki.Add(c ? ItemSystem.PassiveSkills.Effects.Crit.HitRenki(ctx) : 0);
                 dealtDmg += d; dealtFixed += f; isCrit |= c;
                 if (refire) { refire = false; CritRefireFired++; Debug.Log($"[必殺の照準器] 会心の撃をもう 1 回発火 → {d}"); }
                 else if (echoing) { echoing = false; GuardEchoFired++; Debug.Log($"[防人の軍標] {h + 1} 撃目をもう 1 回発火 → {d}"); }
-                else if (sniper && c && h == 0) { refire = true; sniperAdd = ctx.lastCritAddPct; h--; }
+                else if (sniper && c && h == 0 && ctx.hitIsFocused) { refire = true; sniperSpent = ctx.hitFocusSpentRenki; h--; }
                 else if (echoAll && h < hitBases.Count) { echoing = true; h--; }
             }
             ctx.forceCritThisHit = false; ctx.critSkipRoll = false; ctx.hitFinalDamagePct = 0; ctx.hitOutgoingPct = 0; ctx.hitIgnoreDefense = false; ctx.hitArmorPen = 0;
+            ctx.isRefireHit = false; ctx.hitCritRateMulAdd = 0f; ctx.hitIsFocused = false; ctx.hitFocusSpentRenki = 0;
             if (nHits > 1)
             {
                 // この後の処理 (計装・画面の倍率) は 1 撃目の後の値を読む前提なので、 1 撃目の後の値へ戻す
@@ -1045,7 +1049,7 @@ namespace CombatSystem
             //   主攻撃へ加算していたので、 攻撃しないはずのターンに 1 以上のダメージが入っていた。 会心も立てない。
             //   逃げるターンは固定ダメの枠も捨てる (atkBase の確定後に足された臨界爆発・品が預けた分を含む)。
             //   役の追撃も攻撃に付くものなので、 攻撃しないターンには乗せない。
-            if (skipAttack) { dealtDmg = 0; isCrit = false; hitDealt.Clear(); hitCrit.Clear(); }
+            if (skipAttack) { dealtDmg = 0; isCrit = false; hitDealt.Clear(); hitCrit.Clear(); hitFocus.Clear(); hitSpent.Clear(); hitRenki.Clear(); }
             // [読むための欄・実績〈鎧通し〉] 主攻撃が通り、 敵の防御を貫通で 0 にした (ProcessDamage の中の防御の計算と同じ式で読むだけ)
             result.defensePiercedToZero = !skipAttack && dealtDmg > 0 && ctx.enemyDefense > 0
                 && DefenseFormula.Effective(ctx.enemyDefense, ctx.playerArmorPen + (isCrit ? ctx.critArmorPen : 0)) == 0;
@@ -1102,10 +1106,10 @@ namespace CombatSystem
             // 7層ヴェスカ: 〈解析演算〉の回避 → 〈真守/革の手甲/不落の城盾〉のシールド吸収 の順に通す。
             EnemyHpLedger.NoteFixedPreDefense(dealtFixed);   // [計装] 固定ダメ枠の要求 (毒・爆発・その他に按分する)
             {
-                //   〈死相の面頬〉: 会心した撃は敵のシールド (ヴェスカの守り) に吸われない
+                //   〈死相の面頬〉(2026-11-23): 集中会心か【練気】5 以上の会心の撃は敵のシールド (ヴェスカの守り) に吸われない
                 int critPierce = 0;
-                if (ItemSystem.PassiveSkills.Effects.DeathMaskVisor.Pierces(ctx))
-                    for (int h = 0; h < hitDealt.Count; h++) if (hitCrit[h]) critPierce += hitDealt[h];
+                for (int h = 0; h < hitDealt.Count; h++)
+                    if (hitCrit[h] && ItemSystem.PassiveSkills.Effects.DeathMaskVisor.PiercesHit(ctx, hitFocus[h], hitRenki[h])) critPierce += hitDealt[h];
                 ApplyVescaDefense(ctx, ref dealtDmg, ref dealtFixed, Math.Min(critPierce, dealtDmg));
             }
             result.totalDamage = dealtDmg;
@@ -1154,10 +1158,10 @@ namespace CombatSystem
                 int hitDmg = h == hitDealt.Count - 1 ? hitLeft : Math.Min(hitDealt[h], hitLeft);
                 hitLeft -= hitDmg;
                 HpLossDiag.Lose(ref enemyHP, hitDmg, "通常攻撃");
-                // 〈天眼の鍔〉: 会心の一撃のあと、 敵の HP が「会心倍率 × 6%」(最大 30%・ボスはその半分) 以下なら倒す。 〈百人切りの鉈〉と同じく CanExecuteEnemy で止まる
-                if (hitCrit[h] && hitDmg > 0 && enemyHP > 0)
+                // 〈天眼の鍔〉(2026-11-23): 集中会心の一撃のあと、 敵の HP が「(会心倍率 × 5 ＋ 使った【練気】× 3)%」(ボスはその半分・上限なし) 以下なら倒す。 〈百人切りの鉈〉と同じく CanExecuteEnemy で止まる
+                if (hitCrit[h] && hitFocus[h] && hitDmg > 0 && enemyHP > 0)
                 {
-                    int line = ItemSystem.PassiveSkills.Effects.HeavenEyeGuard.KillLine(ctx);
+                    int line = ItemSystem.PassiveSkills.Effects.HeavenEyeGuard.KillLine(ctx, hitSpent[h]);
                     if (line >= 0 && enemyHP <= line && ctx.CanExecuteEnemy())
                     {
                         int left = enemyHP;
@@ -1165,7 +1169,7 @@ namespace CombatSystem
                         CritExecuteFired++;
                         HpLossDiag.Add("経路:処刑(天眼の鍔)", left);
                         EnemyHpLedger.Land("処刑(天眼の鍔)", left, left);
-                        if (Debug.unityLogger.logEnabled) Debug.Log($"[天眼の鍔] 会心のあと敵 HP {left} ≤ {line} → 倒す");
+                        if (Debug.unityLogger.logEnabled) Debug.Log($"[天眼の鍔] 集中会心のあと敵 HP {left} ≤ {line} → 倒す");
                     }
                 }
                 // 〈百人切りの鉈〉(2026-11-21・BleedCore): 撃が当たったあと、 敵の出血が 12 以上で HP が「出血 × 1.2%」(ボスは半分・最大 25%) 以下なら倒す。 CanExecuteEnemy で止まる

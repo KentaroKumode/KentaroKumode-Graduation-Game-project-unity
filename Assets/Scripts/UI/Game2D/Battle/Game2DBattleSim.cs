@@ -683,7 +683,20 @@ namespace UI.Game2D.Battle
             {
                 if (!HasCrit) return "";
                 var hs = CombatManager.Instance.PreviewHudStats();
-                return "会心 " + Mathf.RoundToInt(hs.critRate * 100f) + "% ×" + hs.critMul.ToString("0.00");
+                string t = "会心 " + Mathf.RoundToInt(hs.critRate * 100f) + "% ×" + hs.critMul.ToString("0.00");
+                // 【練気】の数と、 この配線で【集中】になる時の集中の会心率と使う練気 (2026-11-23・仮置き・CritCore の同じ関数。 撃ごとの品と〈測量師の片眼鏡〉の乗算は入らない)
+                var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
+                var run = GameLoop.GameManager.Instance?.Run;
+                int renki = ItemSystem.PassiveSkills.Effects.Crit.Renki(ctx);
+                if (renki > 0) t += " 練" + renki;
+                var f = CritCore.FocusOf(run);
+                if (ctx != null && preview != null && preview.attackHits.Count == 1 && CritCore.FocusCount(f) >= CritCore.FocusNeedCount)
+                {
+                    float fr = CritCore.FocusedRate(hs.critRate, true, false, f, CritCore.CritRelicCount(run),
+                        ItemSystem.PassiveSkills.Effects.QuickDrawArt.FocusRateBonus(ctx, run, CombatManager.Instance.EnemyDownNow));
+                    if (fr > 0f) t += " 集中 " + Mathf.RoundToInt(fr * 100f) + "% (練-" + CritCore.RenkiSpend(renki + 1) + ")";
+                }
+                return t;
             }
         }
 

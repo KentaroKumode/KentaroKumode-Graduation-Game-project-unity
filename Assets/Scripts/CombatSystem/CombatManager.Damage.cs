@@ -214,6 +214,13 @@ namespace CombatSystem
             {
                 if (Debug.unityLogger.logEnabled) Debug.Log($"[急所] 会心 → 敵の防御{ctx.enemyDefense} を無視");
             }
+            else if (isCrit && ctx.enemyDefense > 0 && totalDmg > 0
+                     && ((ctx.hitIsFocused && ItemSystem.PassiveSkills.Effects.HeavenEyeGuard.Held(ctx))
+                         || (ctx.critExcessDouble && ItemSystem.PassiveSkills.Effects.Crit.HitRenki(ctx) >= ItemSystem.PassiveSkills.Effects.Suntetsu.IgnoreRenki)))
+            {
+                // 〈天眼の鍔〉の集中会心 / 〈寸鉄〉の【練気】5 以上の会心は敵の防御を完全に無視する (2026-11-23)
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[天眼の鍔/寸鉄] 会心 → 敵の防御{ctx.enemyDefense} を無視");
+            }
             else if (ctx.hitIgnoreDefense && ctx.enemyDefense > 0 && totalDmg > 0)
             {
                 if (Debug.unityLogger.logEnabled) Debug.Log($"[防御の無視] この撃は敵の防御{ctx.enemyDefense} を無視 (破城斧・急所の 2 撃目以降・連刃の追撃)");
@@ -369,14 +376,15 @@ namespace CombatSystem
                 Debug.Log("[CombatManager] 共助発動: 敵の最初の攻撃を半減");
             }
 
-            // 〈死相の面頬〉: 会心したターン、 そのターンの敵の攻撃を (会心倍率 − 1) × 25% 減らす (最大 −60%・切り捨てで減らす)
+            // 〈死相の面頬〉(2026-11-23): 会心したターン、 そのターンの敵の攻撃を 練気 ÷ (練気 + 12) 減らす (大技のターンは練気を 2 倍で数える・切り捨てで減らす・上限なし)
             {
-                float maskCut = ItemSystem.PassiveSkills.Effects.DeathMaskVisor.CutNow(ctx);
+                bool heavyNow = currentEnemy != null && Escalation.IsHeavyTurn(currentEnemy, ctx.currentTurn) && !BossDown.ActiveNow;
+                float maskCut = ItemSystem.PassiveSkills.Effects.DeathMaskVisor.CutNow(ctx, heavyNow);
                 if (maskCut > 0f && totalDmg > 0)
                 {
                     int reduced = (int)(totalDmg * maskCut);
                     totalDmg -= reduced;
-                    if (Debug.unityLogger.logEnabled) Debug.Log($"[死相の面頬] 会心したターン: 敵の攻撃 −{maskCut:P0} (−{reduced}) → {totalDmg}");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[死相の面頬] 会心したターン (練気 {ItemSystem.PassiveSkills.Effects.Crit.CritRenkiThisTurn(ctx)}{(heavyNow ? "・大技" : "")}): 敵の攻撃 −{maskCut:P0} (−{reduced}) → {totalDmg}");
                 }
             }
 

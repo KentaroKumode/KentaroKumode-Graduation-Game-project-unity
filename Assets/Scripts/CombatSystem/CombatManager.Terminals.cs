@@ -40,6 +40,8 @@ namespace CombatSystem
         /// <summary>[計装] 超過会心率 (100% 超え) が会心倍率になった会心の回数 / 〈天眼の鍔〉で処刑した回数 / 〈必殺の照準器〉がもう 1 回発火した回数
         /// (ランの始めに BOT が 0 へ戻す・ランの記録の critOverflowFired / critExecuteFired / critRefireFired)。</summary>
         public static long CritOverflowFired, CritExecuteFired, CritRefireFired;
+        /// <summary>[計装 2026-11-23] 【集中】の撃の回数 / 集中会心の回数 / 集中会心で使った【練気】の合計 (ランの始めに BOT が 0 へ戻す・ランの記録の focusAttempted / focusCritted / renkiSpentTotal)。</summary>
+        public static long FocusAttempted, FocusCritted, RenkiSpentTotal;
         /// <summary>[計装] 使い捨ての端子を使った回数 / 山札を切り直した回数 (ランの始めに BOT が 0 へ戻す・ランの記録の deckDisposeFired / deckShuffleFired)。</summary>
         public static long DeckDisposeFired, DeckShuffleFired;
         /// <summary>[計装] 役が成立した回数 / 〈万象のゾロ目〉が 2 個そろいをゾロ目として扱った回数 (ランの始めに BOT が 0 へ戻す・ランの記録の roleFormedFired / roleOmniFired)。</summary>

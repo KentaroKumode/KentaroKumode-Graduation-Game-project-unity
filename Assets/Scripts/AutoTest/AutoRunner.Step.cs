@@ -286,6 +286,7 @@ namespace AutoTest
             CombatSystem.CombatManager.BleedSpendFired = CombatSystem.CombatManager.BleedExecuteFired = 0;
             CombatSystem.CombatManager.BurstFired = CombatSystem.CombatManager.BurstBreakFired = 0;
             CombatSystem.CombatManager.CritOverflowFired = CombatSystem.CombatManager.CritExecuteFired = CombatSystem.CombatManager.CritRefireFired = 0;
+            CombatSystem.CombatManager.FocusAttempted = CombatSystem.CombatManager.FocusCritted = CombatSystem.CombatManager.RenkiSpentTotal = 0;
             CombatSystem.CombatManager.DeckDisposeFired = CombatSystem.CombatManager.DeckShuffleFired = 0;
             CombatSystem.CombatManager.RoleFormedFired = CombatSystem.CombatManager.RoleOmniFired = 0;
             CombatSystem.CombatManager.WeaponChainFired = CombatSystem.CombatManager.WeaponExecuteFired = CombatSystem.CombatManager.WeaponGaryoFired = CombatSystem.CombatManager.WeaponBashFired = CombatSystem.CombatManager.GuardEchoFired = 0;

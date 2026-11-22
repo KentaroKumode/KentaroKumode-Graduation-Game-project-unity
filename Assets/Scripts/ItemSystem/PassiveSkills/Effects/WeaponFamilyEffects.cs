@@ -452,7 +452,7 @@ namespace ItemSystem.PassiveSkills.Effects
     //  竜閃 — 一刀両断・極大単撃
     // ============================================================
 
-    /// <summary>画竜点睛: 攻撃の端子を 1 枚だけ発動し、 そこにこのターン振った目の最大 (タイ含む) を挿したとき、 その 1 撃は確定会心・最終与ダメージ ×2.0 (+100%)。
+    /// <summary>画竜点睛: 攻撃の端子を 1 枚だけ発動し、 そこにこのターン振った目の最大 (タイ含む) を挿したとき、 その 1 撃の最終与ダメージ ×2.0 (+100%)。
     /// その目が装備ダイスの最大の目なら ×3.0 (+200%) で、 ボスの次の目盛りをその場で割る (満額のダウン・1 ターン 1 回)。 攻撃の端子を 2 枚以上発動したターンは不発 (〈無我無心〉)。
     /// 式は <see cref="CombatRules.GaryoPct"/> (2026-11-22・旧: 装備ダイスの最大の目だけ)。</summary>
     public class GaryoTensei : IPassiveSkillEffect
@@ -468,11 +468,10 @@ namespace ItemSystem.PassiveSkills.Effects
                 if (!ctx.IsRealHit || ctx.hitCount != 1 || ctx.hitIndex != 0) return;
                 int pct = CombatRules.GaryoPct(ctx.hitFaceMax, RolledMax(ctx), MaxFace(ctx));
                 if (pct <= 0) return;
-                ctx.forceCritThisHit = true;
-                ctx.hitFinalDamagePct += pct;
+                ctx.hitFinalDamagePct += pct;   // 確定会心は 2026-11-23 に撤去 (〈竜閃〉は武器の会心率 100%)
                 if (pct >= FinalPct) ctx.accumulatedValues[TurnKey] = ctx.currentTurn;      // 目盛りを割るのは装備ダイスの最大の目の時だけ
                 CombatManager.WeaponGaryoFired++;
-                Rw.Log($"[画竜点睛] 目 {ctx.hitFaceMax} (振った最大 {RolledMax(ctx)}・ダイスの最大 {MaxFace(ctx)}) → 確定会心・最終与ダメージ +{pct}%");
+                Rw.Log($"[画竜点睛] 目 {ctx.hitFaceMax} (振った最大 {RolledMax(ctx)}・ダイスの最大 {MaxFace(ctx)}) → 最終与ダメージ +{pct}%");
                 return;
             }
             if ((int)ctx.GetAccumulated(TurnKey) != ctx.currentTurn || !Psn.Hit(ctx) || !Rw.OncePerTurn(ctx, BrokeKey)) return;

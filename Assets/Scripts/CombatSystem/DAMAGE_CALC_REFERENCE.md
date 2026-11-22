@@ -127,12 +127,12 @@ total = final + pursuitDamage
        critAdd  = critBaseRate(武器+層補正) + ctx.critRatePctAdd + メタ
        critRate = ResolveCritRate(critAdd)   ← 加算した分がそのまま (0〜1 クランプのみ・§2-B)
        会心成立 = !critSuppressed && !critSkipRoll && GameRng.Value("PassiveSkillManager.2") < critRate
-         critSkipRoll【2026-11-21】= 〈必殺の照準器〉がもう 1 回発火した撃。 乱数を引かない (キーの並びを崩さない)・forceCritThisHit で確定
+         critSkipRoll【2026-11-21】= 乱数を引かない撃 (2026-11-23 から立てる所は無い・〈必殺の照準器〉のもう 1 回も実際の会心率で振る)
        critSuppressed(無心の刃) → 常に false / forceCritical(末那識・天極・短絡・画竜) → 常に true（最終上書き）
-         forceCritThisHit【2026-11-20】→ この 1 撃だけ確定 (〈抜き打ちの作法〉・撃ごとに CombatManager が戻す)
+         forceCritThisHit【2026-11-20】→ この 1 撃だけ確定 (戦術消耗品〈急所突きの針〉だけ・会心の品からは 2026-11-23 に撤去・撃ごとに CombatManager が戻す)
        〈銑鉄棍〉【規則】(critToDamage・2026-11-21): 会心しなかった撃だけ outgoingDamageMultiplier += min(1, critAdd) (与ダメ% の池・撃ごとに戻る)。 会心は普通に出る
        成立かつ total>0 → Crit.Note (このターンの会心の数) → FireTrigger(OnCriticalDamage)
-                         → total ×= CritCore.EffectiveMul (§3-N: 敵の会心耐性 (下限 1.0) → + 超過会心率 → 〈天眼の鍔〉の確定会心 ×1.25)
+                         → total ×= CritCore.EffectiveMul (§3-N: 敵の会心耐性 (下限 1.0) → + 超過会心率)
        不成立かつ total>0 → 鈍器 ×(1 + nonCritOutgoingMultiplier) → 〈一点読みの片眼〉の代価 ×0.45 (2026-11-22 final6・旧 ×0.6 → ×0.5 → final4 ×0.65 → final5 ×0.50)
        【狩猟旅団 (契約)】armed状態の脆弱を持つ敵への会心時、 全段に ×(1 + 0.15/0.30/0.45) 倍率を適用 → 脆弱は consumed へ
                           (詳細: docs/GAME.md §12)
@@ -357,7 +357,7 @@ ResolveCritRate(addTotal):
     それ以外         →  1.0             // 常時会心
 ```
 
-**加算が 100% に届けば常時会心が成立する。** 100% を超えた分は捨てずに、 会心した撃の会心倍率へ 1% ごとに +0.02 で変わる (2026-11-21・`CritCore.ExcessMul`・§3-N・final5: 旧 +0.01)。 旧カーブ（knee 20% / falloff 1.25・100% へ漸近）は
+**加算が 100% に届けば常時会心が成立する。** 100% を超えた分は捨てずに、 会心した撃の会心倍率へ 1% ごとに +0.01 で変わる (2026-11-21・`CritCore.ExcessMul`・§3-N・final5〜6 は +0.02)。 旧カーブ（knee 20% / falloff 1.25・100% へ漸近）は
 `forceCritical`（末那識 / 天極 / 短絡 / 画竜点睛）を「確定会心の特権」にしていたが、
 その特権は**到達コストの差**に置き換わった ── 特権側は 1 ターンで確定する。
 
@@ -542,7 +542,7 @@ Hermes / Bloodlust / EvenEyes / MasterworkNotes / KaleidoDice。
 | シールドバッシュ I/II | OnWired / OnPostDealDamage | 攻撃に挿し防御の端子 0 個のターン、 シールドの半分（切り上げ）/ 全部を `Kw.SpendShield` で使い、 攻撃 +ceil(使った量 × 0.9/1.5)・そのターンの撃は目盛りへの削り +30% |
 | 堅守の構え | OnWired | 防御の端子に 2 個以上のターン シールド +18・次の 2 ターンは不発（`steadfastStanceReadyTurn`） |
 | 黎明 | OnTurnEnd | `mutualHpLossFromEnemy == 0` なら floor(軽減前 / 10) × 5%（ジャスト防御なら 8% とボスの次の目盛りにひび `CrackBossNotch`）× 敵最大 HP を `enemyCurrentHP` から引く |
-| 画竜点睛（竜閃） | OnPreDealDamage / OnPostDealDamage | `hitCount == 1` の撃で `CombatRules.GaryoPct(hitFaceMax, このターン振った目の最大, 装備ダイスの最大の目)`: 振った目の最大以上（タイ含む）→ `forceCritThisHit`・+100%（×2.0）／ それが装備ダイスの最大の目以上 → +200%（×3.0）（final5: 旧 +60% / +150%）・当たったら `BreakBossNotch`（1 ターン 1 回・2026-11-22 旧: ダイスの最大の目だけ） |
+| 画竜点睛（竜閃） | OnPreDealDamage / OnPostDealDamage | `hitCount == 1` の撃で `CombatRules.GaryoPct(hitFaceMax, このターン振った目の最大, 装備ダイスの最大の目)`: 振った目の最大以上（タイ含む）→ +100%（×2.0）／ それが装備ダイスの最大の目以上 → +200%（×3.0）（final5: 旧 +60% / +150%）・当たったら `BreakBossNotch`（1 ターン 1 回・2026-11-22 旧: ダイスの最大の目だけ） | (2026-11-23: 確定会心は撤去・〈竜閃〉は武器の会心率 100%)
 | 無我無心（竜閃） | OnWired | 攻撃の端子 1 枚: 攻撃 +ceil(攻撃以外の端子に挿した目の合計 × 1.5)（他の端子の働きはそのまま）・`itemBlockBonus += 3 × 防御の端子に挿した出目の数`（`CombatRules.MugaBlock`・2026-11-22）。 2 枚以上: 攻撃 −武器の攻撃力（=武器の攻撃力 0）・画竜点睛は撃が 2 つ以上なので不発 |
 
 **武器そのものの防御・貫通（2026-10-28・ADR-0013）**: items.json の武器の `defense` / `armorPen`（`[無印, +]`）。
@@ -758,21 +758,29 @@ CombatManager に預け、 プレイヤーの攻撃の直前に固定ダメ枠�
 
 個々の品の数値は `HeatEffects.cs` / `HeatCore.cs` の定数と XML コメントが正本。
 
-### 3-N. 会心の軸 (2026-11-21・`CritEffects.cs`・`CritCore.cs`・full-item-rework-ledger §⑥)
+### 3-N. 会心の軸 (2026-11-21・2026-11-23 仕組みの転換・`CritEffects.cs`・`CritCore.cs`・指示 Captures/overhaul/crit_redesign/neon/answer8_final_impl.md)
+
+27 品 = 共通 9・分岐 A〈練気の維持〉9・分岐 B〈集中〉9。 会心の品が配る確定会心は 0。 【超会心】は無い。
 
 | 計算の位置 | 式 |
 |---|---|
-| 超過会心率 (全員の規則・`CritCore.ExcessMul`) | 会心した撃の会心倍率 `+= max(0, critAdd − 1) × 2` (超過 1% ごとに +0.02・final5: 旧 +0.01・〈寸鉄〉は ×2 = +0.04・挑戦カード〈急所読み〉III は × 1.25 = `CardRules.CritExcessPct`)。 critAdd = 武器 + `critRatePctAdd` + 整備パネル (100% 超えもそのまま・`lastCritAddPct`) |
-| 会心倍率 (`CritCore.EffectiveMul`) | `m = max(1, criticalMultiplier − 敵の会心耐性)` → `m += 超過` → 〈天眼の鍔〉を持ち critAdd ≥ 1 なら `m ×= 1.25`。 本体 (ProcessDamage)・BOT (FillReadOut / ReadOutOneHit)・画面 (PreviewHudStats の critMul) が同じ関数 |
-| このターンの会心 (`Crit.Note`) | 会心のたび (OnCriticalDamage の前) にこのターンの数 (`Crit.ThisTurn`) と会心を出したターン (`Crit.LastTurn` = 前のターンに会心) を書く |
-| 撃ごとの目 | 撃の輪が `ctx.hitFaceMax = CritCore.HitFaceMax(端子の結果, 目, h)` (その撃の端子に挿した目の最大) を書く (〈狙い目の刻み〉) |
-| 〈必殺の照準器〉 | 攻撃の端子 1 枚のターン、 その撃が会心なら同じ撃をもう 1 回 (撃の輪で `h--`・池・会心倍率・会心率を戻し、 `forceCritThisHit` と `critSkipRoll`。 critAdd ≥ 1 なら `criticalMultiplier += 1.0`)。 もう 1 回の撃も目盛り・天眼の処刑・5f の出血の対象 |
-| 配線の後のブロック | 配線の集計 (`FinalBlockSum`) の後に品が足した `itemBlockBonus` (OnWired・会心のたび・爆発のたび) は、 敵の攻撃の解決の前に `blockSum` へ足す (〈狂暴化〉なら足さない・遺物/大罪/錐/不完全な転移は掛けない) |
-| 〈死相の面頬〉 | 敵の攻撃 `× (1 − min(0.6, (会心倍率 + 超過 − 1) × 0.25))` (会心したターン・`ApplyLossDamageModifiers`)。 会心した撃の与ダメはヴェスカのシールドに吸われない (`ApplyVescaDefense` の unabsorbable) |
-| 〈天眼の鍔〉の処刑 | 会心した撃を HP に入れた後、 敵の HP ≤ `最大 HP × min(0.30, 掛かった会心倍率 × 0.06)` (ボスは半分) なら倒す (`CanExecuteEnemy` で止まる) |
-| 品 (出来事) | 〈鷹匠の革手袋〉OnWired 攻撃の目の最大 ≥ 4 で 会心率 +15%・会心倍率 +0.25 (final6: final5 +12%) / 〈狙い目の刻み〉撃の目 ≥ 5 で その撃 +25% (final6: final5 +20%・final4 +30%)・6 で確定 / 〈一の矢〉hitCount = 1 で撃の目 ≥ 5 の撃 +45%・+0.40 (final6: final5 +30%) / 〈余韻の鈴〉OnWired で 前のターンの会心の数 n (`Crit.LastTurnCount`) × (+15%・ブロック +3) (上限なし・final6: final5 n ≥ 2 で +18%・+5) / 〈受け流しの扇〉防御の端子 2 枚以上 (`Fam.BlockTerminals` = `TerminalOutcome.blockTerminals`・【再起動】を含む) での完封 (`Psn.Shutout`) の次のターン +28%・ブロック +4・最初の会心の撃で `playerArmorPen += 8` (2026-11-22 neon 収束) / 〈銑鉄棍〉上の ProcessDamage / 〈測量師の片眼鏡〉1〜2 ターン目の撃に `min(1, 歩数 × 0.05)` (neon 収束: 旧 1 ターン目) / 〈研ぎ師の見立て書〉会心のたび ブロック +2 (上限なし)・ターン 2 回目の会心で さらにブロック +6・HP +3 (ターン 1 回) (final6: final5 +4・HP +2・final4 +4・HP +3) / 〈刃毀れの見立て〉`critArmorPen += 12`・会心した撃のダメージ × 25% だけ `RaiseBossNextNotch` / 〈渾身の柄頭〉hitCount = 1 の撃が会心なら `hitFinalDamagePct += 35`・ブロック +6 / 〈瑠璃砥石〉OnCriticalCheck で撃ごと 会心率 +10% + 3% × n・会心倍率 +0.04 × n (n = この戦闘の会心の数・OnCriticalDamage で +1・上限なし・final6: final5 +8%・ターン 2 回目の会心で倍率 +0.15) / 〈斬り重ねの鞘〉会心のたび +0.12 (2026-11-22・旧 0.20) が積もり、 ターン開始で `n − ceil(n/2)` (前のターンの会心 ≥ 3 なら減らない) / 〈重ね斬りの型〉同じターンに直前 2 撃が会心なら その撃の会心倍率 +1.0・会心したらブロック +5 / 〈連なる閃き〉前のターンに会心 1 回以上・このターンの最初の会心の撃とその後の撃 `hitFinalDamagePct += 25` (2026-11-22 Phase 4: 1 回・45 → 2 回・35 → neon 収束: 1 回・25) / 〈抜き打ちの作法〉1 ターン目かダウン中の最初の撃 確定・その撃の `critRatePctAdd += 0.60` (final6: final5 0.50 / final5: 旧 会心倍率 +1.0・100% を超えた分は超過の変換で倍率) / 〈寸鉄〉`critExcessDouble`・`critArmorPen += IgnoreAll` / 〈一点読みの片眼〉OnWired +25%・+0.65・非会心 ×0.45 (final6: final5 +20%・+0.70・×0.50) (会心の品の値は 2026-11-21 Phase 4 較正・旧値は docs/GAME.md §13-8) / 〈千里眼の水晶〉ターン 2 回目の会心で 次のターン 手札 +1・会心率 +40%・全部の撃 `hitFinalDamagePct += 25` |
-| BOT | `FillReadOut` が配線の前に分かる会心率と倍率 (`Crit.ForecastTurn`: 受け流し・瑠璃・斬り重ね・一点読み・千里眼・測量師) を足し、 `ReadOutOneHit` が撃ごとに 余韻 (前のターンの会心だけ)・鷹匠 (攻撃の目の最大)・狙い目 (撃の目)・一の矢/渾身/照準器 (撃の数 1)・抜き打ち (最初の撃) を足して `CritCore.EffectiveMul` で倍率を出す。 〈銑鉄棍〉は非会心の撃の池へ。 照準器は `p × 会心の撃` を足す。 乱数は引かない |
-| 計装 | `CombatManager.CritOverflowFired` (超過会心率が倍率になった会心) / `CritExecuteFired` (天眼の処刑) / `CritRefireFired` (照準器のもう 1 回) → ランの記録 `critOverflowFired` / `critExecuteFired` / `critRefireFired` |
+| 合算の会心率 (`PassiveSkillManager.ProcessDamage`) | `critAdd = max(0, 武器 + critRatePctAdd + 整備パネル)` → `× (1 + ctx.hitCritRateMulAdd)` (乗算の枠・〈測量師の片眼鏡〉が OnCriticalCheck で書く・撃ごとに 0) |
+| 【集中】(`CritCore.FocusedRate`) | 入口: 集中の品 (9 品・`CritCore.FocusIds`) を 3 つ以上・攻撃の端子 1 枚の撃 (`hitCount == 1`)・〈必殺の照準器〉のもう 1 回でない。 集中の会心率 `= critAdd − 賭け金 + 〈抜き打ちの作法〉の +0.20 (1 ターン目・ダウン中)` が 0.01 以上なら `ctx.hitIsFocused = true` でその率で振る。 未満なら集中にならない (賭け金も集中の効果も無し・会心率はそのまま) |
+| 賭け金 (`CritCore.FocusCost`) | `(0.25 + Σ 品の賭け金) ÷ (1 + 0.2 × max(0, 会心の品の数 − 3))`。 品の賭け金: BRONZE 0 / SILVER 0.08 / GOLD 0.20 / LEGENDARY 0.28 (一の矢・初太刀・細目 = 0 / 刃毀れ・渾身 = 0.08 / 抜き打ち・一閃 = 0.20 / 天眼・照準器 = 0.28)。 会心の品の数は items.json の axis = 会心 の所持数 (`AxisRules.Count`) |
+| 【練気】(`Crit.GainOnCrit`) | プレイヤーの撃が会心するたび (OnCriticalDamage の前) +1 (戦闘の中だけ・減らない・上限なし)。 集中の撃が会心したら、 +1 した後の値 r から `ceil(r / 2)` (`CritCore.RenkiSpend`) を使い `ctx.hitFocusSpentRenki` に書く。 〈抜き打ちの作法〉は戦闘の始めに +2 |
+| 会心倍率 (`CritCore.EffectiveMul`) | `m = max(1, criticalMultiplier − 敵の会心耐性)` → `m += 超過会心率 × 1` (1% ごとに +0.01・〈寸鉄〉は ×2・挑戦カード〈急所読み〉III ×1.25)。 OnCriticalDamage が倍率を足す品 (集中会心の品・〈白刃の鏡砥〉) は、 ProcessDamage が OnCriticalDamage の後で倍率を掛けるのでその撃に乗る。 旧〈天眼の鍔〉の確定会心 ×1.25 は撤去 |
+| 敵の防御 (`ApplyWinDamageModifiers`) | 会心した撃が 集中会心で〈天眼の鍔〉を持つ / 〈寸鉄〉を持ち +1 した後の練気 ≥ 5 なら防御を全部無視。 〈細目の覗き筒〉は集中会心で `hitArmorPen += 10 + 3 × 使った練気` |
+| 〈死相の面頬〉 | 会心したターン、 敵の直接攻撃 `× (1 − x / (x + 12))` (x = このターンの会心の練気 (使う前) の最大・敵の大技のターン (`Escalation.IsHeavyTurn` でダウン中でない) は 2x・切り捨てで減らす・`ApplyLossDamageModifiers`)。 集中会心か練気 ≥ 5 の会心の撃の与ダメはヴェスカのシールドに吸われない (`ApplyVescaDefense`) |
+| 〈天眼の鍔〉の処刑 | 集中会心の撃を HP に入れた後、 敵の HP ≤ `最大 HP × (掛かった会心倍率 × 0.05 + 使った練気 × 0.03)` (ボスは半分・上限なし) なら倒す |
+| 〈必殺の照準器〉 | 攻撃の端子 1 枚のターン、 その撃が集中会心なら同じ撃をもう 1 回 (撃の輪で `h--`・`ctx.isRefireHit = true` で集中にならず練気を使わない・会心は実際の会心率で振る・会心倍率 `+0.50 + 0.25 × 元の撃で使った練気`) |
+| 撃ごとの目 | 撃の輪が `ctx.hitFaceMax = CritCore.HitFaceMax(端子の結果, 目, h)` を書く (〈狙い目の刻み〉〈一の矢〉) |
+| 配線の後のブロック | 品が足した `itemBlockBonus` (OnWired・会心のたび) は、 敵の攻撃の解決の前に `blockSum` へ足す |
+| 共通の品 | 〈鷹匠の革手袋〉OnWired 攻撃の目の最大 ≥ 4 で +10% / 〈狙い目の刻み〉撃の目 5 で +12%・6 で +24% / 〈受け流しの扇〉防御 2 枚以上の完封の次のターン +14%・ブロック +4・最初の会心で `playerArmorPen += 8` / 〈測量師の片眼鏡〉歩数 n で撃ごとに `hitCritRateMulAdd += 0.05n`・`criticalMultiplier += 0.03n` / 〈銑鉄棍〉上の ProcessDamage / 〈脈打ちの測り針〉直前の本物の撃が会心なら次の撃 +15% (OnPostDealDamage で書き直す・ターンをまたぐ) / 〈瑠璃砥石〉撃ごとに +5% + 4% × n・倍率 +0.04 × n (n = 同じターンの 2 回目以降の会心か集中会心の回数) / 〈一点読みの片眼〉OnWired +18%・+0.55・非会心 ×0.35 / 〈死相の面頬〉上 |
+| 分岐 A | 〈余韻の鈴〉OnWired max(0, 前のターンの会心 − 1) × (+12%・ブロック +3) / 〈見切りの目印〉攻撃の端子 2 枚以上の 2 撃目以降 +12% (練気 ≥ 4 で +16%) / 〈研ぎ師の見立て書〉会心ごとブロック +2・ターン 2 回目でブロック +6・HP +3 / 〈斬り重ねの鞘〉会心ごと +0.12 が積もりターン開始で半分 (前のターンの会心 ≥ 3 か練気 ≥ 6 で減らない) / 〈重ね斬りの型〉直前 2 撃が会心ならその撃 +25%・+0.75・会心でブロック +5 / 〈連なる閃き〉前のターンに会心 ≥ 2 でこのターンの最初の会心の撃とその後の撃 `hitFinalDamagePct += 25` (練気 ≥ 6 で 40) / 〈白刃の鏡砥〉会心した撃に倍率 +0.06 × 今の練気・ターン 2 回目以降の会心でブロック +4 / 〈寸鉄〉`critExcessDouble`・上の防御 / 〈千里眼の水晶〉ターン 2 回目の会心で次のターン 手札 +1・+35%・全部の撃 +25% |
+| 分岐 B (集中会心の時だけ・s = 使った練気) | 〈一の矢〉倍率 +0.40 + 0.10s (+0.30 目 ≥ 5) / 〈初太刀の鍔留め〉ブロック +6 + 2s・次のターンの最初の撃 +15% / 〈細目の覗き筒〉上の防御 / 〈刃毀れの見立て〉その撃のダメージ × (25 + 8s)% を `RaiseBossNextNotch` / 〈渾身の柄頭〉`hitFinalDamagePct += 25 + 12s`・ブロック +6 / 〈抜き打ちの作法〉倍率 +0.80 / 〈一閃の極意〉この戦闘の会心倍率 +0.10s が積もる (OnCriticalCheck で撃ごと)・HP +2 / 〈天眼の鍔〉上 / 〈必殺の照準器〉上 |
+| 〈竜閃〉 | 武器の会心率 100% (items.json)。 〈画竜点睛〉の確定会心は撤去 (最終与ダメの +100% / +200% は据え置き)。 武器の会心率の上限 50% (`MaxWeaponCritPct`・ItemDatabase と層の補正) は撤去 |
+| BOT | `FillReadOut` が配線の前に分かる会心率・倍率・会心率の乗算 (`Crit.ForecastTurn`) と練気・集中の品を読み、 `ReadOutOneHit` が撃ごとの品と【集中】(本体と同じ `CritCore.FocusedRate`・使う練気は `RenkiSpend(練気 + 1)`) を足して `CritCore.EffectiveMul` で倍率を出す。 照準器は集中会心の確率 × (もう 1 回の期待値)。 〈死相の面頬〉は被ダメ `× (1 − このターンに 1 回でも会心する確率 × Cut(練気 + 1, 大技))`。 乱数は引かない |
+| 計装 | `CombatManager.CritOverflowFired` / `CritExecuteFired` / `CritRefireFired` / `FocusAttempted` (集中の撃) / `FocusCritted` (集中会心) / `RenkiSpentTotal` (使った練気) → ランの記録 `critOverflowFired` ほか `focusAttempted` / `focusCritted` / `renkiSpentTotal` |
 
 個々の品の数値は `CritEffects.cs` / `CritCore.cs` の定数と XML コメントが正本。
 
