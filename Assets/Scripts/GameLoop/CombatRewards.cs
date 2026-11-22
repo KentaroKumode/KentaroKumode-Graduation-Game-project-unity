@@ -27,7 +27,7 @@ namespace GameLoop
     {
         /// <summary>エリート戦の勝利で恒久パッシブが落ちる確率。
         /// <b>2026-09-15: 確定 1.0 → 0.40。</b></summary>
-        public static float EliteDropRate = 0.10f;   // 2026-11-06: 0.40 → 0.10 (パッシブの取得数を 40 以下へ・選択を生むため)
+        public static float EliteDropRate = 1.0f;   // 2026-11-06: 0.40 → 0.10 / 2026-11-22: 0.10 → 確定 1.0 (秘宝 SILVER 以上の 3 択・見送り換金あり・neon 最終仕上げ §1-4)
 
         /// <summary>通常戦の勝利で恒久パッシブが落ちる確率。
         /// 0.50 (〜2026-09-09) → 0.15 → <b>0.10 (2026-09-15)</b>。</summary>
@@ -53,8 +53,8 @@ namespace GameLoop
         /// <summary>エリート戦の報酬ゴールド倍率。
         /// 1.8 → 2.6 (2026-09-15) → <b>2.0 (2026-09-20)</b>。 航行がエリートの戦闘コストを見積もるようになり、
         /// 稼ぎがエリートに偏りすぎていたため。 <b>航行スコアもこの値を読む</b> (<c>AutoRunner.Rank</c> の goldPull)。</summary>
-        public static float EliteRewardMul = 2.0f;
-        public const float EliteRewardMulDefault = 2.0f;
+        public static float EliteRewardMul = 1.5f;   // 2026-11-22: 2.0 → 1.5 (エリートが確定の秘宝 3 択になり踏み得が大きいので金を控えめに・neon 最終仕上げ §1-4)
+        public const float EliteRewardMulDefault = 1.5f;
 
         /// <summary>[計装] 落ちた回数 / 抽選した回数。 エリートと通常を分けて数える
         /// ── 合算だと「どちらの経路が供給しているか」が読めない。</summary>

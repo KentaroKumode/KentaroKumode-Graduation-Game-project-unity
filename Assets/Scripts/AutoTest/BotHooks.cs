@@ -143,7 +143,7 @@ namespace AutoTest
         }
 
         /// <summary>提示から、 欲しい品 (<see cref="WantsPassive"/>) の中で買いの点が一番の品を選ぶ。 欲しい品が無ければ −1 (見送り換金)。</summary>
-        private static int ChooseOrSkip(IReadOnlyList<string> offers)
+        public static int ChooseOrSkip(IReadOnlyList<string> offers)
         {
             var run = GameManager.Instance?.Run;
             int best = -1; float bestScore = float.NegativeInfinity;

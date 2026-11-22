@@ -90,6 +90,19 @@ namespace ItemSystem.Shop
             (ItemRarity.LEGENDARY, 0.05f),
         };
 
+        // 2026-11-22 (neon 最終仕上げ §1-3): 秘宝の枠は画面の層 (RunState.currentFloor・Run.Depth ではない) で重みを替える。
+        //   序盤 1〜2 層 B55/S32/G11/L2・中盤 3〜4 層 B35/S35/G22/L8・終盤 5 層〜 B20/S30/G32/L18。 上の tierWeights (B45/S32/G18/L5) は消耗品の枠と層の分からない時。
+        private static readonly (ItemRarity rarity, float weight)[] passiveTierEarly =
+            { (ItemRarity.BRONZE, 0.55f), (ItemRarity.SILVER, 0.32f), (ItemRarity.GOLD, 0.11f), (ItemRarity.LEGENDARY, 0.02f) };
+        private static readonly (ItemRarity rarity, float weight)[] passiveTierMid =
+            { (ItemRarity.BRONZE, 0.35f), (ItemRarity.SILVER, 0.35f), (ItemRarity.GOLD, 0.22f), (ItemRarity.LEGENDARY, 0.08f) };
+        private static readonly (ItemRarity rarity, float weight)[] passiveTierLate =
+            { (ItemRarity.BRONZE, 0.20f), (ItemRarity.SILVER, 0.30f), (ItemRarity.GOLD, 0.32f), (ItemRarity.LEGENDARY, 0.18f) };
+
+        /// <summary>秘宝の枠のレア度の重み (画面の層で替える)。 floor ≤ 0 (分からない) は <see cref="tierWeights"/>。</summary>
+        private static (ItemRarity rarity, float weight)[] PassiveTierWeights(int floor)
+            => floor <= 0 ? tierWeights : floor <= 2 ? passiveTierEarly : floor <= 4 ? passiveTierMid : passiveTierLate;
+
         // 2026-11-07: 武器枠は BRONZE 90% / SILVER 10% / GOLD 0 / LEGENDARY 0 (パッシブより控えめに)。
         //   武器のレアリティ自体は SILVER / GOLD / LEGENDARY のまま (段 2 / 3 / 4)・BRONZE の武器は無い。 RollTier はプールに実在する
         //   レアリティだけで正規化するので、 実質は SILVER (段 2) だけが出る。 段 3 を時々出したければ GOLD に小さな重みを足す。
@@ -106,10 +119,10 @@ namespace ItemSystem.Shop
 
         /// <summary>通常枠の Tier 提示重み。 <b>層化ホールドアウトが逆数を取るための唯一の出所</b>
         /// （AutoRunner が重みを直書きすると、 ここを変えたとき静かに食い違う）。
-        /// 未知の rarity は 0.25 (4 帯均等相当) を返す。</summary>
-        public static float TierOfferWeight(ItemRarity r)
+        /// 未知の rarity は 0.25 (4 帯均等相当) を返す。 <paramref name="passiveFloor"/> = 秘宝の枠の重みを引く画面の層 (0 = 消耗品の枠・層別でない重み)。</summary>
+        public static float TierOfferWeight(ItemRarity r, int passiveFloor = 0)
         {
-            foreach (var (rarity, weight) in tierWeights)
+            foreach (var (rarity, weight) in PassiveTierWeights(passiveFloor))
                 if (rarity == r) return weight;
             return 0.25f;
         }
@@ -129,7 +142,7 @@ namespace ItemSystem.Shop
         /// <summary>軸指定リロールで、 指定した軸の端子 (TerminalDef.axis) の出現の重みに掛ける倍率。 秘宝は <see cref="AxisPool.Narrow"/> の軸の重み (同じ値)。</summary>
         public const float AxisRerollWeightMul = AxisPool.FocusWeight;
         /// <summary>軸指定リロールで、 振り直す秘宝の枠のうち必ず指定の軸の品にする枠の数 (前から)。 残りの枠は指定の軸の重み ×<see cref="AxisRerollWeightMul"/>。</summary>
-        public const int AxisRerollGuaranteed = 2;
+        public const int AxisRerollGuaranteed = 3;   // 2026-11-22: 2 → 3 (neon 最終仕上げ §1-2)
         /// <summary>〈目利きの紹介状〉: 軸指定リロールの追加から引く額 (仮)。</summary>
         public const int LetterAxisDiscount = 3;
         /// <summary>軸指定リロールで指定できる軸: 出現の枠 (RunState.lockedAxes) に入った軸と金。</summary>
@@ -609,7 +622,7 @@ namespace ItemSystem.Shop
                 if (hi.Count > 0) pool = hi;
             }
 
-            // 秘宝: 出現の枠と 2 段階の軸均等の抽選 (軸か枠外に絞ってからレア度で引く・full-item-rework-spec §1-2)。 軸指定リロールは指定の軸を重み ×4・前の 2 枠は確定
+            // 秘宝: 出現の枠と 2 段階の軸均等の抽選 (軸か枠外に絞ってからレア度で引く・full-item-rework-spec §1-2)。 軸指定リロールは指定の軸を重み ×4・前の AxisRerollGuaranteed 枠は確定
             if (kind == ShopSlotKind.Passive)
             {
                 pool = AxisPool.Narrow(GameLoop.GameManager.Instance?.Run, pool, "shop.axis", _focusAxis, _focusForceLeft > 0);
@@ -625,7 +638,8 @@ namespace ItemSystem.Shop
             }
 
             // Tier重みで抽選 (武器は専用重みで T4 を超レア化)
-            var weights = (kind == ShopSlotKind.Weapon) ? weaponTierWeights : tierWeights;
+            var weights = kind == ShopSlotKind.Weapon ? weaponTierWeights
+                        : kind == ShopSlotKind.Passive ? PassiveTierWeights(GameLoop.GameManager.Instance?.Run?.currentFloor ?? 0) : tierWeights;
             // 呪物の賽 (ADR-0016): 秘宝の枠は LEGENDARY の重み ×3 (他のレア度の重みはそのまま)
             float legMul = kind == ShopSlotKind.Passive ? CombatSystem.DiePassives.LegendaryOfferMul(GameLoop.GameManager.Instance?.Run) : 1f;
             if (legMul != 1f)

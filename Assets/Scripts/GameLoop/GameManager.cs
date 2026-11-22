@@ -164,10 +164,10 @@ namespace GameLoop
         // 戦闘トリガで保留している場合、戦闘終了後に MapNavigation へ戻すフラグ
         private bool returnToMapAfterEventCombat;
 
-        // === 戦闘後ドロップの2択 ===
-        // 各ドロップにつき、同カテゴリ・同レア度の2候補(a,b)。プレイヤー/Botが1つ選ぶ。
-        private readonly System.Collections.Generic.List<(string a, string b)> pendingRewardChoices
-            = new System.Collections.Generic.List<(string a, string b)>();
+        // === 戦闘後ドロップの 3 択 (2026-11-22・旧 2 択) ===
+        // 各ドロップにつき、同カテゴリ・同レア度の候補 (最大 3)。プレイヤー/Botが1つ選ぶ (秘宝なら見送り換金も)。
+        private readonly System.Collections.Generic.List<System.Collections.Generic.List<string>> pendingRewardChoices
+            = new System.Collections.Generic.List<System.Collections.Generic.List<string>>();
         private int rewardChoiceIndex;
 
         // === メタデバフ Lv5: 偽の商人戦の進行中フラグ ===
@@ -642,6 +642,7 @@ namespace GameLoop
             {
                 if (Input.GetKeyDown(KeyCode.Alpha1)) { ResolveRewardChoice(0); return; }
                 if (Input.GetKeyDown(KeyCode.Alpha2)) { ResolveRewardChoice(1); return; }
+                if (Input.GetKeyDown(KeyCode.Alpha3)) { ResolveRewardChoice(2); return; }
                 return;
             }
 

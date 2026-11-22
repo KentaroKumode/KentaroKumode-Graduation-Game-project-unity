@@ -379,7 +379,7 @@ namespace UI.Game2D
             var run = gm.Run; var sm = ShopManager.Instance; var inv = sm != null ? sm.Current : null;
             int price = sm != null ? sm.AxisRerollPrice : 0;
             var d = New("ショップ ― 軸で振り直す", "所持金 " + run.coins + "G", 460);
-            d.body = "出現の枠 " + ItemSystem.AxisPool.SlotsLabel(run) + " の軸か金を選ぶ。 売れていない秘宝の前の " + ShopManager.AxisRerollGuaranteed + " 枠はその軸の品になり、 残りの枠と端子も出やすくなる。"; d.bodyLines = 2;
+            d.body = "出現の枠 " + ItemSystem.AxisPool.SlotsLabel(run) + " の軸か金を選ぶ。 売れていない秘宝の前の " + ShopManager.AxisRerollGuaranteed + " 枠はその軸の品になり、 残りの枠と端子も出やすくなる。\n" + ItemSystem.AxisPool.MainAxisRule; d.bodyLines = 3;
             var axList = new List<string>(run.lockedAxes) { ItemSystem.PassiveSkills.AxisRules.Gold };
             var axes = axList.ToArray();
             foreach (var ax in axes)
@@ -919,18 +919,20 @@ namespace UI.Game2D
             var d = New("報酬", _lastCoinsGained > 0 ? "+" + _lastCoinsGained + "G" : null);
             if (gm.HasPendingRewardChoice)
             {
-                var (a, b) = gm.CurrentRewardChoice;
-                bool relicPair = ItemSystem.AxisPool.SkipGoldFor(new[] { a, b }) > 0;
-                d.body = relicPair ? "どちらか 1 つを受け取る。 見送ればゴールドになる。" : "どちらか 1 つを受け取る。";
-                foreach (var id in new[] { a, b })
+                var offer = gm.CurrentRewardChoice;
+                bool relicPair = ItemSystem.AxisPool.SkipGoldFor(offer) > 0;
+                string pickLine = offer.Count >= 3 ? "3 つから 1 つを受け取る。" : offer.Count == 2 ? "どちらか 1 つを受け取る。" : "受け取るか選ぶ。";
+                d.body = relicPair ? pickLine + " 見送ればゴールドになる。" : pickLine;
+                foreach (var id in offer)
                 {
                     var data = ItemDatabase.Instance?.GetItem(id);
                     d.Items.Add(new ModalItem { name = data != null ? data.displayName : id, desc = data?.description });
                 }
-                AddInstabilityLine(gm, d, d.Items.Count);   // 不安定化: 2 つから選ぶ報酬の窓にも (2026-11-13)
+                AddInstabilityLine(gm, d, d.Items.Count);   // 不安定化: 択から選ぶ報酬の窓にも (2026-11-13)
                 d.buttons.Add(B("受け取る", "pick", true));
-                if (relicPair) d.buttons.Add(SkipButton(new[] { a, b }));
-                d.onAction = (act, sel) => { if (act == "pick") gm.ResolveRewardChoice(Mathf.Clamp(sel, 0, 1)); else if (act == "skip") gm.ResolveRewardChoice(-1); Refresh(); };
+                if (relicPair) d.buttons.Add(SkipButton(offer));
+                int n = offer.Count;
+                d.onAction = (act, sel) => { if (act == "pick") gm.ResolveRewardChoice(Mathf.Clamp(sel, 0, n - 1)); else if (act == "skip") gm.ResolveRewardChoice(-1); Refresh(); };
                 return d;
             }
             d.body = _lastCoinsGained > 0 ? _lastCoinsGained + "G を手に入れた。" : "戦利品を手に入れた。";

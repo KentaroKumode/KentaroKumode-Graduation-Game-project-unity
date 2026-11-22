@@ -349,7 +349,7 @@ lore 的には「ギルド管轄も 5 層まで」「5 層を抜けた時点で�
 [RunSave.cs](../Assets/Scripts/GameLoop/RunSave.cs) と [GameManager.Save.cs](../Assets/Scripts/GameLoop/GameManager.Save.cs)。
 
 - **セーブできる時点**: 航行のマップ（`MapNavigation`・自由移動の層）で、何も待っていない時だけ（`GameManager.CanSuspendNow`）。
-  窓（挑戦カード・開幕パッシブ・武器の入れ替え・端子の報酬・報酬の 2 択）が残っている間、追跡者・使い魔と接触している間、
+  窓（挑戦カード・開幕パッシブ・武器の入れ替え・端子の報酬・報酬の択）が残っている間、追跡者・使い魔と接触している間、
   戦闘・店・イベント・休憩・〈門〉の途中、8 層（マップの無いヴェスカ戦）は保存しない（その場の状態を写す口を持たない）。
 - **入口**: 中断 = 設定の窓（Esc）の「中断して終える」（航行のマップで開いた時だけ出る）→ 書いてタイトルへ。ランは終えない（`EndRun` を通らない＝遺物は出ない）。
   再開 = タイトルの「はじめる」を押した時に中断セーブがあれば窓が出る（続きから／新しく始める（確かめてから消す）／やめる）。
@@ -457,7 +457,7 @@ lore 的には「ギルド管轄も 5 層まで」「5 層を抜けた時点で�
 （CLAUDE.md「隠し倍率禁止・実数値を直接調整」）。
 
 - **エリートは常に単体。** 2 体戦は通常マスの引き（報酬 ×2 の賭け）として残す。
-- 報酬ゴールドは ×2.0（[CombatRewards.cs](../Assets/Scripts/GameLoop/CombatRewards.cs) `EliteRewardMul`）。
+- 報酬ゴールドは ×1.5（2026-11-22 に 2.0 から・秘宝の 3 択が確定になったぶん・[CombatRewards.cs](../Assets/Scripts/GameLoop/CombatRewards.cs) `EliteRewardMul`）。
   **BOT の航行スコアも同じ値を読む**ので、ここを動かすと BOT の進路選択も動く。
 - 4 層以降の敵のエリートは、固有のエリートパッシブ（早業 / 不死の軍勢 / 霊体 …）を持つ。
 - 旧実装（雑魚に後から倍率を掛ける 2 系統の「精鋭化」）は §24 を参照。
@@ -3630,19 +3630,27 @@ Tier ごとの正味（本番と同じく 2 枚配って選ぶ・各 1 万ラン
 
 - リロールの時に軸を 1 つ選べる。値段 = 今のリロールの値段 + **6G**（`ShopManager.AxisRerollSurcharge`・旧 15G。〈目利きの紹介状〉−3G・〈軸引きの手形〉の値引き・下限 0）。回数（`rerollCount`）は通常のリロールと共有する。
 - 選べる軸: **出現の枠（§16-3c）に入った軸 ＋ 金**（`ShopManager.AxisRerollAllowed`）。枠に無い軸を渡すと通常のリロールになる（`GameManager.ShopReroll` も同じ判定で端子の棚を引き直さない）。
-- 秘宝の 5 枠: 振り直す枠の**前の 2 枠は指定の軸の品で確定**（`AxisRerollGuaranteed`）、残りの枠は軸均等の抽選（§16-3c）で指定の軸を選ぶ重みを **×4**（`AxisPool.FocusWeight`）。金を指定した時は、枠外の中の金の品 1 つの重みを ×4。
+- 秘宝の 5 枠: 振り直す枠の**前の 3 枠は指定の軸の品で確定**（`AxisRerollGuaranteed`・2026-11-22 に 2 → 3・neon 最終仕上げ §1-2）、残りの枠は軸均等の抽選（§16-3c）で指定の軸を選ぶ重みを **×4**（`AxisPool.FocusWeight`）。金を指定した時は、枠外の中の金の品 1 つの重みを ×4。
 - 端子の棚: 売れていない枠を引き直す（その軸の端子 = `TerminalDef.axis` の重み ×4・`AxisRerollWeightMul`・キー `terminal.shop`・`GameManager.RerollTerminalShop`）。**通常のリロールは端子の棚を引き直さない**。
 - 画面: 店の「軸で振り直す」→ 出現の枠の軸と金の一覧（横に今の偏重）→「振り直す NG」（追加込みの値段）。
-- BOT（最小限・`AutoRunner.AxisRerollFocus`）: 出現の枠の軸のうち最も深い偏重が 3 以上、かつ残金がしきい値 + 追加以上なら、その軸を指定する。切る口は `axisFocusReroll=false`。
+- BOT（`AutoRunner.AxisRerollFocus`）: 寄せの軸（`buyAxisFocus`）が出現の枠にあればそれ、無ければ出現の枠の軸のうち最も深い偏重が 3 以上の軸を、残金がしきい値 + 追加以上なら指定する。
+  2026-11-22: 買い終えた後の**フェーズ2c**（画面の層 2 以上・1 店 1 回・回した後に 12G 残る時・`AxisSurplusRerollMinFloor` / `AxisSurplusRerollPerShop` / `AxisSurplusReserve`）で余った金の軸指定リロールを回す。切る口は `axisFocusReroll=false`。計装はランの記録の `axisRerollFired`。
+
+### 16-3b2. 店の秘宝の枠のレア度（2026-11-22・neon 最終仕上げ §1-3・`ShopManager.PassiveTierWeights`）
+
+画面の層（`RunState.currentFloor`・深さではない）で替える: 1〜2 層 B55 / S32 / G11 / L2%・3〜4 層 B35 / S35 / G22 / L8%・5 層 B20 / S30 / G32 / L18%。
+消耗品の枠と層の分からない時は旧い一律の B45 / S32 / G18 / L5%（`tierWeights`）。秘宝の枠の数（5）は据え置き。BOT の層化ホールドアウトの逆数も同じ表（`TierOfferWeight(r, floor)`）。
 
 ### 16-3c. 出現の枠（動的 4 枠ロック）・軸均等の抽選・見送り換金（2026-11-21・full-item-rework-spec §1）
 
 - **出現の枠**（`RunState.lockedAxes`・中断セーブに乗る）: 8 軸（`AxisRules.Ranked`）の秘宝を取得するたび（店・宝箱・報酬・イベント・交換・開幕のどれでも・`PassiveAddHelper.AddPassiveItem` → `AxisPool.NoteAcquired`）、その軸が無く枠が空いていれば末尾へ足す（最大 4）。
   種火を挿していれば、その軸がランの始めから 1 つ目（`RunState.Initialize`・`MetaBuffApplicator.GetSparkAxis`）。**4 つ埋まったらロック成立**: 以降の秘宝の抽選と軸の端子（`TerminalDef.axis`・`GameManager.RollTerminals`）はロックした 4 軸と枠外（金・軸なし・軸の無い端子）からだけ出る。手放しても枠は外れない。賽・武器・消耗品は対象外。
 - **軸均等の抽選**（`AxisPool.Narrow`・秘宝を引く全経路の共通の第 1 段）: 軸あり 80% / 枠外 20% → 軸あり なら出せる軸（ロック前は 8 軸・後は 4 軸・品の残っていない軸は除く）から等確率で 1 軸 → その軸（か枠外）の中で、経路の今までのレア度の引き方（店の `tierWeights`・`RarityWeightedPicker`）。
-  無いレア度は引かない（= 別のレアへ落ちる）。乱数は経路ごとの専用キー（`shop.axis` / `event.axis` / `treasure.axis` / `reward.axis` / `start.axis` / `bonus.axis` / `goblin.axis` / `exchange.axis` の `.cat` と `.axis`）を毎回 1 本ずつ。
-  種類の混ざった候補（戦闘報酬の 2 択・トレジャーゴブリン）は、今までどおり引いた品が秘宝なら同じレア度の秘宝の中で軸を均して引き直す（`AxisPool.Repick`・秘宝と消耗品の割合とレア度の出方は変えない）。
-- **見送り換金**（`AxisPool.TakeSkip`）: 店の外の秘宝の提示（支給の秘宝・宝箱・戦闘報酬の秘宝の 2 択・縄張りの宝・イベントの「Nつから選ぶ」・交換マスの受け取り・開幕の秘宝）に「見送る（+NG）」。
+  無いレア度は引かない（= 別のレアへ落ちる）。乱数は経路ごとの専用キー（`shop.axis` / `event.axis` / `treasure.axis` / `reward.axis` / `reward.elite.axis` / `reward.boss.axis` / `start.axis` / `bonus.axis` / `exchange.axis` の `.cat` と `.axis`）を毎回 1 本ずつ。
+- **主軸共鳴**（2026-11-22・neon 最終仕上げ §1-1・`AxisPool.MainAxis` / `MainAxisWeight`）: ロック成立後、4 枠の軸のうち所持数（`AxisRules.Count`）が**単独 1 位**の軸（主軸）を選ぶ重みを **×2**（4 軸なら 40 : 20 : 20 : 20）。同率 1 位の間は均等。軸指定リロールの ×4 とは掛け合わせる。
+  画面: 出現の枠の主軸に「×2」の印（「出現 [毒×2][充電][出血][役] ロック」・`AxisPool.SlotsLabel`）、店の「軸で振り直す」の画面にルールの 1 文（`AxisPool.MainAxisRule`）。計装: 経路の集計の「主軸共鳴:回」・ランの記録の `mainAxisPicks`。
+  種類の混ざった候補（通常戦の報酬の 3 択）は、今までどおり引いた品が秘宝なら同じレア度の秘宝の中で軸を均して引き直す（`AxisPool.Repick`・秘宝と消耗品の割合とレア度の出方は変えない）。
+- **見送り換金**（`AxisPool.TakeSkip`）: 店の外の秘宝の提示（支給の秘宝・宝箱・戦闘報酬の秘宝の 3 択・縄張りの宝・イベントの「Nつから選ぶ」・交換マスの受け取り・開幕の秘宝）に「見送る（+NG）」。
   額は BRONZE 15 / SILVER 22 / GOLD 35 / LEGENDARY 50G（`AxisPool.SkipGold`）。**複数の択の提示を見送ると、提示の中で一番高いレア度の額**。ゴールドは `GoldIncome.Gain` を通す（挑戦デバフの収入減が掛かる）。見送った品は既出にしない（また出得る）。
   宝箱の秘宝は 1 択の提示になった（人は地図へ戻ってからの選択画面・BOT はその場）。名前の決まったイベントの品・ボス撃破の追加・強奪・〈剛胆〉・追跡者・偽の商人の戦利品は提示ではないので見送れない。
 - **画面**: 地図の右上（上の帯の真下）と店の見出しに「出現 [毒][充電][？][？]」。4 つ埋まったら明るい色と「ロック」。
@@ -3668,7 +3676,7 @@ Tier ごとの正味（本番と同じく 2 枚配って選ぶ・各 1 万ラン
 | フィルタ | 除外対象 |
 |---|---|
 | `WeaponShopFilter` | 武器の排出可否（LEGENDARY は排出可・頻度は重みで制御） |
-| `EventOnlyItemFilter` | イベント限定固有 / 連番フラグ系 / **職業スターター消耗品** / レイピア / 無銘の剣舞譜 / 博士の〈止まらない時計〉 |
+| `EventOnlyItemFilter` | イベント限定固有（ちいさな灯火・確信の 3 品・幸運の硬貨・相棒の魂）/ 連番フラグ系 / **職業スターター消耗品** / レイピア / 無銘の剣舞譜 / 博士の〈止まらない時計〉。8 軸の品（英雄の意志・毒草摘みの杖・激情の刃・希望の灯片・十五年目の計測器）は 2026-11-22 に通常のプールへ合流 |
 | `ItemIds.Undroppable`（手放せない品・2026-11-13） | 売却（`CanSell`）・取り替え（交換マス・イベントの取り替え・`CanTradeAway`）・ランダムな喪失（偽の商人に敗北・`CanBeLost`）の対象外。確信の 3 品＋`Entrusted` |
 | `ItemIds.Entrusted`（預かり物・2026-11-13） | 記録（図鑑）には手に入れるまで「？？？」の枠も出さない（`HiddenInCodexUntilOwned`）。`Undroppable` にも入る。今は〈止まらない時計〉だけ |
 | `ItemIds.ProgressionItems`（進行用の品） | 〈門〉で捧げない（`CanOfferAtGate`）・大罪の強欲/色欲の対象外（`CanBeTakenBySin`）・BOT の学習から外す。`Undroppable` は全部ここにも入る。売れるかはこの集合では決まらない |
@@ -3725,7 +3733,7 @@ Tier ごとの正味（本番と同じく 2 枚配って選ぶ・各 1 万ラン
 
 items.json の `consFamily: "tactic"`・`tier: 1`（id は `ItemIds.Tactic*`）。**戦闘中・判断の間（振り直し・配線）だけ使える**（`Consumables.Use` → `ApplyTactic`・人の画面も同じ口）。
 挑戦カード「1 戦闘で使える消耗品は N 個まで」にも数える。効き目が無い時（同じターンに 2 つ目の潤滑油・共鳴玉、仕込み済みの針、倒れた敵への鑿）は使えない（消費しない）。
-店の 3 枠目の抽選: 1 品の重み = レア度の重み ÷ そのレア度の品の数（レア度の出方は秘宝と同じ 45/32/18/5%）。イベントの「消費アイテム獲得」（品の指定なし）の抽選にも入る。
+店の 3 枠目の抽選: 1 品の重み = レア度の重み ÷ そのレア度の品の数（レア度の出方 45/32/18/5%・秘宝の枠は 2026-11-22 から層別・§16-3b の下）。イベントの「消費アイテム獲得」（品の指定なし）の抽選にも入る。
 
 | 品 | レア | 基準価格 | 効果 |
 |---|---|---|---|
@@ -4164,9 +4172,9 @@ OfferPassives / TradePassive / ForgeWeapon / NextShopDiscount / NextRestBonus /
 
 | 物 | 値段（層 1 / 2 / 3 / 4） | 根拠 |
 |---|---|---|
-| 戦闘 1 回の金 | 10G（エリート 20G・2 体戦 ×2）。層によらない | `FloorManager.cs:296-297`（`ceil((7 + 深さ/2)/5) × GoldScale 5` = 2 × 5）・`CombatRewards.cs:51,57` |
+| 戦闘 1 回の金 | 10G（エリート 15G・2026-11-22〜・2 体戦 ×2）。層によらない | `FloorManager.cs:296-297`（`ceil((7 + 深さ/2)/5) × GoldScale 5` = 2 × 5）・`CombatRewards.cs:51,57` |
 | 戦闘 1 回の HP の純減（実測） | 通常 2.4 / 4.6 / 2.1 / 11.6、エリート 3.6 / 9.9 / 6.4 / 13.1 | 2026-11-11 の runs.jsonl（Optimal・n=10 ラン・378 戦。小さい標本） |
-| 戦闘のドロップ | 通常 0%・エリート 10%（パッシブ）・素材 +1（エリート +2） | `CombatRewards.cs:30,37`・`GameManager.Combat.cs:37-40` |
+| 戦闘のドロップ | 通常 0%（落ちれば 3 択）・エリート確定（秘宝 SILVER 以上の 3 択・2026-11-22）・ボス確定（ファーム層と最終以外・秘宝 GOLD 以上の 3 択）・素材 +1（エリート +2） | `CombatRewards.cs:30,37`・`GameManager.Combat.cs:37-40` |
 | イベントの戦闘 | **金も報酬も無い**（HP の損だけ）。「エリートとの戦闘」も敵は通常の抽選 | `GameManager.Rewards.cs:120-128`・`GameManager.Events.cs:206` |
 | ランダムなパッシブ 1 個 | 22 / 29 / 41 / 58G | 店頭価格 = 基準価格 × 抽選の幅 1.0〜1.25 × 2 ×（1 + 0.25 × レア度）× 物価（`ShopManager.cs:190,196,526`・`ItemDatabase.cs:250-251`）をレア度の抽選重み 54/35/10/1%（`RarityWeightedPicker.cs:16-19`）で平均 |
 | ランダムな消耗品 1 個 | 15 / 20 / 28 / 39G | 同じ式（基準価格 4〜8・items.json） |
@@ -6147,6 +6155,7 @@ BOT の払い方（`AutoRunner.Terminals` の `ChooseGoldPunch`）は実装済�
 | **シールドの旧い効果（Phase 2c）: 偏重を読むシールドの品（〈油染みの盾革〉堅牢 × 3%・〈盾押しの心得〉堅牢 × 5%・〈落城の礎石〉堅牢 × 20%）・〈防人の軍標〉のシールドを得るたび +5%・〈鏡返しの小盾〉の吸収の 50% の返し（`Kw.ReflectKey` / `AbsorbIsAttackKey`）・〈鋲の胸当て〉の毎ターン +1・〈受け太刀の籠手〉の受けきりで +3・AxisCatalog のシールド 2 行・旧クラス 22 本** | 2026-11-21 | フルリワーク（full-item-rework-spec §3 軸3・台帳 §③）。シールドを「耐えるだけ」から【ジャスト防御】と要塞の反撃へ。22 品は `ShieldEffects.cs` の新効果 |
 | **毒の旧い効果（Phase 2b）: 入り口（`EntryEffect`）の毒の 7 行・偏重を読む毒の品（〈瘴気溜まりの壺〉〈瘴気の外套〉〈腐れ沼の苔玉〉の瘴気 × 2%）・〈石抜きの毒指輪〉の毒 50 で 25 消費・〈骨溶かしの黒油〉の強いひび（`crackStrong`）・出来事 OnPoisonCap・〈麻痺の吹き矢〉の stats（`per: enemyPoison`）・段の交代での毒の持ち越し・§7-1 の旧い表（毒塗り・毒殺者・麻痺毒ほか 2026-07-15 の品）・旧クラス 23 本** | 2026-11-21 | フルリワーク（full-item-rework-spec §3 軸2・台帳 §②）。毒を「毎ターンの微ダメ」から蝕みと【起爆】へ。25 品は `PoisonEffects.cs` の新効果。DoT の基準の経緯: 2026-11-20 に 0.05% から 0.1% へ戻した・11-10 に 0.1% → 0.05%・11-07 に「最大 HP の 0.5%」から 0.1%（同日に一度「現在 HP の 0.1%」にしたが与ダメの 13% しか出ず戻した）・11-05 に 1% → 0.5%・11-01 に「スタック数 × 1」から 1% |
 | **削除の検証ゲート（Phase 3i）: `AxisItemEffects.cs`（最後の `AxisCatalog`）と BOT の「軸に絞る買い方」（`v3.axisCommitBuy`・① 数を参照・②【規則】の旧区分）・端子〈賽振り台〉〈役落とし〉の賽目（→ この戦闘の役の回数）・`TerminalEnv.axRole`・CombatContext の読み手のないフィールド 9 個（`playerBaseMaxHP` `diceDifference` `blockWiredThisTurn` `damageReduced` `nullifyScratchDamage` `overDamageAccumulated` `damageDealtTotal` `damageTakenTotal` `truceThisTurn`）・`Kw.BurstSuperKey`・`DieIds.Pumice`・BOT の旧い品名（`PriorityItemList` の `dice_*`・吸血III/IV、`BuildPersona` のシールドバッシュIII）** | 2026-11-21 | フルリワーク（full-item-rework-spec §7-2）。監査は `Tools/rework_audit.py` |
+| **戦闘報酬の 2 択・エリートの 10% のドロップ・1 層ボス（トレジャーゴブリン）の単発の品（武器か秘宝・SILVER 以上・`PickTreasureGoblinDrop`）・`PickTreasureChoicePair`** | 2026-11-22 | neon 最終仕上げ §1-4: 通常戦は 3 択（率は据え置きの 0%）・エリートは確定で秘宝 SILVER 以上の 3 択・ファーム層と最終以外のボス（深さ 1・3・5・6）は確定で秘宝 GOLD 以上の 3 択（どれも見送り換金あり・`GameManager.PickRewardOffer`）。ゴブリンの単発はボスの 3 択へ統合 |
 | **宝箱・戦闘の報酬の 2 択に賽（最初の賽を含む）が混ざっていた** | 2026-11-21 | 賽は店とイベントの交換で装備する物で、宝箱から出た賽は所持の一覧に入るだけで働かなかった（BOT のランの記録の `acquired` に装備していない賽が載っていた・Phase 3g の報告）。宝箱と報酬の 2 択の抽選から賽を外した（`GameManager.PickRandomTreasureItem` / `PickTreasureChoicePair`）。値下げ交渉の戦利品の賽は店で買った時と同じく今の賽と入れ替わる |
 | **充電の旧い効果（Phase 2a）: 過充電 7・〈電流〉の②（充電端子の出目の一部を攻撃へ・`chargeToAttackPct`・旧〈二股の導線〉）・〈雷壷〉のターン開始の目減り・〈雷神槍〉の stats（`per: chargeSpent`）・旧クラス 25 本（`ForkedTerminal` `InvertedRod` `SearingWhip` `LightningHeadguard` ほか）** | 2026-11-21 | フルリワーク（full-item-rework-spec §3 軸1・台帳 §①）。充電を「貯めて平らなダメージに換える」から「払って行動の回数と質を増やす」マナへ。26 品は `ChargeEffects.cs` の新効果 |
 | **異軸クロスの 6 品の効果（〈劇毒の火薬庫〉〈血染めの歯車〉〈雷鳴のゾロ目〉〈必殺の照準器〉〈血濡れの符丁〉〈雷毒の導管〉・`CrossItemEffects.cs`・`Cross.Need` 偏重 5 の門）と BOT の見積もり・`ItemIds.Cross*`** | 2026-11-21 | フルリワーク（full-item-rework-spec §0-2 の 3「異軸クロス回路は禁止」・§7-1）。A 資源を B 資源へ繋ぐ橋はつまみ食いを加速させ、軸の特色を消す。品（名前・絵・フレーバー）は残し、純軸の新効果は Phase 2/3（台帳）。**再提案しない** |

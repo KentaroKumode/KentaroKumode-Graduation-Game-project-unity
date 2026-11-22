@@ -439,11 +439,10 @@ namespace GameLoop
                 case GameManager.GamePhase.Reward:
                     if (GameManager.Instance != null && GameManager.Instance.HasPendingRewardChoice)
                     {
-                        var (rcA, rcB) = GameManager.Instance.CurrentRewardChoice;
+                        var rc = GameManager.Instance.CurrentRewardChoice;
                         var idb = ItemSystem.ItemDatabase.Instance;
-                        string nA = idb?.GetItem(rcA)?.displayName ?? rcA;
-                        string nB = idb?.GetItem(rcB)?.displayName ?? rcB;
-                        helpText = $"報酬を選択 (同Tier):\n[1] {nA}\n[2] {nB}";
+                        helpText = "報酬を選択 (同Tier):";
+                        for (int ri = 0; ri < rc.Count; ri++) helpText += $"\n[{ri + 1}] {idb?.GetItem(rc[ri])?.displayName ?? rc[ri]}";
                     }
                     else
                     {

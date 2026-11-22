@@ -23,6 +23,8 @@ namespace ItemSystem
         public const float AxisShare = 0.8f;
         /// <summary>軸指定リロール (店) で、 指定の軸を選ぶ重み (他の軸は 1)。</summary>
         public const float FocusWeight = 4f;
+        /// <summary>主軸共鳴 (2026-11-22・neon 最終仕上げ §1-1): ロック後、 4 枠の中で所持数が単独 1 位の軸 (主軸) の重みに掛ける数 (4 軸なら 40:20:20:20)。</summary>
+        public const float MainAxisWeight = 2f;
         /// <summary>枠外の呼び名 (計装・画面)。</summary>
         public const string Outside = "枠外";
 
@@ -46,14 +48,35 @@ namespace ItemSystem
             UnityEngine.Debug.Log($"[出現の枠] {axis} を登録 ({run.lockedAxes.Count}/{LockSlots}{(run.lockedAxes.Count == LockSlots ? "・ロック成立" : "")})");
         }
 
-        /// <summary>画面に出す 4 枠 (「[毒][充電][？][？]」)。 地図と店の上に出す。</summary>
+        /// <summary>主軸: ロック成立後、 4 枠の軸のうち所持数 (<see cref="AxisRules.Count"/>) が単独 1 位の軸。 ロック前・同率 1 位・所持 0 なら null。</summary>
+        public static string MainAxis(RunState run)
+        {
+            if (!IsLocked(run)) return null;
+            string best = null; int bestN = 0; bool tie = false;
+            foreach (var a in run.lockedAxes)
+            {
+                int n = AxisRules.Count(run, a);
+                if (n > bestN) { bestN = n; best = a; tie = false; }
+                else if (n == bestN && n > 0) tie = true;
+            }
+            return tie ? null : best;
+        }
+
+        /// <summary>画面に出す 4 枠 (「[毒][充電][？][？]」)。 地図と店の上に出す。 主軸は「[毒×2]」(主軸共鳴)。</summary>
         public static string SlotsLabel(RunState run)
         {
             var sb = new System.Text.StringBuilder();
+            string main = MainAxis(run);
             for (int i = 0; i < LockSlots; i++)
-                sb.Append('[').Append(run?.lockedAxes != null && i < run.lockedAxes.Count ? run.lockedAxes[i] : "？").Append(']');
+            {
+                string a = run?.lockedAxes != null && i < run.lockedAxes.Count ? run.lockedAxes[i] : "？";
+                sb.Append('[').Append(a).Append(a == main ? "×2" : "").Append(']');
+            }
             return sb.ToString();
         }
+
+        /// <summary>主軸共鳴のルールの 1 文 (店の軸指定リロールの画面に出す・地図と店の 4 枠は「×2」の印)。</summary>
+        public const string MainAxisRule = "4 枠が埋まった後、 所持が単独で一番多い軸 (主軸・×2 の印) は出やすさ 2 倍。";
 
         /// <summary>見送り換金の額 (BRONZE 15 / SILVER 22 / GOLD 35 / LEGENDARY 50・仮)。</summary>
         public static int SkipGold(ItemRarity r) => r switch
@@ -116,16 +139,19 @@ namespace ItemSystem
                     && ax * (outside.Count + (FocusWeight - 1f) * outFocus.Count) < FocusWeight * outFocus.Count) return Note(Outside, outFocus);
                 return Note(Outside, outside);
             }
-            // 軸は Ranked の順に並べて重みで引く (辞書の列挙順に頼らない)
+            // 軸は Ranked の順に並べて重みで引く (辞書の列挙順に頼らない)。 主軸共鳴: 主軸は ×MainAxisWeight (指定の軸の ×FocusWeight と掛け合わせる)
+            string main = MainAxis(run);
+            float W(string a) => (a == focus ? FocusWeight : 1f) * (a == main ? MainAxisWeight : 1f);
             float total = 0f;
-            foreach (var a in AxisRules.Ranked) if (byAxis.ContainsKey(a)) total += a == focus ? FocusWeight : 1f;
+            foreach (var a in AxisRules.Ranked) if (byAxis.ContainsKey(a)) total += W(a);
             float r = ax * total; string pick = null;
             foreach (var a in AxisRules.Ranked)
             {
                 if (!byAxis.ContainsKey(a)) continue;
                 pick = a;
-                if ((r -= a == focus ? FocusWeight : 1f) < 0f) break;
+                if ((r -= W(a)) < 0f) break;
             }
+            if (pick == main && main != null) { MainAxisPicks++; RunMainAxisPicks++; }
             return Note(pick, byAxis[pick]);
         }
 
@@ -144,17 +170,22 @@ namespace ItemSystem
         /// <summary>第 1 段で選んだ軸 (と <see cref="Outside"/>) の回数。</summary>
         public static readonly Dictionary<string, long> Drawn = new Dictionary<string, long>();
         public static long Skips, SkipGoldTotal, LocksCompleted, LockFloorSum;
+        /// <summary>第 1 段で主軸 (主軸共鳴の ×2) を引いた回数 (バッチ累計・「主軸共鳴:回」)。</summary>
+        public static long MainAxisPicks;
         /// <summary>今のランの見送り換金の回数と額 (ランの頭で BOT が 0 に戻す・ランの記録の skipFired / skipGold)。</summary>
         public static int RunSkips, RunSkipGold;
         /// <summary>今のランの店の軸指定リロールの回数 (GameManager.ShopReroll・ランの頭で BOT が 0 に戻す・ランの記録の axisRerollFired)。</summary>
         public static int RunAxisRerolls;
-        public static void ResetStats() { Drawn.Clear(); Skips = SkipGoldTotal = LocksCompleted = LockFloorSum = 0; }
+        /// <summary>今のランの第 1 段で主軸を引いた回数 (ランの頭で BOT が 0 に戻す・ランの記録の mainAxisPicks)。</summary>
+        public static int RunMainAxisPicks;
+        public static void ResetStats() { Drawn.Clear(); Skips = SkipGoldTotal = LocksCompleted = LockFloorSum = MainAxisPicks = 0; }
 
         /// <summary>計装を経路の集計 (PassiveSourceAudit.Counts) へ「軸抽選:」「見送り:」「ロック:」付きで混ぜる (並列ワーカーの返し・通常バッチのサマリー)。</summary>
         public static void WriteStats(Dictionary<string, int> into)
         {
             foreach (var kv in Drawn) into["軸抽選:" + kv.Key] = (int)System.Math.Min(int.MaxValue, kv.Value);
             into["見送り:回"] = (int)Skips; into["見送り:G"] = (int)SkipGoldTotal;
+            into["主軸共鳴:回"] = (int)System.Math.Min(int.MaxValue, MainAxisPicks);
             into["ロック:成立"] = (int)LocksCompleted; into["ロック:成立の層の和"] = (int)LockFloorSum;
         }
 

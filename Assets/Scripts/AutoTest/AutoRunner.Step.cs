@@ -289,7 +289,7 @@ namespace AutoTest
             CombatSystem.CombatManager.DeckDisposeFired = CombatSystem.CombatManager.DeckShuffleFired = 0;
             CombatSystem.CombatManager.RoleFormedFired = CombatSystem.CombatManager.RoleOmniFired = 0;
             CombatSystem.CombatManager.WeaponChainFired = CombatSystem.CombatManager.WeaponExecuteFired = CombatSystem.CombatManager.WeaponGaryoFired = CombatSystem.CombatManager.WeaponBashFired = 0;
-            ItemSystem.AxisPool.RunSkips = ItemSystem.AxisPool.RunSkipGold = ItemSystem.AxisPool.RunAxisRerolls = 0;
+            ItemSystem.AxisPool.RunSkips = ItemSystem.AxisPool.RunSkipGold = ItemSystem.AxisPool.RunAxisRerolls = ItemSystem.AxisPool.RunMainAxisPicks = 0;
             ItemSystem.PassiveSkills.PassiveSkillManager.ChainDeepestPath = "";
             ItemSystem.PassiveSkills.Keywords.Kw.HeatMaxBurstsOneAdd = 0;
             ItemSystem.PassiveSkills.Keywords.Kw.HeatMaxBurstsInfo = "";
@@ -511,26 +511,24 @@ namespace AutoTest
                     return false;
 
                 case GameManager.GamePhase.Reward:
-                    // 戦闘後ドロップ2択: 未所持(ビルドの幅)を優先、同条件なら option a。
+                    // 戦闘後ドロップの 3 択 (2026-11-22・旧 2 択)。 秘宝: 欲しい品 (BotHooks.WantsPassive) の中で買いの点が一番の品・無ければ見送り換金 (イベントの択と同じ BotHooks.ChooseOrSkip)。
+                    //   消耗品: 未所持 > 寄せの軸の品 > 先頭。
                     while (gm.HasPendingRewardChoice)
                     {
-                        var (ra, rb) = gm.CurrentRewardChoice;
-                        var owned = gm.Run?.ownedPassiveItems;
-                        bool ownsA = owned != null && ra != null && owned.Contains(ra);
-                        bool ownsB = owned != null && rb != null && owned.Contains(rb);
-                        int pick = (ownsA && !ownsB) ? 1 : 0;
-                        // [2026-11-10] 軸に寄せる方策: 片方だけが未所持の軸の品なら、 そちらを取る (両方/どちらも違うなら従来どおり)
-                        if (!string.IsNullOrEmpty(buyAxisFocus))
+                        var offer = gm.CurrentRewardChoice;
+                        int pick = 0;
+                        if (ItemSystem.AxisPool.SkipGoldFor(offer) > 0) pick = BotHooks.ChooseOrSkip(offer);
+                        else
                         {
-                            bool fa = !ownsA && IsAxisFocusItem(ra), fb = !ownsB && IsAxisFocusItem(rb);
-                            if (fa != fb) pick = fa ? 0 : 1;
+                            var owned = gm.Run?.ownedPassiveItems;
+                            int bestS = -1;
+                            for (int i = 0; i < offer.Count; i++)
+                            {
+                                int sc = (owned != null && owned.Contains(offer[i]) ? 0 : 2) + (!string.IsNullOrEmpty(buyAxisFocus) && IsAxisFocusItem(offer[i]) ? 1 : 0);
+                                if (sc > bestS) { bestS = sc; pick = i; }
+                            }
                         }
-                        // 見送り換金 (2026-11-21): 秘宝の 2 択で、 欲しい品 (BotHooks.WantsPassive) が片方だけならそちら・どちらも違えば見送る
-                        if (ItemSystem.AxisPool.SkipGoldFor(new[] { ra, rb }) > 0)
-                        {
-                            bool wa = BotHooks.WantsPassive(gm.Run, ra), wb = BotHooks.WantsPassive(gm.Run, rb);
-                            if (!wa && !wb) pick = -1; else if (wa != wb) pick = wa ? 0 : 1;
-                        }
+                        if (pick >= 0) _cur.rewardPicks++; else _cur.rewardSkips++;
                         gm.ResolveRewardChoice(pick);
                     }
                     gm.ConfirmReward();

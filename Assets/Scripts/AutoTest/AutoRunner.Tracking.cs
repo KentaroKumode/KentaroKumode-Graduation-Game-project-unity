@@ -506,6 +506,7 @@ namespace AutoTest
                 _cur.skipFired = ItemSystem.AxisPool.RunSkips;
                 _cur.skipGold = ItemSystem.AxisPool.RunSkipGold;
                 _cur.axisRerollFired = ItemSystem.AxisPool.RunAxisRerolls;
+                _cur.mainAxisPicks = ItemSystem.AxisPool.RunMainAxisPicks;
                 _cur.chainPath = ItemSystem.PassiveSkills.PassiveSkillManager.ChainDeepestPath;
                 _cur.heatBurstInfo = ItemSystem.PassiveSkills.Keywords.Kw.HeatMaxBurstsOneAdd + "|" + ItemSystem.PassiveSkills.Keywords.Kw.HeatMaxBurstsInfo;
                 _cur.attackSumInfo = CombatSystem.CombatManager.AttackSumMaxInfo;
