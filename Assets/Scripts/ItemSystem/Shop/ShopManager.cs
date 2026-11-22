@@ -90,8 +90,8 @@ namespace ItemSystem.Shop
             (ItemRarity.LEGENDARY, 0.05f),
         };
 
-        // 2026-11-22 (neon 最終仕上げ §1-3): 秘宝の枠は画面の層 (RunState.currentFloor・Run.Depth ではない) で重みを替える。
-        //   序盤 1〜2 層 B55/S32/G11/L2・中盤 3〜4 層 B35/S35/G22/L8・終盤 5 層〜 B20/S30/G32/L18。 上の tierWeights (B45/S32/G18/L5) は消耗品の枠と層の分からない時。
+        // 2026-11-22 (neon 最終仕上げ §1-3): 秘宝の枠は深さ (Run.Depth) で重みを替える (段 1 は画面の層だった・段 3 で深さへ)。
+        //   序盤 深さ 1 B55/S32/G11/L2・中盤 深さ 3 B35/S35/G22/L8・終盤 深さ 5〜7 B20/S30/G32/L18。 上の tierWeights (B45/S32/G18/L5) は消耗品の枠と層の分からない時。
         private static readonly (ItemRarity rarity, float weight)[] passiveTierEarly =
             { (ItemRarity.BRONZE, 0.55f), (ItemRarity.SILVER, 0.32f), (ItemRarity.GOLD, 0.11f), (ItemRarity.LEGENDARY, 0.02f) };
         private static readonly (ItemRarity rarity, float weight)[] passiveTierMid =
@@ -99,9 +99,10 @@ namespace ItemSystem.Shop
         private static readonly (ItemRarity rarity, float weight)[] passiveTierLate =
             { (ItemRarity.BRONZE, 0.20f), (ItemRarity.SILVER, 0.30f), (ItemRarity.GOLD, 0.32f), (ItemRarity.LEGENDARY, 0.18f) };
 
-        /// <summary>秘宝の枠のレア度の重み (画面の層で替える)。 floor ≤ 0 (分からない) は <see cref="tierWeights"/>。</summary>
-        private static (ItemRarity rarity, float weight)[] PassiveTierWeights(int floor)
-            => floor <= 0 ? tierWeights : floor <= 2 ? passiveTierEarly : floor <= 4 ? passiveTierMid : passiveTierLate;
+        /// <summary>秘宝の枠のレア度の重み (<b>深さ</b>で替える・neon の「序盤 1〜2 / 中盤 3〜4 / 終盤 5〜6 層」は深さの番号: 深さ 1 = 序盤・3 = 中盤・5/6/7 = 終盤)。
+        /// depth ≤ 0 (ファーム層・分からない) は <see cref="tierWeights"/>。</summary>
+        private static (ItemRarity rarity, float weight)[] PassiveTierWeights(int depth)
+            => depth <= 0 ? tierWeights : depth <= 2 ? passiveTierEarly : depth <= 4 ? passiveTierMid : passiveTierLate;
 
         // 2026-11-07: 武器枠は BRONZE 90% / SILVER 10% / GOLD 0 / LEGENDARY 0 (パッシブより控えめに)。
         //   武器のレアリティ自体は SILVER / GOLD / LEGENDARY のまま (段 2 / 3 / 4)・BRONZE の武器は無い。 RollTier はプールに実在する
@@ -119,7 +120,7 @@ namespace ItemSystem.Shop
 
         /// <summary>通常枠の Tier 提示重み。 <b>層化ホールドアウトが逆数を取るための唯一の出所</b>
         /// （AutoRunner が重みを直書きすると、 ここを変えたとき静かに食い違う）。
-        /// 未知の rarity は 0.25 (4 帯均等相当) を返す。 <paramref name="passiveFloor"/> = 秘宝の枠の重みを引く画面の層 (0 = 消耗品の枠・層別でない重み)。</summary>
+        /// 未知の rarity は 0.25 (4 帯均等相当) を返す。 <paramref name="passiveFloor"/> = 秘宝の枠の重みを引く深さ (Run.Depth・0 = 消耗品の枠・層別でない重み)。</summary>
         public static float TierOfferWeight(ItemRarity r, int passiveFloor = 0)
         {
             foreach (var (rarity, weight) in PassiveTierWeights(passiveFloor))
@@ -639,7 +640,7 @@ namespace ItemSystem.Shop
 
             // Tier重みで抽選 (武器は専用重みで T4 を超レア化)
             var weights = kind == ShopSlotKind.Weapon ? weaponTierWeights
-                        : kind == ShopSlotKind.Passive ? PassiveTierWeights(GameLoop.GameManager.Instance?.Run?.currentFloor ?? 0) : tierWeights;
+                        : kind == ShopSlotKind.Passive ? PassiveTierWeights(GameLoop.GameManager.Instance?.Run?.Depth ?? 0) : tierWeights;
             // 呪物の賽 (ADR-0016): 秘宝の枠は LEGENDARY の重み ×3 (他のレア度の重みはそのまま)
             float legMul = kind == ShopSlotKind.Passive ? CombatSystem.DiePassives.LegendaryOfferMul(GameLoop.GameManager.Instance?.Run) : 1f;
             if (legMul != 1f)

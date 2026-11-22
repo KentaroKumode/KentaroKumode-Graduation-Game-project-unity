@@ -296,13 +296,13 @@ namespace GameLoop
             if (!EventSystem.TimedEffects.BattleBoonRule.GrantsDrops(LastBattleBoon)) { RunStats.ToilBlockedDrops += drops; drops = 0; }   // [計装 2026-11-14] 止めた数を数えるだけ
             if (LastBattleBoon != EventSystem.TimedEffects.BattleBoon.None) Log(BattleBoonLine);
 
-            // 各ドロップを「同カテゴリ・同レア度の 3 択」として保留 (2026-11-22・旧 2 択)。 エリートは秘宝だけ・SILVER 以上 (neon 最終仕上げ §1-4)。
+            // 各ドロップを「同カテゴリ・同レア度の 3 択」として保留 (2026-11-22・旧 2 択)。 エリートは秘宝だけ (neon 最終仕上げ §1-4・レア度の縛りは 2026-11-22 に外した = ふつうのレア度の重み・作者の決定 C)。
             // 相方候補が無い場合のみ即時付与（単体ドロップにフォールバック）。
             pendingRewardChoices.Clear();
             rewardChoiceIndex = 0;
             for (int d = 0; d < drops; d++)
             {
-                var offer = eliteWin ? PickRewardOffer(passiveOnly: true, ItemRarity.SILVER, "reward.elite") : PickRewardOffer(passiveOnly: false, null, "reward");
+                var offer = eliteWin ? PickRewardOffer(passiveOnly: true, null, "reward.elite") : PickRewardOffer(passiveOnly: false, null, "reward");
                 if (offer.Count == 0) continue;
                 if (offer.Count == 1 && !ItemDatabase.Instance.GetItem(offer[0]).IsPassive)
                 {
@@ -605,7 +605,7 @@ namespace GameLoop
         public const int RewardOfferSize = 3;
 
         /// <summary>戦闘報酬の提示 (主候補 + 同カテゴリ・同レア度の相方 最大 2 つ)。 <paramref name="passiveOnly"/> = 秘宝だけ (エリート・ボス)。
-        /// <paramref name="minRarity"/> = 最低のレア度 (エリート SILVER・ボス GOLD)。 相方が同じレア度で足りなければ minRarity 以上から足す。 候補が無ければ空。</summary>
+        /// <paramref name="minRarity"/> = 最低のレア度 (ボス GOLD・エリートは縛りなし)。 相方が同じレア度で足りなければ minRarity 以上から足す。 候補が無ければ空。</summary>
         private System.Collections.Generic.List<string> PickRewardOffer(bool passiveOnly, ItemRarity? minRarity, string key)
         {
             var offer = new System.Collections.Generic.List<string>();

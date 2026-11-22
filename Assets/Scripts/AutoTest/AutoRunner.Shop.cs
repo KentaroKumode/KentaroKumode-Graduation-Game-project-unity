@@ -214,7 +214,7 @@ namespace AutoTest
                 var s = inv.slots[_exploreCandidates[i]];
                 var data = (s != null && !string.IsNullOrEmpty(s.itemId)) ? db?.GetItem(s.itemId) : null;
                 float w = data != null
-                    ? 1f / Mathf.Max(0.001f, ItemSystem.Shop.ShopManager.TierOfferWeight(data.rarity, data.IsPassive ? (GameManager.Instance?.Run?.currentFloor ?? 0) : 0))
+                    ? 1f / Mathf.Max(0.001f, ItemSystem.Shop.ShopManager.TierOfferWeight(data.rarity, data.IsPassive ? (GameManager.Instance?.Run?.Depth ?? 0) : 0))
                     : 4f;   // rarity 不明 (パーツ/素材) は 1/0.25
                 _exploreWeights.Add(w);
                 total += w;

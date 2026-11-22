@@ -3643,7 +3643,7 @@ Tier ごとの正味（本番と同じく 2 枚配って選ぶ・各 1 万ラン
 
 ### 16-3b2. 店の秘宝の枠のレア度（2026-11-22・neon 最終仕上げ §1-3・`ShopManager.PassiveTierWeights`）
 
-画面の層（`RunState.currentFloor`・深さではない）で替える: 1〜2 層 B55 / S32 / G11 / L2%・3〜4 層 B35 / S35 / G22 / L8%・5 層 B20 / S30 / G32 / L18%。
+**深さ**（`RunState.Depth`）で替える: 深さ 1 B55 / S32 / G11 / L2%・深さ 3 B35 / S35 / G22 / L8%・深さ 5〜7 B20 / S30 / G32 / L18%（画面の層では 1 層・2 層・3〜5 層）。neon の「序盤 1〜2 / 中盤 3〜4 / 終盤 5〜6 層」は深さの番号（同じ指示の「各層ボス 1〜6 層」「深さ 7 ヴェスカ」と同じ数え方）。2026-11-22 の段 1 は画面の層で分けていた（終盤の L18% がヴェスカの層だけ）→ 段 3 で深さへ直した。
 消耗品の枠と層の分からない時は旧い一律の B45 / S32 / G18 / L5%（`tierWeights`）。秘宝の枠の数（5）は据え置き。BOT の層化ホールドアウトの逆数も同じ表（`TierOfferWeight(r, floor)`）。
 
 ### 16-3c. 出現の枠（動的 4 枠ロック）・軸均等の抽選・見送り換金（2026-11-21・full-item-rework-spec §1）
@@ -4179,7 +4179,7 @@ OfferPassives / TradePassive / ForgeWeapon / NextShopDiscount / NextRestBonus /
 |---|---|---|
 | 戦闘 1 回の金 | 10G（エリート 15G・2026-11-22〜・2 体戦 ×2）。層によらない | `FloorManager.cs:296-297`（`ceil((7 + 深さ/2)/5) × GoldScale 5` = 2 × 5）・`CombatRewards.cs:51,57` |
 | 戦闘 1 回の HP の純減（実測） | 通常 2.4 / 4.6 / 2.1 / 11.6、エリート 3.6 / 9.9 / 6.4 / 13.1 | 2026-11-11 の runs.jsonl（Optimal・n=10 ラン・378 戦。小さい標本） |
-| 戦闘のドロップ | 通常 0%（落ちれば 3 択）・エリート確定（秘宝 SILVER 以上の 3 択・2026-11-22）・ボス確定（ファーム層と最終以外・秘宝 GOLD 以上の 3 択）・素材 +1（エリート +2） | `CombatRewards.cs:30,37`・`GameManager.Combat.cs:37-40` |
+| 戦闘のドロップ | 通常 0%（落ちれば 3 択）・エリート確定（秘宝の 3 択・レア度はふつうの重み・2026-11-22）・ボス確定（ファーム層と最終以外・秘宝 GOLD 以上の 3 択）・素材 +1（エリート +2） | `CombatRewards.cs:30,37`・`GameManager.Combat.cs:37-40` |
 | イベントの戦闘 | **金も報酬も無い**（HP の損だけ）。「エリートとの戦闘」も敵は通常の抽選 | `GameManager.Rewards.cs:120-128`・`GameManager.Events.cs:206` |
 | ランダムなパッシブ 1 個 | 22 / 29 / 41 / 58G | 店頭価格 = 基準価格 × 抽選の幅 1.0〜1.25 × 2 ×（1 + 0.25 × レア度）× 物価（`ShopManager.cs:190,196,526`・`ItemDatabase.cs:250-251`）をレア度の抽選重み 54/35/10/1%（`RarityWeightedPicker.cs:16-19`）で平均 |
 | ランダムな消耗品 1 個 | 15 / 20 / 28 / 39G | 同じ式（基準価格 4〜8・items.json） |
@@ -6166,7 +6166,7 @@ BOT の払い方（`AutoRunner.Terminals` の `ChooseGoldPunch`）は実装済�
 | **シールドの旧い効果（Phase 2c）: 偏重を読むシールドの品（〈油染みの盾革〉堅牢 × 3%・〈盾押しの心得〉堅牢 × 5%・〈落城の礎石〉堅牢 × 20%）・〈防人の軍標〉のシールドを得るたび +5%・〈鏡返しの小盾〉の吸収の 50% の返し（`Kw.ReflectKey` / `AbsorbIsAttackKey`）・〈鋲の胸当て〉の毎ターン +1・〈受け太刀の籠手〉の受けきりで +3・AxisCatalog のシールド 2 行・旧クラス 22 本** | 2026-11-21 | フルリワーク（full-item-rework-spec §3 軸3・台帳 §③）。シールドを「耐えるだけ」から【ジャスト防御】と要塞の反撃へ。22 品は `ShieldEffects.cs` の新効果 |
 | **毒の旧い効果（Phase 2b）: 入り口（`EntryEffect`）の毒の 7 行・偏重を読む毒の品（〈瘴気溜まりの壺〉〈瘴気の外套〉〈腐れ沼の苔玉〉の瘴気 × 2%）・〈石抜きの毒指輪〉の毒 50 で 25 消費・〈骨溶かしの黒油〉の強いひび（`crackStrong`）・出来事 OnPoisonCap・〈麻痺の吹き矢〉の stats（`per: enemyPoison`）・段の交代での毒の持ち越し・§7-1 の旧い表（毒塗り・毒殺者・麻痺毒ほか 2026-07-15 の品）・旧クラス 23 本** | 2026-11-21 | フルリワーク（full-item-rework-spec §3 軸2・台帳 §②）。毒を「毎ターンの微ダメ」から蝕みと【起爆】へ。25 品は `PoisonEffects.cs` の新効果。DoT の基準の経緯: 2026-11-20 に 0.05% から 0.1% へ戻した・11-10 に 0.1% → 0.05%・11-07 に「最大 HP の 0.5%」から 0.1%（同日に一度「現在 HP の 0.1%」にしたが与ダメの 13% しか出ず戻した）・11-05 に 1% → 0.5%・11-01 に「スタック数 × 1」から 1% |
 | **削除の検証ゲート（Phase 3i）: `AxisItemEffects.cs`（最後の `AxisCatalog`）と BOT の「軸に絞る買い方」（`v3.axisCommitBuy`・① 数を参照・②【規則】の旧区分）・端子〈賽振り台〉〈役落とし〉の賽目（→ この戦闘の役の回数）・`TerminalEnv.axRole`・CombatContext の読み手のないフィールド 9 個（`playerBaseMaxHP` `diceDifference` `blockWiredThisTurn` `damageReduced` `nullifyScratchDamage` `overDamageAccumulated` `damageDealtTotal` `damageTakenTotal` `truceThisTurn`）・`Kw.BurstSuperKey`・`DieIds.Pumice`・BOT の旧い品名（`PriorityItemList` の `dice_*`・吸血III/IV、`BuildPersona` のシールドバッシュIII）** | 2026-11-21 | フルリワーク（full-item-rework-spec §7-2）。監査は `Tools/rework_audit.py` |
-| **戦闘報酬の 2 択・エリートの 10% のドロップ・1 層ボス（トレジャーゴブリン）の単発の品（武器か秘宝・SILVER 以上・`PickTreasureGoblinDrop`）・`PickTreasureChoicePair`** | 2026-11-22 | neon 最終仕上げ §1-4: 通常戦は 3 択（率は据え置きの 0%）・エリートは確定で秘宝 SILVER 以上の 3 択・ファーム層と最終以外のボス（深さ 1・3・5・6）は確定で秘宝 GOLD 以上の 3 択（どれも見送り換金あり・`GameManager.PickRewardOffer`）。ゴブリンの単発はボスの 3 択へ統合 |
+| **戦闘報酬の 2 択・エリートの 10% のドロップ・1 層ボス（トレジャーゴブリン）の単発の品（武器か秘宝・SILVER 以上・`PickTreasureGoblinDrop`）・`PickTreasureChoicePair`** | 2026-11-22 | neon 最終仕上げ §1-4: 通常戦は 3 択（率は据え置きの 0%）・エリートは確定で秘宝 SILVER 以上の 3 択・ファーム層と最終以外のボス（深さ 1・3・5・6）は確定で秘宝 GOLD 以上の 3 択（どれも見送り換金あり・`GameManager.PickRewardOffer`）。ゴブリンの単発はボスの 3 択へ統合。**エリートの SILVER 以上の縛りは同日に外した**（作者の決定 C・確定 3 択のまま、レア度はふつうの重み） |
 | **宝箱・戦闘の報酬の 2 択に賽（最初の賽を含む）が混ざっていた** | 2026-11-21 | 賽は店とイベントの交換で装備する物で、宝箱から出た賽は所持の一覧に入るだけで働かなかった（BOT のランの記録の `acquired` に装備していない賽が載っていた・Phase 3g の報告）。宝箱と報酬の 2 択の抽選から賽を外した（`GameManager.PickRandomTreasureItem` / `PickTreasureChoicePair`）。値下げ交渉の戦利品の賽は店で買った時と同じく今の賽と入れ替わる |
 | **充電の旧い効果（Phase 2a）: 過充電 7・〈電流〉の②（充電端子の出目の一部を攻撃へ・`chargeToAttackPct`・旧〈二股の導線〉）・〈雷壷〉のターン開始の目減り・〈雷神槍〉の stats（`per: chargeSpent`）・旧クラス 25 本（`ForkedTerminal` `InvertedRod` `SearingWhip` `LightningHeadguard` ほか）** | 2026-11-21 | フルリワーク（full-item-rework-spec §3 軸1・台帳 §①）。充電を「貯めて平らなダメージに換える」から「払って行動の回数と質を増やす」マナへ。26 品は `ChargeEffects.cs` の新効果 |
 | **異軸クロスの 6 品の効果（〈劇毒の火薬庫〉〈血染めの歯車〉〈雷鳴のゾロ目〉〈必殺の照準器〉〈血濡れの符丁〉〈雷毒の導管〉・`CrossItemEffects.cs`・`Cross.Need` 偏重 5 の門）と BOT の見積もり・`ItemIds.Cross*`** | 2026-11-21 | フルリワーク（full-item-rework-spec §0-2 の 3「異軸クロス回路は禁止」・§7-1）。A 資源を B 資源へ繋ぐ橋はつまみ食いを加速させ、軸の特色を消す。品（名前・絵・フレーバー）は残し、純軸の新効果は Phase 2/3（台帳）。**再提案しない** |
