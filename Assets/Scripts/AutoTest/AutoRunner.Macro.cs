@@ -120,11 +120,74 @@ namespace AutoTest
                 : carryW * Mathf.Clamp(supply - freeSupply - exitSteps * FreeMapParams.MoveSupply, 0f, run.provisionCap);
             float carry0 = Carry(start.supply, toGoal[at]);
 
+            // 速度 (2026-11-22・結果は変えない): 枝刈り。 枝の下の残り r 手の値の和は「点ごとの値の上限」の大きい順 r 個の和を超えない。
+            //   上限は状態に依らない: 戦闘 = 報酬 − 素の被ダメ (嵐は損を増やすだけ・死の項 ≧ 0)・休む = 0.3 回復・店 = 持ち得る金の全部を品へ・歩数 / 嵐の歩く損 / 恐れ ≧ 0。
+            //   それに出口の代償 ≧ 0 (exit0 を足し戻す) と持ち越しの最大を足しても今の best を超えないなら、 その枝の下では best も最初の点も変わらない。
+            //   上限の前提 (重み ≧ 0・学習の損と敗北率 ≧ 0 など) が崩れる設定では切らない。
+            float wHpB = MacroHpPer10[layer] * 10f * (layer == D6Layer ? navD6HpWeightMul : 1f);
+            float wItemB = MacroItem[layer], wGoldB = wItemB / MacroPrice[layer] * MacroGoldDiscount;
+            float vaneB = run.OwnsPassive(ItemIds.MacroVane) ? Mathf.Max(0f, GameManager.VaneGold) * wGoldB : 0f;
+            bool canPrune = wHpB >= 0f && wGoldB >= 0f && navStormPointPrice == 0f && navFearMacro >= 0f && (storm == null || storm.BoundsNonNeg);
+            var ub = new float[cands.Count];
+            var isShop = new bool[cands.Count];
+            float shopCoef = Mathf.Max(0f, wItemB / Mathf.Max(1f, MacroPrice[layer]) - wGoldB);
+            float deathMulB = Mathf.Clamp(0.8f / Mathf.Max(0.05f, Mathf.Max(1f, start.hp)), 0.5f, 4f);
+            for (int i = 0; i < cands.Count && canPrune; i++)
+            {
+                var n = candNode[i];
+                if (n == null) continue;
+                bool fight = !n.revealed || n.EffectiveType == TileType.Battle || n.EffectiveType == TileType.EliteBattle;
+                if (fight)
+                {
+                    if (!(candLook[i].mean >= 0.0 && candLook[i].lose >= 0.0)) { canPrune = false; break; }
+                    bool elite = n.revealed && n.EffectiveType == TileType.EliteBattle;
+                    float w = n.revealed ? 1f : MacroUnknownWeight;
+                    // 死の項の下限 = 敗北率 × 死の損 × (HP の余裕の逆数の下限)。 計画の中の HP は max(今, 1) を超えない (休むは 1 までしか戻さない)。
+                    //   嵐は敗北率を下げない (倍率 ≧ 1・足す量は損の平均 ≧ 1e-6 の時だけ比が 1 以上) ので、 その前提が立つ点だけ数える
+                    double lose = candLook[i].lose;
+                    float deathMin = lose <= 1.0 && (storm == null || candLook[i].mean >= 1e-6) ? (float)lose * MacroDeathCost * deathMulB : 0f;
+                    ub[i] = ((elite ? 20f : 10f) * wGoldB + (elite ? CombatRewards.EliteDropRate * wItemB : 0f) - wHpB * (float)candLook[i].mean - deathMin) * w + vaneB * w - MacroStepCost;
+                    continue;
+                }
+                switch (n.EffectiveType)
+                {
+                    case TileType.Rest: ub[i] = wHpB * 0.3f + 0.02f; break;
+                    case TileType.Shop: isShop[i] = true; break;
+                    case TileType.Treasure: ub[i] = wItemB * (CombatRewards.TreasurePassiveRate + 0.5f * (1f - CombatRewards.TreasurePassiveRate)); break;
+                    case TileType.Exchange: ub[i] = 0.05f; break;
+                    case TileType.Event: case TileType.SupplyDepot: ub[i] = 0.02f; break;
+                }
+            }
+            float goldPerStepB = 20f + (vaneB > 0f ? Mathf.Max(0f, GameManager.VaneGold) : 0f);   // 1 手で増え得る金の最大 (精鋭の報酬 + 風見鶏)
+            float tailB = (storm != null ? exit0 : 0f) + Mathf.Max(0f, carryW * Mathf.Max(0f, run.provisionCap)) - carry0 + 1e-3f;   // 1e-3 = 浮動小数の丸めの余裕
+            var topB = new float[MacroDepth];
+            // 残り r 手で足せる値の上限 (使っていない点の上限の大きい順 r 個・正の分だけ)
+            float BoundOf(int r, float coins)
+            {
+                int k = 0;
+                float shopV = shopCoef * (coins + r * goldPerStepB);
+                for (int j = 0; j < cands.Count; j++)
+                {
+                    if (used[j]) continue;
+                    float v = isShop[j] ? shopV : ub[j];
+                    if (!(v > 0f)) continue;
+                    int p = k < r ? k++ : r;
+                    if (p == r) { if (v <= topB[r - 1]) continue; p = r - 1; }
+                    while (p > 0 && topB[p - 1] < v) { topB[p] = topB[p - 1]; p--; }
+                    topB[p] = v;
+                }
+                float sum = 0f;
+                for (int j = 0; j < k; j++) sum += topB[j];
+                return sum;
+            }
+
             void Search(int from, int[] dFrom, MacroSim s, float acc, int first, int depth)
             {
                 for (int i = 0; i < cands.Count; i++)
                 {
                     if (used[i]) continue;
+                    // 枝刈り (上の BoundOf と同じ上限): 最後の手は、 その点の上限を足しても best を超えないなら評価しない
+                    if (canPrune && depth == MacroDepth - 1 && acc + (isShop[i] ? shopCoef * s.coins : ub[i]) + tailB <= best + 1e-6f) continue;
                     int c = cands[i];
                     int steps = dFrom[c];
                     if (steps == int.MaxValue) continue;
@@ -176,7 +239,8 @@ namespace AutoTest
                     if (depth + 1 < MacroDepth && ns.hp > 0f)
                     {
                         used[i] = true;
-                        Search(c, candDist[i], ns, total, f, depth + 1);
+                        if (!canPrune || total + BoundOf(MacroDepth - depth - 1, ns.coins) + tailB > best + 1e-6f)
+                            Search(c, candDist[i], ns, total, f, depth + 1);
                         used[i] = false;
                     }
                 }
@@ -258,6 +322,9 @@ namespace AutoTest
             }
 
             private static int P(float pts) => Mathf.RoundToInt(pts);
+
+            /// <summary>計画の枝刈りの前提: 歩く損・出口の代償 ≧ 0、 嵐は戦闘の損を増やすだけ (倍率 ≧ 1・足す量 ≧ 0)。</summary>
+            public bool BoundsNonNeg => _wHp >= 0f && _bossLose >= 0.0 && _stormMul >= 1f && _addN >= 0f && _addE >= 0f;
 
             /// <summary>状態 <paramref name="s"/> (累計の見込み) で点 c が嵐の中か (<see cref="MarkFight"/> と同じ読み方)。</summary>
             public bool InStorm(int c, MacroSim s) => _sv.InStormAt(c, P(s.pts));
