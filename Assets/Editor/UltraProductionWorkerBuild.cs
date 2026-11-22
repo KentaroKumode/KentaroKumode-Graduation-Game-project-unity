@@ -30,7 +30,7 @@ namespace AutoTest.EditorTools
         /// <summary>並列のワーカーを Unity を使わない .NET 8 のコンソールアプリ (Tools/headless/DiceBoundHeadless.csproj) で作る (2026-11-22)。
         /// false = 今までどおり IL2CPP の Player。 起動引数・job.json・書き出すファイルはどちらも同じ (RankMarginWorkerBootstrap がそのまま走る)。
         /// .NET 版は Assets/Scripts の .cs をリンクしてビルドするだけで、 シーンも PlayerSettings も触らない。 要: .NET SDK 8。</summary>
-        public const bool UseDotnetWorker = false;
+        public const bool UseDotnetWorker = true;
 
         /// <summary>ワーカーを起動する時の環境変数 (.NET 版だけ・runtimeconfig では指定できない GC の設定)。 gen0 の予算 64 MB (既定 16 MB 前後・1 プロセス 220 MB/秒 割り当てる)。
         /// 2026-11-22 の実測 (22 並列・同じシードの対): 1 プロセスの秒数 −2〜4%・結果は全チャンクで一致。</summary>

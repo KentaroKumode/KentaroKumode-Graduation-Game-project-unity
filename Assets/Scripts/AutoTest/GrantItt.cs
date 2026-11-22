@@ -396,7 +396,8 @@ namespace AutoTest
             // ---- IRLS ----
             var beta = new double[D];
             for (int s = 0; s < NS; s++) beta[SBASE + s] = -2.0;   // 素直な初期値
-            var act = new int[16];
+            int maxG = 0; foreach (var run in runs) maxG = Math.Max(maxG, run.gItem.Length);
+            var act = new int[maxG + 2];   // 段の切片 + 付与品 + 金。 16 固定だと付与 15 品以上のランの品が黙って切られていた (2026-11-22)
             double[,] hess = null; double[] grad = null;
             int obsTotal = 0;
             for (int iter = 0; iter < 25; iter++)

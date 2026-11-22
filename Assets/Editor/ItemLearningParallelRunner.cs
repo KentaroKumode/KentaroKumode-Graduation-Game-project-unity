@@ -42,6 +42,10 @@ namespace AutoTest.EditorTools
             public int round;          // 走らせている (または次に走らせる) ラウンド
             public int rounds;
             public int runsPerRound;
+            /// <summary>1 回目だけのラン数 (0 = runsPerRound と同じ)。 ITT の 1 回目が 1 万だと品の処置ランが MinTreatedRuns に届かず、 回 2 の BOT が序列なし同然になる (2026-11-22)。</summary>
+            public int firstRoundRuns;
+            public int RunsOf(int r) => r == 0 && firstRoundRuns > 0 ? firstRoundRuns : runsPerRound;
+            public long OffsetOf(int r) => r == 0 ? 0 : RunsOf(0) + (long)(r - 1) * runsPerRound;
             public string learningRoot = "";
             public string configKeysJoined = "";
             public string configValuesJoined = "";
@@ -160,15 +164,15 @@ namespace AutoTest.EditorTools
                     ["v3.mainCorr"] = "True", ["v3.readOutgoingMult"] = "-1" });
         }
 
-        /// <summary>ITT (Super の方策) を 10,000 ラン × 20 回 = 合計 200,000 ラン (2026-11-10)。
+        /// <summary>ITT (Super の方策) を 1 回目 20,000 + 10,000 ラン × 18 回 = 合計 200,000 ラン (2026-11-10・1 回目を 2 万に 2026-11-22)。
         /// <b>回ごとにラン番号をずらす</b> (同じ割り当てを引き直さない) ・<b>割り当ては積み上げて合算</b>し、 回の終わりごとに
         /// 序列を作り直す (次の回はその序列で買う)。 精度は 20 万ラン 1 回と同じで、 買い方だけが途中で更新される。
         /// 条件は今の測定と同じ: 主攻撃の見積もりの補正 (v3.mainCorr)。 物差しは掛けない。</summary>
-        [MenuItem("Tools/AutoRun/■ ITT 並列 (Super の方策): 10000ラン × 20 回 (合算 20万)", priority = 8)]
+        [MenuItem("Tools/AutoRun/■ ITT 並列 (Super の方策): 20000 + 10000ラン × 18 回 (合算 20万)", priority = 8)]
         private static void LaunchIttSuperPooled()
         {
             AutoTest.GrantItt.Variant = "super";
-            LaunchWith(0, AutoRunner.WiringSkill.Super, 10000, itt: true, ittRounds: 20,
+            LaunchWith(0, AutoRunner.WiringSkill.Super, 10000, itt: true, ittRounds: 19, firstRoundRuns: 20000,
                 overrides: new Dictionary<string, string> { ["useIttBeta"] = "True", ["lockWeaponFamily"] = "True",
                     ["v3.mainCorr"] = "True", ["v3.readOutgoingMult"] = "-1" });
         }
@@ -293,7 +297,7 @@ namespace AutoTest.EditorTools
         private static void LaunchWith(int fightTraceRuns,
             AutoRunner.WiringSkill skill = AutoRunner.WiringSkill.Optimal, int runsPerRound = RunsPerRound, bool scout = false,
             bool learnedDanger = false, bool itt = false, bool useItt = true, Dictionary<string, string> overrides = null, bool ab = false,
-            int ittRounds = 1)
+            int ittRounds = 1, int firstRoundRuns = 0)
         {
             if (_running) { Debug.LogWarning("[学習並列] すでに走っている"); return; }
             if (EditorApplication.isPlayingOrWillChangePlaymode)
@@ -352,7 +356,7 @@ namespace AutoTest.EditorTools
             Directory.CreateDirectory(_root);
             _st = new State
             {
-                round = 0, rounds = itt ? Math.Max(1, ittRounds) : ab ? 1 : Rounds, runsPerRound = runsPerRound, mode = itt ? "itt" : "learn", noMerge = ab,
+                round = 0, rounds = itt ? Math.Max(1, ittRounds) : ab ? 1 : Rounds, runsPerRound = runsPerRound, firstRoundRuns = firstRoundRuns, mode = itt ? "itt" : "learn", noMerge = ab,
                 learningRoot = MetaProfileHelper.BotLearningRoot(0),
                 configKeysJoined = string.Join("\n", ks),
                 configValuesJoined = string.Join("\n", vs),
@@ -433,7 +437,8 @@ namespace AutoTest.EditorTools
             _slots.Clear(); _pending.Clear();
             _maxParallel = Mathf.Max(1, SystemInfo.processorCount - 2);
             int chunks = _maxParallel;
-            int baseRuns = _st.runsPerRound / chunks, extra = _st.runsPerRound % chunks, offset = 0;
+            int roundRuns = _st.RunsOf(_st.round);
+            int baseRuns = roundRuns / chunks, extra = roundRuns % chunks, offset = 0;
             string[] keys = _st.configKeysJoined.Split('\n');
             string[] values = _st.configValuesJoined.Split('\n');
             for (int c = 0; c < chunks; c++)
@@ -448,13 +453,13 @@ namespace AutoTest.EditorTools
                 {
                     jobKeys = new string[keys.Length + 1]; jobValues = new string[values.Length + 1];
                     System.Array.Copy(keys, jobKeys, keys.Length); System.Array.Copy(values, jobValues, values.Length);
-                    jobKeys[keys.Length] = "randomGrantStartIndex"; jobValues[values.Length] = (_st.round * _st.runsPerRound + offset).ToString(CultureInfo.InvariantCulture);   // 回ごとにもずらす (同じ割り当てを引き直さない)
+                    jobKeys[keys.Length] = "randomGrantStartIndex"; jobValues[values.Length] = (_st.OffsetOf(_st.round) + offset).ToString(CultureInfo.InvariantCulture);   // 回ごとにもずらす (同じ割り当てを引き直さない)
                 }
                 var job = new RankMarginWorkerJob
                 {
                     label = $"learn r{_st.round + 1}",
                     runs = size,
-                    seedStart = SeedBase + _st.round * _st.runsPerRound + offset,
+                    seedStart = SeedBase + (int)_st.OffsetOf(_st.round) + offset,
                     configKeys = jobKeys,
                     configValues = jobValues,
                     responsePath = slot.responsePath,
@@ -470,7 +475,7 @@ namespace AutoTest.EditorTools
             }
             _roundStartUtc = DateTime.UtcNow;
             _lastReport = 0;
-            Debug.Log($"[学習並列] ラウンド {_st.round + 1}/{_st.rounds} 開始: {_st.runsPerRound:N0} ラン / {_slots.Count} プロセス");
+            Debug.Log($"[学習並列] ラウンド {_st.round + 1}/{_st.rounds} 開始: {roundRuns:N0} ラン / {_slots.Count} プロセス");
             Pump();
         }
 
@@ -555,7 +560,7 @@ namespace AutoTest.EditorTools
                 if (elapsed - _lastReport >= 30)
                 {
                     _lastReport = elapsed;
-                    long all = (long)_st.rounds * _st.runsPerRound, doneAll = (long)_st.round * _st.runsPerRound + completed;
+                    long all = _st.OffsetOf(_st.rounds), doneAll = _st.OffsetOf(_st.round) + completed;
                     string pl = $"{DateTime.Now:HH:mm:ss} ラウンド {_st.round + 1}/{_st.rounds}: {completed:N0}/{total:N0} ラン"
                               + $" / {completed / Math.Max(1.0, elapsed):F1} ラン/秒 / 全体 {doneAll:N0}/{all:N0} ({100.0 * doneAll / Math.Max(1, all):F1}%)";
                     Debug.Log("[学習並列] " + pl);
@@ -622,7 +627,7 @@ namespace AutoTest.EditorTools
             {
                 var jobs = new List<(string path, int runs)>();
                 foreach (var s in _slots) jobs.Add((s.learnPath, s.runs));
-                _parse = System.Threading.Tasks.Task.Run(() => ParseRound(jobs, _st.runsPerRound));
+                _parse = System.Threading.Tasks.Task.Run(() => ParseRound(jobs, _st.RunsOf(_st.round)));
                 return;
             }
             if (!_parse.IsCompleted) return;
