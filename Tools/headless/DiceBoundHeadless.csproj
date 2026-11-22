@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Unity を使わずにゲームの計算部分と BOT を回す並列ワーカー。 .cs は Assets/Scripts をリンクするだけ (複製しない)。 -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>DiceBoundHeadless</AssemblyName>
+    <RootNamespace>DiceBoundHeadless</RootNamespace>
+    <!-- ゲームの .cs とデータの根 (既定 = このリポジトリ)。 照合で別の作業ツリーの版を作る時だけ -p:GameRoot=... で差し替える -->
+    <GameRoot Condition="'$(GameRoot)' == ''">$(MSBuildThisFileDirectory)..\..\</GameRoot>
+    <DefineConstants>$(DefineConstants);HEADLESS</DefineConstants>
+    <NoWarn>$(NoWarn);0169;0649;0414;0067;0162;0219;0108;0114;0618;0672;CS8632;CS1998;CS0436</NoWarn>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- 短命のプロセス (1 本 十数秒) なので段階 JIT を切って最初から最適化する。 22 並列の実測で 1 プロセス 11.4 → 7.1 秒 (IL2CPP 11.2 秒) -->
+    <TieredCompilation>false</TieredCompilation>
+    <ServerGarbageCollector>false</ServerGarbageCollector>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Shim\**\*.cs;Program.cs;SelfTest.cs" />
+    <Compile Include="$(GameRoot)Assets\Scripts\**\*.cs"
+             Exclude="$(GameRoot)Assets\Scripts\UI\**;$(GameRoot)Assets\Scripts\**\Editor\**;$(GameRoot)Assets\Scripts\**\Tests\**;$(GameRoot)Assets\Scripts\CameraMouseFollow.cs"
+             Link="Game\%(RecursiveDir)%(Filename)%(Extension)" />
+    <!-- 画面だけの部品 (どこからも参照されない・IMGUI / カメラ) -->
+    <Compile Remove="$(GameRoot)Assets\Scripts\GameLoop\GameDebugHUD.cs;$(GameRoot)Assets\Scripts\GameLoop\PhaseDirector.cs;$(GameRoot)Assets\Scripts\GameLoop\PhaseSceneRouter.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Player がビルド時に焼き込むデータと同じものを exe の隣へ写す (Resources/ と ItemDatabase の items.json) -->
+    <None Include="$(GameRoot)Assets\Resources\enemies.json" Link="Resources\enemies.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(GameRoot)Assets\Resources\Events\*.txt" Link="Resources\Events\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(GameRoot)Assets\Data\InventorySystem\items.json" Link="Data\items.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

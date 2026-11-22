@@ -120,6 +120,10 @@ crashlytics-build.properties
 # テスト・計測の生成物 (自動プレイ・スイープ・ワーカー用ビルド・自動生成レポート)
 /AutoRunLogs/
 /UltraProductionWorkerBuild/
+/HeadlessWorkerBuild/
+Tools/headless/bin/
+Tools/headless/obj/
+!/Tools/headless/DiceBoundHeadless.csproj
 /BALANCE_CHANGELOG_*.md
 /BALANCE_TIER_LIST_*.md
 /Tools/arms/
