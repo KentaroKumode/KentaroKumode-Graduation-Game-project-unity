@@ -250,7 +250,7 @@ namespace AutoTest
         /// その次を見る・全部致死ならミスしない)。 最良と同点の手しか無い時もミスしない (同点の入れ替えは損をしない = ミスではない)。</para>
         ///
         /// <para>判定の乱数は旧と同じく局面 (敵 HP・自 HP・ターン・ラン番号・出目) のハッシュから作る専用の値で、 <b>GameRng を消費しない</b>
-        /// (同じシードの対比較を壊さない)。 判定は 2 ターン先読み (<see cref="deckLookahead"/>) で選び直した後、 〈金で殴る〉の払い方の前。</para></summary>
+        /// (同じシードの対比較を壊さない)。 判定は 2 ターン先読み (<see cref="deckLookahead"/>) で選び直した後。</para></summary>
         public float wiringMistakeRate = 0f;
 
         /// <summary>このターンにミスするか (局面のハッシュ・GameRng を引かない)。 旧 MaybeMisWire と同じハッシュ。</summary>
@@ -667,9 +667,9 @@ namespace AutoTest
                 d += consBurst;
                 if (termMul != 1f && d > 0) d = System.Math.Max(1, Mathf.RoundToInt(d * termMul));   // 〈激昂〉〈共鳴〉: 本体と同じ位置 (攻撃バーストの後・物差しの前)
                 d = CombatSystem.EnemyHpLedger.ProbeMain(d);   // [測定用の物差し 2026-11-10] 本体と同じ位置 (攻撃バーストの後・防御の前)
-                d = ApplyFinalPct(d, fpct + (crit ? critFpct : 0));     // 最終与ダメージ倍率: 本体と同じ位置 (物差しの直後・怠惰の前・〈渾身の柄頭〉は会心した撃だけ)
-                d = MetaProgression.MetaDebuffApplicator.ApplyOutgoingCut(d);   // [#121] 〈大罪:怠惰〉: 本体と同じ位置 (物差しの直後・防御の前・CombatManager.Damage.cs)
-                d = CombatSystem.BossDown.ApplyTaken(d, down);               // ボスのダウン ×1.5: 本体と同じ位置 (怠惰の直後)
+                d = ApplyFinalPct(d, fpct + (crit ? critFpct : 0));     // 最終与ダメージ倍率: 本体と同じ位置 (物差しの直後・徒労の前・〈渾身の柄頭〉は会心した撃だけ)
+                d = MetaProgression.MetaDebuffApplicator.ApplyOutgoingCut(d);   // 〈徒労〉: 本体と同じ位置 (物差しの直後・防御の前・CombatManager.Damage.cs)
+                d = CombatSystem.BossDown.ApplyTaken(d, down);               // ボスのダウン ×1.5: 本体と同じ位置 (徒労の直後)
                 if (eDef > 0 && d > 0 && !(crit && vital))
                 {
                     int effDef = CombatSystem.DefenseFormula.Effective(eDef, pen + (crit ? critPen : 0));
@@ -974,9 +974,9 @@ namespace AutoTest
                 if (ws.damageMul != 1f) dmg = System.Math.Max(1, Mathf.RoundToInt(dmg * ws.damageMul));
             }
             if (aCount > 0) dmg = CombatSystem.EnemyHpLedger.ProbeMain(dmg);   // [測定用の物差し 2026-11-10] 旧の式にも同じ位置で (防御の前)
-            if (aCount > 0) dmg = ApplyFinalPct(dmg, s.finalPct + rung.FinalPct(s.solo, aCount, bCount, s.execBoost, s.shattered, s.undyingStreak + 1));   // 最終与ダメージ倍率 (武器の撃ごとの +% 込み): 本体と同じ位置 (物差しの直後・怠惰の前)
-            if (aCount > 0) dmg = MetaProgression.MetaDebuffApplicator.ApplyOutgoingCut(dmg);   // [#121] 〈大罪:怠惰〉: 本体と同じ位置 (物差しの直後・防御の前)
-            if (aCount > 0) dmg = CombatSystem.BossDown.ApplyTaken(dmg, s.enemyDown && !s.enemyDownWeak);   // ボスのダウン ×1.5: 本体と同じ位置 (怠惰の直後・ひびの弱いダウンは無し)
+            if (aCount > 0) dmg = ApplyFinalPct(dmg, s.finalPct + rung.FinalPct(s.solo, aCount, bCount, s.execBoost, s.shattered, s.undyingStreak + 1));   // 最終与ダメージ倍率 (武器の撃ごとの +% 込み): 本体と同じ位置 (物差しの直後・徒労の前)
+            if (aCount > 0) dmg = MetaProgression.MetaDebuffApplicator.ApplyOutgoingCut(dmg);   // 〈徒労〉: 本体と同じ位置 (物差しの直後・防御の前)
+            if (aCount > 0) dmg = CombatSystem.BossDown.ApplyTaken(dmg, s.enemyDown && !s.enemyDownWeak);   // ボスのダウン ×1.5: 本体と同じ位置 (徒労の直後・ひびの弱いダウンは無し)
             // 敵の防御 (このターンの値) で軽減
             if (aCount > 0 && eDefNow > 0)
                 dmg = CombatSystem.DefenseFormula.Apply(dmg, CombatSystem.DefenseFormula.Effective(eDefNow, myPen + ws.armorPen));
@@ -1045,7 +1045,9 @@ namespace AutoTest
             if (ws.takenMul < 1f && !tele.enemyAttackIgnoresGuard) taken = Mathf.RoundToInt(taken * ws.takenMul);
             taken += (int)reflectPenalty;
             // 【ジャスト防御】の見込み (本体 ShieldCore.IsJustGuard・許容幅は既定・HP の減り 0)。 盾〈黎明〉〈城壁〉が読む
-            bool jgNow = taken == 0 && CombatSystem.ShieldCore.IsJustGuard(enemyAtk, block + ws.shield + shieldKept, CombatSystem.ShieldCore.JustWidth);
+            bool jgNow = taken == 0 && CombatSystem.ShieldCore.IsJustGuard(enemyAtk, block + ws.shield + shieldKept, CombatSystem.ShieldCore.JustWidth + CombatSystem.CardRules.JustWidthAdd);
+            // 挑戦カード〈見切り〉: ジャスト防御の時の防御無視の反撃 (本体と同じく固定の量)
+            if (jgNow && CombatSystem.CardRules.JustCounter > 0) { effDmg += CombatSystem.CardRules.JustCounter; noAtkDmg += CombatSystem.CardRules.JustCounter; }
             // 盾〈黎明〉: 無傷で受け切ったら、 敵の攻撃 10 につき敵の最大 HP の 5% (ジャスト防御なら 8%) を削る
             if (rung.daybreak && taken == 0)
             {

@@ -58,6 +58,7 @@ namespace CombatSystem
         {
             if (spent <= 0) return 0;
             long d = (long)spent * ((f & PoisonItems.Magazine) != 0 ? MagazineMul : DetonateMul);
+            if (CardRules.DetonateMulTenths > 0) d += (long)spent * CardRules.DetonateMulTenths / 10;   // 挑戦カード〈毒仕込み〉: 倍率 +0.5 / +1.0 / +1.5 (切り捨て)
             if ((f & PoisonItems.SlowBlade) != 0 && before > 0) d = d * (100 + SlowBladePctPerDetonate * before) / 100;
             if ((f & PoisonItems.Oil) != 0 && down) d *= OilDownMul;
             return (int)System.Math.Min(int.MaxValue, d * powerPct / 100);

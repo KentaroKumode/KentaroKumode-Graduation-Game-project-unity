@@ -143,7 +143,6 @@ namespace CombatSystem
             _fleeRequested = true;
             return true;
         }
-        private bool wrathDiceOverrideArmed; // 恒久デバフ「憤怒」: 1T目のダイス最大化トリガー
         private int playerDiceCount;
         private int playerDiceMax;
         private int playerAttackPower = 2;            // #2 案A': 装備武器の素火力（勝利base = attackPower + floor(|差|/3)）
@@ -672,7 +671,7 @@ namespace CombatSystem
             //   プレイヤーの土台 = 初期値 + 武器 + 整備パネル〈装甲〉。 アイテムの def / pen は毎ターン OnPostRoll で乗る。
             if (ctx != null)
             {
-                ctx.enemyDefense = Math.Max(0, enemy.defense) + MetaProgression.MetaDebuffApplicator.GetEnemyDefenseBonus();   // 挑戦カード: 敵の防御 +N
+                ctx.enemyDefense = Math.Max(0, enemy.defense);
                 ctx.enemyArmorPen = GameLoop.GameHooks.EnemyArmorPen(enemy.id, enemy.armorPen);   // [測定] 差し替えの口 (既定 null = データの値)
                 ctx.playerDefenseBase = DefenseFormula.PlayerBaseDefense + _weaponDefense + MetaProgression.MetaBuffApplicator.GetArmorDefense()
                                       + MetaProgression.Relics.RelicApplicator.GetDefense();   // 遺物 (§15-5) 防御 +N
@@ -817,23 +816,26 @@ namespace CombatSystem
             MetaProgression.Achievements.AchievementService.NoteCombatStarted(enemy.id);
 
             
-            // 恒久デバフ「コルヴェンの憤怒」: ボス戦の戦闘開始時、現在HP半減（1T目のダイス最大化は OnRoll で処理）
+            // コルヴェンの憤怒 (挑戦カード IV・2026-11-22): ボス戦の戦闘開始時、 現在 HP −N% (1 は残る)。 そのターンの敵の攻撃 +N% は Escalation.GetMultiplier
             var runForWrath = GameLoop.GameManager.Instance?.Run;
             var nodeForWrath = MapSystem.MapManager.Instance?.CurrentNode;
-            wrathDiceOverrideArmed = false;
-            if (runForWrath != null && nodeForWrath != null
-                && nodeForWrath.type == MapSystem.TileType.Boss
-                && MetaProgression.MetaDebuffApplicator.HasSinWrath)   // 大罪:憤怒 (挑戦カード IV)
-            {
-                int oldHp = playerHP;
-                playerHP = Mathf.Max(1, playerHP / 2); // 割合計算が先
-                wrathDiceOverrideArmed = true;
-                if (Debug.unityLogger.logEnabled) Debug.Log($"[CombatManager] 恒久デバフ {MetaProgression.PermanentDebuffIds.Wrath}: HP {oldHp}→{playerHP}, 1T目ダイス最大化を予約");
-            }
+            if (runForWrath != null && nodeForWrath != null && nodeForWrath.type == MapSystem.TileType.Boss)
+                ApplyWrathHpCut("戦闘開始");
 
             if (Debug.unityLogger.logEnabled) Debug.Log($"[CombatManager] ===== COMBAT START: {enemy.displayName} =====");
             if (Debug.unityLogger.logEnabled) Debug.Log($"  Player HP: {playerHP}/{this.playerMaxHP}, Dice: {playerDiceCount}d{playerDiceMax}, Crit: {playerCritBaseRate * 100f:F1}%");
             if (Debug.unityLogger.logEnabled) Debug.Log($"  Enemy  HP: {enemyHP}/{enemy.maxHP}, Dice: {enemy.DiceNotation}, Threat: {enemy.threat}");
+        }
+
+        /// <summary>コルヴェンの憤怒 (挑戦カード IV): 現在 HP −N% (四捨五入・1 は残る)。 札が無ければ何もしない。 削ったら true。</summary>
+        private bool ApplyWrathHpCut(string when)
+        {
+            float pct = MetaProgression.MetaDebuffApplicator.GetWrathHpCutPct();
+            if (pct <= 0f || playerHP <= 1) return false;
+            int oldHp = playerHP;
+            playerHP = Mathf.Max(1, playerHP - Mathf.RoundToInt(playerHP * pct / 100f));
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[{MetaProgression.PermanentDebuffIds.Wrath}] {when}: HP {oldHp}→{playerHP}");
+            return true;
         }
 
         /// <summary>戦闘中にエネミーを差し替える（ヴェスカの 4 連戦で使用）。
@@ -923,7 +925,7 @@ namespace CombatSystem
                 ctx.enemyDiceMax = newEnemy.EffectiveRollMax;
                 ctx.enemyDiceTotalBonus = 0;
                 ctx.bossDiceBonus = 0; // swapで一旦クリア。新形態の OnBattleStart パッシブ(刹那等)が再設定する
-                ctx.enemyDefense = Math.Max(0, newEnemy.defense) + MetaProgression.MetaDebuffApplicator.GetEnemyDefenseBonus();   // 新形態の防御値を反映 (ADR-0013)・挑戦カードの防御 +N も全段に
+                ctx.enemyDefense = Math.Max(0, newEnemy.defense);   // 新形態の防御値を反映 (ADR-0013)
                 ReapplyTacticAcid(ctx);   // 戦術消耗品〈鎧割りの酸瓶〉は「この戦闘中」なので後の段にも
                 ctx.enemyArmorPen = GameLoop.GameHooks.EnemyArmorPen(newEnemy.id, newEnemy.armorPen);
                 // [計装] 出ていく段の実長を締める。 currentTurn は連戦で通算なので、
@@ -937,15 +939,8 @@ namespace CombatSystem
                 }
                 ctx.phaseStartTurn = ctx.currentTurn + 1;
                 Escalation.PhaseStartTurn = ctx.phaseStartTurn;
-                // 大罪:憤怒 (挑戦カード IV・2026-11-10): ボスの**各形態**の最初のターンも、 現在 HP 半減・自ダイスを全て最大
-                if (MetaProgression.MetaDebuffApplicator.HasSinWrath && CombatSystem.BossParams.IsBoss(newEnemy.id))
-                {
-                    int oldHp = playerHP;
-                    playerHP = Mathf.Max(1, playerHP / 2);
-                    ctx.playerCurrentHP = playerHP;
-                    wrathDiceOverrideArmed = true;
-                    if (Debug.unityLogger.logEnabled) Debug.Log($"[大罪:憤怒] 形態の交代: HP {oldHp}→{playerHP}, 次のターンのダイス最大化を予約");
-                }
+                // コルヴェンの憤怒 (挑戦カード IV): ボスの**各形態**の最初のターンも、 現在 HP −N%
+                if (CombatSystem.BossParams.IsBoss(newEnemy.id) && ApplyWrathHpCut("形態の交代")) ctx.playerCurrentHP = playerHP;
                 ctx.bossId = CombatSystem.BossParams.IsBoss(newEnemy.id) ? newEnemy.id : "";
                 ctx.lastDamageCause = ItemSystem.PassiveSkills.DeathCause.Normal; // 形態swapで死因タグをリセット (前形態の残留防止)
                 // (ADR-0011: 役は毎ターン自動で効き、 使用済みの管理を持たないので、 形態交代で戻すものは無い。)

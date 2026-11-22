@@ -437,28 +437,8 @@ namespace CombatSystem
                     CombatStats.PassiveUpkeepDue  += upkeep;
                 }
             }
-            // 挑戦カード〈蝕み〉: ターンの始めに、 最大 HP の N% の軽減できないダメージ (シールドは肩代わりする)。
-            //   刻限の死と同じく下の死亡判定・ラストスタンドを通す。
-            if (ctx != null && playerHP > 0)
-            {
-                float erode = MetaProgression.MetaDebuffApplicator.GetErodePct();
-                if (erode > 0f)
-                {
-                    int raw = Math.Max(1, Mathf.CeilToInt(playerMaxHP * erode / 100f));
-                    int absorbed = ctx.consShield > 0 ? ItemSystem.PassiveSkills.Keywords.Kw.AbsorbShield(ctx, raw, isAttack: false) : 0;
-                    int dmg = raw - absorbed;
-                    if (dmg > 0)
-                    {
-                        playerHP = Math.Max(0, playerHP - dmg);
-                        ctx.playerCurrentHP = playerHP;
-                        ctx.AddPlayerDamageSource(ItemSystem.PassiveSkills.DeathCause.Erosion, dmg);
-                        if (playerHP <= 0) ctx.lastDamageCause = ItemSystem.PassiveSkills.DeathCause.Erosion;
-                    }
-                    if (Debug.unityLogger.logEnabled) Debug.Log($"[蝕み] {raw} (シールド {absorbed} 肩代わり) → HP {playerHP}");
-                }
-            }
-            // T4-E〈最後の審判〉: ラン累計ターンの刻限。 **ターン開始時に清算する**。
-            ApplyFinalJudgment();
+            // ラン累計の戦闘ターンを数える (実績・記録。 旧〈最後の審判〉の刻限は 2026-11-22 に撤去)。
+            CountRunCombatTurn();
             // 刻限の死にもラストスタンドは効く。 ここを飛ばすと「ターン開始で死んだ時だけ
             //   蘇生しない」という、 死因でしか区別できない不整合になる。
             TryLastStandRevive(ctx);
@@ -507,11 +487,6 @@ namespace CombatSystem
             }
 
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnTurnStart);
-            // 挑戦カード: 毎ターン、 臨界のメーター +N (臨界の品が無い時は AddHeat が 0 にする)
-            {
-                int heat = MetaProgression.MetaBuffApplicator.GetHeatPerTurn();
-                if (heat > 0 && ctx != null) ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, heat, "挑戦カード(毎ターン)");
-            }
             SyncHPFromContext(ctx);
             ApplyGuardCycle(ctx);
 
@@ -528,25 +503,18 @@ namespace CombatSystem
                     if (Debug.unityLogger.logEnabled) Debug.Log($"[CombatManager] フロアデバフ: 敵HP+{heal} ({enemyHP}/{currentEnemy.maxHP})");
                 }
             }
-            // 挑戦カード〈再生〉: 敵が毎ターン最大 HP の N% を回復する / 〈敵のシールド〉: 最大 HP の N% までシールドを張り直す。
-            //   シールドはヴェスカと同じ池 (ApplyVescaDefense が吸わせる・予告に出る)。 ヴェスカは自分の半減と抽選の後にここで底上げされる。
+            // 挑戦カード〈再生〉: 敵が毎ターン最大 HP の N% を回復する。
             if (ctx != null && enemyHP > 0)
             {
                 int eMax = Math.Max(1, ctx.enemyMaxHP > 0 ? ctx.enemyMaxHP : currentEnemy.maxHP);
                 float regen = MetaProgression.MetaDebuffApplicator.GetEnemyRegenPct();
                 if (regen > 0f && enemyHP < eMax)
                 {
-                    int heal = ctx.WedgeEnemyGain(Math.Min(eMax - enemyHP, Math.Max(1, Mathf.CeilToInt(eMax * regen / 100f))));   // 〈血の楔〉(2026-11-20)
+                    int heal = ctx.WedgeEnemyGain(Math.Min(eMax - enemyHP, Math.Max(1, Mathf.RoundToInt(eMax * regen / 100f))));   // 〈血の楔〉(2026-11-20)・敵を強くする % は四捨五入 (2026-11-22)
                     enemyHP += heal;
                     ctx.enemyCurrentHP = enemyHP;
                     EnemyHpLedger.NoteHeal(heal); EnemyHpLedger.CtxOverwritten();   // [計装]
                     if (Debug.unityLogger.logEnabled) Debug.Log($"[再生] 敵HP+{heal} ({enemyHP}/{eMax})");
-                }
-                float esh = MetaProgression.MetaDebuffApplicator.GetEnemyShieldPct();
-                if (esh > 0f)
-                {
-                    int want = Math.Max(1, Mathf.CeilToInt(eMax * esh / 100f));
-                    if (ctx.vescaShield < want) { ctx.vescaShield = want; Debug.Log($"[敵のシールド] {want} まで張り直す"); }
                 }
             }
 
@@ -577,24 +545,7 @@ namespace CombatSystem
             int[] playerDice = RollDice(actualPlayerDiceCount, playerDiceMax, ctx.equippedDiceFaces, out playerFaceIdx);
             CombatStats.NoteFirstRoll(actualPlayerDiceCount, ctx, playerDice);
 
-            // 恒久デバフ〈コルヴェンの憤怒〉: ボス戦の 1 ターン目は自ダイスが全て最大値 (HP 半減は戦闘開始時に済ませてある)。
-            //   2026-11-09 まで予約の印 (wrathDiceOverrideArmed) だけ立って誰も読んでいなかった。 面ごと最大の面へ止める (パーツ効果も発火する)。
-            if (wrathDiceOverrideArmed)
-            {
-                wrathDiceOverrideArmed = false;
-                var faces = ctx?.equippedDiceFaces;
-                int top = -1;
-                if (faces != null) for (int f = 0; f < faces.Length; f++) if (top < 0 || faces[f] > faces[top]) top = f;
-                for (int i = 0; i < playerDice.Length; i++)
-                {
-                    playerDice[i] = top >= 0 ? faces[top] : playerDiceMax;
-                    if (playerFaceIdx != null && i < playerFaceIdx.Length) playerFaceIdx[i] = top;
-                }
-                if (Debug.unityLogger.logEnabled) Debug.Log($"[{MetaProgression.PermanentDebuffIds.Wrath}] 1T目: 自ダイスを全て最大値 {(top >= 0 ? faces[top] : playerDiceMax)} に");
-            }
-
-
-            // 大罪:怠惰 (挑戦カード IV・2026-11-10): 全部の出目 −N (下限 1)。 値を減らすだけで面は変えない (〈打ち直し〉の加算と同じ扱い)
+            // クェシナの怠惰 (挑戦カード IV): 全部の出目 −N (下限 1)。 値を減らすだけで面は変えない (〈打ち直し〉の加算と同じ扱い)
             {
                 int sloth = MetaProgression.MetaDebuffApplicator.GetSlothDicePenalty();
                 if (sloth > 0) for (int i = 0; i < playerDice.Length; i++) playerDice[i] = Math.Max(1, playerDice[i] - sloth);
@@ -794,25 +745,19 @@ namespace CombatSystem
             //   (旧い配線 ── 前ターンの配線の自動適用・1 つ装着の第 4 端子の接続制限 ── は 2026-11-11 に削除。 GAME.md §24)
             if (_deck == null) BeginTerminalDeck();
             TerminalOutcome term;
-            int goldAsk = 0;   // 挑戦カード〈金で殴る〉(#6): 払いたい金額 (人 = 画面 / BOT = 方策)。 払うのは下の「6. 解決」で、 攻撃するターンだけ
             {
                 var tenv = TerminalEnvNow(ctx, enemyAtkValue);
-                // 挑戦カード〈猫の手〉: 出目と予告が確定したここで、 1 組を先に挿す (人の画面・BOT の方策はこの 1 組を外せない)
-                ChooseCatPaw(playerDice, tele, tenv);
                 int[] slots = null, targets = null; bool[] keepMarks = null;
                 int reboot = ChargeCore.RebootNone; bool overclock = false;      // 充電のコアアクション (人 = 画面 / BOT = 方策・2026-11-21)
                 if (_interactiveTurn)
                 {
                     _pause.Set(TurnPauseKind.Wiring, playerDice, playerFaceIdx, tele);
                     _pause.board = _deck.board; _pause.terminalEnv = tenv; _pause.terminalState = _deck.state;
-                    _pause.catDie = _catDie; _pause.catSlot = _catSlot;
                     yield return _pause;
-                    slots = _pause.slots; targets = _pause.targets; goldAsk = _pause.goldSpend; keepMarks = _pause.keep; reboot = _pause.reboot; overclock = _pause.overclock;
+                    slots = _pause.slots; targets = _pause.targets; keepMarks = _pause.keep; reboot = _pause.reboot; overclock = _pause.overclock;
                 }
-                else if (WiringPolicy != null) { var plan = WiringPolicy(playerDice, tele); slots = plan.slots; targets = plan.targets; goldAsk = plan.goldSpend; keepMarks = plan.keep; reboot = plan.reboot ?? ChargeCore.RebootNone; overclock = plan.overclock; }
-                if (slots == null) slots = TerminalWiring.Auto(_deck.board, playerDice, tenv, _deck.state, _catDie, _catSlot);
-                // 猫の 1 組は答えに関わらず入れる (外した答え・同じ口に挿しすぎた答えは、 猫の組を残して直す)
-                if (_catDie >= 0) slots = TerminalWiring.WithPair(slots, playerDice.Length, _deck.board, _catDie, _catSlot);
+                else if (WiringPolicy != null) { var plan = WiringPolicy(playerDice, tele); slots = plan.slots; targets = plan.targets; keepMarks = plan.keep; reboot = plan.reboot ?? ChargeCore.RebootNone; overclock = plan.overclock; }
+                if (slots == null) slots = TerminalWiring.Auto(_deck.board, playerDice, tenv, _deck.state);
                 // 〈影写し〉〈火葬の剣〉〈有効活用〉の対象: 人 = 画面で選んだ端子 / BOT = 方策 / どちらも無ければ左端の候補
                 term = TerminalCards.Resolve(_deck.board, slots, playerDice, tenv, _deck.state, targets, logAttack: true, reboot: reboot, overclock: overclock);
                 _termWanted = (int[])slots.Clone();   // [計装 #106] 直す前の挿し方 (挿したが不発の数え)
@@ -1007,22 +952,6 @@ namespace CombatSystem
                 atkBase = 0;
                 hitBases.Clear();
                 ctx.pursuitDamage = 0;
-            }
-            // 挑戦カード〈金で殴る〉(#6): 攻撃するターンだけ、 払った金を攻撃+N にする (定義は ChallengeCards.GoldPunchAttack の 1 か所)。
-            //   攻撃+N の枠 (atkBase) へ足すので、 下の麻痺毒の減算・〈不完全な起動〉・会心・与ダメ% ・敵の防御は他の攻撃+N と同じに掛かる。
-            if (!skipAttack && goldAsk > 0 && MetaProgression.MetaBuffApplicator.HasGoldPunch())
-            {
-                var goldRun = GameLoop.GameManager.Instance?.Run;
-                int paid = goldRun != null ? Math.Min(goldAsk, Math.Max(0, goldRun.coins)) : 0;
-                int goldAtk = MetaProgression.ChallengeCards.GoldPunchAttack(paid);
-                if (paid > 0 && goldAtk > 0)
-                {
-                    goldRun.coins -= paid;
-                    hitBases[0] += goldAtk;   // 端子に紐づかない攻撃の加算なので最初の 1 撃へ (攻撃するターンは攻撃の端子が 1 枚以上ある)
-                    atkBase += goldAtk;
-                    GoldPunchPaidTotal += paid; GoldPunchTurnsTotal++;   // [計装]
-                    if (Debug.unityLogger.logEnabled) Debug.Log($"[金で殴る] {paid}G を払って攻撃 +{goldAtk} (残り {goldRun.coins}G)");
-                }
             }
             // 7層ヴェスカ〈麻痺毒の小瓶〉・敵〈罠師〉〈呪縛〉: このターンのプレイヤー攻撃力を減算 (0 で床)。
             // 武器 attackPower は LEG でも 4〜8 なので実効は「武器素火力を消す」。 配線出目の分は残る。
@@ -1675,7 +1604,16 @@ namespace CombatSystem
             ctx.accumulatedValues[ItemSystem.PassiveSkills.Effects.MutualKeys.HpLossFromEnemy] = takenApplied;
             // 【ジャスト防御】(2026-11-21・ShieldCore): 1 体目の攻撃 E > 0・敵の攻撃で HP を 1 も失っていない・E ≤ ブロック + シールド ≤ E + 許容幅
             if (takenApplied <= 0 && _deck != null && ShieldCore.IsJustGuard(jgAttack, jgGuard, ShieldCore.Width(_deck.state.shieldItems)))
+            {
                 ItemSystem.PassiveSkills.Effects.Shd.NoteJustGuard(ctx, jgAttack, jgGuard);
+                // 挑戦カード〈見切り〉: ジャスト防御の時、 敵へ防御無視の反撃 N (固定ダメージ・最終与ダメ倍率とダウンの倍率は HP を減らす口が掛ける)
+                if (CardRules.JustCounter > 0 && enemyHP > 0)
+                {
+                    HpLossDiag.Lose(ref enemyHP, CardRules.JustCounter, "見切り");
+                    ctx.enemyCurrentHP = enemyHP;
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[見切り] ジャスト防御 → 反撃 {CardRules.JustCounter} (敵 HP {enemyHP})");
+                }
+            }
             BossDownDiag.NoteEnemyTurn(diagHeavyKind, takenApplied);   // [診断 2026-11-14] 大技 / 小技のターンの被ダメ (防御・シールドの後)
             FightEndDiag.NoteEnemyTurn(diagHeavyKind, primaryAttacked, takenApplied);   // [計装 2026-11-18] 戦闘の終わりの診断 (読むだけ)
             if ((diagHeavyKind == 0 || diagHeavyKind == 2) && primaryAttacked)   // [計装 2026-11-14] 大技の被ダメ (実際に撃った大技 / 小技のターン)

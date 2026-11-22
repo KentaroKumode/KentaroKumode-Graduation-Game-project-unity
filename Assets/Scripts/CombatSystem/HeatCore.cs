@@ -125,7 +125,7 @@ namespace CombatSystem
         /// 基礎 30 + 〈二度詰めの雷管〉+ 〈天工開物〉+ 〈溢れ取りの鋳型〉→ 超臨界 → 〈火花読みの眼鏡〉→ 〈燧石の指輪〉→ 〈八日目の灰燼〉→ 〈柱折りの発破筒〉(切り捨て)。</summary>
         public static int Damage(in State s, in Burst b)
         {
-            long d = BurstBase + s.stack + s.flat + (Has(s.items, HeatItems.Mold) ? MoldPerExcess * b.excess : 0);
+            long d = BurstBase + CardRules.BurstBaseAdd + s.stack + s.flat + (Has(s.items, HeatItems.Mold) ? MoldPerExcess * b.excess : 0);   // 挑戦カード〈予熱〉III: 基礎 +10
             if (b.super) d = d * (Has(s.items, HeatItems.Kiln) ? KilnSuperMulPct : SuperMulPct) / 100;
             if (Has(s.items, HeatItems.Spark)) d = d * (100 + SparkPctPerBurst * s.burstsTotal) / 100;
             if (Has(s.items, HeatItems.Flint) && s.doubled) d = d * (100 + FlintPctPerBurst * (s.burstsTurn - 1)) / 100;
@@ -136,7 +136,7 @@ namespace CombatSystem
 
         /// <summary>爆発のダメージを敵の防御に通す (防御の <see cref="DefensePenPct"/>% を無視・〈火花読みの眼鏡〉は全部無視)。</summary>
         public static int VsDefense(int dmg, int enemyDefense, HeatItems f)
-            => Has(f, HeatItems.Spark) ? dmg : DefenseFormula.Apply(dmg, enemyDefense - enemyDefense * DefensePenPct / 100);
+            => Has(f, HeatItems.Spark) ? dmg : DefenseFormula.Apply(dmg, enemyDefense - enemyDefense * System.Math.Min(100, DefensePenPct + CardRules.BurstPenAddPct) / 100);   // 挑戦カード〈予熱〉: 無視 +N% (100% まで)
 
         /// <summary>Resolve の 5g (全部の発動・再起動が決まった後)。 配線で決まる臨界 (<see cref="TerminalOutcome.heatGains"/>・1 つが 1 回の「臨界を得る」)・
         /// 〈燻りの革胸当て〉のブロック・〈燧石の指輪〉の倍 (<see cref="TerminalOutcome.heatDouble"/>) を書く (本体・画面の見込み・BOT が同じ)。</summary>

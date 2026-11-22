@@ -49,31 +49,34 @@ namespace AutoTest
             GameHooks.OnCritRateResolved = CritRateCensus.Note;
         }
 
-        /// <summary>挑戦カードの 2 枚から、 バフが自分の軸 (品の数が一番多い軸) に合う方を取る (2026-11-09)。
-        /// 軸の札は「その軸の品の数」、 汎用の札は 1 で比べ、 同点は先頭。 デバフは見ない (方策は最小限・比べるための基準)。</summary>
+        /// <summary>挑戦カードの 2 枚から、 裏のバフが自分の軸 (品の数が一番多い軸) に合う方を取る (2026-11-09・裏の軸は Card.axis・2026-11-22)。
+        /// 軸の札は「その軸の品の数」、 汎用の札は 1 で比べ、 同点は先頭。 表は見ない (方策は最小限・比べるための基準)。
+        /// <para>七つの大罪 (裏なし・難易度 10 の 4→5): ムシュファの強欲だけ所持金と消耗品を見る ── 失う物が少ない
+        /// (所持金 <see cref="GreedCheapCoins"/>G 以下・消耗品 1 個以下) なら強欲を取り、 多ければ避ける。 ほかの 6 柱は同点 (先頭)。</para></summary>
         public static int ChooseChallengeByAxis(System.Collections.Generic.IReadOnlyList<string> offer)
         {
             var run = GameManager.Instance?.Run;
             int best = 0; float bestScore = float.MinValue;
             for (int i = 0; i < offer.Count; i++)
             {
-                MetaProgression.ChallengeCards.Split(offer[i], out _, out var buf);
-                string axis = buf == null ? null : buf.kind switch
+                MetaProgression.ChallengeCards.Split(offer[i], out var deb, out var buf);
+                float score;
+                if (buf == null && deb != null && MetaProgression.ChallengeCards.IsSin(deb.kind))
+                    score = deb.kind != MetaProgression.ChallengeCards.SinGreed ? 1f
+                          : (run?.coins ?? 0) <= GreedCheapCoins && (run?.ownedConsumables?.Count ?? 0) <= 1 ? 2f : 0f;
+                else
                 {
-                    MetaProgression.ChallengeCards.Poison => ItemSystem.PassiveSkills.AxisRules.Poison,
-                    MetaProgression.ChallengeCards.Bleed => ItemSystem.PassiveSkills.AxisRules.Bleed,
-                    MetaProgression.ChallengeCards.Heat => ItemSystem.PassiveSkills.AxisRules.Heat,
-                    MetaProgression.ChallengeCards.Charge => ItemSystem.PassiveSkills.AxisRules.Charge,
-                    MetaProgression.ChallengeCards.Shield => ItemSystem.PassiveSkills.AxisRules.Shield,
-                    MetaProgression.ChallengeCards.Crit => ItemSystem.PassiveSkills.AxisRules.Crit,
-                    _ => null,
-                };
-                float score = axis != null ? ItemSystem.PassiveSkills.AxisRules.Count(run, axis) : 1f;
-                if (InFocus(axis)) score += 1000f;   // [2026-11-10] 軸に寄せる方策
+                    string axis = buf?.axis;
+                    score = axis != null ? ItemSystem.PassiveSkills.AxisRules.Count(run, axis) : 1f;
+                    if (InFocus(axis)) score += 1000f;   // [2026-11-10] 軸に寄せる方策
+                }
                 if (score > bestScore) { bestScore = score; best = i; }
             }
             return best;
         }
+
+        /// <summary>BOT がムシュファの強欲を「安い」と見る所持金 (G・仮)。</summary>
+        public const int GreedCheapCoins = 60;
 
         public static void Uninstall()
         {

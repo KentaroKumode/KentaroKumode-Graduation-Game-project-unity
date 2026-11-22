@@ -418,7 +418,8 @@ namespace UI.Game2D
                 {
                     MetaProgression.ChallengeCards.Split(run.challengePicks[i], out var deb, out var buf);
                     int tier = deb?.tier ?? buf?.tier ?? 1;
-                    d.Items.Add(new ModalItem { challengeTier = Mathf.Clamp(tier, 1, 4), deb = MetaProgression.ChallengeCards.Text(deb), buf = MetaProgression.ChallengeCards.Text(buf) });
+                    if (deb == null && buf == null) continue;   // 廃止したカードの古いセーブ (知らない id) は出さない
+                    d.Items.Add(Game2DPhaseScreens.SinOrCardItem(Mathf.Clamp(tier, 1, 4), deb, buf));
                 }
                 d.footer = "受けている挑戦カード " + run.challengePicks.Count + " 枚 (同じ種類はランで 1 度だけ)";
             }

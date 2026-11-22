@@ -159,7 +159,7 @@ namespace UI.Game2D
                 int die = HandUp ? DieAt(d) : -1;
                 if (die >= 0)
                 {
-                    if (sim.CanOperate && !sim.IsCatLocked(die)) { _pressDie = die; _pressDot = d; _moved = false; }
+                    if (sim.CanOperate) { _pressDie = die; _pressDot = d; _moved = false; }
                     else Game2DSfx.Play("ui_click");
                     return;
                 }
@@ -431,7 +431,7 @@ namespace UI.Game2D
             else if (s.guardIn == 1 && s.heavyIn == 1) { parts.Add("次 構え・大技"); hot = true; }
             else if (s.heavyIn == 1) { parts.Add("次 大技"); hot = true; }
             else if (s.guardIn == 1) parts.Add("次 構え");
-            if (s.down && !s.downWeak) { parts.Add("被ダメ×" + BossDown.TakenMul.ToString("0.0")); hot = true; }
+            if (s.down && !s.downWeak) { parts.Add("被ダメ×" + BossDown.TakenMulCard.ToString("0.0#")); hot = true; }
             else if (s.crackBreakTurn >= 0) { parts.Add(s.crackBreakTurn <= s.turn ? "ひび このターンで割れる" : "ひび あと" + (s.crackBreakTurn - s.turn + 1) + "ターン"); hot = true; }
             else if (s.downNotchHp >= 0 && s.downCracks != null && s.downBroken < s.downCracks.Length && s.downCracks[s.downBroken] >= 0) { parts.Add("ひび 通常攻撃で割れる"); hot = true; }
             if (parts.Count > 0)
@@ -693,7 +693,6 @@ namespace UI.Game2D
                     if (!sim.Rolling(i)) DrawDie(sr.x + 1, sr.y + 1, sim.pd[i], plugged && !fires ? 0.6f : 1f);      // 挿したが発動しない = 暗く
                     else DrawRolling(i, sr.x + 1, sr.y + 1);
                     if (sim.IsRoleDie(i)) Frame1(sr.x, sr.y, sr.width, sr.height, Game2DKit.Gold);
-                    if (sim.IsCatLocked(i)) Frame1(sr.x, sr.y, sr.width, sr.height, Amber);
                     k2++;
                 }
                 else if (q == 0 && !string.IsNullOrEmpty(d.condLabel)) Txt(d.condLabel, sr.x + 2, sr.y + 4, dim ? Half(kc) : kc, false);
@@ -734,7 +733,6 @@ namespace UI.Game2D
                 else if (!s.rolled && s.phase != Game2DBattleSim.P.PRoll) { if (rim) { Rect(x - 1, y - 1, 20, 20, Edge); Rect(x + 1, y + 1, 19, 19, Edge); } Box(x, y, 18, 18, Game2DKit.Ivory, Edge); TxtC("?", x + 9, y + 3, Edge, false); }
                 else { if (rim) DieRim(Game2DDiceRoll.FaceImg(s.pd[i]), Game2DDiceRoll.Face, Game2DDiceRoll.Face, x, y, false); DrawDie(x, y, s.pd[i]); }
                 if (s.IsRoleDie(i)) Frame1(x - 1, y - 1, 20, 20, Game2DKit.Gold);
-                if (s.IsCatLocked(i)) Frame1(x - 1, y - 1, 20, 20, Amber);
                 if (_hoverCard < 0 && _hasMouse && In(_mouse, new RectInt(x, y, 18, 18)) && s.CanOperate) Frame1(x - 1, y - 1, 20, 20, Bone);
             }
             // 役 (仮): 床の出目の上に名前 (出目は金の縁)

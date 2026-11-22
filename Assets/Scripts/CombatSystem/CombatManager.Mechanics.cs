@@ -162,7 +162,8 @@ namespace CombatSystem
         {
             if (DiePassives.FreeRerollByDie(GameLoop.GameManager.Instance?.Run)) return 0;      // 賭場の賽 (ADR-0015): 充電は払わない (代わりに HP を払う・RerollPhase)
             int cost = EventSystem.TimedEffects.TimedDebuffRule.RerollCost(diceCount, nth, free,
-                EventSystem.TimedEffects.TimedDebuffRule.RerollSurcharge(GameLoop.GameManager.Instance?.Run?.timedDebuffs));
+                EventSystem.TimedEffects.TimedDebuffRule.RerollSurcharge(GameLoop.GameManager.Instance?.Run?.timedDebuffs)
+                + MetaProgression.MetaDebuffApplicator.GetRerollSurcharge());   // 挑戦カード〈重い賽〉+N (無料の振り直しには足さない)
             var ctx = PassiveSkillManager.Instance?.Context;
             return ctx != null ? ctx.ChargeCostNow(cost) : cost;   // 〈過負荷チューナー〉: 過充電の間 −1 (最低 1・2026-11-20)
         }
@@ -378,17 +379,13 @@ namespace CombatSystem
             }
         }
 
-        /// <summary>〈最後の審判〉のラン累計戦闘ターンを進める。 刻限後の罰は敵の攻撃の上乗せ (MetaDebuffApplicator.GetEnemyAttackPct)。</summary>
-        private void ApplyFinalJudgment()
+        /// <summary>ラン累計の戦闘ターンを進める (ファーム層は数えない・実績と記録が読む)。 旧〈最後の審判〉の刻限は 2026-11-22 に撤去。</summary>
+        private void CountRunCombatTurn()
         {
             var run = GameLoop.GameManager.Instance?.Run;
             if (run == null) return;
-            // 〈最後の審判〉はファーム層のターンを数えない
             if (run.Depth == MapSystem.FreeMove.FloorPlan.FarmFloor) return;
             run.totalCombatTurns++;
-            int th = MetaProgression.MetaDebuffApplicator.GetJudgmentTurnThreshold();
-            if (th > 0 && run.totalCombatTurns == th)
-                if (Debug.unityLogger.logEnabled) Debug.Log($"[最後の審判] 刻限到来 (累計{run.totalCombatTurns}T >= {th}) → 以後の敵の攻撃 +%");
         }
 
         // 役の判定で使う一時バッファ。 毎ターン new すると GC を踏むので使い回す。

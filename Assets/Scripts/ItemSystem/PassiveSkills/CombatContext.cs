@@ -711,9 +711,10 @@ namespace ItemSystem.PassiveSkills
                     if (shieldGainPct > 0) value += (value - _consShield) * shieldGainPct / 100;   // 〈二拍目の心臓〉: この戦闘のシールドの獲得量 ×1.5
                     float sg = MetaProgression.Relics.RelicApplicator.GetShieldGainPct();
                     if (sg > 0f) value += (int)((value - _consShield) * sg);
-                    // 大罪:傲慢 (挑戦カード IV): シールドの獲得 −N% (切り捨てた分を捨てる)
-                    if (MetaProgression.MetaDebuffApplicator.GetSinBlockCutPct() > 0f)
-                        value = _consShield + (int)((value - _consShield) * (1f - MetaProgression.ChallengeCards.SinPrideShieldCutPct / 100f));
+                    // カイロスの傲慢 (挑戦カード IV): シールドの獲得 −N% (四捨五入・デバフの丸め)
+                    float prideCut = MetaProgression.MetaDebuffApplicator.GetSinShieldCutPct();
+                    if (prideCut > 0f)
+                        value = _consShield + UnityEngine.Mathf.RoundToInt((value - _consShield) * (1f - prideCut / 100f));
                     // [計装 2026-11-12・#95] 呼び出し側は頼んだ量だけを shieldGainedTotal へ足すので、 遺物の上乗せと傲慢の削りの差をここで足す
                     //   (遺物なし・傲慢なしでは 0 ── 学習の条件では記録が変わらない)。
                     shieldGainedTotal += value - asked;
@@ -952,9 +953,6 @@ namespace ItemSystem.PassiveSkills
                 {
                     int now = dict.TryGetValue(def.id, out int nowStacks) ? nowStacks : stacks;
                     int keep = def.target == StatusTarget.Enemy ? EffectivePoisonKeepPct : 50;   // 〈瘴気〉の②は敵の毒だけ
-                    // 挑戦カード: 敵の毒が半減で減る量を N% 減らす (残る割合の足し算でなく減る量に掛けるので 100% を超えない)
-                    float cut = def.target == StatusTarget.Enemy ? MetaProgression.MetaBuffApplicator.GetPoisonDecayCut() : 0f;
-                    if (cut > 0f) keep = 100 - (int)((100 - keep) * (1f - cut));
                     dict[def.id] = now * keep / 100;
                 }
                 else dict[def.id] = System.Math.Max(0, stacks - decay);
@@ -1134,9 +1132,6 @@ namespace ItemSystem.PassiveSkills
                 int relicKeep = MetaProgression.Relics.RelicApplicator.GetShieldKeepBonus();
                 int keepPct = System.Math.Min(80, 50 + shieldKeepBonusPct + MetaProgression.MetaBuffApplicator.GetShieldKeepBonusPct());
                 if (relicKeep > 0) keepPct = System.Math.Min(90, keepPct + relicKeep);
-                // 挑戦カード: 減衰で減る量を N% 減らす (減る量に掛けるので 100% を超えない)
-                float shCut = MetaProgression.MetaBuffApplicator.GetShieldDecayCut();
-                if (shCut > 0f) keepPct = 100 - (int)((100 - keepPct) * (1f - shCut));
                 int lost = _consShield - _consShield * keepPct / 100;
                 _consShield -= lost;
                 Keywords.Kw.Raise(this, PassiveSkillTrigger.OnShieldDecay, lost);

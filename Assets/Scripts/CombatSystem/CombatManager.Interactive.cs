@@ -33,9 +33,6 @@ namespace CombatSystem
         public TerminalEnv terminalEnv;
         /// <summary>端子の戦闘中の状態 (溜まり・連続)。 見積もりは Clone した写しに掛けること。</summary>
         public TerminalBattleState terminalState;
-        /// <summary>挑戦カード〈猫の手〉が先に挿した 1 組 (出目の添字 → 場の添字)。 配線の判断の時だけ入る・−1 = 無し。
-        /// 答えの挿し方にこの組が無くても、 本体が入れ直す (画面はこの組を外せないように見せる)。</summary>
-        public int catDie = -1, catSlot = -1;
 
         // ===== 答え (CombatManager が読む) =====
         internal bool reroll;
@@ -44,8 +41,6 @@ namespace CombatSystem
         internal int[] slots;
         /// <summary>〈影写し〉〈火葬の剣〉〈有効活用〉の対象 (添字 = その端子の場の位置・値 = 対象の場の位置・−1 = 選ばない)。 null あり。</summary>
         internal int[] targets;
-        /// <summary>挑戦カード〈金で殴る〉(#6) で払う金額 (G)。 0 = 払わない。 画面はまだこの答えを出さない (#6 の残り)。</summary>
-        internal int goldSpend;
         /// <summary>手札の規則 Pick: 次のターンも手札に残す印 (添字 = 場の位置)。 null = 何も残さない。</summary>
         internal bool[] keep;
         /// <summary>〈二股の導線〉【再起動】の対象 (場の添字・<see cref="ChargeCore.RebootNone"/> = しない) / 〈雷鳴の太鼓〉【オーバークロック】を使う。</summary>
@@ -55,9 +50,8 @@ namespace CombatSystem
         internal void Set(TurnPauseKind k, int[] dice, int[] faceIdx, MutualTurnTelegraph t)
         {
             kind = k; playerDice = dice; playerFaceIdx = faceIdx; tele = t;
-            rerollCost = 0; reroll = false; rerollKeep = -1; slots = null; targets = null; goldSpend = 0; keep = null; board = null; terminalEnv = default; terminalState = null;
+            rerollCost = 0; reroll = false; rerollKeep = -1; slots = null; targets = null; keep = null; board = null; terminalEnv = default; terminalState = null;
             reboot = ChargeCore.RebootNone; overclock = false;
-            catDie = catSlot = -1;
         }
     }
 
@@ -106,13 +100,12 @@ namespace CombatSystem
 
         /// <summary>端子の山札 (ADR-0014) の配線に答える。 出目ごとの挿し先 (場の端子の添字・−1 = 挿さない)。 規則に合わない挿し方は挿さなかった扱いになる。
         /// targets = 〈影写し〉〈火葬の剣〉〈有効活用〉の対象 (添字 = その端子の場の位置・値 = 対象の場の位置)。 null / −1 / 候補でない対象は左端の候補。
-        /// goldSpend = 挑戦カード〈金で殴る〉で払う金額 (G・攻撃するターンだけ所持金まで払う・札が無ければ無視)。</summary>
         /// keep = 手札の規則 Pick の、 次のターンも手札に残す印 (添字 = 場の位置・null = 何も残さない)。 BOT の WiringPlan.keep と同じ口。
-        /// reboot / overclock = 充電のコアアクション (〈二股の導線〉の再起動の対象・〈雷鳴の太鼓〉のオーバークロック・品が無ければ無視)。
-        public void AnswerWiringSlots(int[] slots, int[] targets = null, int goldSpend = 0, bool[] keep = null, int reboot = ChargeCore.RebootNone, bool overclock = false)
+        /// reboot / overclock = 充電のコアアクション (〈二股の導線〉の再起動の対象・〈雷鳴の太鼓〉のオーバークロック・品が無ければ無視)。</summary>
+        public void AnswerWiringSlots(int[] slots, int[] targets = null, bool[] keep = null, int reboot = ChargeCore.RebootNone, bool overclock = false)
         {
             if (_activeTurn == null || _pause.kind != TurnPauseKind.Wiring) return;
-            _pause.slots = slots; _pause.targets = targets; _pause.goldSpend = goldSpend; _pause.keep = keep; _pause.reboot = reboot; _pause.overclock = overclock;
+            _pause.slots = slots; _pause.targets = targets; _pause.keep = keep; _pause.reboot = reboot; _pause.overclock = overclock;
             Advance();
         }
 

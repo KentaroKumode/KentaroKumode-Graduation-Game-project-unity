@@ -28,8 +28,6 @@ namespace CombatSystem
         public int[] slots;
         /// <summary>端子の山札: 〈影写し〉〈火葬の剣〉〈有効活用〉の対象 (添字 = その端子の場の位置・値 = 対象の場の位置・−1 = 選ばない)。 null = 左端の候補。</summary>
         public int[] targets;
-        /// <summary>挑戦カード〈金で殴る〉(#6): このターンに払う金額 (G)。 攻撃するターンだけ所持金まで払う (<see cref="MetaProgression.ChallengeCards.GoldPunchAttack"/>)。 0 = 払わない。</summary>
-        public int goldSpend;
         /// <summary>手札の規則 Pick (2026-11-13): 次のターンも手札に残す印 (添字 = 場の位置)。 残せるのは挿さなかった手札の端子だけ (本体が KeepFromMarks で直す)。 null = 何も残さない。</summary>
         public bool[] keep;
         /// <summary>〈二股の導線〉【再起動】の対象 (場の添字・<see cref="ChargeCore.RebootAuto"/> = おまかせ)。 null = 再起動しない。</summary>
@@ -38,7 +36,7 @@ namespace CombatSystem
         public bool overclock;
 
         public static WiringPlan Of(DiceTerminal[] main) => new WiringPlan { main = main };
-        public static WiringPlan OfSlots(int[] slots, int[] targets = null, int goldSpend = 0, bool[] keep = null) => new WiringPlan { slots = slots, targets = targets, goldSpend = goldSpend, keep = keep };
+        public static WiringPlan OfSlots(int[] slots, int[] targets = null, bool[] keep = null) => new WiringPlan { slots = slots, targets = targets, keep = keep };
     }
 
     /// <summary>

@@ -196,9 +196,8 @@ namespace MetaProgression
         //  与ダメ% (出力トラック 0..50)
         // ============================================================
 
-        /// <summary>与ダメ % (池に足す): 基礎整備 5 段目 + 挑戦カード。</summary>
-        public static int GetOutgoingDamagePct()
-            => MetaPanel.BaseDamagePct(Tier) + (int)ChallengeCards.Value(ChallengeCards.Output);   // 挑戦カード: 与ダメ +N%
+        /// <summary>与ダメ % (池に足す): 基礎整備 5 段目。 (挑戦カード〈与ダメ +N%〉は 2026-11-22 に撤去)</summary>
+        public static int GetOutgoingDamagePct() => MetaPanel.BaseDamagePct(Tier);
 
         /// <summary>〈戦意〉が挿さっているか。</summary>
         public static bool IsBattleSpiritUnlocked() => Has(MetaModule.BattleSpirit);
@@ -272,38 +271,29 @@ namespace MetaProgression
         public static int GetEliteSlayerPct()
             => Has(MetaModule.Valor) && MetaPanel.SlayerEnabled ? MetaPanel.ValorEliteSlayerPct : 0;
 
-        /// <summary>会心率の加算 (%)。 挑戦カードの会心率 +N% だけ (小数で足す)。
+        /// <summary>会心率の加算 (%)。 挑戦カード〈急所読み〉の会心率 +N% だけ (小数で足す)。
         /// (旧: 精密トラックの段あたり会心率 MetaPanel.PrecisionCritRatePct を足していたが、 2026-09-10 の撤去で常に 0f だった。
         ///  0f + x は x と同じ値なので 2026-11-12 に外した)</summary>
         public static float GetCritRatePctBonus()
             => ChallengeCards.Value(ChallengeCards.Crit) / 100f;
 
-        /// <summary>攻撃端子調律 + 挑戦カード: 攻撃の端子に挿した出目 1 個あたりの加算。 呼び出し側で個数を掛けること。</summary>
-        public static int GetAttackTerminalPerDice()
-            => (Has(MetaModule.AttackTune) ? MetaPanel.TerminalTunePerDie : 0) + (int)ChallengeCards.Value(ChallengeCards.TermAtk);
+        /// <summary>攻撃端子調律: 攻撃の端子に挿した出目 1 個あたりの加算。 呼び出し側で個数を掛けること。 (挑戦カードの端子の札は 2026-11-22 に撤去)</summary>
+        public static int GetAttackTerminalPerDice() => Has(MetaModule.AttackTune) ? MetaPanel.TerminalTunePerDie : 0;
 
-        /// <summary>防御端子調律 + 挑戦カード: 防御の端子に挿した出目 1 個あたりの加算。 呼び出し側で個数を掛けること。</summary>
-        public static int GetBlockTerminalPerDice()
-            => (Has(MetaModule.BlockTune) ? MetaPanel.TerminalTunePerDie : 0) + (int)ChallengeCards.Value(ChallengeCards.TermBlk);
+        /// <summary>防御端子調律: 防御の端子に挿した出目 1 個あたりの加算。 呼び出し側で個数を掛けること。</summary>
+        public static int GetBlockTerminalPerDice() => Has(MetaModule.BlockTune) ? MetaPanel.TerminalTunePerDie : 0;
 
         /// <summary>〈軸引きの手形〉: 店の軸指定リロールの追加から引く額。
         /// <b>未接続</b> ── 追加の額は ShopManager.AxisRerollSurchargeFor が決めるが、 ShopManager は並行作業 (8 軸化) の区域なので Stage D では触っていない。
         /// 接続は AxisRerollSurchargeFor の式から <c>MetaBuffApplicator.GetAxisRerollDiscount()</c> を引く 1 か所 (下限 0)。</summary>
-        public static int GetAxisRerollDiscount() => Has(MetaModule.AxisTicket) ? MetaPanel.AxisTicketDiscount : 0;
+        public static int GetAxisRerollDiscount()
+            => (Has(MetaModule.AxisTicket) ? MetaPanel.AxisTicketDiscount : 0) + (int)ChallengeCards.Value(ChallengeCards.Regular);   // 挑戦カード〈顔なじみ〉(III は 999 = 無料・下限 0 は呼び手)
 
         /// <summary>〈戦術の懐刀〉: ラン開始時にランダムな戦術消耗品を 1 個持つ (付与は GameManager のラン開始)。</summary>
         public static bool HasTacticKnife() => Has(MetaModule.TacticKnife);
 
         /// <summary>〈圧縮の心得〉: 店での 1 回目の端子の削除が無料 (GameManager.TerminalRemovePrice)。</summary>
         public static bool IsFirstShopRemovalFree() => Has(MetaModule.Compression);
-
-        /// <summary>挑戦カード〈猫の手〉: 毎ターン、 猫が 1 組を先に挿す確率 (0..1)。 札を受けていなければ 0。 読むのは CombatManager.ChooseCatPaw。</summary>
-        public static float GetCatPawChance()
-            => System.Math.Max(0f, System.Math.Min(1f, ChallengeCards.Value(ChallengeCards.Cat) / 100f));
-
-        /// <summary>挑戦カード〈金で殴る〉(#6) を受けているか (払う金額を決める判断が要るか)。 効果の量は <see cref="ChallengeCards.GoldPunchAttack"/>。</summary>
-        public static bool HasGoldPunch()
-            => ChallengeCards.Value(ChallengeCards.GoldPunch) > 0f;
 
         // === 種火 (軸の宣言・枠に 1 つ) ===
 
@@ -315,12 +305,11 @@ namespace MetaProgression
         }
 
         /// <summary>種火・充電: 充電上限 +N。 CombatManager.ChargeMax + この値。</summary>
-        public static int GetChargeCapBonus()
-            => (Has(MetaModule.SparkCharge) ? MetaPanel.ChargeCapBonus : 0) + (int)ChallengeCards.Value(ChallengeCards.Charge);
+        public static int GetChargeCapBonus() => Has(MetaModule.SparkCharge) ? MetaPanel.ChargeCapBonus : 0;
 
-        /// <summary>種火・充電: 戦闘開始時に得る充電。</summary>
+        /// <summary>種火・充電 + 挑戦カード〈予備電源〉: 戦闘開始時に得る充電。</summary>
         public static int GetChargeOpening()
-            => (Has(MetaModule.SparkCharge) ? MetaPanel.ChargeOpening : 0) + ChallengeCards.ChargeOpening(ChallengeCards.Held(ChallengeCards.Charge)?.tier ?? 0);
+            => (Has(MetaModule.SparkCharge) ? MetaPanel.ChargeOpening : 0) + (int)ChallengeCards.Value(ChallengeCards.Charge);
 
         /// <summary>種火・臨界: 戦闘終了時にメーターの何割を次戦闘へ持ち越すか (0 or 0.5)。</summary>
         public static float GetRinkaiCarryoverRatio() => Has(MetaModule.SparkRinkai) ? MetaPanel.RinkaiCarryoverRatio : 0f;
@@ -332,20 +321,12 @@ namespace MetaProgression
         public static int GetSparkDeckOpeningDraw() => Has(MetaModule.SparkDeck) ? MetaPanel.DeckOpeningDraw : 0;
 
         /// <summary>種火・役 (2026-11-21): 各戦闘で、 最初から数えて無料になる振り直しの回数 (CombatManager.FreeRerollsLeft)。</summary>
-        public static int GetSparkRoleFreeRerolls() => Has(MetaModule.SparkRole) ? MetaPanel.RoleFreeRerolls : 0;
+        public static int GetSparkRoleFreeRerolls()
+            => (Has(MetaModule.SparkRole) ? MetaPanel.RoleFreeRerolls : 0) + (int)ChallengeCards.Value(ChallengeCards.Role);   // 挑戦カード〈手馴染み〉も同じ数え方 (各戦闘の最初から)
 
         /// <summary>種火・出血: 敵の出血が閾値以上で敵攻撃値 −N。 CombatManager 予告後・敵攻撃前で減算。</summary>
         public static int GetBleedWeakenAttack(int enemyBleedStacks)
-            => (Has(MetaModule.SparkBleed) && enemyBleedStacks >= MetaPanel.BleedWeakenThreshold ? MetaPanel.BleedWeakenAmount : 0)
-               + System.Math.Min((int)ChallengeCards.Value(ChallengeCards.Bleed), enemyBleedStacks / 2);   // 挑戦カード: 出血 2 につき −1 (最大はカードの値)
+            => Has(MetaModule.SparkBleed) && enemyBleedStacks >= MetaPanel.BleedWeakenThreshold ? MetaPanel.BleedWeakenAmount : 0;
 
-        /// <summary>挑戦カード: 毎ターン足す臨界のメーター。</summary>
-        public static int GetHeatPerTurn() => (int)ChallengeCards.Value(ChallengeCards.Heat);
-        /// <summary>挑戦カード: 戦闘に勝つたびの追加ゴールド。</summary>
-        public static int GetWinGoldBonus() => (int)ChallengeCards.Value(ChallengeCards.WinGold);
-        /// <summary>挑戦カード: 毒の半減で減る量を減らす割合 (0..1)。</summary>
-        public static float GetPoisonDecayCut() => ChallengeCards.Value(ChallengeCards.Poison) / 100f;
-        /// <summary>挑戦カード: シールドの減衰で減る量を減らす割合 (0..1)。</summary>
-        public static float GetShieldDecayCut() => ChallengeCards.Value(ChallengeCards.Shield) / 100f;
     }
 }

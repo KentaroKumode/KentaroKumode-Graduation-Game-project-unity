@@ -81,7 +81,7 @@ namespace GameLoop
         //   |                          |                                        | CanBeLost    → GameManager.LoseRandomPassiveItem (偽の商人に敗北)           |
         //   | Entrusted (預かり物)     | 止まらない時計                         | IsEntrusted  → ItemCards (持ち物の画面の印「預かり物」)                    |
         //   | ProgressionItems (進行用) | 確信の 3 品・時計・灯火・レイピア・    | CanOfferAtGate   → GameManager.OfferGateRelics (〈門〉で捧げない)          |
-        //   |                          | 初期装備・武器階梯 T2/T3 ほか          | CanBeTakenBySin  → GameManager.Challenge (大罪の強欲・色欲)               |
+        //   |                          | 初期装備・武器階梯 T2/T3 ほか          |                                                                          |
         //   |                          |                                        | (直接) AutoTest.ItemLearningStats.ExcludedFromLift (BOT の学習から外す)  |
         //
         //   | EndingKeyItems (結末に関わる品) | 確信の 3 品・時計               | HiddenInCodexUntilOwned → GalleryView (手に入れるまで影も出さない)・      |
@@ -143,8 +143,6 @@ namespace GameLoop
         public static bool HiddenInCodexUntilOwned(string id) => !string.IsNullOrEmpty(id) && EndingKeyItems.Contains(id);
         /// <summary>〈門〉で秘宝として捧げられるか。 進行用の品 (<see cref="ProgressionItems"/>) は false。</summary>
         public static bool CanOfferAtGate(string id) => !string.IsNullOrEmpty(id) && !ProgressionItems.Contains(id);
-        /// <summary>大罪 (強欲・色欲) が封じる・奪う対象になり得るか。 進行用の品 (<see cref="ProgressionItems"/>) は false。</summary>
-        public static bool CanBeTakenBySin(string id) => !string.IsNullOrEmpty(id) && !ProgressionItems.Contains(id);
 
         // === 初期装備 ===
         public const string DiceWood = "dice_wood";
@@ -277,7 +275,7 @@ namespace GameLoop
 
         // === 進行用の品 ===
         /// <summary>**進行用の品**: 強さではなく進行度や配布条件を表す品。 〈門〉で秘宝として捧げられない
-        /// (<see cref="CanOfferAtGate"/>)・大罪 (強欲・色欲) の対象にならない (<see cref="CanBeTakenBySin"/>)。
+        /// (<see cref="CanOfferAtGate"/>)。 (旧: 大罪の強欲・色欲が奪う・封じる対象から外す ── 2026-11-22 に秘宝を奪う効果ごと撤去)
         /// BOT の lift 評価もこれを除外する (AutoTest.ItemLearningStats.ExcludedFromLift)。
         /// <b>売れる・取り替えに出せるかはこの集合では決まらない</b> (<see cref="Undroppable"/>) ── 〈ちいさな灯火〉〈シュヴァリエのレイピア〉は売れる (売値 0G)。</summary>
         public static readonly System.Collections.Generic.HashSet<string> ProgressionItems =

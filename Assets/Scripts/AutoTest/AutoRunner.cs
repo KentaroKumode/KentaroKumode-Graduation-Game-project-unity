@@ -190,7 +190,7 @@ namespace AutoTest
         /// <summary>[測定 2026-11-14] 〈徒労〉の別の形 (LayerLong) で宝箱が空になる確率 (%・既定 50)。 本体の GameHooks.ToilChestEmptyPct へ流す。 Stacks・UntilKing では効かない。</summary>
         public int toilChestEmptyPct = EventSystem.TimedEffects.BattleBoonRule.DefaultChestEmptyPct;
         /// <summary>[測定 2026-11-14] 〈徒労〉の戦闘のデバフ (%・既定 = 本体の既定 50・0 を入れればデバフなし)。 本体の GameHooks.ToilDamageDownPct へ流す (ラン終了で本体の既定へ)。
-        /// 〈徒労〉を持っている間、 すべての戦闘でプレイヤーが敵に与えるダメージ −N% (大罪:怠惰と同じ枠・重なったら厳しい方)。 形 (toilMode) を問わない。
+        /// 〈徒労〉を持っている間、 すべての戦闘でプレイヤーが敵に与えるダメージ −N% (旧 大罪:怠惰と同じ枠)。 形 (toilMode) を問わない。
         /// 〈徒労〉を受けるのは「はじめて」の版だけなので、 ashKingBeatenEver = False の腕で振る。</summary>
         public int toilDamageDownPct = EventSystem.TimedEffects.BattleBoonRule.DefaultToilDamageDownPct;
         /// <summary>[2026-11-14] 航行が〈徒労〉を読むか。 true (既定) = 〈徒労〉で通常の戦闘の報酬が止まっている間 (<see cref="ToilNavRule.RewardlessLeft"/>)、
@@ -201,7 +201,7 @@ namespace AutoTest
         /// <summary>[2026-11-14・#140 の 2] 航行が嵐 (不安定化の時計) を読むか。 false = 旧い動き (乱数の消費も同じ・終点の位置を知っている・フェーズ 3 で出口へ)。
         /// <b>2026-11-18〜 既定 true</b> (測定の基準を「嵐あり + 嵐を読む BOT (T2 = この口と第 2 巡の 3 つ)」に切り替えた・GAME.md §13-5)。
         /// 根拠: 嵐あり・Super・同じシード 4,000 ランで、 読まない 2.1% → T2 9.7% (53 対 356・p=3e-56)。 読まない BOT は嵐を値付けしないので、 嵐ありの測定がゲームでなく BOT の穴を測っていた。
-        /// 旧い基準の数字 (読まない・嵐なし) と比べる腕は false を明示する。 BOT の口なので、 ゲームの挙動は変わらない (猫の手の写しは配線しか使わない)。
+        /// 旧い基準の数字 (読まない・嵐なし) と比べる腕は false を明示する。 BOT の口なので、 ゲームの挙動は変わらない。
         /// true = Optimal / Super (追跡者を避ける方策) が、 嵐の層で <see cref="StormNavView"/> の見方を使う ──
         /// 隠れたボスの点を読まない (候補から探す)・点を取る価値から「溜まるポイントで嵐が早まる代償」を引く・「まだ取る」と「出口へ」を値で比べる (フェーズ 3 の規則は外す)・
         /// 嵐の中の 1 歩の HP を道の費用に入れる。 Naive は読まない (嵐を読まない下限)。 手番の時計 (stormClock=Turns)・嵐の無い層では効かない。 乱数は引かない。</summary>
@@ -2377,6 +2377,7 @@ namespace AutoTest
             // パッシブ取得の経路別計装をバッチ単位で数え直す (前バッチの値を持ち越さない)。
             ItemSystem.Helpers.PassiveSourceAudit.Reset();
             ItemSystem.AxisPool.ResetStats();
+            MetaProgression.ChallengeCards.ResetStats();
             ItemSystem.PassiveSkills.Effects.MirrorTwinsResponse.ResetStats();
 
             // **マスターシードはスイープ経路にも適用する** (2026-08-05)。

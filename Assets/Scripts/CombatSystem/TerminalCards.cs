@@ -213,6 +213,8 @@ namespace CombatSystem
         /// (CombatManager.ResolveRoles がターンの役の後に書く・2026-11-21・同じ目にしたのは 2026-11-22)。
         /// 〈符丁の刻み板〉〈血濡れの符丁〉〈揃いの拍子木〉〈万象のゾロ目〉が読む。 Resolve の中では、 このターンの役はまだ入っていない。</summary>
         public int roleCount, roleStreak, roleLastFace;
+        /// <summary>この戦闘の何ターン目か (<see cref="BeginTurn"/> が 1 つ進める・戦闘の始めは 0)。 挑戦カード〈初太刀〉の「1 ターン目」が読む (2026-11-22)。</summary>
+        public int turn;
 
         /// <summary>場の s がこのターン止まっているか。</summary>
         public bool IsStopped(int s) => stopped != null && s >= 0 && s < stopped.Length && stopped[s];
@@ -234,6 +236,7 @@ namespace CombatSystem
         /// <summary>ターンの始めに呼ぶ (持ち越しを今のターンへ移す)。 戻り値 = このターンに多く引く枚数。</summary>
         public int BeginTurn()
         {
+            turn++;
             ignoreCond = ignoreCondNext; ignoreCondNext = false;
             doubleAll = false;
             shuffledNow = 0; engineDrawTurn = 0;
@@ -875,11 +878,12 @@ namespace CombatSystem
             // ── 0. 止まった端子 (ヴェスカ〈停滞する時間〉) と、 挿せる数を超えた分を外す ──
             //   止まった端子に挿した出目は挿さなかった扱い。 本体も BOT も画面もここを通るので、 同じ計算になる。
             var cnt = Scratch(ref _sCnt, m);
+            int wiredLeft = CardRules.MaxWiredDice > 0 ? CardRules.MaxWiredDice : n;      // クァディルの色欲 (挑戦カード IV): 挿せる出目の数 (前の出目から・超えた分は挿さなかった扱い)
             for (int i = 0; i < n; i++)
             {
                 int s = o.slotOfDie[i]; if (s < 0) continue;
-                if (defs[s] == null || state.IsStopped(s) || cnt[s] >= defs[s].capacity || (env.noAttack && defs[s].kind == TerminalKind.Attack)) { o.slotOfDie[i] = -1; continue; }
-                cnt[s]++;
+                if (defs[s] == null || state.IsStopped(s) || cnt[s] >= defs[s].capacity || (env.noAttack && defs[s].kind == TerminalKind.Attack) || wiredLeft <= 0) { o.slotOfDie[i] = -1; continue; }
+                cnt[s]++; wiredLeft--;
             }
 
             // ── 1. 〈号令の剣〉: 他の出目すべて +1 (他の端子より先に効く)。 強化した〈号令の剣＋〉は挿した出目も +1 ──
@@ -1068,7 +1072,7 @@ namespace CombatSystem
             if ((ci & ChargeItems.Fork) != 0 && reboot != ChargeCore.RebootNone)
             {
                 int tgt = reboot == ChargeCore.RebootAuto ? Best(false, false) : Rebootable(reboot, false, false) ? reboot : -1;
-                int cost = ChargeCore.CostNow(ChargeCore.RebootCost, env.chargeCostCut);
+                int cost = CardRules.RebootCost(ChargeCore.CostNow(ChargeCore.RebootCost, env.chargeCostCut));   // 挑戦カード〈予備電源〉III: −N (最低 1)
                 if (tgt >= 0 && charge >= cost) { Pay(o, ref charge, cost); o.rebootSlot = tgt; Refire(tgt, "再起動"); }
             }
             //   〈逆さ避雷針〉: 敵の攻撃が来るターン、 充電 5 で被ダメ −6 と、 発動した防御の端子 (ブロックの最も多い 1 枚) の自動再起動 (1 ターン 1 回)
@@ -1085,7 +1089,7 @@ namespace CombatSystem
             //   〈雷鳴の太鼓〉【オーバークロック】: 攻撃の端子を挿したターン、 充電 15 以上なら 12 を払う (1 ターン 1 回)。 掛けるのは本体の撃の輪 (最初の 1 撃)
             if ((ci & ChargeItems.Drum) != 0 && overclock && o.attackHits.Count > 0 && charge >= ChargeCore.OverclockNeed)
             {
-                Pay(o, ref charge, ChargeCore.CostNow(ChargeCore.OverclockCost, env.chargeCostCut));
+                Pay(o, ref charge, CardRules.RebootCost(ChargeCore.CostNow(ChargeCore.OverclockCost, env.chargeCostCut)));
                 o.overclock = true;
             }
             //   〈灼線鞭〉: このターン充電を 2 回以上使った (振り直しも数える) なら、 発動した中で最も攻撃の多い攻撃の端子を無料で再起動 (1 ターン 1 回)
@@ -1139,6 +1143,9 @@ namespace CombatSystem
 
             // ── 6d. 賽目の品 (2026-11-21・段 1-f)。 役が立ったターン、 攻撃 +N は撃 1 つずつに (6c と同じ形) ──
             ApplyRoleItems(env, state, o, roleKind, dice);
+
+            // ── 6e. 挑戦カードの裏 (2026-11-22・CardRules)。 札が無ければ何もしない ──
+            ApplyCardBuffs(state, o);
 
             for (int i = 0; i < n; i++)
                 o.kindOfDie[i] = o.slotOfDie[i] >= 0 ? LegacyKind(defs[o.slotOfDie[i]].kind) : DiceTerminal.None;
@@ -1201,6 +1208,24 @@ namespace CombatSystem
                 foreach (int x in o.slotOfDie) if (x < 0) idle++;
                 st.extraDrawNext += Math.Min(IdleWeightDrawMax, idle);
             }
+        }
+
+        /// <summary>挑戦カードの裏のうち、 端子の解決の中で効く物 (Resolve の 6e・値は <see cref="CardRules"/>)。
+        /// 〈刃研ぎ〉撃ごとの攻撃 +N・〈追い打ち〉ボスのダウン中のターンの撃ごとの攻撃 +N・〈手捌き〉使い捨てを使うたびブロック +N・〈手馴染み〉役が立ったターン ブロック +N・
+        /// 〈初太刀〉戦闘の 1 ターン目の撃ごとの出血 +N (5f の出血に足す)。</summary>
+        private static void ApplyCardBuffs(TerminalBattleState st, TerminalOutcome o)
+        {
+            int each = CardRules.BladeAtk + (BossDown.ActiveNow ? CardRules.PursuitAtk : 0);
+            if (each > 0 && o.attackHits.Count > 0)
+            {
+                for (int h = 0; h < o.attackHits.Count; h++) o.attackHits[h] += each;
+                o.attackAdd += each * o.attackHits.Count;
+                if (o.logAttack) o.attackLog.Add($"挑戦カード:+{each}×{o.attackHits.Count}撃");
+            }
+            if (CardRules.DisposeBlock > 0 && o.disposedNow > 0) o.blockAdd += CardRules.DisposeBlock * o.disposedNow;
+            if (CardRules.RoleBlock > 0 && o.roleNow > 0) o.blockAdd += CardRules.RoleBlock;
+            if (CardRules.FirstStrikeBleed > 0 && st.turn == 1)
+                for (int h = 0; h < o.attackHitBleed.Count; h++) o.attackHitBleed[h] += CardRules.FirstStrikeBleed;
         }
 
         /// <summary>役の軸の品のうち、 端子の解決の中で効く物 (Resolve の 6d)。 旗は <see cref="TerminalBattleState.roleItems"/>。 役の回数はこのターンの役を足して数える。</summary>
@@ -1572,7 +1597,7 @@ namespace CombatSystem
         /// (常設を引いた時も・〈先読み〉で多く引く分も)。 止まった端子はこのターン挿せず、 捨て札へ行かず次のターンも手札に残って普通に使える
         /// (引いた物ではないのでもう一度は止まらない・その分 新しく引く枚数が減る)。 止まった常設は場に残り、 次のターンには解ける。
         /// 止まった場所は <see cref="TerminalBattleState.stopped"/> (場の添字) に持つ ── BOT の写しにも乗る。</para></summary>
-        public void DrawTurn(int size, string retained = null, float stopChance = 0f)
+        public void DrawTurn(int size, string retained = null, float stopChance = 0f, int forceStop = 0)
         {
             // 前のターンの手札を、 残す端子と捨て札へ送る端子に分ける (規則は SplitHand の 1 か所・BOT の先読みも同じ関数を呼ぶ)
             var mode = TerminalCards.CarryMode;
@@ -1597,6 +1622,7 @@ namespace CombatSystem
             // 引く (このターンに引いた物だけが止まる対象)
             var stoppedPerm = new List<int>();   // permanent の添字
             var stoppedHand = new List<int>();   // hand の添字
+            var drawnHand = forceStop > 0 ? new List<int>() : null;   // このターンに引いた手札の添字 (挑戦カード〈目詰まり〉・クェシナの怠惰)
             int guard = 0, drawn = 0;
             LastDrawnIds.Clear();
             while (hand.Count < size && guard++ < 64)
@@ -1610,8 +1636,11 @@ namespace CombatSystem
                 var d = TerminalCards.Get(id);
                 if (d != null && d.permanent) { if (stop) stoppedPerm.Add(permanent.Count); permanent.Add(id); continue; }
                 if (stop) stoppedHand.Add(hand.Count);
+                else drawnHand?.Add(hand.Count);
                 hand.Add(id);
             }
+            //   挑戦カード〈目詰まり〉・クェシナの怠惰 (2026-11-22): このターンに引いた手札の端子を、 引いた順に forceStop 枚止める (乱数は引かない)
+            if (drawnHand != null) for (int k = 0; k < drawnHand.Count && k < forceStop; k++) stoppedHand.Add(drawnHand[k]);
             // 〈影写し〉の写し (2026-11-14): 引く枚数とは別に、 手札の最後へ 1 枚足す (引く枚数を減らさない・止まる対象でもない)。
             //   使わなければほかの手札と同じに次のターンの頭で捨て札へ行き、 この戦闘の山札を回る (戦闘が終われば消える = BeginBattle で作り直す)
             if (copyNext != null) { hand.Add(copyNext); copyNext = null; }

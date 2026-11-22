@@ -222,7 +222,7 @@ namespace MetaProgression.Achievements
             D(HiddenCalmDown, C.Play, 4, "落ち着けよ、兄弟", $"回復せずに、HP1のまま{CalmDownTurns}ターン耐えて勝つ", H),
             D(HiddenPerpetualMotion, C.Play, 4, "ノーベル賞は私のモノ", $"1戦闘で、最大HPの{PerpetualHealTimes}倍以上を回復して勝つ（あふれた分も数える）", H),
             // id は旧〈最後の審判〉の刻限 124 の名残 (条件は作り直した・2026-11-17)。 id は保存に使うので据え置き
-            D(HiddenTurn124, C.Play, 4, "あと一ターンだけ", "〈最後の審判〉の札を背負って、刻限の1ターン前にボスを倒す", H),
+            D(HiddenTurn124, C.Play, 4, "あと一ターンだけ", "〈刻限〉の札を背負って、段が上がる直前のターンにボスを倒す", H),
             D(HiddenReturningEnemy, C.Play, 3, "昨日の敵は今日も敵", "逃げた相手と同じ敵に、同じランのうちに勝つ", H),
             D(CrateSlow, C.Play, 2, "鍵を探している", $"0層の古い宝箱を、{CrateSlowTurns}ターン以上かけて開ける", H),
             D(BossOnlyFloor, C.Play, 3, "素通り", "2層以降の1つの層で、ボスのほかに一度も戦わずに抜ける", H),

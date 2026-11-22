@@ -20,7 +20,7 @@ namespace CombatSystem
         private void ResetBossDown(EnemyData enemy, bool newCombat)
         {
             bool clock = GameLoop.VescaClock.Held(GameLoop.GameManager.Instance?.Run);
-            _down.Reset(BossParams.DownNotches(enemy?.id, clock));
+            _down.Reset(BossDown.WidenNotches(BossParams.DownNotches(enemy?.id, clock), (int)MetaProgression.MetaDebuffApplicator.GetDownNotchSpacingPct()));   // 挑戦カード〈受身〉III: 目盛りの間隔 +N%
             VescaClockActive = clock && _down.Enabled && GameLoop.BossIds.VescaStageOf(enemy?.id) > 0;   // ダウンを止めた測定の口では効かない
             // 戦闘の始めの地の文 (最初の段だけ 1 回)。 戦闘の画面に文の欄が無いので戦闘ログの行として出す (2026-11-13)。 ヴェスカの台詞は置かない (作者の決定)
             if (VescaClockActive && newCombat && enemy?.id == GameLoop.BossIds.VescaP1)
@@ -150,7 +150,7 @@ namespace CombatSystem
             BossDown.ActiveNow = true;
             BossDown.TakenMulNow = !_down.downWeakNow;   // ひびで割れた弱いダウン (2026-11-14) は受けるダメージ ×1.5 なし
             BossDownDiag.NoteDown(hadHeavy, canceled, toHeavyAtDown, _down.downWeakNow);
-            if (Debug.unityLogger.logEnabled) Debug.Log($"[ダウン] T{ctx.currentTurn} {currentEnemy?.displayName}: 行動不能" + (_down.downWeakNow ? "・ひびのダウン (受けるダメージは普段どおり)" : $"・受けるダメージ ×{BossDown.TakenMul:0.0}")
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[ダウン] T{ctx.currentTurn} {currentEnemy?.displayName}: 行動不能" + (_down.downWeakNow ? "・ひびのダウン (受けるダメージは普段どおり)" : $"・受けるダメージ ×{BossDown.TakenMulCard:0.00}")
                     + (canceled ? "・大技は取り消し (周期は頭から)" : hadHeavy ? (always ? "・(大技は溜まっていない)" : "・大技の周期はそのまま進む") : "")
                     + (_down.pending > 0 ? $" (あと {_down.pending} ターン続く)" : ""));
         }

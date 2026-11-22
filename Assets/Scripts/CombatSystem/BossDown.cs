@@ -31,6 +31,8 @@ namespace CombatSystem
     {
         /// <summary>ダウン中に受けるダメージの倍率 (満額のダウンだけ・ひびで割れた弱いダウンには付かない)。</summary>
         public const float TakenMul = 1.5f;
+        /// <summary>今の戦闘のダウンの倍率 (既定 <see cref="TakenMul"/>・挑戦カード〈受身〉で 1.35 / 1.20)。 戦闘の始めに <see cref="CardRules.Load"/> が入れる。</summary>
+        public static float TakenMulCard = TakenMul;
 
         /// <summary>ひびの猶予の既定 (ターン数・2026-11-14)。 ひびが入ったターンから数えてこのターン数の後のターンの終わりに割れる
         /// (0 = ひびが入ったターンの終わりにすぐ割れる・1 = 次のターンの終わり)。 負 = ひびでは割れない。 測定の口 downCrackGrace。</summary>
@@ -65,6 +67,16 @@ namespace CombatSystem
             return r;
         }
 
+        /// <summary>目盛りの間隔を <paramref name="pct"/>% 広げた新しい並び (挑戦カード〈受身〉III・2026-11-22)。 満タンから i 番目の目盛りまでの距離 (1 − 割合) を ×(1 + pct/100) し、
+        /// 0 以下になった目盛りは消す。 <paramref name="pct"/> ≤ 0・null なら元のまま (元の配列は書き換えない)。</summary>
+        public static float[] WidenNotches(float[] notches, int pct)
+        {
+            if (notches == null || notches.Length == 0 || pct <= 0) return notches;
+            var l = new System.Collections.Generic.List<float>(notches.Length);
+            foreach (float f in notches) { float g = 1f - (1f - f) * (100 + pct) / 100f; if (g > 0f) l.Add(g); }
+            return l.Count > 0 ? l.ToArray() : null;
+        }
+
         /// <summary>次に割る目盛りの HP (−1 = もう目盛りが無い・ダウンの無い敵)。</summary>
         public static int NextNotchHp(float[] notches, int maxHp, int broken)
             => notches != null && broken >= 0 && broken < notches.Length ? NotchHp(maxHp, notches[broken]) : -1;
@@ -75,7 +87,7 @@ namespace CombatSystem
             => notches != null && hpAfter > 0 && pendingNow + (BrokenCount(notches, maxHp, hpAfter, broken) - broken) > 0;
 
         /// <summary>受けるダメージにダウンの倍率を掛ける (<paramref name="down"/> = このターンはダウン・切り捨て)。</summary>
-        public static int ApplyTaken(int dmg, bool down) => down && dmg > 0 ? (int)(dmg * TakenMul) : dmg;
+        public static int ApplyTaken(int dmg, bool down) => down && dmg > 0 ? (int)(dmg * TakenMulCard) : dmg;
 
         /// <summary>いまの戦闘のこのターンがダウンか (種類を問わない・CombatManager がターンの頭に立て、 次のターンの頭・戦闘の始めと終わりに戻す)。
         /// 「ダウン中は発動しない」を名乗ったパッシブの止め (<c>PassiveSkillManager.FireEnemyTrigger</c>) が読む。</summary>

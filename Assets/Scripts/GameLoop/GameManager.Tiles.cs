@@ -69,6 +69,13 @@ namespace GameLoop
                         SetPhase(GamePhase.MapNavigation);
                         break;
                     }
+                    // ムシュファの強欲 (挑戦カード IV・2026-11-22): 店を使えない (受けるのは 5 層の入口なので 5 層の店だけ)。 偽の商人の戦闘は起きる
+                    if (!node.isFalseMerchant && MetaProgression.MetaDebuffApplicator.ShopsClosedBySin())
+                    {
+                        Log($"ショップ閉鎖中: {MetaProgression.PermanentDebuffIds.Greed} ── 商人は取引に応じない");
+                        SetPhase(GamePhase.MapNavigation);
+                        break;
+                    }
                     if (node.isFalseMerchant) StartFalseMerchantCombat();
                     else EnterShop();
                     break;

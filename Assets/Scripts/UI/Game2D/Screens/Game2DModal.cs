@@ -21,8 +21,9 @@ namespace UI.Game2D
         /// <summary>押されている列 (-1 = どれも押されていない)。</summary>
         public int segOn = -1;
         /// <summary>挑戦カードの行 (2026-11-08・docs/GAME.md §23-25)。 1..4 だと、 左に Tier の紋章、 右に「− デバフ」(赤) と「+ バフ」(緑) の 2 段で描く。
-        /// Tier はレアリティの色を使わない (灰 → 琥珀 → 熾火 → 深紅)。 IV は紋章が脈打つ。</summary>
-        public int challengeTier; public string deb, buf;
+        /// Tier はレアリティの色を使わない (灰 → 琥珀 → 熾火 → 深紅)。 IV は紋章が脈打つ。
+        /// 七つの大罪 (IV・裏なし) は <see cref="buf"/> を null にして、 2 段目に <see cref="sub"/> (フレーバーの一節) を記号なし・沈んだ色で描く (2026-11-22)。</summary>
+        public int challengeTier; public string deb, buf, sub;
     }
 
     public sealed class ModalBtn { public string label, action; public bool primary; }
@@ -522,8 +523,13 @@ namespace UI.Game2D
             const int mw = 9; int my = Game2DJpFont.Cell / 2;
             p.Rect(tx, ty + my, 5, 1, ChDeb);
             Game2DJpFont.Draw(p, Game2DJpFont.Clip(it.deb ?? "", tw - mw), tx + mw, ty, sel ? ChDebHi : ChDeb);
+            if (it.buf == null)   // 大罪: 裏は無い。 2 段目はフレーバーの一節 (記号なし)
+            {
+                Game2DJpFont.Draw(p, Game2DJpFont.Clip(it.sub ?? "", tw - mw), tx + mw, ty + LH, sel ? ChDeb : Game2DKit.Off);
+                return;
+            }
             p.Rect(tx, ty + LH + my, 5, 1, ChBuf); p.Rect(tx + 2, ty + LH + my - 2, 1, 5, ChBuf);
-            Game2DJpFont.Draw(p, Game2DJpFont.Clip(it.buf ?? "", tw - mw), tx + mw, ty + LH, sel ? ChBufHi : ChBuf);
+            Game2DJpFont.Draw(p, Game2DJpFont.Clip(it.buf, tw - mw), tx + mw, ty + LH, sel ? ChBufHi : ChBuf);
         }
 
         public static string ChallengeRomanOf(int t) => t == 1 ? "I" : t == 2 ? "II" : t == 3 ? "III" : "IV";

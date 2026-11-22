@@ -17,7 +17,11 @@ namespace CombatSystem
 
         /// <summary>超過会心率で足す会心倍率 (<paramref name="critAdd"/> = 合算した会心率・1 = 100%)。</summary>
         public static float ExcessMul(float critAdd, bool suntetsu)
-            => critAdd > 1f ? (critAdd - 1f) * ExcessPerRate * (suntetsu ? SuntetsuExcessMul : 1f) : 0f;
+        {
+            if (critAdd <= 1f) return 0f;
+            float m = (critAdd - 1f) * ExcessPerRate * (suntetsu ? SuntetsuExcessMul : 1f);
+            return CardRules.CritExcessPct > 0 ? m * (100 + CardRules.CritExcessPct) / 100f : m;   // 挑戦カード〈急所読み〉III: 変換 +25%
+        }
 
         /// <summary>会心した撃に実際に掛かる会心倍率。 順: 敵の会心耐性 (下限 1.0) → 超過会心率の変換 → 〈天眼の鍔〉の確定会心 ×1.25。</summary>
         public static float EffectiveMul(float critMul, float enemyReduction, float critAdd, bool suntetsu, bool heaven)
