@@ -998,7 +998,7 @@ namespace CombatSystem
             //   〈必殺の照準器〉(CritCore): 攻撃の端子が 1 枚だけのターン、 その撃が会心なら同じ撃をもう 1 回発火する (1 ターン 1 回・会心は確定・乱数は引かない)
             bool sniper = hitBases.Count == 1 && GameLoop.GameManager.Instance?.Run?.OwnsPassive(GameLoop.ItemIds.CritSniper) == true;
             bool refire = false; float sniperAdd = 0f;
-            //   〈防人の軍標〉(2026-11-22): 3 回目以降のジャスト防御の次のターン、 全部の撃がもう 1 回ずつ発火する (同じ撃をすぐもう 1 回・会心は振り直す)。
+            //   〈防人の軍標〉(2026-11-22): 2 回目以降 (BorderGuardStandard.EchoNeed) のジャスト防御の次のターン、 全部の撃がもう 1 回ずつ発火する (同じ撃をすぐもう 1 回・会心は振り直す)。
             //   shortcut: 〈必殺の照準器〉がもう 1 回発火した撃には重ねない (照準器は攻撃の端子 1 枚のターンだけ)
             bool echoAll = hitBases.Count > 0 && ItemSystem.PassiveSkills.Effects.BorderGuardStandard.EchoNow(ctx), echoing = false;
             for (int h = 0; h < nHits; h++)
@@ -1627,11 +1627,14 @@ namespace CombatSystem
             //   **ヴェスカがそのターンを丸ごと飛ばす**のを防ぐため (踏みとどまった以上は殴り返す)。
             //   よってこの 2 点セットで 1 ターン分を覆う。 ClampToThreshold は冪等。
             // --- 臨界メーター (Rinkai) 更新 ---
-            //   攻撃端子の出目の合計を溜める。 閾値をまたいだらその場で爆発のダメージが入る (Kw.AddHeat → LandBurst・ADR-0016)。
+            //   攻撃の端子に挿した出目の合計の半分を溜める (HeatCore.EndGain・2026-11-22 neon 収束: 旧 攻撃の端子の合計)。 閾値をまたいだらその場で爆発のダメージが入る (Kw.AddHeat → LandBurst・ADR-0016)。
             //   品が溜める分 (被弾・充電・会心など) は、 それぞれの出来事の時点で Kw.AddHeat を通る。
             //   **手元の HP を ctx へ書き戻す前 (解決中) に置く** ── 書き戻しの後だと爆発で減らした ctx の HP が上書きされて消える。
-            if (ctx.rinkaiThreshold > 0 && attackSum > 0)
-                ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, attackSum, "ターンの終わり(攻撃の端子の合計)");
+            {
+                int endHeat = CombatSystem.HeatCore.EndGain(term);
+                if (ctx.rinkaiThreshold > 0 && endHeat > 0)
+                    ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, endHeat, "ターンの終わり(攻撃に挿した出目の半分)");
+            }
             // 攻撃の後に品が預けた敵へのダメージ (Kw.DamageEnemy) をここで通す。 踏みとどまりの clamp より前。
             {
                 int pendingKw = ItemSystem.PassiveSkills.Keywords.Kw.TakePendingEnemyDamage(ctx);

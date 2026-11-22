@@ -536,6 +536,8 @@ namespace AutoTest
             public bool critDouble, critHeaven, ironClub, critOff, critOn;
             /// <summary>[会心の軸] 配線で決まる品: 〈鷹匠の革手袋〉〈狙い目の刻み〉/ 攻撃の端子 1 枚の撃の〈一の矢〉〈渾身の柄頭〉〈必殺の照準器〉/ 最初の 1 撃が〈抜き打ちの作法〉で確定会心。</summary>
             public bool falconer, aim, firstArrow, pommel, sniper, quickDrawFirst;
+            /// <summary>〈余韻の鈴〉: 前のターンの会心の条件は満たした (攻撃の撃 2 つ以上の挿し方で会心率が乗る・2026-11-22 neon 収束)。</summary>
+            public bool bell;
             /// <summary>〈加重の拳套〉: 2 撃目以降の撃で与ダメ % の池に足す割合 (0 = 持っていない・本体 ctx.hitOutgoingPct)。</summary>
             public float lateHitOutPct;
             public float nonCritMul;           // 鈍器: 非会心だけ ×(1+x)
@@ -645,6 +647,7 @@ namespace AutoTest
             if (hitNo == 0 && s.quickDrawFirst) mulAdd += ItemSystem.PassiveSkills.Effects.QuickDrawArt.Mul;
             if (s.falconer && ws.atkFaceMax >= ItemSystem.PassiveSkills.Effects.FalconerGlove.MinFace) { add += ItemSystem.PassiveSkills.Effects.FalconerGlove.Rate; mulAdd += ItemSystem.PassiveSkills.Effects.FalconerGlove.Mul; }
             if (s.aim && ws.hitFace != null && hitNo < ws.hitFace.Length) { add += CombatSystem.CritCore.AimRate(ws.hitFace[hitNo]); force |= CombatSystem.CritCore.AimForce(ws.hitFace[hitNo]); }
+            if (s.bell && ws.aHits >= ItemSystem.PassiveSkills.Effects.LingeringBell.NeedAttackTerminals) add += ItemSystem.PassiveSkills.Effects.LingeringBell.Rate;
             bool solo = ws.aHits == 1;
             if (solo && s.firstArrow && ws.atkFaceMax >= ItemSystem.PassiveSkills.Effects.FirstArrow.MinFace) { add += ItemSystem.PassiveSkills.Effects.FirstArrow.Rate; mulAdd += ItemSystem.PassiveSkills.Effects.FirstArrow.Mul; }
             float critMulEff = CombatSystem.CritCore.EffectiveMul(s.critMulBase + mulAdd, s.critRed, add, s.critDouble, s.critHeaven);
@@ -718,7 +721,7 @@ namespace AutoTest
             // 会心率: 本体の CritRateOf(pendingBuff: true) と同じ (武器 + このターンの加算 + 整備パネル + 戦闘中バフ)。 OnCriticalCheck の条件付きは入らない。
             float add = (cm?.PlayerCritBaseRate ?? 0f) + ctx.critRatePctAdd + MetaProgression.MetaBuffApplicator.GetCritRatePctBonus()
                       + ctx.GetBuff(ItemSystem.PassiveSkills.CombatContext.CritRateBuffKey);
-            //   配線の前に分かる会心の品 (〈余韻の鈴〉〈瑠璃砥石〉〈一点読みの片眼〉ほか・Crit.ForecastTurn) を足す
+            //   配線の前に分かる会心の品 (〈瑠璃砥石〉〈一点読みの片眼〉ほか・Crit.ForecastTurn) を足す
             ItemSystem.PassiveSkills.Effects.Crit.ForecastTurn(ctx, run, out float itemRate, out float itemMul);
             add = System.Math.Max(0f, add + itemRate);
             st.critAdd = add;
@@ -730,6 +733,7 @@ namespace AutoTest
             st.critOff = ctx.critSuppressed;
             st.critOn = !st.critOff && ctx.forceCritical;
             st.falconer = run != null && run.OwnsPassive("鷹匠の革手袋");
+            st.bell = run != null && run.OwnsPassive(ItemSystem.PassiveSkills.Effects.LingeringBell.Id) && ItemSystem.PassiveSkills.Effects.LingeringBell.Primed(ctx);
             st.aim = run != null && run.OwnsPassive(ItemIds.CritAim);
             st.firstArrow = run != null && run.OwnsPassive(ItemIds.CritFirstArrow);
             st.pommel = run != null && run.OwnsPassive(ItemIds.CritPommel);
@@ -1856,15 +1860,15 @@ namespace AutoTest
                 bool big = CombatSystem.YachtRoles.IsBig(r);
                 int face = CombatSystem.TerminalCards.FaceOfRole(r);
                 float v = 0f, mul = 1f;
-                if ((f & CombatSystem.RoleItems.WoodTag) != 0 && face == CombatSystem.TerminalCards.WoodTagFace) v += CombatSystem.TerminalCards.WoodTagAttack + CombatSystem.TerminalCards.WoodTagBlock;
+                if ((f & CombatSystem.RoleItems.WoodTag) != 0 && CombatSystem.TerminalCards.FaceIn(CombatSystem.TerminalCards.WoodTagFaces, face)) v += CombatSystem.TerminalCards.WoodTagAttack + CombatSystem.TerminalCards.WoodTagBlock;
                 if ((f & CombatSystem.RoleItems.Gear) != 0 && face == CombatSystem.TerminalCards.GearFace) v += CombatSystem.TerminalCards.GearAttack;
-                if ((f & CombatSystem.RoleItems.NotchBoard) != 0 && face == CombatSystem.TerminalCards.NotchBoardFace)
+                if ((f & CombatSystem.RoleItems.NotchBoard) != 0 && CombatSystem.TerminalCards.FaceIn(CombatSystem.TerminalCards.NotchBoardFaces, face))
                     v += System.Math.Min(CombatSystem.TerminalCards.NotchBoardMax, CombatSystem.TerminalCards.NotchBoardPer * count) * (big ? 2 : 1);
-                if ((f & CombatSystem.RoleItems.Chipped) != 0 && face == CombatSystem.TerminalCards.ChippedFace)
+                if ((f & CombatSystem.RoleItems.Chipped) != 0 && CombatSystem.TerminalCards.FaceIn(CombatSystem.TerminalCards.ChippedFaces, face))
                     v += System.Math.Min(CombatSystem.TerminalCards.ChippedPen, System.Math.Max(0, ctx.enemyDefense));
                 if ((f & CombatSystem.RoleItems.Clapper) != 0 && face != 0 && face == st.roleLastFace) mul += CombatSystem.TerminalCards.ClapperPct;
                 if ((f & CombatSystem.RoleItems.Thunder) != 0 && big) { mul *= 1f + CombatSystem.TerminalCards.ThunderFinalPct; v += CombatSystem.TerminalCards.ThunderBlock; }
-                if ((f & CombatSystem.RoleItems.Bloodmark) != 0 && (face == 3 || face == 4))
+                if ((f & CombatSystem.RoleItems.Bloodmark) != 0)
                     mul *= 1f + System.Math.Min(CombatSystem.TerminalCards.BloodmarkMax, CombatSystem.TerminalCards.BloodmarkPer * count);
                 acc += v + (mul - 1f) * sum;
             }

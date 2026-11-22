@@ -395,7 +395,7 @@ namespace UI.Game2D
             var run = gm.Run; var sm = ShopManager.Instance; var inv = sm != null ? sm.Current : null;
             int price = sm != null ? sm.AxisRerollPrice : 0;
             var d = New("ショップ ― 軸で振り直す", "所持金 " + run.coins + "G", 460);
-            d.body = "出現の枠 " + ItemSystem.AxisPool.SlotsLabel(run) + " の軸か金を選ぶ。 売れていない秘宝の前の " + ShopManager.AxisRerollGuaranteed + " 枠はその軸の品になり、 残りの枠と端子も出やすくなる。\n" + ItemSystem.AxisPool.MainAxisRule; d.bodyLines = 3;
+            d.body = "出現の枠 " + ItemSystem.AxisPool.SlotsLabel(run) + " の軸か金を選ぶ。 売れていない秘宝の前の " + ShopManager.AxisRerollGuaranteed + " 枠はその軸の品になり、 残りの枠と端子も出やすくなる。"; d.bodyLines = 2;
             var axList = new List<string>(run.lockedAxes) { ItemSystem.PassiveSkills.AxisRules.Gold };
             var axes = axList.ToArray();
             foreach (var ax in axes)

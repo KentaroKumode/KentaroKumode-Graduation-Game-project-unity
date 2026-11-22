@@ -142,7 +142,7 @@ namespace AutoTest
             if (sg.ring && o.attackHits.Count > 0)
             {
                 int pz = env.enemyPoison + o.poison;
-                if (pz >= PoisonCore.RingNeed) ws.extraDmg += PoisonCore.Damage(PoisonCore.Spend(pz), sg.poisonItems, sg.detonates, s.enemyDown);
+                if (pz >= PoisonCore.RingNeed) ws.extraDmg += PoisonCore.Damage(PoisonCore.Spend(pz), sg.poisonItems, sg.detonates, s.enemyDown, sg.enemyMaxHp);
             }
             // 出血の BOT の規則 (2026-11-21): 撃を順に追い、 撃の前の出血 (配線の時点 + それより前の撃の出血) で〈血の楔〉+40%・〈血桜〉(2 撃目から・出血 2 を使う) の撃の最終与ダメを、
             //   撃の後の出血で〈紅の搾り具〉(15 以上・1/3 を使う × 8・1 ターン 1 回) を足す。 〈涸れぬ血晶〉の倍は本体と同じ BleedCore.CrystalGain。
@@ -267,7 +267,7 @@ namespace AutoTest
                 if (sg.jgMirror) ws.extraDmg += jgE * (ItemSystem.PassiveSkills.Effects.MirrorBuckler.JustPct - ItemSystem.PassiveSkills.Effects.MirrorBuckler.Pct) / 100;
                 if (sg.jgBlade) ws.extraDmg += jgE;
                 if (sg.jgStandard) sightFlat += ItemSystem.PassiveSkills.Effects.BorderGuardStandard.PctPerGuard / 100f * per * Math.Max(0, turns - 1) * 0.5f + DeckDrawDmg;
-                //   〈防人の軍標〉3 回目以降: 次のターンの撃がもう 1 回ずつ = 次の攻撃 1 回分 (2026-11-22)
+                //   〈防人の軍標〉EchoNeed (2) 回目以降: 次のターンの撃がもう 1 回ずつ = 次の攻撃 1 回分 (2026-11-22)
                 if (sg.jgStandard && turns > 1 && ItemSystem.PassiveSkills.Effects.Shd.Count(sg.jgCtx, ItemSystem.PassiveSkills.Effects.Shd.JustGuardCountKey) + 1 >= ItemSystem.PassiveSkills.Effects.BorderGuardStandard.EchoNeed)
                     sightFlat += per * DeckFutureAttackShare;
                 if (sg.jgCatch) sightFlat += ItemSystem.PassiveSkills.Effects.CatchBracer.Atk * DeckFutureAttackShare;
@@ -275,13 +275,13 @@ namespace AutoTest
                     sightFlat += (ItemSystem.PassiveSkills.Effects.SilentStance.JustPct - ItemSystem.PassiveSkills.Effects.SilentStance.Pct) / 100f * per * DeckFutureAttackShare;
                 if (sg.jgHero && env.heavyTurn) sightFlat += 0.5f * per;
             }
-            // 臨界の BOT の規則 (2026-11-21): 本体と同じ HeatCore.Forecast (端子の臨界 → 5g の品の臨界 → ターンの終わりの攻撃の端子の合計) で、
+            // 臨界の BOT の規則 (2026-11-21): 本体と同じ HeatCore.Forecast (端子の臨界 → 5g の品の臨界 → ターンの終わりの攻撃に挿した出目の合計の半分 HeatCore.EndGain) で、
             //   この配線で起きる爆発のダメージ (敵の防御の後) を軽減不可の分に足す。 溜まりの増減は 臨界 1 = 爆発の基礎 ÷ 閾値 × DeckGaugeShare (爆発で 0 に戻る分は負で相殺)。
             //   配線の時に爆発する (= 攻撃の前に【過熱】) か既に【過熱】なら、 〈二度目の打金〉の撃ごとの攻撃 +6・〈烈刃〉の撃の最終与ダメ % を足す。
             //   shortcut: 1 撃の与ダメは 1 ターンの見込み ÷ 撃の数・ボスの目盛りのひびと〈恒熱の炉壁〉のブロックは見ない
             if (sg.heat.threshold > 0 || o.heat > 0 || o.heatGains.Count > 0)
             {
-                var hf = HeatCore.Forecast(sg.heat, o, o.attackAdd);
+                var hf = HeatCore.Forecast(sg.heat, o);
                 ws.extraDmg += hf.landed;
                 int th = Math.Max(1, sg.heat.threshold > 0 ? sg.heat.threshold : HeatCore.StartThreshold(sg.heat.items));
                 flat += (hf.meterAfter - sg.heat.meter) * (HeatCore.BurstBase / (float)th) * DeckGaugeShare * dw;
@@ -589,7 +589,7 @@ namespace AutoTest
             /// <summary>〈石抜きの毒指輪〉: このターンまだ起爆していない (持っていなければ false)。 / 毒の品の旗・この戦闘で起爆した回数 (起爆のダメージの式 PoisonCore.Damage が読む)。</summary>
             public bool ring;
             public PoisonItems poisonItems;
-            public int detonates;
+            public int detonates, enemyMaxHp;
             /// <summary>出血の品の旗 (撃ごとの出血は Resolve の 5f が書く・〈血桜〉〈血の楔〉〈紅の搾り具〉〈涸れぬ血晶〉はここで見積もる) / 〈紅の搾り具〉をこのターンもう使った。</summary>
             public BleedItems bleedItems;
             public bool pressed;
@@ -611,6 +611,7 @@ namespace AutoTest
                 v.secondStrike = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.SecondStrike.Id); v.fierceBlade = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.FierceBlade.Id);
                 v.poisonItems = PoisonCore.ItemsOf(run);
                 v.detonates = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.Psn.DetonateCountKey);
+                v.enemyMaxHp = ctx.enemyMaxHP;      // 起爆の最大 HP の項 (本体と同じ ctx.enemyMaxHP)
                 v.bleedItems = BleedCore.ItemsOf(run);
                 v.pressed = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.CrimsonPress.TurnKey) == ctx.currentTurn;
                 v.ring = (v.poisonItems & PoisonItems.Ring) != 0 && (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.HollowPoisonRing.TurnKey) != ctx.currentTurn;

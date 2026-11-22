@@ -167,9 +167,9 @@ namespace AutoTest.EditorTests
             Assert.That(b2.attackHitBleed[0], Is.EqualTo(0));
             CardRules.FirstStrikeBleed = 0;
             // 毒仕込み・見切り・予熱・急所読み・予備電源
-            Assert.That(PoisonCore.Damage(10, PoisonItems.None, 0, false), Is.EqualTo(10 * PoisonCore.DetonateMul));
+            Assert.That(PoisonCore.Damage(10, PoisonItems.None, 0, false, 0), Is.EqualTo(10 * PoisonCore.DetonateMul));
             CardRules.DetonateMulTenths = 15;
-            Assert.That(PoisonCore.Damage(10, PoisonItems.None, 0, false), Is.EqualTo(10 * PoisonCore.DetonateMul + 15));
+            Assert.That(PoisonCore.Damage(10, PoisonItems.None, 0, false, 0), Is.EqualTo(10 * PoisonCore.DetonateMul + 15));
             Assert.That(ShieldCore.Width(ShieldItems.None), Is.EqualTo(ShieldCore.JustWidth));
             CardRules.JustWidthAdd = 1;
             Assert.That(ShieldCore.Width(ShieldItems.None), Is.EqualTo(ShieldCore.JustWidth + 1));

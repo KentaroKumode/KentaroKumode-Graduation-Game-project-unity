@@ -21,10 +21,10 @@ namespace AutoTest.EditorTests
             Assert.That(b.landed, Is.EqualTo(DefenseFormula.Apply(30, 5)));   // 防御 10 の半分を無視
             Assert.That(s.meter, Is.EqualTo(0));
             Assert.That(HeatCore.TryBurst(ref s, out _), Is.False);
-            // 〈火花読みの眼鏡〉: 防御を全部無視・1 回目 ×1.08
+            // 〈火花読みの眼鏡〉: 防御を全部無視・1 回目 ×(1 + 回数 × 5%)
             var g = S(HeatItems.Spark, HeatCore.Threshold, 10);
             HeatCore.TryBurst(ref g, out var bg);
-            Assert.That(bg.landed, Is.EqualTo(30 * 108 / 100));
+            Assert.That(bg.landed, Is.EqualTo(30 * (100 + HeatCore.SparkPctPerBurst) / 100));
         }
 
         [Test]
@@ -54,11 +54,21 @@ namespace AutoTest.EditorTests
             var st = new TerminalBattleState { heatItems = HeatItems.Stone | HeatItems.Spanner | HeatItems.Breastplate | HeatItems.Flint };
             var env = new TerminalEnv { chargeCap = 30, hp = 50, maxHp = 50, enemyAttack = 10, enemyHp = 100, enemyMaxHp = 100 };
             var o = TerminalCards.Resolve(board, new[] { 0, 1, 2 }, new[] { 5, 4, 3 }, env, st);
-           // 過熱石 +6 (攻撃に 2 個)・燻り +4 (防御 1 枚)・スパナ +2 × 2 撃・燧石の倍 (攻撃 2 枚)
+           // 過熱石 +6 (攻撃に 2 個)・燻り +4 (防御 1 枚)・スパナ +2 × 2 撃。 燧石の倍は 3 撃から (2026-11-22 neon 収束) なので 2 撃では立たない
             Assert.That(o.heatGains, Is.EquivalentTo(new[] { HeatCore.StoneTwo, HeatCore.BreastHeat, HeatCore.SpannerPerHit, HeatCore.SpannerPerHit }));
-            Assert.That(o.heatDouble, Is.True);
-            var f = HeatCore.Forecast(new HeatCore.State { items = st.heatItems, threshold = 25 }, o, 0);
-            Assert.That(f.burstsWired, Is.EqualTo(1));   // (6+4+2+2) × 2 = 28 で 1 回 (閾値 25 を越えた時に 0 へ)
+            Assert.That(o.heatDouble, Is.False);
+            Assert.That(o.attackPips, Is.EqualTo(9));                  // 攻撃に挿した 5 + 4
+            Assert.That(HeatCore.EndGain(o), Is.EqualTo(4));           // ターンの終わりは 9 の半分 (切り捨て)
+            // 攻撃 3 枚 (5・4・3): 過熱石 +12 (3 個とも攻撃)・スパナ +2 × 3 撃・燧石の倍
+            var board3 = new List<string> { TerminalIds.Attack, TerminalIds.Attack, TerminalIds.Attack };
+            var o3 = TerminalCards.Resolve(board3, new[] { 0, 1, 2 }, new[] { 5, 4, 3 }, env, st);
+            Assert.That(o3.heatGains, Is.EquivalentTo(new[] { HeatCore.StoneAll, HeatCore.SpannerPerHit, HeatCore.SpannerPerHit, HeatCore.SpannerPerHit }));
+            Assert.That(o3.heatDouble, Is.True);
+            var f = HeatCore.Forecast(new HeatCore.State { items = st.heatItems, threshold = 25 }, o3);
+            // 12 × 2 = 24 → +4 で 28 (閾値 25 を越えた時に 0 へ・1 回) → +4 +4 = 8 → ターンの終わり 12 / 2 = 6 × 2 = 12 → 20
+            Assert.That(f.burstsWired, Is.EqualTo(1));
+            Assert.That(f.burstsEnd, Is.EqualTo(0));
+            Assert.That(f.meterAfter, Is.EqualTo(20));
         }
     }
 }

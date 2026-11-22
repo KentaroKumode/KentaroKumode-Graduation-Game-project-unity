@@ -125,11 +125,11 @@ namespace ItemSystem.PassiveSkills.Effects
 
     // ── G: 分岐 A〈高速連鎖〉/ 分岐 B〈高圧超臨界〉 ── (〈帳簿外の爆薬〉〈火花読みの眼鏡〉は HeatCore の旗)
 
-    /// <summary>溢れ取りの鋳型 (分岐 B): 爆発のとき、 閾値を超えて溢れていた臨界 1 につき、 その爆発 +3 (HeatCore の旗)・次の 1 撃の与ダメージ +3%。</summary>
+    /// <summary>溢れ取りの鋳型 (分岐 B): 爆発のとき、 閾値を超えて溢れていた臨界 1 につき、 その爆発 +2 (HeatCore の旗)・次の 1 撃の与ダメージ +2% (2026-11-22 neon 収束: +3・+3%)。</summary>
     public class OverflowMold : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => GameLoop.ItemIds.HeatMold;
-        public const int PctPerExcess = 3;
+        public const int PctPerExcess = 2;
         /// <summary>[persistent・次の 1 撃で 0] 溜まっている与ダメージの % 。</summary>
         private const string Key = "heat.mold";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Pct(Rw.Count(ctx, Key) / 100f);
@@ -156,12 +156,12 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>天工開物 (分岐 B): 武器を強化するたび、 このランの爆発の基礎 +12 (累積・この品を持っている間の強化・RunState.heavenlyCraftUpgrades)。
+    /// <summary>天工開物 (分岐 B): 武器を強化するたび、 このランの爆発の基礎 +8 (2026-11-22 neon 収束: +12・累積・この品を持っている間の強化・RunState.heavenlyCraftUpgrades)。
     /// 【過熱】のターン、 攻撃は敵の防御を 12 無視する (配線で起きた爆発はそのターンの撃に間に合う)。</summary>
     public class TenkouKaibutsu : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => GameLoop.ItemIds.HeavenlyCraft;
-        public const int PerUpgrade = 12, Pen = 12;
+        public const int PerUpgrade = 8, Pen = 12;
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(PerUpgrade * (Rw.Run?.heavenlyCraftUpgrades ?? 0));
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnWired };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)

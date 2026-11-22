@@ -496,7 +496,7 @@ namespace ItemSystem.PassiveSkills.Effects
 
     /// <summary>回帰性真理 ── 7 層 p4 ヴェスカ・天与 の中核パッシブ。
     ///
-    /// 効果 (2026-11-11 の実コード): 毒・出血の蓄積を毎ターン半減 (付与そのものは通る) /
+    /// 効果 (2026-11-11 の実コード): 出血の蓄積を毎ターン半減・毒の蓄積を毎ターン 3/4 (2026-11-22 neon 収束: 旧 半減・付与そのものは通る) /
     /// 受ける会心の倍率 −<see cref="CritMultReduction"/> (下限 1.0) / 臨界メーターを毎ターン −<see cref="RinkaiDrainPerTurn"/> /
     /// 最大 HP の変更を拒否 / 処刑を拒否。 割合ダメージの免疫は 2026-07-29 に撤去済み。
     ///
@@ -518,7 +518,7 @@ namespace ItemSystem.PassiveSkills.Effects
             {
                 ctx.enemyRecurrentTruth = true;
                 ctx.enemyCritMultReduction = CritMultReduction;
-                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[回帰性真理] 毒/出血を毎ターン半減・受ける会心倍率 −{CritMultReduction:F2}"
+                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[回帰性真理] 出血を毎ターン半減・毒を毎ターン 3/4・受ける会心倍率 −{CritMultReduction:F2}"
                                     + $" ・臨界メーター毎ターン −{RinkaiDrainPerTurn} ・処刑/最大HP変更を拒否");
             }
             if (trigger != PassiveSkillTrigger.OnTurnStart) return;

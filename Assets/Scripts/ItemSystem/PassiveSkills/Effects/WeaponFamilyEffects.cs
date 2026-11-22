@@ -52,6 +52,8 @@ namespace ItemSystem.PassiveSkills.Effects
 
         /// <summary>このターンに発動した攻撃の端子の枚数 (OnWired 以降・端子の解決の結果)。</summary>
         public static int AttackTerminals() => CombatManager.Instance?.LastTerminalOutcome?.attackHits.Count ?? 0;
+        /// <summary>このターンに発動した防御の端子の枚数 (【再起動】の分も 1 回・OnWired 以降)。</summary>
+        public static int BlockTerminals() => CombatManager.Instance?.LastTerminalOutcome?.blockTerminals ?? 0;
 
         /// <summary>攻撃端子とブロック端子の両方に挿した (剣の条件)。</summary>
         public static bool Split(CombatContext ctx)

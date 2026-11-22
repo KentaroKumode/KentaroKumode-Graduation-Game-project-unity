@@ -18,10 +18,10 @@ namespace ItemSystem.PassiveSkills.Effects
         public static RoleKind? Last(CombatContext ctx)
             => ctx.firedRolesThisTurn.Count > 0 ? ctx.firedRolesThisTurn[ctx.firedRolesThisTurn.Count - 1] : (RoleKind?)null;
 
-        /// <summary>このターン、 目 <paramref name="face"/> の役が立ったか。</summary>
-        public static bool FaceRoleThisTurn(CombatContext ctx, int face)
+        /// <summary>このターン、 目の集合 <paramref name="faces"/> (<see cref="TerminalCards.FaceIn"/>) のどれかの役が立ったか。</summary>
+        public static bool FaceRoleThisTurn(CombatContext ctx, int faces)
         {
-            foreach (var k in ctx.firedRolesThisTurn) if (TerminalCards.FaceOfRole(k) == face) return true;
+            foreach (var k in ctx.firedRolesThisTurn) if (TerminalCards.FaceIn(faces, TerminalCards.FaceOfRole(k))) return true;
             return false;
         }
 
@@ -29,7 +29,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public static void BlockNext(CombatContext ctx, int n) => YachtRoleEffects.AddNextTurn(ctx, YachtRoleEffects.BlockNextKey, n);
     }
 
-    /// <summary>欠け目の見立て: 1 の役〈特別〉が立ったターン (2026-11-22〜・前は 1・2・3 の目を含む役)、 攻撃が当たるたびボスの次の目盛りがその撃のダメージの 25% だけ上がる
+    /// <summary>欠け目の見立て: 1 の役〈特別〉か 2 の役〈封じ〉が立ったターン (2026-11-22 neon 収束〜・その前は 1 だけ・さらに前は 1・2・3 の目を含む役)、 攻撃が当たるたびボスの次の目盛りがその撃のダメージの 25% だけ上がる
     /// (目盛りへの削り +25%・〈刃毀れの見立て〉と同じ口 CombatManager.RaiseBossNextNotch)。 防御 12 の無視は旗 (<see cref="RoleItems.Chipped"/>)。</summary>
     public class ChippedEyeReading : IPassiveSkillEffect
     {
@@ -38,7 +38,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (!Psn.Hit(ctx) || !RoleFx.FaceRoleThisTurn(ctx, TerminalCards.ChippedFace)) return;
+            if (!Psn.Hit(ctx) || !RoleFx.FaceRoleThisTurn(ctx, TerminalCards.ChippedFaces)) return;
             int add = ctx.finalDamage * NotchPct / 100;
             if (add > 0) CombatManager.Instance?.RaiseBossNextNotch(add);
         }
@@ -76,7 +76,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>雷毒の導管: 2 の役〈封じ〉が立ったターン (2026-11-22〜・前は 1・2・3 の目を含む役)、 次のターンの手札 +1 枚・次のターンのブロック +4。</summary>
+    /// <summary>雷毒の導管: 1・2・3 の役 (〈特別〉〈封じ〉〈追撃〉) が立ったターン (2026-11-22 neon 収束〜・その前は 2 だけ)、 次のターンの手札 +1 枚 (1 ターン 1 回: 役は 1 ターンに高々 1 つ)・次のターンのブロック +4。</summary>
     public class LowFaceConduit : IPassiveSkillEffect
     {
         public string SkillId => ItemIds.RoleConduit;
@@ -85,7 +85,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             var k = RoleFx.Last(ctx);
-            if (k == null || TerminalCards.FaceOfRole(k.Value) != TerminalCards.ConduitFace) return;
+            if (k == null || !TerminalCards.FaceIn(TerminalCards.ConduitFaces, TerminalCards.FaceOfRole(k.Value))) return;
             Rw.DrawNext(1);
             RoleFx.BlockNext(ctx, Block);
             Rw.Log($"[雷毒の導管] 〈{YachtRoles.NameOf(k.Value)}〉 → 次のターン 手札 +1・ブロック +{Block}");

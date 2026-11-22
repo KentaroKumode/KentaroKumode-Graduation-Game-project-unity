@@ -201,7 +201,7 @@ namespace AutoTest
             /// 使い捨ての端子を使った回数 / 山札の切り直し (DeckDisposeFired / DeckShuffleFired)。 役の成立 / 〈万象のゾロ目〉の格上げ (RoleFormedFired / RoleOmniFired)。
             /// 見送り換金の回数 / 額 (AxisPool.RunSkips / RunSkipGold・額は〈銭皿〉込み・金の出入りは goldKeys の「見送り(…)」と totalCoinsSpent)。
             /// 武器の〈連刃〉の追撃 /〈処刑〉/〈画竜点睛〉/〈シールドバッシュ〉(CombatManager.WeaponChainFired ほか)。
-            /// [2026-11-22] 戦闘報酬の択を取った / 見送った回数 (rewardPicks / rewardSkips)・主軸共鳴で主軸を引いた回数 (AxisPool.RunMainAxisPicks)。</summary>
+            /// [2026-11-22] 戦闘報酬の択を取った / 見送った回数 (rewardPicks / rewardSkips)・主軸 (所持が単独 1 位の軸) を引いた回数 (AxisPool.RunMainAxisPicks・2026-11-22 neon 収束で主軸共鳴の重みは撤去 = 今は供給の集中の計装)。</summary>
             public int rebootFired, overclockFired, detonateFired, justGuardFired, bleedSpendFired, bleedExecuteFired, burstFired, burstBreakFired, critOverflowFired, critExecuteFired, critRefireFired,
                 deckDisposeFired, deckShuffleFired, roleFormedFired, roleOmniFired, skipFired, skipGold, axisRerollFired,
                 rewardPicks, rewardSkips, mainAxisPicks,

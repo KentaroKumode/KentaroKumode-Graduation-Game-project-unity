@@ -9,10 +9,10 @@ namespace ItemSystem.PassiveSkills.Effects
     //    天秤 = GameManager.Rewards (<see cref="SpoilsScale.Apply"/>) / 溶金 = items.json の stats (per = coins・swordShopSpent・数えるのは ShopManager.Close)。
     // ============================================================
 
-    /// <summary>銭皿: 秘宝を見送り換金したとき、 獲得ゴールド +50% (切り上げ・AxisPool.SkipGoldFor が掛ける)。</summary>
+    /// <summary>銭皿: 秘宝を見送り換金したとき、 獲得ゴールド +80% (切り上げ・AxisPool.SkipGoldFor が掛ける・2026-11-22 neon 収束: +50%)。</summary>
     public static class CoinDish
     {
-        public const int Pct = 50;
+        public const int Pct = 80;
         /// <summary>見送り換金の額 <paramref name="gold"/> に〈銭皿〉を掛けた額 (持っていなければそのまま)。</summary>
         public static int Apply(RunState run, int gold)
             => gold > 0 && run != null && run.OwnsPassive(ItemIds.GoldCoinDish) ? (gold * (100 + Pct) + 99) / 100 : gold;
@@ -83,11 +83,11 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>相場師の算盤: 店でリロール (軸指定を含む) を 1 回するたび 1 回分 (最大 <see cref="MaxStacks"/>・RunState.abacusStacks・ShopManager.TryReroll)。
-    /// 戦闘開始時 (1 ターン目) のブロック +2・最初の 1 撃の基礎攻撃 +1 (どちらも × 回分)。</summary>
+    /// 戦闘開始時 (1 ターン目) のブロック +3・最初の 1 撃の基礎攻撃 +2 (どちらも × 回分・2026-11-22 neon 収束: +2・+1)。</summary>
     public class MacroAbacus : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => ItemIds.MacroAbacus;
-        public const int BlockPer = 2, AtkPer = 1, MaxStacks = 10;
+        public const int BlockPer = 3, AtkPer = 2, MaxStacks = 10;
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Rw.Run?.abacusStacks ?? 0);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
