@@ -1928,11 +1928,13 @@ namespace AutoTest
                     v += System.Math.Min(CombatSystem.TerminalCards.ChippedPen, System.Math.Max(0, ctx.enemyDefense));
                 if ((f & CombatSystem.RoleItems.Clapper) != 0 && face != 0 && face == st.roleLastFace) mul += CombatSystem.TerminalCards.ClapperPct;
                 if ((f & CombatSystem.RoleItems.Thunder) != 0 && big) { mul *= 1f + CombatSystem.TerminalCards.ThunderFinalPct; v += CombatSystem.TerminalCards.ThunderBlock; }
+                else if ((f & CombatSystem.RoleItems.Thunder) != 0) { mul *= 1f + CombatSystem.TerminalCards.ThunderRerollPct; v += CombatSystem.TerminalCards.ThunderRerollBlock; }   // answer12: 振り直したターンの他の役
                 if ((f & CombatSystem.RoleItems.Bloodmark) != 0 && CombatSystem.TerminalCards.BloodmarkFires(r))
                     mul *= 1f + CombatSystem.TerminalCards.BloodmarkPer * count;
                 acc += v + (mul - 1f) * sum;
             }
-            return (float)(acc / total);
+            // 〈擦り切れた賽袋〉振り直したターンは役の有無を問わずブロック (answer12)
+            return (float)(acc / total) + ((f & CombatSystem.RoleItems.Pouch) != 0 ? CombatSystem.TerminalCards.PouchBlock : 0f);
         }
 
         /// <summary>振り直す目の添字。 目利きの賽 (ADR-0015) を持つ時は、 いちばん大きい目を残して残りを振る。</summary>

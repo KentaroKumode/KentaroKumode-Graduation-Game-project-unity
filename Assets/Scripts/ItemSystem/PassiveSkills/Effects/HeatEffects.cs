@@ -129,7 +129,7 @@ namespace ItemSystem.PassiveSkills.Effects
     public class OverflowMold : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => GameLoop.ItemIds.HeatMold;
-        public const int PctPerExcess = 2;
+        public const int PctPerExcess = 3;   // answer12: +2 → +3
         /// <summary>[persistent・次の 1 撃で 0] 溜まっている与ダメージの % 。</summary>
         private const string Key = "heat.mold";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Pct(Rw.Count(ctx, Key) / 100f);
@@ -148,7 +148,7 @@ namespace ItemSystem.PassiveSkills.Effects
     public class QuickKettle : IPassiveSkillEffect
     {
         public string SkillId => GameLoop.ItemIds.HeatKettle;
-       public const int Heat = 2;
+       public const int Heat = 1;   // answer12: +2 → +1
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {

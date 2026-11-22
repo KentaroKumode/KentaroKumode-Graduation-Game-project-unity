@@ -51,6 +51,22 @@ namespace AutoTest.EditorTests
         }
 
         [Test]
+        public void RerollTurnItems_Answer12()
+        {
+            // 〈雷鳴のゾロ目〉振り直したターンは 2 個そろいでも最終 +30%・ブロック +8 (振り直していなければ乗らない)
+            var pair = new[] { 2, 2, 5 };
+            var b = Run(RoleItems.None, pair, rerolled: true);
+            var th = Run(RoleItems.Thunder, pair, rerolled: true);
+            Assert.That(th.damageMul, Is.EqualTo(b.damageMul * (1f + TerminalCards.ThunderRerollPct)).Within(1e-4));
+            Assert.That(th.blockAdd - b.blockAdd, Is.EqualTo(TerminalCards.ThunderRerollBlock));
+            Assert.That(Run(RoleItems.Thunder, pair).damageMul, Is.EqualTo(Run(RoleItems.None, pair).damageMul).Within(1e-4));
+            // 〈擦り切れた賽袋〉振り直したターンは役が無くてもブロック +5
+            var none = new[] { 1, 3, 5 };
+            Assert.That(Run(RoleItems.Pouch, none, rerolled: true).blockAdd - Run(RoleItems.None, none, rerolled: true).blockAdd, Is.EqualTo(TerminalCards.PouchBlock));
+            Assert.That(Run(RoleItems.Pouch, none).blockAdd, Is.EqualTo(Run(RoleItems.None, none).blockAdd));
+        }
+
+        [Test]
         public void MultipliersAndOmniChance()
         {
             int[] triple = { 4, 4, 4 }, t5 = { 5, 5, 5 };
@@ -64,8 +80,8 @@ namespace AutoTest.EditorTests
             Assert.That(Run(RoleItems.Bloodmark, pair, roleCount: 1).damageMul, Is.EqualTo(Run(RoleItems.None, pair).damageMul * (1f + 2 * TerminalCards.BloodmarkPer)).Within(1e-4));
             Assert.That(Run(RoleItems.Bloodmark, triple, roleCount: 1).damageMul, Is.EqualTo(b.damageMul * (1f + 2 * TerminalCards.BloodmarkPer)).Within(1e-4));
             // final5: × 7%・上限なし ── 役 10 回目のペアで ×1.70
-            Assert.That(Run(RoleItems.Bloodmark, pair, roleCount: 9).damageMul, Is.EqualTo(Run(RoleItems.None, pair).damageMul * 1.70f).Within(1e-4));
-            Assert.That(Run(RoleItems.Bloodmark, triple, roleCount: 9).damageMul, Is.EqualTo(b.damageMul * 1.70f).Within(1e-4));
+            Assert.That(Run(RoleItems.Bloodmark, pair, roleCount: 9).damageMul, Is.EqualTo(Run(RoleItems.None, pair).damageMul * 1.80f).Within(1e-4));
+            Assert.That(Run(RoleItems.Bloodmark, triple, roleCount: 9).damageMul, Is.EqualTo(b.damageMul * 1.80f).Within(1e-4));
             Assert.That(Run(RoleItems.Bloodmark, t5, roleCount: 1).damageMul, Is.EqualTo(Run(RoleItems.None, t5).damageMul * (1f + 2 * TerminalCards.BloodmarkPer)).Within(1e-4));
             Assert.That(Run(RoleItems.Bloodmark, new[] { 1, 3, 5 }, roleCount: 1).damageMul, Is.EqualTo(Run(RoleItems.None, new[] { 1, 3, 5 }).damageMul).Within(1e-4));   // 役なし
             // 拍子木: 前のターンに同じ目の役が立っていれば与ダメージ +N%
