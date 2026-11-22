@@ -1452,7 +1452,7 @@
       "floor": 7,
       "displayName": "ヴェスカ・小手調べ",
       "description": "最深部の裂け目を背に、値踏みするような目で歩み寄る遺物学者。浅層でも見かけるありふれた品を、自分の指先のように造作もなく操る。",
-      "maxHP": 4012,
+      "maxHP": 4333,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 10,
@@ -1489,7 +1489,7 @@
           "flavorText": "「開けたのは私だ。だが閉じ方は誰も知らない」"
         }
       ],
-      "baseAttack": 23,
+      "baseAttack": 24,
       "attackRollMin": 2,
       "attackRollMax": 6,
       "heavyPeriod": 0,
@@ -1501,7 +1501,7 @@
       "floor": 7,
       "displayName": "ヴェスカ・遺物学者",
       "description": "外套の裏から深層の危険な遺物を次々と取り出し、構えを改めるヴェスカ。止まった時の中で百年繰り返した、手慣れた手順で力を重ねていく。",
-      "maxHP": 4012,
+      "maxHP": 4333,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 10,
@@ -1538,7 +1538,7 @@
           "flavorText": "「開けたのは私だ。だが閉じ方は誰も知らない」"
         }
       ],
-      "baseAttack": 22,
+      "baseAttack": 23,
       "attackRollMin": 2,
       "attackRollMax": 5,
       "heavyPeriod": 0,
@@ -1550,7 +1550,7 @@
       "floor": 7,
       "displayName": "ヴェスカ・神話",
       "description": "地上の鑑定所には一度も届いたことのない、神話級の遺物が宙に浮かぶ。裂け目から漏れる異界の光を浴びて、眠っていた品々が次々と目を覚ます。",
-      "maxHP": 3562,
+      "maxHP": 3847,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 12,
@@ -1587,7 +1587,7 @@
           "flavorText": "「開けたのは私だ。だが閉じ方は誰も知らない」"
         }
       ],
-      "baseAttack": 23,
+      "baseAttack": 24,
       "attackRollMin": 2,
       "attackRollMax": 7,
       "heavyPeriod": 5,
