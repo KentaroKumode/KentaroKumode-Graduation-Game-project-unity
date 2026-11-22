@@ -1824,8 +1824,8 @@ namespace AutoTest
 
         /// <summary>全部振り直した後に立つ役が、 役の軸の品で生む得の期待値 (攻撃相当の量・出目の和と同じ単位)。 持っていなければ 0。
         /// 面の出方を全部数える (<see cref="ExpectedBestUtilityAfterReroll"/> と同じ)。 役は本体と同じ関数 (<see cref="CombatSystem.TerminalCards.RoleOf"/>・封じ・格上げ込み)、
-        /// 量は TerminalCards の定数 (Resolve の 6d と同じ値)。 役の回数・続いたターンは本体の TerminalBattleState.roleCount / roleStreak。
-        /// 撃 1 つぶん (撃の数は見ない)。 与ダメージの % は振った目の和に掛けた量。 振り直した後の手なので〈血染めの歯車〉は必ず乗る。
+        /// 量は TerminalCards の定数 (Resolve の 6d と同じ値)。 役の回数・前のターンの役の目は本体の TerminalBattleState.roleCount / roleLastFace。
+        /// 撃 1 つぶん (撃の数は見ない)。 与ダメージの % は振った目の和に掛けた量。 振り直した後の手なので〈血染めの歯車〉は 3 の役なら乗る。 品の条件の目は本体の TerminalCards の定数 (2026-11-22)。
         /// shortcut: 次のターンへ持ち越す分 (雷毒の導管・揃いの拍子木の手札・負け越しの賽) と役そのものの効果は数えない。</summary>
         private static float RoleRerollPips(ItemSystem.PassiveSkills.CombatContext ctx, int[] faces, int k, CombatSystem.MutualTurnTelegraph tele)
         {
@@ -1848,19 +1848,18 @@ namespace AutoTest
                 if (rk == null) continue;
                 var r = rk.Value;
                 bool big = CombatSystem.YachtRoles.IsBig(r);
-                int face = r == CombatSystem.RoleKind.Straight ? 0 : CombatSystem.YachtRoles.FaceOf(r);
+                int face = CombatSystem.TerminalCards.FaceOfRole(r);
                 float v = 0f, mul = 1f;
-                if ((f & CombatSystem.RoleItems.WoodTag) != 0) v += CombatSystem.TerminalCards.WoodTagAttack + CombatSystem.TerminalCards.WoodTagBlock;
-                if ((f & CombatSystem.RoleItems.Gear) != 0) v += CombatSystem.TerminalCards.GearAttack;
-                if ((f & CombatSystem.RoleItems.NotchBoard) != 0)
+                if ((f & CombatSystem.RoleItems.WoodTag) != 0 && face == CombatSystem.TerminalCards.WoodTagFace) v += CombatSystem.TerminalCards.WoodTagAttack + CombatSystem.TerminalCards.WoodTagBlock;
+                if ((f & CombatSystem.RoleItems.Gear) != 0 && face == CombatSystem.TerminalCards.GearFace) v += CombatSystem.TerminalCards.GearAttack;
+                if ((f & CombatSystem.RoleItems.NotchBoard) != 0 && face == CombatSystem.TerminalCards.NotchBoardFace)
                     v += System.Math.Min(CombatSystem.TerminalCards.NotchBoardMax, CombatSystem.TerminalCards.NotchBoardPer * count) * (big ? 2 : 1);
-                if ((f & CombatSystem.RoleItems.Chipped) != 0 && CombatSystem.TerminalCards.HasLowFace(r, buf))
+                if ((f & CombatSystem.RoleItems.Chipped) != 0 && face == CombatSystem.TerminalCards.ChippedFace)
                     v += System.Math.Min(CombatSystem.TerminalCards.ChippedPen, System.Math.Max(0, ctx.enemyDefense));
-                if ((f & CombatSystem.RoleItems.Clapper) != 0 && st.roleStreak >= 1) mul += CombatSystem.TerminalCards.ClapperPct;
+                if ((f & CombatSystem.RoleItems.Clapper) != 0 && face != 0 && face == st.roleLastFace) mul += CombatSystem.TerminalCards.ClapperPct;
                 if ((f & CombatSystem.RoleItems.Thunder) != 0 && big) { mul *= 1f + CombatSystem.TerminalCards.ThunderFinalPct; v += CombatSystem.TerminalCards.ThunderBlock; }
-                if ((f & CombatSystem.RoleItems.Bloodmark) != 0)
-                    mul *= 1f + System.Math.Min(CombatSystem.TerminalCards.BloodmarkMax, CombatSystem.TerminalCards.BloodmarkPer * count)
-                         + (face == 3 || face == 4 ? CombatSystem.TerminalCards.BloodmarkBonus : 0f);
+                if ((f & CombatSystem.RoleItems.Bloodmark) != 0 && (face == 3 || face == 4))
+                    mul *= 1f + System.Math.Min(CombatSystem.TerminalCards.BloodmarkMax, CombatSystem.TerminalCards.BloodmarkPer * count);
                 acc += v + (mul - 1f) * sum;
             }
             return (float)(acc / total);

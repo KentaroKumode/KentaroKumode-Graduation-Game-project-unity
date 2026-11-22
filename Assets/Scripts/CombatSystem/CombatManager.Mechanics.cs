@@ -415,13 +415,12 @@ namespace CombatSystem
             bool omni = AxisRules.Owns(roleRun, GameLoop.ItemIds.RoleOmni), mirror = AxisRules.Owns(roleRun, GameLoop.ItemIds.RoleMirror),
                  fate = AxisRules.Owns(roleRun, GameLoop.ItemIds.RoleFate);
             var tier = GameLoop.DiceFaceParts.Tier.T3;   // Tier は使わない (ADR-0015)。 実績の呼び手のために渡すだけ
-            // 〈宿命の刻み目〉: 前のターンに立った役の効果が、 このターンにももう 1 回働く (役が立ったのではないので数えない・出来事も鳴らさない)。
-            //   連なりの効果 (端子がすべて 2 回働く) は端子の解決の中なので、 前のターンに TerminalBattleState.fateDoubleNext で渡してある
+            // 〈宿命の刻み目〉: 前のターンに立ったゾロ目の効果が、 このターンにももう 1 回働く (役が立ったのではないので数えない・出来事も鳴らさない・2026-11-22〜 ゾロ目だけ)。
             if (fate)
             {
                 int prev = (int)ctx.GetAccumulated(FateRoleKey) - 1;
                 ctx.accumulatedValues[FateRoleKey] = 0;
-                if (prev >= 0 && (RoleKind)prev != RoleKind.Straight)
+                if (prev >= 0)
                 {
                     YachtRoleEffects.Apply((RoleKind)prev, tier, ctx, ref outcome);
                     Debug.Log($"[宿命の刻み目] 前のターンの役〈{YachtRoles.NameOf((RoleKind)prev)}〉の効果がもう 1 回働く");
@@ -442,11 +441,7 @@ namespace CombatSystem
                 for (int t = 0; t < times; t++) YachtRoleEffects.Apply(k, tier, ctx, ref outcome);
                 // 〈鏡合わせの盤〉: 2 個そろいなら、 1 つ小さい目の 2 個そろいの効果も働く (1 の 2 個そろいなら、 次のターンの無料の振り直し +1)
                 if (mirror && !YachtRoles.IsBig(k)) MirrorPair(k, ctx, tier, ref outcome);
-                if (fate)
-                {
-                    ctx.accumulatedValues[FateRoleKey] = (int)k + 1;
-                    if (k == RoleKind.Straight && _deck != null) _deck.state.fateDoubleNext = true;
-                }
+                if (fate && YachtRoles.IsTriple(k)) ctx.accumulatedValues[FateRoleKey] = (int)k + 1;
                 ctx.firedRolesThisTurn.Add(k);
                 RaiseCue(CombatCue.Role, YachtRoles.NameOf(k));      // 合図 (#319)
                 YachtRoleEffects.FiredCount[(int)k]++;
@@ -457,12 +452,14 @@ namespace CombatSystem
                 // 役が立った (2026-11-21・段 1-f): 量 = 強さ (2 個そろい 1 / ゾロ目・連なり 2)。 OnWired の前なので、 品の攻撃 +N は撃ごとに乗る
                 ItemSystem.PassiveSkills.Keywords.Kw.Raise(ctx, PassiveSkillTrigger.OnRoleFired, YachtRoles.Strength(k));
             }
-            // 役の回数と続いたターン (役の軸の品が読む・TerminalBattleState)。 〈宿命の刻み目〉〈鏡合わせの盤〉の重ねた効果は数えない
+            // 役の回数と同じ目の役が続いたターン (役の軸の品が読む・TerminalBattleState)。 〈宿命の刻み目〉〈鏡合わせの盤〉の重ねた効果は数えない
             if (_deck != null)
             {
                 int formed = ctx.firedRolesThisTurn.Count;
+                int face = formed > 0 ? TerminalCards.FaceOfRole(ctx.firedRolesThisTurn[formed - 1]) : 0;
                 _deck.state.roleCount += formed;
-                _deck.state.roleStreak = formed > 0 ? _deck.state.roleStreak + 1 : 0;
+                _deck.state.roleStreak = face == 0 ? 0 : face == _deck.state.roleLastFace ? _deck.state.roleStreak + 1 : 1;
+                _deck.state.roleLastFace = face;
                 RoleFormedFired += formed;      // [計装]
             }
 

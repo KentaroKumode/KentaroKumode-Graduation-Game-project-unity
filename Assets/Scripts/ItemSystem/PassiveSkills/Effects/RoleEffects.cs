@@ -18,10 +18,10 @@ namespace ItemSystem.PassiveSkills.Effects
         public static RoleKind? Last(CombatContext ctx)
             => ctx.firedRolesThisTurn.Count > 0 ? ctx.firedRolesThisTurn[ctx.firedRolesThisTurn.Count - 1] : (RoleKind?)null;
 
-        /// <summary>このターン、 1・2・3 の目を含む役が立ったか。</summary>
-        public static bool LowRoleThisTurn(CombatContext ctx)
+        /// <summary>このターン、 目 <paramref name="face"/> の役が立ったか。</summary>
+        public static bool FaceRoleThisTurn(CombatContext ctx, int face)
         {
-            foreach (var k in ctx.firedRolesThisTurn) if (TerminalCards.HasLowFace(k, ctx.playerDice)) return true;
+            foreach (var k in ctx.firedRolesThisTurn) if (TerminalCards.FaceOfRole(k) == face) return true;
             return false;
         }
 
@@ -29,7 +29,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public static void BlockNext(CombatContext ctx, int n) => YachtRoleEffects.AddNextTurn(ctx, YachtRoleEffects.BlockNextKey, n);
     }
 
-    /// <summary>欠け目の見立て: 1・2・3 の目を含む役が立ったターン、 攻撃が当たるたびボスの次の目盛りがその撃のダメージの 25% だけ上がる
+    /// <summary>欠け目の見立て: 1 の役〈特別〉が立ったターン (2026-11-22〜・前は 1・2・3 の目を含む役)、 攻撃が当たるたびボスの次の目盛りがその撃のダメージの 25% だけ上がる
     /// (目盛りへの削り +25%・〈刃毀れの見立て〉と同じ口 CombatManager.RaiseBossNextNotch)。 防御 12 の無視は旗 (<see cref="RoleItems.Chipped"/>)。</summary>
     public class ChippedEyeReading : IPassiveSkillEffect
     {
@@ -38,13 +38,13 @@ namespace ItemSystem.PassiveSkills.Effects
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (!Psn.Hit(ctx) || !RoleFx.LowRoleThisTurn(ctx)) return;
+            if (!Psn.Hit(ctx) || !RoleFx.FaceRoleThisTurn(ctx, TerminalCards.ChippedFace)) return;
             int add = ctx.finalDamage * NotchPct / 100;
             if (add > 0) CombatManager.Instance?.RaiseBossNextNotch(add);
         }
     }
 
-    /// <summary>揃いの拍子木: 2 ターン以上続けて役が立ったターン (役が途切れるまで毎ターン)、 次のターンの手札 +1 枚・次のターンの最初の振り直しが無料
+    /// <summary>揃いの拍子木: 同じ目の役が 2 ターン以上続けて立ったターン (2026-11-22〜・途切れるか目が変わるまで毎ターン・連なりは数えない)、 次のターンの手札 +1 枚・次のターンの最初の振り直しが無料
     /// (無料の振り直し +1・〈特別・対〉と同じ口)。 各撃の与ダメージ +35% は旗 (<see cref="RoleItems.Clapper"/>)。</summary>
     public class MatchedClappers : IPassiveSkillEffect
     {
@@ -52,10 +52,12 @@ namespace ItemSystem.PassiveSkills.Effects
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRoleFired };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if ((CombatManager.Instance?.TerminalDeck?.state.roleStreak ?? 0) < 1) return;   // 前のターンにも役が立った (このターンの分はまだ入っていない)
+            var k = RoleFx.Last(ctx);
+            int face = k == null ? 0 : TerminalCards.FaceOfRole(k.Value);
+            if (face == 0 || face != (CombatManager.Instance?.TerminalDeck?.state.roleLastFace ?? 0)) return;   // 前のターンにも同じ目の役 (このターンの分はまだ入っていない)
             Rw.DrawNext(1);
             YachtRoleEffects.AddNextTurn(ctx, YachtRoleEffects.FreeRerollKey, 1);
-            Rw.Log("[揃いの拍子木] 役が続いた → 次のターン 手札 +1・最初の振り直しが無料");
+            Rw.Log($"[揃いの拍子木] {face} の役が続いた → 次のターン 手札 +1・最初の振り直しが無料");
         }
     }
 
@@ -74,7 +76,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>雷毒の導管: 1・2・3 の目を含む役が立ったターン、 次のターンの手札 +1 枚・次のターンのブロック +4。</summary>
+    /// <summary>雷毒の導管: 2 の役〈封じ〉が立ったターン (2026-11-22〜・前は 1・2・3 の目を含む役)、 次のターンの手札 +1 枚・次のターンのブロック +4。</summary>
     public class LowFaceConduit : IPassiveSkillEffect
     {
         public string SkillId => ItemIds.RoleConduit;
@@ -83,7 +85,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             var k = RoleFx.Last(ctx);
-            if (k == null || !TerminalCards.HasLowFace(k.Value, ctx.playerDice)) return;
+            if (k == null || TerminalCards.FaceOfRole(k.Value) != TerminalCards.ConduitFace) return;
             Rw.DrawNext(1);
             RoleFx.BlockNext(ctx, Block);
             Rw.Log($"[雷毒の導管] 〈{YachtRoles.NameOf(k.Value)}〉 → 次のターン 手札 +1・ブロック +{Block}");

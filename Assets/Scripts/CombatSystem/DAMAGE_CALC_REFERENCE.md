@@ -796,16 +796,17 @@ sup = 発動した補助の端子 (基本を除く)・perm = 場の常設 (基�
 ### 3-P. 役の軸 (2026-11-21・`RoleEffects.cs`・`TerminalCards.cs` の `RoleItems`・full-item-rework-ledger §⑧)
 
 分岐 A〈低目ロール連打〉/ 分岐 B〈リロール＆格上げ爆発〉。 軸の数 (賽目) を読む品は無い。 C = この戦闘で役が成立した回数 (`TerminalBattleState.roleCount`・Resolve の中ではこのターンの役を足した C + 1)・
-S = 直前のターンまで役が続いたターン数 (`roleStreak`)。 どちらも `CombatManager.ResolveRoles` がターンの役の後に書く (〈宿命の刻み目〉のもう 1 回・〈鏡合わせの盤〉の重ねた効果は数えない)。
-低い役 = 1・2・3 の目を含む役 (`TerminalCards.HasLowFace`・連なりは振った目のどれかが 1〜3)。 big = ゾロ目か連なり。
+F = 役の目 (`TerminalCards.FaceOfRole`・2 個そろいとゾロ目の目・連なりは 0)・L = 直前のターンに立った役の目 (`roleLastFace`・0 = なしか連なり)・
+S = 直前のターンまで同じ目の役が続いたターン数 (`roleStreak`・表示だけ)。 どれも `CombatManager.ResolveRoles` がターンの役の後に書く (〈宿命の刻み目〉のもう 1 回・〈鏡合わせの盤〉の重ねた効果は数えない)。
+big = ゾロ目か連なり。 品が働く目 (2026-11-22〜・前はどの役でも / 1・2・3 の目を含む役) は `TerminalCards.*Face` の定数。
 
 | 計算の位置 | 式 |
 |---|---|
-| 6d 撃ごとの攻撃 +N (`ApplyRoleItems`) | 〈見切りの木札〉+1 / 〈血染めの歯車〉振り直したターン (`env.diceRerolled`) +6 / 〈符丁の刻み板〉+min(6, 1 × (C + 1)) × (big ? 2 : 1) |
-| 6d ブロック | 〈見切りの木札〉+2 / 〈雷鳴のゾロ目〉big なら +4 |
-| 6d 掛け算 | 〈雷鳴のゾロ目〉big なら `damageMul ×= 1.2` / 〈血濡れの符丁〉`damageMul ×= 1 + min(0.5, 0.05 × (C + 1)) + (役が〈追撃〉〈攻め〉なら 0.3)` / 〈揃いの拍子木〉S ≥ 1 なら `outgoingPctAdd += 0.12` |
-| 6d その他 | 〈欠け目の見立て〉低い役なら `armorPen += 12` |
-| 出来事 (`RoleEffects.cs`) | 〈欠け目の見立て〉低い役のターン、 当たった撃のダメージ × 25% だけ `RaiseBossNextNotch` / 〈揃いの拍子木〉OnRoleFired で S ≥ 1 なら次のターン 手札 +1・無料の振り直し +1 / 〈雷毒の導管〉OnRoleFired で低い役なら次のターン 手札 +1・ブロック +4 / 〈負け越しの賽〉OnTurnEnd で役なしなら次のターン 無料の振り直し +1・ブロック +6 |
+| 6d 撃ごとの攻撃 +N (`ApplyRoleItems`) | 〈見切りの木札〉F = 5 なら +1 / 〈血染めの歯車〉振り直したターン (`env.diceRerolled`) かつ F = 3 なら +6 / 〈符丁の刻み板〉F = 4 なら +min(6, 1 × (C + 1)) × (ゾロ目 ? 2 : 1) (C はどの役も数える) |
+| 6d ブロック | 〈見切りの木札〉F = 5 なら +2 / 〈雷鳴のゾロ目〉big なら +4 |
+| 6d 掛け算 | 〈雷鳴のゾロ目〉big なら `damageMul ×= 1.2` / 〈血濡れの符丁〉F = 3 か 4 なら `damageMul ×= 1 + min(0.5, 0.05 × (C + 1))` / 〈揃いの拍子木〉F ≠ 0 かつ F = L なら `outgoingPctAdd += 0.12` |
+| 6d その他 | 〈欠け目の見立て〉F = 1 なら `armorPen += 12` |
+| 出来事 (`RoleEffects.cs`) | 〈欠け目の見立て〉1 の役のターン、 当たった撃のダメージ × 25% だけ `RaiseBossNextNotch` / 〈揃いの拍子木〉OnRoleFired で F ≠ 0 かつ F = L なら次のターン 手札 +1・無料の振り直し +1 / 〈雷毒の導管〉OnRoleFired で F = 2 なら次のターン 手札 +1・ブロック +4 / 〈負け越しの賽〉OnTurnEnd で役なしなら次のターン 無料の振り直し +1・ブロック +6 |
 | 次のターンのブロック | nextTurnBuffs `roleBlockNext` (`YachtRoleEffects.BlockNextKey`) → BeginNewTurn の Phase B で `itemBlockBonus` の初期値 (〈負け越しの賽〉〈雷毒の導管〉〈鏡合わせの盤〉) |
 | 役の適用 (`ResolveRoles` / `DecideOmniPair`) | 〈擦り切れた賽袋〉戦闘の最初の振り直しが無料 / 〈鏡合わせの盤〉〈宿命の刻み目〉〈万象のゾロ目〉は §9.2 の役の段 |
 | BOT | 6d は Resolve と同じ関数なので配線の見積もりに自動で入る。 振り直すかの線 (`RoleRerollPips`) は TerminalCards の定数で 6d を面の出方ごとに数え、 掛け算は振った目の和に掛けた量。 次のターンへ持ち越す分は見ない。 乱数は引かない |
@@ -1100,8 +1101,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
          賽目の【規則】と締め (2026-11-21・段 1-f・所持は AxisRules.Owns):
            〈万象のゾロ目〉: ゾロ目 (格上げも) の効果を 2 回 Apply
            〈鏡合わせの盤〉: 2 個そろい (目 f) なら Pair(f − 1) の効果も Apply (役は立っていない ── firedRolesThisTurn・OnRoleFired・計装に数えない)。 f = 1 なら次のターンの無料の振り直し +1・次のターンのブロック +6
-           〈宿命の刻み目〉: 立った役を ctx.accumulatedValues["role.fate"] に控え、 次のターンの ResolveRoles の頭でその効果を 1 回 Apply (数えない・万象の 2 回・鏡は掛けない)。
-              連なりは端子の解決の中の効果なので TerminalBattleState.fateDoubleNext → 次のターンの BeginTurn で doubleAll
+           〈宿命の刻み目〉: 立った役がゾロ目 (格上げも・2026-11-22〜) なら ctx.accumulatedValues["role.fate"] に控え、 次のターンの ResolveRoles の頭でその効果を 1 回 Apply (数えない・万象の 2 回・鏡は掛けない)
          役を適用した直後に出来事 OnRoleFired (量 = YachtRoles.Strength・2 個そろい 1 / ゾロ目・連なり 2)。 OnWired の前 = 品の攻撃 +N (mutualAttackBonus) と貫通は撃ごとに乗る。
 
 攻撃しないターン (攻撃端子 0 本 / 逃げる・2026-11-04 修正)

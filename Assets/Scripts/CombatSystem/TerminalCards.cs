@@ -209,11 +209,10 @@ namespace CombatSystem
         public BleedItems bleedItems;
         /// <summary>臨界の品の旗 (戦闘の始めに所持品から・CombatManager.BeginTerminalDeck・<see cref="HeatCore.ItemsOf"/>・2026-11-21)。</summary>
         public HeatItems heatItems;
-        /// <summary>〈宿命の刻み目〉: このターンに立った役〈連なり〉の効果 (挿した端子がすべて 2 回働く) を次のターンにももう 1 回 (<see cref="BeginTurn"/> が <see cref="doubleAll"/> へ移す・CombatManager.ResolveRoles が立てる)。</summary>
-        public bool fateDoubleNext;
-        /// <summary>この戦闘で役が成立した回数 / 直前のターンまで役が続いて成立したターンの数 (CombatManager.ResolveRoles がターンの役の後に書く・2026-11-21)。
+        /// <summary>この戦闘で役が成立した回数 / 直前のターンまで同じ目の役が続いて成立したターンの数 / 直前のターンに立った役の目 (<see cref="TerminalCards.FaceOfRole"/>・0 = なしか連なり)
+        /// (CombatManager.ResolveRoles がターンの役の後に書く・2026-11-21・同じ目にしたのは 2026-11-22)。
         /// 〈符丁の刻み板〉〈血濡れの符丁〉〈揃いの拍子木〉〈万象のゾロ目〉が読む。 Resolve の中では、 このターンの役はまだ入っていない。</summary>
-        public int roleCount, roleStreak;
+        public int roleCount, roleStreak, roleLastFace;
 
         /// <summary>場の s がこのターン止まっているか。</summary>
         public bool IsStopped(int s) => stopped != null && s >= 0 && s < stopped.Length && stopped[s];
@@ -236,7 +235,7 @@ namespace CombatSystem
         public int BeginTurn()
         {
             ignoreCond = ignoreCondNext; ignoreCondNext = false;
-            doubleAll = fateDoubleNext; fateDoubleNext = false;      // 〈宿命の刻み目〉の連なりの分 (2026-11-21)
+            doubleAll = false;
             shuffledNow = 0; engineDrawTurn = 0;
             foundryFiredTurn = 0;
             storedAttack += storedAttackNext; storedAttackNext = 0;
@@ -463,11 +462,13 @@ namespace CombatSystem
         /// <summary>〈折り目のついた札〉与ダメージ % の池 / 〈常設の作業台〉常設 1 枚あたりの最終与ダメージ / 〈灰から組む機関〉使い捨て 1 回あたりの最終与ダメージ・上限。</summary>
         public const float FoldedPct = 0.45f, WorkbenchFinalPct = 0.10f, AshPer = 0.06f, AshMax = 0.60f;
         // ===== 賽目 (役の軸) の品の数値 (2026-11-21・段 1-f・item-overhaul-spec §5・未測定) =====
-        /// <summary>〈見切りの木札〉役が立ったターン 各撃の攻撃 +N・ブロック +N / 〈符丁の刻み板〉各撃の攻撃 + min(上限, 役の回数 × N) (ゾロ目・連なりなら 2 倍) /
-        /// 〈欠け目の見立て〉防御の無視 / 〈血染めの歯車〉各撃 +N / 〈雷鳴のゾロ目〉ブロック (full-item-rework-ledger §⑧・未測定)。</summary>
+        /// <summary>〈見切りの木札〉5 の役のターン 各撃の攻撃 +N・ブロック +N / 〈符丁の刻み板〉4 の役のターン 各撃の攻撃 + min(上限, 役の回数 × N) (ゾロ目なら 2 倍) /
+        /// 〈欠け目の見立て〉1 の役のターン 防御の無視 / 〈血染めの歯車〉振り直し＋3 の役のターン 各撃 +N / 〈雷鳴のゾロ目〉ブロック (full-item-rework-ledger §⑧・未測定)。</summary>
         public const int WoodTagAttack = 1, WoodTagBlock = 2, NotchBoardPer = 1, NotchBoardMax = 6, ChippedPen = 12, GearAttack = 6, ThunderBlock = 4;
-        /// <summary>〈揃いの拍子木〉与ダメージ % の池 / 〈雷鳴のゾロ目〉最終与ダメージ / 〈血濡れの符丁〉役の回数 1 回あたりの最終与ダメージ・上限・〈追撃〉〈攻め〉の上乗せ。</summary>
-        public const float ClapperPct = 0.12f, ThunderFinalPct = 0.20f, BloodmarkPer = 0.05f, BloodmarkMax = 0.50f, BloodmarkBonus = 0.30f;
+        /// <summary>役の軸の品が働く役の目 (2026-11-22・どの役でも → 目を指定)。 〈雷毒の導管〉は RoleEffects.cs。</summary>
+        public const int WoodTagFace = 5, NotchBoardFace = 4, ChippedFace = 1, GearFace = 3, ConduitFace = 2;
+        /// <summary>〈揃いの拍子木〉与ダメージ % の池 / 〈雷鳴のゾロ目〉最終与ダメージ / 〈血濡れの符丁〉3・4 の役のターン 役の回数 1 回あたりの最終与ダメージ・上限。</summary>
+        public const float ClapperPct = 0.12f, ThunderFinalPct = 0.20f, BloodmarkPer = 0.05f, BloodmarkMax = 0.50f;
         /// <summary>〈賽振り台〉次のターンの最初の振り直しの費用から引く上限 (min(上限, 役の回数)) / 〈役落とし〉役が成立したターン 攻撃 + 役の回数 × N。
         /// 役の回数 = この戦闘で役が成立した回数 (このターンの役を含む・役の軸の品と同じ数え方・台帳 §⑧)。 *Up = 強化した端子。</summary>
         public const int DiceTableCap = 6, DiceTableCapUp = 8, RoleDropPer = 3, RoleDropPerUp = 4;
@@ -1182,18 +1183,16 @@ namespace CombatSystem
             if (f == RoleItems.None || rk == null) return;
             var k = rk.Value;
             bool big = YachtRoles.IsBig(k);
-            int count = st.roleCount + 1, each = 0;
-            if ((f & RoleItems.WoodTag) != 0) { each += WoodTagAttack; o.blockAdd += WoodTagBlock; }                          // 〈見切りの木札〉
-            if ((f & RoleItems.Gear) != 0 && env.diceRerolled) each += GearAttack;                                           // 〈血染めの歯車〉
-            if ((f & RoleItems.NotchBoard) != 0) each += Math.Min(NotchBoardMax, NotchBoardPer * count) * (big ? 2 : 1);     // 〈符丁の刻み板〉
-            if ((f & RoleItems.Chipped) != 0 && HasLowFace(k, dice)) o.armorPen += ChippedPen;                               // 〈欠け目の見立て〉
-            if ((f & RoleItems.Clapper) != 0 && st.roleStreak >= 1) o.outgoingPctAdd += ClapperPct;                          // 〈揃いの拍子木〉
+            int count = st.roleCount + 1, each = 0, face = FaceOfRole(k);   // 品の条件は目の役 (2026-11-22・連なりはどの目でもない)
+            if ((f & RoleItems.WoodTag) != 0 && face == WoodTagFace) { each += WoodTagAttack; o.blockAdd += WoodTagBlock; }    // 〈見切りの木札〉5〈守り〉
+            if ((f & RoleItems.Gear) != 0 && env.diceRerolled && face == GearFace) each += GearAttack;                        // 〈血染めの歯車〉3〈追撃〉
+            if ((f & RoleItems.NotchBoard) != 0 && face == NotchBoardFace)                                                   // 〈符丁の刻み板〉4〈攻め〉 (回数はどの役も)
+                each += Math.Min(NotchBoardMax, NotchBoardPer * count) * (big ? 2 : 1);
+            if ((f & RoleItems.Chipped) != 0 && face == ChippedFace) o.armorPen += ChippedPen;                              // 〈欠け目の見立て〉1〈特別〉
+            if ((f & RoleItems.Clapper) != 0 && face != 0 && face == st.roleLastFace) o.outgoingPctAdd += ClapperPct;         // 〈揃いの拍子木〉同じ目が続いた
             if ((f & RoleItems.Thunder) != 0 && big) { o.damageMul *= 1f + ThunderFinalPct; o.blockAdd += ThunderBlock; }    // 〈雷鳴のゾロ目〉
-            if ((f & RoleItems.Bloodmark) != 0)                                                                              // 〈血濡れの符丁〉
-            {
-                int face = k == RoleKind.Straight ? 0 : YachtRoles.FaceOf(k);
-                o.damageMul *= 1f + Math.Min(BloodmarkMax, BloodmarkPer * count) + (face == 3 || face == 4 ? BloodmarkBonus : 0f);
-            }
+            if ((f & RoleItems.Bloodmark) != 0 && (face == 3 || face == 4))                                                  // 〈血濡れの符丁〉3〈追撃〉・4〈攻め〉
+                o.damageMul *= 1f + Math.Min(BloodmarkMax, BloodmarkPer * count);
             if (each > 0 && o.attackHits.Count > 0)
             {
                 for (int h = 0; h < o.attackHits.Count; h++) o.attackHits[h] += each;
@@ -1202,13 +1201,8 @@ namespace CombatSystem
             }
         }
 
-        /// <summary>役 <paramref name="k"/> が 1・2・3 の目を含むか (2 個そろい・ゾロ目は目、 連なりは振った目で見る)。 〈欠け目の見立て〉〈雷毒の導管〉。</summary>
-        public static bool HasLowFace(RoleKind k, int[] dice)
-        {
-            if (k != RoleKind.Straight) return YachtRoles.FaceOf(k) <= 3;
-            if (dice != null) foreach (int d in dice) if (d >= 1 && d <= 3) return true;
-            return false;
-        }
+        /// <summary>役 <paramref name="k"/> の目 (2 個そろい・ゾロ目の目・連なりは 0)。 役の軸の品の条件 (2026-11-22)。</summary>
+        public static int FaceOfRole(RoleKind k) => k == RoleKind.Straight ? 0 : YachtRoles.FaceOf(k);
 
         /// <summary>このターンに立つ役 (立たなければ null)。 CombatManager.ResolveRoles と同じ判定: 振った 3 つの目 (<see cref="YachtRoles.Evaluate"/>)・
         /// 〈凶運〉で封じた役は立たない・〈万象のゾロ目〉で格上げした 2 個そろいはゾロ目 (<see cref="UpgradePair"/>)。 3 つの目では役は高々 1 つ。</summary>
