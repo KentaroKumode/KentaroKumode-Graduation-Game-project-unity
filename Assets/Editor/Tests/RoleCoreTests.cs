@@ -36,9 +36,10 @@ namespace AutoTest.EditorTests
             Assert.That(Atk(RoleItems.NotchBoard, p4, 20), Is.EqualTo(TerminalCards.NotchBoardMax * 2));
             Assert.That(Atk(RoleItems.NotchBoard, p5, 3), Is.EqualTo(0));
             // 血染めの歯車: 振り直し + 3 の役
-            Assert.That(Atk(RoleItems.Gear, p3, rr: true), Is.EqualTo(TerminalCards.GearAttack * 2));
+            // 血染めの歯車 (answer9): 振り直したターンのどの役も +5・3 の役かゾロ目は +10
+            Assert.That(Atk(RoleItems.Gear, p3, rr: true), Is.EqualTo(TerminalCards.GearAttackHigh * 2));
             Assert.That(Atk(RoleItems.Gear, p3), Is.EqualTo(0));
-            Assert.That(Atk(RoleItems.Gear, p5, rr: true), Is.EqualTo(0));
+            Assert.That(Atk(RoleItems.Gear, p5, rr: true), Is.EqualTo(TerminalCards.GearAttack * 2));
             // 欠け目の見立て: 1・2 の役だけ
             Assert.That(Run(RoleItems.Chipped, p1).armorPen - Run(RoleItems.None, p1).armorPen, Is.EqualTo(TerminalCards.ChippedPen));
             Assert.That(Run(RoleItems.Chipped, p2).armorPen - Run(RoleItems.None, p2).armorPen, Is.EqualTo(TerminalCards.ChippedPen));
@@ -58,24 +59,23 @@ namespace AutoTest.EditorTests
             var t = Run(RoleItems.Thunder, triple);
             Assert.That(t.damageMul, Is.EqualTo(b.damageMul * (1f + TerminalCards.ThunderFinalPct)).Within(1e-4));
             Assert.That(t.blockAdd - b.blockAdd, Is.EqualTo(TerminalCards.ThunderBlock));
-            // 血濡れの符丁: 2 個そろいだけ・回数 (1 + 1) × BloodmarkPer (2026-11-22 final4)・ゾロ目では働かない
+            // 血濡れの符丁 (answer9): どの役でも (ゾロ目・連なりも)・回数 (1 + 1) × BloodmarkPer
             int[] pair = { 2, 2, 5 };
             Assert.That(Run(RoleItems.Bloodmark, pair, roleCount: 1).damageMul, Is.EqualTo(Run(RoleItems.None, pair).damageMul * (1f + 2 * TerminalCards.BloodmarkPer)).Within(1e-4));
-            Assert.That(Run(RoleItems.Bloodmark, triple, roleCount: 1).damageMul, Is.EqualTo(b.damageMul).Within(1e-4));
+            Assert.That(Run(RoleItems.Bloodmark, triple, roleCount: 1).damageMul, Is.EqualTo(b.damageMul * (1f + 2 * TerminalCards.BloodmarkPer)).Within(1e-4));
             // final5: × 7%・上限なし ── 役 10 回目のペアで ×1.70
             Assert.That(Run(RoleItems.Bloodmark, pair, roleCount: 9).damageMul, Is.EqualTo(Run(RoleItems.None, pair).damageMul * 1.70f).Within(1e-4));
-            Assert.That(Run(RoleItems.Bloodmark, triple, roleCount: 9).damageMul, Is.EqualTo(b.damageMul).Within(1e-4));
-            Assert.That(Run(RoleItems.Bloodmark, t5, roleCount: 1).damageMul, Is.EqualTo(Run(RoleItems.None, t5).damageMul).Within(1e-4));
+            Assert.That(Run(RoleItems.Bloodmark, triple, roleCount: 9).damageMul, Is.EqualTo(b.damageMul * 1.70f).Within(1e-4));
+            Assert.That(Run(RoleItems.Bloodmark, t5, roleCount: 1).damageMul, Is.EqualTo(Run(RoleItems.None, t5).damageMul * (1f + 2 * TerminalCards.BloodmarkPer)).Within(1e-4));
             Assert.That(Run(RoleItems.Bloodmark, new[] { 1, 3, 5 }, roleCount: 1).damageMul, Is.EqualTo(Run(RoleItems.None, new[] { 1, 3, 5 }).damageMul).Within(1e-4));   // 役なし
             // 拍子木: 前のターンに同じ目の役が立っていれば与ダメージ +N%
             Assert.That(Run(RoleItems.Clapper, triple, lastFace: 4).outgoingPctAdd - b.outgoingPctAdd, Is.EqualTo(TerminalCards.ClapperPct).Within(1e-4));
             Assert.That(Run(RoleItems.Clapper, triple, lastFace: 3).outgoingPctAdd, Is.EqualTo(b.outgoingPctAdd).Within(1e-4));
             Assert.That(Run(RoleItems.Clapper, triple).outgoingPctAdd, Is.EqualTo(b.outgoingPctAdd).Within(1e-4));
-            // 〈万象のゾロ目〉(final6): 役 3 回で 0%・4 回で 50%・6 回で 50%・7 回で 100%
-            Assert.That(CombatManager.OmniPairChance(3), Is.EqualTo(0f));
-            Assert.That(CombatManager.OmniPairChance(4), Is.EqualTo(0.5f));
-            Assert.That(CombatManager.OmniPairChance(6), Is.EqualTo(0.5f));
-            Assert.That(CombatManager.OmniPairChance(7), Is.EqualTo(1f));
+            Assert.That(CombatManager.OmniPairChance(1), Is.EqualTo(0f));   // answer9: 2 回で 50%・4 回で 100%
+            Assert.That(CombatManager.OmniPairChance(2), Is.EqualTo(0.5f));
+            Assert.That(CombatManager.OmniPairChance(3), Is.EqualTo(0.5f));
+            Assert.That(CombatManager.OmniPairChance(4), Is.EqualTo(1f));
         }
 
         /// <summary>役の端子〈役落とし〉〈賽振り台〉は賽目でなく、 この戦闘の役の回数 (このターンを含む) を読む (Phase 3i)。</summary>

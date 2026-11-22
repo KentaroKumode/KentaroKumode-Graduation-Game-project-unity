@@ -542,7 +542,7 @@ namespace AutoTest
             public int renki, focusCount, critRelics;
             public CombatSystem.CritCore.FocusItems focusItems;
             public float focusBonus, critRateMul;
-            public bool quickDraw, narrow, heaven, readMark, pulse, pulsePrimed, firstStrokePrimed, whiteBlade, mask;
+            public bool quickDraw, narrow, nick, heaven, readMark, pulse, pulsePrimed, firstStrokePrimed, whiteBlade, mask;
             /// <summary>〈余韻の鈴〉: 前のターンの会心の条件は満たした (どの挿し方でも会心率が乗る・2026-11-22 final4)。</summary>
             public float bellRate;   // 〈余韻の鈴〉: 前のターンの会心の数 × RatePer (final6)
             /// <summary>〈加重の拳套〉: 2 撃目以降の撃で与ダメ % の池に足す割合 (0 = 持っていない・本体 ctx.hitOutgoingPct)。</summary>
@@ -628,6 +628,9 @@ namespace AutoTest
         }
 
         /// <summary>主攻撃 1 撃の与ダメの期待値 (<paramref name="termAtk"/> = その撃の端子の出力)。 <see cref="ReadOutMainDamage"/> が撃の数だけ呼ぶ。</summary>
+        /// <summary>[2026-11-23 answer9] 【練気】1 つ (会心 1 回) の将来の価値 (与ダメ相当・会心の秘宝を持つ時だけ)。</summary>
+        private const float RenkiFutureDmg = 1.5f;
+
         private static float ReadOutOneHit(in OptimalTurnState s, int bCount, int termAtk, in WiredSums ws, int hitNo = 0, int rawOverride = -1)
         {
             //   竜閃〈無我無心〉: 攻撃の端子 2 枚以上のターンは武器の攻撃力 0 / 〈連刃〉の追撃は武器の攻撃力 × 率だけ (rawOverride)
@@ -651,13 +654,13 @@ namespace AutoTest
             // 会心 (CritCore・本体の ProcessDamage と同じ式): 撃ごとの会心率と会心倍率。 配線で決まる品はこの撃の目・撃の数で足す
             float add = s.critAdd, mulAdd = ws.critMultAdd;
             bool force = ws.forceCrit || (hitNo == 0 && s.critP1 >= 1f);   // 〈画竜点睛〉の確定会心は 2026-11-23 に撤去
-            if (s.falconer && ws.atkFaceMax >= ItemSystem.PassiveSkills.Effects.FalconerGlove.MinFace) add += ItemSystem.PassiveSkills.Effects.FalconerGlove.Rate;
+            if (s.falconer && ws.atkFaceMax >= ItemSystem.PassiveSkills.Effects.FalconerGlove.MinFace) { add += ItemSystem.PassiveSkills.Effects.FalconerGlove.Rate; mulAdd += ItemSystem.PassiveSkills.Effects.FalconerGlove.Mul; }
             if (s.aim && ws.hitFace != null && hitNo < ws.hitFace.Length) add += CombatSystem.CritCore.AimRate(ws.hitFace[hitNo]);
             add += s.bellRate;
             bool solo = ws.aHits == 1;
             //   分岐 A の撃ごとの品 (2026-11-23): 〈見切りの目印〉2 撃目以降 / 〈脈打ちの測り針〉前の撃が会心 (2 撃目以降は前の撃の会心率で重み付け) / 〈初太刀の鍔留め〉の次のターンの最初の撃
             if (s.readMark && ws.aHits >= 2 && hitNo >= 1) add += ItemSystem.PassiveSkills.Effects.ReadMark.RateFor(s.renki);
-            if (s.pulse) add += (hitNo == 0 ? (s.pulsePrimed ? 1f : 0f) : s.critP) * ItemSystem.PassiveSkills.Effects.PulseNeedle.Rate;
+            if (s.pulse) { float w = hitNo == 0 ? (s.pulsePrimed ? 1f : 0f) : s.critP; add += w * ItemSystem.PassiveSkills.Effects.PulseNeedle.Rate; mulAdd += w * ItemSystem.PassiveSkills.Effects.PulseNeedle.Mul; }
             if (s.firstStrokePrimed && hitNo == 0) add += ItemSystem.PassiveSkills.Effects.FirstStrokePin.NextRate;
             add *= 1f + s.critRateMul;   // 〈測量師の片眼鏡〉: 会心率の乗算 (本体 ctx.hitCritRateMulAdd)
             float addPlain = add, mulPlain = mulAdd;   // 集中にならない撃 (〈必殺の照準器〉のもう 1 回) の会心率・倍率
@@ -672,13 +675,16 @@ namespace AutoTest
                     if (s.firstArrow) mulAdd += ItemSystem.PassiveSkills.Effects.FirstArrow.MulFor(spent, ws.atkFaceMax);
                     if (s.quickDraw) mulAdd += ItemSystem.PassiveSkills.Effects.QuickDrawArt.Mul;
                     if (s.pommel) critFpct += ItemSystem.PassiveSkills.Effects.HeftyPommel.FinalPctFor(spent);
-                    if (s.narrow) focusPen += ItemSystem.PassiveSkills.Effects.NarrowSpyglass.Pen + ItemSystem.PassiveSkills.Effects.NarrowSpyglass.PenPerRenki * spent;
+                    if (s.narrow) { focusPen += ItemSystem.PassiveSkills.Effects.NarrowSpyglass.Pen + ItemSystem.PassiveSkills.Effects.NarrowSpyglass.PenPerRenki * spent; mulAdd += ItemSystem.PassiveSkills.Effects.NarrowSpyglass.Mul; }
+                    if (s.nick) focusPen += ItemSystem.PassiveSkills.Effects.NickAppraisal.Pen;   // answer9: 集中会心の撃は防御 12 無視
                 }
             }
+            //   【練気】の基礎の効果 (answer9 案 A・本体 PassiveSkillManager): 会心の秘宝を持てば、 会心した撃の会心倍率 +0.06 × (練気 + 1) (集中会心は使う前)
+            if (s.critRelics > 0) { mulAdd += CombatSystem.CritCore.RenkiMulPer * (s.renki + 1); mulPlain += CombatSystem.CritCore.RenkiMulPer * (s.renki + 1); }
             //   〈白刃の鏡砥〉: 会心した撃は今の【練気】(この会心の +1・集中なら使った後) × 0.06
             if (s.whiteBlade) { mulAdd += ItemSystem.PassiveSkills.Effects.WhiteBladeMirror.MulPerRenki * (s.renki + 1 - spent); mulPlain += ItemSystem.PassiveSkills.Effects.WhiteBladeMirror.MulPerRenki * (s.renki + 1); }
             bool focusNoDef = focus && s.heaven;                                                                   // 〈天眼の鍔〉: 集中会心は防御を全部無視
-            bool suntetsuNoDef = s.critDouble && s.renki + 1 >= ItemSystem.PassiveSkills.Effects.Suntetsu.IgnoreRenki;   // 〈寸鉄〉: 練気 5 以上の会心は防御を全部無視
+            bool suntetsuNoDef = s.critDouble && s.renki + 1 >= ItemSystem.PassiveSkills.Effects.Suntetsu.IgnoreRenki;   // 〈寸鉄〉: 練気 3 以上の会心は防御を全部無視
             float critMulEff = CombatSystem.CritCore.EffectiveMul(s.critMulBase + mulAdd, s.critRed, add, s.critDouble);
             float sniperMul = CombatSystem.CritCore.EffectiveMul(s.critMulBase + mulPlain + CombatSystem.CritCore.SniperMulAdd(spent), s.critRed, addPlain, s.critDouble);
             float ironOut = s.ironClub ? System.Math.Min(1f, add) : 0f;
@@ -712,6 +718,8 @@ namespace AutoTest
             }
             float p = s.critOff ? 0f : force || s.critOn ? 1f : ItemSystem.PassiveSkills.CombatContext.ResolveCritRate(add);
             float v = p >= 1f ? D(true, critMulEff) : p <= 0f ? D(false, critMulEff) : p * D(true, critMulEff) + (1f - p) * D(false, critMulEff);
+            //   【練気】の将来の価値 (answer9): 会心の秘宝を持つ時、 会心 1 回 (= 練気 +1) を与ダメ RenkiFutureDmg 相当に数える
+            if (s.critRelics > 0) v += p * RenkiFutureDmg;
             //   〈必殺の照準器〉(2026-11-23): 集中会心の撃をもう 1 回 (集中にならない・実際の会心率で振る)
             if (focus && s.sniper && p > 0f)
             {
@@ -774,6 +782,7 @@ namespace AutoTest
             st.focusBonus = ItemSystem.PassiveSkills.Effects.QuickDrawArt.FocusRateBonus(ctx, run, cm != null && cm.EnemyDownNow);
             st.quickDraw = run != null && run.OwnsPassive(ItemIds.CritQuickDraw);
             st.narrow = run != null && run.OwnsPassive(ItemIds.CritNarrow);
+            st.nick = run != null && run.OwnsPassive(ItemIds.CritNick);
             st.heaven = run != null && run.OwnsPassive(ItemIds.CritHeaven);
             st.readMark = run != null && run.OwnsPassive(ItemIds.CritReadMark);
             st.pulse = run != null && run.OwnsPassive(ItemIds.CritPulse);
@@ -1912,7 +1921,7 @@ namespace AutoTest
                 int face = CombatSystem.TerminalCards.FaceOfRole(r);
                 float v = 0f, mul = 1f;
                 if ((f & CombatSystem.RoleItems.WoodTag) != 0 && CombatSystem.TerminalCards.FaceIn(CombatSystem.TerminalCards.WoodTagFaces, face)) v += CombatSystem.TerminalCards.WoodTagAttack + CombatSystem.TerminalCards.WoodTagBlock;
-                if ((f & CombatSystem.RoleItems.Gear) != 0 && face == CombatSystem.TerminalCards.GearFace) v += CombatSystem.TerminalCards.GearAttack;
+                if ((f & CombatSystem.RoleItems.Gear) != 0) v += face == CombatSystem.TerminalCards.GearFace || (big && r != CombatSystem.RoleKind.Straight) ? CombatSystem.TerminalCards.GearAttackHigh : CombatSystem.TerminalCards.GearAttack;   // answer9: どの役も (3 の役かゾロ目は倍・振り直しのターンの見込み)
                 if ((f & CombatSystem.RoleItems.NotchBoard) != 0 && CombatSystem.TerminalCards.FaceIn(CombatSystem.TerminalCards.NotchBoardFaces, face))
                     v += System.Math.Min(CombatSystem.TerminalCards.NotchBoardMax, CombatSystem.TerminalCards.NotchBoardPer * count) * (big ? 2 : 1);
                 if ((f & CombatSystem.RoleItems.Chipped) != 0 && CombatSystem.TerminalCards.FaceIn(CombatSystem.TerminalCards.ChippedFaces, face))

@@ -75,11 +75,11 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>重ね札の盾: シールドが 16 以上ある間、 受ける直接ダメージ −2 (敵の攻撃を受けるその時のシールドで判定・2026-11-22 10 → 16)。</summary>
+    /// <summary>重ね札の盾: シールドが 12 以上ある間、 受ける直接ダメージ −3 (敵の攻撃を受けるその時のシールドで判定・2026-11-22 10 → 16・answer9: 16 / −2 → 12 / −3)。</summary>
     public class LayeredTagShield : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "重ね札の盾";
-        public const int Need = 16, Cut = 2;
+        public const int Need = 12, Cut = 3;
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.consShield >= Need);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreReceiveDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
@@ -163,11 +163,11 @@ namespace ItemSystem.PassiveSkills.Effects
 
     // ── G: 分岐 (A = ジャスト防御・見切り / B = 余剰の持ち越し・要塞) ──
 
-    /// <summary>力みの小手: シールドを合計 12 得るたび【力み】+1。 攻撃の端子を挿したターン、 【力み】を全部使い、 1 つにつき全撃の基礎攻撃 +4 (攻撃 +N・撃ごとに乗る)。</summary>
+    /// <summary>力みの小手: シールドを合計 10 得るたび【力み】+1。 攻撃の端子を挿したターン、 【力み】を全部使い、 1 つにつき全撃の基礎攻撃 +5 (攻撃 +N・撃ごとに乗る・answer9: 旧 12 / +4)。</summary>
     public class StrainGauntlet : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "力みの小手";
-        public const int Every = 12, AtkPer = 4;
+        public const int Every = 10, AtkPer = 5;
         private const string Stk = "shd.strain", Tally = "shd.strainTally";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Shd.Count(ctx, Stk));
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnShieldGain, PassiveSkillTrigger.OnWired };

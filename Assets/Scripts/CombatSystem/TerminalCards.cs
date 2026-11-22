@@ -487,7 +487,7 @@ namespace CombatSystem
         // ===== 賽目 (役の軸) の品の数値 (2026-11-21・段 1-f・item-overhaul-spec §5・未測定) =====
         /// <summary>〈見切りの木札〉4・5 の役のターン 各撃の攻撃 +N・ブロック +N / 〈符丁の刻み板〉3・4 の役のターン 各撃の攻撃 + min(上限, 役の回数 × N) (ゾロ目なら 2 倍) /
         /// 〈欠け目の見立て〉1・2 の役のターン 防御の無視 / 〈血染めの歯車〉振り直し＋3 の役のターン 各撃 +N / 〈雷鳴のゾロ目〉ブロック (full-item-rework-ledger §⑧・未測定)。</summary>
-        public const int WoodTagAttack = 1, WoodTagBlock = 2, NotchBoardPer = 1, NotchBoardMax = 6, ChippedPen = 12, GearAttack = 6, ThunderBlock = 4;
+        public const int WoodTagAttack = 1, WoodTagBlock = 2, NotchBoardPer = 1, NotchBoardMax = 6, ChippedPen = 12, GearAttack = 5, GearAttackHigh = 10, ThunderBlock = 10;   // answer9: 歯車 3 の役 +6 → どの役も +5 (3 の役かゾロ目は +10)・雷鳴 ブロック +4 → +10
         /// <summary>役の軸の品が働く役の目 (2026-11-22・どの役でも → 目を指定)。 *Faces = 目の集合 (ビット 1 &lt;&lt; 目・<see cref="FaceIn"/>)。
         /// 2026-11-22 neon 収束で広げた: 木札 5 → 4・5 / 刻み板 4 → 3・4 / 見立て 1 → 1・2 / 導管 2 → 1・2・3。 〈雷毒の導管〉は RoleEffects.cs。</summary>
         public const int WoodTagFaces = 1 << 4 | 1 << 5, NotchBoardFaces = 1 << 3 | 1 << 4, ChippedFaces = 1 << 1 | 1 << 2, GearFace = 3, ConduitFaces = 1 << 1 | 1 << 2 | 1 << 3;
@@ -495,9 +495,9 @@ namespace CombatSystem
         public static bool FaceIn(int faces, int face) => face > 0 && ((faces >> face) & 1) != 0;
         /// <summary>〈揃いの拍子木〉与ダメージ % の池 / 〈雷鳴のゾロ目〉最終与ダメージ / 〈血濡れの符丁〉2 個そろいの役のターン 役の回数 1 回あたりの最終与ダメージ・上限
         /// (2026-11-22 neon 収束: 3・4 の役 × 5% → すべての役 × 8% → final4: 2 個そろいだけ (ゾロ目・連なりでは働かない) × 10%・上限 50% → final5: × 7%・上限なし)。</summary>
-        public const float ClapperPct = 0.12f, ThunderFinalPct = 0.20f, BloodmarkPer = 0.07f;
+        public const float ClapperPct = 0.12f, ThunderFinalPct = 0.45f, BloodmarkPer = 0.07f;   // answer9: 雷鳴 +20% → +45%
         /// <summary>〈血濡れの符丁〉が働く役 = 2 個そろい (ゾロ目・連なりでは働かない・2026-11-22 final4)。 本体と BOT が同じ判定。</summary>
-        public static bool BloodmarkFires(RoleKind k) => !YachtRoles.IsBig(k) && k != RoleKind.Straight;
+        public static bool BloodmarkFires(RoleKind k) => true;   // answer9: どの役でも (旧 2 個そろいだけ)
         /// <summary>〈賽振り台〉次のターンの最初の振り直しの費用から引く上限 (min(上限, 役の回数)) / 〈役落とし〉役が成立したターン 攻撃 + 役の回数 × N。
         /// 役の回数 = この戦闘で役が成立した回数 (このターンの役を含む・役の軸の品と同じ数え方・台帳 §⑧)。 *Up = 強化した端子。</summary>
         public const int DiceTableCap = 6, DiceTableCapUp = 8, RoleDropPer = 3, RoleDropPerUp = 4;
@@ -1255,13 +1255,13 @@ namespace CombatSystem
             bool big = YachtRoles.IsBig(k);
             int count = st.roleCount + 1, each = 0, face = FaceOfRole(k);   // 品の条件は目の役 (2026-11-22・連なりはどの目でもない)
             if ((f & RoleItems.WoodTag) != 0 && FaceIn(WoodTagFaces, face)) { each += WoodTagAttack; o.blockAdd += WoodTagBlock; }    // 〈見切りの木札〉4〈攻め〉・5〈守り〉
-            if ((f & RoleItems.Gear) != 0 && env.diceRerolled && face == GearFace) each += GearAttack;                        // 〈血染めの歯車〉3〈追撃〉
+            if ((f & RoleItems.Gear) != 0 && env.diceRerolled) each += face == GearFace || (big && k != RoleKind.Straight) ? GearAttackHigh : GearAttack;   // 〈血染めの歯車〉振り直したターンのどの役も (3 の役かゾロ目は倍・answer9)
             if ((f & RoleItems.NotchBoard) != 0 && FaceIn(NotchBoardFaces, face))                                            // 〈符丁の刻み板〉3〈追撃〉・4〈攻め〉 (回数はどの役も)
                 each += Math.Min(NotchBoardMax, NotchBoardPer * count) * (big ? 2 : 1);
             if ((f & RoleItems.Chipped) != 0 && FaceIn(ChippedFaces, face)) o.armorPen += ChippedPen;                       // 〈欠け目の見立て〉1〈特別〉・2〈封じ〉
             if ((f & RoleItems.Clapper) != 0 && face != 0 && face == st.roleLastFace) o.outgoingPctAdd += ClapperPct;         // 〈揃いの拍子木〉同じ目が続いた
             if ((f & RoleItems.Thunder) != 0 && big) { o.damageMul *= 1f + ThunderFinalPct; o.blockAdd += ThunderBlock; }    // 〈雷鳴のゾロ目〉
-            if ((f & RoleItems.Bloodmark) != 0 && BloodmarkFires(k))                                                         // 〈血濡れの符丁〉2 個そろいだけ (回数はどの役も)
+            if ((f & RoleItems.Bloodmark) != 0 && BloodmarkFires(k))                                                         // 〈血濡れの符丁〉どの役でも (回数はどの役も・answer9)
                 o.damageMul *= 1f + BloodmarkPer * count;
             if (each > 0 && o.attackHits.Count > 0)
             {

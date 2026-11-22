@@ -677,6 +677,9 @@ namespace ItemSystem.PassiveSkills
                 {
                     // 【練気】(2026-11-23): 会心で +1、 集中会心ならその後で半分 (切り上げ) を使う。 OnCriticalDamage の品 (集中会心の品・〈白刃の鏡砥〉) が読むので先に
                     int spent = Effects.Crit.GainOnCrit(context);
+                    //   【練気】の基礎の効果 (answer9 案 A): 会心した撃の会心倍率 +0.06 × 練気 (+1 した後・集中会心は使う前・会心の秘宝を持たない戦闘は 0)
+                    if (Effects.Crit.HitRenki(context) > 0 && CombatSystem.CritCore.CritRelicCount(GameLoop.GameManager.Instance?.Run) > 0)
+                        context.criticalMultiplier += CombatSystem.CritCore.RenkiMulPer * Effects.Crit.HitRenki(context);
                     if (context.hitIsFocused)
                     {
                         CombatSystem.CombatManager.FocusCritted++; CombatSystem.CombatManager.RenkiSpentTotal += spent;   // [計装]
