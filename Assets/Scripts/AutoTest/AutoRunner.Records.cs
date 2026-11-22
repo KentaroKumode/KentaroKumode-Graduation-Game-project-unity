@@ -105,6 +105,7 @@ namespace AutoTest
              .Append(" tiers=").Append(LearnedPriorityProvider.BuyTierCount)
              .Append(" priceK=").Append(LearnedPriorityProvider.IttPriceK.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture))
              .Append(" itt=").Append(string.IsNullOrEmpty(GrantItt.Variant) ? "base" : GrantItt.Variant)
+             .Append(LearnedPriorityProvider.IttTimingMul ? " tmul=" + (GrantItt.TimingLoaded ? "1" : "未読") : "")
              .Append(" mistake=").Append(wiringMistakeRate.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture))
              .Append(" freeBlock=").Append(FreeBlockRule ? 1 : 0)
              .Append(" def=").Append(v3.superDefense ? 1 : 0).Append(" cons=").Append(v3.superConsumables ? 1 : 0)

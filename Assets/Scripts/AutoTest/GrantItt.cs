@@ -29,7 +29,7 @@ namespace AutoTest
     /// <para><b>共変量を足してはいけない。</b> 与ダメ・戦闘数などの列は
     /// <b>処置の後に決まる</b> 中間変数なので、 説明変数に入れると合流点で条件付けて
     /// 因果効果を壊す。 ここは band ~ 割り当て のみ。</para></summary>
-    public static class GrantItt
+    public static partial class GrantItt
     {
         /// <summary>数値安定のためだけの ridge。 設計がランダム化されていて D ≪ n なので
         /// 縮小はほぼ不要 ── 大きくすると効果量が 0 へ引っ張られて band 単位が壊れる。</summary>
@@ -400,61 +400,8 @@ namespace AutoTest
             // ---- IRLS ----
             var beta = new double[D];
             for (int s = 0; s < NS; s++) beta[SBASE + s] = -2.0;   // 素直な初期値
-            int maxG = 0; foreach (var run in runs) maxG = Math.Max(maxG, run.gItem.Length);
-            var act = new int[maxG + 2];   // 段の切片 + 付与品 + 金。 16 固定だと付与 15 品以上のランの品が黙って切られていた (2026-11-22)
-            double[,] hess = null; double[] grad = null;
-            int obsTotal = 0;
-            for (int iter = 0; iter < 25; iter++)
-            {
-                hess = new double[D, D]; grad = new double[D];
-                obsTotal = 0;
-                foreach (var run in runs)
-                {
-                    int lastStage = Math.Min(run.band + 1, MaxLevel);
-                    for (int k = 2; k <= lastStage; k++)
-                    {
-                        int na = 0;
-                        act[na++] = SBASE + (k - 2);
-                        int fk = FloorOfLevel[k];
-                        for (int g = 0; g < run.gItem.Length; g++)
-                            if (run.gFloor[g] <= fk && na < act.Length) act[na++] = run.gItem[g];
-                        if (run.goldCol >= 0 && run.goldFloor <= fk && na < act.Length)
-                            act[na++] = NI + run.goldCol;
-
-                        double eta = 0;
-                        for (int a = 0; a < na; a++) eta += beta[act[a]];
-                        double mu = 1.0 / (1.0 + Math.Exp(-eta));
-                        double w = Math.Max(1e-6, mu * (1 - mu));
-                        double y = (run.band == k - 1) ? 1.0 : 0.0;
-                        double resid = y - mu;
-                        for (int a = 0; a < na; a++)
-                        {
-                            grad[act[a]] += resid;
-                            for (int b = 0; b < na; b++) hess[act[a], act[b]] += w;
-                        }
-                        obsTotal++;
-                    }
-                }
-                for (int i = 0; i < NI + NG; i++) hess[i, i] += Ridge;   // 数値安定のみ
-                if (!InvertInPlace(hess, D, out double[,] hinv))
-                { SurvivalSummary = "ヘッセ行列が特異"; return false; }
-
-                double maxStep = 0;
-                for (int i = 0; i < D; i++)
-                {
-                    double d = 0;
-                    for (int j = 0; j < D; j++) d += hinv[i, j] * grad[j];
-                    // 発散防止のダンピング。 疎な列で 1 歩が飛ぶことがある。
-                    d = Math.Max(-1.0, Math.Min(1.0, d));
-                    beta[i] += d;
-                    maxStep = Math.Max(maxStep, Math.Abs(d));
-                }
-                if (maxStep < 1e-6) break;
-            }
-
-            // ---- 分散 (最終ヘッセの逆) ----
-            for (int i = 0; i < NI + NG; i++) hess[i, i] += Ridge;
-            InvertInPlace(hess, D, out double[,] cov);
+            if (!Irls(runs, NI, SBASE, NS, 25, beta, out double[,] cov, out int obsTotal))
+            { SurvivalSummary = "ヘッセ行列が特異"; return false; }
 
             // ---- Δクリア率へ変換 ----
             var alpha = new double[MaxLevel + 1];
@@ -495,6 +442,72 @@ namespace AutoTest
             try { WriteSurvival(learningRoot, cols, goldCols, beta, NI, alpha, p0, runs.Count); }
             catch (Exception e) { Debug.LogWarning($"[GrantItt] 生存レポート書込失敗: {e.Message}"); }
             Debug.Log("[GrantItt] " + SurvivalSummary);
+            // 群 × 届いた深さの倍率 (2026-11-22・ハイブリッド案)。 同じランから当て直す ── 版ごとに大きく変わるので ITT を撮るたびに書き直す。
+            try { RecomputeTiming(runs, cols, goldCols, learningRoot); }
+            catch (Exception e) { Debug.LogWarning($"[GrantItt] 時期の倍率の当て直し失敗: {e.Message}"); }
+            return true;
+        }
+
+        /// <summary>離散時間生存の IRLS (Newton・歩幅 ±1 で打ち切り)。 列は [0, nFree) が係数 (品・金・追加の列)、 [nFree, nFree+NS) が段 k=2..11 の切片。
+        /// 金は <c>NI + run.goldCol</c>、 品と追加の列は <c>run.gItem</c> の添字そのまま。 <paramref name="beta"/> は初期値を入れて渡す (結果で上書き)。
+        /// <paramref name="cov"/> は最終ヘッセ (尾根をもう一度足した物) の逆。</summary>
+        private static bool Irls(List<Run> runs, int NI, int nFree, int NS, int iters, double[] beta, out double[,] cov, out int obsTotal)
+        {
+            int D = nFree + NS;
+            int maxG = 0; foreach (var run in runs) maxG = Math.Max(maxG, run.gItem.Length);
+            var act = new int[maxG + 2];   // 段の切片 + 付与品 + 金。 16 固定だと付与 15 品以上のランの品が黙って切られていた (2026-11-22)
+            double[,] hess = null; double[] grad = null;
+            obsTotal = 0; cov = null;
+            for (int iter = 0; iter < iters; iter++)
+            {
+                hess = new double[D, D]; grad = new double[D];
+                obsTotal = 0;
+                foreach (var run in runs)
+                {
+                    int lastStage = Math.Min(run.band + 1, MaxLevel);
+                    for (int k = 2; k <= lastStage; k++)
+                    {
+                        int na = 0;
+                        act[na++] = nFree + (k - 2);
+                        int fk = FloorOfLevel[k];
+                        for (int g = 0; g < run.gItem.Length; g++)
+                            if (run.gFloor[g] <= fk && na < act.Length) act[na++] = run.gItem[g];
+                        if (run.goldCol >= 0 && run.goldFloor <= fk && na < act.Length)
+                            act[na++] = NI + run.goldCol;
+
+                        double eta = 0;
+                        for (int a = 0; a < na; a++) eta += beta[act[a]];
+                        double mu = 1.0 / (1.0 + Math.Exp(-eta));
+                        double w = Math.Max(1e-6, mu * (1 - mu));
+                        double y = (run.band == k - 1) ? 1.0 : 0.0;
+                        double resid = y - mu;
+                        for (int a = 0; a < na; a++)
+                        {
+                            grad[act[a]] += resid;
+                            for (int b = 0; b < na; b++) hess[act[a], act[b]] += w;
+                        }
+                        obsTotal++;
+                    }
+                }
+                for (int i = 0; i < nFree; i++) hess[i, i] += Ridge;   // 数値安定のみ
+                if (!InvertInPlace(hess, D, out double[,] hinv)) return false;
+
+                double maxStep = 0;
+                for (int i = 0; i < D; i++)
+                {
+                    double d = 0;
+                    for (int j = 0; j < D; j++) d += hinv[i, j] * grad[j];
+                    // 発散防止のダンピング。 疎な列で 1 歩が飛ぶことがある。
+                    d = Math.Max(-1.0, Math.Min(1.0, d));
+                    beta[i] += d;
+                    maxStep = Math.Max(maxStep, Math.Abs(d));
+                }
+                if (maxStep < 1e-6) break;
+            }
+
+            // ---- 分散 (最終ヘッセの逆) ----
+            for (int i = 0; i < nFree; i++) hess[i, i] += Ridge;
+            InvertInPlace(hess, D, out cov);
             return true;
         }
 

@@ -175,19 +175,36 @@ namespace AutoTest
         /// <summary>序列から差し引く価格の重み (Δクリア pt / 店頭価格 1G・0 = 差し引かない)。 金をランダムに配った時の効果が目安 (25G で +0.35pt)。</summary>
         public static float IttPriceK = 0f;
 
-        private static int ApplyIttRankMapping(List<ItemLearningStats.ItemAggregate> pool)
+        /// <summary>[2026-11-22・ハイブリッド案] ITT の Δ に群 × 取得の時期の倍率 (<see cref="GrantItt.TimingMul"/>) を掛けた値で順位を作る。
+        /// 順位は時期 (深さ 1 / 3 / 5) ごとに作り置き (<see cref="_scoreByTime"/>)・今の <c>Run.Depth</c> で引く。 AutoRunner.ittTimingMul が流し込む。</summary>
+        public static bool IttTimingMul = false;
+        /// <summary>時期ごとの得点 (添字 = <see cref="GrantItt.TimeOfDepth"/>)。 null なら <see cref="_itemContinuousScore"/> だけを使う。</summary>
+        private static Dictionary<string, double>[] _scoreByTime;
+
+        /// <summary>今の深さで使う得点の表。</summary>
+        private static Dictionary<string, double> ScoresNow()
+        {
+            if (_scoreByTime == null) return _itemContinuousScore;
+            var run = GameLoop.GameManager.Instance?.Run;
+            return run == null ? _itemContinuousScore : _scoreByTime[GrantItt.TimeOfDepth(run.Depth)];
+        }
+
+        private static int ApplyIttRankMapping(List<ItemLearningStats.ItemAggregate> pool) => ApplyIttRankMapping(pool, _itemContinuousScore, -1);
+
+        /// <summary><paramref name="time"/> &gt;= 0 なら Δ にその時期の倍率を掛けて並べる。</summary>
+        private static int ApplyIttRankMapping(List<ItemLearningStats.ItemAggregate> pool, Dictionary<string, double> score, int time)
         {
             var targets = new List<string>();
             foreach (var a in pool)
                 if (GrantItt.IsTrusted(a.id)
                     && GrantItt.TryGetClearEffect(a.id, out double _, out double _2)
-                    && _itemContinuousScore.ContainsKey(a.id))
+                    && score.ContainsKey(a.id))
                     targets.Add(a.id);
             if (targets.Count < 2) return 0;
 
             // 空いているスロット (= 対象品が今持っている得点) を降順に並べる
             var slots = new List<double>(targets.Count);
-            foreach (var id in targets) slots.Add(_itemContinuousScore[id]);
+            foreach (var id in targets) slots.Add(score[id]);
             slots.Sort(); slots.Reverse();
 
             // Δクリア率の降順。 同値は id 順で決定的に割る (乱数を使わない)。
@@ -195,6 +212,7 @@ namespace AutoTest
             double Net(string id)
             {
                 GrantItt.TryGetClearEffect(id, out double d, out double _);
+                if (time >= 0) d *= GrantItt.TimingMul(id, time);
                 return IttPriceK > 0f ? d - IttPriceK * ItemSystem.Shop.ShopManager.ExpectedShopPrice(id, null) : d;
             }
             var net = new Dictionary<string, double>(targets.Count);
@@ -205,7 +223,7 @@ namespace AutoTest
                 int c = dy.CompareTo(dx);
                 return c != 0 ? c : string.CompareOrdinal(x, y);
             });
-            for (int i = 0; i < targets.Count; i++) _itemContinuousScore[targets[i]] = slots[i];
+            for (int i = 0; i < targets.Count; i++) score[targets[i]] = slots[i];
             return targets.Count;
         }
 
@@ -306,6 +324,7 @@ namespace AutoTest
             bool prevFallback = _useFallback;
 
             _itemContinuousScore.Clear();
+            _scoreByTime = null;
             _ranked.Clear();
             _useFallback = true;
             _lastLoadedSummary = "(未読み込み)";
@@ -344,6 +363,13 @@ namespace AutoTest
                                        + (IttStrict ? " → 付与対象品が全て未学習になる" : " → 観測 regβ へフォールバック"));
                     else
                         Debug.Log($"[LearnedPriorityProvider] 序列 = Δクリア率 / {GrantItt.SurvivalSummary}");
+                    if (IttTimingMul)
+                    {
+                        if (GrantItt.TryLoadTiming(learningRoot))
+                            Debug.Log($"[LearnedPriorityProvider] 時期の倍率 (ittTimingMul) を読んだ: {GrantItt.TimingSummary}");
+                        else
+                            Debug.LogWarning($"[LearnedPriorityProvider] ittTimingMul=true だが {GrantItt.TimingPath(learningRoot)} を読めない → 倍率 1 (今の BOT と同じ)");
+                    }
                 }
 
                 // 除外リスト適用 + minAcq6F フィルタ → スコア用プール確定。
@@ -596,6 +622,16 @@ namespace AutoTest
                     int n = ApplyIttRankMapping(pool);
                     Debug.Log($"[LearnedPriorityProvider] ITT 順位マッピング: {n} 品のスロットを付け替え"
                             + " (得点分布は不変 ＝ 並び順だけの介入)");
+                    if (IttTimingMul && GrantItt.TimingLoaded)
+                    {
+                        // 時期ごとの順位を作り置く (得点の集合は同じ・割り当てだけが違う)。 _itemContinuousScore (通し表・保存) は倍率なしのまま。
+                        _scoreByTime = new Dictionary<string, double>[3];
+                        for (int t = 0; t < 3; t++)
+                        {
+                            _scoreByTime[t] = new Dictionary<string, double>(_itemContinuousScore);
+                            ApplyIttRankMapping(pool, _scoreByTime[t], t);
+                        }
+                    }
                 }
                 pool.Sort((x, y) => _itemContinuousScore[y.id].CompareTo(_itemContinuousScore[x.id]));
                 weaponPool.Sort((x, y) => _itemContinuousScore[y.id].CompareTo(_itemContinuousScore[x.id]));
@@ -790,7 +826,7 @@ namespace AutoTest
                 if (PriorityItemList.IsARank(id)) return PowerCuts[1]; // フォールバックは A・B 区別なし
                 return Unlearned;
             }
-            if (!_itemContinuousScore.TryGetValue(id, out double v))
+            if (!ScoresNow().TryGetValue(id, out double v))
             {
                 // 帯にサンプルが無い品は 0pt 帯の値で代替する。 これが無いと帯を作った直後に
                 //   全品が足切りされ、 統計が永久に溜まらない。
@@ -850,7 +886,7 @@ namespace AutoTest
             // **学習値が無ければ 0。** ここは所持価値の合算 (InventoryPower) に入るので、
             //   未知の品に点を与えると Power 帯 (10/25/50/80) が丸ごとずれる。
             //   Lv 補正も入れない ── 旧 RawScore と同じく素の Tier 相当だけを見る。
-            if (!_itemContinuousScore.TryGetValue(id, out double v)
+            if (!ScoresNow().TryGetValue(id, out double v)
                 && !_baseScore.TryGetValue(id, out v)) return 0;
             for (int i = 0; i < PowerCuts.Length; i++)
                 if (v >= PowerCuts[i]) return PowerCuts.Length - i;   // [0]→4 … [3]→1

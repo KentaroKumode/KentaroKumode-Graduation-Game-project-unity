@@ -1673,6 +1673,9 @@ namespace AutoTest
         public float superIttPriceK = 0.1f;
         /// <summary>Super は自分の方策で測った ITT の序列 (itt_clear.super.json) を使う (2026-11-06)。 k は金の価値が約 10 倍になったので 0.1。</summary>
         public bool superOwnItt = true;
+        /// <summary>[2026-11-22・ハイブリッド案] ITT の Δ に群 × 取得の時期の倍率 (itt_timing.&lt;版&gt;.json・有意な群だけ) を掛けて序列を作る。
+        /// 既定 false (今の BOT と同じ)。 <see cref="LearnedPriorityProvider.IttTimingMul"/>。</summary>
+        public bool ittTimingMul = false;
         /// <summary>付与試行のラン番号オフセット。 <b>並列プロセスごとに区間を分けるためにある</b>。
         /// runIdx = 90000 + これ + i。 0 のとき従来と完全に同じ。</summary>
         [Tooltip("付与試行の開始オフセット (並列時にプロセスごとの担当区間を分ける)")]
@@ -2014,10 +2017,12 @@ namespace AutoTest
             if (treasurePassiveRate >= 0f) GameLoop.CombatRewards.TreasurePassiveRate = treasurePassiveRate;
             float priceK = ittPriceK >= 0f ? ittPriceK : (wiringSkill == WiringSkill.Super ? superIttPriceK : 0f);
             string ittVariant = wiringSkill == WiringSkill.Super && superOwnItt ? "super" : "";
-            if (!Mathf.Approximately(LearnedPriorityProvider.IttPriceK, priceK) || GrantItt.Variant != ittVariant)
+            if (!Mathf.Approximately(LearnedPriorityProvider.IttPriceK, priceK) || GrantItt.Variant != ittVariant
+                || LearnedPriorityProvider.IttTimingMul != ittTimingMul)
             {
                 LearnedPriorityProvider.IttPriceK = priceK;
                 GrantItt.Variant = ittVariant;
+                LearnedPriorityProvider.IttTimingMul = ittTimingMul;
                 LearnedPriorityProvider.Reload(TierLearningRoot, writeMarkdown: false);
             }
             bool isSuperSkill = wiringSkill == WiringSkill.Super;
