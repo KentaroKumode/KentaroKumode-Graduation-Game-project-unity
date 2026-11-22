@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -318,8 +318,12 @@ namespace AutoTest
 
         /// <summary>band レベル k を踏む階層。 R1a〜R1d(=band 1) は 1〜2層をまとめている。
         /// band 5 (4Fボス死) と 8 (5Fクリア) は実測で出現しないが、 欠けても壊れない。
-        /// band 10 は Null Point で死亡 (R10) と、 深さ 6 クリアで終了 (R10b・#137・ashKingBeatenEver=False の腕だけ) を含む ── どちらも「ヴェスカを倒していない」。</summary>
-        private static readonly int[] FloorOfLevel = { 0, 2, 3, 3, 4, 4, 5, 5, 5, 6, 7, 7 };
+        /// band 10 は Null Point で死亡 (R10) と、 深さ 6 クリアで終了 (R10b・#137・ashKingBeatenEver=False の腕だけ) を含む ── どちらも「ヴェスカを倒していない」。
+        /// 付与との比べ方 (2026-11-22 修正): 付与層 g の品は <c>Run.Depth &gt;= g</c> で配られ (AutoRunner.ApplyDueGrants)、 深さは 0/1/3/5/6/7 と飛ぶ。
+        /// なので段 k を踏む時点で持っている付与層の上限は 段 2 (深さ ≤1) = 1・段 3〜6 (深さ 3) = 3・段 7 以降 (深さ 5〜) = 5。
+        /// 旧表 {…, 3, 3, 4, 4, 5, …} は段 2 で付与層 2・3、 段 4 で付与層 4 をまだ届いていないのに「持っている」扱いにしていた (Δ で最大 0.3 pp・itt_design/stage_split)。
+        /// 段 9 以降の 6 / 7 は付与層が 5 までなので 5 と同じ働き。</summary>
+        private static readonly int[] FloorOfLevel = { 0, 2, 1, 3, 3, 3, 3, 5, 5, 6, 7, 7 };
         private const int MaxLevel = 11;
         /// <summary>付与層の台。 <see cref="AutoRunner"/> は 1〜5 から一様に引く。</summary>
         private static readonly int[] GrantFloors = { 1, 2, 3, 4, 5 };
