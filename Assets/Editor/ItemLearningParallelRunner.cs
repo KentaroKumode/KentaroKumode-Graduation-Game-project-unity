@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -164,15 +164,15 @@ namespace AutoTest.EditorTools
                     ["v3.mainCorr"] = "True", ["v3.readOutgoingMult"] = "-1" });
         }
 
-        /// <summary>ITT (Super の方策) を 1 回目 20,000 + 10,000 ラン × 18 回 = 合計 200,000 ラン (2026-11-10・1 回目を 2 万に 2026-11-22)。
+        /// <summary>ITT (Super の方策) を 1 回目 20,000 + 10,000 ラン × 8 回 = 合計 100,000 ラン (2026-11-10・1 回目を 2 万に・20 万 → 10 万に 2026-11-22: BOT の序列は 10 万ランで頭打ち (その先 +0.03 ± 0.17 pp)・作者の決定)。
         /// <b>回ごとにラン番号をずらす</b> (同じ割り当てを引き直さない) ・<b>割り当ては積み上げて合算</b>し、 回の終わりごとに
         /// 序列を作り直す (次の回はその序列で買う)。 精度は 20 万ラン 1 回と同じで、 買い方だけが途中で更新される。
         /// 条件は今の測定と同じ: 主攻撃の見積もりの補正 (v3.mainCorr)。 物差しは掛けない。</summary>
-        [MenuItem("Tools/AutoRun/■ ITT 並列 (Super の方策): 20000 + 10000ラン × 18 回 (合算 20万)", priority = 8)]
+        [MenuItem("Tools/AutoRun/■ ITT 並列 (Super の方策): 20000 + 10000ラン × 8 回 (合算 10万)", priority = 8)]
         private static void LaunchIttSuperPooled()
         {
             AutoTest.GrantItt.Variant = "super";
-            LaunchWith(0, AutoRunner.WiringSkill.Super, 10000, itt: true, ittRounds: 19, firstRoundRuns: 20000,
+            LaunchWith(0, AutoRunner.WiringSkill.Super, 10000, itt: true, ittRounds: 9, firstRoundRuns: 20000,
                 overrides: new Dictionary<string, string> { ["useIttBeta"] = "True", ["lockWeaponFamily"] = "True",
                     ["v3.mainCorr"] = "True", ["v3.readOutgoingMult"] = "-1" });
         }
