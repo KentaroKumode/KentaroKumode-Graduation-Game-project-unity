@@ -12,8 +12,8 @@ namespace CombatSystem
         Thorn = 1 << 3,        // 毒棘の小盾: 防御の端子に挿したターン ブロック +6
         Mantle = 1 << 4,       // 瘴気の外套: 毒 15 以上で受けるダメージ −35%
         Blowpipe = 1 << 5,     // 麻痺の吹き矢: 毒 18 以上で敵の防御を全部無視
-        Ring = 1 << 6,         // 石抜きの毒指輪: 毒 24 以上で攻撃が当たると【起爆】
-        Magazine = 1 << 7,     // 劇毒の火薬庫: 起爆の倍率 ×4
+        Ring = 1 << 6,         // 石抜きの毒指輪: 毒 24 以上で攻撃が当たると【起爆】 (2026-11-22 neon 収束: 16 → 24)
+        Magazine = 1 << 7,     // 劇毒の火薬庫: 起爆の倍率 ×5・敵の最大 HP の 0.32% / 毒
         SlowBlade = 1 << 8,    // 遅効の毒刃: 起爆のダメージ +30% × この戦闘の起爆の回数
         Oil = 1 << 9,          // 骨溶かしの黒油: ダウン中の毒のダメージと起爆 ×2
     }
@@ -21,7 +21,8 @@ namespace CombatSystem
     /// <summary>
     /// 毒の軸 (2026-11-21・full-item-rework-spec §3 軸2) の式の<b>正本</b>。
     ///
-    /// <para><b>【起爆】</b>: 敵の毒を半分 (切り上げ) 消費し、 消費量 × 倍率 (既定 ×4・2026-11-22 Phase 4 較正: 旧 ×3) の軽減不可ダメージ (防御も無視)。
+    /// <para><b>【起爆】</b>: 敵の毒を 1/3 (切り上げ・2026-11-22 neon 収束: 旧 半分) 消費し、 max(消費量 × 倍率 (既定 ×4), floor(消費量 × 敵の最大 HP × 0.25%)) の軽減不可ダメージ (防御も無視)。
+    /// 最大 HP の項は 2026-11-22 neon 収束 (HP の大きいボスで起爆が細る分を補う)。
     /// 起爆したターンの終わりに、 ボスの目盛りのひびを全部、 正規のダウン (受けるダメージ ×1.5 あり) として割る (CombatManager.NoteBossDownTurnEnd)。
     /// 起爆は品が起こす (〈石抜きの毒指輪〉〈劇毒の火薬庫〉)。 ダメージの式はここだけにあり、 本体 (PoisonEffects の Psn.Detonate) と BOT の見積もり (AutoRunner の ItemSight) が同じ関数を呼ぶ。</para>
     /// <para>このファイルは UnityEngine に依存しない。</para>
@@ -30,8 +31,12 @@ namespace CombatSystem
     {
         /// <summary>起爆の倍率 (消費した毒 1 につき) / 〈劇毒の火薬庫〉を持つ時の倍率。</summary>
         public const int DetonateMul = 4, MagazineMul = 5;
-        /// <summary>〈石抜きの毒指輪〉: 起爆に要る敵の毒。</summary>
-        public const int RingNeed = 16;
+        /// <summary>起爆の最大 HP の項: 消費した毒 1 につき 敵の最大 HP × これ / 10000 (既定 25 = 0.25% / 〈劇毒の火薬庫〉32 = 0.32%・2026-11-22 neon 収束)。</summary>
+        public const int DetonateMaxHpBp = 25, MagazineMaxHpBp = 32;
+        /// <summary>起爆で消費する毒の割合の分母 (毒 ÷ これ・切り上げ・2026-11-22 neon 収束: 2 → 3)。</summary>
+        public const int SpendDiv = 3;
+        /// <summary>〈石抜きの毒指輪〉: 起爆に要る敵の毒 (2026-11-22 neon 収束: 16 → 24。 起爆の後も 16 残り、 〈瘴気の外套〉15・〈口縫いの毒糸〉10・〈麻痺の吹き矢〉12 が切れない)。</summary>
+        public const int RingNeed = 24;
         /// <summary>〈劇毒の火薬庫〉: 1 ターンに与えた毒の合計がこれ以上なら、 ターンの終わりに起爆。</summary>
         public const int MagazineGiven = 8;
         /// <summary>〈遅効の毒刃〉: この戦闘で起爆した回数 1 回につき、 起爆のダメージ +%。</summary>
@@ -50,14 +55,17 @@ namespace CombatSystem
         /// <summary>5d の量: 〈緑染みの小刀〉毒 / 回数 ・〈蛇血瓶〉毒 / 目 / 回数・〈毒見役の小匙〉毒 / HP・〈毒棘の小盾〉ブロック。</summary>
         public const int KnifePoison = 3, KnifeMax = 3, SerpentPoison = 4, SerpentFace = 4, SerpentMax = 3, TasterPoison = 3, TasterHeal = 1, ThornBlock = 6;
 
-        /// <summary>起爆で消費する毒 (半分・切り上げ)。</summary>
-        public static int Spend(int poison) => poison > 0 ? (poison + 1) / 2 : 0;
+        /// <summary>起爆で消費する毒 (1/3・切り上げ)。</summary>
+        public static int Spend(int poison) => poison > 0 ? (poison + SpendDiv - 1) / SpendDiv : 0;
 
-        /// <summary>起爆 1 回のダメージ (消費量 <paramref name="spent"/>・この戦闘でここまでに起爆した回数 <paramref name="before"/>・ダウン中 <paramref name="down"/>・威力 <paramref name="powerPct"/>%)。 切り捨て。</summary>
-        public static int Damage(int spent, PoisonItems f, int before, bool down, int powerPct = 100)
+        /// <summary>起爆 1 回のダメージ (消費量 <paramref name="spent"/>・この戦闘でここまでに起爆した回数 <paramref name="before"/>・ダウン中 <paramref name="down"/>・
+        /// 敵の最大 HP <paramref name="enemyMaxHp"/> (ctx.enemyMaxHP・ヴェスカは段ごとの最大 HP)・威力 <paramref name="powerPct"/>%)。 切り捨て。</summary>
+        public static int Damage(int spent, PoisonItems f, int before, bool down, int enemyMaxHp, int powerPct = 100)
         {
             if (spent <= 0) return 0;
-            long d = (long)spent * ((f & PoisonItems.Magazine) != 0 ? MagazineMul : DetonateMul);
+            bool mag = (f & PoisonItems.Magazine) != 0;
+            long d = System.Math.Max((long)spent * (mag ? MagazineMul : DetonateMul),
+                                     (long)spent * System.Math.Max(0, enemyMaxHp) * (mag ? MagazineMaxHpBp : DetonateMaxHpBp) / 10000);
             if ((f & PoisonItems.SlowBlade) != 0 && before > 0) d = d * (100 + SlowBladePctPerDetonate * before) / 100;
             if ((f & PoisonItems.Oil) != 0 && down) d *= OilDownMul;
             return (int)System.Math.Min(int.MaxValue, d * powerPct / 100);

@@ -542,7 +542,7 @@ namespace ItemSystem.PassiveSkills
         public float shieldOnWinPct;
 
         // ==== 臨界メーター (Rinkai) 2026-07-16 追加 ====
-        /// <summary>[persistent] 臨界メーター: 攻撃の端子の合計 (attackSum) を毎ターンの終わりに足し、 品・端子の分はその時点で足す (Keywords.Kw.AddHeat)。
+        /// <summary>[persistent] 臨界メーター: 攻撃の端子に挿した出目の合計の半分 (HeatCore.EndGain) を毎ターンの終わりに足し、 品・端子の分はその時点で足す (Keywords.Kw.AddHeat)。
         /// 閾値に届くとその場で爆発する (式は CombatSystem.HeatCore)。</summary>
         public int rinkaiMeter;
         /// <summary>[persistent] 直近ターンにプレイヤーが与えた総ダメージ。
@@ -629,7 +629,7 @@ namespace ItemSystem.PassiveSkills
         public bool critExcessDouble;
         /// <summary>[persistent] 〈銑鉄棍〉: 会心しなかった撃に、 会心率 1% につき与ダメージ +1% (100% を上限に数える・与ダメ % の池へ足す・PassiveSkillManager.ProcessDamage)。 会心は普通に出る。</summary>
         public bool critToDamage;
-        /// <summary>[persistent] 〈天工開物〉: 爆発の基礎への上乗せ (武器を強化した回数 × 12・CombatSystem.HeatCore.Damage)。</summary>
+        /// <summary>[persistent] 〈天工開物〉: 爆発の基礎への上乗せ (武器を強化した回数 × 8・CombatSystem.HeatCore.Damage)。</summary>
         public int burstFlatBonus;
         /// <summary>[persistent] 〈重装兵の隠し刃〉: ボスのダウン中のターンは、 ターン開始時にシールドが半減しない (BeginNewTurn)。</summary>
         public bool shieldKeepOnBossDown;
@@ -869,7 +869,10 @@ namespace ItemSystem.PassiveSkills
                 accumulatedValues[Keywords.Kw.BleedMaxKey] = enemyBleedStacks;   // 実績が読む
         }
 
-        /// <summary>〈回帰性真理〉: 敵に乗っている毒・出血の**蓄積を半減**する (切り捨て)。
+        /// <summary>〈回帰性真理〉が毎ターン残す毒の % (切り捨て・2026-11-22 neon 収束: 50 → 75)。</summary>
+        public const int RecurrentTruthPoisonKeepPct = 75;
+        /// <summary>〈回帰性真理〉: 敵に乗っている出血の蓄積を**半減**、 毒の蓄積を **3/4** にする (どちらも切り捨て・2026-11-22 neon 収束: 毒も半減 → 3/4。
+        /// 毒はターン開始の毒のダメージでも減るので、 半減を重ねると二重に減っていた)。
         /// ターン開始の DOT 判定が済んだ後に呼ぶ ── ダメージは通し、 累積だけを抑える。
         ///
         /// <para>切り捨てなので、 毎ターン +N を撃ち続けるビルドは概ね N 前後で平衡する
@@ -879,9 +882,10 @@ namespace ItemSystem.PassiveSkills
             int bleed = enemyBleedStacks;
             if (bleed > 0) enemyBleedStacks = bleed / 2;
             int poison = GetStatus(StatusTarget.Enemy, "poison");
-            if (poison > 0) enemyStatusStacks["poison"] = poison / 2;
+            int poisonAfter = poison * RecurrentTruthPoisonKeepPct / 100;
+            if (poison > 0) enemyStatusStacks["poison"] = poisonAfter;
             if (bleed > 0 || poison > 0)
-                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[回帰性真理] 毒/出血を半減 (毒 {poison}→{poison / 2} / 出血 {bleed}→{bleed / 2})");
+                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[回帰性真理] 出血を半減・毒を 3/4 (毒 {poison}→{poisonAfter} / 出血 {bleed}→{bleed / 2})");
         }
 
         /// <summary>現在スタック数（未付与は0）。</summary>

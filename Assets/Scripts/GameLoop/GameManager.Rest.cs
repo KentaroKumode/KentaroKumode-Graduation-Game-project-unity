@@ -227,7 +227,7 @@ namespace GameLoop
                     apex ? RunChronicle.ForgeApex : RunChronicle.ForgeUpgrade,
                     run.equippedWeaponId, cost);
             }
-            // 天工開物: 武器を強化するたび、 このランの爆発の基礎 +12 (累積・この品を持っている間の強化・HeatEffects.TenkouKaibutsu)
+            // 天工開物: 武器を強化するたび、 このランの爆発の基礎 +8 (累積・この品を持っている間の強化・HeatEffects.TenkouKaibutsu)
             if (run != null && run.OwnsPassive(ItemIds.HeavenlyCraft))
             {
                 run.heavenlyCraftUpgrades++;

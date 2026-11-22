@@ -667,7 +667,7 @@ namespace UI.Game2D.Battle
             if (ctx == null || !TermInputs(out _, out _, out _)) return false;
             var s = ItemSystem.PassiveSkills.Keywords.Kw.HeatState(ctx);
             if (s.threshold <= 0 && (preview == null || (preview.heat <= 0 && preview.heatGains.Count == 0))) return false;
-            var f = preview != null ? HeatCore.Forecast(s, preview, preview.attackAdd) : default;
+            var f = preview != null ? HeatCore.Forecast(s, preview) : default;
             int n = f.burstsWired + f.burstsEnd;
             label = "臨界 " + s.meter + "/" + (s.threshold > 0 ? s.threshold : HeatCore.StartThreshold(s.items)) + (n > 0 ? " 爆発" + n : "");
             return n > 0;

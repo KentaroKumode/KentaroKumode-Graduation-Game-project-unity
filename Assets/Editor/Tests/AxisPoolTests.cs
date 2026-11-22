@@ -76,9 +76,9 @@ namespace AutoTest.EditorTests
             Assert.That(gold.TrueForAll(it => it.axis == AxisRules.Gold));
         }
 
-        /// <summary>主軸共鳴 (2026-11-22): ロック後、 所持が単独 1 位の軸だけ ×2 (4 軸で 40:20:20:20)。 同率・ロック前は無し。</summary>
+        /// <summary>主軸共鳴の撤去 (2026-11-22 neon 収束 §4): ロック後は所持が単独 1 位の軸 (主軸・計装だけ) も均等 (4 軸で 25:25:25:25)・4 枠に「×2」の印は出ない。</summary>
         [Test]
-        public void MainAxis_SoleLeaderGetsDoubleWeight()
+        public void MainAxis_NoExtraWeightAfterLock()
         {
             var db = ItemDatabase.Instance;
             if (db == null) Assert.Ignore("ItemDatabase が無い");
@@ -90,7 +90,7 @@ namespace AutoTest.EditorTests
             Assert.That(AxisPool.MainAxis(run), Is.Null, "同率 1 位");
             run.ownedPassiveItems.Add(Of(AxisRules.Poison, 1));
             Assert.That(AxisPool.MainAxis(run), Is.EqualTo(AxisRules.Poison));
-            StringAssert.Contains("[" + AxisRules.Poison + "×2]", AxisPool.SlotsLabel(run));
+            StringAssert.DoesNotContain("×2", AxisPool.SlotsLabel(run));
             var pool = Pool();
             int poison = 0, axisDraws = 0;
             for (int i = 0; i < 16000; i++)
@@ -99,7 +99,7 @@ namespace AutoTest.EditorTests
                 if (!AxisPool.IsRanked(got[0].axis)) continue;
                 axisDraws++; if (got[0].axis == AxisRules.Poison) poison++;
             }
-            Assert.That(poison / (float)axisDraws, Is.EqualTo(0.4f).Within(0.02f));
+            Assert.That(poison / (float)axisDraws, Is.EqualTo(1f / AxisPool.LockSlots).Within(0.02f));
             run.lockedAxes.RemoveAt(3);
             Assert.That(AxisPool.MainAxis(run), Is.Null, "ロック前");
         }

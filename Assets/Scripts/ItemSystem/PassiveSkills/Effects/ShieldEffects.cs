@@ -350,14 +350,14 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>落城の礎石: 吸収またはターン開始の減衰で 1 ターンにシールドを 20 以上失ったとき、 次のターンの全撃の基礎攻撃 +「そのターンに失ったシールドの半分」(攻撃 +N・撃ごと)・
+    /// <summary>落城の礎石: 吸収またはターン開始の減衰で 1 ターンにシールドを 12 以上 (2026-11-22 neon 収束: 旧 20) 失ったとき、 次のターンの全撃の基礎攻撃 +「そのターンに失ったシールドの半分」(攻撃 +N・撃ごと)・
     /// 全撃の最終与ダメージ +60%。 シールドが吸収か減衰で減るたび、 ボスの次の目盛りにひびを入れる (ひびが既にあれば何もしない・CombatManager.CrackBossNotch)。
     /// 2026-11-22 (neon 最終仕上げ §2-2) 旧: 減るたび 減った量 × 2 の軽減不可ダメージ。</summary>
     public class FallenCastleCornerstone : IPassiveSkillEffect, IRelicDisplay
     {
         public const string Id = "落城の礎石";
         public string SkillId => Id;
-        public const int Need = 20, FinalPct = 60;
+        public const int Need = 12, FinalPct = 60;   // 2026-11-22 neon 収束: 失うシールド 20 → 12
         /// <summary>このターンに失ったシールド (Psn.TurnN) / 上乗せが働くターン / その攻撃 +N。</summary>
         private const string LostKey = "shd.castle.lost", TurnKey = "shd.castle.turn", AtkKey = "shd.castle.atk";
         public static bool Primed(CombatContext ctx) => ctx != null && ctx.currentTurn > 0 && Shd.Count(ctx, TurnKey) == ctx.currentTurn;
@@ -396,12 +396,12 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>防人の軍標【規則】: 【ジャスト防御】を成立させるたび、 この戦闘の最終与ダメージ倍率 +45% (累積・ctx.finalDamagePct) と、 次のターンの手札 +1 枚 (Rw.DrawNext)。
-    /// この戦闘で 3 回目以降のジャスト防御を成立させた次のターン、 全部の撃がもう 1 回ずつ発火する (2 回当たる・本体の撃の輪 CombatManager.Turn が <see cref="EchoNow"/> を読む・2026-11-22)。</summary>
+    /// この戦闘で 2 回目以降 (2026-11-22 neon 収束: 旧 3 回目以降) のジャスト防御を成立させた次のターン、 全部の撃がもう 1 回ずつ発火する (2 回当たる・本体の撃の輪 CombatManager.Turn が <see cref="EchoNow"/> を読む・2026-11-22)。</summary>
     public class BorderGuardStandard : IPassiveSkillEffect, IRelicDisplay
     {
         public const string Id = "防人の軍標";
         public string SkillId => Id;
-        public const int PctPerGuard = 45, Draw = 1, EchoNeed = 3;
+        public const int PctPerGuard = 45, Draw = 1, EchoNeed = 2;
         /// <summary>[persistent] 撃がもう 1 回ずつ発火するターン。</summary>
         public const string EchoKey = "shd.standard.echo";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Pct(ctx.finalDamagePct / 100f);

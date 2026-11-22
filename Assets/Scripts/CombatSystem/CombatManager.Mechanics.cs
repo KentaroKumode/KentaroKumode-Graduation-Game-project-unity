@@ -415,7 +415,8 @@ namespace CombatSystem
             bool omni = AxisRules.Owns(roleRun, GameLoop.ItemIds.RoleOmni), mirror = AxisRules.Owns(roleRun, GameLoop.ItemIds.RoleMirror),
                  fate = AxisRules.Owns(roleRun, GameLoop.ItemIds.RoleFate);
             var tier = GameLoop.DiceFaceParts.Tier.T3;   // Tier は使わない (ADR-0015)。 実績の呼び手のために渡すだけ
-            // 〈宿命の刻み目〉: 前のターンに立ったゾロ目の効果が、 このターンにももう 1 回働く (役が立ったのではないので数えない・出来事も鳴らさない・2026-11-22〜 ゾロ目だけ)。
+            // 〈宿命の刻み目〉: 前のターンに立ったゾロ目・連なり、 または 2 ターン続けて立った役の効果が、 このターンにももう 1 回働く
+            //   (役が立ったのではないので数えない・出来事も鳴らさない・2026-11-22 neon 収束〜・その前はゾロ目だけ)。
             if (fate)
             {
                 int prev = (int)ctx.GetAccumulated(FateRoleKey) - 1;
@@ -427,6 +428,7 @@ namespace CombatSystem
                 }
             }
 
+            bool fateStreak = fate && (int)ctx.GetAccumulated(FateLastTurnKey) == ctx.currentTurn - 1 && ctx.currentTurn > 1;   // 前のターンにも役が立った
             for (int i = 0; i < _formedRoles.Count; i++)
             {
                 var k = _formedRoles[i];
@@ -441,7 +443,7 @@ namespace CombatSystem
                 for (int t = 0; t < times; t++) YachtRoleEffects.Apply(k, tier, ctx, ref outcome);
                 // 〈鏡合わせの盤〉: 2 個そろいなら、 1 つ小さい目の 2 個そろいの効果も働く (1 の 2 個そろいなら、 次のターンの無料の振り直し +1)
                 if (mirror && !YachtRoles.IsBig(k)) MirrorPair(k, ctx, tier, ref outcome);
-                if (fate && YachtRoles.IsTriple(k)) ctx.accumulatedValues[FateRoleKey] = (int)k + 1;
+                if (fate && (YachtRoles.IsBig(k) || fateStreak)) ctx.accumulatedValues[FateRoleKey] = (int)k + 1;
                 ctx.firedRolesThisTurn.Add(k);
                 RaiseCue(CombatCue.Role, YachtRoles.NameOf(k));      // 合図 (#319)
                 YachtRoleEffects.FiredCount[(int)k]++;
@@ -463,6 +465,7 @@ namespace CombatSystem
                 RoleFormedFired += formed;      // [計装]
             }
 
+            if (fate && ctx.firedRolesThisTurn.Count > 0) ctx.accumulatedValues[FateLastTurnKey] = ctx.currentTurn;
             if (ctx.firedRolesThisTurn.Count > 0)
             {
                 var names = new string[ctx.firedRolesThisTurn.Count];
@@ -474,6 +477,8 @@ namespace CombatSystem
 
         /// <summary>〈宿命の刻み目〉(2026-11-21): 前のターンに立った役 ((int)RoleKind + 1・0 = なし・ctx.accumulatedValues)。</summary>
         private const string FateRoleKey = "role.fate";
+        /// <summary>[persistent・戦闘で 0 から] 〈宿命の刻み目〉: 役が立った直近のターンの番号 (「2 ターン続けて立った役」・2026-11-22 neon 収束)。</summary>
+        private const string FateLastTurnKey = "role.fateLast";
         /// <summary>〈万象のゾロ目〉(2026-11-21): 2 個そろいをゾロ目として扱うと決めたターンの番号 (ctx.accumulatedValues) / 乱数のキー (専用) /
         /// この戦闘の役の回数がこれ以上なら確率 <see cref="OmniPctMid"/>・<see cref="OmniNeedFull"/> 以上なら 100%。</summary>
         private const string OmniTurnKey = "role.omniTurn";
