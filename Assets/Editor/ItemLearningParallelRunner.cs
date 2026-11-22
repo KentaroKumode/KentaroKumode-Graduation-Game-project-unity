@@ -500,7 +500,7 @@ namespace AutoTest.EditorTools
             while (active < _maxParallel && _pending.Count > 0)
             {
                 Slot s = _pending.Dequeue();
-                s.process = Process.Start(new ProcessStartInfo
+                var start = new ProcessStartInfo
                 {
                     FileName = UltraProductionWorkerBuild.ExecutablePath,
                     Arguments = "-batchmode -nographics -logFile " + Quote(s.logPath)
@@ -509,7 +509,9 @@ namespace AutoTest.EditorTools
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     WindowStyle = ProcessWindowStyle.Hidden,
-                });
+                };
+                UltraProductionWorkerBuild.ApplyWorkerEnvironment(start);
+                s.process = Process.Start(start);
                 if (s.process == null) { Debug.LogError("[学習並列] 起動失敗: " + s.jobPath); s.done = s.failed = true; continue; }
                 active++;
             }

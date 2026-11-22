@@ -443,6 +443,7 @@ namespace AutoTest.EditorTools
                     CreateNoWindow = true,
                     WindowStyle = ProcessWindowStyle.Hidden,
                 };
+                UltraProductionWorkerBuild.ApplyWorkerEnvironment(start);
                 slot.process = Process.Start(start);
                 if (slot.process == null)
                 { Debug.LogError("[並列] プロセス起動に失敗: " + slot.armLabel); continue; }

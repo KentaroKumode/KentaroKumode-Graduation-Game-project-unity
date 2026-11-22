@@ -14,11 +14,16 @@
     <NoWarn>$(NoWarn);0169;0649;0414;0067;0162;0219;0108;0114;0618;0672;CS8632;CS1998;CS0436</NoWarn>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <InvariantGlobalization>true</InvariantGlobalization>
-    <!-- 短命のプロセス (1 本 十数秒) なので段階 JIT を切って最初から最適化する。 22 並列の実測で 1 プロセス 11.4 → 7.1 秒 (IL2CPP 11.2 秒) -->
-    <TieredCompilation>false</TieredCompilation>
+    <!-- 段階 JIT は入れたまま (動的 PGO が効く)、 呼び出しの数え始めの遅延 (既定 100 ms・起動の間ずっと延び続ける) を 0 にする。
+         2026-11-22 の実測 (22 並列・同じシードの対で同時に回した比・段階 JIT を切った版を 1): 1 プロセス 15 ラン 0.86 / 300 ラン 0.86
+         (既定の段階 JIT は 1.44 / 0.91・ReadyToRun は 0.85 / 0.90 で長い仕事で負ける)。 結果は全チャンクで一致 -->
+    <TieredCompilation>true</TieredCompilation>
     <ServerGarbageCollector>false</ServerGarbageCollector>
     <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
   </PropertyGroup>
+  <ItemGroup>
+    <RuntimeHostConfigurationOption Include="System.Runtime.TieredCompilation.CallCountingDelayMs" Value="0" />
+  </ItemGroup>
   <ItemGroup>
     <Compile Include="Shim\**\*.cs;Program.cs;SelfTest.cs" />
     <Compile Include="$(GameRoot)Assets\Scripts\**\*.cs"
