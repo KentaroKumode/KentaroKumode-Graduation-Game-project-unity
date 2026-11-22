@@ -525,7 +525,7 @@ namespace AutoTest
                             int bestS = -1;
                             for (int i = 0; i < offer.Count; i++)
                             {
-                                int sc = (owned != null && owned.Contains(offer[i]) ? 0 : 2) + (!string.IsNullOrEmpty(buyAxisFocus) && IsAxisFocusItem(offer[i]) ? 1 : 0);
+                                int sc = (owned != null && owned.Contains(offer[i]) ? 0 : 2) + (!string.IsNullOrEmpty(buyAxisFocus) && IsAxisFocusItem(offer[i]) ? 1 + BotHooks.BranchAdj(offer[i]) : 0);
                                 if (sc > bestS) { bestS = sc; pick = i; }
                             }
                         }

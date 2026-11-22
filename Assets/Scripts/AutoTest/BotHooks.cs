@@ -26,6 +26,19 @@ namespace AutoTest
         /// <summary>軸に寄せる加点 (序列の段の数・× StepPerTier)。</summary>
         public static int AxisFocusBonus = 1;
 
+        /// <summary>[2026-11-23] 寄せる軸の中の分岐 (AutoRunner.buyBranchFocus・"A" / "B"・空 = 無効)。</summary>
+        public static string BranchFocus = "";
+
+        /// <summary>寄せる軸の品の分岐の加減 (加点の倍数): 指定した分岐の品 +1 (= 加点 2 倍)・もう一方の分岐の品 −1 (= 加点 0・禁止はしない)・共通の品と分岐の指定なしは 0。
+        /// 分岐は items.json の branch (id の綴りは読まない)。</summary>
+        public static int BranchAdj(string id)
+        {
+            if (string.IsNullOrEmpty(BranchFocus) || string.IsNullOrEmpty(id)) return 0;
+            var it = ItemSystem.ItemDatabase.Instance?.GetItem(id);
+            if (it == null || string.IsNullOrEmpty(it.branch) || !InFocus(it.axis)) return 0;
+            return it.branch == BranchFocus ? 1 : -1;
+        }
+
         private static bool IsFocusItem(string id)
             => !string.IsNullOrEmpty(id) && InFocus(ItemSystem.ItemDatabase.Instance?.GetItem(id)?.axis);
 
@@ -104,7 +117,7 @@ namespace AutoTest
             for (int i = 0; i < offers.Count; i++)
             {
                 float sc = LearnedPriorityProvider.BuyScore(offers[i]);
-                if (IsFocusItem(offers[i])) sc += AxisFocusBonus * LearnedPriorityProvider.StepPerTier;
+                if (IsFocusItem(offers[i])) sc += AxisFocusBonus * (1 + BranchAdj(offers[i])) * LearnedPriorityProvider.StepPerTier;
                 if (sc < bestScore) { bestScore = sc; best = i; }
             }
             return best;
@@ -154,7 +167,7 @@ namespace AutoTest
             {
                 if (!WantsPassive(run, offers[i])) continue;
                 float sc = LearnedPriorityProvider.BuyScore(offers[i]);
-                if (IsFocusItem(offers[i])) sc += AxisFocusBonus * LearnedPriorityProvider.StepPerTier;
+                if (IsFocusItem(offers[i])) sc += AxisFocusBonus * (1 + BranchAdj(offers[i])) * LearnedPriorityProvider.StepPerTier;
                 if (sc > bestScore) { bestScore = sc; best = i; }
             }
             return best;
@@ -166,7 +179,7 @@ namespace AutoTest
             for (int i = 0; i < offers.Count; i++)
             {
                 float sc = LearnedPriorityProvider.BuyScore(offers[i]);
-                if (IsFocusItem(offers[i])) sc += AxisFocusBonus * LearnedPriorityProvider.StepPerTier;   // [2026-11-10] 軸に寄せる方策
+                if (IsFocusItem(offers[i])) sc += AxisFocusBonus * (1 + BranchAdj(offers[i])) * LearnedPriorityProvider.StepPerTier;   // [2026-11-10] 軸に寄せる方策
                 if (sc > bestScore) { bestScore = sc; best = i; }
             }
             return best;

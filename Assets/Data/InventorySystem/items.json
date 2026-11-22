@@ -459,7 +459,8 @@
       "category": "Passive",
       "rarity": "GOLD",
       "basePrice": 9,
-      "axis": "出血"
+      "axis": "出血",
+      "branch": "B"
     },
     {
       "id": "力みの小手",
@@ -470,7 +471,8 @@
       "rarity": "GOLD",
       "basePrice": 9,
       "skill": "力みの小手",
-      "axis": "シールド"
+      "axis": "シールド",
+      "branch": "B"
     },
     {
       "id": "魂喰らいの血石",
@@ -503,7 +505,8 @@
       "rarity": "GOLD",
       "basePrice": 9,
       "skill": "重装兵の隠し刃",
-      "axis": "シールド"
+      "axis": "シールド",
+      "branch": "A"
     },
     {
       "id": "工廠の材料箱",
@@ -557,7 +560,8 @@
       "category": "Passive",
       "rarity": "GOLD",
       "basePrice": 9,
-      "axis": "充電"
+      "axis": "充電",
+      "branch": "A"
     },
     {
       "id": "過負荷チューナー",
@@ -568,7 +572,8 @@
       "rarity": "GOLD",
       "basePrice": 9,
       "skill": "過負荷チューナー",
-      "axis": "充電"
+      "axis": "充電",
+      "branch": "A"
     },
     {
       "id": "雷壷",
@@ -579,7 +584,8 @@
       "rarity": "GOLD",
       "basePrice": 9,
       "skill": "雷壷",
-      "axis": "充電"
+      "axis": "充電",
+      "branch": "B"
     },
     {
       "id": "乾き火口箱",
@@ -622,7 +628,8 @@
       "rarity": "GOLD",
       "basePrice": 9,
       "skill": "溢れ取りの鋳型",
-      "axis": "臨界"
+      "axis": "臨界",
+      "branch": "B"
     },
     {
       "id": "帳簿外の爆薬",
@@ -632,7 +639,8 @@
       "category": "Passive",
       "rarity": "GOLD",
       "basePrice": 9,
-      "axis": "臨界"
+      "axis": "臨界",
+      "branch": "A"
     },
     {
       "id": "恒温の竈",
@@ -653,7 +661,8 @@
       "rarity": "GOLD",
       "basePrice": 9,
       "skill": "早沸かし釜",
-      "axis": "臨界"
+      "axis": "臨界",
+      "branch": "A"
     },
     {
       "id": "恒熱の炉壁",
@@ -675,7 +684,8 @@
       "rarity": "LEGENDARY",
       "basePrice": 10,
       "skill": "八日目の灰燼",
-      "axis": "臨界"
+      "axis": "臨界",
+      "branch": "B"
     },
     {
       "id": "鉛入りの握斧",
@@ -696,7 +706,8 @@
       "rarity": "LEGENDARY",
       "basePrice": 10,
       "skill": "破城斧",
-      "axis": "シールド"
+      "axis": "シールド",
+      "branch": "B"
     },
     {
       "id": "銑鉄棍",
@@ -729,7 +740,8 @@
       "rarity": "GOLD",
       "basePrice": 9,
       "skill": "焦げ導線",
-      "axis": "充電"
+      "axis": "充電",
+      "branch": "A"
     },
     {
       "id": "加重の拳套",
@@ -792,7 +804,8 @@
       "rarity": "GOLD",
       "basePrice": 9,
       "skill": "石抜きの毒指輪",
-      "axis": "毒"
+      "axis": "毒",
+      "branch": "B"
     },
     {
       "id": "廃庭の霧吹き",
@@ -814,7 +827,8 @@
       "rarity": "GOLD",
       "basePrice": 9,
       "skill": "岸上げの麻痺瓶",
-      "axis": "毒"
+      "axis": "毒",
+      "branch": "A"
     },
     {
       "id": "雷鯰の棘",
@@ -856,7 +870,8 @@
       "rarity": "GOLD",
       "basePrice": 9,
       "skill": "逆綴じの止血帯",
-      "axis": "出血"
+      "axis": "出血",
+      "branch": "A"
     },
     {
       "id": "血桜",
@@ -867,7 +882,8 @@
       "rarity": "LEGENDARY",
       "basePrice": 10,
       "skill": "血桜",
-      "axis": "出血"
+      "axis": "出血",
+      "branch": "A"
     },
     {
       "id": "医書裏の開き針",
@@ -878,7 +894,8 @@
       "rarity": "GOLD",
       "basePrice": 9,
       "skill": "医書裏の開き針",
-      "axis": "出血"
+      "axis": "出血",
+      "branch": "A"
     },
     {
       "id": "先血の腕輪",
@@ -900,7 +917,8 @@
       "rarity": "LEGENDARY",
       "basePrice": 10,
       "skill": "雷神槍",
-      "axis": "充電"
+      "axis": "充電",
+      "branch": "B"
     },
     {
       "id": "貸与された時間",
@@ -911,7 +929,8 @@
       "rarity": "LEGENDARY",
       "basePrice": 10,
       "skill": "貸与された時間",
-      "axis": "充電"
+      "axis": "充電",
+      "branch": "A"
     },
     {
       "id": "烈刃",
@@ -987,7 +1006,8 @@
       "rarity": "SILVER",
       "basePrice": 8,
       "skill": "聖路の白靴",
-      "axis": "シールド"
+      "axis": "シールド",
+      "branch": "B"
     },
     {
       "id": "血車",
@@ -998,7 +1018,8 @@
       "rarity": "GOLD",
       "basePrice": 9,
       "skill": "血車",
-      "axis": "出血"
+      "axis": "出血",
+      "branch": "B"
     },
     {
       "id": "腐し刃",
@@ -1009,7 +1030,8 @@
       "rarity": "GOLD",
       "basePrice": 9,
       "skill": "腐し刃",
-      "axis": "毒"
+      "axis": "毒",
+      "branch": "A"
     },
     {
       "id": "溶金の領主剣",
@@ -1049,7 +1071,8 @@
       "rarity": "GOLD",
       "basePrice": 9,
       "skill": "天工開物",
-      "axis": "臨界"
+      "axis": "臨界",
+      "branch": "B"
     },
     {
       "id": "二拍目の心臓",
@@ -1060,7 +1083,8 @@
       "rarity": "LEGENDARY",
       "basePrice": 10,
       "skill": "二拍目の心臓",
-      "axis": "シールド"
+      "axis": "シールド",
+      "branch": "B"
     },
     {
       "id": "灼線鞭",
@@ -1070,7 +1094,8 @@
       "category": "Passive",
       "rarity": "LEGENDARY",
       "basePrice": 10,
-      "axis": "充電"
+      "axis": "充電",
+      "branch": "A"
     },
     {
       "id": "毒草摘みの杖",
@@ -1092,7 +1117,8 @@
       "rarity": "LEGENDARY",
       "basePrice": 10,
       "skill": "寸鉄",
-      "axis": "会心"
+      "axis": "会心",
+      "branch": "A"
     },
     {
       "id": "戦果の天秤",
@@ -1113,7 +1139,8 @@
       "rarity": "LEGENDARY",
       "basePrice": 10,
       "skill": "脈なしの鋼心臓",
-      "axis": "シールド"
+      "axis": "シールド",
+      "branch": "B"
     },
     {
       "id": "血脈の災環",
@@ -1124,7 +1151,8 @@
       "rarity": "LEGENDARY",
       "basePrice": 10,
       "skill": "血脈の災環",
-      "axis": "出血"
+      "axis": "出血",
+      "branch": "B"
     },
     {
       "id": "無害灯",
@@ -1179,7 +1207,8 @@
       "rarity": "LEGENDARY",
       "basePrice": 10,
       "skill": "遅効の毒刃",
-      "axis": "毒"
+      "axis": "毒",
+      "branch": "B"
     },
     {
       "id": "医家の反り刃",
@@ -1200,7 +1229,8 @@
       "rarity": "BRONZE",
       "basePrice": 7,
       "skill": "鏡返しの小盾",
-      "axis": "シールド"
+      "axis": "シールド",
+      "branch": "A"
     },
     {
       "id": "鎧縫いの針",
@@ -1229,7 +1259,8 @@
       "category": "Passive",
       "rarity": "LEGENDARY",
       "basePrice": 10,
-      "axis": "臨界"
+      "axis": "臨界",
+      "branch": "A"
     },
     {
       "id": "サーベル・ワルツ",
@@ -1600,7 +1631,8 @@
       "category": "Passive",
       "rarity": "BRONZE",
       "basePrice": 7,
-      "axis": "シールド"
+      "axis": "シールド",
+      "branch": "B"
     },
     {
       "id": "二度目の打金",
@@ -1621,7 +1653,8 @@
       "category": "Passive",
       "rarity": "SILVER",
       "basePrice": 8,
-      "axis": "シールド"
+      "axis": "シールド",
+      "branch": "A"
     },
     {
       "id": "黄金色の封蝋",
@@ -1715,7 +1748,8 @@
       "category": "Passive",
       "rarity": "GOLD",
       "basePrice": 9,
-      "axis": "出血"
+      "axis": "出血",
+      "branch": "A"
     },
     {
       "id": "相棒の魂",
@@ -1726,7 +1760,8 @@
       "rarity": "GOLD",
       "basePrice": 9,
       "skill": "相棒の魂",
-      "axis": "シールド"
+      "axis": "シールド",
+      "branch": "B"
     },
     {
       "id": "根拠のない確信",
@@ -1775,7 +1810,8 @@
       "rarity": "GOLD",
       "basePrice": 9,
       "skill": "斬り重ねの鞘",
-      "axis": "会心"
+      "axis": "会心",
+      "branch": "A"
     },
     {
       "id": "一点読みの片眼",
@@ -1847,7 +1883,8 @@
       "category": "Passive",
       "rarity": "BRONZE",
       "basePrice": 7,
-      "axis": "シールド"
+      "axis": "シールド",
+      "branch": "B"
     },
     {
       "id": "研ぎ師の見立て書",
@@ -1858,7 +1895,8 @@
       "rarity": "SILVER",
       "basePrice": 8,
       "skill": "研ぎ師の見立て書",
-      "axis": "会心"
+      "axis": "会心",
+      "branch": "A"
     },
     {
       "id": "重ね斬りの型",
@@ -1869,7 +1907,8 @@
       "rarity": "GOLD",
       "basePrice": 9,
       "skill": "重ね斬りの型",
-      "axis": "会心"
+      "axis": "会心",
+      "branch": "A"
     },
     {
       "id": "血止め知らずの針箱",
@@ -1912,7 +1951,8 @@
       "rarity": "GOLD",
       "basePrice": 9,
       "skill": "腐れ沼の苔玉",
-      "axis": "毒"
+      "axis": "毒",
+      "branch": "A"
     },
     {
       "id": "焚き足しの炭",
@@ -1953,7 +1993,8 @@
       "category": "Passive",
       "rarity": "GOLD",
       "basePrice": 9,
-      "axis": "充電"
+      "axis": "充電",
+      "branch": "A"
     },
     {
       "id": "油染みの盾革",
@@ -1964,7 +2005,8 @@
       "rarity": "SILVER",
       "basePrice": 8,
       "skill": "油染みの盾革",
-      "axis": "シールド"
+      "axis": "シールド",
+      "branch": "B"
     },
     {
       "id": "盾押しの心得",
@@ -1975,7 +2017,8 @@
       "rarity": "GOLD",
       "basePrice": 9,
       "skill": "盾押しの心得",
-      "axis": "シールド"
+      "axis": "シールド",
+      "branch": "B"
     },
     {
       "id": "狙い目の刻み",
@@ -1997,7 +2040,8 @@
       "rarity": "BRONZE",
       "basePrice": 7,
       "skill": "一の矢",
-      "axis": "会心"
+      "axis": "会心",
+      "branch": "B"
     },
     {
       "id": "余韻の鈴",
@@ -2008,7 +2052,8 @@
       "rarity": "BRONZE",
       "basePrice": 7,
       "skill": "余韻の鈴",
-      "axis": "会心"
+      "axis": "会心",
+      "branch": "A"
     },
     {
       "id": "受け流しの扇",
@@ -2030,7 +2075,8 @@
       "rarity": "SILVER",
       "basePrice": 8,
       "skill": "刃毀れの見立て",
-      "axis": "会心"
+      "axis": "会心",
+      "branch": "B"
     },
     {
       "id": "負け越しの賽",
@@ -2041,7 +2087,8 @@
       "rarity": "SILVER",
       "basePrice": 8,
       "skill": "負け越しの賽",
-      "axis": "役"
+      "axis": "役",
+      "branch": "B"
     },
     {
       "id": "連なる閃き",
@@ -2052,7 +2099,8 @@
       "rarity": "GOLD",
       "basePrice": 9,
       "skill": "連なる閃き",
-      "axis": "会心"
+      "axis": "会心",
+      "branch": "A"
     },
     {
       "id": "抜き打ちの作法",
@@ -2063,7 +2111,8 @@
       "rarity": "GOLD",
       "basePrice": 9,
       "skill": "抜き打ちの作法",
-      "axis": "会心"
+      "axis": "会心",
+      "branch": "B"
     },
     {
       "id": "千里眼の水晶",
@@ -2074,7 +2123,8 @@
       "rarity": "LEGENDARY",
       "basePrice": 10,
       "skill": "千里眼の水晶",
-      "axis": "会心"
+      "axis": "会心",
+      "branch": "A"
     },
     {
       "id": "予備のバッテリー",
@@ -2162,7 +2212,8 @@
       "rarity": "GOLD",
       "basePrice": 9,
       "skill": "雷鳴の太鼓",
-      "axis": "充電"
+      "axis": "充電",
+      "branch": "B"
     },
     {
       "id": "欠け刃のナイフ",
@@ -2226,7 +2277,8 @@
       "rarity": "LEGENDARY",
       "basePrice": 10,
       "skill": "紅の搾り具",
-      "axis": "出血"
+      "axis": "出血",
+      "branch": "B"
     },
     {
       "id": "涸れぬ血晶",
@@ -2237,7 +2289,8 @@
       "rarity": "LEGENDARY",
       "basePrice": 10,
       "skill": "涸れぬ血晶",
-      "axis": "出血"
+      "axis": "出血",
+      "branch": "A"
     },
     {
       "id": "酸の小瓶",
@@ -2281,7 +2334,8 @@
       "rarity": "GOLD",
       "basePrice": 9,
       "skill": "麻痺の吹き矢",
-      "axis": "毒"
+      "axis": "毒",
+      "branch": "A"
     },
     {
       "id": "瘴気の外套",
@@ -2292,7 +2346,8 @@
       "rarity": "LEGENDARY",
       "basePrice": 10,
       "skill": "瘴気の外套",
-      "axis": "毒"
+      "axis": "毒",
+      "branch": "A"
     },
     {
       "id": "毒溜まりの主",
@@ -2303,7 +2358,8 @@
       "rarity": "LEGENDARY",
       "basePrice": 10,
       "skill": "毒溜まりの主",
-      "axis": "毒"
+      "axis": "毒",
+      "branch": "A"
     },
     {
       "id": "天眼の鍔",
@@ -2314,7 +2370,8 @@
       "rarity": "LEGENDARY",
       "basePrice": 10,
       "skill": "天眼の鍔",
-      "axis": "会心"
+      "axis": "会心",
+      "branch": "B"
     },
     {
       "id": "死相の面頬",
@@ -2336,7 +2393,8 @@
       "rarity": "LEGENDARY",
       "basePrice": 10,
       "skill": "戻り血の古鎌",
-      "axis": "出血"
+      "axis": "出血",
+      "branch": "B"
     },
     {
       "id": "血の楔",
@@ -2369,7 +2427,8 @@
       "rarity": "LEGENDARY",
       "basePrice": 10,
       "skill": "骨溶かしの黒油",
-      "axis": "毒"
+      "axis": "毒",
+      "branch": "B"
     },
     {
       "id": "暴れ窯の火床",
@@ -2379,7 +2438,8 @@
       "category": "Passive",
       "rarity": "LEGENDARY",
       "basePrice": 10,
-      "axis": "臨界"
+      "axis": "臨界",
+      "branch": "B"
     },
     {
       "id": "柱折りの発破筒",
@@ -2411,7 +2471,8 @@
       "rarity": "LEGENDARY",
       "basePrice": 10,
       "skill": "積雷の黒舎利",
-      "axis": "充電"
+      "axis": "充電",
+      "branch": "B"
     },
     {
       "id": "落城の礎石",
@@ -2422,7 +2483,8 @@
       "rarity": "LEGENDARY",
       "basePrice": 10,
       "skill": "落城の礎石",
-      "axis": "シールド"
+      "axis": "シールド",
+      "branch": "B"
     },
     {
       "id": "防人の軍標",
@@ -2433,7 +2495,8 @@
       "rarity": "LEGENDARY",
       "basePrice": 10,
       "skill": "防人の軍標",
-      "axis": "シールド"
+      "axis": "シールド",
+      "branch": "A"
     },
     {
       "id": "帯革の薬嚢",
@@ -2453,7 +2516,8 @@
       "category": "Passive",
       "rarity": "SILVER",
       "basePrice": 8,
-      "axis": "山札"
+      "axis": "山札",
+      "branch": "A"
     },
     {
       "id": "底抜けの小瓶",
@@ -2573,7 +2637,8 @@
       "rarity": "BRONZE",
       "basePrice": 7,
       "skill": "焼き入れの挟み",
-      "axis": "山札"
+      "axis": "山札",
+      "branch": "A"
     },
     {
       "id": "予備の差込口",
@@ -2593,7 +2658,8 @@
       "category": "Passive",
       "rarity": "BRONZE",
       "basePrice": 7,
-      "axis": "山札"
+      "axis": "山札",
+      "branch": "B"
     },
     {
       "id": "補助歯車",
@@ -2613,7 +2679,8 @@
       "category": "Passive",
       "rarity": "BRONZE",
       "basePrice": 7,
-      "axis": "山札"
+      "axis": "山札",
+      "branch": "A"
     },
     {
       "id": "灰払いの箒",
@@ -2623,7 +2690,8 @@
       "category": "Passive",
       "rarity": "SILVER",
       "basePrice": 8,
-      "axis": "山札"
+      "axis": "山札",
+      "branch": "A"
     },
     {
       "id": "早回しのゼンマイ",
@@ -2633,7 +2701,8 @@
       "category": "Passive",
       "rarity": "SILVER",
       "basePrice": 8,
-      "axis": "山札"
+      "axis": "山札",
+      "branch": "A"
     },
     {
       "id": "仕込みの配電盤",
@@ -2654,7 +2723,8 @@
       "category": "Passive",
       "rarity": "SILVER",
       "basePrice": 8,
-      "axis": "山札"
+      "axis": "山札",
+      "branch": "B"
     },
     {
       "id": "整理された工具箱",
@@ -2664,7 +2734,8 @@
       "category": "Passive",
       "rarity": "SILVER",
       "basePrice": 8,
-      "axis": "山札"
+      "axis": "山札",
+      "branch": "A"
     },
     {
       "id": "再利用のるつぼ",
@@ -2674,7 +2745,8 @@
       "category": "Passive",
       "rarity": "GOLD",
       "basePrice": 9,
-      "axis": "山札"
+      "axis": "山札",
+      "branch": "A"
     },
     {
       "id": "無銘の設計図",
@@ -2684,7 +2756,8 @@
       "category": "Passive",
       "rarity": "GOLD",
       "basePrice": 9,
-      "axis": "山札"
+      "axis": "山札",
+      "branch": "A"
     },
     {
       "id": "継ぎ目のない導線",
@@ -2694,7 +2767,8 @@
       "category": "Passive",
       "rarity": "GOLD",
       "basePrice": 9,
-      "axis": "山札"
+      "axis": "山札",
+      "branch": "B"
     },
     {
       "id": "折り目のついた札",
@@ -2704,7 +2778,8 @@
       "category": "Passive",
       "rarity": "GOLD",
       "basePrice": 9,
-      "axis": "山札"
+      "axis": "山札",
+      "branch": "B"
     },
     {
       "id": "解体屋の袋",
@@ -2714,7 +2789,8 @@
       "category": "Passive",
       "rarity": "LEGENDARY",
       "basePrice": 10,
-      "axis": "山札"
+      "axis": "山札",
+      "branch": "A"
     },
     {
       "id": "常設の作業台",
@@ -2724,7 +2800,8 @@
       "category": "Passive",
       "rarity": "LEGENDARY",
       "basePrice": 10,
-      "axis": "山札"
+      "axis": "山札",
+      "branch": "B"
     },
     {
       "id": "灰から組む機関",
@@ -2734,7 +2811,8 @@
       "category": "Passive",
       "rarity": "LEGENDARY",
       "basePrice": 10,
-      "axis": "山札"
+      "axis": "山札",
+      "branch": "A"
     },
     {
       "id": "永久機関の主軸",
@@ -2744,7 +2822,8 @@
       "category": "Passive",
       "rarity": "LEGENDARY",
       "basePrice": 10,
-      "axis": "山札"
+      "axis": "山札",
+      "branch": "A"
     },
     {
       "id": "擦り切れた賽袋",
@@ -2754,7 +2833,8 @@
       "category": "Passive",
       "rarity": "BRONZE",
       "basePrice": 7,
-      "axis": "役"
+      "axis": "役",
+      "branch": "B"
     },
     {
       "id": "見切りの木札",
@@ -2785,7 +2865,8 @@
       "rarity": "SILVER",
       "basePrice": 8,
       "skill": "欠け目の見立て",
-      "axis": "役"
+      "axis": "役",
+      "branch": "A"
     },
     {
       "id": "揃いの拍子木",
@@ -2796,7 +2877,8 @@
       "rarity": "GOLD",
       "basePrice": 9,
       "skill": "揃いの拍子木",
-      "axis": "役"
+      "axis": "役",
+      "branch": "A"
     },
     {
       "id": "鏡合わせの盤",
@@ -2806,7 +2888,8 @@
       "category": "Passive",
       "rarity": "GOLD",
       "basePrice": 9,
-      "axis": "役"
+      "axis": "役",
+      "branch": "A"
     },
     {
       "id": "宿命の刻み目",
@@ -2816,7 +2899,8 @@
       "category": "Passive",
       "rarity": "LEGENDARY",
       "basePrice": 10,
-      "axis": "役"
+      "axis": "役",
+      "branch": "A"
     },
     {
       "id": "万象のゾロ目",
@@ -2826,7 +2910,8 @@
       "category": "Passive",
       "rarity": "LEGENDARY",
       "basePrice": 10,
-      "axis": "役"
+      "axis": "役",
+      "branch": "B"
     },
     {
       "id": "劇毒の火薬庫",
@@ -2837,7 +2922,8 @@
       "rarity": "GOLD",
       "basePrice": 9,
       "skill": "劇毒の火薬庫",
-      "axis": "毒"
+      "axis": "毒",
+      "branch": "B"
     },
     {
       "id": "血染めの歯車",
@@ -2847,7 +2933,8 @@
       "category": "Passive",
       "rarity": "BRONZE",
       "basePrice": 7,
-      "axis": "役"
+      "axis": "役",
+      "branch": "B"
     },
     {
       "id": "雷鳴のゾロ目",
@@ -2857,7 +2944,8 @@
       "category": "Passive",
       "rarity": "GOLD",
       "basePrice": 9,
-      "axis": "役"
+      "axis": "役",
+      "branch": "B"
     },
     {
       "id": "必殺の照準器",
@@ -2867,7 +2955,8 @@
       "category": "Passive",
       "rarity": "LEGENDARY",
       "basePrice": 10,
-      "axis": "会心"
+      "axis": "会心",
+      "branch": "B"
     },
     {
       "id": "血濡れの符丁",
@@ -2888,7 +2977,8 @@
       "rarity": "BRONZE",
       "basePrice": 7,
       "skill": "雷毒の導管",
-      "axis": "役"
+      "axis": "役",
+      "branch": "A"
     },
     {
       "id": "渾身の柄頭",
@@ -2899,7 +2989,8 @@
       "rarity": "SILVER",
       "basePrice": 8,
       "skill": "渾身の柄頭",
-      "axis": "会心"
+      "axis": "会心",
+      "branch": "B"
     },
     {
       "id": "脈打ちの測り針",
@@ -2921,7 +3012,8 @@
       "rarity": "BRONZE",
       "basePrice": 7,
       "skill": "見切りの目印",
-      "axis": "会心"
+      "axis": "会心",
+      "branch": "A"
     },
     {
       "id": "白刃の鏡砥",
@@ -2932,7 +3024,8 @@
       "rarity": "GOLD",
       "basePrice": 9,
       "skill": "白刃の鏡砥",
-      "axis": "会心"
+      "axis": "会心",
+      "branch": "A"
     },
     {
       "id": "初太刀の鍔留め",
@@ -2943,7 +3036,8 @@
       "rarity": "BRONZE",
       "basePrice": 7,
       "skill": "初太刀の鍔留め",
-      "axis": "会心"
+      "axis": "会心",
+      "branch": "B"
     },
     {
       "id": "細目の覗き筒",
@@ -2954,7 +3048,8 @@
       "rarity": "BRONZE",
       "basePrice": 7,
       "skill": "細目の覗き筒",
-      "axis": "会心"
+      "axis": "会心",
+      "branch": "B"
     },
     {
       "id": "一閃の極意",
@@ -2965,7 +3060,8 @@
       "rarity": "GOLD",
       "basePrice": 9,
       "skill": "一閃の極意",
-      "axis": "会心"
+      "axis": "会心",
+      "branch": "B"
     },
     {
       "id": "静寂の構え",
@@ -2976,7 +3072,8 @@
       "rarity": "GOLD",
       "basePrice": 9,
       "skill": "静寂の構え",
-      "axis": "シールド"
+      "axis": "シールド",
+      "branch": "A"
     },
     {
       "id": "隙衝きの短槍",
@@ -3037,7 +3134,8 @@
       "rarity": "BRONZE",
       "basePrice": 7,
       "skill": "受け太刀の籠手",
-      "axis": "シールド"
+      "axis": "シールド",
+      "branch": "A"
     },
     {
       "id": "重ね札の盾",
@@ -3048,7 +3146,8 @@
       "rarity": "BRONZE",
       "basePrice": 7,
       "skill": "重ね札の盾",
-      "axis": "シールド"
+      "axis": "シールド",
+      "branch": "B"
     },
     {
       "id": "割れ盾の仕返し",

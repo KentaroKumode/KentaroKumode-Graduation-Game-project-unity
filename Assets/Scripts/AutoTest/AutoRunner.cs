@@ -364,6 +364,9 @@ namespace AutoTest
         public string buyAxisFocus = "";
         /// <summary>軸に寄せる加点 (序列の段の数・店では × StepPerTier の準パワー)。 1 = 「同じ値段帯なら軸の品を先に取る」程度。</summary>
         public int buyAxisFocusBonus = 1;
+        /// <summary>[2026-11-23] 寄せる軸の中の分岐 ("" / "A" / "B")。 <see cref="buyAxisFocus"/> と一緒に使う: その軸の品のうち指定した分岐の品の加点を 2 倍にし、
+        /// もう一方の分岐の品の加点を 0 にする (禁止はしない・共通の品は今と同じ)。 分岐は items.json の branch (BotHooks.BranchAdj)。</summary>
+        public string buyBranchFocus = "";
 
         /// <summary>品 <paramref name="itemId"/> が <see cref="buyAxisFocus"/> の軸か (items.json の axis を読む・id の綴りは読まない)。</summary>
         private bool IsAxisFocusItem(string itemId)
@@ -626,7 +629,7 @@ namespace AutoTest
         private int PersonaBonus(string itemId)
         {
             // [2026-11-10] 軸に寄せる方策 (buyAxisFocus): ペルソナとは独立に足す
-            int axisFocus = IsAxisFocusItem(itemId) ? buyAxisFocusBonus : 0;
+            int axisFocus = IsAxisFocusItem(itemId) ? buyAxisFocusBonus * (1 + BotHooks.BranchAdj(itemId)) : 0;   // 分岐の寄せ (buyBranchFocus)
             if (!useBuildPersonas || _currentPersona == BuildPersona.RawTier) return axisFocus;
             return BuildPersonaProfiles.ScoreBonusForItem(_currentPersona, itemId) + axisFocus;
         }
@@ -2037,6 +2040,7 @@ namespace AutoTest
             // [2026-11-10] 軸に寄せる方策を本体の差し込み口 (開幕の品・挑戦カード) へも渡す。 空なら無効。
             BotHooks.AxisFocus = buyAxisFocus ?? "";
             BotHooks.AxisFocusBonus = buyAxisFocusBonus;
+            BotHooks.BranchFocus = buyBranchFocus ?? "";
             LearnedPriorityProvider.BuyTierCount = isSuperSkill ? superBuyTiers : optimalBuyTiers;
             wiringMistakeRate = isSuperSkill ? 0f : optimalMistakeRate;
             LearnedPriorityProvider.GateRaw = v3.tierGateRaw;

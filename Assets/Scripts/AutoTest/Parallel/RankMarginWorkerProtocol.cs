@@ -514,7 +514,7 @@ namespace AutoTest.ParallelSweep
                 // 計測でイベントを切っているか (2026-11-05)。 クリア率の意味が変わるので必ず印字する。
                 "suppressEvents", "suppressConvictionChain", "freeNavScout", "navLearnedDanger", "measureNoExplore",
                 // 2026-11-10: 配線が与ダメの倍率を読むか (−1 = 技量に従う) と実効値・軸に寄せる方策・配布の有無 (配布は使わない前提を確かめる)
-                "v3.readOutgoingMult", "ReadOutgoingMultEffective", "buyAxisFocus", "buyAxisFocusBonus",
+                "v3.readOutgoingMult", "ReadOutgoingMultEffective", "buyAxisFocus", "buyAxisFocusBonus", "buyBranchFocus",
                 "axisPackageAxis", "axisPackageCount", "v3.hpLedger", "predTrace",
                 // 2026-11-10: 主攻撃の見積もりを実績の比で掛け直すか・2026-11-21: 最初の武器の指定
                 "v3.mainCorr", "weaponTierCap", "forceStartWeapon", "vescaDiceForce",

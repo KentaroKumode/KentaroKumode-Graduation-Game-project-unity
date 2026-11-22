@@ -229,6 +229,7 @@ namespace ItemSystem
             item.consFamily = jsonItem.consFamily ?? "";
             item.unique     = jsonItem.unique;
             item.axis       = jsonItem.axis ?? "";
+            item.branch     = jsonItem.branch ?? "";
 
             // サイズ (sizeX/sizeY) は 2026-09-19 に items.json から削除、 型ごと 2026-10-28 に削除 (グリッドの廃止)。
 
