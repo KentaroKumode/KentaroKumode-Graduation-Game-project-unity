@@ -288,7 +288,7 @@ namespace AutoTest
             CombatSystem.CombatManager.CritOverflowFired = CombatSystem.CombatManager.CritExecuteFired = CombatSystem.CombatManager.CritRefireFired = 0;
             CombatSystem.CombatManager.DeckDisposeFired = CombatSystem.CombatManager.DeckShuffleFired = 0;
             CombatSystem.CombatManager.RoleFormedFired = CombatSystem.CombatManager.RoleOmniFired = 0;
-            CombatSystem.CombatManager.WeaponChainFired = CombatSystem.CombatManager.WeaponExecuteFired = CombatSystem.CombatManager.WeaponGaryoFired = CombatSystem.CombatManager.WeaponBashFired = 0;
+            CombatSystem.CombatManager.WeaponChainFired = CombatSystem.CombatManager.WeaponExecuteFired = CombatSystem.CombatManager.WeaponGaryoFired = CombatSystem.CombatManager.WeaponBashFired = CombatSystem.CombatManager.GuardEchoFired = 0;
             ItemSystem.AxisPool.RunSkips = ItemSystem.AxisPool.RunSkipGold = ItemSystem.AxisPool.RunAxisRerolls = ItemSystem.AxisPool.RunMainAxisPicks = 0;
             ItemSystem.PassiveSkills.PassiveSkillManager.ChainDeepestPath = "";
             ItemSystem.PassiveSkills.Keywords.Kw.HeatMaxBurstsOneAdd = 0;

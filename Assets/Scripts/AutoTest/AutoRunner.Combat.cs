@@ -547,6 +547,7 @@ namespace AutoTest
             public int minDmg;                 // 勝利時の与ダメ最低保証
             public float berserkMul;           // 狂暴化 (敵の被ダメ倍率)
             public int finalPct;               // 最終与ダメージ倍率の上乗せ % (ctx.finalDamagePct・〈防人の軍標〉・2026-11-20)
+            public bool guardEcho;             // 〈防人の軍標〉: このターンは全部の撃がもう 1 回ずつ発火する (2026-11-22・本体 CombatManager.Turn の撃の輪)
             /// <summary>[#105 山札の先読み] 攻撃の端子を挿せる手が 1 つも無い (手札に攻撃の端子が無い・条件に合わない) 次のターン。
             /// 「攻撃 0 本」の抑止 (−10000) は選べる時の手の形を決める装置なので、 選べないターンには掛けない
             /// (掛けると、 次のターンの手札の引きの差が −10000 ÷ 標本数の桁で先読みの値を支配する)。 既定 false = 今までどおり。</summary>
@@ -613,6 +614,7 @@ namespace AutoTest
             //   短剣〈連刃〉: 攻撃の端子 2 枚以上なら最後に追撃 (武器の攻撃力 × 率・防御を無視)
             if (s.rung.chainRatePct > 0 && ws.aHits >= ItemSystem.PassiveSkills.Effects.ChainBlade.NeedTerminals)
                 total += ReadOutOneHit(in s, bCount, 0, in ws, hits, CombatSystem.CombatRules.ChainHitBase(s.atkPower, s.rung.chainRatePct));
+            if (s.guardEcho) total *= 2f;      // shortcut: もう 1 回の撃は同じ見込み (撃ごとの積み上げ・敵の防御の変化は見ない)
             return Mathf.RoundToInt(total);
         }
 
@@ -749,6 +751,7 @@ namespace AutoTest
             st.pinpointCut = ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.PinpointEye.NonCritCutKey) > 0f;
             st.outMul = OutgoingPoolNow(ctx, run);
             st.finalPct = ctx.finalDamagePct;
+            st.guardEcho = ItemSystem.PassiveSkills.Effects.BorderGuardStandard.EchoNow(ctx);
             st.consBurst = ctx.consAtkBurst;
             st.critPen = ctx.critArmorPen;
             st.vitalIgnore = ItemSystem.PassiveSkills.Effects.VitalStrike.IgnoresDefense(ctx);

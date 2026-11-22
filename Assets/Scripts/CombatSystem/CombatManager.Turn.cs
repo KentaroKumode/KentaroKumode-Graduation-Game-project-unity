@@ -1069,11 +1069,14 @@ namespace CombatSystem
             //   〈必殺の照準器〉(CritCore): 攻撃の端子が 1 枚だけのターン、 その撃が会心なら同じ撃をもう 1 回発火する (1 ターン 1 回・会心は確定・乱数は引かない)
             bool sniper = hitBases.Count == 1 && GameLoop.GameManager.Instance?.Run?.OwnsPassive(GameLoop.ItemIds.CritSniper) == true;
             bool refire = false; float sniperAdd = 0f;
+            //   〈防人の軍標〉(2026-11-22): 3 回目以降のジャスト防御の次のターン、 全部の撃がもう 1 回ずつ発火する (同じ撃をすぐもう 1 回・会心は振り直す)。
+            //   shortcut: 〈必殺の照準器〉がもう 1 回発火した撃には重ねない (照準器は攻撃の端子 1 枚のターンだけ)
+            bool echoAll = hitBases.Count > 0 && ItemSystem.PassiveSkills.Effects.BorderGuardStandard.EchoNow(ctx), echoing = false;
             for (int h = 0; h < nHits; h++)
             {
                 ctx.hitIndex = h; ctx.forceCritThisHit = refire; ctx.critSkipRoll = refire; ctx.hitFinalDamagePct = 0; ctx.hitOutgoingPct = 0; ctx.hitIgnoreDefense = h == chainHit; ctx.hitArmorPen = 0;   // 撃ごとの値 (〈抜き打ちの作法〉〈加重の拳套〉・〈連刃〉の追撃は防御を無視)
                 ctx.hitFaceMax = CritCore.HitFaceMax(term, playerDice, h);   // 〈狙い目の刻み〉が読む
-                if (h > 0 || refire)
+                if (h > 0 || refire || echoing)
                 {
                     // 次の撃の前に固定ダメの枠を空にする ── 空にしないと 1 撃目の固定ダメ (毒・品が預けた分) が次の撃にも返って二重に入る。
                     ctx.fixedDamageToEnemy = 0;
@@ -1084,7 +1087,7 @@ namespace CombatSystem
                 int needlePen = ctx.playerArmorPen;
                 if (needle) { ctx.forceCritThisHit = true; ctx.playerArmorPen += DefenseFormula.IgnoreAll; Debug.Log("[急所突きの針] この撃は必ず会心・敵の防御を無視"); }
                 //   【オーバークロック】(〈雷鳴の太鼓〉・ChargeCore): 最初の 1 撃の最終与ダメージ +60%・敵の防御を全部無視 (この撃だけ・貫通は撃の後に戻す)
-                bool oc = term.overclock && h == 0 && h < hitBases.Count && !refire;
+                bool oc = term.overclock && h == 0 && h < hitBases.Count && !refire && !echoing;
                 if (refire && sniperAdd >= 1f) ctx.criticalMultiplier += CritCore.SniperMulAdd;   // 〈必殺の照準器〉: 会心率 100% 以上なら、 もう 1 回の撃の会心倍率 +1.0
                 if (oc) { ctx.hitFinalDamagePct += ChargeCore.OverclockFinalPct; if (!needle) ctx.playerArmorPen += DefenseFormula.IgnoreAll; }
                 var (d, f, c) = psm.ProcessDamage(h < hitBases.Count ? hitBases[h] : 0, h == 0 ? ctx.pursuitDamage : 0, playerCritBaseRate);
@@ -1097,7 +1100,9 @@ namespace CombatSystem
                 hitDealt.Add(d); hitCrit.Add(c);
                 dealtDmg += d; dealtFixed += f; isCrit |= c;
                 if (refire) { refire = false; CritRefireFired++; Debug.Log($"[必殺の照準器] 会心の撃をもう 1 回発火 → {d}"); }
+                else if (echoing) { echoing = false; GuardEchoFired++; Debug.Log($"[防人の軍標] {h + 1} 撃目をもう 1 回発火 → {d}"); }
                 else if (sniper && c && h == 0) { refire = true; sniperAdd = ctx.lastCritAddPct; h--; }
+                else if (echoAll && h < hitBases.Count) { echoing = true; h--; }
             }
             ctx.forceCritThisHit = false; ctx.critSkipRoll = false; ctx.hitFinalDamagePct = 0; ctx.hitOutgoingPct = 0; ctx.hitIgnoreDefense = false; ctx.hitArmorPen = 0;
             if (nHits > 1)

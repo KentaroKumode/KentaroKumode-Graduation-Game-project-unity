@@ -262,6 +262,9 @@ namespace AutoTest
                 if (sg.jgMirror) ws.extraDmg += jgE * (ItemSystem.PassiveSkills.Effects.MirrorBuckler.JustPct - ItemSystem.PassiveSkills.Effects.MirrorBuckler.Pct) / 100;
                 if (sg.jgBlade) ws.extraDmg += jgE;
                 if (sg.jgStandard) sightFlat += ItemSystem.PassiveSkills.Effects.BorderGuardStandard.PctPerGuard / 100f * per * Math.Max(0, turns - 1) * 0.5f + DeckDrawDmg;
+                //   〈防人の軍標〉3 回目以降: 次のターンの撃がもう 1 回ずつ = 次の攻撃 1 回分 (2026-11-22)
+                if (sg.jgStandard && turns > 1 && ItemSystem.PassiveSkills.Effects.Shd.Count(sg.jgCtx, ItemSystem.PassiveSkills.Effects.Shd.JustGuardCountKey) + 1 >= ItemSystem.PassiveSkills.Effects.BorderGuardStandard.EchoNeed)
+                    sightFlat += per * DeckFutureAttackShare;
                 if (sg.jgCatch) sightFlat += ItemSystem.PassiveSkills.Effects.CatchBracer.Atk * DeckFutureAttackShare;
                 if (sg.jgSilent && o.attackDice == 0)
                     sightFlat += (ItemSystem.PassiveSkills.Effects.SilentStance.JustPct - ItemSystem.PassiveSkills.Effects.SilentStance.Pct) / 100f * per * DeckFutureAttackShare;

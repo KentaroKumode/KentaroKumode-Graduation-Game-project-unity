@@ -503,6 +503,7 @@ namespace AutoTest
                 _cur.weaponExecuteFired = (int)CombatSystem.CombatManager.WeaponExecuteFired;
                 _cur.weaponGaryoFired = (int)CombatSystem.CombatManager.WeaponGaryoFired;
                 _cur.weaponBashFired = (int)CombatSystem.CombatManager.WeaponBashFired;
+                _cur.guardEchoFired = (int)CombatSystem.CombatManager.GuardEchoFired;
                 _cur.skipFired = ItemSystem.AxisPool.RunSkips;
                 _cur.skipGold = ItemSystem.AxisPool.RunSkipGold;
                 _cur.axisRerollFired = ItemSystem.AxisPool.RunAxisRerolls;

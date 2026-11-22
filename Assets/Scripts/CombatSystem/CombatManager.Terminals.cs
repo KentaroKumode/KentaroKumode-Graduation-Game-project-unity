@@ -37,6 +37,8 @@ namespace CombatSystem
         public static long DetonateFired;
         /// <summary>[計装] 【ジャスト防御】が成立した回数 (ランの始めに BOT が 0 へ戻す・ランの記録の justGuardFired)。</summary>
         public static long JustGuardFired;
+        /// <summary>[計装] 〈防人の軍標〉で撃がもう 1 回発火した回数 (2026-11-22・ランの記録の guardEchoFired)。</summary>
+        public static long GuardEchoFired;
         /// <summary>[計装] 秘宝が敵の出血を使った回数 (Kw.ConsumeBleed・〈血桜〉〈紅の搾り具〉) / 〈百人切りの鉈〉で処刑した回数 (ランの始めに BOT が 0 へ戻す・ランの記録の bleedSpendFired / bleedExecuteFired)。</summary>
         public static long BleedSpendFired, BleedExecuteFired;
         /// <summary>[計装] 臨界の爆発の回数 / 〈柱折りの発破筒〉が爆発のひびを正規のダウンへ割った回数 (ランの始めに BOT が 0 へ戻す・ランの記録の burstFired / burstBreakFired)。</summary>

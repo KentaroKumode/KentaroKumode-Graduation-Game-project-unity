@@ -205,7 +205,7 @@ namespace AutoTest
             public int rebootFired, overclockFired, detonateFired, justGuardFired, bleedSpendFired, bleedExecuteFired, burstFired, burstBreakFired, critOverflowFired, critExecuteFired, critRefireFired,
                 deckDisposeFired, deckShuffleFired, roleFormedFired, roleOmniFired, skipFired, skipGold, axisRerollFired,
                 rewardPicks, rewardSkips, mainAxisPicks,
-                weaponChainFired, weaponExecuteFired, weaponGaryoFired, weaponBashFired;
+                weaponChainFired, weaponExecuteFired, weaponGaryoFired, weaponBashFired, guardEchoFired;
             public string chainPath = "", heatBurstInfo = "", attackSumInfo = "";
             public bool ashBaseOpened;
             /// <summary>[計装 2026-11-14] 〈徒労〉: 掛かった通常の戦闘の勝ちの数 (今の形 = 何も得られなかった戦闘 / 別の形 = 品を落とさなかった戦闘)・
