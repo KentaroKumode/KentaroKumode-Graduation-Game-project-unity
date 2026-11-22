@@ -645,8 +645,12 @@ namespace AutoTest
             float add = s.critAdd, mulAdd = ws.critMultAdd;
             bool force = ws.forceCrit || (hitNo == 0 && s.critP1 >= 1f) || garyo;
             if (hitNo == 0 && s.quickDrawFirst) add += ItemSystem.PassiveSkills.Effects.QuickDrawArt.Rate;   // final5: 倍率 +1.0 → 会心率 +50% (超過で倍率になる)
-            if (s.falconer && ws.atkFaceMax >= ItemSystem.PassiveSkills.Effects.FalconerGlove.MinFace) { add += ItemSystem.PassiveSkills.Effects.FalconerGlove.Rate; mulAdd += ItemSystem.PassiveSkills.Effects.FalconerGlove.Mul; }
-            if (s.aim && ws.hitFace != null && hitNo < ws.hitFace.Length) { add += CombatSystem.CritCore.AimRate(ws.hitFace[hitNo]); force |= CombatSystem.CritCore.AimForce(ws.hitFace[hitNo]); }
+            if (s.falconer && hitNo >= 1 && ws.atkFaceMax >= ItemSystem.PassiveSkills.Effects.FalconerGlove.MinFace)   // final7: 会心の後の撃だけ ── 前の撃のどれかが会心した確率で重み付け (1 撃目には乗せない)
+            {
+                float pPrev = 1f - (1f - s.critP1) * (float)System.Math.Pow(1f - s.critP, hitNo - 1);
+                add += pPrev * ItemSystem.PassiveSkills.Effects.FalconerGlove.Rate; mulAdd += pPrev * ItemSystem.PassiveSkills.Effects.FalconerGlove.Mul;
+            }
+            if (s.aim && ws.hitFace != null && hitNo < ws.hitFace.Length) add += CombatSystem.CritCore.AimRate(ws.hitFace[hitNo]);   // final7: 6 の確定会心は廃止
             add += s.bellRate;
             bool solo = ws.aHits == 1;
             if (solo && s.firstArrow && ws.atkFaceMax >= ItemSystem.PassiveSkills.Effects.FirstArrow.MinFace) { add += ItemSystem.PassiveSkills.Effects.FirstArrow.Rate; mulAdd += ItemSystem.PassiveSkills.Effects.FirstArrow.Mul; }

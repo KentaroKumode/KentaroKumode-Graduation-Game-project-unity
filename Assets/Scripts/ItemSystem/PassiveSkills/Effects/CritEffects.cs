@@ -66,7 +66,7 @@ namespace ItemSystem.PassiveSkills.Effects
         {
             rate = 0f; mul = 0f;
             if (ctx == null || run == null) return;
-            if (run.OwnsPassive("受け流しの扇") && ParryFan.Primed(ctx)) rate += ParryFan.Rate;
+            if (run.OwnsPassive("受け流しの扇") && ParryFan.Primed(ctx)) { rate += ParryFan.Rate; mul += ParryFan.Mul; }
             if (run.OwnsPassive("瑠璃砥石")) { rate += LapisWhetstone.RateNow(ctx); mul += LapisWhetstone.MulNow(ctx); }
             if (run.OwnsPassive("斬り重ねの鞘")) mul += LayeredScabbard.MulNow(ctx);
             if (run.OwnsPassive(ItemIds.CritPinpoint)) { rate += PinpointEye.Rate; mul += PinpointEye.Mul; }
@@ -77,23 +77,24 @@ namespace ItemSystem.PassiveSkills.Effects
 
     // ── B: 起点 ──
 
-    /// <summary>鷹匠の革手袋: 攻撃の端子に 4 以上の目を挿したターン、 会心率 +15%・会心倍率 +0.25 (2026-11-22 neon 収束: +12%・+0.10 → +16%・+0.15 → final4: +20% → final5: +12%・+0.25 → final6: +15%)。</summary>
+    /// <summary>鷹匠の革手袋: 攻撃の端子に 4 以上の目を挿し、 このターンすでに会心を出しているとき、 以降の撃の会心率 +18%・会心倍率 +0.25 (1 撃目には乗らない)
+    /// (2026-11-22 neon 収束: +12%・+0.10 → +16%・+0.15 → final4: +20% → final5: +12%・+0.25 → final6: +15% → final7: 会心の後の撃だけ・+18%)。</summary>
     public class FalconerGlove : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "鷹匠の革手袋";
         public const int MinFace = 4;
-        public const float Rate = 0.15f, Mul = 0.25f;
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(Rw.Count(ctx, MutualKeys.AttackDiceMax) >= MinFace);
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
+        public const float Rate = 0.18f, Mul = 0.25f;
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(Rw.Count(ctx, MutualKeys.AttackDiceMax) >= MinFace && Crit.ThisTurn(ctx) >= 1);
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalCheck };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (Rw.Count(ctx, MutualKeys.AttackDiceMax) < MinFace) return;
-            ctx.critRatePctAdd += Rate;
-            ctx.criticalMultiplier += Mul;     // 配線の後に足した倍率は、 そのターンの全部の撃に乗る (撃の輪がこの値へ戻す)
+            if (!ctx.IsRealHit || Rw.Count(ctx, MutualKeys.AttackDiceMax) < MinFace || Crit.ThisTurn(ctx) < 1) return;
+            ctx.critRatePctAdd += Rate;          // 会心率・会心倍率は撃ごとに戻るので、 この撃だけに乗る
+            ctx.criticalMultiplier += Mul;
         }
     }
 
-    /// <summary>狙い目の刻み: 攻撃の端子に 5 以上の目を挿したターン、 その撃の会心率 +25% (6 なら確定会心・2026-11-22 final4: +20% → +30% → final5: +20% → final6: +25%)。 撃の目は ctx.hitFaceMax (CritCore.HitFaceMax)。</summary>
+    /// <summary>狙い目の刻み: 攻撃の端子に 5 の目を挿した撃は会心率 +15%、 6 の目なら +40% (2026-11-22 final4: +20% → +30% → final5: +20% → final6: +25%・6 で確定会心 → final7: 確定会心を廃止)。 撃の目は ctx.hitFaceMax (CritCore.HitFaceMax)。</summary>
     public class AimNotch : IPassiveSkillEffect
     {
         public string SkillId => ItemIds.CritAim;
@@ -102,15 +103,14 @@ namespace ItemSystem.PassiveSkills.Effects
         {
             if (!ctx.IsRealHit) return;
             ctx.critRatePctAdd += CritCore.AimRate(ctx.hitFaceMax);      // 会心率は撃ごとに戻るので、 この撃だけに乗る
-            if (CritCore.AimForce(ctx.hitFaceMax)) ctx.forceCritThisHit = true;
         }
     }
 
-    /// <summary>一の矢: 攻撃の端子を 1 枚だけ発動し、 そこに 5 以上の目を挿したターン、 その撃の会心率 +45%・会心倍率 +0.40 (2026-11-22 neon 収束: 5 以上・+25%・+0.20 → 4 以上・+35%・+0.30 → final5: 5 以上・+30%・+0.40 → final6: +45%)。 撃の目は ctx.hitFaceMax。</summary>
+    /// <summary>一の矢: 攻撃の端子を 1 枚だけ発動し、 そこに 5 以上の目を挿したターン、 その撃の会心率 +25%・会心倍率 +0.50 (2026-11-22 neon 収束: 5 以上・+25%・+0.20 → 4 以上・+35%・+0.30 → final5: 5 以上・+30%・+0.40 → final6: +45% → final7: +25%・+0.50)。 撃の目は ctx.hitFaceMax。</summary>
     public class FirstArrow : IPassiveSkillEffect
     {
         public string SkillId => ItemIds.CritFirstArrow;
-        public const float Rate = 0.45f, Mul = 0.40f;
+        public const float Rate = 0.25f, Mul = 0.50f;
         public const int MinFace = 5;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalCheck };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
@@ -121,36 +121,38 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>余韻の鈴: 前のターンの会心 1 回につき、 次のターンの会心率 +15%・ブロック +3 (上限なし)
+    /// <summary>余韻の鈴: 前のターンの会心の 2 回目から 1 回につき、 次のターンの会心率 +18%・ブロック +4 (上限なし・final7: 旧 1 回目から +15%・+3)
     /// (2026-11-22 neon 収束: 2 回以上・+18%・+2 → 1 回以上・攻撃 2 枚以上・+14%・+4 → final4: 攻撃の枚数の条件を外して +18% → final5: 2 回以上・ブロック +5 → final6: 回数に比例)。</summary>
     public class LingeringBell : IPassiveSkillEffect, IRelicDisplay
     {
         public const string Id = "余韻の鈴";
         public string SkillId => Id;
-        public const float RatePer = 0.15f;
-        public const int BlockPer = 3;
-        /// <summary>このターンに足す会心率・ブロック (前のターンの会心の数・配線の前に分かる・BOT の見積もりも読む)。</summary>
-        public static float RateNow(CombatContext ctx) => ctx == null ? 0f : RatePer * Crit.LastTurnCount(ctx);
-        public static int BlockNow(CombatContext ctx) => ctx == null ? 0 : BlockPer * Crit.LastTurnCount(ctx);
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Crit.LastTurnCount(ctx));
+        public const float RatePer = 0.18f;
+        public const int BlockPer = 4, MinLastCrits = 2;
+        /// <summary>前のターンの会心のうち数える回数 (2 回目から)。</summary>
+        public static int StacksNow(CombatContext ctx) => ctx == null ? 0 : System.Math.Max(0, Crit.LastTurnCount(ctx) - (MinLastCrits - 1));
+        /// <summary>このターンに足す会心率・ブロック (配線の前に分かる・BOT の見積もりも読む)。</summary>
+        public static float RateNow(CombatContext ctx) => RatePer * StacksNow(ctx);
+        public static int BlockNow(CombatContext ctx) => BlockPer * StacksNow(ctx);
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(StacksNow(ctx));
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            int n = Crit.LastTurnCount(ctx);
-            if (n <= 0) return;
-            ctx.critRatePctAdd += RatePer * n;
-            ctx.itemBlockBonus += BlockPer * n;
+            int s = StacksNow(ctx);
+            if (s <= 0) return;
+            ctx.critRatePctAdd += RatePer * s;
+            ctx.itemBlockBonus += BlockPer * s;
         }
     }
 
     /// <summary>受け流しの扇: 防御の端子を 2 枚以上発動して (【再起動】も数える)、 ブロックとシールドで敵の攻撃を完封した (HP を 1 も失わなかった) 次のターン、
-    /// 会心率 +28%・ブロック +4・そのターンの最初の会心の撃で敵の防御 −8 (貫通 +8・そのターンの残りの撃にも)
-    /// (2026-11-22 neon 収束: 攻撃の端子に挿さない・+25%・−6 → 防御の端子 2 枚以上・+28%・ブロック +4・−8。 攻撃しても可)。</summary>
+    /// 会心率 +15%・会心倍率 +0.20。 そのターンの最初の会心の撃で敵の防御 −8 (貫通 +8・そのターンの残りの撃にも)・ブロック +5
+    /// (2026-11-22 neon 収束: 攻撃の端子に挿さない・+25%・−6 → 防御の端子 2 枚以上・+28%・ブロック +4・−8。 攻撃しても可 → final7: +15%・+0.20・ブロックは最初の会心で +5)。</summary>
     public class ParryFan : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "受け流しの扇";
-        public const float Rate = 0.28f;
-        public const int DefCut = 8, Block = 4, NeedBlockTerminals = 2;
+        public const float Rate = 0.15f, Mul = 0.20f;
+        public const int DefCut = 8, Block = 5, NeedBlockTerminals = 2;
         private const string Key = "crit.parry", PenKey = "crit.parry.pen";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(Primed(ctx));
         public static bool Primed(CombatContext ctx) => Shd.LastTurn(ctx, Key);
@@ -160,9 +162,9 @@ namespace ItemSystem.PassiveSkills.Effects
             switch (t)
             {
                 case PassiveSkillTrigger.OnTurnEnd: if (Psn.Shutout(ctx) && Fam.BlockTerminals() >= NeedBlockTerminals) ctx.accumulatedValues[Key] = ctx.currentTurn; break;
-                case PassiveSkillTrigger.OnWired: if (Shd.LastTurn(ctx, Key)) { ctx.critRatePctAdd += Rate; ctx.itemBlockBonus += Block; } break;
+                case PassiveSkillTrigger.OnWired: if (Shd.LastTurn(ctx, Key)) { ctx.critRatePctAdd += Rate; ctx.criticalMultiplier += Mul; } break;
                 default:
-                    if (ctx.IsRealHit && Shd.LastTurn(ctx, Key) && Rw.OncePerTurn(ctx, PenKey)) ctx.playerArmorPen += DefCut;   // 防御の計算はこの後 (ApplyWinDamageModifiers)
+                    if (ctx.IsRealHit && Shd.LastTurn(ctx, Key) && Rw.OncePerTurn(ctx, PenKey)) { ctx.playerArmorPen += DefCut; ctx.itemBlockBonus += Block; }   // 防御の計算はこの後 (ApplyWinDamageModifiers)・攻撃の中のブロックは敵の攻撃の前に足す
                     break;
             }
         }
@@ -178,17 +180,17 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.critToDamage = true;
     }
 
-    /// <summary>測量師の片眼鏡: マップを 1 歩進むごとに会心率 +5% を蓄積 (最大 100%)。 次の戦闘の 1〜2 ターン目の全部の撃に蓄積分の会心率を足す (2026-11-22 neon 収束: 旧 1 ターン目だけ) (100% を超えた分は会心倍率に変わる・歩数は戦闘で 0 に戻る)。</summary>
+    /// <summary>測量師の片眼鏡: マップを 1 歩進むごとに会心率 +4% を蓄積 (上限なし)。 次の戦闘の 1 ターン目の全部の撃に蓄積分の会心率を足す (2026-11-22 neon 収束: 1 ターン目 → 1〜2 ターン目 → final7: +5%・最大 100%・1〜2 ターン目 → +4%・上限なし・1 ターン目) (100% を超えた分は会心倍率に変わる・歩数は戦闘で 0 に戻る)。</summary>
     public class SurveyorMonocle : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "測量師の片眼鏡";
-        public const float PctPerStep = 0.05f, Max = 1f;
+        public const float PctPerStep = 0.04f;
         /// <summary>[persistent] 戦闘の始めの蓄積 (会心率)。</summary>
         private const string Key = "crit.surveyor";
-        public static float Stored(int steps) => System.Math.Min(Max, steps * PctPerStep);
+        public static float Stored(int steps) => System.Math.Max(0, steps) * PctPerStep;
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Pct(RateNow(ctx));
         /// <summary>この戦闘で蓄積の会心率が乗るターン (1〜この値)。</summary>
-        public const int Turns = 2;
+        public const int Turns = 1;
         /// <summary>このターンの撃に足す会心率 (1〜<see cref="Turns"/> ターン目)。</summary>
         public static float RateNow(CombatContext ctx) => ctx.currentTurn <= Turns ? ctx.GetAccumulated(Key) : 0f;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnCriticalCheck };
@@ -251,12 +253,12 @@ namespace ItemSystem.PassiveSkills.Effects
 
     // ── G: 分岐 A〈確定会心・攻防一体連打〉──
 
-    /// <summary>瑠璃砥石: 会心率 +10%。 会心を出すたび、 この戦闘中の会心率 +3%・会心倍率 +0.04 (累積・上限なし・次の撃から)
+    /// <summary>瑠璃砥石: 会心率 +5%。 会心を出すたび、 この戦闘中の会心率 +2%・会心倍率 +0.02 (累積・上限なし・次の撃から・final7: 旧 +10%・+3%・+0.04)
     /// (2026-11-22 final4: +10% → +18% → final5: +8%・ターン 2 回目の会心で倍率 +0.15 → final6: 会心ごとに率と倍率)。</summary>
     public class LapisWhetstone : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "瑠璃砥石";
-        public const float Rate = 0.10f, RatePer = 0.03f, MulPer = 0.04f;
+        public const float Rate = 0.05f, RatePer = 0.02f, MulPer = 0.02f;
         /// <summary>[persistent] この戦闘で出した会心の数。</summary>
         private const string CountKey = "crit.lapis.n";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Rw.Count(ctx, CountKey));

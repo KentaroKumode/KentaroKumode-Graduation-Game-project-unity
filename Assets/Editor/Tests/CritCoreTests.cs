@@ -23,6 +23,15 @@ namespace AutoTest.EditorTests
             Assert.That(CritCore.EffectiveMul(2f, 0f, 0.9f, false, true), Is.EqualTo(2f).Within(1e-5f));
         }
 
+        /// <summary>〈狙い目の刻み〉(final7): 目 4 / 5 / 6 で +0% / +15% / +40% (確定会心は廃止)。</summary>
+        [Test]
+        public void Aim_FiveAndSix()
+        {
+            Assert.That(CritCore.AimRate(4), Is.EqualTo(0f));
+            Assert.That(CritCore.AimRate(5), Is.EqualTo(0.15f).Within(1e-5f));
+            Assert.That(CritCore.AimRate(6), Is.EqualTo(0.40f).Within(1e-5f));
+        }
+
         /// <summary>基礎の会心倍率 2.0 (final6・作者の決定で final4 までの値へ・final5 は 1.6)。 〈回帰性真理〉(−0.5) を受けて 1.50。</summary>
         [Test]
         public void BaseMultiplier_SurvivesRegression()
