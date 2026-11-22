@@ -29,6 +29,9 @@ namespace AutoTest.EditorTools
         public static string DescriptorPath => Path.Combine(BuildRoot,
             "ultra-production-worker.json");
 
+        /// <summary>worker を IL2CPP で作る (false = Mono)。 作者が遊ぶ本体の PlayerSettings はビルド後に戻す。</summary>
+        public const bool UseIl2cpp = true;
+
         /// <summary>descriptor の actionFingerprint に入れる固定の印 (2026-11-13〜・#135)。
         /// 旧 Ultra の方策の組の候補集合のハッシュの代わり。 照合する側は無い。</summary>
         public const string ActionFingerprintTag = "action:no-policy-portfolio-v1";
@@ -64,11 +67,24 @@ namespace AutoTest.EditorTools
 
             string oldCompany = PlayerSettings.companyName;
             string oldProduct = PlayerSettings.productName;
+            ScriptingImplementation oldBackend = PlayerSettings.GetScriptingBackend(BuildTargetGroup.Standalone);
+            ManagedStrippingLevel oldStripping = PlayerSettings.GetManagedStrippingLevel(BuildTargetGroup.Standalone);
+            // backend を変えると Unity が ProjectSettings.asset をその場で書き出すので、 ファイルごと戻す。
+            const string settingsPath = "ProjectSettings/ProjectSettings.asset";
+            byte[] oldSettingsFile = File.ReadAllBytes(settingsPath);
             try
             {
+                // 別の backend で作った出力先には Unity がビルドを拒むので、 切り替えた時だけ消す。
+                string otherBackendMark = Path.Combine(BuildRoot, UseIl2cpp ? "MonoBleedingEdge" : "GameAssembly.dll");
+                if (Directory.Exists(otherBackendMark) || File.Exists(otherBackendMark))
+                    FileUtil.DeleteFileOrDirectory(BuildRoot);
                 Directory.CreateDirectory(BuildRoot);
                 PlayerSettings.companyName = "UltraAI.IsolatedWorker";
                 PlayerSettings.productName = "UltraAI Production Worker";
+                PlayerSettings.SetScriptingBackend(BuildTargetGroup.Standalone,
+                    UseIl2cpp ? ScriptingImplementation.IL2CPP : ScriptingImplementation.Mono2x);
+                // 反射でフィールド名を引く (RankMarginWorkerProtocol) ので stripping は最小。
+                PlayerSettings.SetManagedStrippingLevel(BuildTargetGroup.Standalone, ManagedStrippingLevel.Minimal);
                 var options = new BuildPlayerOptions
                 {
                     scenes = new[] { ScenePath },
@@ -102,6 +118,10 @@ namespace AutoTest.EditorTools
             {
                 PlayerSettings.companyName = oldCompany;
                 PlayerSettings.productName = oldProduct;
+                PlayerSettings.SetScriptingBackend(BuildTargetGroup.Standalone, oldBackend);
+                PlayerSettings.SetManagedStrippingLevel(BuildTargetGroup.Standalone, oldStripping);
+                File.WriteAllBytes(settingsPath, oldSettingsFile);
+                AssetDatabase.ImportAsset(settingsPath, ImportAssetOptions.ForceUpdate);
             }
         }
 
@@ -178,8 +198,9 @@ namespace AutoTest.EditorTools
         private static UltraProductionWorkerDescriptor CreateDescriptor()
         {
             string exeHash = Sha256File(ExecutablePath);
-            string managed = Path.Combine(BuildRoot,
-                "UltraProductionWorker_Data", "Managed", "Assembly-CSharp.dll");
+            // IL2CPP ではコードが GameAssembly.dll に入る (Managed/ は前の Mono ビルドの残りかもしれない)。
+            string managed = UseIl2cpp ? Path.Combine(BuildRoot, "GameAssembly.dll")
+                : Path.Combine(BuildRoot, "UltraProductionWorker_Data", "Managed", "Assembly-CSharp.dll");
             string assemblyHash = File.Exists(managed) ? Sha256File(managed) : exeHash;
             // 旧: Ultra の方策の組の候補集合のハッシュ (UltraPortfolioProtocol.ComputeCandidateSetHash)。
             //   技量の Ultra ごと候補集合を消した (2026-11-13・#135) ので、 固定の印のハッシュを置く。
