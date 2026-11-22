@@ -43,9 +43,9 @@ namespace CombatSystem
             return mx;
         }
 
-        /// <summary>〈狙い目の刻み〉: この撃に挿した目が 5 以上なら会心率 +20% (final5: final4 の +30% から戻す)、 6 なら確定会心。</summary>
+        /// <summary>〈狙い目の刻み〉: この撃に挿した目が 5 以上なら会心率 +25% (final6・final5 +20%・final4 +30%)、 6 なら確定会心。</summary>
         public const int AimNeed = 5, AimSure = 6;
-        public const float AimPct = 0.20f;
+        public const float AimPct = 0.25f;
         public static float AimRate(int faceMax) => faceMax >= AimNeed ? AimPct : 0f;
         public static bool AimForce(int faceMax) => faceMax >= AimSure;
 

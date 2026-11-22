@@ -287,13 +287,13 @@ namespace ItemSystem.PassiveSkills.Effects
 
     // ── L: 規則破壊 ──
 
-    /// <summary>破城斧: シールドが 20 以上のターン (最初の 1 撃の時のシールドで決める)、 攻撃の端子 1 枚につき (撃ごとに) シールドを 6 使い、 その撃の最終与ダメージ +110%・敵の防御を全部無視。
+    /// <summary>破城斧: シールドが 20 以上のターン (最初の 1 撃の時のシールドで決める)、 攻撃の端子 1 枚につき (撃ごとに) シールドを 6 使い、 その撃の最終与ダメージ +130% (final6: 旧 +110%)・敵の防御を全部無視。
     /// 撃の途中でシールドが 6 を切ったら、 その後の撃には乗らない。 シールド 20 未満のターンは発動しない (2026-11-22 旧: 15 / 8 / +80%)。</summary>
     public class SiegeAxe : IPassiveSkillEffect, IRelicDisplay
     {
         public const string Id = "破城斧";
         public string SkillId => Id;
-        public const int MinShield = 20, PerHitShield = 6, FinalPct = 110;
+        public const int MinShield = 20, PerHitShield = 6, FinalPct = 130;
         private const string TurnKey = "shd.siegeAxe.turn";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.consShield >= MinShield);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
@@ -357,7 +357,7 @@ namespace ItemSystem.PassiveSkills.Effects
     {
         public const string Id = "落城の礎石";
         public string SkillId => Id;
-        public const int Need = 12, FinalPct = 60;   // 2026-11-22 neon 収束: 失うシールド 20 → 12
+        public const int Need = 12, FinalPct = 80;   // 2026-11-22 neon 収束: 失うシールド 20 → 12・final6: +60% → +80%
         /// <summary>このターンに失ったシールド (Psn.TurnN) / 上乗せが働くターン / その攻撃 +N。</summary>
         private const string LostKey = "shd.castle.lost", TurnKey = "shd.castle.turn", AtkKey = "shd.castle.atk";
         public static bool Primed(CombatContext ctx) => ctx != null && ctx.currentTurn > 0 && Shd.Count(ctx, TurnKey) == ctx.currentTurn;

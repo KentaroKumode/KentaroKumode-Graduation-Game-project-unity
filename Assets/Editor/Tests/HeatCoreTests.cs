@@ -17,23 +17,23 @@ namespace AutoTest.EditorTests
         {
             var s = S(HeatItems.None, HeatCore.Threshold, 10);
             Assert.That(HeatCore.TryBurst(ref s, out var b), Is.True);
-            Assert.That(b.damage, Is.EqualTo(30));
-            Assert.That(b.landed, Is.EqualTo(DefenseFormula.Apply(30, 5)));   // 防御 10 の半分を無視
+            Assert.That(b.damage, Is.EqualTo(HeatCore.BurstBase));
+            Assert.That(b.landed, Is.EqualTo(DefenseFormula.Apply(HeatCore.BurstBase, 5)));   // 防御 10 の半分を無視
             Assert.That(s.meter, Is.EqualTo(0));
             Assert.That(HeatCore.TryBurst(ref s, out _), Is.False);
             // 〈火花読みの眼鏡〉: 防御を全部無視・1 回目 ×(1 + 回数 × 5%)
             var g = S(HeatItems.Spark, HeatCore.Threshold, 10);
             HeatCore.TryBurst(ref g, out var bg);
-            Assert.That(bg.landed, Is.EqualTo(30 * (100 + HeatCore.SparkPctPerBurst) / 100));
+            Assert.That(bg.landed, Is.EqualTo(HeatCore.BurstBase * (100 + HeatCore.SparkPctPerBurst) / 100));
         }
 
         [Test]
         public void Burst_SuperKilnLedger()
         {
-            // 超臨界 (閾値の 1.5 倍以上) ×1.5・〈暴れ窯の火床〉×KilnSuperMulPct (2.0・final5) と閾値 −4
+            // 超臨界 (閾値の 1.5 倍以上) ×1.5・〈暴れ窯の火床〉×KilnSuperMulPct (2.25・final6) と閾値 −4
             var s = S(HeatItems.None, HeatCore.Threshold * 3 / 2);
             HeatCore.TryBurst(ref s, out var b);
-            Assert.That(b.super && b.damage == 45, Is.True);   // 基礎 30 × 1.5
+            Assert.That(b.super && b.damage == HeatCore.BurstBase * HeatCore.SuperMulPct / 100, Is.True);   // 基礎 24 (final6) × 1.5
             var k = S(HeatItems.Kiln, HeatCore.Threshold * 3 / 2);
             HeatCore.TryBurst(ref k, out var bk);
             Assert.That(bk.damage, Is.EqualTo(HeatCore.BurstBase * HeatCore.KilnSuperMulPct / 100));
@@ -65,10 +65,10 @@ namespace AutoTest.EditorTests
             Assert.That(o3.heatGains, Is.EquivalentTo(new[] { HeatCore.StoneAll, HeatCore.SpannerPerHit, HeatCore.SpannerPerHit, HeatCore.SpannerPerHit }));
             Assert.That(o3.heatDouble, Is.True);
             var f = HeatCore.Forecast(new HeatCore.State { items = st.heatItems, threshold = 40 }, o3);
-            // 過熱石 16 × 2 = 32 → スパナ 4 × 2 で 40 (閾値 40 に届いて 0 へ・1 回) → +8 +8 = 16 → ターンの終わり 12 / 2 = 6 × 2 = 12 → 28 (final4 の値)
+            // 過熱石 16 × 2 = 32 → スパナ 3 × 2 で 38 → 44 (閾値 40 に届いて 0 へ・1 回) → +6 = 6 → ターンの終わり 12 / 2 = 6 × 2 = 12 → 18 (final6: スパナ +3)
             Assert.That(f.burstsWired, Is.EqualTo(1));
             Assert.That(f.burstsEnd, Is.EqualTo(0));
-            Assert.That(f.meterAfter, Is.EqualTo(28));
+            Assert.That(f.meterAfter, Is.EqualTo(18));
         }
     }
 }

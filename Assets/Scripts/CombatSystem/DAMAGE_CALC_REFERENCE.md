@@ -133,7 +133,7 @@ total = final + pursuitDamage
        〈銑鉄棍〉【規則】(critToDamage・2026-11-21): 会心しなかった撃だけ outgoingDamageMultiplier += min(1, critAdd) (与ダメ% の池・撃ごとに戻る)。 会心は普通に出る
        成立かつ total>0 → Crit.Note (このターンの会心の数) → FireTrigger(OnCriticalDamage)
                          → total ×= CritCore.EffectiveMul (§3-N: 敵の会心耐性 (下限 1.0) → + 超過会心率 → 〈天眼の鍔〉の確定会心 ×1.25)
-       不成立かつ total>0 → 鈍器 ×(1 + nonCritOutgoingMultiplier) → 〈一点読みの片眼〉の代価 ×0.50 (2026-11-22 final5・旧 ×0.6 → ×0.5 → final4 ×0.65)
+       不成立かつ total>0 → 鈍器 ×(1 + nonCritOutgoingMultiplier) → 〈一点読みの片眼〉の代価 ×0.45 (2026-11-22 final6・旧 ×0.6 → ×0.5 → final4 ×0.65 → final5 ×0.50)
        【狩猟旅団 (契約)】armed状態の脆弱を持つ敵への会心時、 全段に ×(1 + 0.15/0.30/0.45) 倍率を適用 → 脆弱は consumed へ
                           (詳細: docs/GAME.md §12)
 FireTrigger(OnPostDealDamage / OnPostReceiveDamage)
@@ -142,7 +142,7 @@ return (total, fixedDamageToEnemy, isCritical)
 ```
 
 > **会心倍率の既定値 (2026-11-22 final5)**
-> `MetaBuffApplicator.GetCriticalMultiplier()` が正本で、現在 **1.6**（2026-08-03〜11-22 は 2.0）。
+> `MetaBuffApplicator.GetCriticalMultiplier()` が正本で、現在 **2.0**（2026-11-22 final6 で 1.6 から戻した・作者の決定。〈回帰性真理〉下で ×1.50。超過の変換 1% = +0.02 は据え置き）。
 > final5 で 2.0 → 1.6 に下げ、 同時に超過会心率の変換を 1% ごとに +0.01 → +0.02 へ上げた（`CritCore.ExcessPerRate` 1 → 2）。 会心率 100% 未満の +1% あたりの期待倍率の伸びは 1.0 → 0.6、 100% 超過帯は 2.0（〈寸鉄〉で 4.0）。 〈回帰性真理〉(−0.5) を受けても ×1.10。
 > 以下は 2026-08-03 の記録:
 > 2026-07-26 に 2.0→3.0 へ上げたが、与ダメ倍率の段別実測で会心段が単独 ×2.18
@@ -222,7 +222,7 @@ playerDamageNegateCharges>0 → total=0(獣の絆)
 痛覚遮断剤【職業/狂戦士 2026-06-28】: painkillerArmedThisTurn && total≥playerHP → total=playerHP−1（HP=1踏みとどまり・チェーン**最後**）
 → (ダメージ適用直前) 仕込み刃【職業/暗殺者 2026-06-28・2026-09-22 に倍率 1→5】: daggerArmed && total>0 → total=0 ＋ **その 5 倍**を enemyHP へ軽減不能で返す（`CombatManager` の仕込み刃の反撃倍率）。使ったターン限りで、被弾しなくても失効
 → 古い手紙【消耗品 2026-10-31】: accumulatedValues[Consumables.OldLetterGuardKey] > 0 → total=0（反撃なし）。仕込み刃の直後・同じく使ったターン限り。1 枚で 3 回使える
-→ (整備パネル〈不動〉の一撃の上限 = 最大 HP の 35% の後) 〈無害灯〉【規則】(2026-11-21・§3-M): 臨界 ≥ 15 なら 1 戦闘 2 回 (1 ターン 1 回) total = 0・臨界 −15・爆発の 30% を敵へ (HarmlessLamp.Apply・2026-11-21〜22 Phase 4 較正: 旧 1 ターン 1 回・−10・50%)
+→ (整備パネル〈不動〉の一撃の上限 = 最大 HP の 35% の後) 〈無害灯〉【規則】(2026-11-21・§3-M): 臨界 ≥ 15 なら 1 戦闘 1 回 (final6: 旧 2 回) total = 0・臨界 −15・爆発の 30% を敵へ (HarmlessLamp.Apply・2026-11-21〜22 Phase 4 較正: 旧 1 ターン 1 回・−10・50%)
 → playerHP −= total (+ fixedDamageToPlayer)
   fixedDamageToEnemy>0 は敗北時も敵へ(反撃/Counter/Riposte) / 出血
   痛覚遮断剤 post-clamp: メイン+固定ダメ適用後も painkillerArmedThisTurn 中は playerHP≤0 → 1 に復帰
@@ -310,7 +310,7 @@ ShieldBash の空振り（盾 0）が 34.2% → 66.1%、1 機会あたりの攻�
 | `diceDifference` | playerDiceTotal − enemyDiceTotal の**読み取り専用プロパティ**（常に最新・代入不可） | — |
 | `baseDamage`/`finalDamage`/`pursuitDamage` | ダメージ計算の作業値 | ProcessDamageで設定 |
 | `fixedDamageToEnemy`/`fixedDamageToPlayer` | 軽減無視の固定ダメ | BeginNewTurnで0 |
-| `criticalMultiplier`/`isCritical` | 会心倍率(既定**1.6**・final5)/結果 | isCriticalは毎T false、倍率はメタ値で毎T再取得 |
+| `criticalMultiplier`/`isCritical` | 会心倍率(既定**2.0**・final6)/結果 | isCriticalは毎T false、倍率はメタ値で毎T再取得 |
 | `critRatePctAdd` | 会心率への加算(小数・0.05=+5%)。**パッシブ・消耗品・バフの会心率はすべてここ** | BeginNewTurnで0 |
 | `critSuppressed`【新2026-07-26】 | 会心封印(無心の刃)。forceCritical より優先度が低い | BeginNewTurnでfalse |
 | `enemyThreat` | 脅威。敗北base下限＆勝利時scratch基準 | 戦闘保持(威圧で+) |
@@ -348,7 +348,7 @@ ShieldBash の空振り（盾 0）が 34.2% → 66.1%、1 機会あたりの攻�
 ## 2-B. 会心率の変換（正本 `CombatContext.ResolveCritRate`）
 
 **2026-09-15: 逓減を撤去した。** 会心率(%) を float で加算し、**0〜1 へクランプするだけ**。
-倍率は **×1.6**（2026-07-26 に 2.0→3.0、2026-08-03 に 2.0 へ差し戻し、2026-11-22 final5 に 1.6）。
+倍率は **×2.0**（2026-07-26 に 2.0→3.0、2026-08-03 に 2.0 へ差し戻し、2026-11-22 final5 に 1.6、final6 に 2.0）。
 
 ```csharp
 ResolveCritRate(addTotal):
@@ -715,7 +715,7 @@ CombatManager に預け、 プレイヤーの攻撃の直前に固定ダメ枠�
 | 5e (`ShieldCore.ApplyToTerminals`) | `o.shield +=` 〈肩当て〉防御の端子に出目全部 12 / 〈当て布の籠手〉2 個以上 6 (旧 16 / 8) / 〈擦り減った小盾〉個数 × 2 / 〈鋲の胸当て〉予告 ≥ 12 で 3・未満 0 (Phase 4 較正: 旧 × 3・5 / 2) |
 | 反撃 | 〈鏡返しの小盾〉OnTurnEnd: `floor((min(EnemyAtk, blockSumThisTurn) + shieldAbsorbedAttackThisTurn) × (ジャスト防御 ? 100 : 60) / 100)` (旧 40) / 〈重装兵の隠し刃〉OnJustGuard: E / 〈割れ盾の仕返し〉OnShieldBreak: 割られる前の量 / 〈落城の礎石〉OnShieldAbsorb・OnShieldDecay: 減った量 × 2 と `CrackBossNotch` (次の目盛りにひび・既にあれば何もしない)。 どれも `Kw.DamageEnemy` (軽減不可・防御無視) |
 | 攻撃へ | 〈盾押しの心得〉OnWired・攻撃の端子あり: `AddPlayerAttackOrDiceBonus(floor(シールド × 35 / 100))` (撃ごとに乗る) / 〈力みの小手〉OnShieldGain の累計 12 ごとに力み +1・OnWired で 4 × 力み を攻撃 +N にして 0 / 〈相棒の魂〉張り直した次のターンの OnWired で +10 / 〈受け太刀の籠手〉ジャスト防御の次のターンの OnTurnStart で `firstHitAttackBonus += 8` |
-| 倍率 | 〈破城斧〉OnPreDealDamage: 最初の撃でシールド ≥ 20 ならそのターン、 シールド ≥ 6 の撃ごとに `Kw.SpendShield(6)`・`hitFinalDamagePct += 110`・`hitIgnoreDefense` (2026-11-22・旧 15 / 8 / 80) / 〈静寂の構え〉攻撃の端子なしで受け切った (`Psn.Shutout`) 次のターンの本物の撃に `hitFinalDamagePct += 60` (ジャスト防御なら 100) / 〈防人の軍標〉OnJustGuard: `finalDamagePct += 45` (旧 35)・次のターンの手札 +1・この戦闘のジャスト防御が 2 回以上 (neon 収束: 旧 3) なら次のターン、 撃の輪 (CombatManager.Turn) が全部の撃をもう 1 回ずつ発火 (`BorderGuardStandard.EchoNow`・会心は振り直す・〈必殺の照準器〉で発火した撃には重ねない・2026-11-22) / 〈落城の礎石〉OnShieldAbsorb・Decay で 1 ターンの失った量を数え、 ターンの終わりに ≥ 12 (neon 収束: 旧 20) なら次のターン OnWired で `AddPlayerAttackOrDiceBonus(失った量 / 2)`・本物の撃に `hitFinalDamagePct += 60` (減るたび CrackBossNotch・2026-11-22 旧: 減った量 × 2 の軽減不可) / 〈敗残兵の部隊章〉OnShieldAbsorb・Decay・Spend の累計 8 ごとに反骨 +1 (最大 10)・OnPostRoll で `AddOutgoingPct(0.08 × 反骨)` (Phase 4 較正: 旧 0.12) / 〈割れ盾の仕返し〉割られた次のターン `AddOutgoingPct(0.35)` |
+| 倍率 | 〈破城斧〉OnPreDealDamage: 最初の撃でシールド ≥ 20 ならそのターン、 シールド ≥ 6 の撃ごとに `Kw.SpendShield(6)`・`hitFinalDamagePct += 130`・`hitIgnoreDefense` (2026-11-22・旧 15 / 8 / 80 → 110 → final6 130) / 〈静寂の構え〉攻撃の端子なしで受け切った (`Psn.Shutout`) 次のターンの本物の撃に `hitFinalDamagePct += 60` (ジャスト防御なら 100) / 〈防人の軍標〉OnJustGuard: `finalDamagePct += 45` (旧 35)・次のターンの手札 +1・この戦闘のジャスト防御が 2 回以上 (neon 収束: 旧 3) なら次のターン、 撃の輪 (CombatManager.Turn) が全部の撃をもう 1 回ずつ発火 (`BorderGuardStandard.EchoNow`・会心は振り直す・〈必殺の照準器〉で発火した撃には重ねない・2026-11-22) / 〈落城の礎石〉OnShieldAbsorb・Decay で 1 ターンの失った量を数え、 ターンの終わりに ≥ 12 (neon 収束: 旧 20) なら次のターン OnWired で `AddPlayerAttackOrDiceBonus(失った量 / 2)`・本物の撃に `hitFinalDamagePct += 80` (final6: 旧 60) (減るたび CrackBossNotch・2026-11-22 旧: 減った量 × 2 の軽減不可) / 〈敗残兵の部隊章〉OnShieldAbsorb・Decay・Spend の累計 8 ごとに反骨 +1 (最大 10)・OnPostRoll で `AddOutgoingPct(0.08 × 反骨)` (Phase 4 較正: 旧 0.12) / 〈割れ盾の仕返し〉割られた次のターン `AddOutgoingPct(0.35)` |
 | 守り | 〈重ね札の盾〉シールド ≥ 16 (2026-11-22・旧 10) で OnPreReceiveDamage −2 (旧 −3) / 〈油染みの盾革〉OnTurnEnd: そのターンにジャスト防御か完封なら `shieldKeepBonusPct = 20`・でなければ 0 (2026-11-22・旧: 常に 20) / 〈脈なしの鋼心臓〉戦闘開始時 X (4・勝つたび +1) と `shieldNoDecayAt = 50` (ターン頭のシールド ≥ 50 なら減衰しない・2026-11-22・旧 6 / 35) / 〈二拍目の心臓〉HP ≤ 50% で `ceil(最大 HP × 30%)` (旧 60%)・`shieldGainPct += 50` (consShield の setter で増えた分に `× (100 + これ) / 100`・遺物の上乗せより前) / 〈相棒の魂〉割られたら `floor(前の量 × 70%)` (1 戦闘 1 回) / 〈聖路の白靴〉戦闘開始時 `min(20, 歩数 / 2)` (2026-11-22・旧 歩数) / 〈英雄の意志〉強敵の大技かチャージのターンの頭 +18・そのターンのジャスト防御で `BreakBossNotch` (HP に関係なく次の目盛りを満額のダウンで割る) |
 | BOT | 配線の見積もり (AutoRunner.DeckSums の ItemSight): ジャスト防御で働く 6 品のどれかを持てば、 挿し方ごとに `JustGuardForecast` を見て、 成立するなら 鏡返し +E × 60%・隠し刃 +E を軽減不可の分 (extraDmg) に、 軍標・受け太刀・静寂・英雄の先の得を控えめな定数で足す。 〈破城斧〉は 1 撃あたりの見込み × 80% × 払える撃の数 |
 
@@ -746,13 +746,13 @@ CombatManager に預け、 プレイヤーの攻撃の直前に固定ダメ枠�
 | 有効化 | 臨界の品を 1 つ以上持つ戦闘は戦闘開始時 (品の OnBattleStart の前) に `Kw.EnableHeat`: 閾値 = `max(12, 32 − (〈早沸かし釜〉? 6 : 0))` (`HeatCore.Threshold`・2026-11-22 段 3 で 30 → 36・neon 収束で 36 → 32)・〈恒温の竈〉は臨界 = 閾値の半分から。 端子が臨界を出した戦闘も同じ |
 | 臨界を得る (`HeatCore.Gain`) | `n` → 〈焚き足しの炭〉+1 (1 ターン 6 回まで・2026-11-22 段 3: 旧 +2) → 〈燧石の指輪〉の倍のターンは ×2 → 遺物〈炉温〉2 個 +20% (切り上げ)。 1 回の `Kw.AddHeat` が 1 回の「得る」 |
 | 爆発 (`HeatCore.TryBurst`) | 臨界 ≥ 閾値で 1 回。 超臨界 = 臨界 ≥ 閾値 × 1.5。 臨界 → 0 (〈帳簿外の爆薬〉は 閾値ぶんだけ減らし、 届けば続けて・そのターン 5 回まで)。 〈恒温の竈〉は爆発の後 `max(残り, 8)`。 〈二度詰めの雷管〉爆発の後 `stack += 3` (減らない・上限なし・2026-11-22 final4: 旧 min(32, +4) → +6 → final5 +3)。 〈暴れ窯の火床〉超臨界の後 閾値 −4 (この戦闘で −16 まで・下限 12) |
-| 爆発のダメージ (`HeatCore.Damage`) | `30 + stack + burstFlatBonus (〈天工開物〉8 × 強化) + 〈溢れ取りの鋳型〉2 × 溢れ (閾値を超えた臨界・帳簿外は 0)` → 超臨界 ×1.5 (〈暴れ窯の火床〉×2.0・final4 ×2.5 → final5 ×2.0) → 〈火花読みの眼鏡〉×(1 + 0.05 × この戦闘の爆発の回数 (この爆発を含む)) (2026-11-22 neon 収束: 旧 天工 12・鋳型 3・眼鏡 0.08 → 0.05 → final4 0.08 → final5 0.05) → 〈燧石の指輪〉の倍のターン ×(1 + 0.25 × このターンのそれより前の爆発) → 〈八日目の灰燼〉臨界 ≥ 40 で起きた爆発 ×1.6 → 〈柱折りの発破筒〉ダウン中の敵 ×2.0 (各段 切り捨て) |
+| 爆発のダメージ (`HeatCore.Damage`) | `24 + stack + burstFlatBonus (final6: 基礎 30 → 24) (〈天工開物〉8 × 強化) + 〈溢れ取りの鋳型〉2 × 溢れ (閾値を超えた臨界・帳簿外は 0)` → 超臨界 ×1.5 (〈暴れ窯の火床〉×2.25・final4 ×2.5 → final5 ×2.0 → final6 ×2.25) → 〈火花読みの眼鏡〉×(1 + 0.05 × この戦闘の爆発の回数 (この爆発を含む)) (2026-11-22 neon 収束: 旧 天工 12・鋳型 3・眼鏡 0.08 → 0.05 → final4 0.08 → final5 0.05) → 〈燧石の指輪〉の倍のターン ×(1 + 0.25 × このターンのそれより前の爆発) → 〈八日目の灰燼〉臨界 ≥ 40 で起きた爆発 ×1.6 → 〈柱折りの発破筒〉ダウン中の敵 ×2.5 (final6: 旧 ×2.0) (各段 切り捨て) |
 | 敵の防御 (`HeatCore.VsDefense`) | `DefenseFormula.Apply(ダメージ, 敵の防御 − floor(敵の防御 × 50 / 100))` (防御の 50% を無視・挑戦カード〈予熱〉で +15/30/50% = 計 65/80/100%・`CardRules.BurstPenAddPct`)。 〈火花読みの眼鏡〉は防御を全部無視。 〈予熱〉III は爆発の基礎 +10 (`HeatCore.Damage` の BurstBase に足す)。 会心・与ダメの池は乗らない。 その後 `CombatManager.LandBurst` → HpLossDiag.Lose が最終与ダメ倍率・怠惰・ダウンの ×1.5・遺物〈炉温〉の現在 HP の % を掛ける |
 | ボスのひび | 爆発のたび `CrackBossNotch` (次の目盛りにひび・既にあれば何もしない)。 〈柱折りの発破筒〉はその後 `BreakBossCrack` (満額のダウン) |
-| 端子の解決の 5g (`HeatCore.ApplyToTerminals`) | `heatGains` (1 つ = 1 回の得る) に: 〈過熱石〉攻撃に挿した目 ≥ 2 で 8・3 個とも攻撃なら 16 (final4: 旧 6 / 12) / 〈燻りの革胸当て〉防御の端子の発動 (再起動も) 1 回ごとに 4 (と `blockAdd += 2`) / 〈火守りの火搔き棒〉`6 × (防御 + 充電 + 補助に挿した目)` / 〈点火スパナ〉撃ごとに 4 / 〈荒砥〉撃ごとに 2 (final4: 旧 2 / 1) (臨界の品の値は 2026-11-22 Phase 4 較正: 旧 10 / 18・4・2)。 `heatDouble` = 〈燧石の指輪〉かつ攻撃の撃 (`attackHits.Count`・【再起動】の撃を含む) ≥ 3 (2026-11-22 neon 収束: 旧 攻撃の端子の発動 ≥ 2 枚) |
+| 端子の解決の 5g (`HeatCore.ApplyToTerminals`) | `heatGains` (1 つ = 1 回の得る) に: 〈過熱石〉攻撃に挿した目 ≥ 2 で 8・3 個とも攻撃なら 16 (final4: 旧 6 / 12) / 〈燻りの革胸当て〉防御の端子の発動 (再起動も) 1 回ごとに 4 (と `blockAdd += 2`) / 〈火守りの火搔き棒〉`6 × (防御 + 充電 + 補助に挿した目)` / 〈点火スパナ〉撃ごとに 3 (final6: 旧 4) / 〈荒砥〉撃ごとに 2 (final4: 旧 2 / 1) (臨界の品の値は 2026-11-22 Phase 4 較正: 旧 10 / 18・4・2)。 `heatDouble` = 〈燧石の指輪〉かつ攻撃の撃 (`attackHits.Count`・【再起動】の撃を含む) ≥ 3 (2026-11-22 neon 収束: 旧 攻撃の端子の発動 ≥ 2 枚) |
 | 本体の順 | 配線を反映する所 (`ApplyTerminalOutcome`・OnWired と撃より前): 倍のターンを立てる → 端子の `heat` → `heatGains` を 1 つずつ `Kw.AddHeat`。 ここでの爆発はそのターンの撃より前 (【過熱】がそのターンの撃に間に合う)。 ターンの終わりに `HeatCore.EndGain` = `floor(TerminalOutcome.attackPips / 2)` (攻撃の種類の端子に挿した出目の合計・〈号令の剣〉〈歯車の軸〉の出目 +N は入る・〈剛腕〉の倍・端子の倍率・基礎攻撃・品の攻撃 +N・端子調律・【再起動】〈残響〉は入らない) を `Kw.AddHeat` (2026-11-22 neon 収束: 旧 攻撃の端子の合計 attackSum) |
 | 【過熱】 | このターンに爆発した (`Kw.Overheated`・`BurstTurnKey == currentTurn`) |
-| 品 (出来事) | 〈工廠の材料箱〉爆発で `playerDefense +2` (この戦闘 +10 まで・毎ターン積み直す) / 〈乾き火口箱〉開始時 +20 (final4: 旧 +14) / 〈炉番の外套〉ターンの終わり `min(12, floor(EnemyAtkPreDefense / 2))` / 〈継ぎ革の旅靴〉開始時 `min(20, 歩数 × 2)` / 〈荒砥〉爆発で与ダメの池 +4% (上限なし・final5: final4 +7%・旧 +5%・30% まで・OnPostRoll で足す = 次のターンから) / 〈点火スパナ〉爆発したターン 次のターンの手札 +1 (1 ターン 1 回) / 〈恒熱の炉壁〉爆発で `itemBlockBonus += min(14, floor(防御の後のダメージ × 25 / 100))` / 〈二度目の打金〉【過熱】と次のターン OnWired で `AddPlayerAttackOrDiceBonus(3)` (撃ごと) / 〈溢れ取りの鋳型〉爆発で `2 × 溢れ` % を溜め、 次の本物の撃の OnPreDealDamage で与ダメの池へ (その撃だけ) / 〈早沸かし釜〉敵が攻撃したターンの終わり +2 (閾値 −6・2026-11-22 段 3: 旧 +3・−8) / 〈天工開物〉上の表 / 〈希望の灯片〉爆発 ≥ 2 回で勝つと最大 HP +3・【過熱】のターンの終わり HP +3 / 〈八日目の灰燼〉OnPreReceiveDamage で致死・臨界 ≥ 25 なら HP 1 で止め、 臨界を全部使って `使った量 × 3` を `LandBurst` (防御を通さない・1 戦闘 1 回) / 〈烈刃〉【過熱】の本物の撃の `hitFinalDamagePct += min(150, 15 × この戦闘の爆発の回数)` / 〈無害灯〉臨界 ≥ 15 なら敵の直接攻撃で失う HP を 0 にし臨界 −15・`VsDefense(floor((30 + stack + flat) × 30 / 100))` を `LandBurst` (1 戦闘 2 回・1 ターン 1 回・CombatManager の敵の攻撃・`HarmlessLamp.Apply`) |
+| 品 (出来事) | 〈工廠の材料箱〉爆発で `playerDefense +2` (この戦闘 +10 まで・毎ターン積み直す) / 〈乾き火口箱〉開始時 +20 (final4: 旧 +14) / 〈炉番の外套〉ターンの終わり `min(12, floor(EnemyAtkPreDefense / 2))` / 〈継ぎ革の旅靴〉開始時 `min(20, 歩数 × 2)` / 〈荒砥〉爆発で与ダメの池 +4% (上限なし・final5: final4 +7%・旧 +5%・30% まで・OnPostRoll で足す = 次のターンから) / 〈点火スパナ〉爆発したターン 次のターンの手札 +1 (1 ターン 1 回) / 〈恒熱の炉壁〉爆発で `itemBlockBonus += floor(防御の後のダメージ × 12 / 100)` (上限なし・final6: 旧 min(14, × 25%)) / 〈二度目の打金〉【過熱】と次のターン OnWired で `AddPlayerAttackOrDiceBonus(3)` (撃ごと) / 〈溢れ取りの鋳型〉爆発で `2 × 溢れ` % を溜め、 次の本物の撃の OnPreDealDamage で与ダメの池へ (その撃だけ) / 〈早沸かし釜〉敵が攻撃したターンの終わり +2 (閾値 −6・2026-11-22 段 3: 旧 +3・−8) / 〈天工開物〉上の表 / 〈希望の灯片〉爆発 ≥ 2 回で勝つと最大 HP +3・【過熱】のターンの終わり HP +3 / 〈八日目の灰燼〉OnPreReceiveDamage で致死・臨界 ≥ 25 なら HP 1 で止め、 臨界を全部使って `使った量 × 3` を `LandBurst` (防御を通さない・1 戦闘 1 回) / 〈烈刃〉【過熱】の本物の撃の `hitFinalDamagePct += min(150, 15 × この戦闘の爆発の回数)` / 〈無害灯〉臨界 ≥ 15 なら敵の直接攻撃で失う HP を 0 にし臨界 −15・`VsDefense(floor((30 + stack + flat) × 30 / 100))` を `LandBurst` (1 戦闘 2 回・1 ターン 1 回・CombatManager の敵の攻撃・`HarmlessLamp.Apply`) |
 | BOT・画面 | 配線の見積もり (AutoRunner.DeckSums) と戦闘の右の列 (`Game2DBattleSim.HeatState`) は `Kw.HeatState(ctx)` の写しで `HeatCore.Forecast(写し, 端子の結果)` (本体と同じ順で Gain / TryBurst・ターンの終わりは `EndGain`)。 BOT: 爆発のダメージを軽減不可の分へ・溜まりの増減を `臨界 × 30 / 閾値 × DeckGaugeShare`・配線の時の爆発か【過熱】なら〈二度目の打金〉+6 × 撃・〈烈刃〉の % × 1 ターンの見込み・〈無害灯〉が使えるターンは被ダメ 0 |
 | 計装 | `CombatManager.BurstFired` (爆発の回数) / `BurstBreakFired` (〈柱折りの発破筒〉の正規のダウン) → ランの記録 `burstFired` / `burstBreakFired` |
 
@@ -770,7 +770,7 @@ CombatManager に預け、 プレイヤーの攻撃の直前に固定ダメ枠�
 | 配線の後のブロック | 配線の集計 (`FinalBlockSum`) の後に品が足した `itemBlockBonus` (OnWired・会心のたび・爆発のたび) は、 敵の攻撃の解決の前に `blockSum` へ足す (〈狂暴化〉なら足さない・遺物/大罪/錐/不完全な転移は掛けない) |
 | 〈死相の面頬〉 | 敵の攻撃 `× (1 − min(0.6, (会心倍率 + 超過 − 1) × 0.25))` (会心したターン・`ApplyLossDamageModifiers`)。 会心した撃の与ダメはヴェスカのシールドに吸われない (`ApplyVescaDefense` の unabsorbable) |
 | 〈天眼の鍔〉の処刑 | 会心した撃を HP に入れた後、 敵の HP ≤ `最大 HP × min(0.30, 掛かった会心倍率 × 0.06)` (ボスは半分) なら倒す (`CanExecuteEnemy` で止まる) |
-| 品 (出来事) | 〈鷹匠の革手袋〉OnWired 攻撃の目の最大 ≥ 4 で 会心率 +12%・会心倍率 +0.25 (2026-11-22 final5: final4 +20%・+0.15) / 〈狙い目の刻み〉撃の目 ≥ 5 で その撃 +20% (final5: final4 +30%)・6 で確定 / 〈一の矢〉hitCount = 1 で撃の目 ≥ 5 の撃 +30%・+0.40 (final5: neon 収束 4 以上・+35%・+0.30) / 〈余韻の鈴〉前のターンに会心 2 回以上 (`Crit.LastTurnCount`) で OnWired +18%・ブロック +5 (final5: final4 1 回以上・+4) / 〈受け流しの扇〉防御の端子 2 枚以上 (`Fam.BlockTerminals` = `TerminalOutcome.blockTerminals`・【再起動】を含む) での完封 (`Psn.Shutout`) の次のターン +28%・ブロック +4・最初の会心の撃で `playerArmorPen += 8` (2026-11-22 neon 収束) / 〈銑鉄棍〉上の ProcessDamage / 〈測量師の片眼鏡〉1〜2 ターン目の撃に `min(1, 歩数 × 0.05)` (neon 収束: 旧 1 ターン目) / 〈研ぎ師の見立て書〉会心のたび ブロック +2 (上限なし)・ターン 2 回目の会心で さらにブロック +4・HP +2 (ターン 1 回) (final5: final4 +4・HP +3・旧 +3・ターン 9 まで・HP +2) / 〈刃毀れの見立て〉`critArmorPen += 12`・会心した撃のダメージ × 25% だけ `RaiseBossNextNotch` / 〈渾身の柄頭〉hitCount = 1 の撃が会心なら `hitFinalDamagePct += 35`・ブロック +6 / 〈瑠璃砥石〉+8% (final5: final4 +18%・旧 +10%)・ターン 2 回目の会心で戦闘の会心倍率 +0.15 (上限なし・final5: 旧 +0.10・最大 1.00・OnCriticalCheck で撃ごと) / 〈斬り重ねの鞘〉会心のたび +0.12 (2026-11-22・旧 0.20) が積もり、 ターン開始で `n − ceil(n/2)` (前のターンの会心 ≥ 3 なら減らない) / 〈重ね斬りの型〉同じターンに直前 2 撃が会心なら その撃の会心倍率 +1.0・会心したらブロック +5 / 〈連なる閃き〉前のターンに会心 1 回以上・このターンの最初の会心の撃とその後の撃 `hitFinalDamagePct += 25` (2026-11-22 Phase 4: 1 回・45 → 2 回・35 → neon 収束: 1 回・25) / 〈抜き打ちの作法〉1 ターン目かダウン中の最初の撃 確定・その撃の `critRatePctAdd += 0.50` (final5: 旧 会心倍率 +1.0・100% を超えた分は超過の変換で倍率) / 〈寸鉄〉`critExcessDouble`・`critArmorPen += IgnoreAll` / 〈一点読みの片眼〉OnWired +20%・+0.70・非会心 ×0.50 (final5: final4 +30%・+0.50・×0.65) (会心の品の値は 2026-11-21 Phase 4 較正・旧値は docs/GAME.md §13-8) / 〈千里眼の水晶〉ターン 2 回目の会心で 次のターン 手札 +1・会心率 +40%・全部の撃 `hitFinalDamagePct += 25` |
+| 品 (出来事) | 〈鷹匠の革手袋〉OnWired 攻撃の目の最大 ≥ 4 で 会心率 +15%・会心倍率 +0.25 (final6: final5 +12%) / 〈狙い目の刻み〉撃の目 ≥ 5 で その撃 +25% (final6: final5 +20%・final4 +30%)・6 で確定 / 〈一の矢〉hitCount = 1 で撃の目 ≥ 5 の撃 +45%・+0.40 (final6: final5 +30%) / 〈余韻の鈴〉OnWired で 前のターンの会心の数 n (`Crit.LastTurnCount`) × (+15%・ブロック +3) (上限なし・final6: final5 n ≥ 2 で +18%・+5) / 〈受け流しの扇〉防御の端子 2 枚以上 (`Fam.BlockTerminals` = `TerminalOutcome.blockTerminals`・【再起動】を含む) での完封 (`Psn.Shutout`) の次のターン +28%・ブロック +4・最初の会心の撃で `playerArmorPen += 8` (2026-11-22 neon 収束) / 〈銑鉄棍〉上の ProcessDamage / 〈測量師の片眼鏡〉1〜2 ターン目の撃に `min(1, 歩数 × 0.05)` (neon 収束: 旧 1 ターン目) / 〈研ぎ師の見立て書〉会心のたび ブロック +2 (上限なし)・ターン 2 回目の会心で さらにブロック +6・HP +3 (ターン 1 回) (final6: final5 +4・HP +2・final4 +4・HP +3) / 〈刃毀れの見立て〉`critArmorPen += 12`・会心した撃のダメージ × 25% だけ `RaiseBossNextNotch` / 〈渾身の柄頭〉hitCount = 1 の撃が会心なら `hitFinalDamagePct += 35`・ブロック +6 / 〈瑠璃砥石〉OnCriticalCheck で撃ごと 会心率 +10% + 3% × n・会心倍率 +0.04 × n (n = この戦闘の会心の数・OnCriticalDamage で +1・上限なし・final6: final5 +8%・ターン 2 回目の会心で倍率 +0.15) / 〈斬り重ねの鞘〉会心のたび +0.12 (2026-11-22・旧 0.20) が積もり、 ターン開始で `n − ceil(n/2)` (前のターンの会心 ≥ 3 なら減らない) / 〈重ね斬りの型〉同じターンに直前 2 撃が会心なら その撃の会心倍率 +1.0・会心したらブロック +5 / 〈連なる閃き〉前のターンに会心 1 回以上・このターンの最初の会心の撃とその後の撃 `hitFinalDamagePct += 25` (2026-11-22 Phase 4: 1 回・45 → 2 回・35 → neon 収束: 1 回・25) / 〈抜き打ちの作法〉1 ターン目かダウン中の最初の撃 確定・その撃の `critRatePctAdd += 0.60` (final6: final5 0.50 / final5: 旧 会心倍率 +1.0・100% を超えた分は超過の変換で倍率) / 〈寸鉄〉`critExcessDouble`・`critArmorPen += IgnoreAll` / 〈一点読みの片眼〉OnWired +25%・+0.65・非会心 ×0.45 (final6: final5 +20%・+0.70・×0.50) (会心の品の値は 2026-11-21 Phase 4 較正・旧値は docs/GAME.md §13-8) / 〈千里眼の水晶〉ターン 2 回目の会心で 次のターン 手札 +1・会心率 +40%・全部の撃 `hitFinalDamagePct += 25` |
 | BOT | `FillReadOut` が配線の前に分かる会心率と倍率 (`Crit.ForecastTurn`: 受け流し・瑠璃・斬り重ね・一点読み・千里眼・測量師) を足し、 `ReadOutOneHit` が撃ごとに 余韻 (前のターンの会心だけ)・鷹匠 (攻撃の目の最大)・狙い目 (撃の目)・一の矢/渾身/照準器 (撃の数 1)・抜き打ち (最初の撃) を足して `CritCore.EffectiveMul` で倍率を出す。 〈銑鉄棍〉は非会心の撃の池へ。 照準器は `p × 会心の撃` を足す。 乱数は引かない |
 | 計装 | `CombatManager.CritOverflowFired` (超過会心率が倍率になった会心) / `CritExecuteFired` (天眼の処刑) / `CritRefireFired` (照準器のもう 1 回) → ランの記録 `critOverflowFired` / `critExecuteFired` / `critRefireFired` |
 
@@ -983,7 +983,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
          〈特別・対〉が前ターンに成立していれば次の N 回 (既定 2) が無料 (currentBuffs["roleFreeReroll"] = 回数)。
          無料の回数と費用は CombatManager.FreeRerollsLeft / RerollCostNow(ctx, 個数, 回目) の 1 か所 (〈擦り切れた賽袋〉〈賽振り台〉・上の ⓪)。
          〈万象のゾロ目〉(2026-11-21): 出目が決まった所 (OnPostRoll の後・配線の前・CombatManager.DecideOmniPair) で、 立つ役が 2 個そろいなら
-           確率 OmniPairChance(この戦闘の役の回数) = 3 回以上 50% (GameRng "role.omni")・5 回以上 100% (乱数を引かない) でこのターンそれをゾロ目として扱う
+           確率 OmniPairChance(この戦闘の役の回数) = 4 回以上 50% (GameRng "role.omni")・7 回以上 100% (乱数を引かない・final6: 旧 3 / 5) でこのターンそれをゾロ目として扱う
            (TerminalEnv.pairAsTriple・ResolveRoles の TerminalCards.UpgradePair)。
 
 配線 (端子の山札・ADR-0014・2026-11-11〜 これだけ)
@@ -1260,7 +1260,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
 臨界     (Rinkai メーター・2026-07-16 追加。 2026-11-21 フルリワークで式を CombatSystem.HeatCore へ・詳細は §3-M)
          溜める処理は Kw.AddHeat の 1 か所 (中で HeatCore.Gain / TryBurst)。 ターン終わりに meter += floor(攻撃に挿した出目の合計 / 2) (`HeatCore.EndGain`・2026-11-22 neon 収束: 旧 attackSum)、 品・端子の分はその出来事の時点。
          meter >= 閾値 (既定 32・〈早沸かし釜〉−6・〈暴れ窯の火床〉で下がる・下限 12) でその場で爆発 → CombatManager.LandBurst、 OnRinkaiBurst を配る。
-         爆発 1 回 = HeatCore.Damage (基礎 30 + 上乗せ → 超臨界 ×1.5 ほか) を HeatCore.VsDefense (敵の防御の 50% を無視) に通した量。
+         爆発 1 回 = HeatCore.Damage (基礎 24 + 上乗せ → 超臨界 ×1.5 ほか) を HeatCore.VsDefense (敵の防御の 50% を無視) に通した量。
            会心・与ダメの池は乗らない。 最終与ダメージ倍率・大罪:怠惰・ダウンの ×1.5 は HpLossDiag.Lose (channel "臨界の爆発") が掛ける。 遺物 (§15-5) の臨界軸: 爆発 1 回ごとに + floor(その時の敵の現在HP × N%)。
          爆発のたびボスの次の目盛りにひび (CrackBossNotch)。
          超臨界爆発: 閾値を引く前の meter が閾値の 1.5 倍以上 (2026-11-21・旧 2 倍)。 OnRinkaiBurst の直後に OnSuperBurst。 出来事の間は Kw.BurstDamageNowKey (防御の後の量) / BurstExcessKey が読める。

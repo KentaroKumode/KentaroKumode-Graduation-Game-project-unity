@@ -98,14 +98,14 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>恒熱の炉壁: 爆発するたび、 その爆発のダメージ (敵の防御の後) の 25% (最大 14) をそのターンのブロックとして得る (配線より後の爆発の分は CombatManager.Turn が敵の攻撃の前に足す)。</summary>
+    /// <summary>恒熱の炉壁: 爆発するたび、 その爆発のダメージ (敵の防御の後) の 12% (上限なし・final6: 旧 25%・最大 14) をそのターンのブロックとして得る (配線より後の爆発の分は CombatManager.Turn が敵の攻撃の前に足す)。</summary>
     public class HeatWall : IPassiveSkillEffect
     {
         public string SkillId => "恒熱の炉壁";
-        public const int Pct = 25, Max = 14;
+        public const int Pct = 12;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRinkaiBurst };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-            => ctx.itemBlockBonus += System.Math.Min(Max, Rw.Count(ctx, Kw.BurstDamageNowKey) * Pct / 100);
+            => ctx.itemBlockBonus += Rw.Count(ctx, Kw.BurstDamageNowKey) * Pct / 100;
     }
 
     /// <summary>二度目の打金: 【過熱】(爆発が起きたターン) と、 その次のターン、 すべての撃の攻撃 +3 (配線で起きた爆発はそのターンの撃に間に合う)。</summary>
@@ -233,7 +233,7 @@ namespace ItemSystem.PassiveSkills.Effects
     {
         public const string Id = "無害灯";
         public string SkillId => Id;
-        public const int MinHeat = 15, Pay = 15, BackPct = 30, MaxPerBattle = 2;
+        public const int MinHeat = 15, Pay = 15, BackPct = 30, MaxPerBattle = 1;   // final6: 1 戦闘 2 回 → 1 回
         /// <summary>[persistent] この品を持っている / [1 ターン 1 回] 使ったターンの番号 / [persistent] この戦闘で使った回数。</summary>
         private const string HeldKey = "heat.lamp.held", TurnKey = "heat.lamp.turn", UsesKey = "heat.lamp.uses";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(Ready(ctx));

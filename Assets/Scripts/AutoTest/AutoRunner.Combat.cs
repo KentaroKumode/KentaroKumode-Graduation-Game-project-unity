@@ -537,7 +537,7 @@ namespace AutoTest
             /// <summary>[会心の軸] 配線で決まる品: 〈鷹匠の革手袋〉〈狙い目の刻み〉/ 攻撃の端子 1 枚の撃の〈一の矢〉〈渾身の柄頭〉〈必殺の照準器〉/ 最初の 1 撃が〈抜き打ちの作法〉で確定会心。</summary>
             public bool falconer, aim, firstArrow, pommel, sniper, quickDrawFirst;
             /// <summary>〈余韻の鈴〉: 前のターンの会心の条件は満たした (どの挿し方でも会心率が乗る・2026-11-22 final4)。</summary>
-            public bool bell;
+            public float bellRate;   // 〈余韻の鈴〉: 前のターンの会心の数 × RatePer (final6)
             /// <summary>〈加重の拳套〉: 2 撃目以降の撃で与ダメ % の池に足す割合 (0 = 持っていない・本体 ctx.hitOutgoingPct)。</summary>
             public float lateHitOutPct;
             public float nonCritMul;           // 鈍器: 非会心だけ ×(1+x)
@@ -647,7 +647,7 @@ namespace AutoTest
             if (hitNo == 0 && s.quickDrawFirst) add += ItemSystem.PassiveSkills.Effects.QuickDrawArt.Rate;   // final5: 倍率 +1.0 → 会心率 +50% (超過で倍率になる)
             if (s.falconer && ws.atkFaceMax >= ItemSystem.PassiveSkills.Effects.FalconerGlove.MinFace) { add += ItemSystem.PassiveSkills.Effects.FalconerGlove.Rate; mulAdd += ItemSystem.PassiveSkills.Effects.FalconerGlove.Mul; }
             if (s.aim && ws.hitFace != null && hitNo < ws.hitFace.Length) { add += CombatSystem.CritCore.AimRate(ws.hitFace[hitNo]); force |= CombatSystem.CritCore.AimForce(ws.hitFace[hitNo]); }
-            if (s.bell) add += ItemSystem.PassiveSkills.Effects.LingeringBell.Rate;
+            add += s.bellRate;
             bool solo = ws.aHits == 1;
             if (solo && s.firstArrow && ws.atkFaceMax >= ItemSystem.PassiveSkills.Effects.FirstArrow.MinFace) { add += ItemSystem.PassiveSkills.Effects.FirstArrow.Rate; mulAdd += ItemSystem.PassiveSkills.Effects.FirstArrow.Mul; }
             float critMulEff = CombatSystem.CritCore.EffectiveMul(s.critMulBase + mulAdd, s.critRed, add, s.critDouble, s.critHeaven);
@@ -733,7 +733,7 @@ namespace AutoTest
             st.critOff = ctx.critSuppressed;
             st.critOn = !st.critOff && ctx.forceCritical;
             st.falconer = run != null && run.OwnsPassive("鷹匠の革手袋");
-            st.bell = run != null && run.OwnsPassive(ItemSystem.PassiveSkills.Effects.LingeringBell.Id) && ItemSystem.PassiveSkills.Effects.LingeringBell.Primed(ctx);
+            st.bellRate = run != null && run.OwnsPassive(ItemSystem.PassiveSkills.Effects.LingeringBell.Id) ? ItemSystem.PassiveSkills.Effects.LingeringBell.RateNow(ctx) : 0f;
             st.aim = run != null && run.OwnsPassive(ItemIds.CritAim);
             st.firstArrow = run != null && run.OwnsPassive(ItemIds.CritFirstArrow);
             st.pommel = run != null && run.OwnsPassive(ItemIds.CritPommel);

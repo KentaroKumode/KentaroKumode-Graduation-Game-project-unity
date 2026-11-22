@@ -23,24 +23,24 @@ namespace AutoTest.EditorTests
             Assert.That(CritCore.EffectiveMul(2f, 0f, 0.9f, false, true), Is.EqualTo(2f).Within(1e-5f));
         }
 
-        /// <summary>基礎の会心倍率 1.6 (final5)。 〈回帰性真理〉(−0.5) を受けても 1.10 で、 1.0 に潰れない。</summary>
+        /// <summary>基礎の会心倍率 2.0 (final6・作者の決定で final4 までの値へ・final5 は 1.6)。 〈回帰性真理〉(−0.5) を受けて 1.50。</summary>
         [Test]
         public void BaseMultiplier_SurvivesRegression()
         {
             float m0 = MetaProgression.MetaBuffApplicator.GetCriticalMultiplier();
-            Assert.That(m0, Is.EqualTo(1.6f).Within(1e-5f));
-            Assert.That(CritCore.EffectiveMul(m0, 0.5f, 0.3f, false, false), Is.EqualTo(1.1f).Within(1e-5f));
+            Assert.That(m0, Is.EqualTo(2.0f).Within(1e-5f));
+            Assert.That(CritCore.EffectiveMul(m0, 0.5f, 0.3f, false, false), Is.EqualTo(1.5f).Within(1e-5f));
         }
 
-        /// <summary>〈抜き打ちの作法〉の量: その撃の会心率 +50%。 素の会心率 10% なら超過 0 (×1.6)、 100% なら超過 +50% で +1.00。
+        /// <summary>〈抜き打ちの作法〉の量: その撃の会心率 +60% (final6)。 素の会心率 10% なら超過 0 (基礎のまま)、 100% なら超過 +60% で +1.20。
         /// Execute は CombatManager.Instance を読むので、 撃での確かめはプレイモード (execute_code) で行う。</summary>
         [Test]
         public void QuickDraw_RateBecomesExcess()
         {
             float m0 = MetaProgression.MetaBuffApplicator.GetCriticalMultiplier();
-            Assert.That(QuickDrawArt.Rate, Is.EqualTo(0.50f).Within(1e-5f));
-            Assert.That(CritCore.EffectiveMul(m0, 0f, 0.10f + QuickDrawArt.Rate, false, false), Is.EqualTo(1.6f).Within(1e-5f));
-            Assert.That(CritCore.EffectiveMul(m0, 0f, 1.0f + QuickDrawArt.Rate, false, false) - m0, Is.EqualTo(1.0f).Within(1e-5f));
+            Assert.That(QuickDrawArt.Rate, Is.EqualTo(0.60f).Within(1e-5f));
+            Assert.That(CritCore.EffectiveMul(m0, 0f, 0.10f + QuickDrawArt.Rate, false, false), Is.EqualTo(m0).Within(1e-5f));
+            Assert.That(CritCore.EffectiveMul(m0, 0f, 1.0f + QuickDrawArt.Rate, false, false) - m0, Is.EqualTo(1.2f).Within(1e-5f));
         }
     }
 }
