@@ -645,7 +645,7 @@ namespace AutoTest
             if (s.falconer && ws.atkFaceMax >= ItemSystem.PassiveSkills.Effects.FalconerGlove.MinFace) { add += ItemSystem.PassiveSkills.Effects.FalconerGlove.Rate; mulAdd += ItemSystem.PassiveSkills.Effects.FalconerGlove.Mul; }
             if (s.aim && ws.hitFace != null && hitNo < ws.hitFace.Length) { add += CombatSystem.CritCore.AimRate(ws.hitFace[hitNo]); force |= CombatSystem.CritCore.AimForce(ws.hitFace[hitNo]); }
             bool solo = ws.aHits == 1;
-            if (solo && s.firstArrow) { add += ItemSystem.PassiveSkills.Effects.FirstArrow.Rate; mulAdd += ItemSystem.PassiveSkills.Effects.FirstArrow.Mul; }
+            if (solo && s.firstArrow && ws.atkFaceMax >= ItemSystem.PassiveSkills.Effects.FirstArrow.MinFace) { add += ItemSystem.PassiveSkills.Effects.FirstArrow.Rate; mulAdd += ItemSystem.PassiveSkills.Effects.FirstArrow.Mul; }
             float critMulEff = CombatSystem.CritCore.EffectiveMul(s.critMulBase + mulAdd, s.critRed, add, s.critDouble, s.critHeaven);
             float sniperMul = CombatSystem.CritCore.EffectiveMul(s.critMulBase + mulAdd + (add >= 1f ? CombatSystem.CritCore.SniperMulAdd : 0f), s.critRed, add, s.critDouble, s.critHeaven);
             float ironOut = s.ironClub ? System.Math.Min(1f, add) : 0f;

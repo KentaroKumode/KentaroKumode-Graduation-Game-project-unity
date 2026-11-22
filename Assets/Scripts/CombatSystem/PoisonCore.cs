@@ -9,7 +9,7 @@ namespace CombatSystem
         GreenKnife = 1 << 0,   // 緑染みの小刀: 攻撃の端子の発動 1 回につき毒 +2 (最大 3 回)
         Serpent = 1 << 1,      // 蛇血瓶: 4 以上の目を挿した攻撃の端子 1 枚につき毒 +3 (最大 3 回)
         Taster = 1 << 2,       // 毒見役の小匙: 攻撃と防御の両方に挿したターン 毒 +4・HP +2
-        Thorn = 1 << 3,        // 毒棘の小盾: 防御の端子に挿したターン ブロック +4
+        Thorn = 1 << 3,        // 毒棘の小盾: 防御の端子に挿したターン ブロック +6
         Mantle = 1 << 4,       // 瘴気の外套: 毒 15 以上で受けるダメージ −35%
         Blowpipe = 1 << 5,     // 麻痺の吹き矢: 毒 18 以上で敵の防御を全部無視
         Ring = 1 << 6,         // 石抜きの毒指輪: 毒 24 以上で攻撃が当たると【起爆】
@@ -48,7 +48,7 @@ namespace CombatSystem
         /// <summary>〈麻痺の吹き矢〉: 敵の防御を全部無視する毒。</summary>
         public const int BlowpipeIgnoreAt = 12;
         /// <summary>5d の量: 〈緑染みの小刀〉毒 / 回数 ・〈蛇血瓶〉毒 / 目 / 回数・〈毒見役の小匙〉毒 / HP・〈毒棘の小盾〉ブロック。</summary>
-        public const int KnifePoison = 3, KnifeMax = 3, SerpentPoison = 4, SerpentFace = 4, SerpentMax = 3, TasterPoison = 3, TasterHeal = 1, ThornBlock = 4;
+        public const int KnifePoison = 3, KnifeMax = 3, SerpentPoison = 4, SerpentFace = 4, SerpentMax = 3, TasterPoison = 3, TasterHeal = 1, ThornBlock = 6;
 
         /// <summary>起爆で消費する毒 (半分・切り上げ)。</summary>
         public static int Spend(int poison) => poison > 0 ? (poison + 1) / 2 : 0;

@@ -133,7 +133,7 @@ total = final + pursuitDamage
        〈銑鉄棍〉【規則】(critToDamage・2026-11-21): 会心しなかった撃だけ outgoingDamageMultiplier += min(1, critAdd) (与ダメ% の池・撃ごとに戻る)。 会心は普通に出る
        成立かつ total>0 → Crit.Note (このターンの会心の数) → FireTrigger(OnCriticalDamage)
                          → total ×= CritCore.EffectiveMul (§3-N: 敵の会心耐性 (下限 1.0) → + 超過会心率 → 〈天眼の鍔〉の確定会心 ×1.25)
-       不成立かつ total>0 → 鈍器 ×(1 + nonCritOutgoingMultiplier) → 〈一点読みの片眼〉の代価 ×0.6
+       不成立かつ total>0 → 鈍器 ×(1 + nonCritOutgoingMultiplier) → 〈一点読みの片眼〉の代価 ×0.5 (2026-11-22・旧 ×0.6)
        【狩猟旅団 (契約)】armed状態の脆弱を持つ敵への会心時、 全段に ×(1 + 0.15/0.30/0.45) 倍率を適用 → 脆弱は consumed へ
                           (詳細: docs/GAME.md §12)
 FireTrigger(OnPostDealDamage / OnPostReceiveDamage)
@@ -697,7 +697,7 @@ CombatManager に預け、 プレイヤーの攻撃の直前に固定ダメ枠�
 | 〈瘴気の外套〉 | 5d の takenMul 0.65 (毒 ≥ 15)。 OnTurnEnd に毒 ≥ 25 なら `Damage(Spend(毒), 旗, 回数, ダウン, 50)` を毒を消費せずに入れる (起爆の回数・ひび・OnPoisonDetonate には数えない) |
 | 〈毒溜まりの主〉 | TickStatuses: 毒 ≥ 20 なら毒のダメージを 2 回 (同じ量)・減らすのは 1 回 |
 | 〈腐蝕の王冠〉 | AddStatus: 付与 (種火 r2 の上乗せの後) を `ceil(× 1.5)`・上限なし。 SwapEnemy (段の交代): 毒 = 王冠 ? floor(毒 / 2) : 0 (王冠が無ければ段の交代で毒は消える・2026-11-21〜。 旧: そのまま持ち越した) |
-| 蝕みの品 | 〈岸上げの麻痺瓶〉mutualEnemyAttackReduction += min(10, 毒 / 5) (OnPostRoll) / 〈口縫いの毒糸〉毒 ≥ 20 で mutualEnemyAttackReduction += 2・毒 ≥ 10 かつ大技のターン (Escalation.IsHeavyTurn・ダウン中は除く) で enemyAtkCutPct += 0.20 / 〈腐し刃〉OnWired で AddOutgoingPct(min(0.45, 毒 × 0.015)) / 〈麻痺の吹き矢〉OnWired で playerArmorPen += 毒 / 3 / 〈酸の小瓶〉毒 ≥ 8 で playerArmorPen += 4 |
+| 蝕みの品 | 〈岸上げの麻痺瓶〉mutualEnemyAttackReduction += min(10, 毒 / 4) (OnPostRoll・2026-11-22 旧 / 5) / 〈口縫いの毒糸〉毒 ≥ 20 で mutualEnemyAttackReduction += 2・毒 ≥ 10 かつ大技のターン (Escalation.IsHeavyTurn・ダウン中は除く) で enemyAtkCutPct += 0.20 / 〈腐し刃〉OnWired で AddOutgoingPct(min(0.45, 毒 × 0.015)) / 〈麻痺の吹き矢〉OnWired で playerArmorPen += 毒 / 3 / 〈酸の小瓶〉毒 ≥ 8 で playerArmorPen += 4 |
 | BOT | 配線の見積もり (AutoRunner.DeckSums の ItemSight): 〈石抜きの毒指輪〉を持ち、 このターンまだ起爆していなければ、 攻撃の撃があり 配線の後の毒 (env.enemyPoison + o.poison) ≥ 24 の挿し方に `PoisonCore.Damage` を軽減不可の分 (extraDmg) として足す。 ボスのひびの割れは見込みに入れない |
 
 個々の品の数値は `PoisonEffects.cs` / `PoisonCore.cs` の定数と XML コメントが正本。
@@ -767,7 +767,7 @@ CombatManager に預け、 プレイヤーの攻撃の直前に固定ダメ枠�
 | 配線の後のブロック | 配線の集計 (`FinalBlockSum`) の後に品が足した `itemBlockBonus` (OnWired・会心のたび・爆発のたび) は、 敵の攻撃の解決の前に `blockSum` へ足す (〈狂暴化〉なら足さない・遺物/大罪/錐/不完全な転移は掛けない) |
 | 〈死相の面頬〉 | 敵の攻撃 `× (1 − min(0.6, (会心倍率 + 超過 − 1) × 0.25))` (会心したターン・`ApplyLossDamageModifiers`)。 会心した撃の与ダメはヴェスカのシールドに吸われない (`ApplyVescaDefense` の unabsorbable) |
 | 〈天眼の鍔〉の処刑 | 会心した撃を HP に入れた後、 敵の HP ≤ `最大 HP × min(0.30, 掛かった会心倍率 × 0.06)` (ボスは半分) なら倒す (`CanExecuteEnemy` で止まる) |
-| 品 (出来事) | 〈鷹匠の革手袋〉OnWired 攻撃の目の最大 ≥ 4 で 会心率 +12%・会心倍率 +0.10 / 〈狙い目の刻み〉撃の目 ≥ 5 で その撃 +20%・6 で確定 / 〈一の矢〉hitCount = 1 の撃 +25%・+0.20 / 〈余韻の鈴〉前のターンに会心で OnWired +12%・ブロック +2 / 〈受け流しの扇〉完封 (`Psn.Shutout`) の次のターン +25%・最初の会心の撃で `playerArmorPen += 6` / 〈銑鉄棍〉上の ProcessDamage / 〈測量師の片眼鏡〉1 ターン目の撃に `min(1, 歩数 × 0.05)` / 〈研ぎ師の見立て書〉会心のたび ブロック +3 (ターン 9 まで)・ターン 2 回目の会心で HP +2 (ターン 1 回) / 〈刃毀れの見立て〉`critArmorPen += 12`・会心した撃のダメージ × 25% だけ `RaiseBossNextNotch` / 〈渾身の柄頭〉hitCount = 1 の撃が会心なら `hitFinalDamagePct += 35`・ブロック +6 / 〈瑠璃砥石〉+10%・ターン 2 回目の会心で戦闘の会心倍率 +0.10 (最大 1.00・OnCriticalCheck で撃ごと) / 〈斬り重ねの鞘〉会心のたび +0.20 が積もり、 ターン開始で `n − ceil(n/2)` (前のターンの会心 ≥ 3 なら減らない) / 〈重ね斬りの型〉同じターンに直前 2 撃が会心なら その撃の会心倍率 +1.0・会心したらブロック +5 / 〈連なる閃き〉前のターンに会心・このターンの最初の会心の撃とその後の撃 `hitFinalDamagePct += 45` / 〈抜き打ちの作法〉1 ターン目かダウン中の最初の撃 確定・+1.0 / 〈寸鉄〉`critExcessDouble`・`critArmorPen += IgnoreAll` / 〈一点読みの片眼〉OnWired +20%・+0.50・非会心 ×0.6 (会心の品の値は 2026-11-21 Phase 4 較正・旧値は docs/GAME.md §13-8) / 〈千里眼の水晶〉ターン 2 回目の会心で 次のターン 手札 +1・会心率 +40%・全部の撃 `hitFinalDamagePct += 25` |
+| 品 (出来事) | 〈鷹匠の革手袋〉OnWired 攻撃の目の最大 ≥ 4 で 会心率 +12%・会心倍率 +0.10 / 〈狙い目の刻み〉撃の目 ≥ 5 で その撃 +20%・6 で確定 / 〈一の矢〉hitCount = 1 で撃の目 ≥ 5 の撃 +25%・+0.20 (2026-11-22) / 〈余韻の鈴〉前のターンに会心 2 回以上 (`Crit.LastTurnCount`) で OnWired +18%・ブロック +2 (2026-11-22) / 〈受け流しの扇〉攻撃の端子なしの完封 (`Psn.Shutout` かつ `!Shd.AttackedWithTerminal`・2026-11-22) の次のターン +25%・最初の会心の撃で `playerArmorPen += 6` / 〈銑鉄棍〉上の ProcessDamage / 〈測量師の片眼鏡〉1 ターン目の撃に `min(1, 歩数 × 0.05)` / 〈研ぎ師の見立て書〉会心のたび ブロック +3 (ターン 9 まで)・ターン 2 回目の会心で HP +2 (ターン 1 回) / 〈刃毀れの見立て〉`critArmorPen += 12`・会心した撃のダメージ × 25% だけ `RaiseBossNextNotch` / 〈渾身の柄頭〉hitCount = 1 の撃が会心なら `hitFinalDamagePct += 35`・ブロック +6 / 〈瑠璃砥石〉+10%・ターン 2 回目の会心で戦闘の会心倍率 +0.10 (最大 1.00・OnCriticalCheck で撃ごと) / 〈斬り重ねの鞘〉会心のたび +0.12 (2026-11-22・旧 0.20) が積もり、 ターン開始で `n − ceil(n/2)` (前のターンの会心 ≥ 3 なら減らない) / 〈重ね斬りの型〉同じターンに直前 2 撃が会心なら その撃の会心倍率 +1.0・会心したらブロック +5 / 〈連なる閃き〉前のターンに会心 2 回以上・このターンの最初の会心の撃とその後の撃 `hitFinalDamagePct += 35` (2026-11-22・旧 1 回・45) / 〈抜き打ちの作法〉1 ターン目かダウン中の最初の撃 確定・+1.0 / 〈寸鉄〉`critExcessDouble`・`critArmorPen += IgnoreAll` / 〈一点読みの片眼〉OnWired +20%・+0.50・非会心 ×0.5 (会心の品の値は 2026-11-21 Phase 4 較正・旧値は docs/GAME.md §13-8) / 〈千里眼の水晶〉ターン 2 回目の会心で 次のターン 手札 +1・会心率 +40%・全部の撃 `hitFinalDamagePct += 25` |
 | BOT | `FillReadOut` が配線の前に分かる会心率と倍率 (`Crit.ForecastTurn`: 余韻・受け流し・瑠璃・斬り重ね・一点読み・千里眼・測量師) を足し、 `ReadOutOneHit` が撃ごとに 鷹匠 (攻撃の目の最大)・狙い目 (撃の目)・一の矢/渾身/照準器 (撃の数 1)・抜き打ち (最初の撃) を足して `CritCore.EffectiveMul` で倍率を出す。 〈銑鉄棍〉は非会心の撃の池へ。 照準器は `p × 会心の撃` を足す。 乱数は引かない |
 | 計装 | `CombatManager.CritOverflowFired` (超過会心率が倍率になった会心) / `CritExecuteFired` (天眼の処刑) / `CritRefireFired` (照準器のもう 1 回) → ランの記録 `critOverflowFired` / `critExecuteFired` / `critRefireFired` |
 
@@ -1050,7 +1050,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
               〈灼線鞭〉: env.chargeSpendsTurn (配線より前に充電を使った回数・振り直し) + この解決の支払いの回数 ≥ 2 → atkD 最大の攻撃の端子を無料で再起動 (1 ターン 1 回)
            5d. 毒の品 (2026-11-21・PoisonCore.ApplyToTerminals・旗は TerminalBattleState.poisonItems・5c の後 = 再起動の撃も数える):
               〈緑染みの小刀〉poison += 3 × min(3, 攻撃の撃の数) / 〈蛇血瓶〉4 以上の目を挿した攻撃の端子 1 枚につき poison += 4 (最大 3 枚・振った目そのもので見る) /
-              〈毒見役の小匙〉攻撃と防御の両方に挿したら poison += 3・heal += 1 / 〈毒棘の小盾〉防御に挿したら blockAdd += 4 /
+              〈毒見役の小匙〉攻撃と防御の両方に挿したら poison += 3・heal += 1 / 〈毒棘の小盾〉防御に挿したら blockAdd += 6 (2026-11-22 旧 4) /
               〈瘴気の外套〉env.enemyPoison ≥ 15 なら takenMul ×= 0.65 / 〈麻痺の吹き矢〉env.enemyPoison ≥ 12 なら ignoreDefense (毒 2 ごとに防御 1 無視・Phase 4 較正: 旧 3 ごと・18)
            6d. 役の軸の品 (旗は TerminalBattleState.roleItems・役が立ったターンだけ・攻撃 +N は 6c と同じく撃 1 つずつ・式は §3-P)
          〈影写し〉〈火葬の剣〉〈保持器〉の対象: Resolve の wantTarget (人 = 画面で選んだ端子 / BOT = WiringPlan.targets)。

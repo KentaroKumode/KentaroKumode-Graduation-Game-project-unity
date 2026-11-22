@@ -212,7 +212,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>毒棘の小盾: 防御の端子に挿したターン、 ブロック +4 (PoisonCore の旗・Resolve の 5d)。 そのターン、 ブロックで防いだダメージ 4 につき敵に毒 +1 (最大 +6)。</summary>
+    /// <summary>毒棘の小盾: 防御の端子に挿したターン、 ブロック +6 (2026-11-22・旧 +4・PoisonCore の旗・Resolve の 5d)。 そのターン、 ブロックで防いだダメージ 4 につき敵に毒 +1 (最大 +6)。</summary>
     public class ThornBuckler : IPassiveSkillEffect
     {
         public string SkillId => "毒棘の小盾";
@@ -244,11 +244,11 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>岸上げの麻痺瓶 (分岐 A): 敵の毒 5 につき敵の攻撃 −1 (最大 −10・予告の前)。 敵の攻撃を受けきったターン (HP を失わなかった)、 敵に毒 +5。</summary>
+    /// <summary>岸上げの麻痺瓶 (分岐 A): 敵の毒 4 につき敵の攻撃 −1 (2026-11-22・旧 5 につき・最大 −10・予告の前)。 敵の攻撃を受けきったターン (HP を失わなかった)、 敵に毒 +5。</summary>
     public class Paralysis : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "岸上げの麻痺瓶";
-        public const int Every = 5, MaxCut = 10, Poison = 5;
+        public const int Every = 4, MaxCut = 10, Poison = 5;
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(System.Math.Min(MaxCut, ctx.EnemyPoison / Every));
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnTurnEnd };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)

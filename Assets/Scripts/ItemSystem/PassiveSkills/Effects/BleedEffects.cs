@@ -204,11 +204,11 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>血脈の災環 (分岐 B): 敵の出血が消費か自然減衰で減るたび、 減った量 × 5 の軽減不可ダメージ。 そのダメージの 20% (切り捨て) だけ HP を回復 (1 ターン最大 10)。</summary>
+    /// <summary>血脈の災環 (分岐 B): 敵の出血が消費か自然減衰で減るたび、 減った量 × 3 の軽減不可ダメージ (2026-11-22・旧 × 5)。 そのダメージの 20% (切り捨て) だけ HP を回復 (1 ターン最大 10)。</summary>
     public class BloodlineRing : IPassiveSkillEffect
     {
         public string SkillId => "血脈の災環";
-        public const int Mul = 5, HealPct = 20, HealMax = 10;
+        public const int Mul = 3, HealPct = 20, HealMax = 10;
         private const string Key = "bld.bloodline";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBleedDecay, PassiveSkillTrigger.OnBleedConsume };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
