@@ -633,8 +633,9 @@ namespace AutoTest
             float termMul = ws.damageMul;
             //   武器の最終与ダメ +% (一対一・捨て身・処刑・鎧砕き・不滅の刃) / 竜閃〈画竜点睛〉(攻撃の端子 1 枚・最大の目 → 確定会心・+150%)
             int fpct = s.finalPct + s.rung.FinalPct(s.solo, 1, bCount, s.execBoost, s.shattered, s.undyingStreak + 1);   // ローカル関数は in の引数を捕まえられないので写す
-            bool garyo = s.rung.garyo && ws.aHits == 1 && hitNo == 0 && rawOverride < 0 && s.dieMaxFace > 0 && ws.atkFaceMax >= s.dieMaxFace;
-            if (garyo) fpct += ItemSystem.PassiveSkills.Effects.GaryoTensei.FinalPct;
+            int garyoPct = s.rung.garyo && ws.aHits == 1 && hitNo == 0 && rawOverride < 0 ? CombatSystem.CombatRules.GaryoPct(ws.atkFaceMax, ws.rolledMax, s.dieMaxFace) : 0;
+            bool garyo = garyoPct > 0;
+            fpct += garyoPct;
             bool noDef = ws.ignoreDefense || (hitNo == 0 && s.needleFirst) || rawOverride >= 0 || (hitNo >= 1 && s.rung.vital2nd);   // 〈急所〉: 2 撃目以降は防御無視
             int minDmg = s.minDmg, consBurst = s.consBurst, eDef = noDef ? 0 : s.eDefNow, pen = s.myPen + ws.armorPen, critPen = s.critPen;
             float nonCritMul = s.nonCritMul, berserk = s.berserkMul;
@@ -863,8 +864,8 @@ namespace AutoTest
             public bool forceCrit;       // このターンは必ず会心
             /// <summary>攻撃に挿した目の一番大きい値 (〈鷹匠の革手袋〉) / 撃ごとの挿した目の一番大きい値 (〈狙い目の刻み〉を持つ時だけ・CritCore.HitFaceMax)。</summary>
             public int atkFaceMax;
-            /// <summary>攻撃以外の端子に挿した目の合計 (竜閃〈無我無心〉)。</summary>
-            public int otherDice;
+            /// <summary>攻撃以外の端子に挿した目の合計 (竜閃〈無我無心〉) / このターン振った目の最大 (竜閃〈画竜点睛〉・2026-11-22)。</summary>
+            public int otherDice, rolledMax;
             public int[] hitFace;
             public bool ignoreDefense;   // 敵の防御を無視
             public int armorPen;         // 敵の防御を N 無視 (〈継ぎ目のない導線〉)

@@ -48,6 +48,14 @@ namespace CombatSystem
         /// <summary>竜閃〈無我無心〉: 他の端子に挿した目の合計 × 1.5 (切り上げ)。</summary>
         public static int MugaBonus(int otherDiceSum) => CeilPct(otherDiceSum, MugaMushin.RatePct);
 
+        /// <summary>竜閃〈無我無心〉: 攻撃の端子 1 枚のターン、 防御の端子に挿した出目 1 個につきブロック +3 (2026-11-22)。</summary>
+        public static int MugaBlock(int blockDice) => blockDice <= 0 ? 0 : blockDice * MugaMushin.BlockPerDie;
+
+        /// <summary>竜閃〈画竜点睛〉の最終与ダメージ +% (攻撃の端子 1 枚の撃・<paramref name="face"/> = その撃に挿した目・<paramref name="rolledMax"/> = このターン振った目の最大・
+        /// <paramref name="dieMax"/> = 装備ダイスの最大の目)。 振った目の最大 (タイ含む) なら +60% (×1.6)、 それが装備ダイスの最大の目なら +150% (×2.5・目盛りを割る)。 どちらでもなければ 0 (2026-11-22)。</summary>
+        public static int GaryoPct(int face, int rolledMax, int dieMax)
+            => face <= 0 || face < rolledMax ? 0 : dieMax > 0 && face >= dieMax ? GaryoTensei.FinalPct : GaryoTensei.RollMaxPct;
+
         /// <summary>処刑人の烙印のしきい値 (最大 HP 比)。</summary>
         public const float ExecuteHpRatio = 0.20f;
 

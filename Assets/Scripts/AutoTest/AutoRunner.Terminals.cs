@@ -89,7 +89,12 @@ namespace AutoTest
                 if (o.kindOfDie[i] == DiceTerminal.Block && rolls[i] > ws.maxBlockDie) ws.maxBlockDie = rolls[i];
                 if (o.kindOfDie[i] == DiceTerminal.Attack && rolls[i] > ws.atkFaceMax) ws.atkFaceMax = rolls[i];   // 〈鷹匠の革手袋〉(本体は MutualKeys.AttackDiceMax)
                 if (o.kindOfDie[i] != DiceTerminal.Attack && o.kindOfDie[i] != DiceTerminal.None) ws.otherDice += rolls[i];   // 竜閃〈無我無心〉
+                if (rolls[i] > ws.rolledMax) ws.rolledMax = rolls[i];                                                          // 竜閃〈画竜点睛〉
             }
+            //   武器の配線の後のブロック (2026-11-22): 竜閃〈無我無心〉攻撃の端子 1 枚なら防御の出目 1 個 +3 / 短剣〈連刃〉追撃するターン +4。
+            //   shortcut: 本体は品のブロック (遺物 % の後) に足すが、 ここは端子のブロックに足す (遺物・大罪の % がずれる)
+            if (s.rung.muga && ws.aHits == 1) ws.blockRaw += CombatSystem.CombatRules.MugaBlock(ws.bCount);
+            if (s.rung.chainRatePct > 0 && ws.aHits >= ItemSystem.PassiveSkills.Effects.ChainBlade.NeedTerminals) ws.blockRaw += ItemSystem.PassiveSkills.Effects.ChainBlade.Block;
             //   〈狙い目の刻み〉: 撃ごとの挿した目 (本体の撃の輪と同じ CritCore.HitFaceMax)
             if (s.aim && o.attackHits.Count > 0)
             {

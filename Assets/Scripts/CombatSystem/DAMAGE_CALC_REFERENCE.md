@@ -524,23 +524,23 @@ Hermes / Bloodlust / EvenEyes / MasterworkNotes / KaleidoDice。
 | スキル | Trigger | 効果 |
 |---|---|---|
 | 猛り I/II/III | OnPostRoll / OnPostDealDamage | 攻撃 +min(currentTurn−1, 5/9/14)・当たった撃のダメージ × 15/25/40% だけボスの次の目盛りを上げる |
-| 鎧砕き I/II | OnBattleStart / OnPreDealDamage + 撃の輪 | 撃が当たるたび（`ArmorBreak.OnHit`・その撃の防御の計算の後）敵の防御 −2/−3（1 ターン 3 回・下限 0）。 自分で 0 にした後、 防御 0 の間 +20/35% |
+| 鎧砕き I/II | OnBattleStart / OnPreDealDamage + 撃の輪 | 撃が当たるたび（`ArmorBreak.OnHit`・その撃の防御の計算の後）敵の防御 −2/−3（1 ターン 3 回・下限 0）。 自分で 0 にした後、 防御 0 の間 +20/20% (2026-11-22・II 旧 35) |
 | 捨て身 | OnPreDealDamage | 攻撃に挿し防御の端子に 0 個のターン +35% |
 | 血令 | OnBattleStart / OnPostRoll / OnWired / OnTurnEnd / OnBossDown | 敵の攻撃で失った HP × 60% を血へ（ボスのダウンのたび +8）。 攻撃 +血・攻撃に挿したら使い切り、 通ったら（`lastPlayerDamage > 0`）HP +floor(使った血 / 3) |
 | 間合 I/II/III | OnPostRoll（III は OnWired も） | `AddAttackDicePct(0.25/0.40/0.60)`・`enemyArmorPenNegate += 3/5/8`。 III: 攻撃と防御の両方に挿したターン 次のターンの手札 +1 |
-| 一対一 I/II | OnPostRoll / OnPreDealDamage | 単体戦のみ 防御 +3/+5・+15/25% |
+| 一対一 I/II | OnPostRoll / OnPreDealDamage | 単体戦のみ 防御 +3/+5・+10/18% (2026-11-22・旧 15/25) |
 | 切り返し | OnWired / OnPreDealDamage | 両方に挿したターン 攻撃 +ceil(blockSumThisTurn × 0.6)・最初の 1 撃 `hitArmorPen += 10` |
 | 不滅の刃 | OnWired / OnPreDealDamage | 両方に挿したターンが続くたび連続数 +1（途切れたら 0）・+min(72, 12 × 連続数)% |
 | 疾手 I/II/III | OnBattleStart / OnPostRoll | currentTurn ≤ 5 で攻撃 +4/+6/+9・戦闘開始時に `extraDrawNext += 1/1/2`（1 ターン目の手札） |
-| 連刃 I/II | OnWired + 撃の輪 | 攻撃の端子 2 枚以上のターン、 撃の列の最後に追撃 1 撃: 攻撃 = ceil(武器の攻撃力 × 1.2/1.6)（端子の外の攻撃は乗らない）・`hitIgnoreDefense`・会心と撃ごとの品はふつうの撃と同じ |
+| 連刃 I/II | OnWired + 撃の輪 | 攻撃の端子 2 枚以上のターン、 撃の列の最後に追撃 1 撃: 攻撃 = ceil(武器の攻撃力 × 1.2/1.6)（端子の外の攻撃は乗らない）・`hitIgnoreDefense`・会心と撃ごとの品はふつうの撃と同じ。 追撃するターン `itemBlockBonus += 4` (OnWired・2026-11-22) |
 | 急所 | OnBattleStart / OnPreDealDamage | 会心の撃は防御の段を飛ばす（`VitalStrike.IgnoresDefense`）・2 撃目以降は `hitIgnoreDefense` |
 | 処刑 | OnBattleStart / OnPreDealDamage + 撃の輪 | 敵の HP（配線の時点）≤ 40% で +50%。 撃を HP に入れた後 HP ≤ 15%（ボス 10%）なら倒す（`Execution.Kills`・`CanExecuteEnemy` で止まる） |
 | 城壁 I/II/III | OnTurnEnd | 【ジャスト防御】のターン シールド +8/12/16。 それ以外で block ≥ 予告の敵攻撃 なら floor((block − 敵攻撃) × 0.6/0.9/1.2) |
 | シールドバッシュ I/II | OnWired / OnPostDealDamage | 攻撃に挿し防御の端子 0 個のターン、 シールドの半分（切り上げ）/ 全部を `Kw.SpendShield` で使い、 攻撃 +ceil(使った量 × 0.9/1.5)・そのターンの撃は目盛りへの削り +30% |
 | 堅守の構え | OnWired | 防御の端子に 2 個以上のターン シールド +18・次の 2 ターンは不発（`steadfastStanceReadyTurn`） |
 | 黎明 | OnTurnEnd | `mutualHpLossFromEnemy == 0` なら floor(軽減前 / 10) × 5%（ジャスト防御なら 8% とボスの次の目盛りにひび `CrackBossNotch`）× 敵最大 HP を `enemyCurrentHP` から引く |
-| 画竜点睛（竜閃） | OnPreDealDamage / OnPostDealDamage | `hitCount == 1` で その撃の目（`hitFaceMax`）≥ 装備ダイスの最大の目 → `forceCritThisHit`・+150%（×2.5）・当たったら `BreakBossNotch`（1 ターン 1 回） |
-| 無我無心（竜閃） | OnWired | 攻撃の端子 1 枚: 攻撃 +ceil(攻撃以外の端子に挿した目の合計 × 1.5)（他の端子の働きはそのまま）。 2 枚以上: 攻撃 −武器の攻撃力（=武器の攻撃力 0）・画竜点睛は撃が 2 つ以上なので不発 |
+| 画竜点睛（竜閃） | OnPreDealDamage / OnPostDealDamage | `hitCount == 1` の撃で `CombatRules.GaryoPct(hitFaceMax, このターン振った目の最大, 装備ダイスの最大の目)`: 振った目の最大以上（タイ含む）→ `forceCritThisHit`・+60%（×1.6）／ それが装備ダイスの最大の目以上 → +150%（×2.5）・当たったら `BreakBossNotch`（1 ターン 1 回・2026-11-22 旧: ダイスの最大の目だけ） |
+| 無我無心（竜閃） | OnWired | 攻撃の端子 1 枚: 攻撃 +ceil(攻撃以外の端子に挿した目の合計 × 1.5)（他の端子の働きはそのまま）・`itemBlockBonus += 3 × 防御の端子に挿した出目の数`（`CombatRules.MugaBlock`・2026-11-22）。 2 枚以上: 攻撃 −武器の攻撃力（=武器の攻撃力 0）・画竜点睛は撃が 2 つ以上なので不発 |
 
 **武器そのものの防御・貫通（2026-10-28・ADR-0013）**: items.json の武器の `defense` / `armorPen`（`[無印, +]`）。
 戦闘開始時に `CombatManager` が `weaponPlus` で要素を選び、`playerDefenseBase` = 2 + 防御、`playerArmorPenBase` = 貫通 へ写す。

@@ -99,11 +99,11 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>鎧砕き I/II: 撃が当たるたび敵の防御 −2/−3 (1 ターン 3 回まで・下限 0・CombatManager の撃の輪が <see cref="OnHit"/> を呼ぶ)。
-    /// 自分で敵の防御を 0 にした後、 防御が 0 の間は全部の撃の最終与ダメージ +20/35%。</summary>
+    /// 自分で敵の防御を 0 にした後、 防御が 0 の間は全部の撃の最終与ダメージ +20/20% (2026-11-22・II 旧 35%)。</summary>
     public class ArmorBreak : IPassiveSkillEffect
     {
         public static readonly string[] Ids = { "鎧砕きI", "鎧砕きII" };
-        public static readonly int[] Amounts = { 2, 3 }, ShatterPct = { 20, 35 };
+        public static readonly int[] Amounts = { 2, 3 }, ShatterPct = { 20, 20 };
         public const int PerTurn = 3;
         /// <summary>[persistent] 持っている段の削り量・割った後の % / 割った印 / [perTurn 相当] 今のターンの番号と削った回数。</summary>
         public const string AmountKey = "axe.breakAmt", PctKey = "axe.breakPct", ShatteredKey = "axe.shattered", TurnKey = "axe.breakTurn", CountKey = "axe.breakN";
@@ -216,11 +216,11 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>一対一 I/II: 単体戦 (ボス含む) のとき、 全部の撃の最終与ダメージ +15/25%・自分の防御 +3/+5。 2 体戦では乗らない (戦闘名は 1 マス手前で開示)。</summary>
+    /// <summary>一対一 I/II: 単体戦 (ボス含む) のとき、 全部の撃の最終与ダメージ +10/18% (2026-11-22・旧 15/25)・自分の防御 +3/+5。 2 体戦では乗らない (戦闘名は 1 マス手前で開示)。</summary>
     public class Duelist : IPassiveSkillEffect
     {
         public static readonly string[] Ids = { "一対一I", "一対一II" };
-        public static readonly int[] FinalPct = { 15, 25 }, Def = { 3, 5 };
+        public static readonly int[] FinalPct = { 10, 18 }, Def = { 3, 5 };
         private readonly int _lv;
         public Duelist(int lv) { _lv = lv; }
         public string SkillId => Ids[_lv];
@@ -292,13 +292,13 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>連刃 I/II: 同じターンに攻撃の端子を 2 枚以上発動したとき、 最後に追撃を 1 撃 (1 ターン 1 回)。
-    /// 追撃の攻撃 = 武器の攻撃力 × 1.2/1.6 (切り上げ・<see cref="CombatRules.ChainHitBase"/>)・敵の防御を無視・会心と撃ごとの効果は通常の撃と同じ。
+    /// 追撃の攻撃 = 武器の攻撃力 × 1.2/1.6 (切り上げ・<see cref="CombatRules.ChainHitBase"/>)・敵の防御を無視・会心と撃ごとの効果は通常の撃と同じ。 追撃するターン、 ブロック +4 (2026-11-22)。
     /// 撃を足すのは CombatManager の撃の輪 (<see cref="HitBase"/> を読む)。</summary>
     public class ChainBlade : IPassiveSkillEffect
     {
         public static readonly string[] Ids = { "連刃I", "連刃II" };
         public static readonly int[] RatePct = { 120, 160 };
-        public const int NeedTerminals = 2;
+        public const int NeedTerminals = 2, Block = 4;
         /// <summary>[perTurn・OnWired で毎ターン書く] このターンの追撃の率 (%・0 = 追撃なし)。</summary>
         public const string RateKey = "dagger.chainRate";
         private readonly int _lv;
@@ -306,7 +306,11 @@ namespace ItemSystem.PassiveSkills.Effects
         public string SkillId => Ids[_lv];
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-            => ctx.accumulatedValues[RateKey] = Fam.AttackTerminals() >= NeedTerminals ? RatePct[_lv] : 0;
+        {
+            bool on = Fam.AttackTerminals() >= NeedTerminals;
+            ctx.accumulatedValues[RateKey] = on ? RatePct[_lv] : 0;
+            if (on) ctx.itemBlockBonus += Block;      // 敵の攻撃の前に足す (配線の後の品のブロック)
+        }
 
         /// <summary>このターンの追撃の攻撃 (0 = 追撃なし)。</summary>
         public static int HitBase(CombatContext ctx, int weaponAtk)
@@ -446,11 +450,12 @@ namespace ItemSystem.PassiveSkills.Effects
     //  竜閃 — 一刀両断・極大単撃
     // ============================================================
 
-    /// <summary>画竜点睛: 攻撃の端子を 1 枚だけ発動し、 そこに挿した目が装備ダイスの最大の目だったとき、 その 1 撃は確定会心・最終与ダメージ ×2.5 (+150%)・
-    /// ボスの次の目盛りをその場で割る (満額のダウン・1 ターン 1 回)。 攻撃の端子を 2 枚以上発動したターンは不発 (〈無我無心〉)。</summary>
+    /// <summary>画竜点睛: 攻撃の端子を 1 枚だけ発動し、 そこにこのターン振った目の最大 (タイ含む) を挿したとき、 その 1 撃は確定会心・最終与ダメージ ×1.6 (+60%)。
+    /// その目が装備ダイスの最大の目なら ×2.5 (+150%) で、 ボスの次の目盛りをその場で割る (満額のダウン・1 ターン 1 回)。 攻撃の端子を 2 枚以上発動したターンは不発 (〈無我無心〉)。
+    /// 式は <see cref="CombatRules.GaryoPct"/> (2026-11-22・旧: 装備ダイスの最大の目だけ)。</summary>
     public class GaryoTensei : IPassiveSkillEffect
     {
-        public const int FinalPct = 150;
+        public const int FinalPct = 150, RollMaxPct = 60;
         public const string TurnKey = "ryusen.garyoTurn", BrokeKey = "ryusen.garyoBroke";
         public string SkillId => "画竜点睛";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage, PassiveSkillTrigger.OnPostDealDamage };
@@ -458,16 +463,26 @@ namespace ItemSystem.PassiveSkills.Effects
         {
             if (t == PassiveSkillTrigger.OnPreDealDamage)
             {
-                if (!ctx.IsRealHit || ctx.hitCount != 1 || ctx.hitIndex != 0 || ctx.hitFaceMax <= 0 || ctx.hitFaceMax < MaxFace(ctx)) return;
+                if (!ctx.IsRealHit || ctx.hitCount != 1 || ctx.hitIndex != 0) return;
+                int pct = CombatRules.GaryoPct(ctx.hitFaceMax, RolledMax(ctx), MaxFace(ctx));
+                if (pct <= 0) return;
                 ctx.forceCritThisHit = true;
-                ctx.hitFinalDamagePct += FinalPct;
-                ctx.accumulatedValues[TurnKey] = ctx.currentTurn;
+                ctx.hitFinalDamagePct += pct;
+                if (pct >= FinalPct) ctx.accumulatedValues[TurnKey] = ctx.currentTurn;      // 目盛りを割るのは装備ダイスの最大の目の時だけ
                 CombatManager.WeaponGaryoFired++;
-                Rw.Log($"[画竜点睛] 目 {ctx.hitFaceMax} = 最大 → 確定会心・最終与ダメージ +{FinalPct}%");
+                Rw.Log($"[画竜点睛] 目 {ctx.hitFaceMax} (振った最大 {RolledMax(ctx)}・ダイスの最大 {MaxFace(ctx)}) → 確定会心・最終与ダメージ +{pct}%");
                 return;
             }
             if ((int)ctx.GetAccumulated(TurnKey) != ctx.currentTurn || !Psn.Hit(ctx) || !Rw.OncePerTurn(ctx, BrokeKey)) return;
             CombatManager.Instance?.BreakBossNotch(SkillId);
+        }
+
+        /// <summary>このターン振った目の最大 (振っていなければ 0)。</summary>
+        public static int RolledMax(CombatContext ctx)
+        {
+            int m = 0;
+            if (ctx.playerDice != null) foreach (int d in ctx.playerDice) if (d > m) m = d;
+            return m;
         }
 
         /// <summary>装備ダイスの最大の目 (面が無ければ playerDiceMax)。</summary>
@@ -481,11 +496,12 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>無我無心: 攻撃の端子を 1 枚だけ発動したターン、 他の端子に挿した目の合計 × 1.5 (切り上げ) をその 1 撃の攻撃に加える (他の端子の働きはそのまま)。
+    /// <summary>無我無心: 攻撃の端子を 1 枚だけ発動したターン、 他の端子に挿した目の合計 × 1.5 (切り上げ) をその 1 撃の攻撃に加え (他の端子の働きはそのまま)、
+    /// 防御の端子に挿した出目 1 個につきブロック +3 (2026-11-22・<see cref="CombatRules.MugaBlock"/>)。
     /// 攻撃の端子を 2 枚以上発動したターンは武器の攻撃力が 0 になる (〈画竜点睛〉は 1 枚の時だけ働く)。</summary>
     public class MugaMushin : IPassiveSkillEffect
     {
-        public const int RatePct = 150;
+        public const int RatePct = 150, BlockPerDie = 3;
         public string SkillId => "無我無心";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
@@ -495,6 +511,8 @@ namespace ItemSystem.PassiveSkills.Effects
             int n = o?.attackHits.Count ?? 0;
             if (n <= 0) return;
             if (n >= 2) { ctx.AddPlayerAttackOrDiceBonus(-cm.PlayerAttackPower); Rw.Log($"[無我無心] 攻撃の端子 {n} 枚 → 武器の攻撃力 0"); return; }
+            int block = CombatRules.MugaBlock(o.blockDice);
+            if (block > 0) { ctx.itemBlockBonus += block; Rw.Log($"[無我無心] 攻撃の端子 1 枚: 防御の出目 {o.blockDice} 個 → ブロック +{block}"); }
             int other = 0;
             if (ctx.playerDice != null && o.kindOfDie != null)
                 for (int i = 0; i < ctx.playerDice.Length && i < o.kindOfDie.Length; i++)
