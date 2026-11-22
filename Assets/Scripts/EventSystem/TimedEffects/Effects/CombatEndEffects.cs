@@ -34,7 +34,7 @@ namespace EventSystem.TimedEffects.Effects
             // 2026-10-17: 空腹の削除に伴い、 旧「空腹度 +1」を物資 +10 へ（物資は旧単位の ×10・GAME.md §10）
             if (run == null) return;
             GameLoop.ProvisionSystem.Recover(run, 1);   // 2026-11-09 デノミ (旧 +10)
-            Debug.Log($"[TimedEffect] 芽吹きの祈り: 物資+1 ({run.provision}/{run.provisionCap})");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[TimedEffect] 芽吹きの祈り: 物資+1 ({run.provision}/{run.provisionCap})");
         }
     }
 }

@@ -123,7 +123,7 @@ namespace ItemSystem.PassiveSkills.Keywords
                 ctx.accumulatedValues[BurstTurnKey] = ctx.currentTurn;
                 ctx.accumulatedValues[BurstDamageNowKey] = b.landed;
                 CombatSystem.CombatManager.BurstFired++;   // [計装]
-                Debug.Log($"[臨界] 閾値{b.threshold} 到達 → {(b.super ? "超臨界" : "")}爆発 (溜まり {b.meterAt}・超過 {b.excess}・残 {s.meter}・ダメージ {b.damage} → 防御の後 {b.landed}・この戦闘 {s.burstsTotal} 回目)");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[臨界] 閾値{b.threshold} 到達 → {(b.super ? "超臨界" : "")}爆発 (溜まり {b.meterAt}・超過 {b.excess}・残 {s.meter}・ダメージ {b.damage} → 防御の後 {b.landed}・この戦闘 {s.burstsTotal} 回目)");
                 var pm = PassiveSkillManager.Instance;
                 var cm = pm != null && ReferenceEquals(pm.Context, ctx) ? CombatSystem.CombatManager.Instance : null;
                 if (cm != null)

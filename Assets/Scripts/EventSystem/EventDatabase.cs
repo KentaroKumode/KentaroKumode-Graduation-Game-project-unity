@@ -51,9 +51,9 @@ namespace EventSystem
                 }
                 var parsed = EventParser.ParseAll(asset.text);
                 all.AddRange(parsed);
-                Debug.Log($"[EventDatabase] {path}: {parsed.Count} 件");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[EventDatabase] {path}: {parsed.Count} 件");
             }
-            Debug.Log($"[EventDatabase] 合計 {all.Count} イベント読み込み完了");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[EventDatabase] 合計 {all.Count} イベント読み込み完了");
         }
 
         /// <summary>

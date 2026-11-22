@@ -405,7 +405,7 @@ namespace ItemSystem.PassiveSkills
         {
             if (enemyRecurrentTruth)
             {
-                UnityEngine.Debug.Log($"[回帰性真理] 最大HP変更 ({enemyMaxHP}→{value}) を拒否");
+                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[回帰性真理] 最大HP変更 ({enemyMaxHP}→{value}) を拒否");
                 return;
             }
             enemyMaxHP = value;
@@ -481,7 +481,7 @@ namespace ItemSystem.PassiveSkills
                 int absorbed = Keywords.Kw.AbsorbShield(this, dmg, isAttack: false);
                 dmg -= absorbed;
                 dbgShieldToChip += absorbed;
-                UnityEngine.Debug.Log($"[軽減無視] シールドが {absorbed} 肩代わり (残シールド {consShield})");
+                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[軽減無視] シールドが {absorbed} 肩代わり (残シールド {consShield})");
                 if (dmg <= 0) return 0;
             }
 
@@ -881,7 +881,7 @@ namespace ItemSystem.PassiveSkills
             int poison = GetStatus(StatusTarget.Enemy, "poison");
             if (poison > 0) enemyStatusStacks["poison"] = poison / 2;
             if (bleed > 0 || poison > 0)
-                UnityEngine.Debug.Log($"[回帰性真理] 毒/出血を半減 (毒 {poison}→{poison / 2} / 出血 {bleed}→{bleed / 2})");
+                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[回帰性真理] 毒/出血を半減 (毒 {poison}→{poison / 2} / 出血 {bleed}→{bleed / 2})");
         }
 
         /// <summary>現在スタック数（未付与は0）。</summary>
@@ -993,7 +993,7 @@ namespace ItemSystem.PassiveSkills
                     // 攻撃+10 (consDiceRoll: 攻撃値へ加算) / 最終与ダメージ+10 (consAtkBurst: 与ダメ倍率の後に加算) を流用
                     consDiceRoll += 10;
                     consAtkBurst += 10;
-                    UnityEngine.Debug.Log("[痛覚遮断剤] HP=1 維持確認 → 攻撃+10/最終与ダメージ+10。 攻撃終了時に死亡。");
+                    if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log("[痛覚遮断剤] HP=1 維持確認 → 攻撃+10/最終与ダメージ+10。 攻撃終了時に死亡。");
                 }
             }
 

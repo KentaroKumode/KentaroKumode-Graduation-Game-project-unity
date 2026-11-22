@@ -231,7 +231,7 @@ namespace GameLoop
             if (run != null && run.OwnsPassive(ItemIds.HeavenlyCraft))
             {
                 run.heavenlyCraftUpgrades++;
-                Debug.Log($"[天工開物] 武器強化 → 以後の爆発の基礎 +{ItemSystem.PassiveSkills.Effects.TenkouKaibutsu.PerUpgrade * run.heavenlyCraftUpgrades}");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[天工開物] 武器強化 → 以後の爆発の基礎 +{ItemSystem.PassiveSkills.Effects.TenkouKaibutsu.PerUpgrade * run.heavenlyCraftUpgrades}");
             }
             return true;
         }

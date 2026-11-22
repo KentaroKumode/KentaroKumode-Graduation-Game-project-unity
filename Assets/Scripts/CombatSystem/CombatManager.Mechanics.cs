@@ -61,7 +61,7 @@ namespace CombatSystem
                 case 3: label = "第四段：天与";     break;
                 default: return false;   // p4 または非ヴェスカ
             }
-            Debug.Log($"[ヴェスカ連戦] {id} 撃破 → {label} へ移行 (戦闘終了前に確定)");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[ヴェスカ連戦] {id} 撃破 → {label} へ移行 (戦闘終了前に確定)");
             var ctx = PassiveSkillManager.Instance?.Context;
             // 計測は SwapEnemy 側で一元化 (ここで重ねると二重計上になる)
             SwapEnemy(next, label);
@@ -295,7 +295,7 @@ namespace CombatSystem
                 {
                     playerHP -= DiePassives.GambleHpCost;
                     ctx.playerCurrentHP = playerHP;
-                    Debug.Log($"[賽] 賭場の賽: 振り直しの代わりに HP −{DiePassives.GambleHpCost} → {playerHP}");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[賽] 賭場の賽: 振り直しの代わりに HP −{DiePassives.GambleHpCost} → {playerHP}");
                 }
 
                 for (int k = 0; k < rerollIdx.Count; k++)
@@ -319,7 +319,7 @@ namespace CombatSystem
                 ctx.rerollsThisTurn++;
                 CombatStats.RerollStats[0]++; CombatStats.RerollStats[1] += rerollIdx.Count; CombatStats.RerollStats[2] += cost;
                 MetaProgression.Achievements.AchievementService.NoteReroll();
-                Debug.Log($"[リロール] 戦闘{ctx.rerollsThisCombat}回目 {rerollIdx.Count}個 (全部) / 充電-{cost} → 残{ctx.GetCharge()}");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[リロール] 戦闘{ctx.rerollsThisCombat}回目 {rerollIdx.Count}個 (全部) / 充電-{cost} → 残{ctx.GetCharge()}");
                 attempt++;
             }
 
@@ -388,7 +388,7 @@ namespace CombatSystem
             run.totalCombatTurns++;
             int th = MetaProgression.MetaDebuffApplicator.GetJudgmentTurnThreshold();
             if (th > 0 && run.totalCombatTurns == th)
-                Debug.Log($"[最後の審判] 刻限到来 (累計{run.totalCombatTurns}T >= {th}) → 以後の敵の攻撃 +%");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[最後の審判] 刻限到来 (累計{run.totalCombatTurns}T >= {th}) → 以後の敵の攻撃 +%");
         }
 
         // 役の判定で使う一時バッファ。 毎ターン new すると GC を踏むので使い回す。
@@ -423,7 +423,7 @@ namespace CombatSystem
                 if (prev >= 0)
                 {
                     YachtRoleEffects.Apply((RoleKind)prev, tier, ctx, ref outcome);
-                    Debug.Log($"[宿命の刻み目] 前のターンの役〈{YachtRoles.NameOf((RoleKind)prev)}〉の効果がもう 1 回働く");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[宿命の刻み目] 前のターンの役〈{YachtRoles.NameOf((RoleKind)prev)}〉の効果がもう 1 回働く");
                 }
             }
 
@@ -467,7 +467,7 @@ namespace CombatSystem
             {
                 var names = new string[ctx.firedRolesThisTurn.Count];
                 for (int i = 0; i < names.Length; i++) names[i] = YachtRoles.NameOf(ctx.firedRolesThisTurn[i]);
-                Debug.Log($"[役] T{ctx.currentTurn} 発動: {string.Join("/", names)}");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[役] T{ctx.currentTurn} 発動: {string.Join("/", names)}");
             }
             return outcome;
         }
@@ -500,7 +500,7 @@ namespace CombatSystem
             if (p <= 0f || (p < 1f && !GameLoop.GameRng.Chance(p, OmniRngKey))) return;
             RoleOmniFired++;      // [計装]
             ctx.accumulatedValues[OmniTurnKey] = ctx.currentTurn;
-            Debug.Log($"[万象のゾロ目] 〈{YachtRoles.NameOf(k.Value)}〉をゾロ目として扱う ({p * 100f:0}%)");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[万象のゾロ目] 〈{YachtRoles.NameOf(k.Value)}〉をゾロ目として扱う ({p * 100f:0}%)");
         }
 
         /// <summary>〈鏡合わせの盤〉(2026-11-21): 2 個そろい <paramref name="k"/> の、 1 つ小さい目の 2 個そろいの効果を働かせる (役が立ったのではない ── 数えない)。
@@ -513,13 +513,13 @@ namespace CombatSystem
             {
                 YachtRoleEffects.AddNextTurn(ctx, YachtRoleEffects.FreeRerollKey, 1);
                 YachtRoleEffects.AddNextTurn(ctx, YachtRoleEffects.BlockNextKey, MirrorOneBlock);
-                Debug.Log($"[鏡合わせの盤] 特別・対 → 次のターンの無料の振り直し +1・ブロック +{MirrorOneBlock}");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[鏡合わせの盤] 特別・対 → 次のターンの無料の振り直し +1・ブロック +{MirrorOneBlock}");
                 return;
             }
             var m = YachtRoles.Of(face - 1, false);
             if ((ctx.sealedRoleMask & (1 << (int)m)) != 0) return;
             YachtRoleEffects.Apply(m, tier, ctx, ref outcome);
-            Debug.Log($"[鏡合わせの盤] 〈{YachtRoles.NameOf(k)}〉に重ねて〈{YachtRoles.NameOf(m)}〉の効果");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[鏡合わせの盤] 〈{YachtRoles.NameOf(k)}〉に重ねて〈{YachtRoles.NameOf(m)}〉の効果");
         }
 
         // 端子の状態のうち、 戦闘の情報 (accumulatedValues) を通して渡すキー。 **フィールドを増やさない**
@@ -537,7 +537,7 @@ namespace CombatSystem
             int before = takenDmg;
             takenDmg = Mathf.Max(0, Mathf.RoundToInt(takenDmg * (1f - outcome.damageTakenCutPct / 100f)));
             int saved = before - takenDmg;
-            Debug.Log($"[役] 守り: 被ダメ {before} → {takenDmg} (-{outcome.damageTakenCutPct}%)");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[役] 守り: 被ダメ {before} → {takenDmg} (-{outcome.damageTakenCutPct}%)");
             if (outcome.guardToShield && saved / 2 > 0 && ctx != null)
             {
                 int sh = saved / 2;
@@ -613,7 +613,7 @@ namespace CombatSystem
             }
             int add = Mathf.Max(1, Mathf.RoundToInt(extra));
             if (outcome.extraDamageTrue) dealtFixed += add; else dealtDmg += add;
-            Debug.Log($"[役] 追撃: 与ダメ {basis} の {outcome.extraDamageRatio:P0} = +{add}"
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[役] 追撃: 与ダメ {basis} の {outcome.extraDamageRatio:P0} = +{add}"
                     + (outcome.extraDamageTrue ? " (確定)" : "") + (crit ? " 会心" : ""));
         }
 
@@ -663,15 +663,15 @@ namespace CombatSystem
             string critStr = r.isCritical ? " ★CRITICAL★" : "";
             string winStr = r.isDraw ? "DRAW" : (r.playerWon ? "Player WIN" : "Enemy WIN");
 
-            Debug.Log($"[Turn {r.turnNumber}] {winStr}{critStr}");
-            Debug.Log($"  Player Dice: [{playerDiceStr}] = {r.playerDiceTotal}");
-            Debug.Log($"  Enemy  Dice: [{enemyDiceStr}] = {r.enemyDiceTotal}");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[Turn {r.turnNumber}] {winStr}{critStr}");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"  Player Dice: [{playerDiceStr}] = {r.playerDiceTotal}");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"  Enemy  Dice: [{enemyDiceStr}] = {r.enemyDiceTotal}");
             if (!r.isDraw)
             {
-                Debug.Log($"  Main: {r.mainDamage}, Pursuit: {r.pursuitDamage}, " +
+                if (Debug.unityLogger.logEnabled) Debug.Log($"  Main: {r.mainDamage}, Pursuit: {r.pursuitDamage}, " +
                           $"Total: {r.totalDamage}, Fixed: {r.fixedDamage}, Scratch: {r.scratchDamage}");
             }
-            Debug.Log($"  Player HP: {r.playerHPAfter}, Enemy HP: {r.enemyHPAfter}");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"  Player HP: {r.playerHPAfter}, Enemy HP: {r.enemyHPAfter}");
         }
     }
 }

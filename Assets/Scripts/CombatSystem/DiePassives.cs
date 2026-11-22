@@ -57,7 +57,7 @@ namespace CombatSystem
             if (ItemSystem.ItemDatabase.Instance?.GetItem(itemId)?.rarity != ItemSystem.ItemRarity.LEGENDARY) return;
             run.playerMaxHP = System.Math.Max(1, run.playerMaxHP - CursedMaxHpPerLegendary);
             if (run.playerHP > run.playerMaxHP) run.playerHP = run.playerMaxHP;
-            UnityEngine.Debug.Log($"[賽] 呪物の賽: LEGENDARY の秘宝を手に入れた → 最大 HP {run.playerMaxHP}");
+            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[賽] 呪物の賽: LEGENDARY の秘宝を手に入れた → 最大 HP {run.playerMaxHP}");
         }
 
         /// <summary>端子の結果へ賽のパッシブを足す。 <paramref name="v"/> は端子に入る目 (〈号令の剣〉の +1 の後)。</summary>
@@ -145,7 +145,7 @@ namespace CombatSystem
             if (die == DieIds.Scavenger && Has(dice, 1))
             {
                 GoldIncome.Gain(run, ScavengerGold, "拾い物の賽");
-                UnityEngine.Debug.Log($"[賽] 拾い物の賽: ①が出た → +{ScavengerGold}G");
+                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[賽] 拾い物の賽: ①が出た → +{ScavengerGold}G");
             }
             else if (die == DieIds.OldCoin)
             {
@@ -154,7 +154,7 @@ namespace CombatSystem
                 if (eights > 0)
                 {
                     GoldIncome.Gain(run, OldCoinGold * eights, "古銭の賽");
-                    UnityEngine.Debug.Log($"[賽] 古銭の賽: ⑧ × {eights} → +{OldCoinGold * eights}G");
+                    if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[賽] 古銭の賽: ⑧ × {eights} → +{OldCoinGold * eights}G");
                 }
             }
         }
@@ -177,7 +177,7 @@ namespace CombatSystem
             if (term.attackDice >= RewindNeed && Escalation.EffectiveStage(escTurn) > Escalation.MinStage)
             {
                 Escalation.StageOffset++;
-                UnityEngine.Debug.Log($"[賽] 逆巻きの賽: 段階を 1 つ下げた → {Escalation.EffectiveStage(escTurn)}");
+                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[賽] 逆巻きの賽: 段階を 1 つ下げた → {Escalation.EffectiveStage(escTurn)}");
             }
             int s = Escalation.EffectiveStage(escTurn);
             if (s < 0) ctx.outgoingDamageMultiplier += Escalation.NegativeStageBuff(-s);

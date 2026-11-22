@@ -194,7 +194,7 @@ namespace ItemSystem
                 itemDict = null;
                 Initialize();
                 
-                Debug.Log($"[ItemDatabase] Loaded {items.Count} items from JSON");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[ItemDatabase] Loaded {items.Count} items from JSON");
                 
                 #if UNITY_EDITOR
                 UnityEditor.EditorUtility.SetDirty(this);

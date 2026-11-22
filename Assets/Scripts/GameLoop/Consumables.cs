@@ -62,7 +62,7 @@ namespace GameLoop
                 ctx.accumulatedValues[RapierReleaseTurnKey] = ctx.currentTurn + 1;
                 var deck = CombatManager.Instance?.TerminalDeck;
                 if (deck != null) deck.state.extraDrawNext += RapierReleaseDraw;
-                Debug.Log($"[レイピア] コントラタック解除: 次のターン 手札 +{RapierReleaseDraw}・攻撃は会心確定"
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[レイピア] コントラタック解除: 次のターン 手札 +{RapierReleaseDraw}・攻撃は会心確定"
                         + (run.defeatedSaintGeorges ? $"・会心倍率 +{RapierReleaseCritMul:0.0} (真の決闘術)" : ""));
             }
             return true;
@@ -115,7 +115,7 @@ namespace GameLoop
             int useCap = MetaProgression.MetaDebuffApplicator.GetBattleConsumableCap();
             if (useCap > 0 && lockCtx != null && lockCtx.GetAccumulated(BattleUseKey) >= useCap)
             {
-                Debug.Log($"[Consumables] この戦闘ではもう使えない ({useCap} 個まで)");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[Consumables] この戦闘ではもう使えない ({useCap} 個まで)");
                 return false;
             }
 
@@ -127,7 +127,7 @@ namespace GameLoop
                 if (!ItemSystem.PassiveSkills.Effects.BottomlessVial.TryKeep(lockCtx, run, id)) Consume(run, id);
                 MetaProgression.Achievements.AchievementService.NoteConsumableUsed();
                 NoteVescaPhaseUse();
-                Debug.Log($"[Consumables] 使用: {id}");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[Consumables] 使用: {id}");
                 // 消耗品の連動品の出来事 (2026-11-20・item-overhaul-spec §2-2)。 戦闘中だけ
                 if (lockCtx != null) ItemSystem.PassiveSkills.Keywords.Kw.Raise(lockCtx, PassiveSkillTrigger.OnConsumableUse, System.Math.Max(1, ItemIds.ConsTierOf(id)));
             }
@@ -348,7 +348,7 @@ namespace GameLoop
             switch (id)
             {
                 case ItemIds.TacticSwap:
-                    Debug.Log($"[入れ替えの符] 手札を捨てて {dk.SwapHand()} 枚引き直した");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[入れ替えの符] 手札を捨てて {dk.SwapHand()} 枚引き直した");
                     return true;
                 case ItemIds.TacticOil:
                     dk.state.ignoreCond = true;      // 〈無形の構え〉の「条件を無視」と同じ旗 (このターンだけ・BeginTurn が戻す)
@@ -361,7 +361,7 @@ namespace GameLoop
                     int before = ctx.enemyDefense;
                     ctx.enemyDefense = Mathf.Max(0, ctx.enemyDefense - AcidDefenseCut);
                     ctx.accumulatedValues[CombatManager.TacticAcidKey] = ctx.GetAccumulated(CombatManager.TacticAcidKey) + 1f;
-                    Debug.Log($"[鎧割りの酸瓶] 敵の防御 {before} → {ctx.enemyDefense} (この戦闘中)");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[鎧割りの酸瓶] 敵の防御 {before} → {ctx.enemyDefense} (この戦闘中)");
                     return true;
                 }
                 case ItemIds.TacticNeedle:
@@ -383,7 +383,7 @@ namespace GameLoop
                     if (s < 0) return false;
                     string copied = dk.board[s];
                     dk.AddToHand(copied, MercuryCopies);
-                    Debug.Log($"[複製の水銀] 〈{copied}〉の写しを {MercuryCopies} 枚手札に (この戦闘の間だけ)");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[複製の水銀] 〈{copied}〉の写しを {MercuryCopies} 枚手札に (この戦闘の間だけ)");
                     return true;
                 }
                 default: return false;
