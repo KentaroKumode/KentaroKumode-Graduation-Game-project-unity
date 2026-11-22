@@ -586,6 +586,7 @@ namespace AutoTest
                     if (s == null || s.sold
                         || s.price > GameLoop.ProvisionPayment.PolicyAffordable(run) - _shopReserve)
                         return false;
+                    if (s.kind == ItemSystem.Shop.ShopSlotKind.Passive && BotHooks.BlocksFocusSlot(run, s.itemId)) return false;   // 寄せる軸の最後の枠を残す
                     int before = run.coins;
                     string id = s.itemId;
                     gm.ShopBuy(i);

@@ -113,6 +113,7 @@ namespace AutoTest
         /// 乱数は引かない。</summary>
         public static bool WantsPassive(RunState run, string id)
         {
+            if (BlocksFocusSlot(run, id)) return false;
             var d = ItemSystem.ItemDatabase.Instance?.GetItem(id);
             if (d == null || !d.IsPassive || !ItemSystem.AxisPool.IsRanked(d.axis) || InFocus(d.axis)) return true;
             int first = 0, second = 0, held = 0;
@@ -128,6 +129,17 @@ namespace AutoTest
             // 〈銭皿〉(見送り換金 +50%): 一番の軸でない BRONZE は見送る (23G の方が重い)
             if (d.rarity == ItemSystem.ItemRarity.BRONZE && mine < first && run.OwnsPassive(ItemIds.GoldCoinDish)) return false;
             return mine >= second;
+        }
+
+        /// <summary>寄せる軸 (<see cref="AxisFocus"/>) がまだ出現の枠に無く、 空きが残り 1 枠の時、 枠に無い別の軸の品か (取ると寄せる軸が枠に入れず、 以後その軸が出ない)。
+        /// 2026-11-22: 毒の寄せで 19% のランが枠に入れず自軸 0 個だった (G5)。 full-item-rework-spec §1-3 の「4 枠の純度を守る」。</summary>
+        public static bool BlocksFocusSlot(RunState run, string id)
+        {
+            if (string.IsNullOrEmpty(AxisFocus) || run?.lockedAxes == null) return false;
+            if (run.lockedAxes.Count != ItemSystem.AxisPool.LockSlots - 1) return false;
+            foreach (var a in run.lockedAxes) if (InFocus(a)) return false;
+            var d = ItemSystem.ItemDatabase.Instance?.GetItem(id);
+            return d != null && d.IsPassive && ItemSystem.AxisPool.IsRanked(d.axis) && !InFocus(d.axis) && !run.lockedAxes.Contains(d.axis);
         }
 
         /// <summary>提示から、 欲しい品 (<see cref="WantsPassive"/>) の中で買いの点が一番の品を選ぶ。 欲しい品が無ければ −1 (見送り換金)。</summary>
