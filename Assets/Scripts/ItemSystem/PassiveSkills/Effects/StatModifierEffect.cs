@@ -88,7 +88,7 @@ namespace ItemSystem.PassiveSkills.Effects
         private readonly int[] _perMax;       // 0 = 上限なし
 
         /// <summary>段 3 の単位数の出どころ。 式は旧クラスのものをそのまま写している。</summary>
-        private enum Per { None, CoinsSpent, Axis, EnemyBleed, EnemyPoison, ChargeSpent, TurnsElapsed, SwordWindfall }
+        private enum Per { None, Axis, EnemyBleed, TurnsElapsed, Coins, SwordShopSpent }
 
         public StatModifierEffect(string skillId, StatJson[] stats, IPassiveSkillEffect inner = null)
         {
@@ -182,11 +182,9 @@ namespace ItemSystem.PassiveSkills.Effects
             }
             switch (name)
             {
-                case "coinsSpent":   return Per.CoinsSpent;
-                case "swordWindfall": return Per.SwordWindfall;      // 溶金の領主剣 (RunState.swordWindfallGold)
+                case "coins":        return Per.Coins;               // 今の所持ゴールド (溶金の領主剣)
+                case "swordShopSpent": return Per.SwordShopSpent;    // 溶金の領主剣 (RunState.swordShopSpent)
                 case "enemyBleed":   return Per.EnemyBleed;
-                case "enemyPoison":  return Per.EnemyPoison;
-                case "chargeSpent":  return Per.ChargeSpent;
                 case "turnsElapsed": return Per.TurnsElapsed;
             }
             UnityEngine.Debug.LogError($"[StatModifierEffect] {skillId}: 未知の単位 per='{name}'");
@@ -216,12 +214,10 @@ namespace ItemSystem.PassiveSkills.Effects
             int q;
             switch (_per[i])
             {
-                case Per.CoinsSpent:   q = GameLoop.GameManager.Instance?.Run?.coinsSpent ?? 0; break;
-                case Per.SwordWindfall: q = GameLoop.GameManager.Instance?.Run?.swordWindfallGold ?? 0; break;
+                case Per.Coins:        q = GameLoop.GameManager.Instance?.Run?.coins ?? 0; break;
+                case Per.SwordShopSpent: q = GameLoop.GameManager.Instance?.Run?.swordShopSpent ?? 0; break;
                 case Per.Axis:         q = ctx.AxisDepth(_perAxis[i]); break;
                 case Per.EnemyBleed:   q = ctx.enemyBleedStacks; break;
-                case Per.EnemyPoison:  q = ctx.EnemyPoison; break;
-                case Per.ChargeSpent:  q = (int)ctx.GetAccumulated(CombatContext.ChargeSpentThisTurnKey); break;
                 case Per.TurnsElapsed: q = System.Math.Max(0, ctx.currentTurn - 1); break;
                 default:               return 0;
             }
@@ -439,7 +435,7 @@ namespace ItemSystem.PassiveSkills.Effects
             {
                 case StatKeys.Attack:
                 {
-                    // 端数は切り捨て (旧〈雷神槍〉の FloorToInt(使った充電 × 0.5))。 0 なら足さない。
+                    // 端数は切り捨て。 0 なら足さない。
                     int add = UnityEngine.Mathf.FloorToInt(v * n);
                     if (add != 0) ctx.AddPlayerAttackOrDiceBonus(add);
                     break;

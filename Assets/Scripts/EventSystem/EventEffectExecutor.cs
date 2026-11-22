@@ -128,7 +128,6 @@ namespace EventSystem
                     run.coins = Mathf.Max(0, run.coins + delta);
                     result.log.Add($"ゴールド{delta:+0;-0} (現在 {run.coins})");
                     if (delta > 0) result.NoteGain(MapSystem.FreeMove.EventGainKind.Gold);
-                    if (delta > 0) GameLoop.GoldIncome.CountWindfall(run, GameLoop.GoldOrigin.Event, delta);   // 溶金の領主剣 (額は変えず数えるだけ)
                     break;
                 }
 
@@ -348,7 +347,7 @@ namespace EventSystem
                     {
                         // 人が遊んでいる時は地図へ戻ってからの選択画面へ預ける。 BOT は GameHooks で今選ぶ (乱数の消費は同じ)
                         string got = gm.OfferPassiveChoice(cands);
-                        result.log.Add(got == null ? $"秘宝を {cands.Count} つから 1 つ選ぶ" : $"秘宝獲得: {ResolveLabel(got)}");
+                        result.log.Add(got == null ? $"秘宝を {cands.Count} つから 1 つ選ぶ" : got == "" ? "秘宝を見送った" : $"秘宝獲得: {ResolveLabel(got)}");
                     }
                     else
                     {
@@ -439,7 +438,7 @@ namespace EventSystem
                     if (gm != null)
                     {
                         string got = gm.OfferPassiveChoice(cands);
-                        result.log.Add(got == null ? $"{axis}の秘宝を {cands.Count} つから 1 つ選ぶ" : $"秘宝獲得: {ResolveLabel(got)}");
+                        result.log.Add(got == null ? $"{axis}の秘宝を {cands.Count} つから 1 つ選ぶ" : got == "" ? "秘宝を見送った" : $"秘宝獲得: {ResolveLabel(got)}");
                     }
                     else
                     {
@@ -602,7 +601,7 @@ namespace EventSystem
                 ApplyPassiveAcquisitionBonus(run, id, result);
             }
             run.weaponMaterials += 8;
-            GameLoop.GoldIncome.Gain(run, 60, "観測所の写し", GameLoop.GoldOrigin.Event);
+            GameLoop.GoldIncome.Gain(run, 60, "観測所の写し");
             run.playerHP = run.playerMaxHP;
 
             UnityEngine.Debug.Log($"[観測所] 写しの上乗せ: パッシブ{(string.IsNullOrEmpty(id) ? "なし" : ResolveLabel(id))}"
@@ -639,6 +638,13 @@ namespace EventSystem
                 if (ex.Count > 0) filtered = ex;
             }
 
+            // 秘宝: 出現の枠と 2 段階の軸均等の抽選 (軸か枠外に絞ってからレア度で引く・full-item-rework-spec §1-2)。 軸の指定がある時は、 その軸が枠に無ければ出さない
+            if (category == ItemCategory.Passive)
+            {
+                filtered = ItemSystem.AxisPool.Narrow(run ?? GameLoop.GameManager.Instance?.Run, filtered, "event.axis");
+                if (filtered.Count == 0) return null;
+            }
+
             // 呪物の賽: イベントの秘宝は LEGENDARY の重み ×3 (ADR-0016)
             float legMul = category == ItemCategory.Passive ? CombatSystem.DiePassives.LegendaryOfferMul(run ?? GameLoop.GameManager.Instance?.Run) : 1f;
             var picked = ItemSystem.RarityWeightedPicker.Pick(filtered, null, 0f, legMul);
@@ -661,7 +667,7 @@ namespace EventSystem
             {
                 case GameLoop.ConvictionSystem.IdResolve:
                 {
-                    int gain = GameLoop.GoldIncome.Gain(run, 1, "イベント(決意)", GameLoop.GoldOrigin.Event);
+                    int gain = GameLoop.GoldIncome.Gain(run, 1, "イベント(決意)");
                     result.log.Add($"決意の獲得ボーナス: +{gain}ゴールド");
                     break;
                 }

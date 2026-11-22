@@ -11,7 +11,7 @@ namespace CombatSystem
     {
         /// <summary>
         /// プレイヤー勝利時の与ダメージ修飾（ProcessDamage後〜敵HP適用前）。適用順:
-        /// 画竜点睛 → 与ダメ倍率 (パッシブ・メタ・遺物・研磨剤・鬼火の油を 1 つのプールで加算) → 攻撃バースト → メタ会心 → 向かい風
+        /// 与ダメ倍率 (パッシブ・メタ・遺物・研磨剤・鬼火の油を 1 つのプールで加算) → 攻撃バースト → メタ会心 → 向かい風
         /// → 敵被ダメ軽減(灰塵等の OnPreReceiveDamage) → 基礎防御%(利刃で相殺) → 勝利時最低保証
         /// → 狂暴化 → メタ俊敏回避。
         /// </summary>
@@ -41,14 +41,6 @@ namespace CombatSystem
         private int ApplyWinDamageModifiers(int totalDmg, ref int fixedDmg, ref bool isCrit,
                                             int lbStage, PassiveSkillManager psm, CombatContext ctx)
         {
-            // 画竜点睛: ダメージ＝(出目+10)×会心倍率、会心確定
-            if (ctx.garyoProc)
-            {
-                totalDmg = Mathf.CeilToInt((ctx.garyoDieValue + 10) * ctx.criticalMultiplier);
-                isCrit = true;
-                Debug.Log($"[画竜点睛] 確定会心 {totalDmg} ダメ (出目{ctx.garyoDieValue}+10 ×{ctx.criticalMultiplier})");
-            }
-
             // 与ダメ倍率の内訳計測 (診断用)。 **ここへ来る時点で outgoing にはパッシブ由来が
             // 既に積まれている** (OnPreDealDamage は ProcessDamage の中で発火するため)。
             // 以降の 業物/メタ/遺物 の増分と分けて記録する。
@@ -126,8 +118,7 @@ namespace CombatSystem
 
             // 瞬間研磨剤 (剣士スターター・2026-07-27 リワーク): 次の 1 撃だけ 与ダメージ+150%。
             // 旧「ダイス合計+[本数×2]」は相互攻撃モデルで無効だったため倍率へ移設。
-            // 無我無心 (rollPurity) 中は消費アイテム由来の補正を受けない規約に従い不発。
-            if (ctx.polishArmed && !ctx.rollPurity)
+            if (ctx.polishArmed)
             {
                 if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
                 ctx.outgoingDamageMultiplier += 1.5f;
@@ -147,12 +138,13 @@ namespace CombatSystem
             }
 
             // 与ダメ倍率（激情の刃 等のパッシブ由来 + メタ% + 遺物 + 研磨剤 + 鬼火の油）
-            if (ctx.outgoingDamageMultiplier > 0f
-                && Mathf.Abs(ctx.outgoingDamageMultiplier - 1f) > 0.001f)
+            //   + この 1 撃だけの池への上乗せ (〈加重の拳套〉・ctx.hitOutgoingPct)
+            float outMul = (ctx.outgoingDamageMultiplier > 0f ? ctx.outgoingDamageMultiplier : 1f) + ctx.hitOutgoingPct / 100f;
+            if (Mathf.Abs(outMul - 1f) > 0.001f)
             {
                 int orig = totalDmg;
-                totalDmg = Mathf.CeilToInt(totalDmg * ctx.outgoingDamageMultiplier);
-                Debug.Log($"[CombatManager] 与ダメ補正 ×{ctx.outgoingDamageMultiplier:F2}: {orig}→{totalDmg}");
+                totalDmg = Mathf.CeilToInt(totalDmg * outMul);
+                Debug.Log($"[CombatManager] 与ダメ補正 ×{outMul:F2}: {orig}→{totalDmg}");
             }
             if (CombatStats.DiagWinAttack)
             {
@@ -188,7 +180,7 @@ namespace CombatSystem
             totalDmg = EnemyHpLedger.ProbeMain(totalDmg);
             // 最終与ダメージ倍率 (2026-11-20・GAME.md §23-32・〈防人の軍標〉): すべての倍率の後・敵の軽減パッシブと防御の前 (怠惰の直前)。
             //   主攻撃以外は敵の HP を減らす口 (HpLossDiag.Lose) で掛ける
-            totalDmg = ItemSystem.PassiveSkills.Keywords.Kw.ApplyFinalDamage(ctx, totalDmg, ctx.hitFinalDamagePct);   // この 1 撃だけの上乗せ (〈加重の拳套〉) も足す
+            totalDmg = ItemSystem.PassiveSkills.Keywords.Kw.ApplyFinalDamage(ctx, totalDmg, ctx.hitFinalDamagePct);   // この 1 撃だけの上乗せ (〈血桜〉〈血の楔〉・オーバークロック) も足す
             // 大罪:怠惰 (挑戦カード IV・2026-11-11) /〈徒労〉の戦闘のデバフ (2026-11-14・GameHooks.ToilDamageDownPct・既定 50): 主攻撃の最終ダメージ −N%
             //   (すべての倍率の後・敵の防御の前)。 2 つが重なったら厳しい方 1 つ (BattleBoonRule.OutgoingCutPct)
             totalDmg = MetaProgression.MetaDebuffApplicator.ApplyOutgoingCut(totalDmg);   // 主攻撃以外は敵の HP を減らす口 (HpLossDiag.Lose) で掛ける
@@ -203,7 +195,7 @@ namespace CombatSystem
             int ledgerBeforeRed = totalDmg;   // [計装] 敵の軽減パッシブで削られた量
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnPreReceiveDamage);
             totalDmg = System.Math.Max(0, ctx.finalDamage);
-            // 〈血の楔〉(2026-11-20・§23-32): 敵の軽減パッシブで減った量のうち 出血 ÷ (出血 + 40) を戻す (効き目を弱める)
+            // 〈血の楔〉(2026-11-20・§23-32): 敵の軽減パッシブで減った量のうち 出血 ÷ (出血 + 30) を戻す (効き目を弱める)
             if (ctx.bleedWedge && ledgerBeforeRed > totalDmg)
             {
                 int cut = ledgerBeforeRed - totalDmg;
@@ -222,9 +214,13 @@ namespace CombatSystem
             {
                 Debug.Log($"[急所] 会心 → 敵の防御{ctx.enemyDefense} を無視");
             }
+            else if (ctx.hitIgnoreDefense && ctx.enemyDefense > 0 && totalDmg > 0)
+            {
+                Debug.Log($"[防御の無視] この撃は敵の防御{ctx.enemyDefense} を無視 (破城斧・急所の 2 撃目以降・連刃の追撃)");
+            }
             else if (ctx.enemyDefense > 0 && totalDmg > 0)
             {
-                int effDef = DefenseFormula.Effective(ctx.enemyDefense, ctx.playerArmorPen + (isCrit ? ctx.critArmorPen : 0));
+                int effDef = DefenseFormula.Effective(ctx.enemyDefense, ctx.playerArmorPen + ctx.hitArmorPen + (isCrit ? ctx.critArmorPen : 0));
                 if (effDef > 0)
                 {
                     int beforeDef = totalDmg;
@@ -373,7 +369,7 @@ namespace CombatSystem
                 Debug.Log("[CombatManager] 共助発動: 敵の最初の攻撃を半減");
             }
 
-            // 〈死相の面頬〉(2026-11-20・§23-32): 会心したターン、 そのターンの敵の攻撃を (会心倍率 − 1) × 20% 減らす (最大 −50%・切り捨てで減らす)
+            // 〈死相の面頬〉: 会心したターン、 そのターンの敵の攻撃を (会心倍率 − 1) × 25% 減らす (最大 −60%・切り捨てで減らす)
             {
                 float maskCut = ItemSystem.PassiveSkills.Effects.DeathMaskVisor.CutNow(ctx);
                 if (maskCut > 0f && totalDmg > 0)
@@ -396,7 +392,7 @@ namespace CombatSystem
             int shieldAbsorbed = 0;
             if (ctx.consShield > 0 && totalDmg > 0)
             {
-                // 吸収・割れの出来事を配る (2026-10-31)。 吸収に応じて品が敵へ返す分 (〈鏡返しの小盾〉) はここで使う。
+                // 吸収・割れの出来事を配る (2026-10-31)
                 int absorbed = ItemSystem.PassiveSkills.Keywords.Kw.AbsorbShield(ctx, totalDmg, isAttack: true);
                 totalDmg -= absorbed;
                 shieldAbsorbed = absorbed;
@@ -404,13 +400,6 @@ namespace CombatSystem
                 ctx.dbgShieldToNormal += absorbed;   // [計装] チップ側との配分を見る
                 ctx.shieldAbsorbedAttackThisTurn += absorbed;   // 灰燼の王の〈烈炎〉が読む (主攻撃の肩代わりだけ・2026-11-14)
                 Debug.Log($"[CombatManager] シールド吸収 {absorbed} (残{ctx.consShield})");
-                int reflect = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.ReflectKey);
-                if (reflect > 0)
-                {
-                    HpLossDiag.Lose(ref enemyHP, reflect, "反射(シールドの返し)");
-                    ctx.accumulatedValues[ItemSystem.PassiveSkills.Keywords.Kw.ReflectKey] = 0;
-                    Debug.Log($"[シールドの返し] {reflect} → 敵HP {enemyHP}");
-                }
             }
 
             // 〈シュヴァリエのレイピア〉のコントラタック (2026-11-20 作り直し): ブロックとシールドで防いだダメージの 2 倍を敵へ軽減不可で返す。

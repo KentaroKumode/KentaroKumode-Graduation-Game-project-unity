@@ -31,6 +31,26 @@ namespace CombatSystem
 
         /// <summary>[計装 #6] 挑戦カード〈金で殴る〉で払った金の累計 (G) / 払ったターンの累計。 プロセスの中で累計し続ける (読む側が差分を取る)。</summary>
         public static long GoldPunchPaidTotal, GoldPunchTurnsTotal;
+        /// <summary>[計装] 【再起動】した回数 / 【オーバークロック】した回数 (ランの始めに BOT が 0 へ戻す・ランの記録の rebootFired / overclockFired)。</summary>
+        public static long RebootFired, OverclockFired;
+        /// <summary>[計装] 【起爆】した回数 (ランの始めに BOT が 0 へ戻す・ランの記録の detonateFired)。</summary>
+        public static long DetonateFired;
+        /// <summary>[計装] 【ジャスト防御】が成立した回数 (ランの始めに BOT が 0 へ戻す・ランの記録の justGuardFired)。</summary>
+        public static long JustGuardFired;
+        /// <summary>[計装] 秘宝が敵の出血を使った回数 (Kw.ConsumeBleed・〈血桜〉〈紅の搾り具〉) / 〈百人切りの鉈〉で処刑した回数 (ランの始めに BOT が 0 へ戻す・ランの記録の bleedSpendFired / bleedExecuteFired)。</summary>
+        public static long BleedSpendFired, BleedExecuteFired;
+        /// <summary>[計装] 臨界の爆発の回数 / 〈柱折りの発破筒〉が爆発のひびを正規のダウンへ割った回数 (ランの始めに BOT が 0 へ戻す・ランの記録の burstFired / burstBreakFired)。</summary>
+        public static long BurstFired, BurstBreakFired;
+        /// <summary>[計装] 超過会心率 (100% 超え) が会心倍率になった会心の回数 / 〈天眼の鍔〉で処刑した回数 / 〈必殺の照準器〉がもう 1 回発火した回数
+        /// (ランの始めに BOT が 0 へ戻す・ランの記録の critOverflowFired / critExecuteFired / critRefireFired)。</summary>
+        public static long CritOverflowFired, CritExecuteFired, CritRefireFired;
+        /// <summary>[計装] 使い捨ての端子を使った回数 / 山札を切り直した回数 (ランの始めに BOT が 0 へ戻す・ランの記録の deckDisposeFired / deckShuffleFired)。</summary>
+        public static long DeckDisposeFired, DeckShuffleFired;
+        /// <summary>[計装] 役が成立した回数 / 〈万象のゾロ目〉が 2 個そろいをゾロ目として扱った回数 (ランの始めに BOT が 0 へ戻す・ランの記録の roleFormedFired / roleOmniFired)。</summary>
+        public static long RoleFormedFired, RoleOmniFired;
+        /// <summary>[計装] 武器: 〈連刃〉の追撃 / 〈処刑〉で倒した / 〈画竜点睛〉が働いた撃 / 〈シールドバッシュ〉でシールドを攻撃にした
+        /// (ランの始めに BOT が 0 へ戻す・ランの記録の weaponChainFired / weaponExecuteFired / weaponGaryoFired / weaponBashFired)。</summary>
+        public static long WeaponChainFired, WeaponExecuteFired, WeaponGaryoFired, WeaponBashFired;
 
         /// <summary>〈猫の手〉がこのターン先に挿した出目 (−1 = 無し)。 BOT の挿し方の方策はこの 1 組を固定として扱う (外さない)。</summary>
         public int CatPawDie => _catDie;
@@ -56,9 +76,14 @@ namespace CombatSystem
             else runDeck = TerminalCards.StartingDeck();
             _deck = new TerminalDeckState();
             _deck.BeginBattle(runDeck);
-            // 采配の品 (2026-11-20・段 1-e): 端子の解決と山札の出し入れを変える品の旗 (本体も BOT の写しも state から読む)
+            // 山札の品: 端子の解決と山札の出し入れを変える品の旗 (本体も BOT の写しも state から読む)
             _deck.state.deckItems = TerminalCards.DeckItemsOf(run);
             _deck.state.roleItems = TerminalCards.RoleItemsOf(run);      // 賽目の品 (2026-11-21・段 1-f)
+            _deck.state.chargeItems = ChargeCore.ItemsOf(run);           // 充電の品 (再起動・オーバークロック・2026-11-21)
+            _deck.state.poisonItems = PoisonCore.ItemsOf(run);           // 毒の品 (端子の解決の 5d・起爆の式・2026-11-21)
+            _deck.state.shieldItems = ShieldCore.ItemsOf(run);           // シールドの品 (端子の解決の 5e・ジャスト防御の許容幅・2026-11-21)
+            _deck.state.bleedItems = BleedCore.ItemsOf(run);             // 出血の品 (端子の解決の 5f・撃ごとの出血・2026-11-21)
+            _deck.state.heatItems = HeatCore.ItemsOf(run);               // 臨界の品 (爆発の式・端子の解決の 5g・2026-11-21)
             if (AxisRules.Owns(run, GameLoop.ItemIds.DeckSparePlug)) _deck.state.extraDrawNext += TerminalCards.SparePlugDraw;      // 〈予備の差込口〉: 1 ターン目に多く引く
             _deck.state.extraDrawNext += MetaProgression.MetaBuffApplicator.GetSparkDeckOpeningDraw();      // 種火・山札 (2026-11-21): 1 ターン目の手札 +1
             if (AxisRules.Owns(run, GameLoop.ItemIds.DeckToolbox) && runDeck.Count <= TerminalCards.ToolboxMaxDeck)
@@ -145,7 +170,7 @@ namespace CombatSystem
             e.bursts = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.BurstTotalKey);
             e.axCrit = ctx.AxisDepth(AxisRules.Crit); e.axBleed = ctx.AxisDepth(AxisRules.Bleed); e.axPoison = ctx.AxisDepth(AxisRules.Poison);
             e.axHeat = ctx.AxisDepth(AxisRules.Heat); e.axCharge = ctx.AxisDepth(AxisRules.Charge); e.axShield = ctx.AxisDepth(AxisRules.Shield);
-            e.axDeck = ctx.AxisDepth(AxisRules.Deck); e.axRole = ctx.AxisDepth(AxisRules.Role);
+            e.axDeck = ctx.AxisDepth(AxisRules.Deck);
             // 賽のパッシブ (ADR-0015・DiePassives)
             e.dieId = GameLoop.EquippedDie.IdOf(run);
             e.diceRerolled = ctx.rerollsThisTurn > 0;
@@ -153,18 +178,68 @@ namespace CombatSystem
             if (_enemyDiceNow != null) foreach (int d in _enemyDiceNow) if (d > emax) emax = d;
             e.enemyMaxDie = emax;
             e.heavyTurn = Escalation.IsHeavyTurn(currentEnemy, ctx.currentTurn);
-            e.chargeCostCut = ctx.ChargeCostNow(2) < 2 ? 1 : 0;   // 〈過負荷チューナー〉: 過充電の間 1 減る (最低 1)
+            e.chargeCostCut = ctx.ChargeCostCut;   // 〈過負荷チューナー〉: 過充電の間 2 減る (最低 1)
+            e.chargeSpendsTurn = (int)ctx.GetAccumulated(CombatContext.ChargeSpendsThisTurnKey);   // 〈灼線鞭〉: 配線より前に充電を使った回数
             e.noAttack = GameLoop.Consumables.RapierContreOn(ctx);   // 〈シュヴァリエのレイピア〉のコントラタック中は攻撃の端子に挿せない
             e.sealedRoleMask = ctx.sealedRoleMask;                    // 立つ役 (TerminalCards.RoleOf) は ResolveRoles と同じ判定 (2026-11-21)
             e.pairAsTriple = OmniPairNow(ctx);                        // 〈万象のゾロ目〉: このターン 2 個そろいをゾロ目として扱う (振り直しの後に決める)
             return e;
         }
 
+        /// <summary>ブロックの最終値 (端子の防御の合計 <paramref name="raw"/>・防御の端子に挿した個数 <paramref name="blockDice"/>・このターンの敵の攻撃 <paramref name="enemyAtk"/>)。
+        /// 本体の配線の集計 (CombatManager.Turn の「5. 配線」) と、 ジャスト防御の見込み (<see cref="JustGuardForecast"/>・画面と BOT) が同じこの関数を通す。
+        /// 順: 遺物〈堅牢の環〉+% → 大罪:傲慢 −% → 端子調律 (1 本あたり) → 品のブロック +N → 〈貫きの錐〉→〈狂暴化〉(0) →〈不完全な転移〉。</summary>
+        public int FinalBlockSum(CombatContext ctx, int raw, int blockDice, int enemyAtk, bool log)
+        {
+            int b = raw;
+            float rbp = MetaProgression.Relics.RelicApplicator.GetBlockDicePct();      // 遺物 (§15-5) 堅牢の環: 防御の端子を挿した出目 +N% (切り上げ)
+            if (rbp > 0f && b > 0) b += Mathf.CeilToInt(b * rbp);
+            float cut = MetaProgression.MetaDebuffApplicator.GetSinBlockCutPct();     // 大罪:傲慢 (挑戦カード IV): −N% (切り捨て)
+            if (cut > 0f && b > 0) b = Mathf.FloorToInt(b * (1f - cut / 100f));
+            b += blockDice * MetaProgression.MetaBuffApplicator.GetBlockTerminalPerDice();   // 端子調律メタバフ: 接続したダイス 1 本あたり +N
+            if (ctx != null) b += ctx.itemBlockBonus;                                  // 品のブロック +N (〈帯電の胸甲〉〈絶縁の外套〉〈避雷の杭〉ほか)
+            //   〈貫きの錐〉(7層ヴェスカ): 敵の攻撃値 1 につきブロックを 2 削る (端子調律の本数ボーナスも削る対象なので加算の後)
+            if (ctx != null && ctx.playerBlockIgnored && b > 0)
+            {
+                int before = b;
+                b = Math.Max(0, b - Math.Max(0, enemyAtk) * PierceAwlPerAttack);
+                if (log) Debug.Log($"[貫きの錐] 敵攻撃{enemyAtk} × {PierceAwlPerAttack} → ブロック {before} → {b}");
+            }
+            if (ctx != null && ctx.enemyAttackIgnoresGuard) b = 0;      // 〈狂暴化〉(51T〜): ブロックは何も受けない
+            if (b > 0)      // 〈不完全な転移〉(門を不完全に起動した罰): ブロック量に比例して削る (錐の後)
+            {
+                int beforeGate = b;
+                b = GameLoop.GateFlaws.ApplyTransferPierce(GameLoop.GameManager.Instance?.Run, b);
+                if (log && b != beforeGate) Debug.Log($"[不完全な転移] ブロック貫通 {beforeGate} → {b}");
+            }
+            return b;
+        }
+
+        /// <summary>【ジャスト防御】の見込み (配線の見込みの画面・BOT が読む): 挿し方の結果 <paramref name="o"/> で、 敵の攻撃を受ける時の防御 (ブロック + シールド) が
+        /// <see cref="ShieldCore.IsJustGuard"/> を満たすか。 本体の判定と同じ式・同じブロックの関数 (<see cref="FinalBlockSum"/>)。
+        /// 見ないもの: 敵の攻撃までに品が足す / 使うシールド (〈破城斧〉の消費・OnWired の品のシールド)。 〈狂暴化〉の攻撃は対象外。</summary>
+        public bool JustGuardForecast(CombatContext ctx, TerminalOutcome o, in TerminalEnv env, out int enemyAttack, out int guard)
+        {
+            enemyAttack = ShieldCore.EnemyAttackAfter(o, env.enemyAttack); guard = 0;
+            if (o == null || ctx == null || ctx.enemyAttackIgnoresGuard || enemyAttack <= 0) return false;
+            guard = FinalBlockSum(ctx, o.blockAdd, o.blockDice, enemyAttack, log: false) + ShieldCore.ShieldAfterWiring(o, in env);
+            return ShieldCore.IsJustGuard(enemyAttack, guard, ShieldCore.Width(_deck?.state.shieldItems ?? ShieldItems.None));
+        }
+
         /// <summary>端子の結果のうち、 攻撃・防御・充電の合計以外を戦闘へ反映する (合計は呼び手が受け取る)。</summary>
         private void ApplyTerminalOutcome(CombatContext ctx, TerminalOutcome o, ref int enemyAtkValue)
         {
             _termDamageMul = o.damageMul;
-            if (o.chargeSpend > 0) ctx.ConsumeCharge(Math.Min(o.chargeSpend, ctx.GetCharge()));
+            DeckDisposeFired += o.disposedNow;      // [計装]
+            // 充電の支払いは 1 回ずつ (「充電を使うたび」の品が回数と量を数える・端子 → 再起動 → 〈逆さ避雷針〉 → オーバークロックの順)
+            foreach (int pay in o.chargePays) ctx.ConsumeCharge(Math.Min(pay, ctx.GetCharge()));
+            if (o.takenFlatCut > 0) ctx.playerFlatDamageReduction += o.takenFlatCut;      // 〈逆さ避雷針〉
+            if (o.rebooted.Count > 0 || o.overclock)
+            {
+                RebootFired += o.rebooted.Count; if (o.overclock) OverclockFired++;      // [計装] BOT のサマリー
+                Debug.Log($"[充電] 再起動 {string.Join(" / ", o.rebooted.ConvertAll(i => _deck != null && i < _deck.board.Count ? _deck.board[i] : i.ToString()))}"
+                        + (o.overclock ? "・オーバークロック" : ""));
+            }
             if (o.chargeCapAdd > 0) ctx.chargeCapBonus += o.chargeCapAdd;      // 〈大導電＋〉: この戦闘の充電の上限 (満たす前に)
             if (o.chargeFill) ctx.AddCharge(ctx.ChargeCap);
             if (o.rerollDiscountNext > 0) YachtRoleEffects.AddNextTurn(ctx, RerollDiscountKey, o.rerollDiscountNext);      // 〈賽振り台〉(2026-11-21)
@@ -177,14 +252,18 @@ namespace CombatSystem
                 playerHP = Math.Max(1, playerHP - o.selfDamage);
                 ctx.playerCurrentHP = playerHP;
             }
-            if (o.shieldSpend > 0) ctx.consShield = Math.Max(0, ctx.consShield - o.shieldSpend);
+            if (o.shieldSpend > 0) ItemSystem.PassiveSkills.Keywords.Kw.SpendShield(ctx, o.shieldSpend);
             if (o.shield > 0)
             {
                 ctx.consShield += o.shield; ctx.shieldGainedTotal += o.shield;
                 ShieldDiag.Note("端子", o.shield);
             }
             if (o.poison > 0) ItemSystem.PassiveSkills.Effects.Rw.Poison(ctx, o.poison);
-            if (o.heat > 0) { ItemSystem.PassiveSkills.Keywords.Kw.EnableHeat(ctx); ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, o.heat, "端子"); }
+            //   臨界: 〈燧石の指輪〉の倍を立ててから、 端子の分 → 品の分 (5g) を 1 つずつ (HeatCore.Forecast と同じ順)
+            if (o.heatDouble) ctx.accumulatedValues[HeatCore.DoubleTurnKey] = ctx.currentTurn;
+            if (o.heat > 0 || o.heatGains.Count > 0) ItemSystem.PassiveSkills.Keywords.Kw.EnableHeat(ctx);
+            if (o.heat > 0) ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, o.heat, "端子");
+            foreach (int g in o.heatGains) ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, g, "臨界の品(配線)");
             for (int r = 0; r < o.retreatStage; r++) YachtRoleEffects.AddEscalationDelay(ctx, YachtRoleEffects.TurnsToRetreatOneStage(ctx));
             if (o.escalationDelay > 0)      // 時計の賽 (ADR-0015)
             {
@@ -193,6 +272,7 @@ namespace CombatSystem
             }
             if (o.enemyStunNext) ctx.nextTurnBuffs[YachtRoleEffects.EnemyStunKey] = 1f;
             if (o.ignoreDefense) ctx.playerArmorPen += DefenseFormula.IgnoreAll;
+            if (o.armorPen > 0) ctx.playerArmorPen += o.armorPen;      // 〈継ぎ目のない導線〉
             if (o.forceCrit) ctx.forceCritical = true;
             if (o.critMultAdd > 0f) ctx.criticalMultiplier += o.critMultAdd;      // 会心倍率は毎ターン組み直されるので、 このターンだけ効く
             if (o.outgoingPctAdd > 0f) ctx.AddOutgoingPct(o.outgoingPctAdd);
@@ -241,7 +321,7 @@ namespace CombatSystem
         private void RaiseDeckShuffles(CombatContext ctx)
         {
             if (_deck == null || ctx == null) return;
-            foreach (int n in _deck.TakeShuffled()) ItemSystem.PassiveSkills.Keywords.Kw.Raise(ctx, PassiveSkillTrigger.OnDeckShuffle, n);
+            foreach (int n in _deck.TakeShuffled()) { DeckShuffleFired++; ItemSystem.PassiveSkills.Keywords.Kw.Raise(ctx, PassiveSkillTrigger.OnDeckShuffle, n); }
         }
 
         /// <summary>撃破のボーナスを配る端子のうち、 このターンに発動したもの。 場の添字は <see cref="TerminalDeckState.FinishTurn"/> で書き換わるので、

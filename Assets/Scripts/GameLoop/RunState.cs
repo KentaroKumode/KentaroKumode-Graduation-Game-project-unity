@@ -252,6 +252,11 @@ namespace GameLoop
         /// パッシブの重複取得を禁止する判定に使う（= 一度捨てたものも再取得しない）。</summary>
         public HashSet<string> seenPassiveItemIds = new HashSet<string>();
 
+        /// <summary><b>出現の枠 (動的 4 枠ロック・2026-11-21・docs/full-item-rework-spec.md §1-1)。</b> 8 軸の秘宝を取得した順の軸 (最大 4)。
+        /// 4 つ埋まると、 秘宝と軸の端子はこの 4 軸と枠外 (金・軸なし) からだけ出る。 手放しても外れない。 種火を挿していれば、 その軸が最初から 1 つ目。
+        /// 書くのは <see cref="ItemSystem.AxisPool.NoteAcquired"/> とランの始めだけ。</summary>
+        public List<string> lockedAxes = new List<string>();
+
         /// <summary>〈昇華〉済みパッシブID（グリッド外・刻印なしの永久パッシブ）。
         /// 戦闘では owned と同様に発動するが、容量/トリアージ/グリッドには載らない（枠を消費しない）。</summary>
         public List<string> ascendedPassiveIds = new List<string>();
@@ -357,9 +362,8 @@ namespace GameLoop
         /// <summary>〈富〉(目 9) の役で積んだ、 この戦闘のゴールド報酬への加算 (%)。
         /// 戦闘開始時に 0 へ戻し、 勝利報酬の計算で使い切る。 [perCombat]</summary>
         public int roleGoldBonusPct;
-        /// <summary>溶金の領主剣 (2026-11-19): 持っている間に秘宝・賽・イベントから得た金の累計 (<see cref="GoldIncome.CountWindfall"/>)。
-        /// 1G につき与ダメージ +2% (items.json の stats・per = swordWindfall)。 [persistent]</summary>
-        public int swordWindfallGold;
+        /// <summary>溶金の領主剣: 持っている間に店で使った金の累計 (ShopManager.Close が足す)。 100G につき基礎攻撃 +2 (items.json の stats・per = swordShopSpent)。 [persistent]</summary>
+        public int swordShopSpent;
 
         /// <summary>ヴェスカ撃破後の選択 (2026-08-17)。 **true = 裂け目を閉じなかった**。
         ///
@@ -467,17 +471,17 @@ namespace GameLoop
         /// <summary>前の戦闘が終わってからマップで進んだ歩数。 移動で貯まる品 (継ぎ革の旅靴・聖路の白靴・毒草摘みの杖・測量師の片眼鏡) が
         /// 次の戦闘の開始時に読む。 GameManager の点に入る前のフックで +1、 戦闘終了で 0。</summary>
         public int  stepsSinceBattle;
-        /// <summary>〈天工開物〉: このランで武器・ダイスを強化した回数 (持っている間だけ数える)。 戦闘開始時の臨界 +5 × 回数。</summary>
+        /// <summary>〈天工開物〉: このランで武器を強化した回数 (持っている間だけ数える)。 爆発の基礎 +12 × 回数 (HeatEffects.TenkouKaibutsu)。</summary>
         public int  heavenlyCraftUpgrades;
-        /// <summary>〈脈なしの鋼心臓〉の X: 戦闘開始時のシールド。 ランの始めに 10、 持っている間に戦闘に勝つたび +1 (2026-11-20)。</summary>
+        /// <summary>〈脈なしの鋼心臓〉の X: 戦闘開始時のシールド。 ランの始めに 12、 持っている間に戦闘に勝つたび +2 (2026-11-21)。</summary>
         public int  pulselessHeartShield = ItemSystem.PassiveSkills.Effects.PulselessHeart.StartShield;
 
         // === マクロ秘宝 (2026-11-20・item-overhaul-spec §9)。 どれも持っている間の出来事だけ数える ===
         /// <summary>〈研ぎ代の領収書〉: 店・休憩で山札から端子を抜いた回数 (攻撃 +2 × 回数)。</summary>
         public int  receiptRemovals;
-        /// <summary>〈相場師の算盤〉: 店に入って最初のリロールをした回数 (戦闘開始時の充電 +3・臨界 +5 × 回数)。</summary>
+        /// <summary>〈相場師の算盤〉: 持っている間に店でリロールした回数 (最大 10・戦闘開始時のブロック +2・最初の 1 撃 +1 × 回数)。</summary>
         public int  abacusStacks;
-        /// <summary>〈黄金の通行手形〉: 店で使ったゴールドの 100G に満たない端数 (店を出る時に足す)。</summary>
+        /// <summary>〈黄金の通行手形〉: 店で使ったゴールドの 80G に満たない端数 (店を出る時に足す)。</summary>
         public int  passShopSpent;
         /// <summary>〈黄金の通行手形〉: 秘宝の棚が 1 段上のレア度で並ぶ店の残り軒数 (店に入るたび 1 つ使う)。</summary>
         public int  passShopsUp;
@@ -530,6 +534,8 @@ namespace GameLoop
             permanentDebuffs = new HashSet<string>();
             seenOnceEvents = new HashSet<string>();
             seenPassiveItemIds = new HashSet<string>();
+            lockedAxes = new List<string>();
+            { string spark = MetaProgression.MetaBuffApplicator.GetSparkAxis(); if (spark != null) lockedAxes.Add(spark); }   // 種火の軸は最初から 1 つ目の枠
             ascendedPassiveIds = new List<string>();
             sublimationCount = 0;
             lastStandActive = false;
@@ -552,7 +558,7 @@ namespace GameLoop
             _cardMap = null;
             if (chronicle == null) chronicle = new List<string>(); else chronicle.Clear();
             roleGoldBonusPct = 0;
-            swordWindfallGold = 0;
+            swordShopSpent = 0;
             riftLeftOpen = false;
             totalCombatTurns = 0;
             judgmentPostDamage = judgmentHealRequested = judgmentHealActual = judgmentHealPrevented = 0;

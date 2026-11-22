@@ -457,6 +457,14 @@ namespace CombatSystem
                 // 役が立った (2026-11-21・段 1-f): 量 = 強さ (2 個そろい 1 / ゾロ目・連なり 2)。 OnWired の前なので、 品の攻撃 +N は撃ごとに乗る
                 ItemSystem.PassiveSkills.Keywords.Kw.Raise(ctx, PassiveSkillTrigger.OnRoleFired, YachtRoles.Strength(k));
             }
+            // 役の回数と続いたターン (役の軸の品が読む・TerminalBattleState)。 〈宿命の刻み目〉〈鏡合わせの盤〉の重ねた効果は数えない
+            if (_deck != null)
+            {
+                int formed = ctx.firedRolesThisTurn.Count;
+                _deck.state.roleCount += formed;
+                _deck.state.roleStreak = formed > 0 ? _deck.state.roleStreak + 1 : 0;
+                RoleFormedFired += formed;      // [計装]
+            }
 
             if (ctx.firedRolesThisTurn.Count > 0)
             {
@@ -469,34 +477,48 @@ namespace CombatSystem
 
         /// <summary>〈宿命の刻み目〉(2026-11-21): 前のターンに立った役 ((int)RoleKind + 1・0 = なし・ctx.accumulatedValues)。</summary>
         private const string FateRoleKey = "role.fate";
-        /// <summary>〈万象のゾロ目〉(2026-11-21): 2 個そろいをゾロ目として扱うと決めたターンの番号 (ctx.accumulatedValues) / 乱数のキー (専用) / 賽目 1 つあたりの確率。</summary>
+        /// <summary>〈万象のゾロ目〉(2026-11-21): 2 個そろいをゾロ目として扱うと決めたターンの番号 (ctx.accumulatedValues) / 乱数のキー (専用) /
+        /// この戦闘の役の回数がこれ以上なら確率 <see cref="OmniPctMid"/>・<see cref="OmniNeedFull"/> 以上なら 100%。</summary>
         private const string OmniTurnKey = "role.omniTurn";
         public const string OmniRngKey = "role.omni";
-        public const float OmniPctPerDepth = 0.08f;
+        public const int OmniNeedMid = 3, OmniNeedFull = 5;
+        public const float OmniPctMid = 0.5f;
+
+        /// <summary>〈万象のゾロ目〉: この戦闘の役の回数 <paramref name="roles"/> での、 2 個そろいをゾロ目として扱う確率。</summary>
+        public static float OmniPairChance(int roles) => roles >= OmniNeedFull ? 1f : roles >= OmniNeedMid ? OmniPctMid : 0f;
 
         /// <summary>〈万象のゾロ目〉: このターン 2 個そろいをゾロ目として扱う (<see cref="DecideOmniPair"/> が決めた)。 端子の盤面 (TerminalEnv.pairAsTriple) と ResolveRoles が読む。</summary>
         public static bool OmniPairNow(CombatContext ctx)
             => ctx != null && ctx.currentTurn > 0 && (int)ctx.GetAccumulated(OmniTurnKey) == ctx.currentTurn;
 
         /// <summary>〈万象のゾロ目〉(2026-11-21): 出目が決まった所 (振り直しと出目を書き換える効果の後・配線の前) で、 立つ役が 2 個そろいなら、
-        /// 確率 min(100%, 賽目 × 8%) でこのターンそれをゾロ目として扱う。 配線の前に決めるので、 配線の判断 (人・BOT) はその結果を見て挿せる。</summary>
-        private static void DecideOmniPair(CombatContext ctx, int[] dice)
+        /// この戦闘で役が 3 回以上成立した後は確率 50%・5 回以上なら 100% でこのターンそれをゾロ目として扱う。 配線の前に決めるので、 配線の判断 (人・BOT) はその結果を見て挿せる。
+        /// 100% の時は乱数を引かない。</summary>
+        private void DecideOmniPair(CombatContext ctx, int[] dice)
         {
-            if (ctx == null || !AxisRules.Owns(GameLoop.GameManager.Instance?.Run, GameLoop.ItemIds.RoleOmni)) return;
+            if (ctx == null || _deck == null || !AxisRules.Owns(GameLoop.GameManager.Instance?.Run, GameLoop.ItemIds.RoleOmni)) return;
             var k = TerminalCards.RoleOf(dice, new TerminalEnv { sealedRoleMask = ctx.sealedRoleMask });
             if (k == null || YachtRoles.IsBig(k.Value)) return;
-            float p = Mathf.Min(1f, OmniPctPerDepth * ctx.AxisDepth(AxisRules.Role));
-            if (p <= 0f || !GameLoop.GameRng.Chance(p, OmniRngKey)) return;
+            float p = OmniPairChance(_deck.state.roleCount);
+            if (p <= 0f || (p < 1f && !GameLoop.GameRng.Chance(p, OmniRngKey))) return;
+            RoleOmniFired++;      // [計装]
             ctx.accumulatedValues[OmniTurnKey] = ctx.currentTurn;
             Debug.Log($"[万象のゾロ目] 〈{YachtRoles.NameOf(k.Value)}〉をゾロ目として扱う ({p * 100f:0}%)");
         }
 
         /// <summary>〈鏡合わせの盤〉(2026-11-21): 2 個そろい <paramref name="k"/> の、 1 つ小さい目の 2 個そろいの効果を働かせる (役が立ったのではない ── 数えない)。
-        /// 1 の 2 個そろいなら、 次のターンの無料の振り直し +1。 1 つ小さい目の役が〈凶運〉で封じられていれば働かない。</summary>
+        /// 1 の 2 個そろいなら、 次のターンの無料の振り直し +1・次のターンのブロック +<see cref="MirrorOneBlock"/>。 1 つ小さい目の役が〈凶運〉で封じられていれば働かない。</summary>
+        public const int MirrorOneBlock = 6;
         private static void MirrorPair(RoleKind k, CombatContext ctx, GameLoop.DiceFaceParts.Tier tier, ref RoleOutcome outcome)
         {
             int face = YachtRoles.FaceOf(k);
-            if (face <= 1) { YachtRoleEffects.AddNextTurn(ctx, YachtRoleEffects.FreeRerollKey, 1); Debug.Log("[鏡合わせの盤] 特別・対 → 次のターンの無料の振り直し +1"); return; }
+            if (face <= 1)
+            {
+                YachtRoleEffects.AddNextTurn(ctx, YachtRoleEffects.FreeRerollKey, 1);
+                YachtRoleEffects.AddNextTurn(ctx, YachtRoleEffects.BlockNextKey, MirrorOneBlock);
+                Debug.Log($"[鏡合わせの盤] 特別・対 → 次のターンの無料の振り直し +1・ブロック +{MirrorOneBlock}");
+                return;
+            }
             var m = YachtRoles.Of(face - 1, false);
             if ((ctx.sealedRoleMask & (1 << (int)m)) != 0) return;
             YachtRoleEffects.Apply(m, tier, ctx, ref outcome);
@@ -534,13 +556,15 @@ namespace CombatSystem
         /// 同じ式を <c>OnCriticalCheck</c> の加算とバフの後に組むので、 配線を決める前の値には
         /// <paramref name="pendingBuff"/> = true でまだ乗っていない戦闘中バフ (月蝕/レイピア) を足す。
         /// 本判定の後 (バフは <c>critRatePctAdd</c> に取り込み済み) では false にすること ── 二重に数えない。</summary>
-        private float CritRateOf(CombatContext ctx, bool pendingBuff)
+        private float CritRateOf(CombatContext ctx, bool pendingBuff) => ItemSystem.PassiveSkills.CombatContext.ResolveCritRate(CritAddOf(ctx, pendingBuff));
+
+        /// <summary>合算した会心率 (100% を超えた分もそのまま・超過会心率の変換 CritCore.ExcessMul と画面の表示が読む)。</summary>
+        private float CritAddOf(CombatContext ctx, bool pendingBuff)
         {
             float add = playerCritBaseRate + ctx.critRatePctAdd
                       + MetaProgression.MetaBuffApplicator.GetCritRatePctBonus();
             if (pendingBuff) add += ctx.GetBuff(ItemSystem.PassiveSkills.CombatContext.CritRateBuffKey);
-            add = Mathf.Max(0f, add);
-            return ItemSystem.PassiveSkills.CombatContext.ResolveCritRate(add);
+            return Mathf.Max(0f, add);
         }
 
         /// <summary>HUD に出すプレイヤーのステータス (2026-11-05)。 <b>配線を決める前に呼ぶ</b>こと
@@ -557,13 +581,14 @@ namespace CombatSystem
             var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
             var s = new HudStats { attack = playerAttackPower, toilCutPct = MetaProgression.MetaDebuffApplicator.GetToilDamageCutPct() };
             if (ctx == null) return s;
-            s.critRate = CritRateOf(ctx, pendingBuff: true);
-            s.critMul = ctx.criticalMultiplier;
+            //   会心率は 100% を超えた分も出す (超えた分は会心倍率へ変わる・CritCore.EffectiveMul と同じ式で倍率に入れる)
+            s.critRate = CritAddOf(ctx, pendingBuff: true);
+            s.critMul = CritCore.EffectiveMul(ctx.criticalMultiplier, ctx.enemyCritMultReduction, s.critRate, ctx.critExcessDouble, false);
             float mul = ctx.outgoingDamageMultiplier <= 0f ? 1f : ctx.outgoingDamageMultiplier;
             int metaPct = MetaProgression.MetaBuffApplicator.GetOutgoingDamagePct()
                         + MetaProgression.MetaBuffApplicator.GetBattleSpiritPct(GameLoop.GameManager.Instance?.Run);
             // 消耗品の分 (ApplyWinDamageModifiers の〈瞬間研磨剤〉+150%・〈油・膏薬〉consDmgMultPct と同じ条件)
-            s.consOutgoingPct = Mathf.Max(0, ctx.consDmgMultPct) + (ctx.polishArmed && !ctx.rollPurity ? 150 : 0);
+            s.consOutgoingPct = Mathf.Max(0, ctx.consDmgMultPct) + (ctx.polishArmed ? 150 : 0);
             s.outgoingPct = Mathf.RoundToInt((mul - 1f) * 100f) + metaPct + s.consOutgoingPct;
             s.defense = ctx.playerDefense;
             s.pen = ctx.playerArmorPen;
@@ -586,7 +611,7 @@ namespace CombatSystem
                 float rate = CritRateOf(ctx, pendingBuff: false);
                 // 本判定と同じ優先順: 封印 (無心の刃) で外れ、 forceCritical が最後に確定で上書きする。
                 crit = ((!ctx.critSuppressed && GameLoop.GameRng.Chance(rate, "combat.roleExtraCrit", RngIdx(3)))
-                    || ctx.forceCritical) && !ctx.critToDamage;   // 〈銑鉄棍〉の【規則】: 会心が出なくなる
+                    || ctx.forceCritical);
                 if (crit) extra *= ctx.criticalMultiplier;
             }
             int add = Mathf.Max(1, Mathf.RoundToInt(extra));

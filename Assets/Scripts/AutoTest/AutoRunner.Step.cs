@@ -58,9 +58,6 @@ namespace AutoTest
             _rerollYieldSum = 0f; _rerollYieldN = 0;
             // [V3 mainCorr] 主攻撃の実績の比もランをまたいで持ち越さない
             ResetMainCorrRun();
-            // [2026-11-10 試験] 黎明の溜める形の率を本体へ (ラン終了時に 0 へ戻す)
-            ItemSystem.PassiveSkills.Effects.Daybreak.NextAttackPctPerUnit = System.Math.Max(0f, daybreakNextAttackPct);
-            _daybreakApplied = ItemSystem.PassiveSkills.Effects.Daybreak.NextAttackPctPerUnit; _daybreakAppliedOnce = true;
             // [測定用の物差し 2026-11-10] 主攻撃 / 毒・出血・爆発・止血帯の倍率を本体へ (ラン終了時に 1 へ戻す)
             GameLoop.GameHooks.WeaponTierCap = System.Math.Max(0, weaponTierCap);
             GameLoop.GameHooks.PursuerNoReward = pursuerNoReward;                 // [測定 2026-11-12・#35]
@@ -280,10 +277,19 @@ namespace AutoTest
                 ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(gm.Run, _pendingGrantItemId);
             // [測定の口] 最初の賽を指定する (ADR-0015 の賽の確かめ・既定は空 = 角の取れた賽)。 乱数は引かない。
             if (!string.IsNullOrEmpty(forceStartDie) && gm.Run != null) GameLoop.EquippedDie.Equip(gm.Run, forceStartDie);
+            if (!string.IsNullOrEmpty(forceStartWeapon) && gm.Run != null) GameLoop.Loadout.SwapWeapon(gm.Run, forceStartWeapon);
             // [計装] 連鎖の計装を 0 へ (2026-11-19)
             ItemSystem.PassiveSkills.PassiveSkillManager.ChainMaxDepth = 0;
             ItemSystem.PassiveSkills.PassiveSkillManager.ChainRepeats = 0;
             ItemSystem.PassiveSkills.PassiveSkillManager.ChainGuardHits = 0;
+            CombatSystem.CombatManager.RebootFired = CombatSystem.CombatManager.OverclockFired = CombatSystem.CombatManager.DetonateFired = CombatSystem.CombatManager.JustGuardFired = 0;
+            CombatSystem.CombatManager.BleedSpendFired = CombatSystem.CombatManager.BleedExecuteFired = 0;
+            CombatSystem.CombatManager.BurstFired = CombatSystem.CombatManager.BurstBreakFired = 0;
+            CombatSystem.CombatManager.CritOverflowFired = CombatSystem.CombatManager.CritExecuteFired = CombatSystem.CombatManager.CritRefireFired = 0;
+            CombatSystem.CombatManager.DeckDisposeFired = CombatSystem.CombatManager.DeckShuffleFired = 0;
+            CombatSystem.CombatManager.RoleFormedFired = CombatSystem.CombatManager.RoleOmniFired = 0;
+            CombatSystem.CombatManager.WeaponChainFired = CombatSystem.CombatManager.WeaponExecuteFired = CombatSystem.CombatManager.WeaponGaryoFired = CombatSystem.CombatManager.WeaponBashFired = 0;
+            ItemSystem.AxisPool.RunSkips = ItemSystem.AxisPool.RunSkipGold = 0;
             ItemSystem.PassiveSkills.PassiveSkillManager.ChainDeepestPath = "";
             ItemSystem.PassiveSkills.Keywords.Kw.HeatMaxBurstsOneAdd = 0;
             ItemSystem.PassiveSkills.Keywords.Kw.HeatMaxBurstsInfo = "";
@@ -518,6 +524,12 @@ namespace AutoTest
                         {
                             bool fa = !ownsA && IsAxisFocusItem(ra), fb = !ownsB && IsAxisFocusItem(rb);
                             if (fa != fb) pick = fa ? 0 : 1;
+                        }
+                        // 見送り換金 (2026-11-21): 秘宝の 2 択で、 欲しい品 (BotHooks.WantsPassive) が片方だけならそちら・どちらも違えば見送る
+                        if (ItemSystem.AxisPool.SkipGoldFor(new[] { ra, rb }) > 0)
+                        {
+                            bool wa = BotHooks.WantsPassive(gm.Run, ra), wb = BotHooks.WantsPassive(gm.Run, rb);
+                            if (!wa && !wb) pick = -1; else if (wa != wb) pick = wa ? 0 : 1;
                         }
                         gm.ResolveRewardChoice(pick);
                     }

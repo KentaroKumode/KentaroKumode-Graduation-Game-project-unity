@@ -309,7 +309,7 @@ namespace GameLoop
                     string id = null;
                     // 人が遊んでいる時は、 選ぶのを航行に入ってからの窓まで預ける (ResolveStartingPassive)。
                     //   提示の抽選はここで済ませるので、 乱数の消費は BOT と同じ。
-                    if (cands.Count > 1 && GameHooks.ChooseStartingPassive == null && !GameHooks.BotDriving && !Application.isBatchMode)
+                    if (cands.Count > 0 && GameHooks.ChooseStartingPassive == null && !GameHooks.BotDriving && !Application.isBatchMode)   // 1 択でも見送れるので預ける
                     {
                         PendingStartingPassiveChoices.Add(cands);
                         continue;
@@ -318,7 +318,8 @@ namespace GameLoop
                     {
                         // BOT は GameHooks で差し込む (無ければ先頭)。
                         int pick = GameHooks.ChooseStartingPassive?.Invoke(cands) ?? 0;
-                        id = cands[System.Math.Max(0, System.Math.Min(pick, cands.Count - 1))];
+                        if (pick < 0) { ItemSystem.AxisPool.TakeSkip(Run, cands, "開幕"); continue; }   // 見送り換金
+                        id = cands[System.Math.Min(pick, cands.Count - 1)];
                     }
                     if (string.IsNullOrEmpty(id)) break;   // プール枯渇
                     if (Run.ownedPassiveItems == null)

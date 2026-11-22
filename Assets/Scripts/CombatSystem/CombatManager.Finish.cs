@@ -123,7 +123,7 @@ namespace CombatSystem
             {
                 var runSteps = GameLoop.GameManager.Instance?.Run;
                 if (runSteps != null) runSteps.stepsSinceBattle = 0;
-                // 〈脈なしの鋼心臓〉: 戦闘に勝つたび X +1 (勝ちの判定は GetLastCombatResult と同じ)
+                // 〈脈なしの鋼心臓〉: 戦闘に勝つたび X +2 (勝ちの判定は GetLastCombatResult と同じ)
                 if (playerHP > 0 && enemyHP <= 0) ItemSystem.PassiveSkills.Effects.PulselessHeart.NoteWin(runSteps);
             }
 

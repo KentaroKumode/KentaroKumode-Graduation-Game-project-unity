@@ -114,7 +114,7 @@ namespace AutoTest
             /// 護符の使い時 (v3.superConsumables)・与ダメの倍率と敵のパッシブを配線の効用で読む (v3.readOutgoingMult / readEnemyPassives の −1)・
             /// 航行の計画 (v3.macroPlan)・戦闘名の危険度で避ける (v3.superNav → UseLearnedDanger)・無段階の序列 (superBuyTiers)・
             /// ITT の Super 版の序列と価格の差し引き (superOwnItt / superIttPriceK)・段階 3 の値順の購入 (v3.phase3Ranked)・
-            /// 軸に絞る買い方 (v3.axisCommitBuy)・難易度 10 の 6 層の店の全投入 (IsSuperTailMode)。
+            /// 難易度 10 の 6 層の店の全投入 (IsSuperTailMode)。
             /// 配線のミスなし (Super は wiringMistakeRate=0・Optimal は 2026-11-12 #134 から optimalMistakeRate で次点を選ぶ) は Optimal との差になる。 防ぎ切りの規則 (FreeBlockRule) は、 山札の方策と HP の帳簿 (既定) では差にならない。</para></summary>
             Super,
             /// <summary>厳密: 旧い expectimax の参照実装 (ExactCombatAI) を差していた技量。
@@ -157,15 +157,6 @@ namespace AutoTest
         /// <summary>[#107] 配線の効用が収支で決まる敵のパッシブと〈吸血〉を読むか (<see cref="V3Flags.readEnemyPassives"/> の実効値: −1 は Super だけ ON)。</summary>
         public bool ReadEnemyPassivesEffective
             => v3.readEnemyPassives > 0 || (v3.readEnemyPassives < 0 && EffectiveWiringSkill == WiringSkill.Super);
-
-        /// <summary>[2026-11-10 試験] 盾〈黎明〉を「溜めて次の主攻撃 +%」にする形の率 (<see cref="ItemSystem.PassiveSkills.Effects.Daybreak.NextAttackPctPerUnit"/>)。
-        /// 0 = 今の挙動 (最大 HP を直接削る)。 ラン開始時に本体の static へ入れ、 ラン終了時に 0 へ戻す。</summary>
-        public float daybreakNextAttackPct = 0f;
-        /// <summary>[計装] 本体へ入れる値。 ラン開始後は直近のラン開始時に実際に入れた値、 ラン開始前 (ワーカーの実効状態はここで読む) は
-        /// ラン開始時に入れる値 (負は 0 に切り詰める)。 2026-11-10: 開始前に読むと 0 と出ていたので直した。 実際に効いたかは戦闘記録の dawnShots で見る。</summary>
-        public float DaybreakNextAttackPctApplied => _daybreakAppliedOnce ? _daybreakApplied : System.Math.Max(0f, daybreakNextAttackPct);
-        private bool _daybreakAppliedOnce;
-        private float _daybreakApplied;
 
         /// <summary>[測定用の物差し 2026-11-10] プレイヤーの主攻撃の最終ダメージに掛ける倍率 (<see cref="CombatSystem.EnemyHpLedger.ProbeMainMult"/>)。
         /// 既定 1 = 今の挙動と同じ。 ラン開始時に本体の static へ入れ、 ラン終了時に 1 へ戻す。 製品では使わない。</summary>
@@ -256,6 +247,9 @@ namespace AutoTest
         /// <summary>[測定の口・2026-11-18] 最初に持つ賽を指定する (ADR-0015 の賽 20 種の確かめ)。 空 = 製品と同じ (角の取れた賽)。
         /// ゲームの数値ではない・乱数は引かない。 v3_queue の腕で <c>forceStartDie=逆巻きの賽</c> のように渡す。</summary>
         public string forceStartDie = "";
+        /// <summary>[測定の口・2026-11-21] 最初に持つ武器を指定する (武器 13 品の家系別の確かめ・Loadout.SwapWeapon)。 空 = 製品と同じ (職業の武器)。
+        /// ゲームの数値ではない・乱数は引かない。 v3_queue の腕で <c>forceStartWeapon=竜閃</c> のように渡す。</summary>
+        public string forceStartWeapon = "";
         /// <summary>[測定 2026-11-18・同上] 嵐の航行の道選び (<see cref="StormNavView.StormStep"/>) が、 第 4 層 (深さ 6) で道すがらの戦闘の点 (行き先でない・未起動の通常・精鋭・種別の見えていない点)
         /// を「その戦闘で失う HP の見込み (学習の戦闘名か種類の平均 × 最大 HP) × この倍率」だけ費用に入れる (着いた点は必ず起動するので、 道順は「どのマスを踏むか」)。 0 = 使わない = 既定。 乱数は引かない。</summary>
         public float navD6PathFightCost = 0f;
@@ -2029,7 +2023,7 @@ namespace AutoTest
             bool isSuperSkill = wiringSkill == WiringSkill.Super;
             // Super = Optimal + 無段階の序列 + 激しい防御 + 消耗品の読み + 偵察と戦闘名の回避 (2026-11-06・同じシードで +4.86σ)。
             //   **戦闘の先読みは含まない** (配線とリロールは山札の方策・先読みは deckLookahead だけ・2026-11-12 に確認)。
-            if (isSuperSkill) { v3.superDefense = true; v3.superConsumables = true; v3.superNav = true; v3.macroPlan = true; v3.phase3Ranked = true; v3.axisCommitBuy = true; UseLearnedDanger = true; AvoidLoseRate = v3.avoidLoseRate; }
+            if (isSuperSkill) { v3.superDefense = true; v3.superConsumables = true; v3.superNav = true; v3.macroPlan = true; v3.phase3Ranked = true; UseLearnedDanger = true; AvoidLoseRate = v3.avoidLoseRate; }
             // [2026-11-10] 軸に寄せる方策を本体の差し込み口 (開幕の品・挑戦カード) へも渡す。 空なら無効。
             BotHooks.AxisFocus = buyAxisFocus ?? "";
             BotHooks.AxisFocusBonus = buyAxisFocusBonus;
@@ -2382,6 +2376,7 @@ namespace AutoTest
 
             // パッシブ取得の経路別計装をバッチ単位で数え直す (前バッチの値を持ち越さない)。
             ItemSystem.Helpers.PassiveSourceAudit.Reset();
+            ItemSystem.AxisPool.ResetStats();
             ItemSystem.PassiveSkills.Effects.MirrorTwinsResponse.ResetStats();
 
             // **マスターシードはスイープ経路にも適用する** (2026-08-05)。

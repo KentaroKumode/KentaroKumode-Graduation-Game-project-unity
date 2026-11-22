@@ -760,6 +760,8 @@ namespace CombatSystem
             // 2026-07-25 v6: 種火 (充電/臨界/毒/出血) の r2 効果 - 戦闘開始時に適用
             if (ctx != null)
             {
+                // 臨界の品を 1 つ以上持つ戦闘は臨界が動く (閾値 30・〈早沸かし釜〉〈恒温の竈〉は HeatCore の旗・品の OnBattleStart より前)
+                if (ctx.AxisDepth(ItemSystem.PassiveSkills.AxisRules.Heat) > 0) ItemSystem.PassiveSkills.Keywords.Kw.EnableHeat(ctx);
                 // 臨界 r2 保温炉: 前戦闘のメーターを持ち越し (RunState.pendingRinkaiCarryover 経由)
                 var runR = GameLoop.GameManager.Instance?.Run;
                 if (runR != null && runR.pendingRinkaiCarryover > 0)
@@ -914,6 +916,9 @@ namespace CombatSystem
                 // ctx 敵パラメータも更新（プレイヤー視点で書く: enemy = ボス、player = プレイヤー）
                 ctx.enemyMaxHP = newEnemy.maxHP;
                 ctx.enemyCurrentHP = newEnemy.maxHP;
+                // 段の交代で敵の毒は消える。 〈腐蝕の王冠〉は半分 (切り捨て) が次の段へ残る (2026-11-21・full-item-rework-ledger §②)
+                int poisonLeft = ctx.EnemyPoison;
+                if (poisonLeft > 0) ctx.enemyStatusStacks["poison"] = ctx.poisonCrown ? poisonLeft / 2 : 0;
                 ctx.enemyThreat = newEnemy.threat;
                 ctx.enemyDiceMax = newEnemy.EffectiveRollMax;
                 ctx.enemyDiceTotalBonus = 0;

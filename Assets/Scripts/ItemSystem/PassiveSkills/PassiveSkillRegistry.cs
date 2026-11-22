@@ -4,12 +4,10 @@ using ItemSystem.PassiveSkills.Effects;
 namespace ItemSystem.PassiveSkills
 {
     /// <summary>
-    /// 全パッシブスキル実装の静的レジストリ
-    /// JSONの internalName → IPassiveSkillEffect のマッピング
-    /// 
-    /// 新スキル追加手順:
-    /// 1. AllPassiveSkillEffects.cs に IPassiveSkillEffect 実装クラスを追加
-    /// 2. RegisterAll() 内に Register(new XxxSkill()) を1行追加
+    /// 全パッシブスキル実装の静的レジストリ (スキル id → IPassiveSkillEffect)。
+    ///
+    /// 新スキル追加手順: 品の軸の Effects/ のファイル (ChargeEffects.cs など・武器は WeaponFamilyEffects.cs) にクラスを足し、
+    /// その軸の Register&lt;軸&gt;() に 1 行足す。 抜けは Tools/rework_audit.py が数える。
     /// </summary>
     public static class PassiveSkillRegistry
     {
@@ -26,7 +24,6 @@ namespace ItemSystem.PassiveSkills
             if (initialized) return;
             RegisterAll();
             RegisterStatSkills();
-            WrapEntries();
             initialized = true;
         }
 
@@ -63,20 +60,6 @@ namespace ItemSystem.PassiveSkills
                     registry.TryGetValue(ps.internalName, out var inner);
                     registry[ps.internalName] = new Effects.StatModifierEffect(ps.internalName, ps.stats, inner);
                 }
-            }
-        }
-
-        /// <summary>毒・臨界の軸の既存品に入り口 (決まった機会に資源を少し足す) を重ねる (2026-11-07・<see cref="Effects.EntryEffect"/>)。</summary>
-        private static void WrapEntries()
-        {
-            foreach (var e in Effects.EntryEffect.Table)
-            {
-                if (!registry.TryGetValue(e.id, out var inner))
-                {
-                    UnityEngine.Debug.LogError($"[PassiveSkillRegistry] 入り口の対象 {e.id} が登録されていない");
-                    continue;
-                }
-                registry[e.id] = new Effects.EntryEffect(inner, e.when, e.heat, e.amount, e.gate, e.gateN);
             }
         }
 
@@ -158,237 +141,125 @@ namespace ItemSystem.PassiveSkills
             registry[effect.SkillId] = effect;
         }
 
-        /// <summary>
-        /// 全スキルを登録
-        /// ★ 新スキル追加時はここに1行追加するだけ ★
-        /// </summary>
+        /// <summary>充電の軸 (2026-11-21・ChargeEffects.cs・full-item-rework-ledger §①)。 〈二股の導線〉〈逆さ避雷針〉〈灼線鞭〉は端子の解決の中だけで効く (CombatSystem.ChargeCore の旗・クラスなし)。</summary>
+        private static void RegisterCharge()
+        {
+            Register(new InfiniteMotor()); Register(new ThunderPowder()); Register(new ChargedCuirass()); Register(new OldGauge());
+            Register(new ToppedJar()); Register(new SpareBattery()); Register(new StaticBlanket()); Register(new FlintNeedle());
+            Register(new LightningHelm()); Register(new CatfishSpine()); Register(new LeakyCopperWire()); Register(new StorageGauntlet());
+            Register(new RerollHammer()); Register(new InsulatedCloak()); Register(new LightningStake());
+            Register(new OverloadTuner()); Register(new ScorchedWire()); Register(new ThunderJar()); Register(new ThunderDrum());
+            Register(new ThunderSpear()); Register(new LentTime()); Register(new FourthStrikeCore()); Register(new ThunderReliquary());
+        }
+
+        /// <summary>毒の軸 (2026-11-21・PoisonEffects.cs・full-item-rework-ledger §②)。 〈緑染みの小刀〉〈蛇血瓶〉〈毒見役の小匙〉は端子の解決の中だけで効く (CombatSystem.PoisonCore の旗・クラスなし)。</summary>
+        private static void RegisterPoison()
+        {
+            Register(new VenomBangle()); Register(new PoisonWedge()); Register(new AcidVial()); Register(new NeedleRing()); Register(new LeafMoldBag());
+            Register(new LongCenser()); Register(new RuinedGardenSprayer()); Register(new HerbStaff()); Register(new StitchThread()); Register(new MiasmaJar());
+            Register(new ThornBuckler()); Register(new HollowPoisonRing()); Register(new Paralysis()); Register(new RotBlade()); Register(new RotMossBall());
+            Register(new Blowpipe()); Register(new PoisonMagazine()); Register(new SlowPoisonBlade()); Register(new MiasmaMantle()); Register(new PoolKeeper());
+            Register(new CorrosionCrown()); Register(new BoneMeltOil());
+        }
+
+        /// <summary>シールドの軸 22 品のうち効果クラスを持つ 18 品 (2026-11-21・ShieldEffects.cs)。 残りの 4 品 (肩当て・当て布の籠手・鋲の胸当て・擦り減った小盾) は ShieldCore の旗。</summary>
+        private static void RegisterShield()
+        {
+            Register(new MirrorBuckler()); Register(new CatchBracer()); Register(new LayeredTagShield()); Register(new HolyRoadShoes());
+            Register(new HeroWill()); Register(new OiledShieldLeather()); Register(new BrokenShieldGrudge()); Register(new StrainGauntlet());
+            Register(new VeteranPatch()); Register(new KnightsTrump()); Register(new CompanionSoul()); Register(new ShieldPushArt());
+            Register(new SilentStance()); Register(new SiegeAxe()); Register(new SecondBeatHeart()); Register(new PulselessHeart());
+            Register(new FallenCastleCornerstone()); Register(new BorderGuardStandard());
+        }
+
+        /// <summary>出血の軸 26 品のうち効果クラスを持つ 16 品 (2026-11-21・BleedEffects.cs)。 残りの 10 品 (鉛入りの握斧・血日に澄む佩玉・医家の反り刃・返し刃の留め金・
+        /// 欠け刃のナイフ・裂け目の楔・鋸刃の山刀・血止め知らずの針箱・激情の刃・百人切りの鉈) は BleedCore の旗。 〈鎧縫いの針〉は stats の内側。</summary>
+        private static void RegisterBleed()
+        {
+            Register(new ThornGlove()); Register(new DrippingEdge()); Register(new SoulBloodstone()); Register(new BloodFate());
+            Register(new ArmorStitchNeedle()); Register(new NoClotSalve()); Register(new Wringing()); Register(new AntiClotting());
+            Register(new BloodWheel()); Register(new ClotVial()); Register(new BloodStrike()); Register(new BloodlineRing());
+            Register(new CrimsonPress()); Register(new EndlessSpringCrystal()); Register(new ReturningBloodSickle()); Register(new BloodWedge());
+        }
+
+        /// <summary>臨界の軸 26 品のうち効果クラスを持つ 15 品 (2026-11-21・HeatEffects.cs)。 残りの 11 品 (過熱石・燻りの革胸当て・火守りの火搔き棒・恒温の竈・二度詰めの雷管・
+        /// 焚き足しの炭・帳簿外の爆薬・火花読みの眼鏡・燧石の指輪・暴れ窯の火床・柱折りの発破筒) は HeatCore の旗 (荒砥・点火スパナ・溢れ取りの鋳型・早沸かし釜・八日目の灰燼は旗とクラスの両方)。</summary>
+        private static void RegisterHeat()
+        {
+            Register(new ArsenalCrate()); Register(new DryTinderbox()); Register(new HearthCloak()); Register(new PatchedBoots()); Register(new RoughWhetstone());
+            Register(new IgnitionSpanner()); Register(new HeatWall()); Register(new SecondStrike()); Register(new OverflowMold()); Register(new QuickKettle());
+            Register(new TenkouKaibutsu()); Register(new HopeShard()); Register(new UnyieldingHeat()); Register(new FierceBlade()); Register(new HarmlessLamp());
+        }
+
+        /// <summary>会心の軸 21 品のうち効果クラスを持つ 20 品 (2026-11-21・CritEffects.cs)。 〈必殺の照準器〉は本体の撃の輪の旗 (CombatManager.Turn)。 超過会心率の変換は CritCore (全員の規則)。</summary>
+        private static void RegisterCrit()
+        {
+            Register(new FalconerGlove()); Register(new AimNotch()); Register(new FirstArrow()); Register(new LingeringBell()); Register(new ParryFan());
+            Register(new UnwhettedClub()); Register(new SurveyorMonocle()); Register(new WhetAppraisal()); Register(new NickAppraisal()); Register(new HeftyPommel());
+            Register(new LapisWhetstone()); Register(new LayeredScabbard()); Register(new LayeredCutForm()); Register(new ChainedFlash()); Register(new QuickDrawArt());
+            Register(new Suntetsu()); Register(new PinpointEye()); Register(new ClairvoyantCrystal()); Register(new HeavenEyeGuard()); Register(new DeathMaskVisor());
+        }
+
+        /// <summary>山札の軸 19 品のうち効果クラスを持つ 2 品 (2026-11-21・DeckEffects.cs)。 残りの 17 品と〈焼き入れの挟み〉の撃の分・〈仕込みの配電盤〉の手札の分は
+        /// CombatSystem.TerminalCards の DeckItems の旗 (〈予備の差込口〉〈整理された工具箱〉は CombatManager.BeginTerminalDeck)。</summary>
+        private static void RegisterDeck()
+        {
+            Register(new TemperTongs()); Register(new PrimedSwitchboard());
+        }
+
+        /// <summary>役の軸 13 品のうち効果クラスを持つ 4 品 (2026-11-21・RoleEffects.cs)。 端子の解決の中の分 (見切りの木札・符丁の刻み板・欠け目の見立ての防御の無視・
+        /// 血染めの歯車・揃いの拍子木の与ダメージ・雷鳴のゾロ目・血濡れの符丁) は CombatSystem.TerminalCards の RoleItems の旗、
+        /// 擦り切れた賽袋・鏡合わせの盤・宿命の刻み目・万象のゾロ目は CombatManager の役の適用 (FreeRerollsLeft / ResolveRoles / DecideOmniPair)。</summary>
+        private static void RegisterRole()
+        {
+            Register(new ChippedEyeReading()); Register(new MatchedClappers()); Register(new LosingStreakDie()); Register(new LowFaceConduit());
+        }
+
+        /// <summary>金の 12 品のうち効果クラスを持つ 5 品 (2026-11-21・GoldEffects.cs)。 残りの 7 品 (封蝋・紹介状・合札・銭皿・天秤・溶金・手形) は戦闘の外で、
+        /// 持っているかを読む所が効かせる (溶金は items.json の stats・銭皿 = CoinDish・天秤 = SpoilsScale)。</summary>
+        private static void RegisterGold()
+        {
+            Register(new LuckyCoin()); Register(new BlastPrize()); Register(new MacroReceipt()); Register(new MacroAbacus()); Register(new SampleBox());
+        }
+
+        /// <summary>軸なし汎用の 36 品のうち効果クラスを持つ 13 品 (2026-11-21・GeneralEffects.cs)。 残りは戦闘の外で働く (探索・嵐・報酬・特殊戦術)。</summary>
+        private static void RegisterGeneral()
+        {
+            Register(new WeightingGauntlet()); Register(new BeltPouch()); Register(new BottomlessVial()); Register(new GapSpear());
+            Register(new BreakingMove()); Register(new HeavyBreakerWedge()); Register(new AdversityHourglass()); Register(new MacroBarometer());
+            Register(new SaberWaltz()); Register(new EspadaPasodoble()); Register(new FleuretBallet()); Register(new FalconTango()); Register(new BladeDance());
+        }
+
+        /// <summary>武器 13 品のスキル (2026-11-21・WeaponFamilyEffects.cs・full-item-rework-ledger §⑫)。 段の割り当ては WeaponProgression.Families、 竜閃は items.json の skills。</summary>
+        private static void RegisterWeapon()
+        {
+            for (int i = 0; i < 3; i++) { Register(new Fervor(i)); Register(new SwordReach(i)); Register(new SwiftHand(i)); Register(new Bulwark(i)); }
+            for (int i = 0; i < 2; i++) { Register(new ArmorBreak(i)); Register(new Duelist(i)); Register(new ChainBlade(i)); Register(new ShieldBash(i)); }
+            Register(new Recklessness()); Register(new BloodEdict()); Register(new GuardCut()); Register(new UndyingBlade());
+            Register(new VitalStrike()); Register(new Execution()); Register(new SteadfastStance()); Register(new Daybreak());
+            Register(new GaryoTensei()); Register(new MugaMushin());
+        }
+
+        /// <summary>全スキルを登録する。 秘宝は軸ごと (Effects/ の軸別 10 ファイル)・武器・敵の順。 ステータスだけのスキルは <see cref="RegisterStatSkills"/>。</summary>
         private static void RegisterAll()
         {
-            // ============================
-            //  アイテム再編 (2026-10-31・ReworkItemEffects.cs)
-            // ============================
-            Register(new OverheatStone());
-            Register(new HearthCloak());
-            Register(new DryTinderbox());
-            Register(new MorningOven());
-            Register(new OverflowMold());
-            Register(new SecondStrike());
-            Register(new SecondBeatHeart());
-            Register(new OffBookChain());
-            Register(new HeatWall());
-            Register(new QuickKettle());
-            Register(new IgnitionSpanner());
-            Register(new RoughWhetstone());
-            Register(new HarmlessLamp());
-            Register(new ArsenalCrate());
-            Register(new PatchedBoots());
-            Register(new HopeShard());
-            Register(new InfiniteMotor());
-            Register(new ThunderPowder());
-            Register(new OldGauge());
-            Register(new InvertedRod());
-            Register(new ThunderJar());
-            Register(new ScorchedWire());
-            Register(new ChargedCuirass());
-            Register(new CatfishSpine());
-            Register(new SearingWhip());
-            Register(new LentTime());
-            Register(new WornBuckler());
-            Register(new Pauldron());
-            Register(new MirrorBuckler());
-            Register(new HolyRoadShoes());
-            Register(new CompanionSoul());
-            Register(new KnightsTrump());
-            Register(new VeteranPatch());
-            Register(new PulselessHeart());
-            Register(new SmolderingBreastplate());
-            Register(new LightningHeadguard());
-            Register(new ThornBuckler());
-            // 鎧縫いの針 はステータス化 (段 3・敵の出血 1 につき貫通 +1)
-            Register(new StrainGauntlet());
-            Register(new GreenKnife());
-            Register(new PoisonWedge());
-            Register(new HerbStaff());
-            Register(new StitchThread());
-            Register(new HollowPoisonRing());
-            Register(new HundredCleaver());
-            Register(new RuinedGardenSprayer());
-            Register(new LongCenser());
-            Register(new WeightingGauntlet());
-            Register(new VenomBangle());
-            Register(new RotBlade());
-            // 血日に澄む佩玉 はステータス化 (段 3・敵の出血 1 につき会心率 +2%)
-            Register(new SoulBloodstone());
-            Register(new BloodlineRing());
-            Register(new SiegeAxe());
-            Register(new BloodWheel());
-            Register(new LeadHandAxe());
-            Register(new FuryBlade());
-            Register(new CoinDish());
-            Register(new TenkouKaibutsu());
-            Register(new LuckyCoin());
-            Register(new SpoilsScale());
-            Register(new BlastPrize());
-            Register(new SurveyorMonocle());
-            Register(new FierceBlade());
-            Register(new SlowPoisonBlade());
-            Register(new LapisWhetstone());
-            Register(new FlintRing());
-            Register(new Suntetsu());
-            Register(new UnwhettedClub());
+            RegisterCharge();
+            RegisterPoison();
+            RegisterShield();
+            RegisterBleed();
+            RegisterHeat();
+            RegisterCrit();
+            RegisterDeck();
+            RegisterRole();
+            RegisterGold();
+            RegisterGeneral();
+            RegisterWeapon();
+            RegisterEnemy();
+        }
 
-            // ============================
-            //  軸の品 (2026-11-07・AxisItemEffects.cs)。 各軸に 燃料 / ① 数を参照 / ②【規則】
-            // ============================
-            // 研ぎ師の見立て書 / 麻痺の吹き矢 はステータス化 (段 3・2026-11-11)。 千里眼の水晶・英雄の意志・過負荷チューナーは 2026-11-20 にクラスへ戻した (下の追加 34 品の並び)
-            Register(new FalconerGlove());                                       Register(new LayeredCutForm());     Register(new LayeredScabbard()); Register(new PinpointEye());
-            Register(new ReturnEdgeClasp());  Register(new UnstanchedNeedles()); Register(new ClotVial());
-            Register(new TasterSpoon());      Register(new MiasmaJar());         Register(new RotMossBall());
-            Register(new FirekeeperPoker());  Register(new CharcoalFeeder());       Register(new SparkReadingGlasses()); Register(new RefiredPrimer());
-            Register(new ToppedJar());        Register(new LeakyCopperWire());   Register(new ForkedTerminal());
-            Register(new PaddedBracer());     Register(new OiledShieldLeather());Register(new ShieldPushArt());
-            // 軸の品・追加 34 品 (2026-11-07・AxisItemEffects2.cs)。 各軸を 23 品にそろえた
-            Register(new AimNotch());   Register(new FirstArrow());   Register(new LingeringBell()); Register(new ParryFan());
-            Register(new NickAppraisal()); Register(new LosingStreakDie()); Register(new ChainedFlash()); Register(new QuickDrawArt());
-            Register(new SpareBattery()); Register(new StaticBlanket()); Register(new FlintNeedle()); Register(new StorageGauntlet());
-            Register(new RerollHammer()); Register(new InsulatedCloak()); Register(new LightningStake()); Register(new ThunderDrum());
-            Register(new ClairvoyantCrystal()); Register(new OverloadTuner()); Register(new HeroWill());   // 2026-11-20 作り直し (旧 items.json の stats)
-            Register(new ChippedKnife()); Register(new ThornGlove()); Register(new RiftWedge()); Register(new DrippingEdge());
-            Register(new NoClotSalve()); Register(new CrimsonPress()); Register(new EndlessSpringCrystal());
-            Register(new AcidVial()); Register(new NeedleRing()); Register(new LeafMoldBag());
-            Register(new MiasmaMantle()); Register(new PoolKeeper());
-            Register(new RivetPlate()); Register(new CatchBracer()); Register(new LayeredTagShield()); Register(new BrokenShieldGrudge());
-            // 軸の締めの LEGENDARY (2026-11-20・AxisItemEffects3.cs・GAME.md §23-32)
-            Register(new HeavenEyeGuard()); Register(new DeathMaskVisor());
-            Register(new ReturningBloodSickle()); Register(new BloodWedge());
-            Register(new CorrosionCrown()); Register(new BoneMeltOil());
-            Register(new WildKilnHearth()); Register(new PillarBreakerCharge());
-            Register(new ThunderReliquary()); Register(new FourthStrikeCore());
-            Register(new FallenCastleCornerstone()); Register(new BorderGuardStandard());
-            // 消耗品の連動品 (2026-11-20・ConsumableLinkEffects.cs・item-overhaul-spec §7-2)
-            Register(new BeltPouch()); Register(new SpentPride()); Register(new BottomlessVial()); Register(new SampleBox());
-            // 嵐・店・金のマクロ秘宝の戦闘の側 (2026-11-20・MacroItemEffects.cs・item-overhaul-spec §9)
-            Register(new MacroBarometer()); Register(new MacroReceipt()); Register(new MacroAbacus());
-            // 采配 (山札の軸) の出来事で書く 2 品 (2026-11-20・DeckItemEffects.cs・残り 16 品は TerminalCards の DeckItems の旗)
-            Register(new TemperTongs()); Register(new AshBroom());
-            // 賽目 (役の軸) の出来事で書く 2 品 (2026-11-21・RoleItemEffects.cs・残り 6 品は TerminalCards の RoleItems の旗と CombatManager の役の適用)
-            Register(new ChippedEyeReading()); Register(new MatchedClappers());
-            // クロス軸の 6 品 (2026-11-21・CrossItemEffects.cs・品の軸の偏重 5 以上で働く)
-            Register(new VenomPowderStore()); Register(new BloodstainedGear()); Register(new ThunderTriple());
-            Register(new FatalSight()); Register(new BloodCipher()); Register(new VenomConduit());
-            // 戦術の 6 品 (2026-11-21・TacticItemEffects.cs・item-overhaul-spec §6-2)
-            Register(new HeftyPommel()); Register(new SilentStance()); Register(new GapSpear());
-            Register(new BreakingMove()); Register(new HeavyBreakerWedge()); Register(new AdversityHourglass());
-
-            // ============================
-            //  汎用パッシブ
-            // ============================
-            // 追撃・剛力・堅忍・慧眼・不屈・治癒阻害の I〜IV の効果クラス (英字の id) は 2026-11-12 削除。
-            //   スキル id が品の名前になった (2026-09-22) あと、 どの品もその id を持っていなかった。
-
-            // 素のステータス品 (2026-09-15)。 **ラダーではない** ── 1 品 1 効果の独立品。
-            //   BRONZE/SILVER に発動条件なしで乗る品が 3 / 1 しか無かった穴を埋める。
-            // 荒砥 / 二度目の打金 / 肩当て / 擦り減った小盾 はステータス化 (items.json の stats)
-
-            // 活力
-            // VitalityI はステータス化
-
-            // ============================
-            //  武器家系 専用ラダー (2026-09-05)
-            //   共通ラダー (筋力/追撃/心眼/頑強/活力) の借用をやめ、家系ごとに 2 本ずつ持たせた。
-            //   正本: WeaponFamilyEffects.cs / 割り当ては WeaponProgression.Families
-            // ============================
-            //   2026-10-28 整理: 1 段に仕組み 1 つ・家系ごとに防御と貫通の使い方を分けた (ADR-0013)。
-            Register(new SwiftHandI());   // II / III はステータス化
-            Register(new VenomHandI());   Register(new VenomHandII());   Register(new VenomHandIII());
-            Register(new VitalStrike());  // 急所: 会心は防御無視 (会心率 +10% は stats)
-            // 処刑はステータスだけ (残HP 35% 以下で与ダメ +80%・2026-11-11 に 25% から)
-            Register(new SwordReachI());  // II / III はステータス化
-            Register(new DuelistIII());   // I / II はステータス化
-            Register(new GuardCut());     // 切り返し
-            Register(new UndyingBlade()); // 不滅の刃
-            Register(new BulwarkI());     Register(new BulwarkII());     Register(new BulwarkIII());
-            Register(new ShieldBashLadderI()); Register(new ShieldBashLadderII()); Register(new ShieldBashLadderIII());
-            Register(new SteadfastStance());   // 堅守の構え
-            Register(new Daybreak());          // 黎明
-            Register(new FervorI());      // II / III はステータス化 (段 3・経過ターン 1 につき 攻撃に挿した出目 +10%・上限 9 / 14)
-            Register(new ArmorBreakI());  Register(new ArmorBreakII());  Register(new ArmorBreakIII());
-            // 捨て身はステータスだけ (HP 割合で劣勢)
-            Register(new BloodEdict());   // 血令
-
-            // 複合武器 T4 の固有 6 種は 2026-09-21 削除 (複合武器の廃止・GAME.md §24)。
-            // 反攻 / 大鉈 / パリィ / 衛士の慣い / 復讐 / 蝕夜 / 処刑のダイス潰し / 果たし合い は 2026-10-28 削除 (GAME.md §24)。
-
-            // ============================
-            //  ユニークパッシブ
-            // ============================
-
-            // Ignite / CurseBind / Abyss は 2026-07-18 に class ごと削除 (dead_staff / curse 系列全廃)
-
-            // ============================
-            //  ダイス固有パッシブ
-            // ============================
-            // Destiny はステータス化 (単体戦)
-            // 武器Tier段階補正 (Lightweight/Mastery/Skill) は 2026-07-15 廃止
-            // (筋力とロールが重複)。クラス実装は AllPassiveSkillEffects に残置 = items.json 参照は将来的に別スキルへ差し替え要
-
-            // 処刑・対タンク・役・触媒（2026-05-29 追加）
-            // LifestealII はステータス化
-            // IndomitableIII はステータス化
-            // ShieldBashI〜IV (旧〈内から落ちた城盾〉) は 2026-10-28 削除。 盾家系の〈シールドバッシュ〉へ一本化した。
-            // Bloodlust / Hermes はステータス化
-            // 溶金の領主剣 はステータス化 (段 3・使ったゴールド 1 につき与ダメ +0.2%)
-
-            // 2026-06-03 新規追加アイテム
-            // EvenEyes / MasterworkNotes / KaleidoDice はステータス化
-
-            // 2026-06-05 会心バリエーション（OnCriticalDamage / OnCriticalCheck）
-            Register(new LacerationCore());   // 裂傷の刃心（会心→出血+2、会心倍率連動）
-
-            // 2026-06-04 [剣の舞] セット（4枚集約→無銘の剣舞譜に変化）
-            Register(new SaberWaltz());       // サーベル・ワルツ（ダイス+1／孤剣時HP半減）
-            Register(new EspadaPasodoble());  // エスパーダ・パソドブレ（自他ダイス+5／与被ダメ+20%）
-            Register(new FleuretBallet());    // フルーレ・バレエ（ダイス+3／敗北時自壊は救済チェーン）
-            Register(new FalconTango());      // ファコン・タンゴ（戦闘終了時 廃棄+全カテゴリ獲得）
-            Register(new BladeDance());       // 無銘の剣舞譜（剣先スタック：ダイス/回復/反射）
-
-            // 竜閃（ユニーク武器）
-            Register(new MugaMushin());
-            Register(new GaryoTensei());
-
-            // 2026-07-15 鈍器系 (新規 9 種・会心を犠牲に非会心火力を伸ばすトレードオフ型)
-            // 重い一撃 / 破城槌 / 鈍器 はステータス化 (items.json の stats)
-            // SingleMinded はステータス化 (非会心の連続)
-            // Stubbornness はステータス化
-
-            // 2026-07-15 毒系 (新規 9 種・拘束/妨害中心のキーワードビルド)
-            Register(new SerpentBlood());     // 蛇の血 (会心で毒+2)
-            Register(new Paralysis());        // 麻痺毒 (毒スタック分 敵攻撃-N・拘束中核)
-            // VenomBlade はステータス化
-
-            // 2026-07-15 炎上系 拡張 (既存 Ignite + 新 8種で計9のキーワードビルド化)
-            // Burn (炎上) 系 2026-07-16 削除: Bleed と機構重複のため撤廃、「臨界」新軸に置換
-            // Kindling/FlamingWeapon/InfernoOrder/Stoke/Immortalflame/InfernoManifest/FlameEdge/EverBurning は 2026-07-18 class ごと削除
-
-            // 2026-07-15 出血系 拡張 (既存3種+新6種で計9のキーワードビルド化)
-            // BloodScent はステータス化
-            Register(new CrimsonBlade());    // 紅蓮の刃 (HP割合で出血付与)
-            Register(new Wringing());        // 絞り出し (T終了時 出血×2 追加ダメ)
-            Register(new BloodStrike());     // 血の一撃 (出血1消費で×3ダメ)
-            Register(new AntiClotting());    // 止血阻害 (出血減衰無効化)
-            Register(new BloodFate());       // 血の宿命 (開幕 出血+2)
-
-            // 2026-07-15 充電系 (ADR-0009 柱5・新パイプライン専用)
-            // Overload はステータス化
-            // 雷神槍 (旧 ShortCircuit) はステータス化 (段 3・このターンに使った充電の半分を攻撃へ)
-
-            // 臨界系 (Rinkai) 2026-07-16 追加: メーター蓄積型・Burn 撤廃後の新軸
-            Register(new UnyieldingHeat());    // 不朽の熱 (meter40+ で致命耐え・meter全消費)      // 臨界 (過充電3T継続で会心確定+全消費)
-
-            // ============================
-            //  敵専用スキル
-            // ============================
-
+        /// <summary>敵とボスのパッシブ (EnemyPassiveSkillEffects.cs・7 層のヴェスカは VescaEffects.cs)。</summary>
+        private static void RegisterEnemy()
+        {
             // 1～3層: シンプル型
             Register(new Trapper());
             Register(new Undying());
@@ -438,7 +309,6 @@ namespace ItemSystem.PassiveSkills
             Register(new MirrorTwinsResponse());
             Register(new JudgmentFlames());
             Register(new BlazeBrand());
-            // 灰燼の王 リワーク（見切り＆カウンター型）※ADR-0009 相互攻撃モデル下で発火経路が壊れており deprecated
             Register(new JudgmentBlaze());
             Register(new AshArmor());
             // 灰燼の王 v2 リワーク (2026-07-16 ADR-0009 相互攻撃対応): 外殻半減/周期予兆/階段回復/収支負けスタック
@@ -458,12 +328,6 @@ namespace ItemSystem.PassiveSkills
             Register(new RecurrentTruth());      // 回帰性真理（毒/出血の毎T半減・受ける会心倍率-0.5・臨界-5/T・処刑/最大HP変更を拒否）
             Register(new ContinuousExperiment()); // 連続実験（HP0で死なず次フェーズへ。最終段は非所持）
             Register(new DivineTalent());        // 天与の才（段4のみ 2枚抽選）
-            // [削除 2026-10-17] FlawlessRobe (天衣無縫) ── 覚者専用・使う敵なし        // 天衣無縫（回復/シールド獲得の減衰。 ヴェスカでも流用可）
-
-            // [廃止] 覚者×7形態連戦 (AwakenedP1..P7 / TrueSelf)。
-            //   旧ロール勝負モデル専用の機構で ADR-0009 既定 true 下では発火経路が成立しない。
-            //   **2026-08-24 にクラスごと削除済み** (再登録できるコードはもう無い)。
-            //   経緯と代替は docs/GAME.md §24 / §13-4。
         }
     }
 }

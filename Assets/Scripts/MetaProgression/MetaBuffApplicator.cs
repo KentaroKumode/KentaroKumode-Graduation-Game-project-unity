@@ -307,12 +307,11 @@ namespace MetaProgression
 
         // === 種火 (軸の宣言・枠に 1 つ) ===
 
-        /// <summary>種火の店の出現の重み: 挿している種火の軸の品は ×<see cref="MetaPanel.SparkAppearanceWeightMul"/>、 それ以外は 1.0。
-        /// <paramref name="keyword"/> は SparkStarterPicker.KeywordOf の値 ("charge" など)。</summary>
-        public static float GetSparkAppearanceWeightMul(string keyword)
+        /// <summary>挿している種火の軸 (items.json の axis・"充電" など)。 ランの始めに出現の枠 (RunState.lockedAxes) の 1 つ目へ入る。 種火が無ければ null。</summary>
+        public static string GetSparkAxis()
         {
             var m = S?.Equipped(MetaSlot.Spark);
-            return m.HasValue && keyword != null && MetaPanel.SparkKeyword(m.Value) == keyword ? MetaPanel.SparkAppearanceWeightMul : 1.0f;
+            return m.HasValue ? SparkStarterPicker.AxisOf(MetaPanel.SparkKeyword(m.Value)) : null;
         }
 
         /// <summary>種火・充電: 充電上限 +N。 CombatManager.ChargeMax + この値。</summary>

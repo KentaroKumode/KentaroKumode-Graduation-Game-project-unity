@@ -245,41 +245,31 @@ namespace CombatSystem
         ///   - シールドは通常ダメージから先に吸い、 余れば固定ダメージも吸う。
         ///     吸収量は反射（返しの盾/不落の城盾）の原資として記録する。
         /// </summary>
-        /// <summary>臨界の爆発 1 回のダメージをその場で入れる (ADR-0016・Kw.AddHeat の中から呼ばれる)。 軽減無視 (会心・与ダメの池・防御は乗らない。
-        /// 最終与ダメージ倍率・怠惰・ダウンの ×1.5 は HpLossDiag.Lose が掛ける)。 <paramref name="burstDmg"/> = 爆発 1 回の量 (Kw.BurstBase・超臨界なら ×1.5)。
-        /// 〈火花読みの眼鏡〉(burstCritRule) なら爆発ごとに会心の判定をし、 会心なら会心倍率の半分が乗る。
+        /// <summary>臨界の爆発 1 回のダメージをその場で入れる (ADR-0016・Kw.AddHeat の中から・〈八日目の灰燼〉〈無害灯〉も)。 <paramref name="landed"/> = 敵の防御を通した後の量
+        /// (HeatCore.VsDefense・会心と与ダメの池は乗らない。 最終与ダメージ倍率・怠惰・ダウンの ×1.5 は HpLossDiag.Lose が掛ける)。
         /// 遺物 (§15-5) 臨界の「爆発時に敵の現在 HP の N%」も 1 回ごとに足す (現在 HP 比なので自己減衰し、 撃破には届かない)。
         /// ターンの解決中は手元の HP (enemyHP)、 それ以外は ctx の HP を減らす。 戻り値 = この爆発で敵が倒れた。</summary>
-        public bool LandBurst(ItemSystem.PassiveSkills.CombatContext ctx, int burstDmg)
+        public bool LandBurst(ItemSystem.PassiveSkills.CombatContext ctx, int landed)
         {
-            if (ctx == null || burstDmg <= 0 || !isCombatActive) return false;
+            if (ctx == null || landed <= 0 || !isCombatActive) return false;
             bool resolving = ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.ResolvingKey) > 0;
             int hp = resolving ? enemyHP : ctx.enemyCurrentHP;
             if (hp <= 0) return false;
-            int dmg = burstDmg;
-            bool crit = false;
-            if (ctx.burstCritRule)
-            {
-                int n = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.BurstTotalKey);
-                // 本判定と同じ優先順 (ApplyRoleExtraDamage と同じ): 封印 (無心の刃) で外れ、 forceCritical が最後に確定で上書きする
-                crit = ((!ctx.critSuppressed && GameLoop.GameRng.Chance(CritRateOf(ctx, pendingBuff: false), "combat.burstCrit", RngIdx(50 + n % 50)))
-                    || ctx.forceCritical) && !ctx.critToDamage;   // 〈銑鉄棍〉の【規則】: 会心が出なくなる
-                if (crit) dmg += Mathf.FloorToInt(burstDmg * Math.Max(0f, ctx.criticalMultiplier / 2f - 1f));
-            }
             float rinPct = MetaProgression.Relics.RelicApplicator.GetRinkaiCurrentHpPct(GameLoop.GameManager.Instance?.Run, ctx);
             int relicBurst = rinPct > 0f ? Mathf.FloorToInt(hp * rinPct) : 0;
             // [測定用の物差し 2026-11-10] 入る量だけに掛ける
-            int landed = EnemyHpLedger.ProbePassive(dmg) + EnemyHpLedger.ProbePassive(relicBurst);
+            int dmg = EnemyHpLedger.ProbePassive(landed) + EnemyHpLedger.ProbePassive(relicBurst);
             int before = hp;
-            HpLossDiag.Lose(ref hp, landed, "臨界の爆発");
+            HpLossDiag.Lose(ref hp, dmg, "臨界の爆発");
             CombatStats.DamageBreakdown[22] += before - hp;   // [計装] 臨界の爆発
             if (resolving) enemyHP = hp; else ctx.enemyCurrentHP = hp;
-            Debug.Log($"[臨界爆発] {burstDmg}{(crit ? $" 会心 → {dmg}" : "")}{(relicBurst > 0 ? $" ＋遺物 {relicBurst} (現在HP {before} の {rinPct:P0})" : "")} → 敵HP {hp}");
+            Debug.Log($"[臨界爆発] {landed}{(relicBurst > 0 ? $" ＋遺物 {relicBurst} (現在HP {before} の {rinPct:P0})" : "")} → 敵HP {hp}");
             return hp <= 0;
         }
 
+        /// <param name="unabsorbable">主攻撃のうちシールドに吸われない量 (〈死相の面頬〉の会心した撃)。</param>
         private void ApplyVescaDefense(ItemSystem.PassiveSkills.CombatContext ctx,
-                                       ref int dealtDmg, ref int dealtFixed)
+                                       ref int dealtDmg, ref int dealtFixed, int unabsorbable = 0)
         {
             if (ctx == null) return;
 
@@ -311,7 +301,7 @@ namespace CombatSystem
             // --- シールド吸収 ---
             if (ctx.vescaShield <= 0) return;
             int absorbed = 0;
-            int take = Math.Min(ctx.vescaShield, dealtDmg);
+            int take = Math.Min(ctx.vescaShield, Math.Max(0, dealtDmg - unabsorbable));
             dealtDmg -= take; ctx.vescaShield -= take; absorbed += take;
             if (ctx.vescaShield > 0 && dealtFixed > 0)
             {
@@ -810,20 +800,21 @@ namespace CombatSystem
                 // 挑戦カード〈猫の手〉: 出目と予告が確定したここで、 1 組を先に挿す (人の画面・BOT の方策はこの 1 組を外せない)
                 ChooseCatPaw(playerDice, tele, tenv);
                 int[] slots = null, targets = null; bool[] keepMarks = null;
+                int reboot = ChargeCore.RebootNone; bool overclock = false;      // 充電のコアアクション (人 = 画面 / BOT = 方策・2026-11-21)
                 if (_interactiveTurn)
                 {
                     _pause.Set(TurnPauseKind.Wiring, playerDice, playerFaceIdx, tele);
                     _pause.board = _deck.board; _pause.terminalEnv = tenv; _pause.terminalState = _deck.state;
                     _pause.catDie = _catDie; _pause.catSlot = _catSlot;
                     yield return _pause;
-                    slots = _pause.slots; targets = _pause.targets; goldAsk = _pause.goldSpend; keepMarks = _pause.keep;
+                    slots = _pause.slots; targets = _pause.targets; goldAsk = _pause.goldSpend; keepMarks = _pause.keep; reboot = _pause.reboot; overclock = _pause.overclock;
                 }
-                else if (WiringPolicy != null) { var plan = WiringPolicy(playerDice, tele); slots = plan.slots; targets = plan.targets; goldAsk = plan.goldSpend; keepMarks = plan.keep; }
+                else if (WiringPolicy != null) { var plan = WiringPolicy(playerDice, tele); slots = plan.slots; targets = plan.targets; goldAsk = plan.goldSpend; keepMarks = plan.keep; reboot = plan.reboot ?? ChargeCore.RebootNone; overclock = plan.overclock; }
                 if (slots == null) slots = TerminalWiring.Auto(_deck.board, playerDice, tenv, _deck.state, _catDie, _catSlot);
                 // 猫の 1 組は答えに関わらず入れる (外した答え・同じ口に挿しすぎた答えは、 猫の組を残して直す)
                 if (_catDie >= 0) slots = TerminalWiring.WithPair(slots, playerDice.Length, _deck.board, _catDie, _catSlot);
                 // 〈影写し〉〈火葬の剣〉〈有効活用〉の対象: 人 = 画面で選んだ端子 / BOT = 方策 / どちらも無ければ左端の候補
-                term = TerminalCards.Resolve(_deck.board, slots, playerDice, tenv, _deck.state, targets, logAttack: true);
+                term = TerminalCards.Resolve(_deck.board, slots, playerDice, tenv, _deck.state, targets, logAttack: true, reboot: reboot, overclock: overclock);
                 _termWanted = (int[])slots.Clone();   // [計装 #106] 直す前の挿し方 (挿したが不発の数え)
                 mutualWiring = term.kindOfDie;
                 _termOutcome = term;
@@ -850,63 +841,18 @@ namespace CombatSystem
             ApplyTerminalOutcome(ctx, term, ref enemyAtkValue);
             RaiseTerminalEvents(ctx, term);   // 端子の出来事 (使い捨て・切り直し・残した端子・補助・2026-11-20)。 OnWired の前 (〈灰払いの箒〉の「次の撃」がこのターンの撃になる)
             int _diagAtkRaw = attackSum;
-            // 遺物 (§15-5) 堅牢の環: 防御の端子を挿した出目 +N% (出目の合計に掛けて切り上げ・端子調律より前)
-            {
-                float rbp = MetaProgression.Relics.RelicApplicator.GetBlockDicePct();
-                if (rbp > 0f && blockSum > 0) blockSum += Mathf.CeilToInt(blockSum * rbp);
-            }
-            // 大罪:傲慢 (挑戦カード IV・2026-11-10): 防御の端子を挿した出目 −N% (切り捨て)
-            {
-                float cut = MetaProgression.MetaDebuffApplicator.GetSinBlockCutPct();
-                if (cut > 0f && blockSum > 0) blockSum = Mathf.FloorToInt(blockSum * (1f - cut / 100f));
-            }
-
-            // 端子調律メタバフ: **接続したダイス 1 本あたり** +N (2026-07-28 に「合計 +N」から変更)。
-            // r3 で 3 本挿せば +9 ── 端子へ厚く配線するほど伸びるので、 §6-4 の配線判断と噛む。
-            // 本数ベースなので「0 配線の端子に架空の加算が乗る」問題は構造的に起きない。
+            // 端子調律メタバフ: **接続したダイス 1 本あたり** +N (2026-07-28 に「合計 +N」から変更)。 ブロックの分は FinalBlockSum の中
             int _diagAtkGhost = 0;   // (ゴースト接続は ADR-0011 で廃止)
             attackSum += attackDiceCount * MetaProgression.MetaBuffApplicator.GetAttackTerminalPerDice();
-            blockSum  += blockDiceCount  * MetaProgression.MetaBuffApplicator.GetBlockTerminalPerDice();
-
-            // 〈貫きの錐〉(7層ヴェスカ GOLD 遺物・2026-07-29 変更)。
-            //   旧: ブロック配線を **丸ごと 0 にする**。 防御という選択肢が消えるため、
-            //       予告があっても対処のしようがなく、 致死率が基準の 2.80 倍に達していた。
-            //   新: **敵の攻撃値 1 につきブロックを 2 削る**。 貫通量が攻撃値に比例するので、
-            //       厚く配線すれば残る ＝ 「守り切れるか」の計算問題になる。
-            //   端子調律メタの本数ボーナスも貫通対象に含めるため、 加算の **後** に処理する。
-            if (ctx != null && ctx.playerBlockIgnored && blockSum > 0)
-            {
-                int pierce = Math.Max(0, enemyAtkValue) * PierceAwlPerAttack;
-                int before = blockSum;
-                blockSum = Math.Max(0, blockSum - pierce);
-                Debug.Log($"[貫きの錐] 敵攻撃{enemyAtkValue} × {PierceAwlPerAttack} = ブロック -{pierce} "
-                        + $"({before} → {blockSum})");
-            }
-            // 〈狂暴化〉(51T〜・2026-11-21): ブロックは何も受けない (守った量も 0)
-            if (ctx != null && ctx.enemyAttackIgnoresGuard) blockSum = 0;
-            // 〈不完全な転移〉(門を不完全に起動した罰・2026-09-14)。
-            //   錐と同じ「ブロックを削る」枠だが、 <b>敵攻撃値ではなくブロック量に比例</b>する。
-            //   厚く配線した分は必ず一定割合残るので、 守りという選択肢は消えない。
-            //   錐の後に置く ── 両方掛かるときは「錐で削られた残り」へさらに貫通が乗る。
-            if (blockSum > 0)
-            {
-                var gateRun = GameLoop.GameManager.Instance?.Run;
-                int beforeGate = blockSum;
-                blockSum = GameLoop.GateFlaws.ApplyTransferPierce(gateRun, blockSum);
-                if (blockSum != beforeGate)
-                    Debug.Log($"[不完全な転移] ブロック貫通 {beforeGate} → {blockSum}");
-            }
+            // ブロックの最終値 (遺物・大罪・端子調律・品のブロック +N・貫きの錐・狂暴化・不完全な転移)。 ジャスト防御の見込み (JustGuardForecast) と同じ関数
+            blockSum = FinalBlockSum(ctx, term.blockAdd, blockDiceCount, enemyAtkValue, log: true);
+            int itemBlockAtWiring = ctx.itemBlockBonus;   // これより後 (OnWired・攻撃の中の会心・爆発) に品が足したブロックは、 敵の攻撃の前に足す
             // 充電: **接続ダイスの出目合計**を獲得 (2026-07-28 に「個数」から変更)。
             //   旧: 1 本 = 1 充電。 だが消費側は 雷撃 3 / 火花 1 / 過充電閾値 7 と桁が合わず、
             //       雷撃を毎ターン撃つだけで 5 本中 3 本を充電に固定する必要があった。
             //   山札 (ADR-0014) では、 充電に入る量は端子ごとに違う (〈雷溜め〉は 出目 +2 など)。 chargeSum は端子の結果の合計。
             if (chargeSum > 0) ctx.AddCharge(chargeSum);
-            // 〈電流〉の②: 充電端子に挿した出目の一部が攻撃にも加わる (2026-11-07)。 攻撃に 1 個も挿していないターンは攻撃しないので乗らない。
-            if (ctx.chargeToAttackPct > 0f && chargeSum > 0)
-                attackSum += Mathf.FloorToInt(chargeSum * ctx.chargeToAttackPct);
 
-            // 遺物 (§15-5): 刻印〈ブロック端子に未配線〉の判定材料。 **配線集計の直後に確定させる**。
-            ctx.blockWiredThisTurn = blockDiceCount > 0;
             // 剣〈切り返し〉・盾〈城壁〉が読む「守った量」。 **貫通 (playerBlockIgnored) を差し引いた後の値**を渡す
             //   ── 実際に受け止めた分だけを数える。 ここは解決 (step6) より前なので
             //   OnWired / OnPreDealDamage から読める (OnPostRoll は配線より前なので読めない)。
@@ -990,8 +936,8 @@ namespace CombatSystem
             //   自攻撃前に true、敵攻撃前に false へ toggle する (収支トリガーは §収支計算 で最終確定)
             ctx.playerWonRoll = true; ctx.playerLostRoll = false;
             // 2026-07-25: 消費 (cons_atk_*) の攻撃バフ。旧モデルでは consDiceRoll=勝敗判定のみだったが、
-            // 相互攻撃モデルでは攻撃値に直接加算する (竜閃 rollPurity 中は無効)。
-            int consAtk = ctx.rollPurity ? 0 : ctx.consDiceRoll;
+            // 相互攻撃モデルでは攻撃値に直接加算する。
+            int consAtk = ctx.consDiceRoll;
             // 遺物 (§15-5) 攻撃+N。 パッシブ由来の mutualAttackBonus と同じ枠へ足す。
             int relicAtk = MetaProgression.Relics.RelicApplicator
                            .GetAttackBonus(GameLoop.GameManager.Instance?.Run, ctx);
@@ -1000,6 +946,7 @@ namespace CombatSystem
             //   端子に紐づかない攻撃の加算 (連係・変圧・溜めた攻撃・賽の加算・〈電流〉の②) は最初の 1 撃に入れる。
             int itemAtk = ctx.mutualAttackBonus;   // 品の攻撃 +N (下の出目 +% は足す前に控える ── 出目 +% は端子ごとの 1 撃に入れる)
             var hitBases = new List<int>();
+            attackSum += ctx.firstHitAttackBonus;      // 〈引き直しの撃鉄〉: 最初の 1 撃へ (端子に紐づかない加算と同じく下の rest に入る)
             {
                 int metaPerDie = MetaProgression.MetaBuffApplicator.GetAttackTerminalPerDice();
                 int rest = attackSum;
@@ -1028,6 +975,12 @@ namespace CombatSystem
             {
                 int outside = playerAttackPower + itemAtk + consAtk + relicAtk;
                 for (int h = 0; h < hitBases.Count; h++) hitBases[h] += outside;
+            }
+            // 短剣〈連刃〉: 攻撃の端子 2 枚以上のターン、 最後に追撃を 1 撃 (攻撃 = 武器の攻撃力 × 率・敵の防御を無視・撃ごとの効果は通常の撃と同じ)
+            int chainHit = -1;
+            {
+                int cb = attackDiceCount > 0 ? ItemSystem.PassiveSkills.Effects.ChainBlade.HitBase(ctx, playerAttackPower) : 0;
+                if (cb > 0 && hitBases.Count >= ItemSystem.PassiveSkills.Effects.ChainBlade.NeedTerminals) { hitBases.Add(cb); chainHit = hitBases.Count - 1; WeaponChainFired++; }
             }
             // atkBase = 1 撃ずつの合計 (画面・計装が読む)。 1 撃ずつの量は hitBases
             int atkBase = hitBases.Sum();
@@ -1113,10 +1066,14 @@ namespace CombatSystem
             var hitDealt = new List<int>(); var hitCrit = new List<bool>();
             int nHits = Math.Max(1, hitBases.Count);
             ctx.hitCount = hitBases.Count;   // 撃ごとの品が読む (攻撃しないターンは 0 ── 下の 1 回は固定ダメの枠を取り出すだけ)
+            //   〈必殺の照準器〉(CritCore): 攻撃の端子が 1 枚だけのターン、 その撃が会心なら同じ撃をもう 1 回発火する (1 ターン 1 回・会心は確定・乱数は引かない)
+            bool sniper = hitBases.Count == 1 && GameLoop.GameManager.Instance?.Run?.OwnsPassive(GameLoop.ItemIds.CritSniper) == true;
+            bool refire = false; float sniperAdd = 0f;
             for (int h = 0; h < nHits; h++)
             {
-                ctx.hitIndex = h; ctx.forceCritThisHit = false; ctx.hitFinalDamagePct = 0;   // 撃ごとの値 (〈抜き打ちの作法〉〈加重の拳套〉など)
-                if (h > 0)
+                ctx.hitIndex = h; ctx.forceCritThisHit = refire; ctx.critSkipRoll = refire; ctx.hitFinalDamagePct = 0; ctx.hitOutgoingPct = 0; ctx.hitIgnoreDefense = h == chainHit; ctx.hitArmorPen = 0;   // 撃ごとの値 (〈抜き打ちの作法〉〈加重の拳套〉・〈連刃〉の追撃は防御を無視)
+                ctx.hitFaceMax = CritCore.HitFaceMax(term, playerDice, h);   // 〈狙い目の刻み〉が読む
+                if (h > 0 || refire)
                 {
                     // 次の撃の前に固定ダメの枠を空にする ── 空にしないと 1 撃目の固定ダメ (毒・品が預けた分) が次の撃にも返って二重に入る。
                     ctx.fixedDamageToEnemy = 0;
@@ -1126,14 +1083,23 @@ namespace CombatSystem
                 bool needle = TakeTacticNeedle(ctx, h, h < hitBases.Count);
                 int needlePen = ctx.playerArmorPen;
                 if (needle) { ctx.forceCritThisHit = true; ctx.playerArmorPen += DefenseFormula.IgnoreAll; Debug.Log("[急所突きの針] この撃は必ず会心・敵の防御を無視"); }
+                //   【オーバークロック】(〈雷鳴の太鼓〉・ChargeCore): 最初の 1 撃の最終与ダメージ +60%・敵の防御を全部無視 (この撃だけ・貫通は撃の後に戻す)
+                bool oc = term.overclock && h == 0 && h < hitBases.Count && !refire;
+                if (refire && sniperAdd >= 1f) ctx.criticalMultiplier += CritCore.SniperMulAdd;   // 〈必殺の照準器〉: 会心率 100% 以上なら、 もう 1 回の撃の会心倍率 +1.0
+                if (oc) { ctx.hitFinalDamagePct += ChargeCore.OverclockFinalPct; if (!needle) ctx.playerArmorPen += DefenseFormula.IgnoreAll; }
                 var (d, f, c) = psm.ProcessDamage(h < hitBases.Count ? hitBases[h] : 0, h == 0 ? ctx.pursuitDamage : 0, playerCritBaseRate);
                 d = ApplyWinDamageModifiers(d, ref f, ref c, lbStage, psm, ctx);
-                if (needle) ctx.playerArmorPen = needlePen;
+                //   出血の品 (5f・BleedCore・2026-11-21): その撃が当たった直後に、 撃ごとの出血を入れる (次の撃は増えた出血を見る)
+                if (d > 0 && h < hitBases.Count && h < term.attackHitBleed.Count && term.attackHitBleed[h] > 0) ctx.AddEnemyBleed(term.attackHitBleed[h]);
+                if (needle || oc) ctx.playerArmorPen = needlePen;
+                if (d > 0 && h < hitBases.Count) ItemSystem.PassiveSkills.Effects.ArmorBreak.OnHit(ctx);   // 斧〈鎧砕き〉: 撃が当たったら敵の防御 −N (この撃の防御の計算の後)
                 if (h == 0) { afterPool = ctx.outgoingDamageMultiplier; afterCritMul = ctx.criticalMultiplier; afterCritAdd = ctx.critRatePctAdd; }
                 hitDealt.Add(d); hitCrit.Add(c);
                 dealtDmg += d; dealtFixed += f; isCrit |= c;
+                if (refire) { refire = false; CritRefireFired++; Debug.Log($"[必殺の照準器] 会心の撃をもう 1 回発火 → {d}"); }
+                else if (sniper && c && h == 0) { refire = true; sniperAdd = ctx.lastCritAddPct; h--; }
             }
-            ctx.forceCritThisHit = false; ctx.hitFinalDamagePct = 0;
+            ctx.forceCritThisHit = false; ctx.critSkipRoll = false; ctx.hitFinalDamagePct = 0; ctx.hitOutgoingPct = 0; ctx.hitIgnoreDefense = false; ctx.hitArmorPen = 0;
             if (nHits > 1)
             {
                 // この後の処理 (計装・画面の倍率) は 1 撃目の後の値を読む前提なので、 1 撃目の後の値へ戻す
@@ -1201,7 +1167,13 @@ namespace CombatSystem
 
             // 7層ヴェスカ: 〈解析演算〉の回避 → 〈真守/革の手甲/不落の城盾〉のシールド吸収 の順に通す。
             EnemyHpLedger.NoteFixedPreDefense(dealtFixed);   // [計装] 固定ダメ枠の要求 (毒・爆発・その他に按分する)
-            ApplyVescaDefense(ctx, ref dealtDmg, ref dealtFixed);
+            {
+                //   〈死相の面頬〉: 会心した撃は敵のシールド (ヴェスカの守り) に吸われない
+                int critPierce = 0;
+                if (ItemSystem.PassiveSkills.Effects.DeathMaskVisor.Pierces(ctx))
+                    for (int h = 0; h < hitDealt.Count; h++) if (hitCrit[h]) critPierce += hitDealt[h];
+                ApplyVescaDefense(ctx, ref dealtDmg, ref dealtFixed, Math.Min(critPierce, dealtDmg));
+            }
             result.totalDamage = dealtDmg;
             result.fixedDamage = dealtFixed;
             // [計測] ボス戦のみ、 プレイヤーの主攻撃と固定ダメを分けて実測する
@@ -1215,8 +1187,8 @@ namespace CombatSystem
                     BossDmgDiag.AddSpike(
                         $"{(currentEnemy != null ? currentEnemy.displayName : ctx.bossId)} T{ctx.currentTurn} "
                       + $"主{dealtDmg} 固{dealtFixed} | crit={isCrit} critMul={ctx.criticalMultiplier:F2} "
-                      + $"outMul={ctx.outgoingDamageMultiplier:F2} burstDmg={ctx.rinkaiBurstDamage} 脆弱={ctx.enemyVulnerabilityMultiplier:F2} "
-                      + $"armorPen={ctx.playerArmorPen} 敵防御={ctx.enemyDefense} 画竜={ctx.garyoProc} "
+                      + $"outMul={ctx.outgoingDamageMultiplier:F2} 臨界={ctx.rinkaiMeter}/{ctx.rinkaiThreshold} 脆弱={ctx.enemyVulnerabilityMultiplier:F2} "
+                      + $"armorPen={ctx.playerArmorPen} 敵防御={ctx.enemyDefense} "
                       + $"atkDice={(int)ctx.GetAccumulated("mutualAttackDiceCount")} "
                       + $"pRoll={ctx.playerDiceTotal} 武器={GameLoop.GameManager.Instance?.Run?.equippedWeaponId}");
                 }
@@ -1248,7 +1220,7 @@ namespace CombatSystem
                 int hitDmg = h == hitDealt.Count - 1 ? hitLeft : Math.Min(hitDealt[h], hitLeft);
                 hitLeft -= hitDmg;
                 HpLossDiag.Lose(ref enemyHP, hitDmg, "通常攻撃");
-                // 〈天眼の鍔〉(2026-11-20・§23-32): 会心の一撃のあと、 敵の HP が「会心倍率 × 5%」以下なら倒す (ボスはその半分)。 〈百人切りの鉈〉と同じく CanExecuteEnemy で止まる
+                // 〈天眼の鍔〉: 会心の一撃のあと、 敵の HP が「会心倍率 × 6%」(最大 30%・ボスはその半分) 以下なら倒す。 〈百人切りの鉈〉と同じく CanExecuteEnemy で止まる
                 if (hitCrit[h] && hitDmg > 0 && enemyHP > 0)
                 {
                     int line = ItemSystem.PassiveSkills.Effects.HeavenEyeGuard.KillLine(ctx);
@@ -1256,10 +1228,36 @@ namespace CombatSystem
                     {
                         int left = enemyHP;
                         enemyHP = 0;
+                        CritExecuteFired++;
                         HpLossDiag.Add("経路:処刑(天眼の鍔)", left);
                         EnemyHpLedger.Land("処刑(天眼の鍔)", left, left);
                         Debug.Log($"[天眼の鍔] 会心のあと敵 HP {left} ≤ {line} → 倒す");
                     }
+                }
+                // 〈百人切りの鉈〉(2026-11-21・BleedCore): 撃が当たったあと、 敵の出血が 12 以上で HP が「出血 × 1.2%」(ボスは半分・最大 25%) 以下なら倒す。 CanExecuteEnemy で止まる
+                if (hitDmg > 0 && enemyHP > 0 && _deck != null && (_deck.state.bleedItems & BleedItems.Cleaver) != 0 && currentEnemy != null)
+                {
+                    int line = BleedCore.CleaverKillLine(ctx.enemyBleedStacks, ctx.enemyMaxHP, GameLoop.BossIds.IsBoss(currentEnemy.id));
+                    if (line >= 0 && enemyHP <= line && ctx.CanExecuteEnemy())
+                    {
+                        int left = enemyHP;
+                        enemyHP = 0;
+                        BleedExecuteFired++;
+                        HpLossDiag.Add("経路:処刑(百人切りの鉈)", left);
+                        EnemyHpLedger.Land("処刑(百人切りの鉈)", left, left);
+                        Debug.Log($"[百人切りの鉈] 出血 {ctx.enemyBleedStacks} の敵 HP {left} ≤ {line} → 倒す");
+                    }
+                }
+                // 短剣〈処刑〉: 撃が当たったあと、 敵の残り HP が 15% 以下 (ボス 10% 以下) なら倒す。 CanExecuteEnemy で止まる
+                if (hitDmg > 0 && enemyHP > 0 && currentEnemy != null
+                    && ItemSystem.PassiveSkills.Effects.Execution.Kills(ctx, enemyHP, ctx.enemyMaxHP, GameLoop.BossIds.IsBoss(currentEnemy.id)))
+                {
+                    int left = enemyHP;
+                    enemyHP = 0;
+                    WeaponExecuteFired++;
+                    HpLossDiag.Add("経路:処刑(短剣)", left);
+                    EnemyHpLedger.Land("処刑(短剣)", left, left);
+                    Debug.Log($"[処刑] 敵 HP {left}/{ctx.enemyMaxHP} → 倒す");
                 }
                 int broke = NoteBossDownMainHit(hitDmg, ctx.currentTurn);   // ボスのダウン (2026-11-14): 目盛りを割れるのは通常攻撃だけ (固定ダメの枠より前の HP で判定)
                 // 端子〈崩し斬り〉(2026-11-20): この撃 (撃 h = 攻撃の端子 h 枚目) で目盛りを割ったら、 最大 HP の 5% の軽減不可 (預かり・ターンの最後に通る。 通常攻撃ではないので次の目盛りは割らない)
@@ -1350,19 +1348,6 @@ namespace CombatSystem
             if (ctx.enemyBleedStacks > 0)
             {
                 int bleedDmg = BattleModifierManager.ApplyBleedModifiers(ctx, ctx.enemyBleedStacks);
-                // 〈血止め知らずの針箱〉(2026-11-20): 血晶 5 以上なら、 出血のダメージに会心が乗る (会心倍率の半分・1 回のダメージごとに判定)。
-                //   判定の優先順は爆発の会心 (LandBurst) と同じ: 封印 (無心の刃) で外れ、 forceCritical が確定で上書きし、 〈銑鉄棍〉の【規則】が止める
-                if (ctx.bleedCritRule && bleedDmg > 0)
-                {
-                    bool bc = ((!ctx.critSuppressed && GameLoop.GameRng.Chance(CritRateOf(ctx, pendingBuff: false), "combat.bleedCrit", RngIdx(5)))
-                               || ctx.forceCritical) && !ctx.critToDamage;
-                    if (bc)
-                    {
-                        int add = Mathf.FloorToInt(bleedDmg * Math.Max(0f, ctx.criticalMultiplier / 2f - 1f));
-                        Debug.Log($"[血止め知らずの針箱] 出血 {bleedDmg} が会心 → +{add}");
-                        bleedDmg += add;
-                    }
-                }
                 if (_diagKind == SkillDiag.Boss && currentEnemy != null)
                     SkillDiag.BossDmgOf(currentEnemy.id)[5] += Math.Min(bleedDmg, enemyHP);
                 RaiseDotDamage(DotKind.Bleed, Math.Min(bleedDmg, enemyHP));      // 入った分だけ (攻撃で倒れていれば 0 = 鳴らない)
@@ -1392,9 +1377,6 @@ namespace CombatSystem
                 EnemyHpLedger.CtxOverwritten();
             }
 
-            if (enemyHP == 0 && dealtDmg > 0)
-                ctx.overDamageAccumulated = dealtDmg + dealtFixed;
-
             // 吸血 / シールドバッシュ (旧法の勝利分岐と同一)
             if (ctx.lifestealPct > 0f && dealtDmg > 0)
             {
@@ -1412,8 +1394,20 @@ namespace CombatSystem
                 }
             }
 
+            //   配線の後に品が足したブロック (OnWired・会心のたび・爆発のたび) を、 このターンの敵の攻撃に間に合わせる (〈狂暴化〉ならブロックは何も受けない)
+            //   shortcut: 遺物・大罪・〈貫きの錐〉・〈不完全な転移〉は配線の時の分 (FinalBlockSum) にだけ掛かる。 後から足す量が大きくなったら FinalBlockSum を通し直す
+            {
+                int lateBlock = ctx.itemBlockBonus - itemBlockAtWiring;
+                if (lateBlock > 0 && !ctx.enemyAttackIgnoresGuard)
+                {
+                    blockSum += lateBlock; ctx.blockSumThisTurn = blockSum;
+                    Debug.Log($"[品のブロック] 配線の後に +{lateBlock} → ブロック {blockSum}");
+                }
+            }
+
             int takenApplied = 0;
             bool primaryAttacked = false, secondaryAttacked = false;   // 盾〈黎明〉の「敵が放った攻撃」
+            int jgAttack = 0, jgGuard = 0;   // 【ジャスト防御】(ShieldCore): 1 体目の攻撃と、 それを受ける時の防御 (ブロック + シールド)
             int parryBlocked = 0;   // 〈後の先〉がブロックで防いだ量 (攻撃 1 回ごとに min(後の先のブロック, ブロックで止めた量))
 
             // 〈封じ・揃〉(前ターン成立) — このターン敵は攻撃しない。 予告は既に出ているので
@@ -1446,10 +1440,10 @@ namespace CombatSystem
             else if (enemyHP > 0)
             {
                 primaryAttacked = true;
-                // 〈廃庭の霧吹き〉: 敵が攻撃するたびにも毒のダメージが入る (2026-10-31)
+                // 〈廃庭の霧吹き〉【規則】: 敵が攻撃するときにも毒のダメージ (威力 50%・毒は減らない) が入る (1 体目の攻撃だけ = 1 ターン 1 回)
                 if (ctx.poisonTickOnEnemyAttack)
                 {
-                    int pd = ctx.TickPoisonOnce();
+                    int pd = ctx.TickPoisonOnce(ItemSystem.PassiveSkills.Effects.RuinedGardenSprayer.PowerPct);
                     if (pd > 0)
                     {
                         HpLossDiag.Lose(ref enemyHP, EnemyHpLedger.ProbePassive(pd), "毒(廃庭の霧吹き)");   // [測定用の物差し] 入る量だけ
@@ -1464,6 +1458,7 @@ namespace CombatSystem
                     BossDmgDiag.RecordTurn(ctx.bossId, currentEnemy != null ? currentEnemy.displayName : ctx.bossId);
                 //   〈狂暴化〉(51T〜): 主攻撃はシールド・被ダメの軽減の鎖 (ProcessDamage 以降) を通さない ── 鎖には 0 を流し、 HP を減らす直前に攻撃値をそのまま入れる
                 bool guardless = ctx != null && ctx.enemyAttackIgnoresGuard;
+                if (!guardless) { jgAttack = enemyAtkValue; jgGuard = blockSum + ctx.consShield; }
                 int lossBase = guardless ? 0 : Math.Max(0, enemyAtkValue - blockSum);
                 GuardDiag.Note(enemyAtkValue, enemyAtkValue, blockSum, lossBase);
                 // ラン内のブロック実績。 **GuardDiag (バッチ累計) とは別に持つ** ──
@@ -1673,6 +1668,9 @@ namespace CombatSystem
             ctx.accumulatedValues[ItemSystem.PassiveSkills.Effects.MutualKeys.EnemyAtkPreDefense] =
                 (primaryAttacked ? enemyAtkBeforeDefense : 0) + (secondaryAttacked ? secondaryAtkBeforeDefense : 0);
             ctx.accumulatedValues[ItemSystem.PassiveSkills.Effects.MutualKeys.HpLossFromEnemy] = takenApplied;
+            // 【ジャスト防御】(2026-11-21・ShieldCore): 1 体目の攻撃 E > 0・敵の攻撃で HP を 1 も失っていない・E ≤ ブロック + シールド ≤ E + 許容幅
+            if (takenApplied <= 0 && _deck != null && ShieldCore.IsJustGuard(jgAttack, jgGuard, ShieldCore.Width(_deck.state.shieldItems)))
+                ItemSystem.PassiveSkills.Effects.Shd.NoteJustGuard(ctx, jgAttack, jgGuard);
             BossDownDiag.NoteEnemyTurn(diagHeavyKind, takenApplied);   // [診断 2026-11-14] 大技 / 小技のターンの被ダメ (防御・シールドの後)
             FightEndDiag.NoteEnemyTurn(diagHeavyKind, primaryAttacked, takenApplied);   // [計装 2026-11-18] 戦闘の終わりの診断 (読むだけ)
             if ((diagHeavyKind == 0 || diagHeavyKind == 2) && primaryAttacked)   // [計装 2026-11-14] 大技の被ダメ (実際に撃った大技 / 小技のターン)

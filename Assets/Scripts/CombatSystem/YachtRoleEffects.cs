@@ -57,6 +57,8 @@ namespace CombatSystem
         public const string EnemyStunKey = "roleEnemyStun";
         /// <summary>〈封じ〉2 個そろい: 次ターンの敵の攻撃を N% 減らす (値 = N)。</summary>
         public const string EnemyAtkCutKey = "roleEnemyAtkCut";
+        /// <summary>役の軸の品 (〈負け越しの賽〉〈雷毒の導管〉〈鏡合わせの盤〉): 次のターンのブロック +N (値 = N・BeginNewTurn が品のブロック +N へ入れる)。</summary>
+        public const string BlockNextKey = "roleBlockNext";
 
         // ── 数値 (ADR-0015・作者 2026-11-18。 小さい目ほど役が強く、 大きい目ほど数字が強い。 仮の値) ──
         const int CutPairPct = 40;          // 封じ 2 個そろい
@@ -141,8 +143,8 @@ namespace CombatSystem
                     break;
                 }
 
-                case 8:   // 癒し: HP +2 / +6
-                    outcome.healAmount += triple ? HealTriple : HealPair;
+                case 8:   // 癒し: HP +2 / +6 (古銭の賽は +3)
+                    outcome.healAmount += (triple ? HealTriple : HealPair) + DiePassives.RoleHealBonus(GameManager.Instance?.Run);
                     break;
 
                 case 9:   // 富: ゴールド報酬 +5% / +30% (9 の面を持つ賽は今は無い)

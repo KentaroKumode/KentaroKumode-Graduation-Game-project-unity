@@ -35,7 +35,6 @@ namespace ItemSystem.PassiveSkills
         public int playerCurrentHP;
         /// <summary>[persistent]</summary>
         public int playerMaxHP;
-        public int playerBaseMaxHP;     // [persistent] 装備補正前の最大HP
 
         // ===== 敵状態 =====
         /// <summary>[persistent] (CombatManager が HP を同期する)</summary>
@@ -48,10 +47,6 @@ namespace ItemSystem.PassiveSkills
         public int[] enemyDice;         // [persistent] (BeginNewTurn では戻さない。 毎ターンの振り (PassiveSkillManager) が上書きする) 敵が振った各ダイスの値
         public int playerDiceTotal;     // [persistent] (BeginNewTurn では戻さない。 毎ターンの振り (PassiveSkillManager) が上書きする) プレイヤーのダイス合計値
         public int enemyDiceTotal;      // [persistent] (BeginNewTurn では戻さない。 毎ターンの振り (PassiveSkillManager) が上書きする) 敵のダイス合計値
-        /// <summary>ダイス差（playerDiceTotal − enemyDiceTotal）。両合計から常に算出する読み取り専用プロパティ。
-        /// 視点スワップ時も両合計が入れ替わるため符号が自動反転し、明示的な反転代入は不要。
-        /// 常に最新値を返すため、OnPostRoll パッシブが合計を改変しても鮮度ズレが起きない。</summary>
-        public int diceDifference => playerDiceTotal - enemyDiceTotal;
         
         // ===== ダイス設定値 =====  
         public int playerDiceMax;       // [persistent] (戦闘開始で設定・CombatManager.Turn.cs が毎ターン入れ直す) プレイヤーのダイス最大出目（装備武器由来）
@@ -98,10 +93,6 @@ namespace ItemSystem.PassiveSkills
         public int baseDamage;          // [persistent] (ProcessDamage が計算のたびに上書きする作業値) 基本ダメージ
         public int finalDamage;         // [persistent] (ProcessDamage が計算のたびに上書きする作業値) 最終ダメージ（スキル補正後）
         public int pursuitDamage;       // [perTurn] 追撃ダメージ（パッシブ由来の固定追撃）
-        /// <summary>[perTurn] このターン、 ブロック端子に 1 本以上配線したか。
-        /// 遺物の刻印〈そのターン、ブロック端子に 1 本も配線していない〉の判定に使う (§15-5)。
-        /// CombatManager の配線集計が毎ターン set し、 BeginNewTurn Phase B でリセットする。</summary>
-        public bool blockWiredThisTurn;
 
         /// <summary>[perTurn] このターン、 ブロック端子へ配線した**出目の合計**。 本数ではない。
         /// 剣〈切り返し〉と盾〈城壁〉が読む (2026-10-28・旧読み手は盾〈反攻〉)。
@@ -134,21 +125,30 @@ namespace ItemSystem.PassiveSkills
         /// <summary>[perTurn] (撃の前に CombatManager が書く) このターンの主攻撃の撃の数 (攻撃しないターンは 0)。 BeginNewTurn で 0。
         /// 攻撃しないターンも固定ダメの枠を取り出すために 1 回 ProcessDamage を通るので、 「撃ごと」の品は <c>hitIndex &lt; hitCount</c> で本物の撃か見る。</summary>
         public int hitCount;
-        /// <summary>[perTurn] (撃ごとに CombatManager が 0 に戻す) この 1 撃だけの最終与ダメージ倍率の上乗せ (%)。 〈加重の拳套〉が OnPreDealDamage で書く。
+        /// <summary>[perTurn] (撃ごとに CombatManager が 0 に戻す) この 1 撃だけの与ダメ % の池への上乗せ (%)。 〈加重の拳套〉が OnPreDealDamage で書く。
+        /// 与ダメ % の池 (<see cref="outgoingDamageMultiplier"/>) にその撃だけ足して掛ける (CombatManager.Damage.cs・池そのものは書き換えない)。</summary>
+        public int hitOutgoingPct;
+        /// <summary>[perTurn] (撃ごとに CombatManager が 0 に戻す) この 1 撃だけの最終与ダメージ倍率の上乗せ (%)。 〈血桜〉が OnPreDealDamage で書く。
         /// 主攻撃の最終与ダメージ倍率 (<see cref="finalDamagePct"/>) に足して掛ける (CombatManager.Damage.cs)。</summary>
         public int hitFinalDamagePct;
+        /// <summary>[perTurn] (撃ごとに CombatManager が false に戻す) この 1 撃は敵の防御を無視する (〈破城斧〉が OnPreDealDamage で立てる・CombatManager.Damage の防御の計算)。</summary>
+        public bool hitIgnoreDefense;
+        /// <summary>[perTurn] (撃ごとに CombatManager が 0 に戻す) この 1 撃だけ敵の防御を N 無視する (貫通に足す・剣〈切り返し〉の最初の 1 撃が OnPreDealDamage で書く・CombatManager.Damage の防御の計算)。</summary>
+        public int hitArmorPen;
+        /// <summary>[perTurn] (撃ごとに CombatManager が書く) この撃 (攻撃の端子 1 枚) に挿した目の一番大きい値 (CombatSystem.CritCore.HitFaceMax・0 = 目なし)。 〈狙い目の刻み〉が読む。 BeginNewTurn で 0。</summary>
+        public int hitFaceMax;
+        /// <summary>[perTurn] (撃ごとに CombatManager が false に戻す) この撃は会心の乱数を引かない (〈必殺の照準器〉がもう 1 回発火した撃・会心は forceCritThisHit で決まる)。
+        /// 乱数のキーの並びを崩さないため (発火した撃の分だけ引く数が増えないように)。</summary>
+        public bool critSkipRoll;
         /// <summary>この撃が本物の主攻撃の撃か (攻撃しないターンの空の 1 回ではない)。</summary>
         public bool IsRealHit => playerWonRoll && hitIndex < hitCount;
         public float criticalMultiplier; // [perTurn] (Phase B で基礎値 + メタ・遺物へ戻す) 会心倍率（既定 2.0。2026-07-26 に 3.0 へ上げ、2026-08-03 に 2.0 へ差し戻し）
-        public bool damageReduced;      // [perTurn] ダメージ軽減が発生したか
 
         // ===== Threat/Scratchシステム =====
         /// <summary>[persistent] (戦闘開始・段の差し替えで設定) 敵の脅威値。毎ターン宣言される削りダメージの基準</summary>
         public int enemyThreat;
         /// <summary>[perTurn] 今ターンのscratchダメージ（勝利時: max(0, threat-diff)）</summary>
         public int scratchDamage;
-        /// <summary>[perTurn] scratch無効化フラグ（パリィ等）</summary>
-        public bool nullifyScratchDamage;
 
         // ===== 戦場修飾子 =====
         /// <summary>[persistent] この戦闘のアクティブな修飾子一覧</summary>
@@ -211,10 +211,6 @@ namespace ItemSystem.PassiveSkills
         // ===== ダメージ無効化フラグ =====
         /// <summary>[perTurn]</summary>
         public bool nullifyPursuitDamage;
-
-        // ===== オーバーダメージ蓄積 =====
-        /// <summary>[persistent] (CombatManager.Turn.cs が毎ターン上書きする)</summary>
-        public int overDamageAccumulated;
 
         // ===== 固定ダメージ =====
         public int fixedDamageToEnemy;  // [perTurn] プレイヤー→敵への軽減不可固定ダメージ
@@ -324,13 +320,6 @@ namespace ItemSystem.PassiveSkills
         public int healAppliedTotal;
         /// <summary>[persistent] (戦闘の累計)</summary>
         public int shieldGainedTotal;
-        /// <summary>[persistent] (戦闘の累計) L1学習用: 戦闘中にプレイヤーが敵に与えた総ダメージ（メイン+固定+出血+反射 等の合算）。
-        /// 戦闘開始時 enemyMaxHP からの最終 enemyCurrentHP 差分で簡易的に算出するため、
-        /// 実体は OnBattleEnded で評価する。フィールド自体はオプションのインクリメント用。</summary>
-        public int damageDealtTotal;
-        /// <summary>[persistent] (戦闘の累計) L1学習用: 戦闘中にプレイヤーが受けた総ダメージ（ヒール前の純粋な損失）。
-        /// 同じく OnBattleEnded 時に最終確定する。</summary>
-        public int damageTakenTotal;
 
         /// <summary>[perTurn] このターンにプレイヤーが実際に受けたダメージ量（メイン＋固定）。
         /// 焦土〈最大HP -被ダメ10%〉が参照する。BeginNewTurn でリセット。</summary>
@@ -342,10 +331,6 @@ namespace ItemSystem.PassiveSkills
 
         /// <summary>[perTurn] 貪欲のダイス: 与ダメージのこの割合をプレイヤーが回復（0=無し。BeginNewTurn でリセット、パッシブが毎ターン再適用）</summary>
         public float lifestealPct;
-
-        /// <summary>[perTurn] 停戦協定: このターンが「完全引き分け→停戦の一撃」で解決されたか。
-        /// true の間は引き分けブランチで出血など他の効果を発動させない。BeginNewTurn でリセット。</summary>
-        public bool truceThisTurn;
 
         /// <summary>[perTurn] 苦難の刻印・不屈の鎧 等の被ダメ固定減算（複数アイテム合算）。CombatManager 敗北分岐で適用。BeginNewTurn でリセット。</summary>
         public int playerFlatDamageReduction;
@@ -559,9 +544,8 @@ namespace ItemSystem.PassiveSkills
         public float shieldOnWinPct;
 
         // ==== 臨界メーター (Rinkai) 2026-07-16 追加 ====
-        /// <summary>[persistent] 臨界メーター: 攻撃配線ダイス合計 (attackSum) を毎T末に加算。
-        /// 閾値 (RinkaiThreshold 基準50、LowerThreshold で下がる) 到達で 次T の攻撃に爆発ボーナス +RinkaiBurstDamage を付与し、0リセット。
-        /// パッシブ「連鎖爆発」で爆発T会心確定、「不朽の熱」で致命耐え、「余熱」で爆発後20残し、等の派生あり。</summary>
+        /// <summary>[persistent] 臨界メーター: 攻撃の端子の合計 (attackSum) を毎ターンの終わりに足し、 品・端子の分はその時点で足す (Keywords.Kw.AddHeat)。
+        /// 閾値に届くとその場で爆発する (式は CombatSystem.HeatCore)。</summary>
         public int rinkaiMeter;
         /// <summary>[persistent] 直近ターンにプレイヤーが与えた総ダメージ。
         /// オーバーロードの発動判断 (「倍にすれば倒し切れるか」) にだけ使う。
@@ -571,32 +555,32 @@ namespace ItemSystem.PassiveSkills
         /// BeginNewTurn Phase B でリセットする。</summary>
         // [撤去 2026-09-13] overloadThisTurn ── 出力 r10 の旧極点〈オーバーロード〉。
         //   〈戦意〉(累積成長) へ差し替え。 経緯は MetaPanel.BattleSpiritUnlocked。
-        /// <summary>[persistent] 臨界の閾値。 基準 50。 〈早沸かし釜〉で 35 に下がる (最小適用)。 0 = 臨界が動いていない。</summary>
+        /// <summary>[persistent] 臨界の閾値。 既定 30 (〈早沸かし釜〉−12・〈暴れ窯の火床〉で下がる・下限 12・CombatSystem.HeatCore)。 0 = 臨界が動いていない。</summary>
         public int rinkaiThreshold;
-        /// <summary>[persistent] 臨界爆発 1 回の flat damage。 基準 50。</summary>
-        public int rinkaiBurstDamage;
-        /// <summary>[persistent] 「不朽の熱」の 1戦闘 1回消費フラグ。 true で発動済み。</summary>
-        public bool rinkaiUnyieldingUsed;
 
         // ---- 規則の品 (2026-10-31 アイテム再編)。 どれも戦闘開始時に品が立てる [persistent] ----
-        /// <summary>[persistent] 〈帳簿外の爆薬〉: 爆発で臨界を 0 にせず閾値ぶんだけ減らし、 溜まっている限り何度でも爆発する。</summary>
-        public bool rinkaiMultiBurst;
-        /// <summary>[persistent] 〈雷壷〉: 充電の上限が無くなる。 代わりにターン開始時、 上限を超えている分の 75% が捨てられる (過充電)。</summary>
+        /// <summary>[persistent] 〈雷壷〉: 充電の上限が無くなる (<see cref="AddCharge"/>)。 ターン終了時の目減りは品のクラス (ChargeEffects.ThunderJar)。</summary>
         public bool chargeCapRemoved;
-        /// <summary>[persistent] 〈廃庭の霧吹き〉: 毒のダメージが、 ターン開始に加えて敵が攻撃するたびにも入る。</summary>
+        /// <summary>[persistent] 〈廃庭の霧吹き〉: 敵が攻撃した直後にも、 毒のダメージ (威力 50%・毒は減らない) が 1 回入る (1 ターン 1 回・CombatManager の敵の攻撃の解決)。</summary>
         public bool poisonTickOnEnemyAttack;
+        /// <summary>[persistent] 〈毒溜まりの主〉: 敵の毒が <see cref="CombatSystem.PoisonCore.PoolNeed"/> 以上なら、 ターン開始の毒のダメージが 2 回入る (2 回目では毒が減らない・<see cref="TickStatuses"/>)。</summary>
+        public bool poisonDoubleTick;
+        /// <summary>[persistent] 〈骨溶かしの黒油〉: ダウン中の敵への毒のダメージ ×2 (<see cref="TickStatuses"/>・起爆は PoisonCore.Damage)。</summary>
+        public bool poisonDownDouble;
 
         // ---- 軸の締めの LEGENDARY (2026-11-20・GAME.md §23-32) ----
         /// <summary>[persistent・戦闘開始で 0] 最終与ダメージ倍率の上乗せ (%)。 すべての倍率 (会心・与ダメ % の池・端子の別枠) の後、
         /// 敵の軽減パッシブと防御の前に ×(100 + これ)/100 で掛ける (<see cref="Keywords.Kw.ApplyFinalDamage"/>・大罪:怠惰と同じ位置)。 〈防人の軍標〉が積む。</summary>
         public int finalDamagePct;
-        /// <summary>[persistent] 〈腐蝕の王冠〉: 敵の毒の上限 (99) が無くなる (AddStatus)。</summary>
-        public bool poisonCapRemoved;
-        /// <summary>[persistent] 〈血の楔〉: 敵が得るシールドと回復の量、 敵の被ダメ軽減のパッシブで減る量を 出血 ÷ (出血 + 40) だけ弱める (<see cref="WedgeEnemyGain"/>)。</summary>
+        /// <summary>[persistent] 〈腐蝕の王冠〉: 敵の毒の上限 (99) が無くなり、 敵へ与える毒がすべて 1.5 倍 (切り上げ・<see cref="AddStatus"/>)。 段の交代で毒の半分が次の段へ残る (CombatManager.SwapEnemy)。</summary>
+        public bool poisonCrown;
+        /// <summary>[persistent] 〈血の楔〉: 敵が得るシールドと回復の量、 敵の被ダメ軽減のパッシブで減る量を 出血 ÷ (出血 + 30) だけ弱める (<see cref="WedgeEnemyGain"/>)。</summary>
         public bool bleedWedge;
+        /// <summary>[persistent] 〈涸れぬ血晶〉: 敵の出血が既に <see cref="CombatSystem.BleedCore.CrystalNeed"/> 以上ある時、 与える出血が 2 倍 (<see cref="AddEnemyBleed"/>)。</summary>
+        public bool bleedDouble;
         /// <summary>〈血の楔〉の割る数の足し分 (出血 ÷ (出血 + これ))。</summary>
-        public const int BleedWedgeK = 40;
-        /// <summary>〈血の楔〉: 敵の得る量 n を 40 ÷ (出血 + 40) 倍にする (切り捨て)。 品が無い・出血 0 なら素通し。</summary>
+        public const int BleedWedgeK = 30;
+        /// <summary>〈血の楔〉: 敵の得る量 n を 30 ÷ (出血 + 30) 倍にする (切り捨て)。 品が無い・出血 0 なら素通し。</summary>
         public int WedgeEnemyGain(int n)
             => bleedWedge && n > 0 && enemyBleedStacks > 0 ? (int)((long)n * BleedWedgeK / (enemyBleedStacks + BleedWedgeK)) : n;
 
@@ -608,21 +592,13 @@ namespace ItemSystem.PassiveSkills
             => System.Math.Min(MetaProgression.Relics.RelicCatalog.PoisonKeepCap, poisonKeepPct + MetaProgression.Relics.RelicApplicator.GetPoisonKeepBonus());
         /// <summary>[persistent] 出血の比例減衰の割る数への上乗せ (AxisRules.BleedDecay)。 〈血晶〉の②。</summary>
         public int bleedDecayDivisorBonus;
-        /// <summary>[persistent] 出血のダメージへの上乗せ率 (0.03 = +3%)。 〈血晶〉の①。</summary>
-        public float bleedDamagePct;
-        /// <summary>[persistent] 臨界を得るたびの上乗せ (Kw.AddHeat)。 〈炉温〉の①。</summary>
-        public int heatGainBonus;
-        /// <summary>[persistent] 〈炉温〉の②: 爆発のたびに会心の判定をし、 会心なら会心倍率の半分が乗る (CombatManager.LandBurst)。 代わりに爆発の基礎が 15 + 炉温 / 2。</summary>
-        public bool burstCritRule;
-        /// <summary>[decay] 爆発への上乗せ (〈二度詰めの雷管〉が爆発のたびに積み、 ターン開始時に 1/4 を失う)。</summary>
+        /// <summary>[persistent] 爆発の基礎への上乗せ (〈二度詰めの雷管〉が爆発のたびに +10・最大 +80・減らない・CombatSystem.HeatCore)。</summary>
         public int burstStackBonus;
-        /// <summary>[persistent] ターン開始の減衰で残るシールドへの上乗せ (% ポイント)。 〈堅牢〉の①。 残る割合は最大 80%。</summary>
+        /// <summary>[persistent] ターン開始の減衰で残るシールドへの上乗せ (% ポイント)。 〈油染みの盾革〉が +20 (50% → 70%)。 残る割合は最大 80%。</summary>
         public int shieldKeepBonusPct;
-        /// <summary>[persistent] 〈電流〉の②: 充電端子に挿した出目のこの割合が攻撃にも加わる。</summary>
-        public float chargeToAttackPct;
         /// <summary>[persistent] 会心した攻撃だけに足す貫通 (〈刃毀れの見立て〉・CombatManager.Damage の防御の計算)。</summary>
         public int critArmorPen;
-        /// <summary>[persistent] 充電の上限への上乗せ (〈雷鳴の太鼓〉・<see cref="ChargeCap"/>)。</summary>
+        /// <summary>[persistent] 充電の上限への上乗せ (〈雷鳴の太鼓〉・端子〈大導電＋〉・<see cref="ChargeCap"/>)。</summary>
         public int chargeCapBonus;
         /// <summary>[perTurn] 敵の攻撃を割合で減らす (0.2 = −20%)。 予告の前に掛ける (CombatManager.Turn の予告)。 BeginNewTurn の Phase B で 0。</summary>
         public float enemyAtkCutPct;
@@ -651,21 +627,29 @@ namespace ItemSystem.PassiveSkills
             foreach (var a in AxisRules.Ranked) if (a != axis && AxisDepth(a) > d) above++;
             return above;
         }
-        /// <summary>[persistent] 〈寸鉄〉(2026-11-20 作り直し): 会心しなかった撃にも、 会心倍率の上乗せ分 × (会心率 ÷ 100) が乗る (会心率は 100% を上限に数える・PassiveSkillManager.ProcessDamage)。</summary>
-        public bool critShareOnNonCrit;
-        /// <summary>[persistent] 〈銑鉄棍〉(2026-11-20 作り直し): 会心が出なくなる (強制の会心も)。 代わりに会心率 1% につき与ダメージ +1% (100% を上限に数える・与ダメ % の池へ足す・PassiveSkillManager.ProcessDamage)。</summary>
+        /// <summary>[persistent] 〈寸鉄〉: 超過会心率の会心倍率への変換が 2 倍 (CombatSystem.CritCore.ExcessMul・PassiveSkillManager.ProcessDamage)。</summary>
+        public bool critExcessDouble;
+        /// <summary>[persistent] 〈銑鉄棍〉: 会心しなかった撃に、 会心率 1% につき与ダメージ +1% (100% を上限に数える・与ダメ % の池へ足す・PassiveSkillManager.ProcessDamage)。 会心は普通に出る。</summary>
         public bool critToDamage;
-        /// <summary>[persistent] 〈天工開物〉: 爆発 1 回のダメージへの上乗せ (武器を強化した回数 × 5・<see cref="Keywords.Kw.BurstBase"/>)。</summary>
+        /// <summary>[persistent] 〈天工開物〉: 爆発の基礎への上乗せ (武器を強化した回数 × 12・CombatSystem.HeatCore.Damage)。</summary>
         public int burstFlatBonus;
         /// <summary>[persistent] 〈重装兵の隠し刃〉: ボスのダウン中のターンは、 ターン開始時にシールドが半減しない (BeginNewTurn)。</summary>
         public bool shieldKeepOnBossDown;
-        /// <summary>[persistent] 〈過負荷チューナー〉: 過充電の間、 充電を払う端子・秘宝・振り直しの払う量が 1 減る (最低 1・<see cref="ChargeCostNow"/>)。</summary>
+        /// <summary>[persistent] 〈脈なしの鋼心臓〉: ターン開始時のシールドがこれ以上なら減衰しない (0 = なし・BeginNewTurn)。</summary>
+        public int shieldNoDecayAt;
+        /// <summary>[persistent] 〈二拍目の心臓〉: この戦闘のシールドの獲得量 +N% (増えた分に掛けて切り捨て・<see cref="consShield"/> の set)。</summary>
+        public int shieldGainPct;
+        /// <summary>[persistent] 〈過負荷チューナー〉: 過充電の間、 充電を払う行動 (振り直し・再起動・端子・秘宝) の払う量が 2 減る (最低 1・<see cref="ChargeCostNow"/>)。</summary>
         public bool overloadChargeCut;
-        /// <summary>[persistent] 〈血止め知らずの針箱〉: 出血のダメージに会心が乗る (会心倍率の半分・1 回のダメージごとに判定・CombatManager.Turn の出血)。</summary>
-        public bool bleedCritRule;
-        /// <summary>充電を n 払う時に実際に払う量 (〈過負荷チューナー〉: 過充電の間 1 減る・最低 1)。 品・端子・振り直しの支払いが通す。</summary>
-        public int ChargeCostNow(int n) => overloadChargeCut && n > 1 && IsOvercharged() ? n - 1 : n;
-        /// <summary>[perTurn] 直近のプレイヤーの攻撃で合算した会心率 (%・100 超えもそのまま)。 〈寸鉄〉〈銑鉄棍〉が読む。
+        /// <summary>充電を払う量から今引く量 (〈過負荷チューナー〉の過充電の間 <see cref="CombatSystem.ChargeCore.TunerCut"/>・それ以外 0)。 端子の解決には TerminalEnv.chargeCostCut で渡す。</summary>
+        public int ChargeCostCut => overloadChargeCut && IsOvercharged() ? CombatSystem.ChargeCore.TunerCut : 0;
+        /// <summary>充電を n 払う時に実際に払う量 (<see cref="CombatSystem.ChargeCore.CostNow"/>・最低 1)。 振り直しの支払いが通す。</summary>
+        public int ChargeCostNow(int n) => CombatSystem.ChargeCore.CostNow(n, ChargeCostCut);
+        /// <summary>[perTurn] 品のブロック +N (このターンのブロックに足す・CombatManager.Turn の配線の集計)。 BeginNewTurn の Phase B で 0。</summary>
+        public int itemBlockBonus;
+        /// <summary>[perTurn] このターンの最初の 1 撃の攻撃 +N (〈引き直しの撃鉄〉・攻撃しないターンは消える)。 BeginNewTurn の Phase B で 0。</summary>
+        public int firstHitAttackBonus;
+        /// <summary>[perTurn] 直近のプレイヤーの攻撃で合算した会心率 (%・100 超えもそのまま)。 超過会心率の変換 (CritCore)・〈銑鉄棍〉が読む。
         /// ProcessDamage が書き、 BeginNewTurn の Phase B で 0。</summary>
         public float lastCritAddPct;
 
@@ -726,6 +710,7 @@ namespace ItemSystem.PassiveSkills
                 if (value > _consShield)
                 {
                     int asked = value;
+                    if (shieldGainPct > 0) value += (value - _consShield) * shieldGainPct / 100;   // 〈二拍目の心臓〉: この戦闘のシールドの獲得量 ×1.5
                     float sg = MetaProgression.Relics.RelicApplicator.GetShieldGainPct();
                     if (sg > 0f) value += (int)((value - _consShield) * sg);
                     // 大罪:傲慢 (挑戦カード IV): シールドの獲得 −N% (切り捨てた分を捨てる)
@@ -755,18 +740,12 @@ namespace ItemSystem.PassiveSkills
         // ===== エリート: 精鋭ハーピィ「死翔」 =====
         public bool consumablesLocked;    // [persistent] この戦闘中、消費アイテム使用不可（戦闘開始時に付与・戦闘ごとに新規生成でリセット）
 
-        // ===== 竜閃 =====
-        public bool rollPurity;           // [persistent] 無我無心: カスタムダイス以外の補正を一切受けない（戦闘中持続）
-        public bool garyoProc;            // [perTurn] 画竜点睛: このターン発動したか（毎ターンリセット）
-        public int  garyoDieValue;        // [perTurn] 画竜点睛: 発動時の出目
-
         /// <summary>
         /// コンテキストを初期化
         /// </summary>
         public CombatContext(int playerMaxHP, int enemyMaxHP = 0, int enemyThreat = 0)
         {
             this.playerMaxHP = playerMaxHP;
-            playerBaseMaxHP = playerMaxHP;
             playerCurrentHP = playerMaxHP;
             this.enemyMaxHP = enemyMaxHP;
             enemyCurrentHP = enemyMaxHP;
@@ -841,10 +820,11 @@ namespace ItemSystem.PassiveSkills
                 int metaBonus = MetaProgression.MetaBuffApplicator.GetPoisonApplyBonus();
                 if (metaBonus > 0) { stacks += metaBonus; _poisonBonusTurn = currentTurn; }
             }
+            if (poisonCrown && stacks > 0 && target == StatusTarget.Enemy && id == "poison") stacks = (stacks * 3 + 1) / 2;   // 〈腐蝕の王冠〉: 1.5 倍 (切り上げ)
             var dict = target == StatusTarget.Enemy ? enemyStatusStacks : playerStatusStacks;
             int cur = dict.TryGetValue(id, out var v) ? v : 0;
             int max = StatusRegistry.Defs.TryGetValue(id, out var def) ? def.maxStacks : int.MaxValue;
-            if (poisonCapRemoved && target == StatusTarget.Enemy && id == "poison") max = int.MaxValue;   // 〈腐蝕の王冠〉(2026-11-20)
+            if (poisonCrown && target == StatusTarget.Enemy && id == "poison") max = int.MaxValue;   // 〈腐蝕の王冠〉
             int next = System.Math.Max(0, System.Math.Min(max, cur + stacks));
             dict[id] = next;
             if (target == StatusTarget.Enemy && id == "poison" && stacks > 0)   // [計装 2026-11-05] 毒の付与量を出どころ別に
@@ -854,30 +834,27 @@ namespace ItemSystem.PassiveSkills
                 int hlOver = cur + stacks - max;
                 if (hlOver > 0) CombatSystem.HpLossDiag.Add("毒溢れ:" + hlSrc, hlOver);
             }
-            // 敵の毒の増加と上限到達を配る (2026-10-31 アイテム再編)
+            // 敵の毒の増加を配る (2026-10-31 アイテム再編)
             if (target == StatusTarget.Enemy && id == "poison" && next > cur)
             {
                 Keywords.Kw.Raise(this, PassiveSkillTrigger.OnPoisonGain, next - cur);
-                if (next >= max && cur < max) Keywords.Kw.Raise(this, PassiveSkillTrigger.OnPoisonCap, 1);
             }
         }
 
         /// <summary>敵の毒の量 (読み取り用)。</summary>
         public int EnemyPoison => GetStatus(StatusTarget.Enemy, "poison");
 
-        /// <summary>毒のダメージ 1 回分 (ターン開始の分と同じ量) を数え、 出来事を配って返す。
-        /// 〈廃庭の霧吹き〉で敵の攻撃のたびに CombatManager が呼び、 返った量を敵の HP から直接引く。</summary>
-        public int TickPoisonOnce()
+        /// <summary>毒のダメージ 1 回分 (ターン開始の分の <paramref name="powerPct"/>%・下限 1) を数え、 出来事を配って返す。 毒は減らさない。
+        /// 〈廃庭の霧吹き〉で敵の攻撃の直後に CombatManager が呼び (1 ターン 1 回・威力 50%)、 返った量を敵の HP から直接引く。</summary>
+        public int TickPoisonOnce(int powerPct)
         {
             if (!StatusRegistry.Defs.TryGetValue("poison", out var def)) return 0;
             int stacks = EnemyPoison;
             if (stacks <= 0) return 0;
-            int dmg = DotDamage(def, stacks);
-            if (dmg <= 0) return 0;
+            int dmg = System.Math.Max(1, DotDamage(def, stacks) * powerPct / 100);
             CombatSystem.CombatStats.DamageBreakdown[20] += dmg;   // [計装] 毒のダメージ
             Keywords.Kw.Raise(this, PassiveSkillTrigger.OnPoisonTick, dmg);
             CombatSystem.CombatManager.RaiseDotDamage(CombatSystem.CombatManager.DotKind.Poison, dmg);
-            if (def.halveAfterTick) enemyStatusStacks["poison"] = EnemyPoison * EffectivePoisonKeepPct / 100;   // 出すたびに半減 (霧吹きの分も・〈瘴気〉の②で残る割合が上がる)
             return dmg;
         }
 
@@ -888,9 +865,10 @@ namespace ItemSystem.PassiveSkills
         public void AddEnemyBleed(int stacks)
         {
             if (stacks <= 0) return;
+            stacks = CombatSystem.BleedCore.CrystalGain(stacks, enemyBleedStacks, bleedDouble);   // 〈涸れぬ血晶〉
             enemyBleedStacks += stacks;
             if (enemyBleedStacks > GetAccumulated(Keywords.Kw.BleedMaxKey))
-                accumulatedValues[Keywords.Kw.BleedMaxKey] = enemyBleedStacks;   // 〈血車〉が読む
+                accumulatedValues[Keywords.Kw.BleedMaxKey] = enemyBleedStacks;   // 実績が読む
         }
 
         /// <summary>〈回帰性真理〉: 敵に乗っている毒・出血の**蓄積を半減**する (切り捨て)。
@@ -940,12 +918,18 @@ namespace ItemSystem.PassiveSkills
                 var dict = def.target == StatusTarget.Enemy ? enemyStatusStacks : playerStatusStacks;
                 if (!dict.TryGetValue(def.id, out int stacks) || stacks <= 0) continue;
                 int dmg = DotDamage(def, stacks);
-                if (def.target == StatusTarget.Enemy && def.id == "poison")     // [計装 2026-11-05] ターン開始時の毒スタック
+                bool isPoison = def.target == StatusTarget.Enemy && def.id == "poison";
+                if (isPoison)     // [計装 2026-11-05] ターン開始時の毒スタック
                 {
                     CombatSystem.HpLossDiag.Add("毒段:T" + System.Math.Min(currentTurn, 8), stacks);
                     CombatSystem.HpLossDiag.Add("毒段n:T" + System.Math.Min(currentTurn, 8), 1);
+                    // 〈骨溶かしの黒油〉: このターンがダウン (待っているダウンがある = ターンの頭でダウンになる) なら ×2
+                    if (poisonDownDouble && (CombatSystem.CombatManager.Instance?.Down?.pending ?? 0) > 0) dmg *= CombatSystem.PoisonCore.OilDownMul;
                 }
+                //   〈毒溜まりの主〉: 毒 20 以上なら 2 回 (2 回目の後には減らない ── 減るのは下の 1 回だけ)。 出来事は 1 回目だけ「減る前の毒のダメージ」(〈瘴気溜まりの壺〉)
+                int ticks = isPoison && poisonDoubleTick && stacks >= CombatSystem.PoisonCore.PoolNeed ? 2 : 1;
                 if (dmg > 0)
+                for (int tk = 0; tk < ticks; tk++)
                 {
                     if (def.target == StatusTarget.Enemy)
                     {
@@ -955,10 +939,12 @@ namespace ItemSystem.PassiveSkills
                         if (def.id == "poison") CombatSystem.EnemyHpLedger.NotePoisonIntoFixed(landed);   // [計装 2026-11-10] 固定ダメ枠の毒
                     }
                     else fixedDamageToPlayer += dmg;
-                    if (def.target == StatusTarget.Enemy && def.id == "poison")
+                    if (isPoison)
                     {
                         CombatSystem.CombatStats.DamageBreakdown[20] += dmg;   // [計装] 毒のダメージ
+                        accumulatedValues[CombatSystem.PoisonCore.DecayTickKey] = tk == 0 ? 1f : 0f;
                         Keywords.Kw.Raise(this, PassiveSkillTrigger.OnPoisonTick, dmg);
+                        accumulatedValues[CombatSystem.PoisonCore.DecayTickKey] = 0f;
                         CombatSystem.CombatManager.RaiseDotDamage(CombatSystem.CombatManager.DotKind.Poison, dmg);
                     }
                 }
@@ -1030,12 +1016,10 @@ namespace ItemSystem.PassiveSkills
             // ダメージ処理の単ターンフラグ
             shieldAbsorbedAttackThisTurn = 0;   // 〈烈炎〉が読む: このターンに主攻撃をシールドが肩代わりした量 (2026-11-14)
             nullifyPursuitDamage = false;
-            nullifyScratchDamage = false;
             fixedDamageToEnemy = 0;
             CombatSystem.EnemyHpLedger.BeginTurn();   // [計装 2026-11-10] 固定ダメ枠と一緒に予約を捨てる
             fixedDamageToPlayer = 0;
             scratchDamage = 0;
-            damageReduced = false;
             pursuitDamage = 0;
             playerDamageThisTurn = 0;   // 焦土用の被ダメ計測
             rerollsThisTurn = 0;        // リロール: このターンの回数 (戦闘の回数 rerollsThisCombat は戻さない)
@@ -1056,7 +1040,7 @@ namespace ItemSystem.PassiveSkills
             isCritical = false;
             forceCritical = false;
             forceCritThisHit = false;
-            hitIndex = 0; hitCount = 0; hitFinalDamagePct = 0;
+            hitIndex = 0; hitCount = 0; hitFinalDamagePct = 0; hitOutgoingPct = 0; hitIgnoreDefense = false; hitArmorPen = 0; hitFaceMax = 0; critSkipRoll = false;
             critSuppressed = false;
             lastCritAddPct = 0f;
             critRatePctAdd = 0f;
@@ -1110,15 +1094,13 @@ namespace ItemSystem.PassiveSkills
             enemyDiceOverrides.Clear();
             enemyDiceTotalPenalty = 0;      // 沈黙の剣帯の1T目-99 等
 
-            // その他 単ターンフラグ
-            truceThisTurn = false;
-            garyoProc = false;              // 画竜点睛は毎ターン判定（rollPurity は戦闘中持続）
-            garyoDieValue = 0;
-
-            // 遺物の刻印 (§15-5) 判定用。 配線は毎ターン確定するので perTurn。
-            blockWiredThisTurn = false;
+            // 配線は毎ターン確定するので perTurn。
             blockSumThisTurn = 0;
-            accumulatedValues[ChargeSpentThisTurnKey] = 0f;   // 〈短絡〉が読む [perTurn] 値
+            accumulatedValues[ChargeSpentThisTurnKey] = 0f;   // 充電の品が読む [perTurn] 値
+            accumulatedValues[ChargeSpendsThisTurnKey] = 0f;
+            // 前のターンに役の軸の品が積んだ「次のターンのブロック +N」(Phase A で currentBuffs へ移った分)
+            itemBlockBonus = currentBuffs.TryGetValue(CombatSystem.YachtRoleEffects.BlockNextKey, out float roleBlockNext) ? (int)roleBlockNext : 0;
+            firstHitAttackBonus = 0;
 
             // ADR-0010: このターン切った役の記録。 usedRoles は [persistent] なのでここでは触らない。
             firedRolesThisTurn.Clear();
@@ -1141,15 +1123,15 @@ namespace ItemSystem.PassiveSkills
                 if (enemyBleedStacks == 0) Keywords.Kw.Raise(this, PassiveSkillTrigger.OnBleedZero, 1);
             }
             if (enemyPassivesDisabledTurns > 0) enemyPassivesDisabledTurns--; // 敵パッシブ無効化 残ターン
-            burstStackBonus -= (burstStackBonus + 7) / 8;   // 〈二度詰めの雷管〉の上乗せは毎ターン 1/8 を失う (2026-11-20: 旧 1/4・端数は切り上げて減らす = 7 からも 0 へ減る・2026-11-15 #320)
             // プレイヤーのシールドは毎ターン半減 (切り捨て。 1 → 0 で確実に消える)。 ヴェスカのシールド規約と同じ (GAME.md §13-4)。
             // T1 は戦闘開始時の付与 (開幕シールド等) をそのまま使うので半減しない。 そのターンの付与は OnTurnStart 以降なので「半減 → 付与」の順になる。
             // 失った分を〈半減で失った〉出来事として配る (2026-10-31)。
             // 〈重装兵の隠し刃〉(2026-11-20): このターンがボスのダウンなら半減しない (ダウンはこの後 CombatManager.BeginBossDownTurn が待ちから 1 つ使って立てる)
             bool keepForDown = shieldKeepOnBossDown && (CombatSystem.CombatManager.Instance?.Down?.pending ?? 0) > 0;
-            if (currentTurn > 1 && _consShield > 0 && !keepForDown)
+            bool keepForHeart = shieldNoDecayAt > 0 && _consShield >= shieldNoDecayAt;   // 〈脈なしの鋼心臓〉(2026-11-21): シールド 25 以上なら減衰しない
+            if (currentTurn > 1 && _consShield > 0 && !keepForDown && !keepForHeart)
             {
-                // 〈堅牢〉の①: 残る割合 50% + 上乗せ (最大 80%・2026-11-07)
+                // 残る割合 50% + 上乗せ (〈油染みの盾革〉+20・最大 80%)
                 // 遺物 (§15-5) 堅牢 3 個: +25%。 遺物の分だけは上限 90% まで (それ以外の上乗せは 80% のまま)
                 int relicKeep = MetaProgression.Relics.RelicApplicator.GetShieldKeepBonus();
                 int keepPct = System.Math.Min(80, 50 + shieldKeepBonusPct + MetaProgression.MetaBuffApplicator.GetShieldKeepBonusPct());
@@ -1160,22 +1142,6 @@ namespace ItemSystem.PassiveSkills
                 int lost = _consShield - _consShield * keepPct / 100;
                 _consShield -= lost;
                 Keywords.Kw.Raise(this, PassiveSkillTrigger.OnShieldDecay, lost);
-            }
-            // 〈雷壷〉: 上限を超えている充電の 75% (切り捨て・2026-11-19 半分 → 75%) を捨てる。 捨てた分は過充電として配る。
-            if (chargeCapRemoved)
-            {
-                int cap = ChargeCap;
-                int ch = GetCharge();
-                if (ch > cap)
-                {
-                    int leak = (ch - cap) * 3 / 4;
-                    if (leak > 0)
-                    {
-                        accumulatedValues["mutualCharge"] = ch - leak;
-                        ChargeWasted += leak;
-                        Keywords.Kw.Raise(this, PassiveSkillTrigger.OnOvercharge, leak);
-                    }
-                }
             }
         }
 
@@ -1306,7 +1272,7 @@ namespace ItemSystem.PassiveSkills
         {
             if (n <= 0) return;
             int cur = GetCharge();
-            // 〈雷壷〉は上限を外す (超えた分はターン開始時に 75% 捨てる・BeginNewTurn の Phase C)。
+            // 〈雷壷〉は上限を外す (超えた分の目減りは品のクラスがターン終了時に)。
             int cap = chargeCapRemoved ? int.MaxValue : ChargeCap;
             int next = (int)System.Math.Min((long)cap, (long)cur + n);
             // [計装] 充電経済。 **上限で捨てられた分**を分けて数える ── 収入が支出を上回って
@@ -1352,10 +1318,23 @@ namespace ItemSystem.PassiveSkills
         /// 毎ターン自動でクリアされない (frenzyDiceBonus のような戦闘持続値が同居する) ので、
         /// perTurn 扱いのキーは明示的に 0 へ戻すこと。</para></summary>
         public const string ChargeSpentThisTurnKey = "chargeSpentThisTurn";
+        /// <summary>[perTurn] このターンに充電を使った回数 (支払い 1 回 = 1・振り直しも)。 〈灼線鞭〉の「2 回以上」が読む (TerminalEnv.chargeSpendsTurn)。 BeginNewTurn の Phase B で 0。</summary>
+        public const string ChargeSpendsThisTurnKey = "chargeSpendsThisTurn";
         private void NoteChargeSpent(int n)
         {
             if (n <= 0) return;
             accumulatedValues[ChargeSpentThisTurnKey] = GetAccumulated(ChargeSpentThisTurnKey) + n;
+            accumulatedValues[ChargeSpendsThisTurnKey] = GetAccumulated(ChargeSpendsThisTurnKey) + 1;
+        }
+
+        /// <summary>充電を n 失う (使ったことにならない ── 「充電を使うたび」の品は鳴らない・〈雷壷〉の目減り)。 戻り値 = 失った量。</summary>
+        public int LoseCharge(int n)
+        {
+            int cur = GetCharge(), take = System.Math.Min(System.Math.Max(0, n), cur);
+            if (take <= 0) return 0;
+            accumulatedValues["mutualCharge"] = cur - take;
+            ChargeWasted += take;
+            return take;
         }
 
         /// <summary>充電の**半分**（切り捨て）を没収し、没収した量を返す。
@@ -1370,9 +1349,8 @@ namespace ItemSystem.PassiveSkills
             return take;
         }
 
-        /// <summary>過充電判定 (charge が OverchargeThreshold 以上・2026-07-16: 上限10維持のまま閾値を7に下方)。
-        /// 目的: Spark/LightningStrike の消費と Overload/Criticality 維持を両立可能にする。</summary>
-        public const int OverchargeThreshold = 7;
+        /// <summary>過充電 = 充電 10 以上 (2026-11-21・full-item-rework-ledger §①・<see cref="CombatSystem.ChargeCore.OverchargeAt"/>)。</summary>
+        public const int OverchargeThreshold = CombatSystem.ChargeCore.OverchargeAt;
         public bool IsOvercharged() => GetCharge() >= OverchargeThreshold;
 
         /// <summary>蓄積値を安全に取得（キーが無ければ0）</summary>

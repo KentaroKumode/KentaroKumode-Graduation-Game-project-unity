@@ -16,7 +16,7 @@ namespace CombatSystem
         public bool VescaClockActive { get; private set; }
 
         /// <summary>戦闘の始め・形態の交代: 敵の目盛りを入れ直す (目盛りの無い敵・測定の口で止めた時は無し)。
-        /// **目盛りの並びを作るのはここ** (時計の目盛りもここで足す・戦闘中に動かすのは〈柱折りの発破筒〉の <see cref="RaiseBossNextNotch"/> とダウンが明けた時だけ)。 画面・BOT は <see cref="Down"/> の並びを読む。</summary>
+        /// **目盛りの並びを作るのはここ** (時計の目盛りもここで足す・戦闘中に動かすのは <see cref="RaiseBossNextNotch"/> だけ)。 画面・BOT は <see cref="Down"/> の並びを読む。</summary>
         private void ResetBossDown(EnemyData enemy, bool newCombat)
         {
             bool clock = GameLoop.VescaClock.Held(GameLoop.GameManager.Instance?.Run);
@@ -68,16 +68,7 @@ namespace CombatSystem
                     ItemSystem.PassiveSkills.Effects.RelicScholar.ClearForDownTurn(ctx);
             }
             if (!was && BossDown.ActiveNow) RaiseCue(CombatCue.BossDownStart);
-            else if (was && !BossDown.ActiveNow)
-            {
-                RaiseCue(CombatCue.BossDownEnd);
-                // 〈柱折りの発破筒〉(2026-11-20): ダウンが明けると、 HP 0 の所に新しい目盛りが 1 本できる (爆発で上がる)
-                if (_down.Enabled && ItemSystem.PassiveSkills.Effects.PillarBreakerCharge.Held(ctx))
-                {
-                    _down.AddNotch(0f);
-                    Debug.Log($"[柱折りの発破筒] ダウンが明けた → HP 0 の所に目盛りを足す (目盛り {_down.notches.Length} 本)");
-                }
-            }
+            else if (was && !BossDown.ActiveNow) RaiseCue(CombatCue.BossDownEnd);
         }
 
         /// <summary>このターン敵が大技の予告かチャージを出しているか (〈英雄の意志〉がターン開始時に読む・2026-11-20)。
@@ -88,6 +79,9 @@ namespace CombatSystem
             return Escalation.IsHeavyTurn(currentEnemy, turn) || Escalation.IsChargeTurn(currentEnemy, turn);
         }
 
+        /// <summary>このターン敵がダウン中か (〈抜き打ちの作法〉が撃の中で読む)。</summary>
+        public bool EnemyDownNow => currentEnemy != null && enemyHP > 0 && _down.downNow;
+
         /// <summary>このターン敵がチャージ中 (大技の前で攻撃しない・天与の盾と指輪も) かダウン中か (〈隙衝きの短槍〉が配線の後に読む・2026-11-21)。
         /// 予告の「チャージ」の印 (<see cref="FillDownTelegraph"/>)・敵の攻撃の解決の「攻撃しない」の枝と同じ判定。</summary>
         public bool EnemyChargingOrDownNow(int turn)
@@ -96,7 +90,7 @@ namespace CombatSystem
             return _down.downNow || Escalation.IsChargeNoAttack(currentEnemy, turn) || TenyoHeavy.NoAttackAt(currentEnemy, turn);
         }
 
-        /// <summary>〈柱折りの発破筒〉(2026-11-20): 次に割る目盛りを <paramref name="add"/> (HP) だけ上げる。 今の HP より上へは行かない (今の HP の 1 下まで ── 割るには通常攻撃が要る)。
+        /// <summary>〈雷鯰の棘〉〈避雷の杭〉〈鎧縫いの針〉: 次に割る目盛りを <paramref name="add"/> (HP) だけ上げる。 今の HP より上へは行かない (今の HP の 1 下まで ── 割るには通常攻撃が要る)。
         /// 目盛りの無い敵では何もしない。 ターンの解決中は CombatManager の手元の HP、 それ以外は ctx の HP の低い方を今の HP とみなす。</summary>
         public void RaiseBossNextNotch(int add)
         {
@@ -105,7 +99,32 @@ namespace CombatSystem
             int hpNow = ctx != null ? System.Math.Min(enemyHP, ctx.enemyCurrentHP) : enemyHP;
             int before = _down.NextNotchHp(currentEnemy.maxHP);
             int to = _down.RaiseNext(currentEnemy.maxHP, hpNow - 1, add);
-            if (to >= 0) Debug.Log($"[柱折りの発破筒] 次の目盛り {before} → {to} (+{add}・HP {hpNow})");
+            if (to >= 0) Debug.Log($"[{CombatContext.CurrentSkillId}] 次の目盛り {before} → {to} (+{add}・HP {hpNow})");
+        }
+
+        /// <summary>ボスの一番上のひびを今割る (満額のダウン・<see cref="BossDownState.BreakTopCrack"/>)。 目盛りの無い敵・ひびが無ければ false。</summary>
+        public bool BreakBossCrack(string label)
+        {
+            if (!_down.Enabled || currentEnemy == null || enemyHP <= 0 || !_down.BreakTopCrack()) return false;
+            Debug.Log($"[{label}] ボスの目盛りのひびを割った (満額のダウン・割った目盛り {_down.broken})");
+            return true;
+        }
+
+        /// <summary>ボスの次の目盛りを HP に関係なく今割る (満額のダウン・〈英雄の意志〉のジャスト防御)。 目盛りの無い敵・割る目盛りが無ければ false。</summary>
+        public bool BreakBossNotch(string label)
+        {
+            if (!_down.Enabled || currentEnemy == null || enemyHP <= 0 || !_down.BreakTopNotch()) return false;
+            Debug.Log($"[{label}] ボスの目盛りを直接 1 段割った (満額のダウン・割った目盛り {_down.broken})");
+            return true;
+        }
+
+        /// <summary>ボスの次の目盛りにひびを入れる (〈落城の礎石〉)。 目盛りの無い敵・既にひびがあれば false。</summary>
+        public bool CrackBossNotch(string label)
+        {
+            int turn = PassiveSkillManager.Instance?.Context?.currentTurn ?? 0;
+            if (!_down.Enabled || currentEnemy == null || enemyHP <= 0 || !_down.CrackTopNotch(turn)) return false;
+            Debug.Log($"[{label}] ボスの次の目盛りにひびを入れた (T{turn})");
+            return true;
         }
 
         private void BeginBossDownTurnCore(CombatContext ctx)
@@ -204,14 +223,24 @@ namespace CombatSystem
                 return;
             }
             _downMainWouldBreak = 0;
-            // 〈骨溶かしの黒油〉(2026-11-20): このターンに毒のダメージが入っていれば、 このターンに入るひびは割れても弱いダウンにならない
-            bool strong = ItemSystem.PassiveSkills.Effects.BoneMeltOil.PoisonTurnNow(PassiveSkillManager.Instance?.Context);
-            int c = _down.NoteTurnEndCracks(enemyHP, currentEnemy.maxHP, turn, GameLoop.GameHooks.DownCrackGrace, GameLoop.GameHooks.DownCrackWeak,
-                                            out int newCracks, strong);
+            // 【起爆】したターン (〈骨溶かしの黒油〉は毒のダメージが入ったターンも・2026-11-21・PoisonCore): ひびを入れた後、 ひびを全部 正規のダウンとして割る (猶予を待たない)
+            bool shatter = ItemSystem.PassiveSkills.Effects.Psn.ShattersCracksNow(PassiveSkillManager.Instance?.Context);
+            int c = _down.NoteTurnEndCracks(enemyHP, currentEnemy.maxHP, turn, shatter ? -1 : GameLoop.GameHooks.DownCrackGrace, GameLoop.GameHooks.DownCrackWeak,
+                                            out int newCracks);
             BossDownDiag.NoteCracks(newCracks, c);
             if (newCracks > 0) Debug.Log($"[ダウン] 通常攻撃以外で目盛りを下回った: ひび {newCracks} (HP {enemyHP}/{currentEnemy.maxHP})");
             if (c > 0) Debug.Log($"[ダウン] ひびの猶予が切れて目盛りが {c} つひとりでに割れた → 次のターンからダウン {_down.pending} ターン");
             if (c > 0) RaiseBossEvent(PassiveSkillManager.Instance?.Context, PassiveSkillTrigger.OnBossDown, c, true);   // ひびで割れた (2026-11-21)
+            if (shatter)
+            {
+                int sh = 0;
+                while (_down.BreakTopCrack()) sh++;
+                if (sh > 0)
+                {
+                    Debug.Log($"[起爆] ボスの目盛りのひびを {sh} つ割った (正規のダウン) → 次のターンからダウン {_down.pending} ターン");
+                    RaiseBossEvent(PassiveSkillManager.Instance?.Context, PassiveSkillTrigger.OnBossDown, sh, false);   // 通常攻撃と同じ扱い (正規のダウン)
+                }
+            }
         }
 
         /// <summary>ボスの出来事 (OnBossDown / OnHeavyCanceled・2026-11-21) を配る。 <paramref name="crack"/> = ひびで割れた分 (<see cref="ItemSystem.PassiveSkills.Keywords.Kw.BossDownCrackKey"/>)。</summary>

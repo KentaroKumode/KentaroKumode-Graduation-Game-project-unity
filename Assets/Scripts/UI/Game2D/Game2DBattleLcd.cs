@@ -171,6 +171,8 @@ namespace UI.Game2D
                     if (In(d, SideRect(0))) { sim.AutoWire(); return; }
                     if (In(d, SideRect(1))) { if (_win != null) _win.OpenItems(); return; }
                     if (In(d, SideRect(2))) { PressFlee(); return; }
+                    if (sim.HasReboot && In(d, SideRect(-1))) { sim.CycleReboot(); return; }
+                    if (sim.HasOverclock && In(d, SideRect(-2))) { sim.ToggleOverclock(); return; }
                 }
                 if (GoVisible && In(d, GoRect())) { if (sim.ButtonEnabled) { _fleeArmed = false; sim.Button(); } return; }
             }
@@ -286,7 +288,10 @@ namespace UI.Game2D
         private RectInt HeadRect() => new RectInt(BattleMotion.EX - 70, BattleMotion.FloorY + BattleLcdLayout.HeadNextDy - 2, 140, -BattleLcdLayout.HeadNextDy + BattleLcdLayout.HeadIntentDy + Game2DJpFont.Cell + 4);
 
         private static readonly string[] SideLabels = { "おまかせ", "道具", "逃げる" };
-        private string SideLabel(int k) => k == 2 && _fleeArmed ? "本当に?" : SideLabels[k];
+        /// <summary>k = 0〜2: おまかせ・道具・逃げる / −1: 【再起動】(〈二股の導線〉) / −2: 【オーバークロック】(〈雷鳴の太鼓〉)・仮置き (2026-11-21)。
+        /// −3: 【起爆】の見込み (〈石抜きの毒指輪〉〈劇毒の火薬庫〉・押す札ではない・2026-11-21)。 −4: 【ジャスト防御】の見込み (防御/予告+許容幅・押す札ではない・2026-11-21)。
+        /// −5: 出血の見込み (今の出血 + この配線の撃ごとの出血・押す札ではない・2026-11-21)。 −6: 臨界の爆発の見込み (今の臨界/閾値 + この配線の爆発の回数・押す札ではない・2026-11-21)。</summary>
+        private string SideLabel(int k) => k == -1 ? _sim.RebootLabel : k == -2 ? _sim.OverclockLabel : k == -3 ? _sim.DetonateLabel : k == -4 ? _sim.JustGuardLabel : k == -5 ? _sim.BleedLabel : k == -6 ? _sim.HeatLabel : k == -7 ? _sim.CritLabel : k == -8 ? _sim.DeckLabel : k == -9 ? _sim.RoleLabel : k == 2 && _fleeArmed ? "本当に?" : SideLabels[k];
         private RectInt SideRect(int k)
         {
             int w = Game2DJpFont.Width(SideLabel(k)) + 2;
@@ -562,6 +567,22 @@ namespace UI.Game2D
             {
                 bool[] on = { s.CanOperate, _win != null && _win.AnyUsable(), s.CanFlee };
                 for (int k = 0; k < 3; k++) { var r = SideRect(k); Txt(SideLabel(k), r.x + 1, r.y + 1, k == 2 && _fleeArmed ? RedC : on[k] ? Bone : DimC); }
+                // 充電のコアアクション (仮): 見込みで成り立つ時は金・選んだが成り立たない時は白・選んでいない時は暗く
+                if (s.HasReboot) { var r = SideRect(-1); Txt(SideLabel(-1), r.x + 1, r.y + 1, s.RebootLive ? Gold2 : s.rebootSel >= 0 ? Bone : DimC); }
+                if (s.HasOverclock) { var r = SideRect(-2); Txt(SideLabel(-2), r.x + 1, r.y + 1, s.OverclockLive ? Gold2 : s.overclockOn ? Bone : DimC); }
+                // 毒の【起爆】の見込み (仮): このターン起爆するなら金・しないなら暗く (表示だけ)
+                if (s.HasDetonate) { var r = SideRect(-3); Txt(SideLabel(-3), r.x + 1, r.y + 1, s.DetonateLive ? Gold2 : DimC); }
+                // シールドの【ジャスト防御】の見込み (仮): 防御 (ブロック + シールド)/予告+許容幅。 成立するなら金・しないなら暗く (表示だけ)
+                if (s.HasJustGuard) { var r = SideRect(-4); Txt(SideLabel(-4), r.x + 1, r.y + 1, s.JustGuardLive ? Gold2 : DimC); }
+                // 出血の撃ごとの出血の見込み (仮): 今の出血 + この配線で与える出血。 〈血桜〉が働く見込みなら金 (表示だけ)
+                if (s.HasBleedHits) { var r = SideRect(-5); Txt(SideLabel(-5), r.x + 1, r.y + 1, s.BleedLive ? Gold2 : Bone); }
+                if (s.HasHeat) { var r = SideRect(-6); Txt(SideLabel(-6), r.x + 1, r.y + 1, s.HeatLive ? Gold2 : Bone); }
+                // 会心率と会心倍率 (仮): 100% を超えた分は倍率に入る。 100% 以上なら金 (表示だけ)
+                if (s.HasCrit) { var r = SideRect(-7); Txt(SideLabel(-7), r.x + 1, r.y + 1, s.CritLive ? Gold2 : Bone); }
+                // 山札の品 (仮): この戦闘で使い捨てを使った回数 + この配線で使う数・別枠の倍率。 この配線で使い捨てを使うなら金 (表示だけ)
+                if (s.HasDeckItems) { var r = SideRect(-8); Txt(SideLabel(-8), r.x + 1, r.y + 1, s.DeckLive ? Gold2 : Bone); }
+                // 役の軸の品 (仮): この戦闘で役が成立した回数 (+ このターン)・続いたターン・別枠の倍率。 このターン役が立つなら金 (表示だけ)
+                if (s.HasRoleItems) { var r = SideRect(-9); Txt(SideLabel(-9), r.x + 1, r.y + 1, s.RoleLive ? Gold2 : Bone); }
             }
             if (!GoVisible) return;
             bool en = s.ButtonEnabled;

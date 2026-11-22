@@ -12,7 +12,6 @@ namespace GameLoop
     public static class DieIds
     {
         public const string Starting   = "角の取れた賽";
-        public const string Pumice     = "軽石の賽";
         public const string RustyNail  = "錆釘の賽";
         public const string Scavenger  = "拾い物の賽";
         public const string Dull       = "鈍色の賽";
@@ -37,8 +36,10 @@ namespace GameLoop
     {
         // === 名前付きパッシブ (日本語 ID ── items.json の id と一致必須) ===
         // MerchantSeal (商人の符牒) / GourmetKnife (食通の懐刀) は 2026-07-18 削除 (アイテム削除に伴う)
-        /// <summary>黄金卿の剣: AutoRunner の装備判断が参照。</summary>
+        /// <summary>溶金の領主剣: ShopManager.Close が店で使った額を数える (RunState.swordShopSpent)。</summary>
         public const string GoldenKingSword = "溶金の領主剣";
+        /// <summary>金の品 (2026-11-21・full-item-rework-ledger §⑨・GoldEffects.cs)。 銭皿 = AxisPool.SkipGoldFor / 天秤 = GameManager.Rewards。</summary>
+        public const string GoldCoinDish = "銭皿", GoldScale = "戦果の天秤", GoldLuckyCoin = "幸運の硬貨", GoldBlastPrize = "爆破祭の小切手";
         /// <summary>天工開物: GameManager の強化フックが参照。</summary>
         public const string HeavenlyCraft = "天工開物";
         /// <summary>竜閃: items.json に family / tier を持たない特殊武器。 戦闘演出 (Game2DBattleSim) が竜閃の絵とモーションを選ぶ判定に使う。</summary>
@@ -53,7 +54,7 @@ namespace GameLoop
         // === 店連動パッシブ (2026-09-15) ===
         //   ShopManager が所持判定に使う ＝ 跨ファイル参照なのでここを経由する。
         //   下の帯 (BRONZE/SILVER) に店の機能へ触る品が 1 つも無かったのを埋めるもの。
-        /// <summary>合札: 同じショップで 2 品目以降を買うとき 10G 安い (ShopManager.TryBuy・2026-10-31)。</summary>
+        /// <summary>合札: 同じショップで 2 品目以降を買うとき 10G 安い (下限 1G・ShopManager.TryBuy)。</summary>
         public const string TrialTossToken = "合札";
 
         // === 確信チェーンのフラグ品 (5F-6F の進路・2026-11-12 に定数化) ===
@@ -189,37 +190,57 @@ namespace GameLoop
         public const string TacticSwap = "入れ替えの符", TacticOil = "無銘の潤滑油", TacticAcid = "鎧割りの酸瓶", TacticNeedle = "急所突きの針",
             TacticChisel = "目盛り削りの鑿", TacticSand = "反転の砂", TacticOrb = "倍化の共鳴玉", TacticMercury = "複製の水銀";
 
-        // === 消耗品の連動品 (2026-11-20・item-overhaul-spec §7-2・名前は仮) ===
-        public const string LinkPouch = "帯革の薬嚢", LinkPride = "使い切りの矜持", LinkBottomless = "底抜けの小瓶", LinkSampleBox = "行商人の見本箱";
+        // === 消耗品の連動品 (帯革・小瓶 = GeneralEffects.cs / 見本箱 = GoldEffects.cs) ===
+        public const string LinkPouch = "帯革の薬嚢", LinkBottomless = "底抜けの小瓶", LinkSampleBox = "行商人の見本箱";
 
         // === 嵐・店・金のマクロ秘宝 (2026-11-20・item-overhaul-spec §9・名前は仮) ===
-        //   嵐: 風見鶏・天幕 = GameManager.Instability / 気圧計 = MacroItemEffects。 店: 算盤・手形・紹介状 = ShopManager / 研ぎ代 = GameManager.Terminals + MacroItemEffects。
+        //   嵐: 風見鶏・天幕 = GameManager.Instability / 気圧計 = GeneralEffects。 店: 算盤・手形・紹介状 = ShopManager (算盤の戦闘の側は GoldEffects) / 研ぎ代 = GameManager.Terminals + GoldEffects。
         //   報酬: 鑑定書 = GameManager.OfferTerminalReward / 交換帳 = GameManager.Tiles (交換マス)。
         public const string MacroVane = "嵐読みの風見鶏", MacroBarometer = "気圧計のペンダント", MacroTent = "避雷の天幕";
         public const string MacroReceipt = "研ぎ代の領収書", MacroAbacus = "相場師の算盤", MacroPass = "黄金の通行手形";
         public const string MacroLetter = "目利きの紹介状", MacroAppraisal = "二股の鑑定書", MacroLedger = "古物商の交換帳";
 
-        // === 采配 (山札の軸) の 18 品 (2026-11-20・段 1-e・item-overhaul-spec §4 / §12-4・名前は仮) ===
-        //   出来事で書く品 (焼き入れの挟み・灰払いの箒) = DeckItemEffects.cs。 端子の解決・山札を変える品 = CombatSystem.TerminalCards の DeckItems の旗
-        //   (TerminalCards.DeckItemsOf)。 予備の差込口・整理された工具箱 = CombatManager.BeginTerminalDeck。
+        // === 山札の軸の 19 品 (full-item-rework-ledger §⑦) ===
+        //   端子の解決・山札を変える分 = CombatSystem.TerminalCards の DeckItems の旗 (TerminalCards.DeckItemsOf)。 予備の差込口・整理された工具箱 = CombatManager.BeginTerminalDeck。
+        //   出来事で書く分 (焼き入れの挟み の敵へのダメージ・仕込みの配電盤 の目盛りの削り) = DeckEffects.cs。
         public const string DeckTongs = "焼き入れの挟み", DeckSparePlug = "予備の差込口", DeckClasp = "留め金の栞", DeckAuxGear = "補助歯車", DeckIdleWeight = "空回りの錘";
         public const string DeckBroom = "灰払いの箒", DeckRewind = "早回しのゼンマイ", DeckSwitchboard = "仕込みの配電盤", DeckMold = "型抜きの金型", DeckToolbox = "整理された工具箱";
         public const string DeckCrucible = "再利用のるつぼ", DeckBlueprint = "無銘の設計図", DeckSeamless = "継ぎ目のない導線", DeckFolded = "折り目のついた札";
+        public const string DeckPride = "使い切りの矜持";
         public const string DeckBag = "解体屋の袋", DeckWorkbench = "常設の作業台", DeckAsh = "灰から組む機関", DeckEngine = "永久機関の主軸";
 
-        // === 賽目 (役の軸) の 8 品 (2026-11-21・段 1-f・item-overhaul-spec §5 / §12-2・名前は仮) ===
-        //   出来事で書く品 (欠け目の見立て・揃いの拍子木) = RoleItemEffects.cs。 見切りの木札・符丁の刻み板 = CombatSystem.TerminalCards の RoleItems の旗。
+        // === 役の軸の 13 品 (2026-11-21・full-item-rework-ledger §⑧) ===
+        //   出来事で書く品 (欠け目の見立て・揃いの拍子木・負け越しの賽・雷毒の導管) = RoleEffects.cs。 端子の解決の中の分 = CombatSystem.TerminalCards の RoleItems の旗。
         //   擦り切れた賽袋 = CombatManager.FreeRerollsLeft。 鏡合わせの盤・宿命の刻み目・万象のゾロ目 = CombatManager.ResolveRoles / DecideOmniPair。
         public const string RoleBag = "擦り切れた賽袋", RoleWoodTag = "見切りの木札", RoleNotchBoard = "符丁の刻み板", RoleChipped = "欠け目の見立て";
         public const string RoleClapper = "揃いの拍子木", RoleMirror = "鏡合わせの盤", RoleFate = "宿命の刻み目", RoleOmni = "万象のゾロ目";
+        public const string RoleLosing = "負け越しの賽", RoleConduit = "雷毒の導管", RoleGear = "血染めの歯車", RoleThunder = "雷鳴のゾロ目", RoleBloodmark = "血濡れの符丁";
 
-        // === クロス軸の 6 品 (2026-11-21・段 1-f・item-overhaul-spec §6-1 / §12-8・名前は仮・どれも品の軸の偏重 5 以上で働く) = CrossItemEffects.cs ===
-        //   雷毒の導管 = §12-8 の「毒×充電の橋」(仮名)
-        public const string CrossVenomPowder = "劇毒の火薬庫", CrossBloodGear = "血染めの歯車", CrossThunderDice = "雷鳴のゾロ目";
-        public const string CrossSniper = "必殺の照準器", CrossBloodCode = "血濡れの符丁", CrossVenomConduit = "雷毒の導管";
+        // === 充電の軸の品で、 端子の解決の中で効く 4 品 (2026-11-21・full-item-rework-ledger §①) = CombatSystem.ChargeCore の ChargeItems の旗 ===
+        public const string ChargeFork = "二股の導線", ChargeRod = "逆さ避雷針", ChargeWhip = "灼線鞭", ChargeDrum = "雷鳴の太鼓";
+        // === 毒の軸の品で、 端子の解決・起爆の式に効く 10 品 (2026-11-21・full-item-rework-ledger §②) = CombatSystem.PoisonCore の PoisonItems の旗 ===
+        public const string PoisonGreenKnife = "緑染みの小刀", PoisonSerpent = "蛇血瓶", PoisonTaster = "毒見役の小匙", PoisonThorn = "毒棘の小盾",
+            PoisonMantle = "瘴気の外套", PoisonBlowpipe = "麻痺の吹き矢", PoisonRing = "石抜きの毒指輪", PoisonMagazine = "劇毒の火薬庫",
+            PoisonSlowBlade = "遅効の毒刃", PoisonOil = "骨溶かしの黒油";
+        // === シールドの軸の品で、 端子の解決 (5e)・ジャスト防御の許容幅に効く 4 品 (2026-11-21・full-item-rework-ledger §③) = CombatSystem.ShieldCore の ShieldItems の旗 ===
+        public const string ShieldPauldron = "肩当て", ShieldPadded = "当て布の籠手", ShieldRivet = "鋲の胸当て", ShieldWorn = "擦り減った小盾";
+        // === 出血の軸の品で、 端子の解決 (5f)・本体の撃の輪・BOT の見積もりに効く 16 品 (2026-11-21・full-item-rework-ledger §④) = CombatSystem.BleedCore の BleedItems の旗 ===
+        public const string BleedLeadAxe = "鉛入りの握斧", BleedPendant = "血日に澄む佩玉", BleedSurgeon = "医家の反り刃", BleedClasp = "返し刃の留め金",
+            BleedChipped = "欠け刃のナイフ", BleedRift = "裂け目の楔", BleedSaw = "鋸刃の山刀", BleedFirstBlood = "先血の腕輪",
+            BleedNeedles = "血止め知らずの針箱", BleedOpenNeedle = "医書裏の開き針", BleedFury = "激情の刃", BleedCleaver = "百人切りの鉈",
+            BleedSakura = "血桜", BleedPress = "紅の搾り具", BleedCrystal = "涸れぬ血晶", BleedWedge = "血の楔";
+        // === 臨界の軸の品で、 爆発の式・端子の解決 (5g)・BOT と画面の見込みに効く 16 品 (2026-11-21・full-item-rework-ledger §⑤) = CombatSystem.HeatCore の HeatItems の旗 ===
+        public const string HeatStone = "過熱石", HeatBreastplate = "燻りの革胸当て", HeatPoker = "火守りの火搔き棒", HeatSpanner = "点火スパナ",
+            HeatWhetstone = "荒砥", HeatOven = "恒温の竈", HeatPrimer = "二度詰めの雷管", HeatCoal = "焚き足しの炭",
+            HeatMold = "溢れ取りの鋳型", HeatLedger = "帳簿外の爆薬", HeatKettle = "早沸かし釜", HeatSpark = "火花読みの眼鏡",
+            HeatAshen = "八日目の灰燼", HeatFlint = "燧石の指輪", HeatKiln = "暴れ窯の火床", HeatPillar = "柱折りの発破筒";
 
-        // === 戦術の 6 品 (2026-11-21・段 1-f・item-overhaul-spec §6-2・名前は仮) = TacticItemEffects.cs ===
-        public const string TacPommel = "渾身の柄頭", TacStill = "静寂の構え", TacGapSpear = "隙衝きの短槍";
+        // === 会心の軸の品で、 会心の式 (CombatSystem.CritCore)・本体の撃の輪・BOT の見積もりが読む品 (2026-11-21・full-item-rework-ledger §⑥) ===
+        public const string CritFirstArrow = "一の矢", CritPommel = "渾身の柄頭", CritSniper = "必殺の照準器", CritHeaven = "天眼の鍔",
+            CritSuntetsu = "寸鉄", CritIronClub = "銑鉄棍", CritPinpoint = "一点読みの片眼", CritQuickDraw = "抜き打ちの作法",
+            CritClairvoyant = "千里眼の水晶", CritMask = "死相の面頬", CritAim = "狙い目の刻み";
+        // === ボス・大技の戦術の 4 品 (軸なし汎用) = GeneralEffects.cs ===
+        public const string TacGapSpear = "隙衝きの短槍";
         public const string TacBreak = "崩しの一手", TacWedge = "大技殺しの楔", TacHourglass = "逆境の砂時計";
 
         // === 航行マップで使う消耗品 (2026-09-28・2026-10-18 に囮と罠を統合) ===

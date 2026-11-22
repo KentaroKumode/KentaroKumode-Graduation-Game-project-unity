@@ -42,8 +42,8 @@ namespace AutoTest
         private const float DeckPreheatDmg = 3f, DeckDrawDmg = 4f, DeckRetainDmg = 2f;
         /// <summary>〈影写し〉: 基本以外を複製 6 / 基本を複製 1。 〈火葬の剣〉: 基本を抜く 6 (山札が締まる) / 基本以外を抜く −4 (与ダメ相当)。</summary>
         private const float DeckCopyGoodDmg = 6f, DeckCopyBasicDmg = 1f, DeckBurnBasicDmg = 6f, DeckBurnGoodDmg = -4f;
-        /// <summary>別枠のダメージ (毒・臨界・出血) 1 あたり 0.5 与ダメ相当。 式は見ていない控えめな定数 (値付けの規則 4: 別枠は量を控えめに)。</summary>
-        private const float DeckPoisonDmg = 0.5f, DeckHeatDmg = 0.5f, DeckBleedDmg = 0.5f;
+        /// <summary>別枠のダメージ (毒・出血) 1 あたり 0.5 与ダメ相当。 式は見ていない控えめな定数 (値付けの規則 4: 別枠は量を控えめに)。 臨界は HeatCore.Forecast で見る。</summary>
+        private const float DeckPoisonDmg = 0.5f, DeckBleedDmg = 0.5f;
         /// <summary>使い捨ての端子を使う費用 (この戦闘ではもう使えない): 攻撃の種類は与ダメ相当 8 (出目 2 個ぶん)・それ以外は HP 相当 3。
         /// 弱い目で火薬樽を切らず、 良い目・危ないターンに回すための足切り。</summary>
         private const float DeckDisposableDmgCost = 8f, DeckDisposableHpCost = 3f;
@@ -85,7 +85,17 @@ namespace AutoTest
             ws.aCount = o.attackDice; ws.bCount = o.blockDice; ws.aHits = o.attackHits.Count;
             ws.aSum = o.attackAdd; ws.blockRaw = o.blockAdd; ws.chargeRaw = o.chargeAdd;
             for (int i = 0; i < k && i < o.kindOfDie.Length; i++)
+            {
                 if (o.kindOfDie[i] == DiceTerminal.Block && rolls[i] > ws.maxBlockDie) ws.maxBlockDie = rolls[i];
+                if (o.kindOfDie[i] == DiceTerminal.Attack && rolls[i] > ws.atkFaceMax) ws.atkFaceMax = rolls[i];   // 〈鷹匠の革手袋〉(本体は MutualKeys.AttackDiceMax)
+                if (o.kindOfDie[i] != DiceTerminal.Attack && o.kindOfDie[i] != DiceTerminal.None) ws.otherDice += rolls[i];   // 竜閃〈無我無心〉
+            }
+            //   〈狙い目の刻み〉: 撃ごとの挿した目 (本体の撃の輪と同じ CritCore.HitFaceMax)
+            if (s.aim && o.attackHits.Count > 0)
+            {
+                ws.hitFace = new int[o.attackHits.Count];
+                for (int h = 0; h < ws.hitFace.Length; h++) ws.hitFace[h] = CritCore.HitFaceMax(o, rolls, h);
+            }
             // 充電: 本体の順 (払う → 満たす → 足す・上限で止まる) で、 実際に増える量を出目の平均で割って「本数」に換える
             int cap = (env.chargeCap > 0 ? env.chargeCap : 9999) + o.chargeCapAdd;      // 〈大導電＋〉は満たす前に上限を足す
             int ch = Math.Max(0, env.charge - o.chargeSpend);
@@ -94,7 +104,7 @@ namespace AutoTest
             ws.chargeUnits = (ch - env.charge) / DeckChargePipsPerDie;
             // ---- 今ターンの追加の効果 (効用の Core が本体の位置で掛ける) ----
             ws.damageMul = o.damageMul; ws.outPctAdd = o.outgoingPctAdd; ws.critMultAdd = o.critMultAdd; ws.forceCrit = o.forceCrit;
-            ws.ignoreDefense = o.ignoreDefense; ws.takenMul = o.takenMul; ws.enemyAtkMul = o.enemyAttackMul;
+            ws.ignoreDefense = o.ignoreDefense; ws.armorPen = o.armorPen; ws.takenMul = o.takenMul; ws.enemyAtkMul = o.enemyAttackMul;
             //   〈急所突きの針〉: 新しい式 (readOut) は最初の 1 撃だけで見る (ReadOutOneHit)。 旧の式は撃を分けないので、 攻撃するターン全体を会心・防御無視と見る (多段では過大)
             if (s.needleFirst && !s.readOut && o.attackDice > 0) { ws.forceCrit = true; ws.ignoreDefense = true; }
             ws.shield = o.shield - o.shieldSpend; ws.heal = o.heal; ws.selfDamage = o.selfDamage;
@@ -105,36 +115,53 @@ namespace AutoTest
             float sightFlat = 0f, sightHp = 0f;      // 与ダメ相当 (下で dw を掛ける) / HP 相当
             if (o.disposedNow > 0)
             {
-                // 使い捨てを使うたび (OnTerminalDispose・配線の解決の直後 = このターンの固定ダメの枠): 〈焼き入れの挟み〉〈血染めの歯車〉
-                ws.extraDmg += o.disposedNow * (sg.tongsDmg + (sg.bloodGear ? env.enemyBleed * 2 : 0));
-                if (sg.bloodGear) sightFlat += o.disposedNow * sg.axDeck * DeckBleedDmg;                 // 出血 +采配 (別枠のダメージの値付けと同じ)
-                // 〈必殺の照準器〉: このターンの攻撃は全部会心・会心倍率 +采配 × 0.15 (何枚使っても 1 回)
-                if (sg.sniperMul >= 0f && o.attackDice > 0) { ws.forceCrit = true; ws.critMultAdd += sg.sniperMul; }
-                // 〈灰払いの箒〉: 次の撃の会心率 +采配 × 5% (使った数だけ)。 1 撃ぶんの与ダメ × 上がる会心率 × (会心倍率 − 1) と見る
-                //   shortcut: 1 撃の与ダメは 1 ターンの見込み ÷ 撃の数 (攻撃しないターンは次の攻撃に乗るので同じ値)・会心率 100% で頭打ちは見ない
-                if (sg.broomPct > 0f)
-                    sightFlat += Math.Min(1f, o.disposedNow * sg.broomPct) * Math.Max(0f, s.critMulEff - 1f)
-                               * DeckPerTurnDamage(in s, k) / Math.Max(1, o.attackHits.Count);
+                // 使い捨てを使うたび (OnTerminalDispose・配線の解決の直後 = このターンの固定ダメの枠): 〈焼き入れの挟み〉の防御無視ダメージ (撃の +2 は Resolve の 6c)
+                ws.extraDmg += o.disposedNow * sg.tongsDmg;
             }
-            // 〈破城斧〉: 最初の 1 撃の時のシールド (持ち越し + このターンの端子の分) が 10 以上なら、 撃ごとにシールド 5 を使い 攻撃 +10 (倍率の前)。
-            //   shortcut: 使ったシールドは、 半分 (毎ターン半減) を先の HP で引く。 このターンの被弾を吸えなくなる分は見ない
+            // 〈破城斧〉: 最初の 1 撃の時のシールド (持ち越し + このターンの端子の分) が 15 以上なら、 撃ごとにシールド 8 を使い その撃の最終与ダメージ +80%・防御無視。
+            //   shortcut: 1 撃の与ダメは 1 ターンの見込み ÷ 撃の数・防御無視の分は見ない。 使ったシールドは、 半分 (毎ターン半減) を先の HP で引く。 このターンの被弾を吸えなくなる分は見ない
             if (sg.siegeAxe && o.attackHits.Count > 0)
             {
                 int sh = s.myShield + ws.shield;
                 if (sh >= ItemSystem.PassiveSkills.Effects.SiegeAxe.MinShield)
                 {
                     int h = Math.Min(o.attackHits.Count, sh / ItemSystem.PassiveSkills.Effects.SiegeAxe.PerHitShield);
-                    ws.aSum += h * ItemSystem.PassiveSkills.Effects.SiegeAxe.PerHitAtk;
+                    sightFlat += h * ItemSystem.PassiveSkills.Effects.SiegeAxe.FinalPct / 100f * DeckPerTurnDamage(in s, k) / o.attackHits.Count;
                     sightHp -= 0.5f * h * ItemSystem.PassiveSkills.Effects.SiegeAxe.PerHitShield * DeckFutureHpWorth(in s);
                 }
             }
-            // 〈無害灯〉: 敵の直接攻撃で失う HP を半分 (使う臨界は見ない)
-            if (sg.lamp) ws.takenMul *= 0.5f;
-            // 〈血濡れの符丁〉: 役〈追撃〉〈攻め〉(3・4 の 2 個そろい・ゾロ目) が立つターン、 出血 × 2 の軽減不可ダメージ (役は出目で決まる = Resolve と同じ RoleOf)
-            if (sg.bloodCode && o.roleNow > 0 && env.enemyBleed > 0)
+            // 〈無害灯〉: 敵の直接攻撃で失う HP を無効 (1 ターン 1 回・使う臨界と返すダメージは見ない)
+            if (sg.lamp) ws.takenMul = 0f;
+            // 〈石抜きの毒指輪〉の【起爆】(毒の BOT の規則・2026-11-21): 配線の後の毒 (端子の毒を足す) が 24 以上で攻撃の撃があれば、 起爆のダメージを軽減不可の分に足す
+            //   (撃が当たるかは見ない・王冠の 1.5 倍は見ない)。 毒を 24 へ押し上げて殴る挿し方が選ばれる
+            if (sg.ring && o.attackHits.Count > 0)
             {
-                var rk = TerminalCards.RoleOf(rolls, in env);
-                if (rk != null && rk.Value != RoleKind.Straight) { int f = YachtRoles.FaceOf(rk.Value); if (f == 3 || f == 4) ws.extraDmg += env.enemyBleed * 2; }
+                int pz = env.enemyPoison + o.poison;
+                if (pz >= PoisonCore.RingNeed) ws.extraDmg += PoisonCore.Damage(PoisonCore.Spend(pz), sg.poisonItems, sg.detonates, s.enemyDown);
+            }
+            // 出血の BOT の規則 (2026-11-21): 撃を順に追い、 撃の前の出血 (配線の時点 + それより前の撃の出血) で〈血の楔〉+40%・〈血桜〉(2 撃目から・出血 2 を使う) の撃の最終与ダメを、
+            //   撃の後の出血で〈紅の搾り具〉(15 以上・1/3 を使う × 8・1 ターン 1 回) を足す。 〈涸れぬ血晶〉の倍は本体と同じ BleedCore.CrystalGain。
+            //   shortcut: 1 撃の与ダメは 1 ターンの見込み ÷ 撃の数・撃が当たるかは見ない・使った出血が先のターンの出血のダメージから減る分は見ない
+            int bleedGain = 0;
+            if (sg.bleedItems != BleedItems.None && o.attackHits.Count > 0)
+            {
+                bool crystal = (sg.bleedItems & BleedItems.Crystal) != 0, pressed = sg.pressed;
+                float perHit = DeckPerTurnDamage(in s, k) / o.attackHits.Count;
+                int b = env.enemyBleed;
+                for (int h = 0; h < o.attackHits.Count; h++)
+                {
+                    int pct = 0;
+                    if ((sg.bleedItems & BleedItems.Wedge) != 0 && b >= BleedCore.WedgeNeed) pct += BleedCore.WedgePct;
+                    if ((sg.bleedItems & BleedItems.Sakura) != 0 && h >= 1 && b >= BleedCore.SakuraNeed) { pct += BleedCore.SakuraPct(b); b -= BleedCore.SakuraSpend; }
+                    sightFlat += pct / 100f * perHit;
+                    int g = h < o.attackHitBleed.Count ? BleedCore.CrystalGain(o.attackHitBleed[h], b, crystal) : 0;
+                    b += g; bleedGain += g;
+                    if ((sg.bleedItems & BleedItems.Press) != 0 && !pressed && b >= BleedCore.PressNeed)
+                    {
+                        int u = BleedCore.PressSpend(b);
+                        ws.extraDmg += u * BleedCore.PressMul; b -= u; pressed = true;
+                    }
+                }
             }
 
             // ---- 先のターンに効く分の見積もり (上の定数) ----
@@ -178,8 +205,8 @@ namespace AutoTest
             flat += (after.mainsUses - before.mainsUses) * TerminalCards.MainsPerUse * turns * 0.5f * DeckFutureAttackShare * dw;
             if (o.enemyStunNext) flat += DeckStunShare * Math.Max(0, s.enemyAtk) * (s.ledger ? 1f : s.wDef);
             // 別枠のダメージ
-            flat += (o.poison * DeckPoisonDmg + o.heat * DeckHeatDmg) * dw;
-            if (o.attackDice > 0) flat += o.bleedOnHit * DeckBleedDmg * dw;
+            flat += o.poison * DeckPoisonDmg * dw;
+            if (o.attackDice > 0) flat += (o.bleedOnHit + bleedGain) * DeckBleedDmg * dw;      // 〈鉤爪〉 + 出血の品の撃ごとの出血 (5f)
             // 〈柔軟な戦略〉: 基本以外の発動 1 回 = 与ダメ +(10% ÷ 10 回) を、 残りターンのうち〈柔軟な戦略〉を引いたターンだけ (本体 DrawTerminalHand・2026-11-20〜 引いた時だけ効く)
             if (counterPerFire > 0f)
                 flat += o.firedNonBasic * counterPerFire * DeckPerTurnDamage(in s, k) * turns * dw;
@@ -226,6 +253,38 @@ namespace AutoTest
                 //   (戦闘をまたいで HP は残るので、 先の戦闘の回復も今の HP と同じ重さ)。 小さな傷に切って捨てないための足切り。
                 if (TerminalCards.LeavesRunDeck(d) && (runNow?.terminalDeck?.Count ?? 0) > TerminalCards.MinDeckSize)
                     flat -= DeckRunLeaveHpCost * hpUnit;
+            }
+            // 【ジャスト防御】を狙う配線 (シールドの BOT の規則・2026-11-21): 本体と同じ判定 (CombatManager.JustGuardForecast) で成立するなら、 成立で働く品の得を足す。
+            //   shortcut: 先のターンの得は控えめな定数 (〈防人の軍標〉= 残りターンの半分に +35%・〈受け太刀の籠手〉+8 と〈静寂の構え〉の上乗せは次の攻撃の 7 割・〈英雄の意志〉のダウンは 1 ターンの与ダメの半分)
+            if (sg.jgCtx != null && CombatManager.Instance != null && CombatManager.Instance.JustGuardForecast(sg.jgCtx, o, in env, out int jgE, out _))
+            {
+                float per = DeckPerTurnDamage(in s, k);
+                if (sg.jgMirror) ws.extraDmg += jgE * (ItemSystem.PassiveSkills.Effects.MirrorBuckler.JustPct - ItemSystem.PassiveSkills.Effects.MirrorBuckler.Pct) / 100;
+                if (sg.jgBlade) ws.extraDmg += jgE;
+                if (sg.jgStandard) sightFlat += ItemSystem.PassiveSkills.Effects.BorderGuardStandard.PctPerGuard / 100f * per * Math.Max(0, turns - 1) * 0.5f + DeckDrawDmg;
+                if (sg.jgCatch) sightFlat += ItemSystem.PassiveSkills.Effects.CatchBracer.Atk * DeckFutureAttackShare;
+                if (sg.jgSilent && o.attackDice == 0)
+                    sightFlat += (ItemSystem.PassiveSkills.Effects.SilentStance.JustPct - ItemSystem.PassiveSkills.Effects.SilentStance.Pct) / 100f * per * DeckFutureAttackShare;
+                if (sg.jgHero && env.heavyTurn) sightFlat += 0.5f * per;
+            }
+            // 臨界の BOT の規則 (2026-11-21): 本体と同じ HeatCore.Forecast (端子の臨界 → 5g の品の臨界 → ターンの終わりの攻撃の端子の合計) で、
+            //   この配線で起きる爆発のダメージ (敵の防御の後) を軽減不可の分に足す。 溜まりの増減は 臨界 1 = 爆発の基礎 ÷ 閾値 × DeckGaugeShare (爆発で 0 に戻る分は負で相殺)。
+            //   配線の時に爆発する (= 攻撃の前に【過熱】) か既に【過熱】なら、 〈二度目の打金〉の撃ごとの攻撃 +6・〈烈刃〉の撃の最終与ダメ % を足す。
+            //   shortcut: 1 撃の与ダメは 1 ターンの見込み ÷ 撃の数・ボスの目盛りのひびと〈恒熱の炉壁〉のブロックは見ない
+            if (sg.heat.threshold > 0 || o.heat > 0 || o.heatGains.Count > 0)
+            {
+                var hf = HeatCore.Forecast(sg.heat, o, o.attackAdd);
+                ws.extraDmg += hf.landed;
+                int th = Math.Max(1, sg.heat.threshold > 0 ? sg.heat.threshold : HeatCore.StartThreshold(sg.heat.items));
+                flat += (hf.meterAfter - sg.heat.meter) * (HeatCore.BurstBase / (float)th) * DeckGaugeShare * dw;
+                bool hot = sg.overheated || hf.burstsWired > 0;
+                if (o.attackHits.Count > 0)
+                {
+                    if (sg.secondStrike && (hot || sg.burstLastTurn)) sightFlat += ItemSystem.PassiveSkills.Effects.SecondStrike.Atk * o.attackHits.Count;
+                    if (sg.fierceBlade && hot)
+                        sightFlat += Math.Min(ItemSystem.PassiveSkills.Effects.FierceBlade.MaxPct, ItemSystem.PassiveSkills.Effects.FierceBlade.PctPerBurst * (sg.heat.burstsTotal + hf.burstsWired)) / 100f
+                                   * DeckPerTurnDamage(in s, k);
+                }
             }
             ws.specFlat = flat + sightFlat * dw + sightHp;
 
@@ -469,35 +528,47 @@ namespace AutoTest
         /// <see cref="PrepareDeckEval"/> が盤面を読むたびに組み直し、 <see cref="DeckSums"/> が挿し方ごとに読む (所持の検索を挿し方ごとにしないため)。</summary>
         private struct ItemSight
         {
-            /// <summary>〈焼き入れの挟み〉: 使い捨て 1 枚あたりの軽減不可ダメージ (4 + 采配・持っていなければ 0)。</summary>
+            /// <summary>〈焼き入れの挟み〉: 使い捨て 1 枚あたりの防御無視ダメージ (持っていなければ 0)。</summary>
             public int tongsDmg;
-            /// <summary>〈血染めの歯車〉(血晶 5 以上): 使い捨て 1 枚あたり 出血 × 2 の軽減不可ダメージ・出血 +采配。</summary>
-            public bool bloodGear;
-            /// <summary>〈灰払いの箒〉: 使い捨て 1 枚あたり、 次の撃の会心率 +采配 × 5%。</summary>
-            public float broomPct;
-            /// <summary>〈必殺の照準器〉(心眼 5 以上): 使い捨てを使ったターン、 攻撃は全部会心・会心倍率 +采配 × 0.15 (−1 = 持っていない)。</summary>
-            public float sniperMul;
-            /// <summary>〈破城斧〉: シールド 10 以上のターン、 撃ごとにシールド 5 を使い 攻撃 +10。</summary>
+            /// <summary>〈破城斧〉: シールド 15 以上のターン、 撃ごとにシールド 8 を使い その撃の最終与ダメージ +80%・防御無視。</summary>
             public bool siegeAxe;
-            /// <summary>〈無害灯〉: 臨界 15 以上なら、 敵の直接攻撃で失う HP を半分にする (1 ターン 1 回)。</summary>
+            /// <summary>〈無害灯〉: 臨界 15 以上なら、 敵の直接攻撃で失う HP を無効にする (1 ターン 1 回・HarmlessLamp.Ready)。</summary>
             public bool lamp;
-            /// <summary>〈血濡れの符丁〉(賽目 5 以上): 役〈追撃〉〈攻め〉(3・4 の 2 個そろい・ゾロ目) のターン、 出血 × 2 の軽減不可ダメージ。</summary>
-            public bool bloodCode;
-            public int axDeck;
+            /// <summary>臨界の盤面の写し (Kw.HeatState・HeatCore.Forecast に渡す) / 【過熱】/ 前のターンに爆発した / 〈二度目の打金〉〈烈刃〉を持つ。</summary>
+            public HeatCore.State heat;
+            public bool overheated, burstLastTurn, secondStrike, fierceBlade;
+            /// <summary>〈石抜きの毒指輪〉: このターンまだ起爆していない (持っていなければ false)。 / 毒の品の旗・この戦闘で起爆した回数 (起爆のダメージの式 PoisonCore.Damage が読む)。</summary>
+            public bool ring;
+            public PoisonItems poisonItems;
+            public int detonates;
+            /// <summary>出血の品の旗 (撃ごとの出血は Resolve の 5f が書く・〈血桜〉〈血の楔〉〈紅の搾り具〉〈涸れぬ血晶〉はここで見積もる) / 〈紅の搾り具〉をこのターンもう使った。</summary>
+            public BleedItems bleedItems;
+            public bool pressed;
+            /// <summary>【ジャスト防御】で働く品 (〈鏡返しの小盾〉〈重装兵の隠し刃〉〈防人の軍標〉〈受け太刀の籠手〉〈静寂の構え〉〈英雄の意志〉は強敵の時だけ)。
+            /// どれかを持っている時だけ <see cref="jgCtx"/> を入れる (挿し方ごとの見込みはこれが null なら飛ばす)。</summary>
+            public bool jgMirror, jgBlade, jgStandard, jgCatch, jgSilent, jgHero;
+            public ItemSystem.PassiveSkills.CombatContext jgCtx;
 
             public static ItemSight Of(RunState run, ItemSystem.PassiveSkills.CombatContext ctx)
             {
-                var v = new ItemSight { sniperMul = -1f };
+                var v = new ItemSight();
                 if (run == null || ctx == null) return v;
-                v.axDeck = ctx.AxisDepth(ItemSystem.PassiveSkills.AxisRules.Deck);
-                if (run.OwnsPassive(ItemIds.DeckTongs)) v.tongsDmg = ItemSystem.PassiveSkills.Effects.TemperTongs.Base + v.axDeck;
-                v.bloodGear = run.OwnsPassive(ItemIds.CrossBloodGear) && ItemSystem.PassiveSkills.Effects.Cross.On(ctx, ItemSystem.PassiveSkills.AxisRules.Bleed);
-                if (run.OwnsPassive(ItemIds.DeckBroom)) v.broomPct = ItemSystem.PassiveSkills.Effects.AshBroom.PctPerDepth * v.axDeck;
-                if (run.OwnsPassive(ItemIds.CrossSniper) && ItemSystem.PassiveSkills.Effects.Cross.On(ctx, ItemSystem.PassiveSkills.AxisRules.Crit))
-                    v.sniperMul = ItemSystem.PassiveSkills.Effects.FatalSight.MulPerDepth * v.axDeck;
+                if (run.OwnsPassive(ItemIds.DeckTongs)) v.tongsDmg = ItemSystem.PassiveSkills.Effects.TemperTongs.Damage;
                 v.siegeAxe = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.SiegeAxe.Id);
-                v.lamp = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.HarmlessLamp.Id) && ctx.rinkaiMeter >= ItemSystem.PassiveSkills.Effects.HarmlessLamp.MinHeat;
-                v.bloodCode = run.OwnsPassive(ItemIds.CrossBloodCode) && ItemSystem.PassiveSkills.Effects.Cross.On(ctx, ItemSystem.PassiveSkills.AxisRules.Role);
+                v.lamp = ItemSystem.PassiveSkills.Effects.HarmlessLamp.Ready(ctx);
+                v.heat = ItemSystem.PassiveSkills.Keywords.Kw.HeatState(ctx);
+                v.overheated = ItemSystem.PassiveSkills.Keywords.Kw.Overheated(ctx);
+                v.burstLastTurn = ctx.currentTurn > 1 && (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.BurstTurnKey) == ctx.currentTurn - 1;
+                v.secondStrike = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.SecondStrike.Id); v.fierceBlade = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.FierceBlade.Id);
+                v.poisonItems = PoisonCore.ItemsOf(run);
+                v.detonates = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.Psn.DetonateCountKey);
+                v.bleedItems = BleedCore.ItemsOf(run);
+                v.pressed = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.CrimsonPress.TurnKey) == ctx.currentTurn;
+                v.ring = (v.poisonItems & PoisonItems.Ring) != 0 && (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.HollowPoisonRing.TurnKey) != ctx.currentTurn;
+                v.jgMirror = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.MirrorBuckler.Id); v.jgBlade = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.KnightsTrump.Id);
+                v.jgStandard = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.BorderGuardStandard.Id); v.jgCatch = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.CatchBracer.Id);
+                v.jgSilent = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.SilentStance.Id); v.jgHero = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.HeroWill.Id) && ItemSystem.PassiveSkills.Effects.Rw.StrongFoe();
+                if (v.jgMirror || v.jgBlade || v.jgStandard || v.jgCatch || v.jgSilent || v.jgHero) v.jgCtx = ctx;
                 return v;
             }
         }
@@ -531,17 +602,20 @@ namespace AutoTest
         private float EvalDeckWiring(in DeckEval ev, int[] rolls, int[] cand, out OptimalTurnOutcome outc, out TerminalOutcome o, out int[] tgts,
                                      out TerminalBattleState after)
         {
-            after = ev.deck.state.Clone();
-            o = TerminalCards.Resolve(ev.board, cand, rolls, ev.env, after);
-            // 〈影写し〉〈火葬の剣〉〈有効活用〉が発動する挿し方なら、 対象を方策で選び直して解き直す (対象は今ターンの攻防を変えない)
-            tgts = ChooseDeckTargets(ev.board, o, ev.run, _recallPrefer);
-            if (tgts != null)
+            using (BotTiming.Enter(BotTiming.Cat.EvalResolve))
             {
                 after = ev.deck.state.Clone();
-                o = TerminalCards.Resolve(ev.board, cand, rolls, ev.env, after, tgts);
+                o = TerminalCards.Resolve(ev.board, cand, rolls, ev.env, after, reboot: BotReboot, overclock: true);
+                // 〈影写し〉〈火葬の剣〉〈有効活用〉が発動する挿し方なら、 対象を方策で選び直して解き直す (対象は今ターンの攻防を変えない)
+                tgts = ChooseDeckTargets(ev.board, o, ev.run, _recallPrefer);
+                if (tgts != null)
+                {
+                    after = ev.deck.state.Clone();
+                    o = TerminalCards.Resolve(ev.board, cand, rolls, ev.env, after, tgts, reboot: BotReboot, overclock: true);
+                }
             }
-            var ws = DeckSums(in ev.st, rolls, ev.board, o, ev.deck.state, after, in ev.env, ev.counterPerFire);
-            return OptimalUtilityCore(in ev.st, rolls.Length, in ws, out outc);
+            WiredSums ws; using (BotTiming.Enter(BotTiming.Cat.EvalSums)) ws = DeckSums(in ev.st, rolls, ev.board, o, ev.deck.state, after, in ev.env, ev.counterPerFire);
+            using (BotTiming.Enter(BotTiming.Cat.EvalUtil)) return OptimalUtilityCore(in ev.st, rolls.Length, in ws, out outc);
         }
 
         /// <summary>挑戦カード〈猫の手〉(#5) の評価 (<see cref="GameHooks.CatPawPick"/> の中身・<see cref="CatPawAdvisor"/> が Super の設定の写しで呼ぶ)。
@@ -555,7 +629,7 @@ namespace AutoTest
             if (best == null) return null;
             var ev = PrepareDeckEval(rolls, tele);
             // 挿し方を直した後の値で数える (条件に合わず外れる組を猫が挿さないように)
-            var fixedUp = TerminalCards.Resolve(ev.board, best, rolls, ev.env, ev.deck.state.Clone(), targets).slotOfDie;
+            var fixedUp = TerminalCards.Resolve(ev.board, best, rolls, ev.env, ev.deck.state.Clone(), targets, reboot: BotReboot, overclock: true).slotOfDie;
             return TerminalWiring.MostValuablePair(fixedUp, w => EvalDeckWiring(ev, rolls, w, out _, out _, out _));
         }
 
@@ -1050,8 +1124,16 @@ namespace AutoTest
             BeginMainCorrTurn(_lastPredA);
             _fbDecided++; if (_lastFreeBlock) _fbTurns++; if (_lastKillsNow) _fbKillTurns++;
             _fbPrevHp = hpNow; _fbPrevExpTaken = _lastExpTaken;
-            return slots != null ? WiringPlan.OfSlots(slots, targets, gold, keep) : default;      // null なら本体が既定 (TerminalWiring.Auto) で挿す
+            if (slots == null) return default;      // null なら本体が既定 (TerminalWiring.Auto) で挿す
+            var plan = WiringPlan.OfSlots(slots, targets, gold, keep);
+            plan.reboot = BotReboot; plan.overclock = true;      // 充電のコアアクション: 見積もり (下の Resolve) と同じ規則で本体も解く
+            return plan;
         }
+
+        /// <summary>充電のコアアクション (2026-11-21) の BOT の規則: 再起動は払える時はいつも、 対象はおまかせ (<see cref="ChargeCore.AutoValue"/> の最大)・
+        /// オーバークロックは使える時はいつも。 挿し方の見積もり (Resolve) にも同じ指定を渡すので、 再起動の撃・ブロックは効用に入る
+        /// (オーバークロックの +60% と〈逆さ避雷針〉の被ダメ −6 は本体の撃の輪・被ダメの所で掛かるので効用には入らない)。</summary>
+        private const int BotReboot = ChargeCore.RebootAuto;
 
         // =====================================================================
         //  挑戦カード〈金で殴る〉(#6・2026-11-12) の払い方 (効果の定義は ChallengeCards.GoldPunchAttack)
@@ -1137,12 +1219,12 @@ namespace AutoTest
         private void ResolveDeckCand(in DeckEval ev, int[] rolls, int[] cand, out TerminalOutcome o, out TerminalBattleState after, out int[] tgts)
         {
             after = ev.deck.state.Clone();
-            o = TerminalCards.Resolve(ev.board, cand, rolls, ev.env, after);
+            o = TerminalCards.Resolve(ev.board, cand, rolls, ev.env, after, reboot: BotReboot, overclock: true);
             tgts = ChooseDeckTargets(ev.board, o, ev.run, _recallPrefer);
             if (tgts != null)
             {
                 after = ev.deck.state.Clone();
-                o = TerminalCards.Resolve(ev.board, cand, rolls, ev.env, after, tgts);
+                o = TerminalCards.Resolve(ev.board, cand, rolls, ev.env, after, tgts, reboot: BotReboot, overclock: true);
             }
         }
 
@@ -1401,7 +1483,7 @@ namespace AutoTest
                 hand.Add(id);
             }
             if (copy != null) hand.Add(copy);      // 〈影写し〉の写し: 本体の DrawTurn と同じく、 引く枚数とは別に手札の最後へ
-            hand.AddRange(ret);                    // 戻る使い捨て (〈灰から組む機関〉〈緊急再装填〉〈解体屋の袋〉): 本体の DrawTurn と同じく写しの後ろへ
+            hand.AddRange(ret);                    // 戻る使い捨て (〈緊急再装填〉〈解体屋の袋〉): 本体の DrawTurn と同じく写しの後ろへ
             var nb = new List<string>(perm.Count + hand.Count);
             nb.AddRange(perm); nb.AddRange(hand);
             stopped = null;
@@ -1429,14 +1511,18 @@ namespace AutoTest
                 bool dup = false;
                 for (int i = 1; i < k && !dup; i++) if (dice[i] == dice[i - 1] && w[i] < w[i - 1]) dup = true;
                 if (dup) continue;
-                var after = state.Clone();
-                var o = TerminalCards.Resolve(board, w, dice, env, after);
-                var tg = ChooseDeckTargets(board, o, ev.run, _recallPrefer);
-                if (tg != null) { after = state.Clone(); o = TerminalCards.Resolve(board, w, dice, env, after, tg); }
-                var ws = DeckSums(in ns, dice, board, o, state, after, in env, ev.counterPerFire);
+                TerminalBattleState after; TerminalOutcome o;
+                using (BotTiming.Enter(BotTiming.Cat.EvalResolve))
+                {
+                    after = state.Clone();
+                    o = TerminalCards.Resolve(board, w, dice, env, after, reboot: BotReboot, overclock: true);
+                    var tg = ChooseDeckTargets(board, o, ev.run, _recallPrefer);
+                    if (tg != null) { after = state.Clone(); o = TerminalCards.Resolve(board, w, dice, env, after, tg, reboot: BotReboot, overclock: true); }
+                }
+                WiredSums ws; using (BotTiming.Enter(BotTiming.Cat.EvalSums)) ws = DeckSums(in ns, dice, board, o, state, after, in env, ev.counterPerFire);
                 if (ws.aCount > 0) anyAttack = true;
                 sums.Add(ws);
-                float u = OptimalUtilityCore(in ns, k, in ws, out _);
+                float u; using (BotTiming.Enter(BotTiming.Cat.EvalUtil)) u = OptimalUtilityCore(in ns, k, in ws, out _);
                 if (u > best) best = u;
             }
             if (sums.Count == 0) return 0f;

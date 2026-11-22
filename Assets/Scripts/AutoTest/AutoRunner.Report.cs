@@ -1351,6 +1351,7 @@ namespace AutoTest
             //   供給の 2/3 が無料経路で、 価格を上げても届かない。 どこが配っているかを出す。
             {
                 var au = ItemSystem.Helpers.PassiveSourceAudit.Counts;
+                if (ItemSystem.AxisPool.Drawn.Count > 0) ItemSystem.AxisPool.WriteStats(au);   // [計装 2026-11-21] 逐次の通常バッチ (並列は worker が混ぜて返す)
                 if (au.Count > 0)
                 {
                     int tot = 0; foreach (var kv in au) tot += kv.Value;

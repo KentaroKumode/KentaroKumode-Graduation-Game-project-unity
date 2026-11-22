@@ -8,7 +8,7 @@ namespace CombatSystem
     /// <para><b>挿した目に効く物</b> (錆釘・鈍色・逆目・秤・渡し守・夜番・大技読み・残り火) は <see cref="ApplyToTerminals"/>。
     /// <see cref="TerminalCards.Resolve"/> の最後の段で呼ぶので、 本体・BOT の見積もり・画面の見込みが同じ値になる (盤面は <see cref="TerminalEnv"/>)。</para>
     ///
-    /// <para><b>戦闘の他の所で効く物</b>: 拾い物・古銭 = <see cref="OnTurnEnd"/> (ターンの終わり)・賭場 = 振り直しの費用 (CombatManager.RerollCostNow) と HP の支払い・
+    /// <para><b>戦闘の他の所で効く物</b>: 拾い物・古銭 = <see cref="OnTurnEnd"/> (ターンの終わり)・古銭の〈癒し〉+3 = YachtRoleEffects (<see cref="RoleHealBonus"/>)・賭場 = 振り直しの費用 (CombatManager.RerollCostNow) と HP の支払い・
     /// 墓標 = HP 0 からの踏みとどまり (CombatManager.TryLastStandRevive)。</para>
     ///
     /// <para><b>ほかの所にある賽</b>: 目利き = 振り直し (CombatManager.RerollPhase・残す目)・逆巻き = エスカレーションの段階 (ApplyRewind・Escalation.StageOffset)・
@@ -30,15 +30,22 @@ namespace CombatSystem
         public const int ScaleBonus = 3;
         /// <summary>残り火: 挿さずに捨てた目の何倍を次のターンの攻撃に足すか。</summary>
         public const int EmberMul = 2;
-        /// <summary>拾い物: ①が出たターンの終わりにゴールド +N。</summary>
-        public const int ScavengerGold = 1;
-        /// <summary>古銭: ⑧が出るたびゴールド +N (2026-11-20: 旧「⑧が出たターンに敵を倒すと +3」)。</summary>
+        /// <summary>拾い物: ①が出たターンの終わりにゴールド +N (2026-11-21 台帳 §⑪: 旧 1)。</summary>
+        public const int ScavengerGold = 2;
+        /// <summary>鈍色: 偶数を防御に挿すと防御 +N・奇数を攻撃に挿すと攻撃 +N (2026-11-21 台帳 §⑪: 旧 1)。</summary>
+        public const int DullBonus = 2;
+        /// <summary>古銭: ⑧が出るたびゴールド +N (2026-11-21 Phase 4 較正: 台帳 §⑪ の 4 から 2 へ戻す)。</summary>
         public const int OldCoinGold = 2;
+        /// <summary>古銭: そのターンの役〈癒し〉(⑧の役) の回復量 +N (YachtRoleEffects の〈癒し〉が読む・1 回働くごと)。</summary>
+        public const int OldCoinHeal = 1;
         public const int OldCoinFace = 8;
         /// <summary>呪物の賽 (ADR-0016・2026-11-20): 店とイベントで秘宝を選ぶ時の LEGENDARY の重みに掛ける数 (他のレア度の重みはそのまま)。</summary>
         public const float CursedLegendaryMul = 3f;
         /// <summary>呪物の賽: LEGENDARY の秘宝を手に入れるたびに減る最大 HP (このランの間・1 より下にはならない・2026-11-20: 旧 秘宝なら何でも −3)。</summary>
         public const int CursedMaxHpPerLegendary = 5;
+
+        /// <summary>役〈癒し〉の回復量に足す分 (古銭の賽なら <see cref="OldCoinHeal"/>・それ以外 0)。</summary>
+        public static int RoleHealBonus(RunState run) => EquippedDie.IdOf(run) == DieIds.OldCoin ? OldCoinHeal : 0;
 
         /// <summary>店とイベントで秘宝を選ぶ時の LEGENDARY の重みの倍率 (呪物の賽なら <see cref="CursedLegendaryMul"/>・それ以外 1)。 戦闘の報酬には掛けない。</summary>
         public static float LegendaryOfferMul(RunState run) => EquippedDie.IdOf(run) == DieIds.Cursed ? CursedLegendaryMul : 1f;
@@ -83,8 +90,8 @@ namespace CombatSystem
                         if (k == TerminalKind.Attack && val >= RustyNailMin) o.attackAdd += 1;
                         break;
                     case DieIds.Dull:
-                        if (val % 2 == 0 && k == TerminalKind.Block) o.blockAdd += 1;
-                        else if (val % 2 != 0 && k == TerminalKind.Attack) o.attackAdd += 1;
+                        if (val % 2 == 0 && k == TerminalKind.Block) o.blockAdd += DullBonus;
+                        else if (val % 2 != 0 && k == TerminalKind.Attack) o.attackAdd += DullBonus;
                         break;
                     case DieIds.Reverse:
                         if (k == TerminalKind.Attack) o.attackAdd += System.Math.Max(0, (7 - val) / 2);
@@ -137,7 +144,7 @@ namespace CombatSystem
             string die = EquippedDie.IdOf(run);
             if (die == DieIds.Scavenger && Has(dice, 1))
             {
-                GoldIncome.Gain(run, ScavengerGold, "拾い物の賽", GoldOrigin.Die);
+                GoldIncome.Gain(run, ScavengerGold, "拾い物の賽");
                 UnityEngine.Debug.Log($"[賽] 拾い物の賽: ①が出た → +{ScavengerGold}G");
             }
             else if (die == DieIds.OldCoin)
@@ -146,7 +153,7 @@ namespace CombatSystem
                 foreach (int d in dice) if (d == OldCoinFace) eights++;
                 if (eights > 0)
                 {
-                    GoldIncome.Gain(run, OldCoinGold * eights, "古銭の賽", GoldOrigin.Die);
+                    GoldIncome.Gain(run, OldCoinGold * eights, "古銭の賽");
                     UnityEngine.Debug.Log($"[賽] 古銭の賽: ⑧ × {eights} → +{OldCoinGold * eights}G");
                 }
             }

@@ -20,7 +20,7 @@ namespace AutoTest
         public EnemyData enemy;          // 読むだけ (周期・倍率)。 共有インスタンスなので書き換えない
         public int pen;                  // プレイヤーの貫通
         public bool cracking, stacking;  // 割れる装甲 / 積み上がる装甲
-        public int armorBreak;           // 斧〈鎧砕き〉: ダメージを入れたターンの終わりに、 敵の防御から引く量 (所持していなければ 0)
+        public int armorBreak;           // 斧〈鎧砕き〉: 撃が当たるたびに敵の防御から引く量 (1 ターン ArmorBreak.PerTurn 回まで・所持していなければ 0)
 
         /// <summary>盤面から作る。 <paramref name="baseDef"/> = 今の防御から構えの増減を除いた「持続する分」。</summary>
         public static EnemyArmorModel From(EnemyData e, CombatContext ctx, out int baseDef)
@@ -36,8 +36,10 @@ namespace AutoTest
             var owned = PassiveSkillManager.Instance?.ActivePlayerSkillIds;
             if (owned != null)
                 for (int i = 0; i < owned.Count; i++)
-                    for (int s = 0; s < ArmorBreakHelper.SkillIds.Length; s++)
-                        if (owned[i] == ArmorBreakHelper.SkillIds[s]) m.armorBreak = Math.Max(m.armorBreak, ArmorBreakHelper.Amounts[s]);
+                {
+                    int s = Array.IndexOf(ArmorBreak.Ids, owned[i]);
+                    if (s >= 0) m.armorBreak = Math.Max(m.armorBreak, ArmorBreak.Amounts[s]);
+                }
             int now = ctx != null ? Math.Max(0, ctx.enemyDefense) : Math.Max(0, e?.defense ?? 0);
             float delta = 0f;
             if (ctx != null) ctx.accumulatedValues.TryGetValue("enemy.guardDelta", out delta);
@@ -82,11 +84,11 @@ namespace AutoTest
             return heavy * guard;
         }
 
-        /// <summary>ターンの終わり: 割れる装甲・自分の〈鎧砕き〉 (ダメージを入れたら −) / 積み上がる装甲 (+)。</summary>
-        public int EndOfTurn(int eDef, bool damaged)
+        /// <summary>ターンの終わり: 割れる装甲・自分の〈鎧砕き〉 (当たった撃の数 × 量・1 ターン 3 回まで) / 積み上がる装甲 (+)。</summary>
+        public int EndOfTurn(int eDef, bool damaged, int hits = 1)
         {
             if (cracking && damaged) eDef = Math.Max(0, eDef - CrackingArmor.Crack);
-            if (armorBreak > 0 && damaged) eDef = Math.Max(0, eDef - armorBreak);
+            if (armorBreak > 0 && damaged) eDef = Math.Max(0, eDef - armorBreak * Math.Min(ArmorBreak.PerTurn, Math.Max(1, hits)));
             if (stacking && eDef < StackingArmor.Cap) eDef = Math.Min(StackingArmor.Cap, eDef + StackingArmor.Grow);
             return eDef;
         }

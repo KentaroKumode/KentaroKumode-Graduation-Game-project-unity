@@ -243,7 +243,7 @@ namespace CombatSystem
 
         private static readonly Dictionary<string, float[]> _downNotches = new Dictionary<string, float[]>
         {
-            // 深さ 3 (HP 505): 戦闘は 5〜8 ターン。 大技 (周期 3) を 1〜2 回消せる数
+            // 深さ 3 (HP 750・2026-11-22 Phase 4 較正: 旧 505): 戦闘は 5〜8 ターン。 大技 (周期 3) を 1〜2 回消せる数
             { GameLoop.BossIds.Layer3Goblin, new[] { 0.70f, 0.35f } },   // 〈号令〉で毎ターン攻撃が乗る → 早めの目盛りで、 前のめりに割る価値を作る
             { GameLoop.BossIds.Layer3Marsh,  new[] { 0.60f } },          // 長引くほど毒が深い敵 → 目盛り 1 つ (割り時を 1 度だけ選ぶ・長引かせる理由を作らない)
             { GameLoop.BossIds.Layer3Mirror, new[] { 0.75f, 0.40f } },   // 浅い一撃を返す鏡 → 溜めて一気に割る遊びと〈鏡映の応答〉(大きく殴れ) の向きが揃う

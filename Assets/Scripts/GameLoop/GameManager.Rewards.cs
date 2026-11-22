@@ -204,7 +204,8 @@ namespace GameLoop
                 // パッシブ刻印〈守銭〉: 発動分 × 1G/ボス
                 // ADR-0011 〈富〉(目 9): 戦闘中に積んだ報酬加算 (%)。 割合先 (メタの定額 +N の前)。
                 rewardBase = ApplyRoleGoldBonus(rewardBase);
-                int reward = GoldIncome.Gain(Run, rewardBase + metaWinGold, "ボス報酬", GoldOrigin.Battle);
+                rewardBase = ItemSystem.PassiveSkills.Effects.SpoilsScale.Apply(Run, rewardBase, strong: true);   // 〈戦果の天秤〉
+                int reward = GoldIncome.Gain(Run, rewardBase + metaWinGold, "ボス報酬");
                 // 物資の補給 (2026-09-28): ボス +150
                 ProvisionSystem.Supply(Run, MapSystem.FreeMove.FreeMapParams.RewardBoss);
 
@@ -243,10 +244,11 @@ namespace GameLoop
 
             // ADR-0011 〈富〉(目 9): 戦闘中に積んだ報酬加算 (%)。 割合先 (メタの定額 +N の前)。
             coins = ApplyRoleGoldBonus(coins);
+            coins = ItemSystem.PassiveSkills.Effects.SpoilsScale.Apply(Run, coins, strong: eliteNodeReward);   // 〈戦果の天秤〉
             coins += metaWinGold;
             // 〈徒労〉0 (別の形 LayerLong はそのまま) /〈開眼〉2 倍 (2026-11-13・通常の戦闘だけ・判定は TakeNormalBattleBoon)。 挑戦デバフの収入減より前 (GoldIncome.Gain の中) に掛ける
             coins = ScaleByBattleBoon(coins);
-            coins = GoldIncome.Gain(Run, coins, "戦闘報酬", GoldOrigin.Battle);
+            coins = GoldIncome.Gain(Run, coins, "戦闘報酬");
             IsEliteSecondFight = false;
             // 不安定化 (2026-11-13・GAME.md §5-12): エリート +2 / 通常の戦闘 +1 (ボスは上で抜けている)。 報酬の秘宝は GrantRewardItem で +3 ずつ
             AddBattleWinInstability(eliteNodeReward, pursuer: false);
@@ -391,13 +393,14 @@ namespace GameLoop
         public readonly System.Collections.Generic.List<System.Collections.Generic.List<string>> PendingStartingPassiveChoices
             = new System.Collections.Generic.List<System.Collections.Generic.List<string>>();
 
-        /// <summary>預かっている開幕パッシブの提示の先頭から 1 つ選んで所持する。</summary>
+        /// <summary>預かっている開幕パッシブの提示の先頭から 1 つ選んで所持する。 pick が負 = 見送る (見送り換金)。</summary>
         public void ResolveStartingPassive(int pick)
         {
             if (Run == null || PendingStartingPassiveChoices.Count == 0) return;
             var cands = PendingStartingPassiveChoices[0];
             PendingStartingPassiveChoices.RemoveAt(0);
             if (cands == null || cands.Count == 0) return;
+            if (pick < 0) { AxisPool.TakeSkip(Run, cands, "開幕"); return; }
             string id = cands[System.Math.Max(0, System.Math.Min(pick, cands.Count - 1))];
             if (Run.ownedPassiveItems == null) Run.ownedPassiveItems = new System.Collections.Generic.List<string>();
             ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, id);
@@ -424,6 +427,7 @@ namespace GameLoop
             }
             if (pool.Count == 0) return null;
 
+            pool = AxisPool.Narrow(Run, pool, "start.axis");   // 出現の枠と軸均等の抽選 (full-item-rework-spec §1-2)
             float bias = MetaProgression.MetaBuffApplicator.GetStartingPassiveRarityBias();
             return ItemSystem.RarityWeightedPicker.Pick(pool, null, bias)?.internalName;
         }
@@ -447,6 +451,8 @@ namespace GameLoop
             }
             if (pool.Count == 0) return null;
 
+            if (wantRare) { var hi = pool.FindAll(it => it.rarity >= ItemRarity.GOLD); if (hi.Count > 0) pool = hi; }   // 軸で絞る前にレア度を決める (絞った軸に GOLD 以上が無いと素の抽選へ落ちるため)
+            pool = AxisPool.Narrow(Run, pool, "bonus.axis");   // 出現の枠と軸均等の抽選
             ItemRarity? minRarity = wantRare ? ItemRarity.GOLD : (ItemRarity?)null;
             var picked = ItemSystem.RarityWeightedPicker.Pick(pool, minRarity);
             if (picked == null && wantRare)
@@ -480,7 +486,7 @@ namespace GameLoop
             // 「いい感じ」: SILVER 以上を優先抽選、該当無しなら全プール
             var picked = ItemSystem.RarityWeightedPicker.Pick(pool, ItemRarity.SILVER)
                          ?? ItemSystem.RarityWeightedPicker.Pick(pool);
-            return picked?.internalName;
+            return AxisPool.Repick(Run, picked, pool, "goblin.axis")?.internalName;   // 秘宝なら同じレア度の中で軸を均す
         }
 
         /// <summary>報酬確認→マップに戻る or フロアクリア</summary>
@@ -545,9 +551,16 @@ namespace GameLoop
             string itemLabel = "（なし）";
             if (!string.IsNullOrEmpty(itemId))
             {
-                Loadout.Gain(Run, itemId);
                 var data = ItemDatabase.Instance?.GetItem(itemId);
                 itemLabel = data != null ? data.displayName : itemId;
+                if (data != null && data.IsPassive)
+                {
+                    // 秘宝は見送れる (見送り換金・full-item-rework-spec §1-3): BOT はこの場で決め、 人は地図へ戻ってからの選択画面
+                    string got = OfferPassiveChoice(new List<string> { itemId });
+                    if (got == null) itemLabel += "（受け取るか見送るかを選ぶ）";
+                    else if (got == "") itemLabel += "（見送った）";
+                }
+                else Loadout.Gain(Run, itemId);
             }
 
             return $"宝箱: ゴールド+{gold}, {itemLabel}";
@@ -585,6 +598,7 @@ namespace GameLoop
                 if (it == null) continue;
                 if (it.category == ItemCategory.Weapon) continue;
                 if (it.category == ItemCategory.Quest) continue;
+                if (it.category == ItemCategory.Dice) continue;   // 賽は店とイベントの交換で装備する物 (所持の一覧に入れても働かない)
                 if (!ItemSystem.Shop.EventOnlyItemFilter.IsAllowed(it)) continue;
                 if (dedup.Contains(it.internalName)) continue;   // ラン重複排除
                 pool.Add(it);
@@ -595,6 +609,7 @@ namespace GameLoop
             bool wantPassive = GameLoop.GameRng.Value("treasure.kind") < CombatRewards.TreasurePassiveRate;
             var kindPool = pool.FindAll(it => (it.category == ItemCategory.Passive) == wantPassive);
             if (kindPool.Count > 0) pool = kindPool;
+            if (wantPassive && kindPool.Count > 0) pool = AxisPool.Narrow(Run, pool, "treasure.axis");   // 出現の枠と軸均等の抽選
 
             // 鑑定の眼鏡: 次の宝箱の最低レア保証（消費）。ショップで既消費なら -1。
             CompleteItemData picked;
@@ -630,6 +645,7 @@ namespace GameLoop
                 if (it == null) continue;
                 if (it.category == ItemCategory.Weapon) continue;
                 if (it.category == ItemCategory.Quest) continue;
+                if (it.category == ItemCategory.Dice) continue;   // 賽は店とイベントの交換で装備する物 (所持の一覧に入れても働かない)
                 if (!ItemSystem.Shop.EventOnlyItemFilter.IsAllowed(it)) continue;
                 if (dedup.Contains(it.internalName)) continue;   // ラン重複排除
                 pool.Add(it);
@@ -648,6 +664,8 @@ namespace GameLoop
             {
                 first = ItemSystem.RarityWeightedPicker.Pick(pool);
             }
+            // 秘宝: 同じレア度の中で軸を均す (秘宝と消耗品の割合・レア度の出方はそのまま・出現の枠の外の軸は出さない)
+            first = AxisPool.Repick(Run, first, pool, "reward.axis");
             if (first == null) return (null, null);
 
             // 同カテゴリ・同レア度の相方候補（自身は除外）
@@ -658,6 +676,7 @@ namespace GameLoop
                 if (it.category == first.category && it.rarity == first.rarity)
                     partners.Add(it);
             }
+            if (first.IsPassive) partners = AxisPool.Narrow(Run, partners, "reward.axis");   // 相方も軸均等 (別の軸になり得る)
             string b = partners.Count > 0
                 ? partners[GameLoop.GameRng.RangeAuto("GameManager.8", 0, partners.Count)].internalName
                 : null;
@@ -684,11 +703,17 @@ namespace GameLoop
         public (string a, string b) CurrentRewardChoice
             => HasPendingRewardChoice ? pendingRewardChoices[rewardChoiceIndex] : (null, null);
 
-        /// <summary>現在の2択から which(0/1) を選んで付与し、次の選択へ進める。</summary>
+        /// <summary>現在の2択から which(0/1) を選んで付与し、次の選択へ進める。 which が負 = 見送る (秘宝の 2 択だけ・見送り換金・full-item-rework-spec §1-3)。</summary>
         public void ResolveRewardChoice(int which)
         {
             if (!HasPendingRewardChoice) return;
             var pair = pendingRewardChoices[rewardChoiceIndex];
+            if (which < 0 && AxisPool.SkipGoldFor(new[] { pair.a, pair.b }) > 0)
+            {
+                AxisPool.TakeSkip(Run, new[] { pair.a, pair.b }, "戦闘報酬");
+                rewardChoiceIndex++;
+                return;
+            }
             string chosen = which == 1 ? pair.b : pair.a;
             GrantRewardItem(chosen, eliteWin: false);
             rewardChoiceIndex++;

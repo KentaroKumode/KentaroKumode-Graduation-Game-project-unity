@@ -367,6 +367,16 @@ namespace UI.Game2D
                 bool calm = !(sim.Weather != WeatherKind.None && !double.IsNegativeInfinity(sim.Front));
                 Text("天気 " + (calm ? "凪" : sim.Weather.DisplayName()), W - 8 - 89, 8, calm ? _lc.dim : _lc.hi, Align.Right);
             }
+            // 出現の枠 (動的 4 枠ロック・2026-11-21・full-item-rework-spec §1-5): 右上の上の帯の真下に「出現 [毒][充電][？][？]」。 4 つ埋まったら明るい色と「ロック」
+            var runL = GameLoop.GameManager.Instance?.Run;
+            if (runL != null)
+            {
+                bool lk = ItemSystem.AxisPool.IsLocked(runL);
+                string slots = "出現 " + ItemSystem.AxisPool.SlotsLabel(runL) + (lk ? " ロック" : "");
+                int sw = Game2DJpFont.Width(slots), sh = Game2DJpFont.Cell, sx = W - 8 - 89 - sw;
+                Rect(sx - 2, TreasureNoteTop - 1, sw + 4, sh + 2, _lc.bg);
+                Text(slots, W - 8 - 89, TreasureNoteTop + sh / 2f, lk ? _lc.hot : _lc.mid, Align.Right);
+            }
             // 縄張りの宝を取った後 (2026-11-12・仮置き): 何を得たかを左上に出す (航行のまま渡すので、 専用の画面は挟まない)
             //   液晶の上端 (y 0〜29) は x 96〜387 が上の帯 (Game2DNavExtras の TopR / StatusR) に覆われるので、 その真下に、
             //   地図の点や道と重なっても読めるよう地の色の下敷きを敷いて出す (y = 8 だと上の帯の裏で見えなかった)。

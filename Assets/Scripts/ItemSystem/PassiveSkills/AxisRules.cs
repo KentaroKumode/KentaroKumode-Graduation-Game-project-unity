@@ -30,10 +30,6 @@ namespace ItemSystem.PassiveSkills
         /// 順位を比べるのはこの 8 つ (金は入れない・2026-11-20 に 6 → 8)。</summary>
         public static readonly string[] Ranked = { Crit, Bleed, Poison, Heat, Charge, Shield, Deck, Role };
 
-        /// <summary>店の軸指定リロール (2026-11-20・item-overhaul-spec §2-3) で指定できる軸: 偏重の軸 (<see cref="Ranked"/>) と金。
-        /// 偏重の軸を足せばここにも並ぶ (2026-11-20 の 采配・賽目も)。</summary>
-        public static readonly string[] ShopFocus = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Append(Ranked, Gold));
-
         /// <summary>軸の品の数を数える (所持パッシブの axis)。 戦闘中は CombatContext.AxisDepth がこれを 1 度だけ呼ぶ。</summary>
         public static int Count(GameLoop.RunState run, string axis)
         {

@@ -121,7 +121,11 @@ namespace ItemSystem.Helpers
             }
             run.ownedPassiveItems.Add(itemId);
             run.seenPassiveItemIds?.Add(itemId); // 以後の重複取得を禁止（廃棄後も残す）
-            if (IsPassiveCategory(itemId)) CombatSystem.DiePassives.OnPassiveAcquired(run, itemId);   // 呪物の賽: LEGENDARY の秘宝を手に入れるたび最大 HP −5
+            if (IsPassiveCategory(itemId))
+            {
+                CombatSystem.DiePassives.OnPassiveAcquired(run, itemId);
+                AxisPool.NoteAcquired(run, ItemDatabase.Instance.GetItem(itemId).axis);   // 出現の枠 (動的 4 枠ロック): 8 軸の品なら空いた枠へ
+            }   // 呪物の賽: LEGENDARY の秘宝を手に入れるたび最大 HP −5
             PassiveSourceAudit.Note(run);        // どの経路から入ったかを数える (計装)
 
             // [剣の舞] を取得し、インベントリに4枚揃ったら〈無銘の剣舞譜〉へ変化させる。

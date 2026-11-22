@@ -297,6 +297,7 @@ namespace UI.Game2D.Battle
                 for (int s = 0; s < target.Length; s++) target[s] = -1;
                 for (int s = 0; s < keepMark.Length; s++) keepMark[s] = false;
                 lastOutcome = null; focusSlot = -1;
+                rebootSel = ChargeCore.RebootNone; overclockOn = false;
                 if (AutoWireOnTurnStart) AutoWire(false);
             }
             else ValidateSlots();
@@ -350,7 +351,7 @@ namespace UI.Game2D.Battle
                     {
                         Game2DSfx.Play("decide");
                         int n = p.playerDice != null ? p.playerDice.Length : 0;
-                        cm.AnswerWiringSlots(BuildSlots(n), (int[])target.Clone(), 0, (bool[])keepMark.Clone());   // 残す印は本体が KeepFromMarks で直す (挿した端子には効かない)
+                        cm.AnswerWiringSlots(BuildSlots(n), (int[])target.Clone(), 0, (bool[])keepMark.Clone(), rebootSel, overclockOn);   // 残す印は本体が KeepFromMarks で直す (挿した端子には効かない)
                         if (!cm.IsAwaitingDecision) Resolve(cm);
                     }
                     break;
@@ -546,8 +547,164 @@ namespace UI.Game2D.Battle
         {
             if (lastOutcome != null) { preview = lastOutcome; return; }
             if (!TermInputs(out var dice, out var env, out var st)) { preview = null; return; }
-            preview = TerminalCards.Resolve(board, BuildSlots(dice.Length), dice, env, st.Clone(), target);
+            preview = TerminalCards.Resolve(board, BuildSlots(dice.Length), dice, env, st.Clone(), target, reboot: rebootSel, overclock: overclockOn);
         }
+
+        // ── 充電のコアアクション (2026-11-21・ChargeCore・仮置き) ──
+        //   【再起動】(〈二股の導線〉): 押すたびに対象を「しない → 発動する攻撃・防御の端子を左から順に」と回す。 見込み (preview) は同じ指定で解く。
+        //   【オーバークロック】(〈雷鳴の太鼓〉): 押すと入り切り。 条件 (攻撃の端子・充電 15 以上) を満たさなければ本体が使わない (見込みにも出ない)。
+
+        /// <summary>再起動の対象 (場の添字・<see cref="ChargeCore.RebootNone"/> = しない)。 / オーバークロックを使う。 ターンの頭に戻す。</summary>
+        public int rebootSel = ChargeCore.RebootNone;
+        public bool overclockOn;
+
+        private ChargeItems ChargeFlags => CombatManager.Instance?.TerminalDeck?.state.chargeItems ?? ChargeItems.None;
+        public bool HasReboot => (ChargeFlags & ChargeItems.Fork) != 0;
+        public bool HasOverclock => (ChargeFlags & ChargeItems.Drum) != 0;
+
+        /// <summary>再起動の対象を次へ回す (発動する攻撃・防御の端子だけ・最後の次は「しない」)。</summary>
+        public void CycleReboot()
+        {
+            if (!CanOperate || !HasReboot) return;
+            var cands = new List<int>();
+            var o = TermInputs(out var dice, out var env, out var st) ? TerminalCards.Resolve(board, BuildSlots(dice.Length), dice, env, st.Clone(), target) : null;
+            if (o != null)
+                foreach (int s in o.fired)
+                {
+                    var d = TerminalCards.Get(board[s]);
+                    if (d != null && (d.kind == TerminalKind.Attack || d.kind == TerminalKind.Block) && !cands.Contains(s)) cands.Add(s);
+                }
+            int i = cands.IndexOf(rebootSel);
+            rebootSel = i + 1 < cands.Count ? cands[i + 1] : ChargeCore.RebootNone;
+            Game2DSfx.Play("ui_tab");
+            RecomputePreview(); Touch();
+        }
+
+        public void ToggleOverclock()
+        {
+            if (!CanOperate || !HasOverclock) return;
+            overclockOn = !overclockOn;
+            Game2DSfx.Play("ui_tab");
+            RecomputePreview(); Touch();
+        }
+
+        /// <summary>見込みで再起動が成り立っている (充電が足り、 対象が発動する)。 / オーバークロックが成り立っている。</summary>
+        public bool RebootLive => preview != null && preview.rebootSlot >= 0;
+        public bool OverclockLive => preview != null && preview.overclock;
+        /// <summary>右の列の札の文字 (仮)。</summary>
+        public string RebootLabel => rebootSel < 0 || rebootSel >= board.Count ? "再起動:なし" : "再起動:" + board[rebootSel];
+        public string OverclockLabel => "オーバークロック";
+
+        // ── 毒の【起爆】(2026-11-21・PoisonCore・仮置き) ── 起爆は品が自動で起こす (押す札ではない)。 見込み (preview) の毒で、 このターン起爆するかを右の列に出す。
+        //   〈石抜きの毒指輪〉= 配線の後の毒が 24 以上で攻撃の端子あり / 〈劇毒の火薬庫〉= このターンに与えた毒 (端子の分を足す) が 8 以上。
+        private PoisonItems PoisonFlags => CombatManager.Instance?.TerminalDeck?.state.poisonItems ?? PoisonItems.None;
+        public bool HasDetonate => (PoisonFlags & (PoisonItems.Ring | PoisonItems.Magazine)) != 0;
+        private bool DetonateState(out string label)
+        {
+            label = "";
+            if (!HasDetonate || !TermInputs(out _, out var env, out _)) return false;
+            int add = preview != null ? preview.poison : 0;
+            if ((PoisonFlags & PoisonItems.Ring) != 0)
+            {
+                int p = env.enemyPoison + add;
+                label = "起爆 毒" + p + "/" + PoisonCore.RingNeed;
+                return p >= PoisonCore.RingNeed && preview != null && preview.attackHits.Count > 0;
+            }
+            var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
+            int g = (ctx != null ? ItemSystem.PassiveSkills.Effects.Psn.TurnN(ctx, ItemSystem.PassiveSkills.Effects.PoisonMagazine.GivenKey) : 0) + add;
+            label = "起爆 付与" + g + "/" + PoisonCore.MagazineGiven;
+            return g >= PoisonCore.MagazineGiven;
+        }
+        /// <summary>このターン起爆する見込み (金で出す)。 / 右の列の文字 (仮)。</summary>
+        public bool DetonateLive => DetonateState(out _);
+        public string DetonateLabel { get { DetonateState(out var l); return l; } }
+
+        // ── シールドの【ジャスト防御】(2026-11-21・ShieldCore・仮置き) ── 見込み (preview) の防御 (ブロック + シールド) が予告ちょうど〜+許容幅なら右の列を金にする (表示だけ)。
+        //   判定は本体と同じ CombatManager.JustGuardForecast。 敵が攻撃しないターン (予告 0) は出さない。
+        private bool JustGuardState(out string label)
+        {
+            label = "";
+            var cm = CombatManager.Instance; var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
+            if (cm == null || ctx == null || preview == null || !TermInputs(out _, out var env, out var st)) return false;
+            bool live = cm.JustGuardForecast(ctx, preview, in env, out int e, out int guard);
+            if (e <= 0) return false;
+            label = "ジャスト防御 " + guard + "/" + e + "+" + ShieldCore.Width(st.shieldItems);
+            return live;
+        }
+        /// <summary>このターン敵の攻撃がある (予告 &gt; 0) なら出す。 / 成立の見込み (金で出す)。 / 右の列の文字 (仮)。</summary>
+        public bool HasJustGuard => JustGuardState(out var l) || l.Length > 0;
+        public bool JustGuardLive => JustGuardState(out _);
+        public string JustGuardLabel { get { JustGuardState(out var l); return l; } }
+
+        // ── 出血の撃ごとの出血 (2026-11-21・BleedCore・仮置き) ── 見込み (preview) の 5f が書いた撃ごとの出血の合計を右の列に出す (表示だけ)。
+        //   〈血桜〉を持っていて 2 撃目以降に出血 12 以上が届く見込みなら金。
+        private BleedItems BleedFlags => CombatManager.Instance?.TerminalDeck?.state.bleedItems ?? BleedItems.None;
+        public bool HasBleedHits => BleedFlags != BleedItems.None;
+        private bool BleedState(out string label)
+        {
+            label = "";
+            if (!HasBleedHits || !TermInputs(out _, out var env, out _)) return false;
+            int sum = 0, b = env.enemyBleed; bool sakura = false;
+            if (preview != null)
+                for (int h = 0; h < preview.attackHitBleed.Count; h++)
+                {
+                    if (h >= 1 && b >= BleedCore.SakuraNeed && (BleedFlags & BleedItems.Sakura) != 0) sakura = true;
+                    sum += preview.attackHitBleed[h]; b += preview.attackHitBleed[h];
+                }
+            label = "出血 " + env.enemyBleed + "+" + sum;
+            return sakura;
+        }
+        /// <summary>〈血桜〉が働く見込み (金で出す)。 / 右の列の文字 (仮・今の出血 + この配線の撃ごとの出血)。</summary>
+        public bool BleedLive => BleedState(out _);
+        public string BleedLabel { get { BleedState(out var l); return l; } }
+
+        // ── 臨界の爆発 (2026-11-21・HeatCore・仮置き) ── 見込み (preview) で、 本体と同じ HeatCore.Forecast を通した爆発の回数を右の列に出す (表示だけ)。
+        //   文字 = 今の臨界/閾値 (+ この配線で爆発する回数)。 爆発する見込みなら金。
+        private bool HeatState(out string label)
+        {
+            label = "";
+            var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
+            if (ctx == null || !TermInputs(out _, out _, out _)) return false;
+            var s = ItemSystem.PassiveSkills.Keywords.Kw.HeatState(ctx);
+            if (s.threshold <= 0 && (preview == null || (preview.heat <= 0 && preview.heatGains.Count == 0))) return false;
+            var f = preview != null ? HeatCore.Forecast(s, preview, preview.attackAdd) : default;
+            int n = f.burstsWired + f.burstsEnd;
+            label = "臨界 " + s.meter + "/" + (s.threshold > 0 ? s.threshold : HeatCore.StartThreshold(s.items)) + (n > 0 ? " 爆発" + n : "");
+            return n > 0;
+        }
+        /// <summary>臨界が動いている戦闘なら出す。 / 爆発の見込み (金で出す)。 / 右の列の文字 (仮)。</summary>
+        public bool HasHeat => HeatState(out var l) || l.Length > 0;
+        public bool HeatLive => HeatState(out _);
+        public string HeatLabel { get { HeatState(out var l); return l; } }
+
+        // ── 会心の超過会心率 (2026-11-21・CritCore・仮置き) ── 会心の品を持つ戦闘で、 配線の前に分かる会心率と会心倍率 (100% を超えた分は倍率に入る・PreviewHudStats) を右の列に出す (表示だけ)。
+        //   100% 以上 (超えた分が倍率へ変わる) なら金。 配線で決まる品 (〈鷹匠の革手袋〉〈一の矢〉ほか) と撃ごとの分は入らない。
+        public bool HasCrit => ItemSystem.PassiveSkills.AxisRules.Count(GameLoop.GameManager.Instance?.Run, ItemSystem.PassiveSkills.AxisRules.Crit) > 0 && CombatManager.Instance != null;
+        public bool CritLive => HasCrit && CombatManager.Instance.PreviewHudStats().critRate >= 1f;
+        public string CritLabel
+        {
+            get
+            {
+                if (!HasCrit) return "";
+                var hs = CombatManager.Instance.PreviewHudStats();
+                return "会心 " + Mathf.RoundToInt(hs.critRate * 100f) + "% ×" + hs.critMul.ToString("0.00");
+            }
+        }
+
+        // ── 山札の品 (2026-11-21・仮置き) ── 山札の品を持つ戦闘で、 この戦闘で使い捨てを使った回数 (+ この配線で使う数) を右の列に出す (表示だけ)。
+        //   この配線で使い捨てを使うなら金。 〈再利用のるつぼ〉〈灰から組む機関〉〈解体屋の袋〉が読む回数。
+        private TerminalBattleState DeckSt => CombatManager.Instance?.TerminalDeck?.state;
+        public bool HasDeckItems => DeckSt != null && DeckSt.deckItems != DeckItems.None;
+        public bool DeckLive => HasDeckItems && preview != null && preview.disposedNow > 0;
+        public string DeckLabel => !HasDeckItems ? "" : "使い捨て " + DeckSt.disposedTotal + (DeckLive ? "+" + preview.disposedNow : "")
+                                   + (preview != null && preview.damageMul != 1f ? " ×" + preview.damageMul.ToString("0.00") : "");
+
+        // ── 役の軸の品 (2026-11-21・仮置き) ── 役の品を持つ戦闘で、 この戦闘で役が成立した回数 (+ このターンに立つ役)・続いたターンを右の列に出す (表示だけ)。
+        //   このターンに役が立つなら金。 〈符丁の刻み板〉〈血濡れの符丁〉〈万象のゾロ目〉が回数を、 〈揃いの拍子木〉が続いたターンを読む。
+        public bool HasRoleItems => DeckSt != null && ItemSystem.PassiveSkills.AxisRules.Count(GameLoop.GameManager.Instance?.Run, ItemSystem.PassiveSkills.AxisRules.Role) > 0;
+        public bool RoleLive => HasRoleItems && preview != null && preview.roleNow > 0;
+        public string RoleLabel => !HasRoleItems ? "" : "役 " + DeckSt.roleCount + (RoleLive ? "+1" : "") + "回" + (DeckSt.roleStreak > 0 ? " 続" + DeckSt.roleStreak : "")
+                                   + (preview != null && preview.damageMul != 1f && RoleLive ? " ×" + preview.damageMul.ToString("0.00") : "");
 
         /// <summary>出目 i を端子 s に挿せるか (挿せる数・払う充電・出目の条件)。 他の出目との関係を見る条件は、 そろう見込みがあれば通す
         /// (〈十字斬り〉の 1 個目を挿せるように)。 本当に発動するかは見込み (Resolve) が決める。</summary>

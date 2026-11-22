@@ -125,7 +125,7 @@ namespace AutoTest
                     dmgParts = DmgPartsSinceStart(),
                     hpLedger = LedgerSinceStart(), shownFloor = _pendingShownFloor, axisAtStart = _pendingAxis,
                     mainPred = (float)System.Math.Round(_mfPred, 1), mainPredCorr = (float)System.Math.Round(_mfPredCorr, 1),
-                    mainActual = (float)System.Math.Round(_mfAct, 1), atkHist = (int[])_mfAtkHist.Clone(), dawnShots = _mfDawnShots.ToArray(),
+                    mainActual = (float)System.Math.Round(_mfAct, 1), atkHist = (int[])_mfAtkHist.Clone(),
                     enemyMaxHP = CombatSystem.EnemyDatabase.Get(_pendingEnemyId)?.maxHP ?? 0,
                     damageDealt = CombatSystem.EnemyDatabase.Get(_pendingEnemyId)?.maxHP ?? 0,
                     playerMaxHpEnd = (cm != null && cm.IsCombatActive)
@@ -301,7 +301,7 @@ namespace AutoTest
                 dmgParts = DmgPartsSinceStart(),
                 hpLedger = LedgerSinceStart(), shownFloor = _pendingShownFloor, axisAtStart = _pendingAxis,
                 mainPred = (float)System.Math.Round(_mfPred, 1), mainPredCorr = (float)System.Math.Round(_mfPredCorr, 1),
-                mainActual = (float)System.Math.Round(_mfAct, 1), atkHist = (int[])_mfAtkHist.Clone(), dawnShots = _mfDawnShots.ToArray(),
+                mainActual = (float)System.Math.Round(_mfAct, 1), atkHist = (int[])_mfAtkHist.Clone(),
                 fbDecided = _fbDecided, fbTurns = _fbTurns, fbKillTurns = _fbKillTurns,
                 enemyMaxHP = r.enemyMaxHP,
                 weaponId = gm?.Run?.equippedWeaponId ?? "",
@@ -484,6 +484,27 @@ namespace AutoTest
                 _cur.chainMaxDepth = ItemSystem.PassiveSkills.PassiveSkillManager.ChainMaxDepth;
                 _cur.chainRepeats = ItemSystem.PassiveSkills.PassiveSkillManager.ChainRepeats;
                 _cur.chainGuardHits = ItemSystem.PassiveSkills.PassiveSkillManager.ChainGuardHits;
+                _cur.rebootFired = (int)CombatSystem.CombatManager.RebootFired;
+                _cur.overclockFired = (int)CombatSystem.CombatManager.OverclockFired;
+                _cur.detonateFired = (int)CombatSystem.CombatManager.DetonateFired;
+                _cur.justGuardFired = (int)CombatSystem.CombatManager.JustGuardFired;
+                _cur.bleedSpendFired = (int)CombatSystem.CombatManager.BleedSpendFired;
+                _cur.bleedExecuteFired = (int)CombatSystem.CombatManager.BleedExecuteFired;
+                _cur.burstFired = (int)CombatSystem.CombatManager.BurstFired;
+                _cur.burstBreakFired = (int)CombatSystem.CombatManager.BurstBreakFired;
+                _cur.critOverflowFired = (int)CombatSystem.CombatManager.CritOverflowFired;
+                _cur.critExecuteFired = (int)CombatSystem.CombatManager.CritExecuteFired;
+                _cur.critRefireFired = (int)CombatSystem.CombatManager.CritRefireFired;
+                _cur.deckDisposeFired = (int)CombatSystem.CombatManager.DeckDisposeFired;
+                _cur.deckShuffleFired = (int)CombatSystem.CombatManager.DeckShuffleFired;
+                _cur.roleFormedFired = (int)CombatSystem.CombatManager.RoleFormedFired;
+                _cur.roleOmniFired = (int)CombatSystem.CombatManager.RoleOmniFired;
+                _cur.weaponChainFired = (int)CombatSystem.CombatManager.WeaponChainFired;
+                _cur.weaponExecuteFired = (int)CombatSystem.CombatManager.WeaponExecuteFired;
+                _cur.weaponGaryoFired = (int)CombatSystem.CombatManager.WeaponGaryoFired;
+                _cur.weaponBashFired = (int)CombatSystem.CombatManager.WeaponBashFired;
+                _cur.skipFired = ItemSystem.AxisPool.RunSkips;
+                _cur.skipGold = ItemSystem.AxisPool.RunSkipGold;
                 _cur.chainPath = ItemSystem.PassiveSkills.PassiveSkillManager.ChainDeepestPath;
                 _cur.heatBurstInfo = ItemSystem.PassiveSkills.Keywords.Kw.HeatMaxBurstsOneAdd + "|" + ItemSystem.PassiveSkills.Keywords.Kw.HeatMaxBurstsInfo;
                 _cur.attackSumInfo = CombatSystem.CombatManager.AttackSumMaxInfo;
@@ -605,7 +626,6 @@ namespace AutoTest
             _curLog.Enqueue($"[AutoRunner] === RUN {_cur.index} 終了: {_cur.band} ({_cur.bandLabel}) — {note} ===");
             _curAttachLog(_cur);
             _cur = null;
-            ItemSystem.PassiveSkills.Effects.Daybreak.NextAttackPctPerUnit = 0f;   // [2026-11-10 試験] ラン終了で既定へ戻す
             GameLoop.GameHooks.WeaponTierCap = 0;
             GameLoop.GameHooks.PursuerNoReward = false;                          // [測定 2026-11-12・#35]
             GameLoop.GameHooks.PursuerAtkMulOverride = 0f;

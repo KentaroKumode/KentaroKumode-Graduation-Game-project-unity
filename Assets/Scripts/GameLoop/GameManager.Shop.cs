@@ -67,6 +67,7 @@ namespace GameLoop
             if (CurrentPhase != GamePhase.ShopVisit) { RunStats.RerollOutcome[0]++; return false; }
             var sm = ShopManager.Instance;
             if (sm == null) { RunStats.RerollOutcome[1]++; return false; }
+            if (focusAxis != null && !ShopManager.AxisRerollAllowed(Run, focusAxis)) focusAxis = null;   // 出現の枠に無い軸は指定なし
             bool ok = sm.TryReroll(Run, focusAxis);
             RunStats.RerollOutcome[ok ? 3 : 2]++;
             if (ok && focusAxis != null) RerollTerminalShop(focusAxis);

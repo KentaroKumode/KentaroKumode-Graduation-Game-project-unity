@@ -39,29 +39,14 @@ namespace AutoTest
         // ============================================================
 
         /// <summary>アイテムS級: lift6F ≥ 0.07 かつ formΔ ≥ +0.4 の本物の貢献者。</summary>
-        public static readonly HashSet<string> ItemSRank = new HashSet<string>
-        {
-            "dice_perfection",   // 完全性のダイス (L6=0.16, formΔ=+0.66)
-            "dice_destiny",      // 運命のダイス (L6=0.15, formΔ=+0.45)
-            "dice_greed",        // 貪欲のダイス (L6=0.07, formΔ=+1.18 ★)
-            // "Might_4" は 2026-09-05 の家系1段化で削除 (Might は Lv1 のみ残置)
-        };
+        public static readonly HashSet<string> ItemSRank = new HashSet<string>();
 
         /// <summary>アイテムA級: lift6F ≥ 0.03 で正の formΔ。</summary>
         public static readonly HashSet<string> ItemARank = new HashSet<string>
         {
-            // パッシブ (Tier-line 高位)
-            // "Might_3" / "Might_2" は 2026-09-05 の家系1段化で削除
-            "帯電の胸甲",           // 剛力I (acq6F=5572 で安定して効く)
-            "戦果の天秤",        // 戦果の秤 (+5G/勝)
-            "吸血III",
-            "吸血IV",
-            // "商人の符牒" 2026-07-17 削除
-            "希望の灯片",        // ← リワーク後想定 (無敗勝利で maxHP+2 永続)
-            // ダイス
-            "dice_star",         // 星のダイス
-            "dice_flame",        // 偏りのダイス
-            "dice_twinsnake",    // 双蛇のダイス
+            "帯電の胸甲",
+            "戦果の天秤",        // 勝利の報酬 +30%・エリート/ボス +15G
+            "希望の灯片",
             // 消費 (2026-08-04 再編: 3 系統 × Tier1〜4。 最上位 T4 のみ S 級)
             "天火の膏薬",       // 攻撃強化 T4: その戦闘中 与ダメ+75%
             "惜別の護符",       // シールド T4: 80

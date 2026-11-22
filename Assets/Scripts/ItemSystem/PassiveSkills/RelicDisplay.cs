@@ -80,8 +80,7 @@ namespace ItemSystem.PassiveSkills
             for (int k = 0; k < 4 && e != null; k++)
             {
                 if (e is IRelicDisplay d) return d;
-                if (e is Effects.EntryEffect en) e = en.Inner;
-                else if (e is Effects.StatModifierEffect sm) e = sm.Inner;
+                if (e is Effects.StatModifierEffect sm) e = sm.Inner;
                 else break;
             }
             return null;

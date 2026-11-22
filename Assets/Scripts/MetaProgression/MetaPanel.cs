@@ -113,8 +113,6 @@ namespace MetaProgression
 
         // ---- 種火 (軸の宣言・旧 r1 + r2 相当。 旧 r3 の開幕の品は外した) ----
 
-        /// <summary>対応する軸の秘宝の、 店の秘宝の枠での出現の重み。</summary>
-        public const float SparkAppearanceWeightMul = 2.0f;
         /// <summary>充電: 充電の上限と戦闘開始時の充電。</summary>
         public const int ChargeCapBonus = 10, ChargeOpening = 10;
         /// <summary>臨界: 戦闘の終わりのメーターを次の戦闘へ持ち越す割合。</summary>

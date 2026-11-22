@@ -386,7 +386,6 @@ namespace AutoTest
         // 段 (形態) ごとの計装
         private double _mfPred, _mfPredCorr, _mfAct;
         private readonly int[] _mfAtkHist = new int[4];
-        private readonly List<int> _mfDawnShots = new List<int>();
 
         private void SettleMainCorr()
         {
@@ -415,13 +414,6 @@ namespace AutoTest
             _mfAtkHist[System.Math.Min(3, System.Math.Max(0, aCount))]++;
             _mcPending = true; _mcPendPred = System.Math.Max(0, _lastPredUsed); _mcPendA = aCount;
             _mcPendBd7 = CombatSystem.CombatStats.DamageBreakdown[7]; _mcPendRatio = _mcRatioNow;
-            // 黎明の溜める形: 攻撃したターンに乗った溜め (OnWired の前なので鍵に値が残っている)
-            if (aCount > 0)
-            {
-                var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
-                float pool = ctx != null ? ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.Daybreak.ChargeKey) : 0f;
-                if (pool > 0f) _mfDawnShots.Add(Mathf.RoundToInt(pool * 100f));
-            }
         }
 
         /// <summary>戦闘の開始と終わり: 保留を締め、 今の戦闘の累計をランの累計へ移す。</summary>
@@ -445,7 +437,6 @@ namespace AutoTest
         {
             _mfPred = _mfPredCorr = _mfAct = 0;
             System.Array.Clear(_mfAtkHist, 0, _mfAtkHist.Length);
-            _mfDawnShots.Clear();
         }
 
         /// <summary>バッチ終了時に閉じる (worker が呼ぶ)。</summary>
@@ -501,9 +492,13 @@ namespace AutoTest
             public float wAtk, wDef, wChg;     // 端子の重み (ペルソナ・ボス別プレイブック・予兆ターン込み)
             public float critMul;
             public int eDefNow, myPen;
-            public bool stepGuardCut, stepUndying, steadfastReady, stepDaybreak;
+            /// <summary>武器のスキル (本体の WeaponFamilyEffects の定数を読む写し) / 〈堅守の構え〉が今使える / 〈不滅の刃〉の連続数 / 今のシールド / 敵の最大 HP。</summary>
+            public WeaponRungModel rung;
+            public bool steadfastReady;
             public int undyingStreak, myShield, enemyMaxHpNow;
-            public float bashRate, bulwarkRate;
+            /// <summary>武器の最終与ダメ +% の条件: 単体戦 (〈一対一〉) / 敵の残り HP が処刑の線以下 (〈処刑〉) / 〈鎧砕き〉で防御 0 にした後 / 装備ダイスの最大の目 (〈画竜点睛〉)。</summary>
+            public bool solo, execBoost, shattered;
+            public int dieMaxFace;
             public float diceAtkPct;           // 攻撃に挿した出目への上乗せ率 (ctx.attackDicePct・2026-11-06)
             public BossPlaybook play;
             public float[] atkGrowth;          // 防ぎ切りの規則: 撃破まで n ターンの敵の攻撃の伸び (null = 規則なし)
@@ -528,18 +523,21 @@ namespace AutoTest
             public int atkPower, atkPenalty;   // 武器の素火力 / 麻痺毒の減算 (本体は atkBase 全体から引く)
             public int atkFlat;                // 攻撃+N: ctx.mutualAttackBonus (配線前に積まれた分) + 消費の攻撃 + 遺物の攻撃
             public int atkPerDie;              // 端子調律: 攻撃に挿したダイス 1 本あたり
-            public float chgToAtk;             // 〈電流〉の②: 充電に挿した出目のこの割合が攻撃へ
             public float igCut;                // 〈不完全な起動〉の攻撃カット率
             public int dmgBonus;               // バフ damageBonus (ProcessDamage の 1.)
             public float critP, critMulEff;    // 会心率 (配線前に分かる分) / 実効の会心倍率 (敵の会心耐性込み)
-            /// <summary>[2026-11-20] このターンの最初の 1 撃の会心率 (〈抜き打ちの作法〉の確定・〈千里眼の水晶〉の上乗せ込み。 無ければ critP と同じ)。</summary>
+            /// <summary>[2026-11-20] このターンの最初の 1 撃の会心率 (〈抜き打ちの作法〉・〈急所突きの針〉の確定。 無ければ critP と同じ)。</summary>
             public float critP1;
             /// <summary>[2026-11-21] 〈急所突きの針〉が仕込んである: 攻撃のある最初の 1 撃は必ず会心・敵の防御を無視 (本体 CombatManager.TakeTacticNeedle)。</summary>
             public bool needleFirst;
-            /// <summary>[2026-11-20] 〈寸鉄〉: 会心しなかった撃に掛かる上乗せ (会心倍率の上乗せ分 × 会心率 (100% まで)・0 = 持っていない)。</summary>
-            public float nonCritShare;
-            /// <summary>[2026-11-20] 〈加重の拳套〉: 撃の番号 (0 から) 1 につき足す最終与ダメージ倍率 (%・0 = 持っていない)。</summary>
-            public int lateHitFinalPct;
+            /// <summary>[会心の軸 2026-11-21・CritCore] 配線の前に分かる合算の会心率 (100% 超えもそのまま) / 会心倍率 (敵の会心耐性の前) / 敵の会心耐性 /
+            /// 〈寸鉄〉(超過の変換 2 倍) /〈天眼の鍔〉(確定会心 ×1.25) /〈銑鉄棍〉(会心しなかった撃に会心率 1% につき +1%) / 会心が出ない (封印) / 必ず会心 (forceCritical)。</summary>
+            public float critAdd, critMulBase, critRed;
+            public bool critDouble, critHeaven, ironClub, critOff, critOn;
+            /// <summary>[会心の軸] 配線で決まる品: 〈鷹匠の革手袋〉〈狙い目の刻み〉/ 攻撃の端子 1 枚の撃の〈一の矢〉〈渾身の柄頭〉〈必殺の照準器〉/ 最初の 1 撃が〈抜き打ちの作法〉で確定会心。</summary>
+            public bool falconer, aim, firstArrow, pommel, sniper, quickDrawFirst;
+            /// <summary>〈加重の拳套〉: 2 撃目以降の撃で与ダメ % の池に足す割合 (0 = 持っていない・本体 ctx.hitOutgoingPct)。</summary>
+            public float lateHitOutPct;
             public float nonCritMul;           // 鈍器: 非会心だけ ×(1+x)
             public bool pinpointCut;           // 〈一点読みの片眼〉の代価: 非会心 ×0.7
             public float outMul;               // 与ダメ倍率の池 (ctx.outgoing + 整備パネル + 戦意 + 剛胆 + 遺物 + 研磨剤 + 油・膏薬)
@@ -608,45 +606,65 @@ namespace AutoTest
             //   麻痺毒の減算・〈不完全な起動〉・バフ・会心の期待値は 1 撃ごと。
             //   shortcut: 端子ごとの出力は持たないので攻撃の合計を撃の数で等分する (端数は 1 撃目)。 端子ごとの差で丸めが変わる時は TerminalOutcome.attackHits を運ぶ。
             int hits = System.Math.Max(1, ws.aHits);
+            if (s.rung.muga && hits == 1) aSum += CombatSystem.CombatRules.MugaBonus(ws.otherDice);   // 竜閃〈無我無心〉: 攻撃の端子 1 枚なら他の端子の目 × 1.5
             float total = 0f;
             for (int h = 0; h < hits; h++)
                 total += ReadOutOneHit(in s, bCount, h == 0 ? aSum - (hits - 1) * (aSum / hits) : aSum / hits, in ws, h);
+            //   短剣〈連刃〉: 攻撃の端子 2 枚以上なら最後に追撃 (武器の攻撃力 × 率・防御を無視)
+            if (s.rung.chainRatePct > 0 && ws.aHits >= ItemSystem.PassiveSkills.Effects.ChainBlade.NeedTerminals)
+                total += ReadOutOneHit(in s, bCount, 0, in ws, hits, CombatSystem.CombatRules.ChainHitBase(s.atkPower, s.rung.chainRatePct));
             return Mathf.RoundToInt(total);
         }
 
         /// <summary>主攻撃 1 撃の与ダメの期待値 (<paramref name="termAtk"/> = その撃の端子の出力)。 <see cref="ReadOutMainDamage"/> が撃の数だけ呼ぶ。</summary>
-        private static float ReadOutOneHit(in OptimalTurnState s, int bCount, int termAtk, in WiredSums ws, int hitNo = 0)
+        private static float ReadOutOneHit(in OptimalTurnState s, int bCount, int termAtk, in WiredSums ws, int hitNo = 0, int rawOverride = -1)
         {
-            int raw = s.atkPower + s.atkFlat + termAtk;
+            //   竜閃〈無我無心〉: 攻撃の端子 2 枚以上のターンは武器の攻撃力 0 / 〈連刃〉の追撃は武器の攻撃力 × 率だけ (rawOverride)
+            int raw = rawOverride >= 0 ? rawOverride : (s.rung.muga && ws.aHits >= 2 ? 0 : s.atkPower) + s.atkFlat + termAtk;
             raw = System.Math.Max(0, raw - s.atkPenalty);
             if (s.igCut > 0f && raw > 0) raw -= Mathf.FloorToInt(raw * s.igCut);
             raw += s.dmgBonus;
             float outMul = s.outMul;
-            if (s.stepUndying && bCount > 0) outMul += TurnRules.UndyingMul(s.undyingStreak + 1) - 1f;   // 本体は与ダメ倍率の池へ足す (式は今のまま: float の値を変えない)
             // 端子の山札 (旧い配線では全部「なし」): 与ダメ% は池へ足す (ctx.AddOutgoingPct)・会心倍率 +N・必ず会心・別枠の掛け算・防御の無視
             outMul += ws.outPctAdd;
+            if (hitNo >= 1) outMul += s.lateHitOutPct;   // 〈加重の拳套〉
             float termMul = ws.damageMul;
-            int fpct = s.finalPct + s.lateHitFinalPct * hitNo;   // ローカル関数は in の引数を捕まえられないので写す (〈加重の拳套〉: 2 撃目以降の上乗せ)
-            float nonCritShare = s.nonCritShare;
-            int minDmg = s.minDmg, consBurst = s.consBurst, eDef = ws.ignoreDefense || (hitNo == 0 && s.needleFirst) ? 0 : s.eDefNow, pen = s.myPen, critPen = s.critPen;
-            float critMulEff = s.critMulEff + ws.critMultAdd, nonCritMul = s.nonCritMul, berserk = s.berserkMul;
+            //   武器の最終与ダメ +% (一対一・捨て身・処刑・鎧砕き・不滅の刃) / 竜閃〈画竜点睛〉(攻撃の端子 1 枚・最大の目 → 確定会心・+150%)
+            int fpct = s.finalPct + s.rung.FinalPct(s.solo, 1, bCount, s.execBoost, s.shattered, s.undyingStreak + 1);   // ローカル関数は in の引数を捕まえられないので写す
+            bool garyo = s.rung.garyo && ws.aHits == 1 && hitNo == 0 && rawOverride < 0 && s.dieMaxFace > 0 && ws.atkFaceMax >= s.dieMaxFace;
+            if (garyo) fpct += ItemSystem.PassiveSkills.Effects.GaryoTensei.FinalPct;
+            bool noDef = ws.ignoreDefense || (hitNo == 0 && s.needleFirst) || rawOverride >= 0 || (hitNo >= 1 && s.rung.vital2nd);   // 〈急所〉: 2 撃目以降は防御無視
+            int minDmg = s.minDmg, consBurst = s.consBurst, eDef = noDef ? 0 : s.eDefNow, pen = s.myPen + ws.armorPen, critPen = s.critPen;
+            float nonCritMul = s.nonCritMul, berserk = s.berserkMul;
+            // 会心 (CritCore・本体の ProcessDamage と同じ式): 撃ごとの会心率と会心倍率。 配線で決まる品はこの撃の目・撃の数で足す
+            float add = s.critAdd, mulAdd = ws.critMultAdd;
+            bool force = ws.forceCrit || (hitNo == 0 && s.critP1 >= 1f) || garyo;
+            if (hitNo == 0 && s.quickDrawFirst) mulAdd += ItemSystem.PassiveSkills.Effects.QuickDrawArt.Mul;
+            if (s.falconer && ws.atkFaceMax >= ItemSystem.PassiveSkills.Effects.FalconerGlove.MinFace) { add += ItemSystem.PassiveSkills.Effects.FalconerGlove.Rate; mulAdd += ItemSystem.PassiveSkills.Effects.FalconerGlove.Mul; }
+            if (s.aim && ws.hitFace != null && hitNo < ws.hitFace.Length) { add += CombatSystem.CritCore.AimRate(ws.hitFace[hitNo]); force |= CombatSystem.CritCore.AimForce(ws.hitFace[hitNo]); }
+            bool solo = ws.aHits == 1;
+            if (solo && s.firstArrow) { add += ItemSystem.PassiveSkills.Effects.FirstArrow.Rate; mulAdd += ItemSystem.PassiveSkills.Effects.FirstArrow.Mul; }
+            float critMulEff = CombatSystem.CritCore.EffectiveMul(s.critMulBase + mulAdd, s.critRed, add, s.critDouble, s.critHeaven);
+            float sniperMul = CombatSystem.CritCore.EffectiveMul(s.critMulBase + mulAdd + (add >= 1f ? CombatSystem.CritCore.SniperMulAdd : 0f), s.critRed, add, s.critDouble, s.critHeaven);
+            float ironOut = s.ironClub ? System.Math.Min(1f, add) : 0f;
+            int critFpct = solo && s.pommel ? ItemSystem.PassiveSkills.Effects.HeftyPommel.FinalPct : 0;
             bool pinpoint = s.pinpointCut, vital = s.vitalIgnore, down = s.enemyDown && !s.enemyDownWeak;   // ひびの弱いダウン (2026-11-14) は ×1.5 なし
-            float D(bool crit)
+            float D(bool crit, float cmul)
             {
                 int d = raw;
                 if (d <= 0) return System.Math.Max(0, minDmg);
-                if (crit) d = (int)(d * critMulEff);
+                if (crit) d = (int)(d * cmul);
                 else
                 {
                     if (nonCritMul > 0f) d = (int)(d * (1f + nonCritMul));
-                    if (nonCritShare > 0f) d = (int)(d * (1f + nonCritShare));   // 〈寸鉄〉: 本体と同じ位置 (鈍器の後・一点読みの前)
                     if (pinpoint) d = d * ItemSystem.PassiveSkills.Effects.PinpointEye.NonCritKeepPct / 100;
                 }
-                if (outMul > 0f && System.Math.Abs(outMul - 1f) > 0.001f) d = Mathf.CeilToInt(d * outMul);
+                float om = crit ? outMul : outMul + ironOut;   // 〈銑鉄棍〉: 会心しなかった撃だけ池へ足す
+                if (om > 0f && System.Math.Abs(om - 1f) > 0.001f) d = Mathf.CeilToInt(d * om);
                 d += consBurst;
                 if (termMul != 1f && d > 0) d = System.Math.Max(1, Mathf.RoundToInt(d * termMul));   // 〈激昂〉〈共鳴〉: 本体と同じ位置 (攻撃バーストの後・物差しの前)
                 d = CombatSystem.EnemyHpLedger.ProbeMain(d);   // [測定用の物差し 2026-11-10] 本体と同じ位置 (攻撃バーストの後・防御の前)
-                d = ApplyFinalPct(d, fpct);                             // 最終与ダメージ倍率: 本体と同じ位置 (物差しの直後・怠惰の前)
+                d = ApplyFinalPct(d, fpct + (crit ? critFpct : 0));     // 最終与ダメージ倍率: 本体と同じ位置 (物差しの直後・怠惰の前・〈渾身の柄頭〉は会心した撃だけ)
                 d = MetaProgression.MetaDebuffApplicator.ApplyOutgoingCut(d);   // [#121] 〈大罪:怠惰〉: 本体と同じ位置 (物差しの直後・防御の前・CombatManager.Damage.cs)
                 d = CombatSystem.BossDown.ApplyTaken(d, down);               // ボスのダウン ×1.5: 本体と同じ位置 (怠惰の直後)
                 if (eDef > 0 && d > 0 && !(crit && vital))
@@ -658,8 +676,10 @@ namespace AutoTest
                 if (berserk > 1f && d > 0) d = Mathf.CeilToInt(d * berserk);
                 return d;
             }
-            float p = ws.forceCrit ? 1f : hitNo == 0 ? s.critP1 : s.critP;
-            return p >= 1f ? D(true) : p <= 0f ? D(false) : p * D(true) + (1f - p) * D(false);
+            float p = s.critOff ? 0f : force || s.critOn ? 1f : ItemSystem.PassiveSkills.CombatContext.ResolveCritRate(add);
+            float v = p >= 1f ? D(true, critMulEff) : p <= 0f ? D(false, critMulEff) : p * D(true, critMulEff) + (1f - p) * D(false, critMulEff);
+            if (solo && s.sniper && p > 0f) v += p * D(true, sniperMul);   // 〈必殺の照準器〉: 会心した撃をもう 1 回 (確定会心)
+            return v;
         }
 
         /// <summary>与ダメ倍率の池: ApplyWinDamageModifiers と同じ足し方 (加算の池)。 読むだけ。
@@ -676,7 +696,7 @@ namespace AutoTest
             }
             outMul += metaPct * 0.01f;
             outMul += MetaProgression.Relics.RelicApplicator.GetOutgoingPct(run, ctx);
-            if (ctx.polishArmed && !ctx.rollPurity) outMul += 1.5f;
+            if (ctx.polishArmed) outMul += 1.5f;
             if (ctx.consDmgMultPct > 0) outMul += ctx.consDmgMultPct / 100f;
             return outMul;
         }
@@ -687,41 +707,47 @@ namespace AutoTest
         {
             st.atkPower = System.Math.Max(0, cm?.PlayerAttackPower ?? 2);
             st.atkPenalty = System.Math.Max(0, atkPenalty);
-            int consAtk = ctx.rollPurity ? 0 : ctx.consDiceRoll;
+            int consAtk = ctx.consDiceRoll;
             st.atkFlat = ctx.mutualAttackBonus + consAtk + MetaProgression.Relics.RelicApplicator.GetAttackBonus(run, ctx);
             st.atkPerDie = MetaProgression.MetaBuffApplicator.GetAttackTerminalPerDice();
-            st.chgToAtk = ctx.chargeToAttackPct;
             st.igCut = (run != null && run.HasFlaw(GameLoop.GateFlaw.IncompleteIgnition)) ? System.Math.Max(0f, GameLoop.GateFlaws.IgnitionAttackCutPct) : 0f;
             st.dmgBonus = (int)ctx.GetBuff("damageBonus");
             // 会心率: 本体の CritRateOf(pendingBuff: true) と同じ (武器 + このターンの加算 + 整備パネル + 戦闘中バフ)。 OnCriticalCheck の条件付きは入らない。
             float add = (cm?.PlayerCritBaseRate ?? 0f) + ctx.critRatePctAdd + MetaProgression.MetaBuffApplicator.GetCritRatePctBonus()
                       + ctx.GetBuff(ItemSystem.PassiveSkills.CombatContext.CritRateBuffKey);
-            add = System.Math.Max(0f, add);
-            float p = ItemSystem.PassiveSkills.CombatContext.ResolveCritRate(add);
-            if (ctx.critSuppressed || ctx.critToDamage) p = 0f;
-            if (ctx.forceCritical && !ctx.critToDamage) p = 1f;
+            //   配線の前に分かる会心の品 (〈余韻の鈴〉〈瑠璃砥石〉〈一点読みの片眼〉ほか・Crit.ForecastTurn) を足す
+            ItemSystem.PassiveSkills.Effects.Crit.ForecastTurn(ctx, run, out float itemRate, out float itemMul);
+            add = System.Math.Max(0f, add + itemRate);
+            st.critAdd = add;
+            st.critMulBase = ctx.criticalMultiplier + itemMul;
+            st.critRed = ctx.enemyCritMultReduction;
+            st.critDouble = ctx.critExcessDouble || (run != null && run.OwnsPassive(ItemIds.CritSuntetsu));
+            st.critHeaven = ItemSystem.PassiveSkills.Effects.HeavenEyeGuard.Held(ctx) || (run != null && run.OwnsPassive(ItemIds.CritHeaven));
+            st.ironClub = ctx.critToDamage || (run != null && run.OwnsPassive(ItemIds.CritIronClub));
+            st.critOff = ctx.critSuppressed;
+            st.critOn = !st.critOff && ctx.forceCritical;
+            st.falconer = run != null && run.OwnsPassive("鷹匠の革手袋");
+            st.aim = run != null && run.OwnsPassive(ItemIds.CritAim);
+            st.firstArrow = run != null && run.OwnsPassive(ItemIds.CritFirstArrow);
+            st.pommel = run != null && run.OwnsPassive(ItemIds.CritPommel);
+            st.sniper = run != null && run.OwnsPassive(ItemIds.CritSniper);
+            float p = st.critOff ? 0f : st.critOn ? 1f : ItemSystem.PassiveSkills.CombatContext.ResolveCritRate(add);
             st.critP = p;
-            // 最初の 1 撃 (2026-11-20): 〈千里眼の水晶〉の会心率の上乗せ・〈抜き打ちの作法〉の確定 (配線の時点では ctx.hitIndex = 0)
+            // 最初の 1 撃: 〈抜き打ちの作法〉(1 ターン目とダウン中)・〈急所突きの針〉の確定 (配線の時点では ctx.hitIndex = 0)
             {
                 float p1 = p;
-                if (run != null && run.OwnsPassive(ItemSystem.PassiveSkills.Effects.ClairvoyantCrystal.Id) && !(ctx.critSuppressed || ctx.critToDamage) && p < 1f)
-                    p1 = ItemSystem.PassiveSkills.CombatContext.ResolveCritRate(add + ItemSystem.PassiveSkills.Effects.ClairvoyantCrystal.FirstHitBonus(ctx));
-                if (run != null && run.OwnsPassive(ItemSystem.PassiveSkills.Effects.QuickDrawArt.Id) && !ctx.critToDamage
-                    && ItemSystem.PassiveSkills.Effects.QuickDrawArt.FirstHitForced(ctx)) p1 = 1f;
+                st.quickDrawFirst = run != null && run.OwnsPassive(ItemIds.CritQuickDraw)
+                    && ItemSystem.PassiveSkills.Effects.QuickDrawArt.FirstHitForced(ctx, cm != null && cm.EnemyDownNow);
+                if (st.quickDrawFirst) p1 = 1f;
                 st.needleFirst = ctx.GetAccumulated(CombatSystem.CombatManager.TacticNeedleKey) > 0f;
                 if (st.needleFirst) p1 = 1f;      // 〈急所突きの針〉: 本体は forceCritThisHit (撃の会心の判定を確定にする)
                 st.critP1 = p1;
             }
-            float cmul = ctx.criticalMultiplier;
-            if (ctx.enemyCritMultReduction > 0f) cmul = System.Math.Max(1f, cmul - ctx.enemyCritMultReduction);
-            st.critMulEff = cmul;
-            // 〈寸鉄〉【規則】: 会心しなかった撃にも 会心倍率の上乗せ分 × 会心率 (100% まで) が乗る (本体 PassiveSkillManager.ProcessDamage と同じ式)
-            st.nonCritShare = ctx.critShareOnNonCrit ? System.Math.Max(0f, (cmul - 1f) * System.Math.Min(1f, add)) : 0f;
-            st.lateHitFinalPct = run != null && run.OwnsPassive(ItemSystem.PassiveSkills.Effects.WeightingGauntlet.Id) ? ItemSystem.PassiveSkills.Effects.WeightingGauntlet.PctPerHit : 0;
+            st.critMulEff = CombatSystem.CritCore.EffectiveMul(st.critMulBase, st.critRed, add, st.critDouble, st.critHeaven);
+            st.lateHitOutPct = run != null && run.OwnsPassive(ItemSystem.PassiveSkills.Effects.WeightingGauntlet.Id) ? ItemSystem.PassiveSkills.Effects.WeightingGauntlet.Pct / 100f : 0f;
             st.nonCritMul = ctx.nonCritOutgoingMultiplier;
             st.pinpointCut = ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.PinpointEye.NonCritCutKey) > 0f;
             st.outMul = OutgoingPoolNow(ctx, run);
-            if (ctx.critToDamage && add > 0f) st.outMul += System.Math.Min(1f, add);   // 〈銑鉄棍〉【規則】: 会心率 1% につき与ダメージ +1% (100% まで・与ダメ % の池)
             st.finalPct = ctx.finalDamagePct;
             st.consBurst = ctx.consAtkBurst;
             st.critPen = ctx.critArmorPen;
@@ -801,7 +827,8 @@ namespace AutoTest
             public int taken;       // 自 HP の減少の見積もり
             public int block;
             public int aCount, bCount;
-            public bool bashSpent;  // 盾〈シールドバッシュ〉でシールドを使い切った
+            public int bashUsed;    // 盾〈シールドバッシュ〉で使ったシールド
+            public bool justGuard;  // 【ジャスト防御】の見込み (〈城壁〉の次のシールド)
             public bool freeBlock;  // [計装 2026-11-10] 防ぎ切りの規則の対象 (撃破まで HP を失わない) だった
             public bool killsNow;   // [計装] 今ターン撃破の見込み
             public int rawNew;           // [計装] 倍率の前の攻撃 (素火力 + 攻撃+N + 出目)
@@ -831,7 +858,13 @@ namespace AutoTest
             public float outPctAdd;      // 与ダメ% の池へ足す分
             public float critMultAdd;    // このターンの会心倍率 +N
             public bool forceCrit;       // このターンは必ず会心
+            /// <summary>攻撃に挿した目の一番大きい値 (〈鷹匠の革手袋〉) / 撃ごとの挿した目の一番大きい値 (〈狙い目の刻み〉を持つ時だけ・CritCore.HitFaceMax)。</summary>
+            public int atkFaceMax;
+            /// <summary>攻撃以外の端子に挿した目の合計 (竜閃〈無我無心〉)。</summary>
+            public int otherDice;
+            public int[] hitFace;
             public bool ignoreDefense;   // 敵の防御を無視
+            public int armorPen;         // 敵の防御を N 無視 (〈継ぎ目のない導線〉)
             public float takenMul;       // このターンの被ダメに掛ける (1 = なし)
             public float enemyAtkMul;    // このターンの敵の攻撃に掛ける (1 = なし)
             public int shield, heal, selfDamage;
@@ -880,11 +913,10 @@ namespace AutoTest
             var tele = s.tele; int enemyHp = s.enemyHp, myHp = s.myHp, myMaxHp = s.myMaxHp, atkBase = s.atkBase, enemyAtk = s.enemyAtk;
             float wAtk = s.wAtk, wDef = s.wDef, wChg = s.wChg;
             var play = s.play; var atkGrowth = s.atkGrowth;
-            int eDefNow = s.eDefNow, myPen = s.myPen, undyingStreak = s.undyingStreak, myShield = s.myShield;
+            int eDefNow = s.eDefNow, myPen = s.myPen, myShield = s.myShield;
             int enemyMaxHpNow = s.enemyMaxHpNow;
-            bool stepGuardCut = s.stepGuardCut, stepUndying = s.stepUndying, steadfastReady = s.steadfastReady;
-            bool stepDaybreak = s.stepDaybreak;
-            float bashRate = s.bashRate, bulwarkRate = s.bulwarkRate;
+            bool steadfastReady = s.steadfastReady;
+            var rung = s.rung;
             int aCount = ws.aCount, bCount = ws.bCount, aSum = ws.aSum, blockRaw = ws.blockRaw, chargeRaw = ws.chargeRaw, maxBlockDie = ws.maxBlockDie;
             float c = ws.chargeUnits, specFlat = ws.specFlat;
             // 端子の山札: このターンの敵の攻撃 ×N (〈大結界〉)。 本体は防御の後の予告の値に掛ける (CombatManager.ApplyTerminalOutcome)。
@@ -902,20 +934,21 @@ namespace AutoTest
             if (wantNew)
             {
                 aSumNew += aCount * s.atkPerDie;
-                if (s.chgToAtk > 0f && chargeRaw > 0) aSumNew += Mathf.FloorToInt(chargeRaw * s.chgToAtk);
                 if (s.diceAtkPct > 0f && aSumNew > 0) aSumNew += CombatSystem.CombatRules.AttackDiceScaled(aSumNew, s.diceAtkPct);
             }
             // 攻撃に挿した出目への上乗せ率 (2026-11-06): 本体と同じく 攻撃の出目の合計 × 率 (切り上げ)
             if (s.diceAtkPct > 0f && aSum > 0)
                 aSum += CombatSystem.CombatRules.AttackDiceScaled(aSum, s.diceAtkPct);
-            // 剣〈切り返し〉: 攻撃と防御の端子を両方挿したターン、 ブロック × 0.5 を攻撃にも
-            if (stepGuardCut && aCount > 0 && bCount > 0)
+            // 剣〈切り返し〉: 攻撃と防御の端子を両方挿したターン、 ブロック × 0.6 を攻撃にも
+            if (rung.guardCut && aCount > 0 && bCount > 0)
             { int gc = TurnRules.GuardCutBonus(blockRaw); aSum += gc; aSumNew += gc; }
-            // 盾〈シールドバッシュ〉: 全部攻撃のターン、 シールドを使い切って × 率 を攻撃へ
-            bool bashSpent = bashRate > 0f && aCount == k && myShield > 0;
-            if (bashSpent) { int bb = TurnRules.BashBonus(myShield, bashRate); aSum += bb; aSumNew += bb; }
-            // 盾〈堅守の構え〉: 全部ブロックのターン、 シールド +15 (このターンの被弾から使える)
-            if (steadfastReady && bCount == k)
+            // 盾〈シールドバッシュ〉: 防御の端子なしで攻撃したターン、 シールド (半分 / 全部) を使って × 率 を攻撃へ
+            bool bashSpent = rung.bashRatePct > 0 && aCount > 0 && bCount == 0 && myShield > 0;
+            int bashUsed = bashSpent ? CombatSystem.CombatRules.BashSpend(myShield, rung.bashAll) : 0;
+            if (bashSpent) { int bb = TurnRules.BashBonus(bashUsed, rung.bashRatePct); aSum += bb; aSumNew += bb; }
+            int shieldKept = myShield - bashUsed;
+            // 盾〈堅守の構え〉: 防御の端子に 2 個以上のターン、 シールド +18 (このターンの被弾から使える)
+            if (steadfastReady && bCount >= ItemSystem.PassiveSkills.Effects.SteadfastStance.NeedBlockDice)
                 blockRaw += ItemSystem.PassiveSkills.Effects.SteadfastStance.Shield;
 
             // 攻撃の端子に 1 つも挿さない手は主攻撃をしない (本体 CombatManager.Turn の skipAttack = attackDiceCount <= 0)。
@@ -924,14 +957,9 @@ namespace AutoTest
             //   v3.oldNoAttackBaseDmg = true で旧い挙動 (素火力を数える) に戻す (測定の口)。
             //   ADR-0016: 素の攻撃力は撃の数だけ乗る (攻撃の端子 1 枚につき 1 撃・端子の外の攻撃は毎回)。
             int dmg = (aCount > 0 || v3.oldNoAttackBaseDmg) ? atkBase * System.Math.Max(1, ws.aHits) + aSum : 0;
-            // 剣〈不滅の刃〉: 両方の端子を挿したターンが続くたび与ダメ +8% (このターンで続けば streak+1)。
-            //   [#122] 本体は与ダメ倍率の池 (加算) へ足すので、 伸びは (池 + 0.08n) / 池 倍。 旧: 池と別に (1 + 0.08n) 倍を掛けていた。
-            //   旧の式は池そのものを掛けない (どの配線でも共通の係数) ので、 比だけを掛ける。 池が読めない (0) ときは 1 = 旧と同じ。
-            if (stepUndying && aCount > 0 && bCount > 0)
-            {
-                float pool = s.outMul > 0f ? s.outMul : 1f;
-                dmg = (int)(dmg * ((pool + TurnRules.UndyingAdd(undyingStreak + 1)) / pool));
-            }
+            //   短剣〈連刃〉: 攻撃の端子 2 枚以上なら追撃 1 撃 (旧の式は防御を引く前の量として足す)
+            if (rung.chainRatePct > 0 && ws.aHits >= ItemSystem.PassiveSkills.Effects.ChainBlade.NeedTerminals)
+                dmg += CombatSystem.CombatRules.ChainHitBase(s.atkPower > 0 ? s.atkPower : atkBase, rung.chainRatePct);
             // 端子の山札の与ダメの効果 (旧の式 = 会心を見ない式なので、 基準を非会心とみなして差分だけ足す)。 旧い配線では全部「なし」で素通し。
             if (aCount > 0 && dmg > 0)
             {
@@ -942,12 +970,12 @@ namespace AutoTest
                 if (ws.damageMul != 1f) dmg = System.Math.Max(1, Mathf.RoundToInt(dmg * ws.damageMul));
             }
             if (aCount > 0) dmg = CombatSystem.EnemyHpLedger.ProbeMain(dmg);   // [測定用の物差し 2026-11-10] 旧の式にも同じ位置で (防御の前)
-            if (aCount > 0) dmg = ApplyFinalPct(dmg, s.finalPct);   // 最終与ダメージ倍率: 本体と同じ位置 (物差しの直後・怠惰の前)
+            if (aCount > 0) dmg = ApplyFinalPct(dmg, s.finalPct + rung.FinalPct(s.solo, aCount, bCount, s.execBoost, s.shattered, s.undyingStreak + 1));   // 最終与ダメージ倍率 (武器の撃ごとの +% 込み): 本体と同じ位置 (物差しの直後・怠惰の前)
             if (aCount > 0) dmg = MetaProgression.MetaDebuffApplicator.ApplyOutgoingCut(dmg);   // [#121] 〈大罪:怠惰〉: 本体と同じ位置 (物差しの直後・防御の前)
             if (aCount > 0) dmg = CombatSystem.BossDown.ApplyTaken(dmg, s.enemyDown && !s.enemyDownWeak);   // ボスのダウン ×1.5: 本体と同じ位置 (怠惰の直後・ひびの弱いダウンは無し)
             // 敵の防御 (このターンの値) で軽減
             if (aCount > 0 && eDefNow > 0)
-                dmg = CombatSystem.DefenseFormula.Apply(dmg, CombatSystem.DefenseFormula.Effective(eDefNow, myPen));
+                dmg = CombatSystem.DefenseFormula.Apply(dmg, CombatSystem.DefenseFormula.Effective(eDefNow, myPen + ws.armorPen));
             int dmgOld = dmg, dmgNew = 0, rawNew = wantNew ? s.atkPower + s.atkFlat + aSumNew : 0;
             // [V3 readOutgoingMult] 攻撃+N・与ダメ倍率・会心の期待値・端子調律・〈電流〉の② を本体の順で読む
             if (wantNew) dmgNew = ReadOutMainDamage(in s, aCount, bCount, aSumNew, in ws);
@@ -1012,14 +1040,14 @@ namespace AutoTest
             }
             if (ws.takenMul < 1f && !tele.enemyAttackIgnoresGuard) taken = Mathf.RoundToInt(taken * ws.takenMul);
             taken += (int)reflectPenalty;
-            // 盾〈黎明〉: 無傷で受け切ったら、 敵の攻撃 10 につき敵の最大 HP の 5% を削る
-            if (stepDaybreak && taken == 0)
+            // 【ジャスト防御】の見込み (本体 ShieldCore.IsJustGuard・許容幅は既定・HP の減り 0)。 盾〈黎明〉〈城壁〉が読む
+            bool jgNow = taken == 0 && CombatSystem.ShieldCore.IsJustGuard(enemyAtk, block + ws.shield + shieldKept, CombatSystem.ShieldCore.JustWidth);
+            // 盾〈黎明〉: 無傷で受け切ったら、 敵の攻撃 10 につき敵の最大 HP の 5% (ジャスト防御なら 8%) を削る
+            if (rung.daybreak && taken == 0)
             {
-                int dbNow = TurnRules.DaybreakDamage(enemyMaxHpNow, enemyAtk);
-                effDmg += dbNow;   // 溜める形 (段 B の試験) のときは 0
+                int dbNow = TurnRules.DaybreakDamage(enemyMaxHpNow, enemyAtk, jgNow);
+                effDmg += dbNow;
                 noAtkDmg += dbNow;
-                // [2026-11-10 試験] 溜める形: 次の主攻撃に乗る +% の価値 = 先のターンの 1 ターンの与ダメの見込み × 溜まる率 (dFull が無い計算では 0)
-                effDmg += TurnRules.DaybreakDeferredValue(s.dFull, enemyAtk);
             }
 
             // 処刑人の烙印: 攻撃終了時に HP が最大の 20% 以下なら 9999。
@@ -1042,7 +1070,7 @@ namespace AutoTest
                     h1 = Mathf.RoundToInt(hit1Raw * tm);
                     hAll = Mathf.RoundToInt((hit1Raw + hit2Raw) * tm);
                 }
-                int pool = (bashSpent ? 0 : myShield) + ws.shield;   // シールドは敵の攻撃で先に減り、 残りが軽減無視を肩代わりする (③-C)
+                int pool = shieldKept + ws.shield;   // シールドは敵の攻撃で先に減り、 残りが軽減無視を肩代わりする (③-C)
                 int hp1 = System.Math.Max(0, h1 - pool);
                 int hpAll = System.Math.Max(0, hAll - pool);
                 int shieldAfter = System.Math.Max(0, pool - hAll);
@@ -1075,11 +1103,11 @@ namespace AutoTest
             //   毒・出血・ターン終了時の削りは、 ここでは見ていない (主攻撃の見積もりと同じく)。
             //   旧い条件 (terminalKillNeedsAttack) = 攻撃したターンだけ。
             if (ws.killBonus != 0f && (aCount > 0 ? effDmg >= enemyHp : !terminalKillNeedsAttack && noAtkDmg >= enemyHp)) u += ws.killBonus;
-            // 盾〈城壁〉: 完全に受け止めたら、 余ったブロック × 率 がシールドへ (次のターン以降の弾・毎ターン半減するので半値で見る)
-            if (bulwarkRate > 0f)
-                u += 0.5f * wDef * TurnRules.BulwarkGain(block, enemyAtk, bulwarkRate);
-            // 〈シールドバッシュ〉で使い切ったシールドは、 このターンの被弾を吸えない
-            if (bashSpent) u -= wDef * System.Math.Min(myShield, System.Math.Max(0, enemyAtk - block));
+            // 盾〈城壁〉: 完全に受け止めたら、 余ったブロック × 率 (ジャスト防御なら固定) がシールドへ (次のターン以降の弾・毎ターン半減するので半値で見る)
+            if (rung.bulwarkRatePct > 0)
+                u += 0.5f * wDef * TurnRules.BulwarkGain(block, enemyAtk, rung.bulwarkRatePct, jgNow, rung.bulwarkJust);
+            // 〈シールドバッシュ〉で使ったシールドは、 このターンの被弾を吸えない
+            if (bashSpent) u -= wDef * System.Math.Min(bashUsed, System.Math.Max(0, enemyAtk - block));
             if (effDmg >= enemyHp && !s.ledger) u += 50f + enemyAtk; // 今ターン撃破 = 敵攻撃が消える (帳簿では先の被ダメ 0 として既に入っている)
             if (taken >= myHpEff) u -= 10000f;           // 致死回避を最優先 (山札の回復・払った HP の後の HP で見る)
             // ボスのダウン (2026-11-13): この手で目盛りを割って次のターンをダウンにするなら、 次のターンの敵の攻撃の一部を今の HP で足す。
@@ -1145,7 +1173,7 @@ namespace AutoTest
                 {
                     float tmB = ws.takenMul < 1f ? ws.takenMul : 1f;
                     int hitsB = Mathf.RoundToInt((hit1Raw + hit2Raw) * tmB);
-                    shieldAbs = System.Math.Min((bashSpent ? 0 : myShield) + ws.shield, hitsB);
+                    shieldAbs = System.Math.Min(shieldKept + ws.shield, hitsB);
                 }
                 blazeGain = CombatSystem.HeavyCycle.BlazeGain(GameLoop.GameHooks.BlazeStack, shieldAbs, s.blazePerShield,
                                                               bCount, ItemSystem.PassiveSkills.Effects.BlazeBrand.BlockDiceThreshold);
@@ -1177,7 +1205,7 @@ namespace AutoTest
                 bool onlySurvivesByNotAttacking = (takenIfAttackOne >= myHpEff) && (taken < myHpEff);
                 if (!onlySurvivesByNotAttacking) u -= 10000f;
             }
-            outcome = new OptimalTurnOutcome { effDmg = effDmg, mainDmg = mainEff, taken = taken, block = block, aCount = aCount, bCount = bCount, bashSpent = bashSpent,
+            outcome = new OptimalTurnOutcome { effDmg = effDmg, mainDmg = mainEff, taken = taken, block = block, aCount = aCount, bCount = bCount, bashUsed = bashUsed, justGuard = jgNow,
                                                freeBlock = fbCovers, killsNow = fbKills, dmgOld = dmgOld, dmgNew = dmgNew, rawNew = rawNew,
                                                dmgUsed = aCount > 0 ? dmgUsed : 0, enemyHeal = enemyHeal, balancePlus = balancePlus, blazeGain = blazeGain };
             return u;
@@ -1386,13 +1414,13 @@ namespace AutoTest
                 if (nd) { ns.enemyAtk = 0; ns.tele.enemyAttackValue = 0; ns.atkGrowth = null; }
             }
             // シールド: 今ターンの被弾で吸われ、 〈城壁〉で増え、 次のターン頭に半分 (切り捨て・DAMAGE_CALC_REFERENCE ③-D)
-            int shield = o.bashSpent ? 0 : System.Math.Max(0, shieldPool - o.taken);
-            if (st.bulwarkRate > 0f) shield += TurnRules.BulwarkGain(o.block, st.enemyAtk, st.bulwarkRate);
+            int shield = System.Math.Max(0, shieldPool - o.bashUsed - o.taken);
+            if (st.rung.bulwarkRatePct > 0) shield += TurnRules.BulwarkGain(o.block, st.enemyAtk, st.rung.bulwarkRatePct, o.justGuard, st.rung.bulwarkJust);
             ns.myShield = shield / 2;
             // 剣〈不滅の刃〉: 攻撃とブロックの両方に挿したターンが続く
-            ns.undyingStreak = (st.stepUndying && o.aCount > 0 && o.bCount > 0) ? st.undyingStreak + 1 : 0;
-            // 盾〈堅守の構え〉: 全部ブロックで使うと次の 2 ターンは使えない
-            int readyTurn = (plan.steadfastOn && st.steadfastReady && o.bCount == k)
+            ns.undyingStreak = (st.rung.undying && o.aCount > 0 && o.bCount > 0) ? st.undyingStreak + 1 : 0;
+            // 盾〈堅守の構え〉: 防御の端子に 2 個以上で使うと次の 2 ターンは使えない
+            int readyTurn = (plan.steadfastOn && st.steadfastReady && o.bCount >= ItemSystem.PassiveSkills.Effects.SteadfastStance.NeedBlockDice)
                 ? plan.turn + ItemSystem.PassiveSkills.Effects.SteadfastStance.Cooldown : plan.steadfastReadyTurn;
             ns.steadfastReady = plan.steadfastOn && plan.turn + 1 >= readyTurn;
             // 敵の防御: 持続分はダメージを入れたターンの終わりに割れる/積み上がる・構えの増減は次のターン番号で決まる
@@ -1548,14 +1576,9 @@ namespace AutoTest
             int myPen = System.Math.Max(0, ctxRoles?.playerArmorPen ?? 0);
             var activeIds = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.ActivePlayerSkillIds;
             var rung = WeaponRungModel.From(activeIds);      // 段の検出と率は WeaponRungModel (Super と共通・2026-11-05)
-            bool stepGuardCut = rung.guardCut;
-            bool stepUndying = rung.undying;
             int undyingStreak = (int)(ctxRoles?.GetAccumulated(ItemSystem.PassiveSkills.Effects.UndyingBlade.StreakKey) ?? 0f);
-            float bashRate = rung.bashRate;
-            float bulwarkRate = rung.bulwarkRate;
             bool steadfastReady = rung.steadfast && ctxRoles != null
                 && ctxRoles.currentTurn >= (int)ctxRoles.GetAccumulated(ItemSystem.PassiveSkills.Effects.SteadfastStance.ReadyKey);
-            bool stepDaybreak = rung.daybreak;
             int myShield = System.Math.Max(0, ctxRoles?.consShield ?? 0);
             int enemyMaxHpNow = System.Math.Max(1, cm?.CurrentEnemy?.maxHP ?? 1);
 
@@ -1570,9 +1593,13 @@ namespace AutoTest
             {
                 tele = tele, enemyHp = enemyHp, myHp = myHp, myMaxHp = myMaxHp, atkBase = atkBase, enemyAtk = enemyAtk,
                 wAtk = wAtk, wDef = wDef, wChg = wChg, critMul = critMul,
-                eDefNow = eDefNow, myPen = myPen, stepGuardCut = stepGuardCut, stepUndying = stepUndying,
-                undyingStreak = undyingStreak, bashRate = bashRate, bulwarkRate = bulwarkRate,
-                steadfastReady = steadfastReady, stepDaybreak = stepDaybreak, myShield = myShield,
+                eDefNow = eDefNow, myPen = myPen, rung = rung,
+                undyingStreak = undyingStreak,
+                steadfastReady = steadfastReady, myShield = myShield,
+                solo = ctxRoles != null && !ctxRoles.isPairEncounter,
+                execBoost = CombatSystem.CombatRules.ExecutionBoostOn(enemyHp, enemyMaxHpNow),
+                shattered = ItemSystem.PassiveSkills.Effects.ArmorBreak.Shattered(ctxRoles),
+                dieMaxFace = ctxRoles != null ? ItemSystem.PassiveSkills.Effects.GaryoTensei.MaxFace(ctxRoles) : 0,
                 enemyMaxHpNow = enemyMaxHpNow,
                 play = play, atkGrowth = atkGrowth,
                 diceAtkPct = ctxRoles?.attackDicePct ?? 0f,
@@ -1660,8 +1687,6 @@ namespace AutoTest
                 st.readOut = readOutNow; st.traceBoth = predTrace;
                 FillReadOut(ref st, cm, ctxRoles, runNow, tele.playerAttackPenalty);
             }
-            // [#122] 旧の式でも〈不滅の刃〉の伸びを池との比で見るので、 池だけは読む (st.outMul を読むのは新しい式と〈不滅の刃〉だけ)
-            else if (st.stepUndying && ctxRoles != null) st.outMul = OutgoingPoolNow(ctxRoles, runNow);
             // [V3 mainCorr] 主攻撃の見積もりに実績の比を掛ける。 下の dFull (HP の帳簿の撃破までの見込み) の計算より前に入れる
             if (v3.mainCorr && EffectiveWiringSkill != WiringSkill.Naive) st.mainCorr = _mcRatioNow;
             // [V3 hpLedger] 先のターンの 1 ターンの与ダメの見込み: 今の手を全部攻撃に挿した時の値を、 面の平均で均す
@@ -1797,47 +1822,46 @@ namespace AutoTest
             return RerollPickForDie(dice, all);
         }
 
-        /// <summary>全部振り直した後に立つ役が、 役の品 (端子の解決の外の分も含む) で生む得の期待値 (攻撃相当の量・出目の和と同じ単位)。 持っていなければ 0。
-        /// 面の出方を全部数える (<see cref="ExpectedBestUtilityAfterReroll"/> と同じ)。 役は本体と同じ関数 (<see cref="CombatSystem.TerminalCards.RoleOf"/>・封じ・格上げ込み)。
-        /// 量: 〈見切りの木札〉攻撃 +4・ブロック +4 / 〈符丁の刻み板〉賽目 × 2 (ゾロ目・連なりは 2 倍) / 〈欠け目の見立て〉1〜3 の目の役で防御を賽目 × 2 無視 (敵の防御まで) /
-        /// 〈血濡れの符丁〉(賽目 5 以上) 3・4 の役で 出血 × 2 / 〈雷鳴のゾロ目〉(電流 5 以上) ゾロ目で (充電 + 賽目 × 2) × 2。 どれも 1 撃ぶん (撃の数は見ない)。
-        /// shortcut: 瑠璃砥石 (会心率)・揃いの拍子木 (次のターン)・雷鳴の充電の分・役そのものの効果は数えない。</summary>
+        /// <summary>全部振り直した後に立つ役が、 役の軸の品で生む得の期待値 (攻撃相当の量・出目の和と同じ単位)。 持っていなければ 0。
+        /// 面の出方を全部数える (<see cref="ExpectedBestUtilityAfterReroll"/> と同じ)。 役は本体と同じ関数 (<see cref="CombatSystem.TerminalCards.RoleOf"/>・封じ・格上げ込み)、
+        /// 量は TerminalCards の定数 (Resolve の 6d と同じ値)。 役の回数・続いたターンは本体の TerminalBattleState.roleCount / roleStreak。
+        /// 撃 1 つぶん (撃の数は見ない)。 与ダメージの % は振った目の和に掛けた量。 振り直した後の手なので〈血染めの歯車〉は必ず乗る。
+        /// shortcut: 次のターンへ持ち越す分 (雷毒の導管・揃いの拍子木の手札・負け越しの賽) と役そのものの効果は数えない。</summary>
         private static float RoleRerollPips(ItemSystem.PassiveSkills.CombatContext ctx, int[] faces, int k, CombatSystem.MutualTurnTelegraph tele)
         {
-            var run = GameLoop.GameManager.Instance?.Run;
             var cm = CombatManager.Instance;
-            if (run == null || cm == null || k <= 0) return 0f;
-            int ax = ctx.AxisDepth(ItemSystem.PassiveSkills.AxisRules.Role);
-            bool wood = run.OwnsPassive(ItemIds.RoleWoodTag), notch = run.OwnsPassive(ItemIds.RoleNotchBoard) && ax > 0, chip = run.OwnsPassive(ItemIds.RoleChipped) && ax > 0;
-            bool code = run.OwnsPassive(ItemIds.CrossBloodCode) && ItemSystem.PassiveSkills.Effects.Cross.On(ctx, ItemSystem.PassiveSkills.AxisRules.Role) && ctx.enemyBleedStacks > 0;
-            bool thunder = run.OwnsPassive(ItemIds.CrossThunderDice) && ItemSystem.PassiveSkills.Effects.Cross.On(ctx, ItemSystem.PassiveSkills.AxisRules.Charge);
-            if (!wood && !notch && !chip && !code && !thunder) return 0f;
+            var st = cm?.TerminalDeck?.state;
+            if (st == null || k <= 0 || st.roleItems == CombatSystem.RoleItems.None) return 0f;
+            var f = st.roleItems;
             var env = cm.TerminalEnvNow(ctx, tele.enemyAttackValue);
             var fv = (faces != null && faces.Length > 0) ? faces : new[] { 1, 2, 3, 4, 5, 6 };
-            int fc = fv.Length;
+            int fc = fv.Length, count = st.roleCount + 1;
             long total = 1; for (int i = 0; i < k; i++) total *= fc;
             var buf = new int[k];
             double acc = 0;
             for (long code0 = 0; code0 < total; code0++)
             {
                 long t = code0;
-                for (int j = 0; j < k; j++) { buf[j] = fv[(int)(t % fc)]; t /= fc; }
+                int sum = 0;
+                for (int j = 0; j < k; j++) { buf[j] = fv[(int)(t % fc)]; t /= fc; sum += buf[j]; }
                 var rk = CombatSystem.TerminalCards.RoleOf(buf, in env);
                 if (rk == null) continue;
                 var r = rk.Value;
-                bool big = CombatSystem.YachtRoles.IsBig(r), triple = r != CombatSystem.RoleKind.Straight && CombatSystem.YachtRoles.IsTriple(r);
+                bool big = CombatSystem.YachtRoles.IsBig(r);
                 int face = r == CombatSystem.RoleKind.Straight ? 0 : CombatSystem.YachtRoles.FaceOf(r);
-                float v = 0f;
-                if (wood) v += 2 * CombatSystem.TerminalCards.WoodTagBonus;
-                if (notch) v += ax * CombatSystem.TerminalCards.NotchBoardPer * (big ? 2 : 1);
-                if (chip)
-                {
-                    bool low = face > 0 ? face <= 3 : System.Array.Exists(buf, d => d >= 1 && d <= 3);
-                    if (low) v += System.Math.Min(ax * ItemSystem.PassiveSkills.Effects.ChippedEyeReading.PerDepth, System.Math.Max(0, ctx.enemyDefense));
-                }
-                if (code && (face == 3 || face == 4)) v += ctx.enemyBleedStacks * 2;
-                if (thunder && triple) v += (ctx.GetCharge() + ax * 2) * 2;
-                acc += v;
+                float v = 0f, mul = 1f;
+                if ((f & CombatSystem.RoleItems.WoodTag) != 0) v += CombatSystem.TerminalCards.WoodTagAttack + CombatSystem.TerminalCards.WoodTagBlock;
+                if ((f & CombatSystem.RoleItems.Gear) != 0) v += CombatSystem.TerminalCards.GearAttack;
+                if ((f & CombatSystem.RoleItems.NotchBoard) != 0)
+                    v += System.Math.Min(CombatSystem.TerminalCards.NotchBoardMax, CombatSystem.TerminalCards.NotchBoardPer * count) * (big ? 2 : 1);
+                if ((f & CombatSystem.RoleItems.Chipped) != 0 && CombatSystem.TerminalCards.HasLowFace(r, buf))
+                    v += System.Math.Min(CombatSystem.TerminalCards.ChippedPen, System.Math.Max(0, ctx.enemyDefense));
+                if ((f & CombatSystem.RoleItems.Clapper) != 0 && st.roleStreak >= 1) mul += CombatSystem.TerminalCards.ClapperPct;
+                if ((f & CombatSystem.RoleItems.Thunder) != 0 && big) { mul *= 1f + CombatSystem.TerminalCards.ThunderFinalPct; v += CombatSystem.TerminalCards.ThunderBlock; }
+                if ((f & CombatSystem.RoleItems.Bloodmark) != 0)
+                    mul *= 1f + System.Math.Min(CombatSystem.TerminalCards.BloodmarkMax, CombatSystem.TerminalCards.BloodmarkPer * count)
+                         + (face == 3 || face == 4 ? CombatSystem.TerminalCards.BloodmarkBonus : 0f);
+                acc += v + (mul - 1f) * sum;
             }
             return (float)(acc / total);
         }

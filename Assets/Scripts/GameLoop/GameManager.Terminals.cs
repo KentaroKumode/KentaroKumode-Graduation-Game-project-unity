@@ -134,6 +134,7 @@ namespace GameLoop
             => RollTerminals(run, n, d => d.rare == boss, 1f, "terminal.reward");
 
         /// <summary>重み付きで重ならないように n 枚引く (基本と強化した端子は出さない ── 強化は休憩でだけ得る・2026-11-20)。 軸の端子は偏重で寄せる。
+        /// 出現の枠が 4 つ埋まった後は、 枠に無い軸の端子は出さない (<see cref="ItemSystem.AxisPool.AxisOpen"/>)。
         /// rareWeight = レアの重みに掛ける (報酬は rare で絞るので 1)。 focusAxis = 店の軸指定リロール (その軸の端子の重み ×<see cref="ItemSystem.Shop.ShopManager.AxisRerollWeightMul"/>・null = なし)。</summary>
         private static List<string> RollTerminals(RunState run, int n, System.Func<TerminalDef, bool> filter, float rareWeight, string rngKey, string focusAxis = null)
         {
@@ -141,6 +142,7 @@ namespace GameLoop
             foreach (var d in TerminalCards.All)
             {
                 if (d.basic || d.upgraded || !filter(d)) continue;
+                if (!ItemSystem.AxisPool.AxisOpen(run, d.axis)) continue;   // 出現の枠 (4 枠ロック後はロックした軸の端子だけ)
                 float wt = 1f;
                 if (d.axis != null)
                 {
@@ -269,7 +271,7 @@ namespace GameLoop
             return true;
         }
 
-        /// <summary>〈研ぎ代の領収書〉: 店・休憩で抜くたび、 ランの間ずっと攻撃 +2 (持っている間に抜いた回数・効果は MacroItemEffects)。</summary>
+        /// <summary>〈研ぎ代の領収書〉: 店・休憩で抜くたび、 ランの間ずっと攻撃 +2 (持っている間に抜いた回数・効果は GoldEffects.cs の MacroReceipt)。</summary>
         private void NoteReceiptRemoval()
         {
             if (!Run.OwnsPassive(ItemIds.MacroReceipt)) return;
