@@ -263,7 +263,7 @@
       "displayName": "鉄砕きの剛鬼",
       "description": "五層の岩棚をうろつく巨大な鬼人。大岩を素手で砕きながら歩き、その縄張りには真っ二つに折れた盾がいくつも転がっている。",
       "floor": 5,
-      "maxHP": 682,
+      "maxHP": 737,
       "criticalNumerator": 0,
       "threat": 6,
       "passiveSkills": [
@@ -286,7 +286,7 @@
       "description": "折れた大剣やつるはしを針金で束ねて担ぐ大柄な個体。歩くたびに鉄の塊が擦れ合い、通路の奥から鈍い音が響いてくる。",
       "floor": 5,
       "elite": true,
-      "maxHP": 878,
+      "maxHP": 948,
       "criticalNumerator": 0,
       "threat": 9,
       "passiveSkills": [
@@ -308,7 +308,7 @@
       "displayName": "風乗りの鳥人",
       "description": "深層から吹き上げる気流に乗り、縦穴を滑空する鳥人。羽ばたきひとつせず風を捉え、切り立った崖の裂け目に巣を作る。",
       "floor": 5,
-      "maxHP": 436,
+      "maxHP": 471,
       "criticalNumerator": 0,
       "threat": 4,
       "passiveSkills": [
@@ -331,7 +331,7 @@
       "description": "墜落した探検家の声色を真似て崖下から助けを呼ぶ個体。足を止めて下をのぞき込んだ者の背へ、音もなく垂直に降りてくる。",
       "floor": 5,
       "elite": true,
-      "maxHP": 540,
+      "maxHP": 583,
       "criticalNumerator": 0,
       "threat": 7,
       "passiveSkills": [
@@ -627,7 +627,7 @@
       "displayName": "薄明の騎士",
       "description": "旧ストレリツ守備騎士団の装束を、穴の底で今も曇りなく磨き上げている不死者。滅びた詰所の前に立ち、通りかかる者を無言で見据えている。",
       "floor": 5,
-      "maxHP": 312,
+      "maxHP": 337,
       "criticalNumerator": 0,
       "threat": 6,
       "passiveSkills": [
@@ -669,7 +669,7 @@
       "description": "騎士団の礼通りに一礼して剣を抜く、黒ずんだ鉄甲の騎士。生前の美しい型はそのままに、刃先から暗い影が煙のように糸を引いている。",
       "floor": 5,
       "elite": true,
-      "maxHP": 396,
+      "maxHP": 428,
       "criticalNumerator": 0,
       "threat": 9,
       "passiveSkills": [
@@ -839,7 +839,7 @@
       "displayName": "吸血の貴人",
       "description": "陽の届かない五層で、古風な礼服のまま生き長らえる夜の貴人。青白い顔に穏やかな笑みを浮かべ、血の乾いた細剣を杖代わりに突いている。",
       "floor": 5,
-      "maxHP": 858,
+      "maxHP": 927,
       "criticalNumerator": 0,
       "threat": 6,
       "passiveSkills": [
@@ -874,7 +874,7 @@
       "description": "「あいつは獣のように襲ってはこない。晩餐の席へ招くように一礼し、気づいた時にはもう喉元が冷たくなっている」——五層生還者の手記。",
       "floor": 5,
       "elite": true,
-      "maxHP": 793,
+      "maxHP": 856,
       "criticalNumerator": 0,
       "threat": 9,
       "passiveSkills": [
@@ -1194,7 +1194,7 @@
       "displayName": "大盾の番兵",
       "description": "とうに隊列が失われた五層の通路で、ひとり号令を唱え続ける番兵。身の丈ほどもある鉄の大盾を石床に据え、一歩も退かずに道を塞いでいる。",
       "floor": 5,
-      "maxHP": 767,
+      "maxHP": 828,
       "criticalNumerator": 0,
       "threat": 7,
       "baseAttack": 10,
@@ -1212,7 +1212,7 @@
       "displayName": "古参の盾番兵",
       "description": "交代の来ない通路に立ち続け、盾の裏に仲間の認識票を幾つも下げた古参兵。一歩踏み出すたびに、乾いた金属の札が触れ合って小さく鳴る。",
       "floor": 5,
-      "maxHP": 884,
+      "maxHP": 955,
       "criticalNumerator": 0,
       "threat": 10,
       "baseAttack": 11,
