@@ -367,6 +367,8 @@ namespace AutoTest
         /// <summary>[2026-11-23] 寄せる軸の中の分岐 ("" / "A" / "B")。 <see cref="buyAxisFocus"/> と一緒に使う: その軸の品のうち指定した分岐の品の加点を 2 倍にし、
         /// もう一方の分岐の品の加点を 0 にする (禁止はしない・共通の品は今と同じ)。 分岐は items.json の branch (BotHooks.BranchAdj)。</summary>
         public string buyBranchFocus = "";
+        /// <summary>[2026-11-23] BOT が選ばない品 (品名のカンマ区切り・空 = 無効)。 依存の測定 (その品を取れない腕を同じシードで比べる) の口。 BotHooks.BanIds へ入れる。</summary>
+        public string botBanItemIds = "";
 
         /// <summary>品 <paramref name="itemId"/> が <see cref="buyAxisFocus"/> の軸か (items.json の axis を読む・id の綴りは読まない)。</summary>
         private bool IsAxisFocusItem(string itemId)
@@ -2041,6 +2043,14 @@ namespace AutoTest
             BotHooks.AxisFocus = buyAxisFocus ?? "";
             BotHooks.AxisFocusBonus = buyAxisFocusBonus;
             BotHooks.BranchFocus = buyBranchFocus ?? "";
+            BotHooks.BanIds.Clear();
+            foreach (var t in (botBanItemIds ?? "").Split(',', '、'))
+            {
+                string bid = t.Trim();
+                if (bid.Length == 0) continue;
+                if (ItemSystem.ItemDatabase.Instance?.GetItem(bid) == null) Debug.LogError($"[AutoRunner] botBanItemIds: 品が無い「{bid}」");
+                BotHooks.BanIds.Add(bid);
+            }
             LearnedPriorityProvider.BuyTierCount = isSuperSkill ? superBuyTiers : optimalBuyTiers;
             wiringMistakeRate = isSuperSkill ? 0f : optimalMistakeRate;
             LearnedPriorityProvider.GateRaw = v3.tierGateRaw;

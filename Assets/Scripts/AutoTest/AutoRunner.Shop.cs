@@ -593,6 +593,7 @@ namespace AutoTest
                         || s.price > GameLoop.ProvisionPayment.PolicyAffordable(run) - _shopReserve)
                         return false;
                     if (s.kind == ItemSystem.Shop.ShopSlotKind.Passive && BotHooks.BlocksFocusSlot(run, s.itemId)) return false;   // 寄せる軸の最後の枠を残す
+                    if (BotHooks.IsBanned(s.itemId)) return false;   // 依存の測定 (botBanItemIds)
                     int before = run.coins;
                     string id = s.itemId;
                     gm.ShopBuy(i);
@@ -914,6 +915,7 @@ namespace AutoTest
                     if (s == null || s.sold) return false;
                     // 兵站 r10 (物資払い) を織り込んだ支払い可能額。 規則より保守的な PolicyFloor。
                     if (s.price > GameLoop.ProvisionPayment.PolicyAffordable(run) - _shopReserve) return false;
+                    if (BotHooks.IsBanned(s.itemId)) return false;   // 依存の測定 (botBanItemIds)
                     // **武器は装備判定を通す** (2026-08-10)。 主経路にゲートが無く素通りしていた。
                     if (s.kind == ShopSlotKind.Weapon && !WouldBuyWeapon(run, s.itemId)) return false;
                     // 賽は買うと今の賽と入れ替わる (ADR-0015)。 今の賽より良い時だけ買う (武器の装備判定と同じ関所)。

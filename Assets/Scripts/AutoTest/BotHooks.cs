@@ -29,6 +29,10 @@ namespace AutoTest
         /// <summary>[2026-11-23] 寄せる軸の中の分岐 (AutoRunner.buyBranchFocus・"A" / "B"・空 = 無効)。</summary>
         public static string BranchFocus = "";
 
+        /// <summary>[2026-11-23] BOT が選ばない品 (AutoRunner.botBanItemIds・依存の測定)。 空 = 無効。 店・提示の択・戦闘報酬・開幕の品で選ばない (配られる品は止めない)。</summary>
+        public static readonly HashSet<string> BanIds = new HashSet<string>();
+        public static bool IsBanned(string id) => BanIds.Count > 0 && id != null && BanIds.Contains(id);
+
         /// <summary>寄せる軸の品の分岐の加減 (加点の倍数): 指定した分岐の品 +1 (= 加点 2 倍)・もう一方の分岐の品 −1 (= 加点 0・禁止はしない)・共通の品と分岐の指定なしは 0。
         /// 分岐は items.json の branch (id の綴りは読まない)。</summary>
         public static int BranchAdj(string id)
@@ -129,6 +133,7 @@ namespace AutoTest
         /// 乱数は引かない。</summary>
         public static bool WantsPassive(RunState run, string id)
         {
+            if (IsBanned(id)) return false;
             if (BlocksFocusSlot(run, id)) return false;
             var d = ItemSystem.ItemDatabase.Instance?.GetItem(id);
             if (d == null || !d.IsPassive || !ItemSystem.AxisPool.IsRanked(d.axis) || InFocus(d.axis)) return true;
@@ -178,11 +183,12 @@ namespace AutoTest
             int best = 0; float bestScore = float.NegativeInfinity;
             for (int i = 0; i < offers.Count; i++)
             {
+                if (IsBanned(offers[i])) continue;
                 float sc = LearnedPriorityProvider.BuyScore(offers[i]);
                 if (IsFocusItem(offers[i])) sc += AxisFocusBonus * (1 + BranchAdj(offers[i])) * LearnedPriorityProvider.StepPerTier;   // [2026-11-10] 軸に寄せる方策
                 if (sc > bestScore) { bestScore = sc; best = i; }
             }
-            return best;
+            return best < offers.Count && IsBanned(offers[best]) ? -1 : best;   // 禁止の品しか無い = 見送り
         }
 
         /// <summary>家系パッシブの価値。 素のステータスには現れないので学習値から引く。
