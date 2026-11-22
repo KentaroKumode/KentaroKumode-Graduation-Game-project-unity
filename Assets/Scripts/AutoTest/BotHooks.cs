@@ -129,7 +129,7 @@ namespace AutoTest
             }
             if (held < 2) return true;
             int mine = ItemSystem.PassiveSkills.AxisRules.Count(run, d.axis);
-            // 〈銭皿〉(見送り換金 +50%): 一番の軸でない BRONZE は見送る (23G の方が重い)
+            // 〈銭皿〉(見送り換金 +100%): 一番の軸でない BRONZE は見送る (23G の方が重い)
             if (d.rarity == ItemSystem.ItemRarity.BRONZE && mine < first && run.OwnsPassive(ItemIds.GoldCoinDish)) return false;
             return mine >= second;
         }

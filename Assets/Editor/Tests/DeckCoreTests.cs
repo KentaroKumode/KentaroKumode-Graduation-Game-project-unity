@@ -23,7 +23,7 @@ namespace AutoTest.EditorTests
             var b = Run(DeckItems.None, 1);
             var o = Run(DeckItems.Tongs | DeckItems.Pride | DeckItems.Crucible | DeckItems.Ash, 1);
             Assert.That(o.disposedNow, Is.EqualTo(1));
-            // 撃ごとに 挟み 2 + 矜持 4 + るつぼ min(32, 4 × 累計 2) = 14・攻撃の撃は 2 つ
+            // 撃ごとに 挟み + 矜持 + るつぼ (CruciblePer × 累計 2・上限なし)・攻撃の撃は 2 つ
             int each = TerminalCards.TongsAttack + TerminalCards.PrideAttack + TerminalCards.CruciblePer * 2;
             Assert.That(o.attackAdd - b.attackAdd, Is.EqualTo(each * 2));
             Assert.That(o.blockAdd - b.blockAdd, Is.EqualTo(TerminalCards.PrideBlock));
@@ -41,7 +41,7 @@ namespace AutoTest.EditorTests
             int more = 0;
             for (int i = 0; i < 3; i++) more += TerminalDeckState.BeforeShuffle(discard, new List<string>(), 10, st, null, null, null);
             Assert.That(more, Is.EqualTo(TerminalCards.EngineDrawMax));      // 1 ターンに 2 枚まで
-           Assert.That(st.doubleAll, Is.True);                              // 切り直し EngineEvery (3) 回目で倍化
+           Assert.That(st.doubleAll, Is.True);                              // 切り直し EngineEvery (2) 回目で倍化
            // 〈解体屋の袋〉: BagEvery (4) 回ごとに 1 枚・1 戦闘 5 回まで
             var bag = new TerminalBattleState { deckItems = DeckItems.Bag, disposedTotal = TerminalCards.BagEvery };
             var o = new TerminalOutcome { disposedNow = TerminalCards.BagEvery };

@@ -30,13 +30,13 @@ namespace AutoTest.EditorTests
         [Test]
         public void Burst_SuperKilnLedger()
         {
-            // 超臨界 (閾値の 1.5 倍以上) ×1.5・〈暴れ窯の火床〉×2.0 と閾値 −4
+            // 超臨界 (閾値の 1.5 倍以上) ×1.5・〈暴れ窯の火床〉×KilnSuperMulPct (2.5・final4) と閾値 −4
             var s = S(HeatItems.None, HeatCore.Threshold * 3 / 2);
             HeatCore.TryBurst(ref s, out var b);
             Assert.That(b.super && b.damage == 45, Is.True);   // 基礎 30 × 1.5
             var k = S(HeatItems.Kiln, HeatCore.Threshold * 3 / 2);
             HeatCore.TryBurst(ref k, out var bk);
-            Assert.That(bk.damage, Is.EqualTo(60));
+            Assert.That(bk.damage, Is.EqualTo(HeatCore.BurstBase * HeatCore.KilnSuperMulPct / 100));
             Assert.That(k.threshold, Is.EqualTo(HeatCore.Threshold - 4));
             // 〈帳簿外の爆薬〉: 閾値ぶんだけ減らして続けて・1 ターン 5 回まで
             var l = S(HeatItems.Ledger, 300);
@@ -54,21 +54,21 @@ namespace AutoTest.EditorTests
             var st = new TerminalBattleState { heatItems = HeatItems.Stone | HeatItems.Spanner | HeatItems.Breastplate | HeatItems.Flint };
             var env = new TerminalEnv { chargeCap = 30, hp = 50, maxHp = 50, enemyAttack = 10, enemyHp = 100, enemyMaxHp = 100 };
             var o = TerminalCards.Resolve(board, new[] { 0, 1, 2 }, new[] { 5, 4, 3 }, env, st);
-           // 過熱石 +6 (攻撃に 2 個)・燻り +4 (防御 1 枚)・スパナ +2 × 2 撃。 燧石の倍は 3 撃から (2026-11-22 neon 収束) なので 2 撃では立たない
+           // 過熱石 (攻撃に 2 個)・燻り (防御 1 枚)・スパナ × 2 撃。 燧石の倍は 3 撃から (2026-11-22 neon 収束) なので 2 撃では立たない
             Assert.That(o.heatGains, Is.EquivalentTo(new[] { HeatCore.StoneTwo, HeatCore.BreastHeat, HeatCore.SpannerPerHit, HeatCore.SpannerPerHit }));
             Assert.That(o.heatDouble, Is.False);
             Assert.That(o.attackPips, Is.EqualTo(9));                  // 攻撃に挿した 5 + 4
             Assert.That(HeatCore.EndGain(o), Is.EqualTo(4));           // ターンの終わりは 9 の半分 (切り捨て)
-            // 攻撃 3 枚 (5・4・3): 過熱石 +12 (3 個とも攻撃)・スパナ +2 × 3 撃・燧石の倍
+            // 攻撃 3 枚 (5・4・3): 過熱石 (3 個とも攻撃)・スパナ × 3 撃・燧石の倍
             var board3 = new List<string> { TerminalIds.Attack, TerminalIds.Attack, TerminalIds.Attack };
             var o3 = TerminalCards.Resolve(board3, new[] { 0, 1, 2 }, new[] { 5, 4, 3 }, env, st);
             Assert.That(o3.heatGains, Is.EquivalentTo(new[] { HeatCore.StoneAll, HeatCore.SpannerPerHit, HeatCore.SpannerPerHit, HeatCore.SpannerPerHit }));
             Assert.That(o3.heatDouble, Is.True);
-            var f = HeatCore.Forecast(new HeatCore.State { items = st.heatItems, threshold = 25 }, o3);
-            // 12 × 2 = 24 → +4 で 28 (閾値 25 を越えた時に 0 へ・1 回) → +4 +4 = 8 → ターンの終わり 12 / 2 = 6 × 2 = 12 → 20
+            var f = HeatCore.Forecast(new HeatCore.State { items = st.heatItems, threshold = 40 }, o3);
+            // 過熱石 16 × 2 = 32 → スパナ 4 × 2 で 40 (閾値 40 に届いて 0 へ・1 回) → +8 +8 = 16 → ターンの終わり 12 / 2 = 6 × 2 = 12 → 28 (final4 の値)
             Assert.That(f.burstsWired, Is.EqualTo(1));
             Assert.That(f.burstsEnd, Is.EqualTo(0));
-            Assert.That(f.meterAfter, Is.EqualTo(20));
+            Assert.That(f.meterAfter, Is.EqualTo(28));
         }
     }
 }

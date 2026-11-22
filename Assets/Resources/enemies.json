@@ -353,7 +353,7 @@
       "displayName": "硬皮の蛇兵",
       "description": "地下の古い水路を縄張りにする、分厚いうろこ肌の兵士。ぬかるみに太い尾を引きずりながら、さびた曲刀を手に巡回している。",
       "floor": 3,
-      "maxHP": 214,
+      "maxHP": 193,
       "criticalNumerator": 0,
       "threat": 6,
       "passiveSkills": [
@@ -370,7 +370,7 @@
           "flavorText": "傷は背中にあった。逃げたわけではない。"
         }
       ],
-      "baseAttack": 10,
+      "baseAttack": 9,
       "attackRollMin": 1,
       "attackRollMax": 3,
       "danger": 20,
@@ -382,7 +382,7 @@
       "description": "脱皮せずに固まった古皮の上から、旧帝国の青銅板を金具で留めた個体。動くたびにさびた装甲と分厚いうろこが擦れて鈍くきしむ。",
       "floor": 3,
       "elite": true,
-      "maxHP": 266,
+      "maxHP": 239,
       "criticalNumerator": 0,
       "threat": 9,
       "passiveSkills": [
@@ -404,7 +404,7 @@
           "description": "防御さらに+4（硬鱗と合わせて8）。受けたダメージが与えたダメージより多かったターン、相手に1の軽減不可ダメージ"
         }
       ],
-      "baseAttack": 9,
+      "baseAttack": 8,
       "attackRollMin": 1,
       "attackRollMax": 5,
       "danger": 28,
@@ -415,7 +415,7 @@
       "displayName": "双角の暴牛",
       "description": "かつて荷運びの牛が三層のゆがみにのまれ、二本足で立ち上がった末裔。通路の岩壁には、やつが角を研いだ深い溝が幾筋も刻まれている。",
       "floor": 3,
-      "maxHP": 195,
+      "maxHP": 176,
       "criticalNumerator": 0,
       "threat": 7,
       "passiveSkills": [
@@ -432,7 +432,7 @@
           "flavorText": "「当たっただけじゃ終わらんのか」「終わってたら苦労してない」"
         }
       ],
-      "baseAttack": 7,
+      "baseAttack": 6,
       "attackRollMin": 1,
       "attackRollMax": 6,
       "defense": 6,
@@ -445,7 +445,7 @@
       "description": "ちぎれた鼻環の鎖を垂らし、白い泡を吹いて通路を駆け回る狂乱個体。折れた片角の断面には、乾いた血と岩くずがこびりついている。",
       "floor": 3,
       "elite": true,
-      "maxHP": 273,
+      "maxHP": 246,
       "criticalNumerator": 0,
       "threat": 10,
       "passiveSkills": [
@@ -467,7 +467,7 @@
           "description": "毎ターン、攻撃+1"
         }
       ],
-      "baseAttack": 7,
+      "baseAttack": 6,
       "attackRollMin": 1,
       "attackRollMax": 6,
       "defense": 6,
@@ -715,7 +715,7 @@
       "displayName": "癒着の多頭獣",
       "description": "三層のゆがみで複数の獣が溶け合い、一つの胴に押し込まれた異形。癒着した皮膚が絶えずひきつれ、別々の首が勝手な方角へほえている。",
       "floor": 3,
-      "maxHP": 130,
+      "maxHP": 117,
       "criticalNumerator": 0,
       "threat": 7,
       "passiveSkills": [
@@ -744,7 +744,7 @@
       "description": "幾度も切り裂かれた傷が盛り上がり、縄のように全身を覆う古株。折れた剣先を肉に埋めたまま、二つの頭で息を合わせて迫ってくる。",
       "floor": 3,
       "elite": true,
-      "maxHP": 143,
+      "maxHP": 129,
       "criticalNumerator": 0,
       "threat": 10,
       "passiveSkills": [
@@ -1001,7 +1001,7 @@
       "displayName": "十三番目の死",
       "description": "三層の霧で隊の人数を数え直した時、最後に混じっている細長い影。誰の松明にも照らされないまま、隊列のすぐ後ろを同じ歩調でついてくる。",
       "floor": 3,
-      "maxHP": 46,
+      "maxHP": 41,
       "criticalNumerator": 0,
       "threat": 4,
       "passiveSkills": [
@@ -1024,7 +1024,7 @@
       "description": "ぼろ布の下から異様に長い手足を伸ばす、三層の古い怪異。背丈を超える大鎌を音もなく引きずり、霧の濃い日にだけ姿を現す。",
       "floor": 3,
       "elite": true,
-      "maxHP": 65,
+      "maxHP": 59,
       "criticalNumerator": 0,
       "threat": 7,
       "passiveSkills": [
@@ -1051,10 +1051,10 @@
       "displayName": "甲殻の這い虫",
       "description": "遺物の破片が混じる土を食い、背の殻だけがいびつに厚くなった虫。通路の隅で泥をすすり、驚くと頭と足を殻の内側へ引っ込める。",
       "floor": 3,
-      "maxHP": 91,
+      "maxHP": 82,
       "criticalNumerator": 0,
       "threat": 6,
-      "baseAttack": 8,
+      "baseAttack": 7,
       "attackRollMin": 1,
       "attackRollMax": 4,
       "defense": 16,
@@ -1067,10 +1067,10 @@
       "displayName": "古殻の這い虫",
       "description": "何年もの脱皮をやり過ごし、殻に泥と鉱石がこびりついた老成個体。じっと足を折り畳んでいると、通路を塞ぐただの岩塊にしか見えない。",
       "floor": 3,
-      "maxHP": 104,
+      "maxHP": 94,
       "criticalNumerator": 0,
       "threat": 9,
-      "baseAttack": 8,
+      "baseAttack": 7,
       "attackRollMin": 1,
       "attackRollMax": 4,
       "defense": 20,
@@ -1271,7 +1271,7 @@
       "displayName": "ゴブリン王",
       "description": "討ち取った探検隊長の鉄帽を冠代わりに被る、異様に肥え太った群れの主。荷箱を積んだ玉座にふんぞり返り、奪った軍用笛を吹き鳴らす。",
       "floor": 3,
-      "maxHP": 975,
+      "maxHP": 878,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 4,
@@ -1283,7 +1283,7 @@
           "flavorText": "号令の内容は誰にも聞き取れなかった。それでも全員が、同時に、強くなった。"
         }
       ],
-      "baseAttack": 20,
+      "baseAttack": 18,
       "attackRollMin": 1,
       "attackRollMax": 4
     },
@@ -1292,7 +1292,7 @@
       "displayName": "毒沼の主",
       "description": "三層の底にたまった腐水と毒霧の中で育った巨大な両生獣。紫色の粘液に覆われた背を泥から浮かせ、ぬるい沼の底で獲物を待っている。",
       "floor": 3,
-      "maxHP": 975,
+      "maxHP": 878,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 4,
@@ -1304,7 +1304,7 @@
           "flavorText": "沼は急がない。急ぐ理由が、沼の側には無い。"
         }
       ],
-      "baseAttack": 21,
+      "baseAttack": 19,
       "attackRollMin": 1,
       "attackRollMax": 4
     },
@@ -1313,7 +1313,7 @@
       "displayName": "鏡の双子",
       "description": "四層の空間のゆがみが生んだ、寸分違わぬ二つの人影。向かい合わせの鏡のように同じ歩幅で進み、瞬きの間合いまで完全に重なっている。",
       "floor": 3,
-      "maxHP": 975,
+      "maxHP": 878,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 6,
@@ -1331,7 +1331,7 @@
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         }
       ],
-      "baseAttack": 18,
+      "baseAttack": 17,
       "attackRollMin": 4,
       "attackRollMax": 4
     },
@@ -1599,7 +1599,7 @@
       "floor": 7,
       "displayName": "ヴェスカ・天与",
       "description": "学者の落ち着きをかなぐり捨て、傷つくことすら楽しむように笑うヴェスカ。未知の強さを解き明かそうと、天変地異を呼ぶ異界の品を振るう。",
-      "maxHP": 4664,
+      "maxHP": 4100,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 12,
@@ -1636,7 +1636,7 @@
           "flavorText": "「開けたのは私だ。だが閉じ方は誰も知らない」"
         }
       ],
-      "baseAttack": 24,
+      "baseAttack": 21,
       "attackRollMin": 2,
       "attackRollMax": 9,
       "heavyPeriod": 5,

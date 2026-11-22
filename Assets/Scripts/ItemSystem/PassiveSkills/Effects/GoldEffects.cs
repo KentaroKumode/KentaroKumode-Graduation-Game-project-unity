@@ -9,10 +9,10 @@ namespace ItemSystem.PassiveSkills.Effects
     //    天秤 = GameManager.Rewards (<see cref="SpoilsScale.Apply"/>) / 溶金 = items.json の stats (per = coins・swordShopSpent・数えるのは ShopManager.Close)。
     // ============================================================
 
-    /// <summary>銭皿: 秘宝を見送り換金したとき、 獲得ゴールド +80% (切り上げ・AxisPool.SkipGoldFor が掛ける・2026-11-22 neon 収束: +50%)。</summary>
+    /// <summary>銭皿: 秘宝を見送り換金したとき、 獲得ゴールド +100% (切り上げ・AxisPool.SkipGoldFor が掛ける・2026-11-22 neon 収束: +50% → +80% → final4 +100%)。</summary>
     public static class CoinDish
     {
-        public const int Pct = 80;
+        public const int Pct = 100;
         /// <summary>見送り換金の額 <paramref name="gold"/> に〈銭皿〉を掛けた額 (持っていなければそのまま)。</summary>
         public static int Apply(RunState run, int gold)
             => gold > 0 && run != null && run.OwnsPassive(ItemIds.GoldCoinDish) ? (gold * (100 + Pct) + 99) / 100 : gold;

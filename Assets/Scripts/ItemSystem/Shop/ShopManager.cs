@@ -162,8 +162,8 @@ namespace ItemSystem.Shop
         /// <summary>通常のリロールで払う額 (画面の表示用・〈目利きの紹介状〉の無料なら 0)。 BOT の「まだ回せる」の判定は 0 にならない <see cref="ShopInventory.CurrentRerollPrice"/> を読む。</summary>
         public int RerollPrice => Current == null ? 0 : LetterFreeReroll(GameLoop.GameManager.Instance?.Run) ? 0 : Current.CurrentRerollPrice;
 
-        /// <summary>〈黄金の通行手形〉: 店で使ったゴールド 50G ごとに、 次の店 1 軒の秘宝の棚が 1 段上のレア度で並ぶ。</summary>
-        public const int PassSpendStep = 50;   // 2026-11-22 neon 収束: 80 → 50
+        /// <summary>〈黄金の通行手形〉: 店で使ったゴールド 40G ごとに、 次の店 1 軒の秘宝の棚が 1 段上のレア度で並ぶ。</summary>
+        public const int PassSpendStep = 40;   // 2026-11-22 neon 収束: 80 → 50 → final4 40
         /// <summary>この店の秘宝の棚を 1 段上のレア度で並べるか (入店で決める・リロールにも効く)。</summary>
         private bool _passRarityUp;
         /// <summary>入店した時の run.coinsSpent (店を出る時に、 この店で使った額を出す)。</summary>
@@ -301,7 +301,7 @@ namespace ItemSystem.Shop
                 if (Debug.unityLogger.logEnabled) Debug.Log($"[ShopManager] イベントの値引き: 全価格 ×{rsCons.nextShopPriceMul:F2}");
                 rsCons.nextShopPriceMul = 1f;
             }
-            // 〈黄金の通行手形〉: 前の店までに使った PassSpendStep (50G) ごとに 1 軒、 秘宝の棚が 1 段上のレア度で並ぶ
+            // 〈黄金の通行手形〉: 前の店までに使った PassSpendStep (40G) ごとに 1 軒、 秘宝の棚が 1 段上のレア度で並ぶ
             _passRarityUp = false;
             _spentAtOpen = rsCons != null ? rsCons.coinsSpent : 0;
             if (rsCons != null && rsCons.passShopsUp > 0)
@@ -1114,7 +1114,7 @@ namespace ItemSystem.Shop
 
         public void Close()
         {
-            // 〈黄金の通行手形〉: この店で使った額を足し、 PassSpendStep (50G) ごとに次の店 1 軒 (持っている時に出た店だけ)
+            // 〈黄金の通行手形〉: この店で使った額を足し、 PassSpendStep (40G) ごとに次の店 1 軒 (持っている時に出た店だけ)
             var run = GameLoop.GameManager.Instance?.Run;
             // 〈溶金の領主剣〉: この店で使った額を積む (100G につき基礎攻撃 +2・items.json の stats・per = swordShopSpent)
             if (Current != null && run != null && run.OwnsPassive(GameLoop.ItemIds.GoldenKingSword))

@@ -76,7 +76,7 @@ namespace ItemSystem
             ItemRarity.BRONZE => 15, ItemRarity.SILVER => 22, ItemRarity.GOLD => 35, _ => r >= ItemRarity.LEGENDARY ? 50 : 15,
         };
 
-        /// <summary>提示 (id の並び) を見送った時の額: 提示の中で一番高いレア度の額 (〈銭皿〉を持っていれば +50%・切り上げ・<see cref="PassiveSkills.Effects.CoinDish"/>)・挑戦カードの増減 (<see cref="MetaProgression.MetaDebuffApplicator.ApplySkipGold"/>)。
+        /// <summary>提示 (id の並び) を見送った時の額: 提示の中で一番高いレア度の額 (〈銭皿〉を持っていれば +100%・切り上げ・<see cref="PassiveSkills.Effects.CoinDish"/>)・挑戦カードの増減 (<see cref="MetaProgression.MetaDebuffApplicator.ApplySkipGold"/>)。
         /// 秘宝が 1 つも無ければ 0。 <paramref name="run"/> を省くと今のラン。</summary>
         public static int SkipGoldFor(IEnumerable<string> ids, RunState run = null)
         {

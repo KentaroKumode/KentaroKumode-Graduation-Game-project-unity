@@ -58,9 +58,11 @@ namespace AutoTest.EditorTests
             var t = Run(RoleItems.Thunder, triple);
             Assert.That(t.damageMul, Is.EqualTo(b.damageMul * (1f + TerminalCards.ThunderFinalPct)).Within(1e-4));
             Assert.That(t.blockAdd - b.blockAdd, Is.EqualTo(TerminalCards.ThunderBlock));
-            // 血濡れの符丁: すべての役・回数 (1 + 1) × 8% (2026-11-22 neon 収束)
-            Assert.That(Run(RoleItems.Bloodmark, triple, roleCount: 1).damageMul, Is.EqualTo(b.damageMul * (1f + 2 * TerminalCards.BloodmarkPer)).Within(1e-4));
-            Assert.That(Run(RoleItems.Bloodmark, t5, roleCount: 1).damageMul, Is.EqualTo(Run(RoleItems.None, t5).damageMul * (1f + 2 * TerminalCards.BloodmarkPer)).Within(1e-4));
+            // 血濡れの符丁: 2 個そろいだけ・回数 (1 + 1) × BloodmarkPer (2026-11-22 final4)・ゾロ目では働かない
+            int[] pair = { 2, 2, 5 };
+            Assert.That(Run(RoleItems.Bloodmark, pair, roleCount: 1).damageMul, Is.EqualTo(Run(RoleItems.None, pair).damageMul * (1f + 2 * TerminalCards.BloodmarkPer)).Within(1e-4));
+            Assert.That(Run(RoleItems.Bloodmark, triple, roleCount: 1).damageMul, Is.EqualTo(b.damageMul).Within(1e-4));
+            Assert.That(Run(RoleItems.Bloodmark, t5, roleCount: 1).damageMul, Is.EqualTo(Run(RoleItems.None, t5).damageMul).Within(1e-4));
             Assert.That(Run(RoleItems.Bloodmark, new[] { 1, 3, 5 }, roleCount: 1).damageMul, Is.EqualTo(Run(RoleItems.None, new[] { 1, 3, 5 }).damageMul).Within(1e-4));   // 役なし
             // 拍子木: 前のターンに同じ目の役が立っていれば与ダメージ +N%
             Assert.That(Run(RoleItems.Clapper, triple, lastFace: 4).outgoingPctAdd - b.outgoingPctAdd, Is.EqualTo(TerminalCards.ClapperPct).Within(1e-4));

@@ -590,7 +590,7 @@ namespace ItemSystem.PassiveSkills
             => System.Math.Min(MetaProgression.Relics.RelicCatalog.PoisonKeepCap, poisonKeepPct + MetaProgression.Relics.RelicApplicator.GetPoisonKeepBonus());
         /// <summary>[persistent] 出血の比例減衰の割る数への上乗せ (AxisRules.BleedDecay)。 〈血晶〉の②。</summary>
         public int bleedDecayDivisorBonus;
-        /// <summary>[persistent] 爆発の基礎への上乗せ (〈二度詰めの雷管〉が爆発のたびに +10・最大 +80・減らない・CombatSystem.HeatCore)。</summary>
+        /// <summary>[persistent] 爆発の基礎への上乗せ (〈二度詰めの雷管〉が爆発のたびに +6・上限なし・減らない・CombatSystem.HeatCore)。</summary>
         public int burstStackBonus;
         /// <summary>[persistent] ターン開始の減衰で残るシールドへの上乗せ (% ポイント)。 〈油染みの盾革〉が +20 (50% → 70%)。 残る割合は最大 80%。</summary>
         public int shieldKeepBonusPct;

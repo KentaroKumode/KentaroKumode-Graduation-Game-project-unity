@@ -479,7 +479,7 @@ namespace GameLoop
         public int  receiptRemovals;
         /// <summary>〈相場師の算盤〉: 持っている間に店でリロールした回数 (最大 10・戦闘開始時のブロック +2・最初の 1 撃 +1 × 回数)。</summary>
         public int  abacusStacks;
-        /// <summary>〈黄金の通行手形〉: 店で使ったゴールドの PassSpendStep (50G) に満たない端数 (店を出る時に足す)。</summary>
+        /// <summary>〈黄金の通行手形〉: 店で使ったゴールドの PassSpendStep (40G) に満たない端数 (店を出る時に足す)。</summary>
         public int  passShopSpent;
         /// <summary>〈黄金の通行手形〉: 秘宝の棚が 1 段上のレア度で並ぶ店の残り軒数 (店に入るたび 1 つ使う)。</summary>
         public int  passShopsUp;

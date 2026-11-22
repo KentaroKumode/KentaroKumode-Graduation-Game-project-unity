@@ -470,16 +470,18 @@ namespace CombatSystem
         /// 〈使い切りの矜持〉各撃 +N・ブロック・1 ターンの回数 / 〈灰払いの箒〉ブロック・多く引く枚数・引くのに要る 1 ターンの使い捨ての回数 / 〈早回しのゼンマイ〉各撃の上限・ブロック /
         /// 〈仕込みの配電盤〉要る枚数・多く引く枚数 / 〈型抜きの金型〉出力・補助のブロック / 〈整理された工具箱〉山札の枚数・手札 / 〈予備の差込口〉1 ターン目に多く引く枚数。</summary>
         // 2026-11-22 neon 収束: 〈使い切りの矜持〉+2・+3 → +4・+5 / 〈灰払いの箒〉ブロック +1 → +3 (使うたび・引く条件は 1 ターン 2 回のまま)。
+        // 2026-11-22 final4: 〈灰払いの箒〉ブロック +3 → +4・引く条件 1 ターン 2 回 → 1 回 (引くのは 1 ターン 1 回まで) / 〈仕込みの配電盤〉4 枚 → 3 枚。
         public const int TongsAttack = 1, ClaspAttack = 5, AuxGearBlock = 6, AuxGearMax = 3, IdleWeightDrawMax = 2, PrideAttack = 4, PrideBlock = 5, PrideMax = 1,
-            BroomBlock = 3, BroomDrawMax = 1, BroomDrawNeed = 2, RewindMax = 10, RewindBlock = 6, SwitchboardNeed = 4, SwitchboardItemDraw = 1, MoldBonus = 4, MoldSupportBlock = 6,
+            BroomBlock = 4, BroomDrawMax = 1, BroomDrawNeed = 1, RewindMax = 10, RewindBlock = 6, SwitchboardNeed = 3, SwitchboardItemDraw = 1, MoldBonus = 4, MoldSupportBlock = 6,
             ToolboxMaxDeck = 12, ToolboxHand = 1, SparePlugDraw = 2;
         /// <summary>〈再利用のるつぼ〉使い捨ての累計 1 回あたり・上限 / 〈継ぎ目のない導線〉補助 1 枚あたりの各撃 +N・防御の無視 / 〈解体屋の袋〉間隔・1 戦闘の上限 /
         /// 〈常設の作業台〉常設 1 枚あたりの各撃 +N・ブロック / 〈灰から組む機関〉要る回数 / 〈永久機関の主軸〉倍化の間隔・1 ターンに多く引く上限。</summary>
         // 2026-11-22 neon 収束 (neon の「旧」は Phase 4 較正の前の値だったので、 今の値に同じ比で掛けた): 〈再利用のるつぼ〉×2 → ×3 / 〈常設の作業台〉各撃 +3 → +5・ブロックは +3 のまま・最終 +10% → +13% / 〈灰から組む機関〉6% → 9%。
-        public const int CruciblePer = 3, CrucibleMax = 16, SeamlessAttack = 6, SeamlessPen = 5, BagEvery = 4, BagMax = 5,
-            WorkbenchPer = 5, WorkbenchBlock = 3, AshNeed = 2, EngineEvery = 3, EngineDrawMax = 2;
-        /// <summary>〈折り目のついた札〉与ダメージ % の池 / 〈常設の作業台〉常設 1 枚あたりの最終与ダメージ / 〈灰から組む機関〉使い捨て 1 回あたりの最終与ダメージ・上限。</summary>
-        public const float FoldedPct = 0.45f, WorkbenchFinalPct = 0.13f, AshPer = 0.09f, AshMax = 0.60f;
+        // 2026-11-22 final4: 〈再利用のるつぼ〉×3・上限 16 → ×4・上限なし / 〈常設の作業台〉+5・+3・+13% → +7・+5・+18% / 〈灰から組む機関〉9%・上限 60% → 15%・上限なし / 〈永久機関の主軸〉3 回目ごと → 2 回目ごと。
+        public const int CruciblePer = 4, SeamlessAttack = 6, SeamlessPen = 5, BagEvery = 4, BagMax = 5,
+            WorkbenchPer = 7, WorkbenchBlock = 5, AshNeed = 2, EngineEvery = 2, EngineDrawMax = 2;
+        /// <summary>〈折り目のついた札〉与ダメージ % の池 / 〈常設の作業台〉常設 1 枚あたりの最終与ダメージ / 〈灰から組む機関〉使い捨て 1 回あたりの最終与ダメージ。</summary>
+        public const float FoldedPct = 0.45f, WorkbenchFinalPct = 0.18f, AshPer = 0.15f;
         // ===== 賽目 (役の軸) の品の数値 (2026-11-21・段 1-f・item-overhaul-spec §5・未測定) =====
         /// <summary>〈見切りの木札〉4・5 の役のターン 各撃の攻撃 +N・ブロック +N / 〈符丁の刻み板〉3・4 の役のターン 各撃の攻撃 + min(上限, 役の回数 × N) (ゾロ目なら 2 倍) /
         /// 〈欠け目の見立て〉1・2 の役のターン 防御の無視 / 〈血染めの歯車〉振り直し＋3 の役のターン 各撃 +N / 〈雷鳴のゾロ目〉ブロック (full-item-rework-ledger §⑧・未測定)。</summary>
@@ -489,9 +491,11 @@ namespace CombatSystem
         public const int WoodTagFaces = 1 << 4 | 1 << 5, NotchBoardFaces = 1 << 3 | 1 << 4, ChippedFaces = 1 << 1 | 1 << 2, GearFace = 3, ConduitFaces = 1 << 1 | 1 << 2 | 1 << 3;
         /// <summary>目 <paramref name="face"/> (1〜6・連なりは 0 でどの集合にも入らない) が集合 <paramref name="faces"/> に入るか。</summary>
         public static bool FaceIn(int faces, int face) => face > 0 && ((faces >> face) & 1) != 0;
-        /// <summary>〈揃いの拍子木〉与ダメージ % の池 / 〈雷鳴のゾロ目〉最終与ダメージ / 〈血濡れの符丁〉すべての役のターン 役の回数 1 回あたりの最終与ダメージ・上限
-        /// (2026-11-22 neon 収束: 3・4 の役 × 5% → すべての役 × 8%)。</summary>
-        public const float ClapperPct = 0.12f, ThunderFinalPct = 0.20f, BloodmarkPer = 0.08f, BloodmarkMax = 0.50f;
+        /// <summary>〈揃いの拍子木〉与ダメージ % の池 / 〈雷鳴のゾロ目〉最終与ダメージ / 〈血濡れの符丁〉2 個そろいの役のターン 役の回数 1 回あたりの最終与ダメージ・上限
+        /// (2026-11-22 neon 収束: 3・4 の役 × 5% → すべての役 × 8% → final4: 2 個そろいだけ (ゾロ目・連なりでは働かない) × 10%)。</summary>
+        public const float ClapperPct = 0.12f, ThunderFinalPct = 0.20f, BloodmarkPer = 0.10f, BloodmarkMax = 0.50f;
+        /// <summary>〈血濡れの符丁〉が働く役 = 2 個そろい (ゾロ目・連なりでは働かない・2026-11-22 final4)。 本体と BOT が同じ判定。</summary>
+        public static bool BloodmarkFires(RoleKind k) => !YachtRoles.IsBig(k) && k != RoleKind.Straight;
         /// <summary>〈賽振り台〉次のターンの最初の振り直しの費用から引く上限 (min(上限, 役の回数)) / 〈役落とし〉役が成立したターン 攻撃 + 役の回数 × N。
         /// 役の回数 = この戦闘で役が成立した回数 (このターンの役を含む・役の軸の品と同じ数え方・台帳 §⑧)。 *Up = 強化した端子。</summary>
         public const int DiceTableCap = 6, DiceTableCapUp = 8, RoleDropPer = 3, RoleDropPerUp = 4;
@@ -1193,19 +1197,19 @@ namespace CombatSystem
             }
             if ((f & DeckItems.Broom) != 0 && disp > 0)                                                              // 〈灰払いの箒〉
             {
-                o.blockAdd += BroomBlock * disp; if (disp >= BroomDrawNeed) st.extraDrawNext += BroomDrawMax;   // 2026-11-22 Phase 4 較正: 1 ターンに 2 回以上使った時だけ引く (旧 1 回から)
+                o.blockAdd += BroomBlock * disp; if (disp >= BroomDrawNeed) st.extraDrawNext += BroomDrawMax;   // 1 ターンに 1 回だけ足す (解決は 1 ターン 1 回・2026-11-22 final4: 要る回数 2 → 1)
             }
             if ((f & DeckItems.Rewind) != 0 && st.shuffledNow > 0)                                                   // 〈早回しのゼンマイ〉: このターンに切り直した枚数
             {
                 each += Math.Min(RewindMax, st.shuffledNow); o.blockAdd += RewindBlock;
             }
-            if ((f & DeckItems.Crucible) != 0 && disp > 0) each += Math.Min(CrucibleMax, CruciblePer * st.disposedTotal);   // 〈再利用のるつぼ〉
+            if ((f & DeckItems.Crucible) != 0 && disp > 0) each += CruciblePer * st.disposedTotal;   // 〈再利用のるつぼ〉
             if ((f & DeckItems.Seamless) != 0 && supports > 0)                                                       // 〈継ぎ目のない導線〉
             {
                 each += SeamlessAttack * supports; o.armorPen += SeamlessPen * supports;
             }
             if (perms > 0) { each += WorkbenchPer * perms; o.blockAdd += WorkbenchBlock * perms; o.damageMul *= 1f + WorkbenchFinalPct * perms; }   // 〈常設の作業台〉
-            if ((f & DeckItems.Ash) != 0 && st.disposedTotal >= AshNeed) o.damageMul *= 1f + Math.Min(AshMax, AshPer * st.disposedTotal);       // 〈灰から組む機関〉
+            if ((f & DeckItems.Ash) != 0 && st.disposedTotal >= AshNeed) o.damageMul *= 1f + AshPer * st.disposedTotal;       // 〈灰から組む機関〉
             if (each > 0 && o.attackHits.Count > 0)
             {
                 for (int h = 0; h < o.attackHits.Count; h++) o.attackHits[h] += each;
@@ -1255,7 +1259,7 @@ namespace CombatSystem
             if ((f & RoleItems.Chipped) != 0 && FaceIn(ChippedFaces, face)) o.armorPen += ChippedPen;                       // 〈欠け目の見立て〉1〈特別〉・2〈封じ〉
             if ((f & RoleItems.Clapper) != 0 && face != 0 && face == st.roleLastFace) o.outgoingPctAdd += ClapperPct;         // 〈揃いの拍子木〉同じ目が続いた
             if ((f & RoleItems.Thunder) != 0 && big) { o.damageMul *= 1f + ThunderFinalPct; o.blockAdd += ThunderBlock; }    // 〈雷鳴のゾロ目〉
-            if ((f & RoleItems.Bloodmark) != 0)                                                                              // 〈血濡れの符丁〉すべての役 (連なりも)
+            if ((f & RoleItems.Bloodmark) != 0 && BloodmarkFires(k))                                                         // 〈血濡れの符丁〉2 個そろいだけ (回数はどの役も)
                 o.damageMul *= 1f + Math.Min(BloodmarkMax, BloodmarkPer * count);
             if (each > 0 && o.attackHits.Count > 0)
             {

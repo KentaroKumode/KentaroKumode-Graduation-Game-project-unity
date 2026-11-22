@@ -34,11 +34,11 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>乾き火口箱: 戦闘開始時、 臨界 +14。</summary>
+    /// <summary>乾き火口箱: 戦闘開始時、 臨界 +20 (2026-11-22 final4: 旧 +14)。</summary>
     public class DryTinderbox : IPassiveSkillEffect
     {
         public string SkillId => "乾き火口箱";
-        public const int Heat = 14;
+        public const int Heat = 20;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => Kw.AddHeat(ctx, Heat);
     }
@@ -67,11 +67,11 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => Kw.AddHeat(ctx, Stored);
     }
 
-    /// <summary>荒砥: 爆発するたび、 この戦闘中の与ダメージ +5% (最大 +30%・次のターンの振り直しの後から)。 撃ごとの臨界 +1 は HeatCore の旗 (5g)。</summary>
+    /// <summary>荒砥: 爆発するたび、 この戦闘中の与ダメージ +7% (次のターンの振り直しの後から・2026-11-22 final4: +5%・最大 +30% → +7%・上限なし)。 撃ごとの臨界 +2 は HeatCore の旗 (5g)。</summary>
     public class RoughWhetstone : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => GameLoop.ItemIds.HeatWhetstone;
-        public const int PctPerBurst = 5, MaxPct = 30;
+        public const int PctPerBurst = 7;
         /// <summary>[persistent] 積もった与ダメージの % 。</summary>
         private const string Key = "heat.whet";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Pct(Rw.Count(ctx, Key) / 100f);
@@ -80,13 +80,13 @@ namespace ItemSystem.PassiveSkills.Effects
         {
             int cur = Rw.Count(ctx, Key);
             if (t == PassiveSkillTrigger.OnPostRoll) { if (cur > 0) ctx.AddOutgoingPct(cur / 100f); return; }
-            if (cur < MaxPct) ctx.accumulatedValues[Key] = System.Math.Min(MaxPct, cur + PctPerBurst);
+            ctx.accumulatedValues[Key] = cur + PctPerBurst;
         }
     }
 
     // ── S: エンジン・安定 ── (〈恒温の竈〉〈二度詰めの雷管〉〈焚き足しの炭〉は HeatCore の旗)
 
-    /// <summary>点火スパナ: 爆発したターン、 次のターンの手札 +1 枚 (1 ターン 1 回)。 撃ごとの臨界 +2 は HeatCore の旗 (5g)。</summary>
+    /// <summary>点火スパナ: 爆発したターン、 次のターンの手札 +1 枚 (1 ターン 1 回)。 撃ごとの臨界 +4 (final4: 旧 +2) は HeatCore の旗 (5g)。</summary>
     public class IgnitionSpanner : IPassiveSkillEffect
     {
         public string SkillId => GameLoop.ItemIds.HeatSpanner;

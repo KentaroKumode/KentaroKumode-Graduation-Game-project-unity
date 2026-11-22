@@ -536,7 +536,7 @@ namespace AutoTest
             public bool critDouble, critHeaven, ironClub, critOff, critOn;
             /// <summary>[会心の軸] 配線で決まる品: 〈鷹匠の革手袋〉〈狙い目の刻み〉/ 攻撃の端子 1 枚の撃の〈一の矢〉〈渾身の柄頭〉〈必殺の照準器〉/ 最初の 1 撃が〈抜き打ちの作法〉で確定会心。</summary>
             public bool falconer, aim, firstArrow, pommel, sniper, quickDrawFirst;
-            /// <summary>〈余韻の鈴〉: 前のターンの会心の条件は満たした (攻撃の撃 2 つ以上の挿し方で会心率が乗る・2026-11-22 neon 収束)。</summary>
+            /// <summary>〈余韻の鈴〉: 前のターンの会心の条件は満たした (どの挿し方でも会心率が乗る・2026-11-22 final4)。</summary>
             public bool bell;
             /// <summary>〈加重の拳套〉: 2 撃目以降の撃で与ダメ % の池に足す割合 (0 = 持っていない・本体 ctx.hitOutgoingPct)。</summary>
             public float lateHitOutPct;
@@ -647,7 +647,7 @@ namespace AutoTest
             if (hitNo == 0 && s.quickDrawFirst) mulAdd += ItemSystem.PassiveSkills.Effects.QuickDrawArt.Mul;
             if (s.falconer && ws.atkFaceMax >= ItemSystem.PassiveSkills.Effects.FalconerGlove.MinFace) { add += ItemSystem.PassiveSkills.Effects.FalconerGlove.Rate; mulAdd += ItemSystem.PassiveSkills.Effects.FalconerGlove.Mul; }
             if (s.aim && ws.hitFace != null && hitNo < ws.hitFace.Length) { add += CombatSystem.CritCore.AimRate(ws.hitFace[hitNo]); force |= CombatSystem.CritCore.AimForce(ws.hitFace[hitNo]); }
-            if (s.bell && ws.aHits >= ItemSystem.PassiveSkills.Effects.LingeringBell.NeedAttackTerminals) add += ItemSystem.PassiveSkills.Effects.LingeringBell.Rate;
+            if (s.bell) add += ItemSystem.PassiveSkills.Effects.LingeringBell.Rate;
             bool solo = ws.aHits == 1;
             if (solo && s.firstArrow && ws.atkFaceMax >= ItemSystem.PassiveSkills.Effects.FirstArrow.MinFace) { add += ItemSystem.PassiveSkills.Effects.FirstArrow.Rate; mulAdd += ItemSystem.PassiveSkills.Effects.FirstArrow.Mul; }
             float critMulEff = CombatSystem.CritCore.EffectiveMul(s.critMulBase + mulAdd, s.critRed, add, s.critDouble, s.critHeaven);
@@ -1868,7 +1868,7 @@ namespace AutoTest
                     v += System.Math.Min(CombatSystem.TerminalCards.ChippedPen, System.Math.Max(0, ctx.enemyDefense));
                 if ((f & CombatSystem.RoleItems.Clapper) != 0 && face != 0 && face == st.roleLastFace) mul += CombatSystem.TerminalCards.ClapperPct;
                 if ((f & CombatSystem.RoleItems.Thunder) != 0 && big) { mul *= 1f + CombatSystem.TerminalCards.ThunderFinalPct; v += CombatSystem.TerminalCards.ThunderBlock; }
-                if ((f & CombatSystem.RoleItems.Bloodmark) != 0)
+                if ((f & CombatSystem.RoleItems.Bloodmark) != 0 && CombatSystem.TerminalCards.BloodmarkFires(r))
                     mul *= 1f + System.Math.Min(CombatSystem.TerminalCards.BloodmarkMax, CombatSystem.TerminalCards.BloodmarkPer * count);
                 acc += v + (mul - 1f) * sum;
             }

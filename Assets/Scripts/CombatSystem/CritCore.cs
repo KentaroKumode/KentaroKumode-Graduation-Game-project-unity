@@ -45,7 +45,7 @@ namespace CombatSystem
 
         /// <summary>〈狙い目の刻み〉: この撃に挿した目が 5 以上なら会心率 +20%、 6 なら確定会心。</summary>
         public const int AimNeed = 5, AimSure = 6;
-        public const float AimPct = 0.20f;
+        public const float AimPct = 0.30f;
         public static float AimRate(int faceMax) => faceMax >= AimNeed ? AimPct : 0f;
         public static bool AimForce(int faceMax) => faceMax >= AimSure;
 

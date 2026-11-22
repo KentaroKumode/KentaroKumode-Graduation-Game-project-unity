@@ -38,10 +38,10 @@ namespace CombatSystem
         // 閾値 30 → 36 (2026-11-22 段 3 の較正 4・臨界の腕が寄せなしの約 2 倍 / ターンの終わりの攻撃の合計が毎ターン溜まる)
         // → 32 (2026-11-22 neon 収束: ターンの終わりの臨界を攻撃の合計から「攻撃に挿した出目の合計の半分」へ下げたのと合わせて)
         public const int Threshold = 32, ThresholdFloor = 12, BurstBase = 30, DefensePenPct = 50;
-        public const int SuperAtPct = 150, SuperMulPct = 150, KilnSuperMulPct = 200;
-        public const int StoneTwo = 6, StoneAll = 12, BreastHeat = 4, BreastBlock = 2, PokerPerDie = 6, SpannerPerHit = 2, WhetPerHit = 1;
-        public const int OvenRestart = 8, PrimerAdd = 4, PrimerMax = 32, CoalAdd = 1, CoalMax = 6, MoldPerExcess = 2, LedgerMax = 5, KettleCut = 6;   // 炭 +2 → +1・釜 −8 → −6 (2026-11-22 段 3 の較正 2)・雷管 +6/48 → +4/32・鋳型 +3 → +2 (neon 収束)
-        public const int SparkPctPerBurst = 5,   // 2026-11-22 段 3 の較正 2: 15 → 8 (長い戦闘で伸び続ける) → neon 収束 5
+        public const int SuperAtPct = 150, SuperMulPct = 150, KilnSuperMulPct = 250;   // 暴れ窯 ×2.0 → ×2.5 (2026-11-22 final4)
+        public const int StoneTwo = 8, StoneAll = 16, BreastHeat = 4, BreastBlock = 2, PokerPerDie = 6, SpannerPerHit = 4, WhetPerHit = 2;   // 過熱石 +6/+12 → +8/+16・スパナ +2 → +4・荒砥 +1 → +2 (final4)
+        public const int OvenRestart = 8, PrimerAdd = 6, CoalAdd = 1, CoalMax = 6, MoldPerExcess = 2, LedgerMax = 5, KettleCut = 6;   // 炭 +2 → +1・釜 −8 → −6 (2026-11-22 段 3 の較正 2)・雷管 +6/48 → +4/32・鋳型 +3 → +2 (neon 収束)・雷管 +4/32 → +6/上限なし (final4)
+        public const int SparkPctPerBurst = 8,   // 2026-11-22 段 3 の較正 2: 15 → 8 (長い戦闘で伸び続ける) → neon 収束 5 → final4 8
                           AshenNeed = 40, AshenMulPct = 160, FlintPctPerBurst = 25, KilnStep = 4, KilnMax = 16, PillarDownMulPct = 200;
         /// <summary>〈燧石の指輪〉: 攻撃の撃 (攻撃の端子の発動・【再起動】の撃も 1 つ) がこの数以上のターン (2026-11-22 neon 収束: 攻撃の端子 2 枚 → 3 撃)。</summary>
         public const int FlintAttackHits = 3;
@@ -117,7 +117,7 @@ namespace CombatSystem
             s.burstsTurn++; s.burstsTotal++;
             b.damage = Damage(in s, in b);
             b.landed = VsDefense(b.damage, s.enemyDefense, s.items);
-            if (Has(s.items, HeatItems.Primer)) s.stack = System.Math.Min(PrimerMax, s.stack + PrimerAdd);
+            if (Has(s.items, HeatItems.Primer)) s.stack += PrimerAdd;
             if (b.super && Has(s.items, HeatItems.Kiln) && s.kilnCut < KilnMax)
             {
                 int c = System.Math.Min(KilnStep, KilnMax - s.kilnCut);
