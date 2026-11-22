@@ -568,6 +568,43 @@ namespace AutoTest.EditorTools
             }
         }
 
+        private static System.Threading.Tasks.Task<ParsedRound> _parse;
+
+        private sealed class ParsedRound
+        {
+            public string error;
+            public List<AutoRunner.RunRec> recs;
+            public List<(string, double, bool)> danger = new List<(string, double, bool)>();   // 戦闘名ごとの危険度の学習 (2026-11-05)
+            public List<IList<int>> stormLayers = new List<IList<int>>();                     // [計装 2026-11-13] 不安定化の内訳
+            public List<(int, int, bool)> stormFights = new List<(int, int, bool)>();
+        }
+
+        /// <summary>別スレッド: ワーカーの記録を読んで、 合流に要る形へまとめる。 Unity の API は呼ばない (JsonUtility は別スレッドで使える)。</summary>
+        private static ParsedRound ParseRound(List<(string path, int runs)> jobs, int capacity)
+        {
+            var r = new ParsedRound { recs = new List<AutoRunner.RunRec>(capacity) };
+            foreach (var (path, runs) in jobs)
+            {
+                var file = JsonUtility.FromJson<LearnRunFile>(File.ReadAllText(path, Encoding.UTF8));
+                if (file?.runs == null || file.runs.Length != runs)
+                { r.error = $"記録の本数が合わない: {path} ({file?.runs?.Length ?? 0}/{runs})"; return r; }
+                foreach (var row in file.runs)
+                {
+                    r.recs.Add(row.ToRunRec());
+                    if (row.stormLayers != null) r.stormLayers.Add(row.stormLayers);
+                    if (row.fights != null)
+                        foreach (var f in row.fights)
+                        {
+                            if (!f.end) continue;
+                            r.stormFights.Add((f.escRises, f.instEsc, f.isBoss));
+                            if (!string.IsNullOrEmpty(f.key) && f.maxHp > 0)
+                                r.danger.Add((f.key, (double)(f.hpBefore - f.hpAfter) / f.maxHp, !f.won));
+                        }
+                }
+            }
+            return r;
+        }
+
         /// <summary>ラウンドの記録を合流させる。 <b>1 本でも欠けたら止める</b> ──
         /// 欠けたまま積むと、 落ちやすい区間 (= 長いラン) だけ抜けた偏った学習になる。</summary>
         private static void FinishRound()
@@ -577,25 +614,21 @@ namespace AutoTest.EditorTools
 
             if (_st.mode == "itt") { FinishItt(); return; }
 
-            var recs = new List<AutoRunner.RunRec>(_st.runsPerRound);
-            var danger = new List<(string, double, bool)>();   // 戦闘名ごとの危険度の学習 (2026-11-05)
-            var stormLayers = new List<IList<int>>(); var stormFights = new List<(int, int, bool)>();   // [計装 2026-11-13] 不安定化の内訳
-            foreach (var s in _slots)
+            // 記録の読み込み (16,000 ランで 800 MB 台の JSON) は別スレッドで。 メインで読むと腕の終わりにエディタが固まる (2026-11-22)。
+            //   Poll が毎フレーム呼ぶので、 終わるまでは何もせずに返る。
+            if (_parse == null)
             {
-                var file = JsonUtility.FromJson<LearnRunFile>(File.ReadAllText(s.learnPath, Encoding.UTF8));
-                if (file?.runs == null || file.runs.Length != s.runs)
-                { Stop($"記録の本数が合わない: {s.learnPath} ({file?.runs?.Length ?? 0}/{s.runs})"); return; }
-                foreach (var row in file.runs)
-                {
-                    recs.Add(row.ToRunRec());
-                    if (row.stormLayers != null) stormLayers.Add(row.stormLayers);
-                    if (row.fights != null) foreach (var f in row.fights) if (f.end) stormFights.Add((f.escRises, f.instEsc, f.isBoss));
-                    if (row.fights != null)
-                        foreach (var f in row.fights)
-                            if (f.end && !string.IsNullOrEmpty(f.key) && f.maxHp > 0)
-                                danger.Add((f.key, (double)(f.hpBefore - f.hpAfter) / f.maxHp, !f.won));
-                }
+                var jobs = new List<(string path, int runs)>();
+                foreach (var s in _slots) jobs.Add((s.learnPath, s.runs));
+                _parse = System.Threading.Tasks.Task.Run(() => ParseRound(jobs, _st.runsPerRound));
+                return;
             }
+            if (!_parse.IsCompleted) return;
+            var task = _parse; _parse = null;
+            if (task.IsFaulted) { Stop("記録の読み込みで例外: " + task.Exception?.InnerException); return; }
+            var parsed = task.Result;
+            if (parsed.error != null) { Stop(parsed.error); return; }
+            var recs = parsed.recs; var danger = parsed.danger; var stormLayers = parsed.stormLayers; var stormFights = parsed.stormFights;
 
             int valid = 0, clears = 0;
             foreach (var r in recs) if (r.bandScore >= 0) { valid++; if (r.bandScore >= 11) clears++; }
@@ -694,6 +727,7 @@ namespace AutoTest.EditorTools
         private static void Stop(string note)
         {
             EditorApplication.update -= Poll;
+            _parse = null;
             _running = false;
             SessionState.EraseString(ActiveKey);
             string msg = $"[学習並列] {note} — {_st?.round ?? 0}/{_st?.rounds ?? 0} ラウンド" + (_st != null && _st.noMerge ? "完了 (学習には合流していない)" : "合流済み") + $"\n  {_root}";
