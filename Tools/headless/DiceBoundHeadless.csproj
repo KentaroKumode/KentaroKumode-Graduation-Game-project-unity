@@ -35,6 +35,7 @@
   <ItemGroup>
     <!-- Player がビルド時に焼き込むデータと同じものを exe の隣へ写す (Resources/ と ItemDatabase の items.json) -->
     <None Include="$(GameRoot)Assets\Resources\enemies.json" Link="Resources\enemies.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(GameRoot)Assets\Resources\meta_board_panels.json" Link="Resources\meta_board_panels.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="$(GameRoot)Assets\Resources\Events\*.txt" Link="Resources\Events\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="$(GameRoot)Assets\Data\InventorySystem\items.json" Link="Data\items.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
