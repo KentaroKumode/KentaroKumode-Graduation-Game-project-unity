@@ -62,13 +62,13 @@ namespace MetaProgression
         /// <summary>クァディルの色欲 ── 秘宝の見送り換金ができない。</summary>
         public static bool SkipCashBlocked() => ChallengeCards.Held(ChallengeCards.SinLust) != null;
 
-        /// <summary>各戦闘の 1 ターン目から数えて <paramref name="battleTurn"/> ターン目に止める手札の端子の数 (〈目詰まり〉とクェシナの怠惰の多い方・CombatManager.DrawTerminalHand)。</summary>
+        /// <summary>各戦闘の 1 ターン目から数えて <paramref name="battleTurn"/> ターン目に止める手札の端子の数 (〈目詰まり〉とクェシナの怠惰 (毎ターン) の多い方・CombatManager.DrawTerminalHand)。</summary>
         public static int GetClogStops(int battleTurn)
         {
             int n = 0;
             var c = ChallengeCards.Held(ChallengeCards.Clog);
             if (c != null && battleTurn >= 1 && battleTurn <= (int)c.value2) n = (int)c.value;
-            if (battleTurn == 1) n = System.Math.Max(n, (int)ChallengeCards.Value2(ChallengeCards.SinSloth));
+            if (battleTurn >= 1) n = System.Math.Max(n, (int)ChallengeCards.Value2(ChallengeCards.SinSloth));   // 怠惰は毎ターン (2026-11-23・answer20)
             return n;
         }
 

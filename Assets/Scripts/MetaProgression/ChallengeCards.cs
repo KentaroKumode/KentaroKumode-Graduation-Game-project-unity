@@ -76,30 +76,30 @@ namespace MetaProgression
 
         static ChallengeCards()
         {
-            // ── 表 (純デバフ) 16 種。 値は仕様書 §2 のまま (未測定・難易度の測定は neon のアイテムリワーク後) ──
-            K(EnemyAtk, false, Family.Attack, null, T(null, null, 35));                     // 猛攻: 敵の攻撃 +N%
-            K(Heavy, false, Family.Attack, null, T(0.4f, 0.8f, 1.2f));                      // 致命的な一撃: 大技の倍率 +N
-            K(Twin, false, Family.Attack, null, T(null, 60, 100));                          // 連撃: 敵の攻撃が 2 回・2 回目は N%
-            K(Opener, false, Family.Attack, null, T(null, 100, 180));                       // 先手必殺: ボスの各形態の 1 ターン目 敵の攻撃 +N%
-            K(EnemyHp, false, Family.Durability, null, T(20, 35, 50));                      // 厚い皮: 敵の最大 HP +N%
-            K(Steel, false, Family.Durability, null, T(1, 1, null), T(0, 20, null));        // 鋼の皮膚: 致命傷を HP1 で耐える / v2 = ボスの最大 HP +N%
-            K(Regen, false, Family.Durability, null, T(null, 3, 5));                        // 再生: 敵が毎ターン最大 HP の N% を回復
-            K(Ukemi, false, Family.Durability, null, T(null, 1.35f, 1.20f), T(null, 0, 15)); // 受身: ダウン中の被ダメ倍率 / v2 = 目盛りの間隔 +N%
-            K(Deadline, false, Family.Hand, null, T(1, 2, 2), T(0, 0, 1));                  // 刻限: 段の到達を N ターン早める / v2 = 1 ならボス戦は毎ターン進む
-            K(HeavyDice, false, Family.Hand, null, T(1, 2, 3));                             // 重い賽: 振り直しの充電の費用 +N (無料は除く)
-            K(Clog, false, Family.Hand, null, T(1, 1, 2), T(1, 2, 1));                      // 目詰まり: 各戦闘の最初の v2 ターン、 手札の端子 N 枚が止まる
-            K(Heal, false, Family.Hand, null, T(25, 45, 65));                               // 深い傷: 回復 −N% (層の入口の全回復も)
-            K(Price, false, Family.Economy, null, T(15, 30, 45));                           // 暴騰: 店の品物の値段 +N%
-            K(Money, false, Family.Economy, null, T(20, 40, null));                         // 通行料: 層を移るたび所持金の N% を失う
-            K(Lowball, false, Family.Economy, null, T(30, 50, null));                       // 買い叩き: 秘宝の見送り換金の額 −N%
-            K(Bag, false, Family.Economy, null, T(2, 2, 1), T(0, 4, 0));                    // 浅い鞄: 1 戦闘で使える消耗品 N 個まで / v2 = 持てる数 (0 = 制限なし)
+            // ── 表 (純デバフ) 16 種。 Tier II・III は 2026-11-23 に neon answer20 表 A の値へ (Tier I は仕様書 §2 のまま) ──
+            K(EnemyAtk, false, Family.Attack, null, T(null, null, 55));                     // 猛攻: 敵の攻撃 +N%
+            K(Heavy, false, Family.Attack, null, T(0.4f, 1.0f, 1.8f));                      // 致命的な一撃: 大技の倍率 +N
+            K(Twin, false, Family.Attack, null, T(null, 70, 120));                          // 連撃: 敵の攻撃が 2 回・2 回目は N%
+            K(Opener, false, Family.Attack, null, T(null, 130, 240));                       // 先手必殺: ボスの各形態の 1 ターン目 敵の攻撃 +N%
+            K(EnemyHp, false, Family.Durability, null, T(20, 45, 75));                      // 厚い皮: 敵の最大 HP +N%
+            K(Steel, false, Family.Durability, null, T(1, 1, null), T(0, 35, null));        // 鋼の皮膚: 致命傷を HP1 で耐える / v2 = ボスの最大 HP +N%
+            K(Regen, false, Family.Durability, null, T(null, 4, 8));                        // 再生: 敵が毎ターン最大 HP の N% を回復
+            K(Ukemi, false, Family.Durability, null, T(null, 1.25f, 1.10f), T(null, 10, 30)); // 受身: ダウン中の被ダメ倍率 / v2 = 目盛りの間隔 +N%
+            K(Deadline, false, Family.Hand, null, T(1, 2, 3), T(0, 0, 1));                  // 刻限: 段の到達を N ターン早める / v2 = 1 ならボス戦は毎ターン進む
+            K(HeavyDice, false, Family.Hand, null, T(1, 3, 5));                             // 重い賽: 振り直しの充電の費用 +N (無料は除く)
+            K(Clog, false, Family.Hand, null, T(1, 1, 2), T(1, 3, 3));                      // 目詰まり: 各戦闘の最初の v2 ターン、 手札の端子 N 枚が止まる
+            K(Heal, false, Family.Hand, null, T(25, 55, 80));                               // 深い傷: 回復 −N% (層の入口の全回復も)
+            K(Price, false, Family.Economy, null, T(15, 40, 75));                           // 暴騰: 店の品物の値段 +N%
+            K(Money, false, Family.Economy, null, T(20, 50, null));                         // 通行料: 層を移るたび所持金の N% を失う
+            K(Lowball, false, Family.Economy, null, T(30, 60, null));                       // 買い叩き: 秘宝の見送り換金の額 −N%
+            K(Bag, false, Family.Economy, null, T(2, 2, 1), T(0, 3, 2));                    // 浅い鞄: 1 戦闘で使える消耗品 N 個まで / v2 = 持てる数 (0 = 制限なし)
 
             // ── 七つの大罪 (IV・仕様書 §4 の値のまま・未較正) ──
             K(SinPride, false, Family.Hand, null, IV(80), IV(50));       // 傲慢 (2026-11-23: 60/25 → 80/50): 防御の端子に挿した出目 −N% / v2 = シールドの獲得 −N%
             K(SinEnvy, false, Family.Attack, null, IV(80));              // 嫉妬: 残り HP の割合が敵より高い間、 敵の攻撃 +N%
-            K(SinGreed, false, Family.Economy, null, IV(2));             // 強欲: 受けた時、 所持金と消耗品をすべて失う + 5 層の店を使えない + 持っている秘宝 1 つにつき敵の攻撃 +N% (2026-11-23)
+            K(SinGreed, false, Family.Economy, null, IV(1));             // 強欲: 受けた時、 所持金と消耗品をすべて失う + 5 層の店を使えない + 持っている秘宝 1 つにつき敵の攻撃 +N% (2026-11-23・answer20 で 2 → 1)
             K(SinWrath, false, Family.Attack, null, IV(40), IV(120));    // 憤怒: ボスの各形態の 1 ターン目、 現在 HP −N% / v2 = そのターンの敵の攻撃 +N%
-            K(SinSloth, false, Family.Hand, null, IV(2), IV(2));         // 怠惰: 全部の出目 −N (下限 1) / v2 = 各戦闘の 1 ターン目、 手札の端子が止まる枚数
+            K(SinSloth, false, Family.Hand, null, IV(2), IV(2));         // 怠惰: 全部の出目 −N (下限 1) / v2 = 毎ターン、 手札の端子が止まる枚数 (2026-11-23・answer20 で 1 ターン目だけ → 毎ターン)
             K(SinGluttony, false, Family.Durability, null, IV(100), IV(35));   // 暴食: 回復 −N% / v2 = 受けた時に最大 HP −N%
             K(SinLust, false, Family.Hand, null, IV(2));                 // 色欲: 1 ターンに挿せる出目は N 個まで + 秘宝の見送り換金ができない
 
@@ -134,8 +134,8 @@ namespace MetaProgression
             new[] { 0, 0, 0, 0, 0 },
             new[] { 1, 0, 0, 0, 0 },
             new[] { 1, 1, 0, 0, 0 },
-            new[] { 1, 1, 1, 0, 0 },
-            new[] { 1, 1, 1, 2, 0 },
+            new[] { 1, 1, 1, 1, 0 },      // Lv3 (2026-11-23・answer20: 旧 1, 1, 1, 0, 0)
+            new[] { 1, 1, 1, 1, 2 },      // Lv4 (2026-11-23・answer20: 旧 1, 1, 1, 2, 0)
             new[] { 1, 1, 2, 2, 2 },
             new[] { 1, 1, 2, 2, 3 },
             new[] { 1, 1, 2, 3, 3 },      // Lv7 (2026-11-23・neon answer19: 旧 1, 2, 2, 3, 3)
@@ -370,7 +370,7 @@ namespace MetaProgression
                 case SinEnvy: return "残り HP の割合が敵より高い間、 敵の攻撃 +" + n + "%";
                 case SinGreed: return "受けた時、 所持金と消耗品をすべて失う・5 層の店を使えない・持っている秘宝 1 つにつき敵の攻撃 +" + n + "%";
                 case SinWrath: return "ボスの各形態の 1 ターン目、 現在 HP −" + n + "%（1 は残る）・そのターンの敵の攻撃 +" + n2 + "%";
-                case SinSloth: return "全部の出目 −" + n + "（1 より小さくならない）・各戦闘の 1 ターン目、 手札の端子 " + n2 + " 枚が止まる";
+                case SinSloth: return "全部の出目 −" + n + "（1 より小さくならない）・毎ターン、 手札の端子 " + n2 + " 枚が止まる";
                 case SinGluttony: return "回復 −" + n + "%（吸血・回復薬・層の入口の全回復も）・受けた時に最大 HP −" + n2 + "%";
                 case SinLust: return "1 ターンに挿せる出目は " + n + " 個まで・秘宝の見送り換金ができない";
                 case Charge: return "戦闘の始めの充電 +" + n + (v2 ? "・【再起動】【オーバークロック】の充電 −" + n2 + "（最低 1）" : "");
