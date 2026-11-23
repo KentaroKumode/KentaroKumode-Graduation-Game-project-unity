@@ -1529,6 +1529,9 @@ namespace AutoTest
         /// <summary>[測定] 挑戦カードを 1 枚ずつ測る: "層:カードの id" を ; で並べる (例 "1:D:狂暴化:1" / "3:B:Plunder.gold:3")。
         /// 指定した層の入口で、 難易度の引き方の代わりにそのカードを受ける。 空 = 使わない。 層は見せる層 (1..5)。</summary>
         public string challengeForce = "";
+        /// <summary>[測定 2026-11-23] 品の知識を一部だけ持つ人: ランごとに品の N% (0〜100) の ITT を隠す。 隠した品は同じレアリティの品の平均の値
+        /// (取れなければ序列の中央の値) で買う。 乱数は GameRng を消費しない (シード・ラン番号・品の id のハッシュ)。 0 = 隠さない (既定)。</summary>
+        public int ittMaskPct = 0;
         /// <summary>挑戦カードの 2 枚の選び方。 true = バフが自分の軸に合う方 (BotHooks.ChooseChallengeByAxis)、 false = 先頭 (配る順は乱数なので実質無作為)。</summary>
         public bool challengeCardPickByAxis = true;
 
@@ -2051,6 +2054,7 @@ namespace AutoTest
                 if (ItemSystem.ItemDatabase.Instance?.GetItem(bid) == null) Debug.LogError($"[AutoRunner] botBanItemIds: 品が無い「{bid}」");
                 BotHooks.BanIds.Add(bid);
             }
+            LearnedPriorityProvider.IttMaskPct = Mathf.Clamp(ittMaskPct, 0, 100);   // 品の知識を一部だけ持つ人 (2026-11-23)
             LearnedPriorityProvider.BuyTierCount = isSuperSkill ? superBuyTiers : optimalBuyTiers;
             wiringMistakeRate = isSuperSkill ? 0f : optimalMistakeRate;
             LearnedPriorityProvider.GateRaw = v3.tierGateRaw;
