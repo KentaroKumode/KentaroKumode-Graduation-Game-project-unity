@@ -545,8 +545,8 @@ namespace AutoTest
             public bool quickDraw, narrow, nick, heaven, readMark, pulse, pulsePrimed, firstStrokePrimed, whiteBlade, mask;
             /// <summary>〈余韻の鈴〉: 前のターンの会心の条件は満たした (どの挿し方でも会心率が乗る・2026-11-22 final4)。</summary>
             public float bellRate;   // 〈余韻の鈴〉: 前のターンの会心の数 × RatePer (final6)
-            /// <summary>〈加重の拳套〉: 2 撃目以降の撃で与ダメ % の池に足す割合 (0 = 持っていない・本体 ctx.hitOutgoingPct)。</summary>
-            public float lateHitOutPct;
+            /// <summary>〈加重の拳套〉: 2 撃目以降の撃の最終与ダメージ % (0 = 持っていない・本体 ctx.hitFinalDamagePct・answer15)。</summary>
+            public int lateHitFinalPct;
             public float nonCritMul;           // 鈍器: 非会心だけ ×(1+x)
             public bool pinpointCut;           // 〈一点読みの片眼〉の代価: 非会心 × PinpointEye.NonCritKeepPct%
             public float outMul;               // 与ダメ倍率の池 (ctx.outgoing + 整備パネル + 戦意 + 剛胆 + 遺物 + 研磨剤 + 油・膏薬)
@@ -641,13 +641,13 @@ namespace AutoTest
             float outMul = s.outMul;
             // 端子の山札 (旧い配線では全部「なし」): 与ダメ% は池へ足す (ctx.AddOutgoingPct)・会心倍率 +N・必ず会心・別枠の掛け算・防御の無視
             outMul += ws.outPctAdd;
-            if (hitNo >= 1) outMul += s.lateHitOutPct;   // 〈加重の拳套〉
             float termMul = ws.damageMul;
             //   武器の最終与ダメ +% (一対一・捨て身・処刑・鎧砕き・不滅の刃) / 竜閃〈画竜点睛〉(攻撃の端子 1 枚・最大の目 → 確定会心・+100% / +200%)
             int fpct = s.finalPct + s.rung.FinalPct(s.solo, 1, bCount, s.execBoost, s.shattered, s.undyingStreak + 1);   // ローカル関数は in の引数を捕まえられないので写す
             int garyoPct = s.rung.garyo && ws.aHits == 1 && hitNo == 0 && rawOverride < 0 ? CombatSystem.CombatRules.GaryoPct(ws.atkFaceMax, ws.rolledMax, s.dieMaxFace) : 0;
             bool garyo = garyoPct > 0;
             fpct += garyoPct;
+            if (hitNo >= 1) fpct += s.lateHitFinalPct;   // 〈加重の拳套〉(answer15: 別枠の最終与ダメ)
             bool noDef = ws.ignoreDefense || (hitNo == 0 && s.needleFirst) || rawOverride >= 0 || (hitNo >= 1 && s.rung.vital2nd);   // 〈急所〉: 2 撃目以降は防御無視
             int minDmg = s.minDmg, consBurst = s.consBurst, eDef = noDef ? 0 : s.eDefNow, pen = s.myPen + ws.armorPen, critPen = s.critPen;
             float nonCritMul = s.nonCritMul, berserk = s.berserkMul;
@@ -805,7 +805,7 @@ namespace AutoTest
                 st.critP1 = p1;
             }
             st.critMulEff = CombatSystem.CritCore.EffectiveMul(st.critMulBase, st.critRed, add, st.critDouble);
-            st.lateHitOutPct = run != null && run.OwnsPassive(ItemSystem.PassiveSkills.Effects.WeightingGauntlet.Id) ? ItemSystem.PassiveSkills.Effects.WeightingGauntlet.Pct / 100f : 0f;
+            st.lateHitFinalPct = run != null && run.OwnsPassive(ItemSystem.PassiveSkills.Effects.WeightingGauntlet.Id) ? ItemSystem.PassiveSkills.Effects.WeightingGauntlet.Pct : 0;
             st.nonCritMul = ctx.nonCritOutgoingMultiplier;
             st.pinpointCut = ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.PinpointEye.NonCritCutKey) > 0f;
             st.outMul = OutgoingPoolNow(ctx, run);

@@ -488,7 +488,7 @@ namespace CombatSystem
         // ===== 賽目 (役の軸) の品の数値 (2026-11-21・段 1-f・item-overhaul-spec §5・未測定) =====
         /// <summary>〈見切りの木札〉4・5 の役のターン 各撃の攻撃 +N・ブロック +N / 〈符丁の刻み板〉3・4 の役のターン 各撃の攻撃 + min(上限, 役の回数 × N) (ゾロ目なら 2 倍) /
         /// 〈欠け目の見立て〉1・2 の役のターン 防御の無視 / 〈血染めの歯車〉振り直し＋3 の役のターン 各撃 +N / 〈雷鳴のゾロ目〉ブロック (full-item-rework-ledger §⑧・未測定)。</summary>
-        public const int WoodTagAttack = 1, WoodTagBlock = 2, NotchBoardPer = 1, NotchBoardMax = 6, ChippedPen = 12, GearAttack = 7, GearAttackHigh = 10, ThunderBlock = 10, ThunderRerollBlock = 10, PouchBlock = 5;   // answer12: 歯車 +5 → +7・雷鳴の振り直しの役 ブロック +8・賽袋 振り直しブロック +5
+        public const int WoodTagAttack = 1, WoodTagBlock = 2, NotchBoardPer = 1, NotchBoardMax = 6, ChippedPen = 12, GearAttack = 8, GearAttackHigh = 10, ThunderBlock = 10, ThunderRerollBlock = 10, PouchBlock = 5;   // answer12: 歯車 +5 → +7・雷鳴の振り直しの役 ブロック +8・賽袋 振り直しブロック +5
           // answer9: 歯車 3 の役 +6 → どの役も +5 (3 の役かゾロ目は +10)・雷鳴 ブロック +4 → +10
         /// <summary>役の軸の品が働く役の目 (2026-11-22・どの役でも → 目を指定)。 *Faces = 目の集合 (ビット 1 &lt;&lt; 目・<see cref="FaceIn"/>)。
         /// 2026-11-22 neon 収束で広げた: 木札 5 → 4・5 / 刻み板 4 → 3・4 / 見立て 1 → 1・2 / 導管 2 → 1・2・3。 〈雷毒の導管〉は RoleEffects.cs。</summary>
