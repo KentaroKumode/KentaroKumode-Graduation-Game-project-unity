@@ -320,6 +320,7 @@ namespace UI.Game2D
                 else Center(p, MetaBoardArt.Get(PanelAt(c) == null ? "cell_empty" : "cell_base"), r);
             }
             foreach (var q in st.ValidPlacements) { var d = MetaBoard.Get(q.id); if (d != null) DrawShape(p, MetaBoard.CellsOf(q), FaceOf(d), 1f, null, 0f); }
+            foreach (var q in st.ValidPlacements) { var d = MetaBoard.Get(q.id); var cells = MetaBoard.CellsOf(q); if (d != null && cells != null) { var m = ShapeMid(cells); Icon(p, d, m.x - 8, m.y - 8, Game2DKit.Ink, true); } }
             // 影 (置こうとしている形: 面を半透明で塗り、 縁を明るく)
             if (_ghostOn && Selected != null && !Unknown(Selected) && _confirmCell < 0)
             {
@@ -366,7 +367,8 @@ namespace UI.Game2D
                 var ink = unknown ? Game2DKit.Faint : placed ? Game2DKit.Ivory : own ? Game2DKit.Ink : Game2DKit.Dim;
                 if (i == _hoverRow && !sel && !unknown) ink = Game2DKit.Ivory;
                 int ty = r.y + (r.height - Game2DJpFont.Cell) / 2 + 1;
-                p.Text(unknown ? "？？？" : d.name, r.x + 30, ty, ink);
+                if (!unknown) Icon(p, d, r.x + 28, r.y + 2, ink, false);
+                p.Text(unknown ? "？？？" : d.name, r.x + 47, ty, ink);
                 if (placed) { var tag = new RectInt(r.xMax - 30, r.y + 3, 24, r.height - 6); p.Rect(tag.x, tag.y, tag.width, tag.height, Game2DKit.Green); p.TextC("盤", tag, Game2DKit.Dark); }
                 else if (own) p.TextR("持", r.xMax - 10, ty, Game2DKit.Ink);
                 else if (unknown) p.TextR("実績", r.xMax - 8, ty, Game2DKit.Faint);
@@ -384,8 +386,9 @@ namespace UI.Game2D
                 Game2DJpFont.Wrap(p, "？？？ ― 実績〈" + (MetaProgression.Achievements.AchievementCatalog.Get(s2.achievement)?.displayName ?? s2.achievement) + "〉で手に入る。", RX, DetY, RW, Game2DKit.Dim, 3);
             else
             {
-                p.Text(s2.name + "  " + ShapeName(s2.shape), RX, DetY, Game2DKit.Ivory);
-                Game2DJpFont.Wrap(p, Game2DMetaPanel.Describe(s2), RX, DetY + Game2DJpFont.LineH, RW, Game2DKit.Ink, 2);
+                Icon(p, s2, RX, DetY, Game2DKit.Ivory, false);
+                p.Text(s2.name + "  " + ShapeName(s2.shape), RX + 20, DetY, Game2DKit.Ivory);
+                Game2DJpFont.Wrap(p, Game2DMetaPanel.Describe(s2), RX + 20, DetY + Game2DJpFont.LineH, RW - 20, Game2DKit.Ink, 2);
             }
             // ボタン
             string[] labels = { "回す", "置く", "外す", BuyLabel() };
@@ -428,6 +431,32 @@ namespace UI.Game2D
         {
             "1" => "1 マス", "I2" => "2 マス", "I3" => "3 マス (I)", "L3" => "3 マス (L)", "T" => "4 マス (T)", "O" => "4 マス (2×2)", "S" => "4 マス (S)", "Z" => "4 マス (Z)", _ => shape,
         };
+
+        /// <summary>パネルの 1 bit アイコン (16×16・Resources/Game2DMetaBoard/icons/&lt;id&gt;) を col で打つ。 outline = 面の上で読めるよう暗い縁を 1 dot 付ける。</summary>
+        private static void Icon(KitPix p, BoardPanelDef d, int x, int y, Color32 col, bool outline)
+        {
+            var s = MetaBoardArt.Get("icons/" + d.id, false); if (s == null) return;
+            bool On(int ix, int iy) => ix >= 0 && iy >= 0 && ix < s.w && iy < s.h && s.px[iy * s.w + ix].a >= 128;
+            if (outline)
+                for (int iy = -1; iy <= s.h; iy++) for (int ix = -1; ix <= s.w; ix++)
+                    if (!On(ix, iy) && (On(ix - 1, iy) || On(ix + 1, iy) || On(ix, iy - 1) || On(ix, iy + 1))) p.Set(x + ix, y + iy, Game2DKit.Dark);
+            for (int iy = 0; iy < s.h; iy++) for (int ix = 0; ix < s.w; ix++) if (On(ix, iy)) p.Set(x + ix, y + iy, col);
+        }
+
+        /// <summary>形の真ん中 (画面の dot)。 マスの中心の平均が形の外 (どのマスにも溝にも乗らない) に落ちたら、 そこに一番近いマスの中心。</summary>
+        private static Vector2Int ShapeMid(int[] cells)
+        {
+            float mr = 0, mc = 0; foreach (int c in cells) { mr += c / 3; mc += c % 3; } mr /= cells.Length; mc /= cells.Length;
+            var pt = new Vector2Int(CellX + Mathf.RoundToInt(mc * Pitch) + CellS / 2, CellY + Mathf.RoundToInt(mr * Pitch) + CellS / 2);
+            int best = cells[0]; float bd = float.MaxValue;
+            foreach (int c in cells)
+            {
+                var r = CellRect(c);
+                if (pt.x >= r.x - Gap && pt.x < r.xMax + Gap && pt.y >= r.y - Gap && pt.y < r.yMax + Gap) return pt;
+                float dd = (c / 3 - mr) * (c / 3 - mr) + (c % 3 - mc) * (c % 3 - mc); if (dd < bd) { bd = dd; best = c; }
+            }
+            var b = CellRect(best); return new Vector2Int(b.x + CellS / 2, b.y + CellS / 2);
+        }
 
         /// <summary>棚の形の小さな絵 (1 マス 6 dot (暗い縁つき) + 隙間 1)。 hollow = 未解禁 (縁だけ)。</summary>
         private static void MiniShape(KitPix p, BoardPanelDef d, int x, int y, Color32 col, bool hollow)
