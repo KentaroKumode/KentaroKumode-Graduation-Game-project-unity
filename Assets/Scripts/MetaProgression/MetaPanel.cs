@@ -98,7 +98,7 @@ namespace MetaProgression
         // ---- 補助 (戦術パーツ) ----
 
         /// <summary>攻撃 / 防御の端子調律: その端子に挿した出目 1 個につき +N。</summary>
-        public const int TerminalTunePerDie = 1;
+        public const int TerminalTunePerDie = 2;      // 2026-11-23 整備盤の段階 1 の後 1 → 2 (作者の承認)
         /// <summary>〈軸引きの手形〉: 店の軸指定リロールの追加から引く額。</summary>
         public const int AxisTicketDiscount = 5;
     }
