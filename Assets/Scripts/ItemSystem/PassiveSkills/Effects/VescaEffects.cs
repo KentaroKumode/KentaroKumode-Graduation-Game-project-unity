@@ -391,7 +391,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// (本体も BOT も画面も同じ関数)。 このパッシブ自身はトリガーで何もしない ── 敵のパッシブ欄に出して効果を読ませるための登録。</para>
     ///
     /// <para><b>p はヴェスカの第一レバー</b> (<c>BossParam.Stagnation</c> = 1 枚あたりの止まる確率 %)。
-    /// 基準は段ごとに p1 10% / p2 15% / p3 20% / p4 25% (<see cref="CombatSystem.BossParams.Spec(CombatSystem.BossParam, string)"/>)。
+    /// 基準は段ごとに p1 10% / p2 15% / p3 20% / p4 20% (<see cref="CombatSystem.BossParams.Spec(CombatSystem.BossParam, string)"/>)。
     /// 実数値なので §13-3 の隠し倍率禁止に適合。</para>
     ///
     /// <para>旧効果 (〜2026-11-11): 攻撃の個数 &lt; ブロックの個数のターンにスタックを積み、 次のターンから敵の攻撃 +N (上限 10)。

@@ -18,11 +18,11 @@ namespace CombatSystem
         ChipCap,           // 審判官・審判の炎の 1 回 (毎ターン) あたりの上限。 基準10
         RegenReduction,    // 灰燼・灰塵の鎧の被ダメ軽減量 (タンク性/ジリ貧)。 基準9
                            //   [読む敵なし] AshArmor はどの敵も持っていない
-        Stagnation,        // 停滞する時間: 引いた端子 1 枚あたりの止まる確率 (%)。 基準は段ごと p1 10 / p2 15 / p3 20 / p4 25 (2026-11-12 #103〜)
+        Stagnation,        // 停滞する時間: 引いた端子 1 枚あたりの止まる確率 (%)。 基準は段ごと p1 10 / p2 15 / p3 20 / p4 20 (2026-11-23〜・p4 はその前 25・2026-11-12 #103〜)
                            //   → **7層ヴェスカの第一レバー** (docs/GAME.md §13-4)。 旧 (〜11-11) は停滞スタック 1 つあたりの敵攻撃加算・基準 1
         IntimidateThreat,  // 威圧+ の加算。 基準3。 2026-11-11 (#104) から敵の攻撃 +N (enemyDiceTotalBonus・戦闘を通して) として効く
                            //   (それまでは ctx.enemyThreat に足して読む処理が無く、 効き先が無かった)
-        PoisonStackCap,    // 毒沼の主・毒の侵蝕の毒スタック上限 (DOTの最大強度)。 基準5
+        PoisonStackCap,    // 毒沼の主・毒の侵蝕の毒スタック上限 (DOTの最大強度)。 基準4 (2026-11-23〜・その前 5)
         MirrorReflectCap,  // 鏡の双子・鏡映の応答の反射ダメ上限。 基準9
         GoblinCall,        // ゴブリン王・号令の毎ターンの敵攻撃加算。 基準3
         // 2026-11-14 (灰燼の王の測定の口): 末尾に足す (番号で保存している所は無いが、 並びは動かさない)
@@ -76,7 +76,7 @@ namespace CombatSystem
                 //   (旧: 停滞スタック 1 つあたりの敵出目加算・基準 1・範囲 0〜12)
                 case BossParam.Stagnation:        return new ParamSpec(10f, 0f, 50f);
                 case BossParam.IntimidateThreat:  return new ParamSpec( 3f, 0f, 10f);
-                case BossParam.PoisonStackCap:    return new ParamSpec( 5f, 1f, 12f);
+                case BossParam.PoisonStackCap:    return new ParamSpec( 4f, 1f, 12f);
                 case BossParam.MirrorReflectCap:  return new ParamSpec( 9f, 0f, 15f);
                 case BossParam.GoblinCall:        return new ParamSpec( 3f, 0f, 12f);
                 // 2026-11-14: 灰燼の王の 2 つ (直書きの値を基準へ移した)。 同日、 測定の口 (AutoRunner.bossParamSpec) で測った値を作者の承認で基準へ:
@@ -97,7 +97,7 @@ namespace CombatSystem
         }
 
         /// <summary>ボス id ごとの基準値と範囲。 基準が段で違う項目だけ <see cref="Spec(BossParam)"/> から差し替える
-        /// (今は〈停滞する時間〉だけ: boss_layer7 10% / _p2 15% / _p3 20% / _p4 25%)。 id が null なら <see cref="Spec(BossParam)"/> と同じ。</summary>
+        /// (今は〈停滞する時間〉だけ: boss_layer7 10% / _p2 15% / _p3 20% / _p4 20%)。 id が null なら <see cref="Spec(BossParam)"/> と同じ。</summary>
         public static ParamSpec Spec(BossParam p, string id)
         {
             var s = Spec(p);
@@ -113,7 +113,7 @@ namespace CombatSystem
             {
                 case GameLoop.BossIds.VescaP2:    return 15f;
                 case GameLoop.BossIds.VescaP3:    return 20f;
-                case GameLoop.BossIds.VescaFinal: return 25f;
+                case GameLoop.BossIds.VescaFinal: return 20f;
                 default:                          return 10f;      // 段 1 (VescaP1) と、 〈停滞する時間〉を持たない id
             }
         }

@@ -839,7 +839,7 @@
       "displayName": "吸血の貴人",
       "description": "陽の届かない五層で、古風な礼服のまま生き長らえる夜の貴人。青白い顔に穏やかな笑みを浮かべ、血の乾いた細剣を杖代わりに突いている。",
       "floor": 5,
-      "maxHP": 927,
+      "maxHP": 700,
       "criticalNumerator": 0,
       "threat": 6,
       "passiveSkills": [
@@ -862,7 +862,7 @@
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         }
       ],
-      "baseAttack": 11,
+      "baseAttack": 9,
       "attackRollMin": 1,
       "attackRollMax": 4,
       "danger": 138,
@@ -1271,7 +1271,7 @@
       "displayName": "ゴブリン王",
       "description": "討ち取った探検隊長の鉄帽を冠代わりに被る、異様に肥え太った群れの主。荷箱を積んだ玉座にふんぞり返り、奪った軍用笛を吹き鳴らす。",
       "floor": 3,
-      "maxHP": 878,
+      "maxHP": 950,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 4,
@@ -1283,7 +1283,7 @@
           "flavorText": "号令の内容は誰にも聞き取れなかった。それでも全員が、同時に、強くなった。"
         }
       ],
-      "baseAttack": 18,
+      "baseAttack": 20,
       "attackRollMin": 1,
       "attackRollMax": 4
     },
@@ -1300,11 +1300,11 @@
         {
           "internalName": "MiasmaCorrosion",
           "skillName": "毒の侵蝕",
-          "description": "毎ターン終了時、毒スタック+1（上限5）、その後スタック分の固定ダメージ（軽減無視）。速攻なら軽傷、長期戦は致命。ダウン中は発動しない。ダウンに入った時、毒が 2 減る。",
+          "description": "毎ターン終了時、毒スタック+1（上限4）、その後スタック分の固定ダメージ（軽減無視）。速攻なら軽傷、長期戦は致命。ダウン中は発動しない。ダウンに入った時、毒が 2 減る。",
           "flavorText": "沼は急がない。急ぐ理由が、沼の側には無い。"
         }
       ],
-      "baseAttack": 19,
+      "baseAttack": 17,
       "attackRollMin": 1,
       "attackRollMax": 4
     },
@@ -1341,7 +1341,7 @@
       "displayName": "審判官",
       "description": "管轄の果てである五層の底に立ち、降りてきた者の罪を量る執行者。白い法衣の背に日輪を負い、手にした天秤は一度も揺れたことがない。",
       "floor": 5,
-      "maxHP": 2386,
+      "maxHP": 2650,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 6,
@@ -1359,7 +1359,7 @@
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         }
       ],
-      "baseAttack": 16,
+      "baseAttack": 18,
       "attackRollMin": 2,
       "attackRollMax": 4,
       "heavyPeriod": 5,
@@ -1489,9 +1489,9 @@
           "flavorText": "「開けたのは私だ。だが閉じ方は誰も知らない」"
         }
       ],
-      "baseAttack": 24,
+      "baseAttack": 28,
       "attackRollMin": 2,
-      "attackRollMax": 6,
+      "attackRollMax": 7,
       "heavyPeriod": 0,
       "heavyMul": 3.0,
       "heavyLightMul": 0.8
@@ -1538,9 +1538,9 @@
           "flavorText": "「開けたのは私だ。だが閉じ方は誰も知らない」"
         }
       ],
-      "baseAttack": 23,
+      "baseAttack": 27,
       "attackRollMin": 2,
-      "attackRollMax": 5,
+      "attackRollMax": 7,
       "heavyPeriod": 0,
       "heavyMul": 3.0,
       "heavyLightMul": 0.8
@@ -1550,7 +1550,7 @@
       "floor": 7,
       "displayName": "ヴェスカ・神話",
       "description": "地上の鑑定所には一度も届いたことのない、神話級の遺物が宙に浮かぶ。裂け目から漏れる異界の光を浴びて、眠っていた品々が次々と目を覚ます。",
-      "maxHP": 3847,
+      "maxHP": 4400,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 12,
@@ -1587,7 +1587,7 @@
           "flavorText": "「開けたのは私だ。だが閉じ方は誰も知らない」"
         }
       ],
-      "baseAttack": 24,
+      "baseAttack": 27,
       "attackRollMin": 2,
       "attackRollMax": 7,
       "heavyPeriod": 5,
@@ -1599,7 +1599,7 @@
       "floor": 7,
       "displayName": "ヴェスカ・天与",
       "description": "学者の落ち着きをかなぐり捨て、傷つくことすら楽しむように笑うヴェスカ。未知の強さを解き明かそうと、天変地異を呼ぶ異界の品を振るう。",
-      "maxHP": 4100,
+      "maxHP": 2600,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 12,
@@ -1620,7 +1620,7 @@
         {
           "internalName": "StagnantTime",
           "skillName": "停滞する時間",
-          "description": "端子を引くたび、25%の確率でその端子を止める。止まった端子はそのターン挿せず、捨て札に行かず次のターンまで手札に残る。",
+          "description": "端子を引くたび、20%の確率でその端子を止める。止まった端子はそのターン挿せず、捨て札に行かず次のターンまで手札に残る。",
           "flavorText": "「急ぐことはない。時間なら、こちらにある」"
         },
         {
@@ -1638,7 +1638,7 @@
       ],
       "baseAttack": 21,
       "attackRollMin": 2,
-      "attackRollMax": 9,
+      "attackRollMax": 8,
       "heavyPeriod": 5,
       "heavyMul": 3.0,
       "heavyLightMul": 0.8

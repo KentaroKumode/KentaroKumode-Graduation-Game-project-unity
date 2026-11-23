@@ -695,7 +695,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>毒沼の主 — 毒の侵蝕: 毎ターン終了時に毒スタック+1（上限5）、
+    /// <summary>毒沼の主 — 毒の侵蝕: 毎ターン終了時に毒スタック+1（上限 BossParam.PoisonStackCap・基準4）、
     /// その後スタック分の固定ダメ（軽減無視）。長期戦ほど加速度的に蝕む。
     /// T1:1 T2:2 … T5:5 で頭打ち。累計はT5までで15＝速攻なら軽傷、長引けば致命。</summary>
     public class MiasmaCorrosion : IPassiveSkillEffect
