@@ -290,7 +290,7 @@ namespace AutoTest
                 {
                     if (sg.secondStrike && (hot || sg.burstLastTurn)) sightFlat += ItemSystem.PassiveSkills.Effects.SecondStrike.Atk * o.attackHits.Count;
                     if (sg.fierceBlade && hot)
-                        sightFlat += Math.Min(ItemSystem.PassiveSkills.Effects.FierceBlade.MaxPct, ItemSystem.PassiveSkills.Effects.FierceBlade.PctPerBurst * (sg.heat.burstsTotal + hf.burstsWired)) / 100f
+                        sightFlat += ItemSystem.PassiveSkills.Effects.FierceBlade.PctPerBurst * (sg.heat.burstsTotal + hf.burstsWired) / 100f
                                    * DeckPerTurnDamage(in s, k);
                 }
             }

@@ -41,7 +41,7 @@ namespace CombatSystem
         public const int SuperAtPct = 150, SuperMulPct = 165, KilnSuperMulPct = 260;   // 超臨界 ×1.5 → ×1.65 (answer9)・暴れ窯 ×2.0 → ×2.5 (2026-11-22 final4) → ×2.0 (final5) → ×2.25 (final6) → ×2.60 (answer12)
         public const int StoneTwo = 8, StoneAll = 16, BreastHeat = 4, BreastBlock = 2, PokerPerDie = 6, SpannerPerHit = 3, WhetPerHit = 2;   // 過熱石 +6/+12 → +8/+16・スパナ +2 → +4・荒砥 +1 → +2 (final4)・スパナ +4 → +3 (final6)
         public const int OvenRestart = 8, PrimerAdd = 4, CoalAdd = 1, CoalMax = 6, MoldPerExcess = 3, LedgerMax = 5, KettleCut = 4;   // 炭 +2 → +1・釜 −8 → −6 (2026-11-22 段 3 の較正 2)・雷管 +6/48 → +4/32・鋳型 +3 → +2 (neon 収束)・雷管 +4/32 → +6/上限なし (final4) → +3/上限なし (final5) → +5 (answer9)・answer12: 雷管 +4・鋳型 +3・釜 −4
-        public const int SparkPctPerBurst = 7,   // 2026-11-22 段 3 の較正 2: 15 → 8 (長い戦闘で伸び続ける) → neon 収束 5 → final4 8 → final5 5 → answer9 7
+        public const int SparkPctPerBurst = 10,   // 2026-11-22 段 3 の較正 2: 15 → 8 (長い戦闘で伸び続ける) → neon 収束 5 → final4 8 → final5 5 → answer9 7 → answer13 10
                           AshenNeed = 40, AshenMulPct = 175, FlintPctPerBurst = 25, KilnStep = 4, KilnMax = 16, PillarDownMulPct = 250;   // 柱折り ×2.0 → ×2.5 (final6)
         /// <summary>〈燧石の指輪〉: 攻撃の撃 (攻撃の端子の発動・【再起動】の撃も 1 つ) がこの数以上のターン (2026-11-22 neon 収束: 攻撃の端子 2 枚 → 3 撃)。</summary>
         public const int FlintAttackHits = 3;

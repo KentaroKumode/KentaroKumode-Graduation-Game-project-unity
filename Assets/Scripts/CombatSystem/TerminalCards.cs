@@ -473,18 +473,18 @@ namespace CombatSystem
         // 2026-11-22 neon 収束: 〈使い切りの矜持〉+2・+3 → +4・+5 / 〈灰払いの箒〉ブロック +1 → +3 (使うたび・引く条件は 1 ターン 2 回のまま)。
         // 2026-11-22 final4: 〈灰払いの箒〉ブロック +3 → +4・引く条件 1 ターン 2 回 → 1 回 (引くのは 1 ターン 1 回まで) / 〈仕込みの配電盤〉4 枚 → 3 枚。
         // 2026-11-22 final5: 〈灰払いの箒〉ブロック +4 → +3・引く条件 1 ターン 1 回 → 2 回。
-        public const int TongsAttack = 1, ClaspAttack = 6, ClaspBlock = 4, AuxGearBlock = 6, AuxGearMax = 3, IdleWeightDrawMax = 2, PrideAttack = 4, PrideBlock = 5, PrideMax = 1,
-            BroomBlock = 3, BroomDrawMax = 1, BroomDrawNeed = 2, RewindMax = 10, RewindBlock = 6, SwitchboardNeed = 3, SwitchboardItemDraw = 1, MoldBonus = 6, MoldSupportBlock = 8,
+        public const int TongsAttack = 1, ClaspAttack = 6, ClaspBlock = 2, AuxGearBlock = 6, AuxGearMax = 3, IdleWeightDrawMax = 2, PrideAttack = 4, PrideBlock = 5, PrideMax = 1,
+            BroomBlock = 3, BroomDrawMax = 1, BroomDrawNeed = 2, RewindMax = 10, RewindBlock = 6, SwitchboardNeed = 3, SwitchboardItemDraw = 1, MoldBonus = 5, MoldSupportBlock = 7,
             ToolboxMaxDeck = 12, ToolboxHand = 1, SparePlugDraw = 2;
         /// <summary>〈再利用のるつぼ〉使い捨ての累計 1 回あたり・上限 / 〈継ぎ目のない導線〉補助 1 枚あたりの各撃 +N・防御の無視 / 〈解体屋の袋〉間隔・1 戦闘の上限 /
         /// 〈常設の作業台〉常設 1 枚あたりの各撃 +N・ブロック / 〈灰から組む機関〉要る回数 / 〈永久機関の主軸〉倍化の間隔・1 ターンに多く引く上限。</summary>
         // 2026-11-22 neon 収束 (neon の「旧」は Phase 4 較正の前の値だったので、 今の値に同じ比で掛けた): 〈再利用のるつぼ〉×2 → ×3 / 〈常設の作業台〉各撃 +3 → +5・ブロックは +3 のまま・最終 +10% → +13% / 〈灰から組む機関〉6% → 9%。
         // 2026-11-22 final4: 〈再利用のるつぼ〉×3・上限 16 → ×4・上限なし / 〈常設の作業台〉+5・+3・+13% → +7・+5・+18% / 〈灰から組む機関〉9%・上限 60% → 15%・上限なし / 〈永久機関の主軸〉3 回目ごと → 2 回目ごと。
         // 2026-11-22 final5: 〈再利用のるつぼ〉×4 → ×2 / 〈常設の作業台〉+7・+5・+18% → +5・+3・+13% / 〈灰から組む機関〉2 回・15% → 3 回・9% (上限なしのまま)。
-        public const int CruciblePer = 2, SeamlessAttack = 8, SeamlessPen = 8, SeamlessBlock = 4, BagEvery = 4, BagMax = 5,
+        public const int CruciblePer = 2, SeamlessAttack = 7, SeamlessPen = 8, SeamlessBlock = 2, BagEvery = 4, BagMax = 5,
             WorkbenchPer = 5, WorkbenchBlock = 3, AshNeed = 3, EngineEvery = 2, EngineDrawMax = 2;
         /// <summary>〈折り目のついた札〉与ダメージ % の池 / 〈常設の作業台〉常設 1 枚あたりの最終与ダメージ / 〈灰から組む機関〉使い捨て 1 回あたりの最終与ダメージ。</summary>
-        public const float FoldedMul = 1.25f, FoldedStreakMul = 1.50f, WorkbenchFinalPct = 0.13f, AshPer = 0.09f;
+        public const float FoldedPerStreak = 0.25f, WorkbenchFinalPct = 0.13f, AshPer = 0.09f;
         // ===== 賽目 (役の軸) の品の数値 (2026-11-21・段 1-f・item-overhaul-spec §5・未測定) =====
         /// <summary>〈見切りの木札〉4・5 の役のターン 各撃の攻撃 +N・ブロック +N / 〈符丁の刻み板〉3・4 の役のターン 各撃の攻撃 + min(上限, 役の回数 × N) (ゾロ目なら 2 倍) /
         /// 〈欠け目の見立て〉1・2 の役のターン 防御の無視 / 〈血染めの歯車〉振り直し＋3 の役のターン 各撃 +N / 〈雷鳴のゾロ目〉ブロック (full-item-rework-ledger §⑧・未測定)。</summary>
@@ -1221,7 +1221,7 @@ namespace CombatSystem
                 o.attackAdd += each * o.attackHits.Count;
                 if (o.logAttack) o.attackLog.Add($"山札の品:+{each}×{o.attackHits.Count}撃");
             }
-            if ((f & DeckItems.Folded) != 0 && keptUsed > 0) o.damageMul *= st.keptStreak >= 2 ? FoldedStreakMul : FoldedMul;   // 〈折り目のついた札〉別枠の最終与ダメージ (answer12)
+            if ((f & DeckItems.Folded) != 0 && keptUsed > 0) o.damageMul *= 1f + FoldedPerStreak * st.keptStreak;   // 〈折り目のついた札〉別枠の最終与ダメージ・続いたターン数 × 25%・上限なし (answer13)
             if ((f & DeckItems.Switchboard) != 0 && o.firedNonBasic >= SwitchboardNeed) st.extraDrawNext += SwitchboardItemDraw;   // 〈仕込みの配電盤〉 (目盛りの削りは DeckEffects.cs)
             if ((f & DeckItems.IdleWeight) != 0)                                                // 〈空回りの錘〉: どの端子にも挿さなかった出目 (条件に合わず外れた目も)
             {

@@ -32,6 +32,21 @@ namespace AutoTest.EditorTests
             Assert.That(Run(DeckItems.Ash, 1).damageMul, Is.EqualTo(b.damageMul).Within(1e-4));
         }
 
+        /// <summary>〈折り目のついた札〉(answer13): 残した端子の発動が続いたターン数 × 25%・上限なし (3 ターン目 ×1.75)。</summary>
+        [Test]
+        public void Folded_StreakTimes25Uncapped()
+        {
+            var board = new List<string> { TerminalIds.Attack, TerminalIds.Block };
+            var env = new TerminalEnv { chargeCap = 30, hp = 50, maxHp = 50, enemyAttack = 10, enemyHp = 100, enemyMaxHp = 100 };
+            TerminalOutcome R(DeckItems f, int streakBefore)
+                => TerminalCards.Resolve(board, new[] { 0, 1 }, new[] { 4, 3 }, env,
+                    new TerminalBattleState { deckItems = f, kept = new List<string> { TerminalIds.Attack }, keptStreak = streakBefore });
+            float b = R(DeckItems.None, 2).damageMul;
+            Assert.That(R(DeckItems.Folded, 0).damageMul, Is.EqualTo(b * 1.25f).Within(1e-4));
+            Assert.That(R(DeckItems.Folded, 2).damageMul, Is.EqualTo(b * 1.75f).Within(1e-4));
+            Assert.That(R(DeckItems.Folded, 9).damageMul, Is.EqualTo(b * 3.50f).Within(1e-4));
+        }
+
         [Test]
         public void Engine_DrawCapAndBagCap()
         {

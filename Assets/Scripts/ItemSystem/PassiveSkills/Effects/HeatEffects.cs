@@ -34,11 +34,11 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>乾き火口箱: 戦闘開始時、 臨界 +20 (2026-11-22 final4: 旧 +14)。</summary>
+    /// <summary>乾き火口箱: 戦闘開始時、 臨界 +14 (answer13: final4 の +20 → +14)。</summary>
     public class DryTinderbox : IPassiveSkillEffect
     {
         public string SkillId => "乾き火口箱";
-        public const int Heat = 20;
+        public const int Heat = 14;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => Kw.AddHeat(ctx, Heat);
     }
@@ -125,11 +125,11 @@ namespace ItemSystem.PassiveSkills.Effects
 
     // ── G: 分岐 A〈高速連鎖〉/ 分岐 B〈高圧超臨界〉 ── (〈帳簿外の爆薬〉〈火花読みの眼鏡〉は HeatCore の旗)
 
-    /// <summary>溢れ取りの鋳型 (分岐 B): 爆発のとき、 閾値を超えて溢れていた臨界 1 につき、 その爆発 +2 (HeatCore の旗)・次の 1 撃の与ダメージ +2% (2026-11-22 neon 収束: +3・+3%)。</summary>
+    /// <summary>溢れ取りの鋳型 (分岐 B): 爆発のとき、 閾値を超えて溢れていた臨界 1 につき、 その爆発 +3 (HeatCore の旗)・次の 1 撃の最終与ダメージ +4% (別枠・answer13: 与ダメの池 +3% → 最終 +4%)。</summary>
     public class OverflowMold : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => GameLoop.ItemIds.HeatMold;
-        public const int PctPerExcess = 3;   // answer12: +2 → +3
+        public const int PctPerExcess = 4;   // answer12: +2 → +3・answer13: +3% (与ダメの池) → +4% (最終与ダメ)
         /// <summary>[persistent・次の 1 撃で 0] 溜まっている与ダメージの % 。</summary>
         private const string Key = "heat.mold";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Pct(Rw.Count(ctx, Key) / 100f);
@@ -140,7 +140,7 @@ namespace ItemSystem.PassiveSkills.Effects
             int p = Rw.Count(ctx, Key);
             if (!ctx.IsRealHit || p <= 0) return;
             ctx.accumulatedValues[Key] = 0;
-            ctx.AddOutgoingPct(p / 100f);   // 与ダメの池は撃ごとに戻るので、 この撃だけ
+            ctx.hitFinalDamagePct += p;   // この撃だけ (撃ごとに 0 へ戻る)
         }
     }
 
@@ -171,11 +171,11 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>希望の灯片: 爆発を 2 回以上起こして戦闘に勝ったとき、 最大 HP +3 (永続)。 【過熱】のターンの終わり、 HP +3。</summary>
+    /// <summary>希望の灯片: 爆発を 2 回以上起こして戦闘に勝ったとき、 最大 HP +2 (永続)。 【過熱】のターンの終わり、 HP +2 (answer13: +3・+3 → +2・+2)。</summary>
     public class HopeShard : IPassiveSkillEffect
     {
         public string SkillId => "希望の灯片";
-        public const int NeedBursts = 2, MaxHp = 3, Heal = 3;
+        public const int NeedBursts = 2, MaxHp = 2, Heal = 2;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd, PassiveSkillTrigger.OnBattleEnd };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -212,13 +212,13 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>烈刃【規則】: 【過熱】の間、 すべての撃の最終与ダメージ +「この戦闘の爆発の回数 × 15%」(最大 +150%)。</summary>
+    /// <summary>烈刃【規則】: 【過熱】の間、 すべての撃の最終与ダメージ +「この戦闘の爆発の回数 × 25%」(上限なし・answer13: 15%・最大 150% → 25%・上限なし)。</summary>
     public class FierceBlade : IPassiveSkillEffect, IRelicDisplay
     {
         public const string Id = "烈刃";
         public string SkillId => Id;
-        public const int PctPerBurst = 15, MaxPct = 150;
-        public static int PctNow(CombatContext ctx) => System.Math.Min(MaxPct, PctPerBurst * Rw.Count(ctx, Kw.BurstTotalKey));
+        public const int PctPerBurst = 25;
+        public static int PctNow(CombatContext ctx) => PctPerBurst * Rw.Count(ctx, Kw.BurstTotalKey);
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(Kw.Overheated(ctx));
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)

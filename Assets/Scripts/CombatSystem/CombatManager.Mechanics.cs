@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 using ItemSystem;
@@ -409,7 +409,7 @@ namespace CombatSystem
 
             // 賽目の締めと【規則】の品 (2026-11-21・段 1-f・item-overhaul-spec §5 / §12-1)。 所持は戦闘の始めから変わらない
             var roleRun = GameLoop.GameManager.Instance?.Run;
-            bool omni = AxisRules.Owns(roleRun, GameLoop.ItemIds.RoleOmni), mirror = AxisRules.Owns(roleRun, GameLoop.ItemIds.RoleMirror),
+            bool mirror = AxisRules.Owns(roleRun, GameLoop.ItemIds.RoleMirror),
                  fate = AxisRules.Owns(roleRun, GameLoop.ItemIds.RoleFate);
             var tier = GameLoop.DiceFaceParts.Tier.T3;   // Tier は使わない (ADR-0015)。 実績の呼び手のために渡すだけ
             // 〈宿命の刻み目〉: 前のターンに立ったゾロ目・連なり、 または 2 ターン続けて立った役の効果が、 このターンにももう 1 回働く
@@ -435,9 +435,7 @@ namespace CombatSystem
                 // 〈万象のゾロ目〉: このターン 2 個そろいをゾロ目として扱う (振り直しの後に DecideOmniPair が決めた・端子の解決も同じ TerminalCards.UpgradePair)
                 k = TerminalCards.UpgradePair(k, OmniPairNow(ctx), ctx.sealedRoleMask);
 
-                // 〈万象のゾロ目〉: ゾロ目の効果は 2 回働く
-                int times = omni && YachtRoles.IsTriple(k) ? 2 : 1;
-                for (int t = 0; t < times; t++) YachtRoleEffects.Apply(k, tier, ctx, ref outcome);
+                YachtRoleEffects.Apply(k, tier, ctx, ref outcome);   // 〈万象のゾロ目〉の「ゾロ目の効果が 2 回働く」は answer13 で削除 (格上げだけ)
                 // 〈鏡合わせの盤〉: 2 個そろいなら、 1 つ小さい目の 2 個そろいの効果も働く (1 の 2 個そろいなら、 次のターンの無料の振り直し +1)
                 if (mirror && !YachtRoles.IsBig(k)) MirrorPair(k, ctx, tier, ref outcome);
                 if (fate && (YachtRoles.IsBig(k) || fateStreak)) ctx.accumulatedValues[FateRoleKey] = (int)k + 1;

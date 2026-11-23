@@ -61,19 +61,20 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>負け越しの賽: 役が立たなかったターンの終わり、 次のターンの最初の振り直しが無料 (無料の振り直し +1)・次のターンの手札 +1 枚・ブロック +8 (answer12)。</summary>
+    /// <summary>負け越しの賽: 役が立たなかったターンの終わり、 次のターンの最初の振り直しが無料 (無料の振り直し +1)・次のターンのブロック +6。 そのターンに振り直していたなら、 次のターンの手札 +1 枚 (answer13)。</summary>
     public class LosingStreakDie : IPassiveSkillEffect
     {
         public string SkillId => ItemIds.RoleLosing;
-        public const int Block = 8, Draw = 1;   // answer12: ブロック +6 → +8・手札 +1
+        public const int Block = 6, Draw = 1;   // answer12: ブロック +6 → +8・手札 +1 → answer13: +6・手札は振り直したターンだけ
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (ctx.firedRolesThisTurn.Count > 0) return;
-            Rw.DrawNext(Draw);
+            bool rerolled = ctx.rerollsThisTurn > 0;
+            if (rerolled) Rw.DrawNext(Draw);
             YachtRoleEffects.AddNextTurn(ctx, YachtRoleEffects.FreeRerollKey, 1);
             RoleFx.BlockNext(ctx, Block);
-            Rw.Log($"[負け越しの賽] 役なし → 次のターン 最初の振り直しが無料・手札 +{Draw}・ブロック +{Block}");
+            Rw.Log($"[負け越しの賽] 役なし → 次のターン 最初の振り直しが無料・ブロック +{Block}" + (rerolled ? $"・手札 +{Draw}" : ""));
         }
     }
 
