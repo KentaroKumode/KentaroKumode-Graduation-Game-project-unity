@@ -1,4 +1,4 @@
-# プレイヤーの武器の攻撃 (たたき台 12 個) の見本。 480×270 の舞台・1 秒 8 コマ・2 倍。 出力は Captures/fxlib/_weapons/index.html (git 管理外)。
+# プレイヤーの武器の攻撃 (たたき台 12 個) の見本。 480×270 の舞台・1 秒 24 コマ (ゲームの書き出しと同じ・export_fx.py の FPS)・2 倍。 出力は Captures/fxlib/_weapons/index.html (git 管理外)。
 import io, json, os, subprocess
 from PIL import Image, ImageDraw
 PFX = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -17,7 +17,7 @@ for fam, ink, moves in PLAN:
     html.append("<h2>%s</h2>" % fam)
     for wid, name, note in moves:
         png = os.path.join(OUT, wid + "_sheet.png")
-        subprocess.run(["node", "lab/lcd_frames.mjs", "dicebound/weapons", png, "--ink", INK.get(wid, ink), "--fps", "8", "--opts", json.dumps({"weapon": wid})], cwd=PFX, check=True, stdout=subprocess.DEVNULL)
+        subprocess.run(["node", "lab/lcd_frames.mjs", "dicebound/weapons", png, "--ink", INK.get(wid, ink), "--fps", "24", "--opts", json.dumps({"weapon": wid})], cwd=PFX, check=True, stdout=subprocess.DEVNULL)
         m = json.load(io.open(png[:-4] + ".json", encoding="utf-8")); sh = Image.open(png).convert("RGBA")
         fr = [sh.crop((i * W, 0, (i + 1) * W, H)) for i in range(m["n"])]
         while len(fr) > 1 and fr[-1].getchannel("A").getbbox() is None: fr.pop()
@@ -26,7 +26,7 @@ for fam, ink, moves in PLAN:
             b = base.copy(); b.paste(f, (0, 0), f); seq.append(b)
         seq += [base.copy()] * 3
         big = [x.resize((W * SC, H * SC), Image.NEAREST) for x in seq]
-        big[0].save(os.path.join(OUT, wid + ".gif"), save_all=True, append_images=big[1:], duration=125, loop=0)
+        big[0].save(os.path.join(OUT, wid + ".gif"), save_all=True, append_images=big[1:], duration=42, loop=0)
         n = len(seq) - 5; o = Image.new("RGB", (W * 5, H), (0, 0, 0))
         for q, i in enumerate([3, 2 + max(2, n // 4), 2 + max(3, n // 2), 2 + max(4, n * 2 // 3), 2 + max(5, n * 5 // 6)]): o.paste(seq[min(i, len(seq) - 1)], (q * W, 0))
         o.save(os.path.join(OUT, wid + "_contact.png")); thumbs.append(o)
@@ -39,6 +39,6 @@ io.open(os.path.join(OUT, "index.html"), "w", encoding="utf-8").write('''<!docty
 h1{font-size:20px;margin:0}h2{font-size:19px;margin:34px 0 0;border-top:1px solid #36323e;padding-top:14px}h3{font-size:16px;margin:20px 0 6px}small{color:#a39cb2;font-weight:400;margin-left:8px}
 p{color:#a39cb2}img{image-rendering:pixelated;display:block;max-width:100%}.s{overflow-x:auto;margin-top:6px}.s img{max-width:none}</style></head><body><main>
 <h1>プレイヤーの武器の攻撃: たたき台 (家系ごとに通常と会心・8 個)</h1>
-<p>元の効果を、 式を書き直さずに、 この画面の大きさで流した物 (大きさ・置く場所・色・速さだけ変えた)。 プレイヤーの攻撃なので、 絵は敵の体の上に出る。 1 秒 8 コマ・2 倍・背景と敵と下の盤は仮。</p>
+<p>元の効果を、 式を書き直さずに、 この画面の大きさで流した物 (大きさ・置く場所・色・速さだけ変えた)。 プレイヤーの攻撃なので、 絵は敵の体の上に出る。 1 秒 24 コマ・2 倍・背景と敵と下の盤は仮。</p>
 ''' + "".join(html) + "</main></body></html>")
 print("ok", len(thumbs))

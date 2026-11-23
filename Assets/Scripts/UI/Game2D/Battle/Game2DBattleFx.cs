@@ -220,7 +220,7 @@ namespace UI.Game2D.Battle
 #endif
         private BossFx.Kind _demoKind = BossFx.Kind.King; private bool _sheetsInTest = true;      // 試験用のキー (K・J・H)
 
-        /// <summary>装備している武器の家系 (items.json の family)。 剣・斧・短剣・盾の時だけ絵を流す (それ以外・素手・竜閃は null)。 戦闘の流れ (Game2DBattleSim) が入れる。</summary>
+        /// <summary>装備している武器の絵の家系 (<see cref="FxLayerPreload.WeaponFamilyOf"/>: items.json の family・段 4 は「家系-legend」)。 剣・斧・短剣・盾の時だけ絵を流す (それ以外・素手・竜閃は null)。 戦闘の流れ (Game2DBattleSim) が入れる。</summary>
         public string WeaponSheetFamily;
         /// <summary>敵の攻撃が当たった (ダメージの数字が出た) か。 戦闘の流れが HP の表示を減らす拍子に使う (大技は当たるまでが長い)。</summary>
         public bool EnemyHitLanded { get; private set; }
@@ -521,7 +521,7 @@ namespace UI.Game2D.Battle
             if (!Showing) return;
             if (Input.GetKeyDown(KeyCode.Space) && !SimDriven)
             {
-                if (_phase == Phase.Idle) { bool crit = _critMode == 1 || (_critMode == 0 && UnityEngine.Random.value < 0.2f); WeaponSheetFamily = _sheetsInTest && !IsDragon(_wi) ? Weapons[_wi].fam : null; PlayerAttack(_wi, crit, Mathf.RoundToInt(Weapons[_wi].atk + UnityEngine.Random.Range(3, 19)) * (crit ? 3 : 2) / 2); }
+                if (_phase == Phase.Idle) { bool crit = _critMode == 1 || (_critMode == 0 && UnityEngine.Random.value < 0.2f); WeaponSheetFamily = _sheetsInTest && !IsDragon(_wi) ? Weapons[_wi].fam + (Weapons[_wi].tier == FxLayerPreload.LegendTier ? FxLayerPreload.LegendSuffix : "") : null; PlayerAttack(_wi, crit, Mathf.RoundToInt(Weapons[_wi].atk + UnityEngine.Random.Range(3, 19)) * (crit ? 3 : 2) / 2); }
                 else if (_phase == Phase.Won) ResetEnemy();
             }
             if (Input.GetKeyDown(KeyCode.R)) ResetEnemy();

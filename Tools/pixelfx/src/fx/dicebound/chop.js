@@ -5,7 +5,8 @@
 // The crescent recipe (the edge whips out, holds, the tail follows, thinning and cooling down the ramp; shavings and sparks) is adapted from Sprite Fusion's
 // open-source slash (https://www.spritefusion.com/pixel-art-vfx/slash), MIT License, Copyright (c) 2026 Hugo Duprez.
 import { Particles, P, Rng, fit, sparkle, clamp, smooth, ease, noise2 } from "../../core/index.js";
-import { through, smear, trace, glowAlong, slashEnd, shavings, onSwing } from "../melee/_lib.js";
+import { through, smear, trace, glowAlong, slashEnd, shavings, onSwing, travel } from "../melee/_lib.js";
+import { glowSlash } from "./_blade.js";
 
 export const meta = {
   name: "Axe chop (DICE BOUND)",
@@ -23,6 +24,8 @@ export const meta = {
     heavy: false,   // 会心: 太く・長く残る・残像が 1 本付く
     bloom: null,    // 斬った跡と刃のまわりのブルームの強さ (既定: 通常 1.1・会心 1.9)
     flow: 2.4,      // 何倍に広げて使うか (筋の細かさを、 広げた後の画面のドットに合わせる)
+    smear: false,
+    keepParticles: false, // 刃の軌跡だけ高速化し、火花・削り屑・着弾光は元のまま据え置く (axe-normal 用)
     seed: 4,
   },
 };
@@ -59,25 +62,62 @@ function chopSlash(p, s, t, FLOW, BLOOM = 1) {
 }
 
 export function create(o) {
-  const C = fit(o.palette, 7), Rg = new Rng(o.seed), ps = new Particles({ rng: Rg, sparks: o.sparks }), big = !!o.heavy;
+  const C = fit(o.palette, 7), Rg = new Rng(o.seed), ps = new Particles({ rng: Rg, sparks: o.sparks }), big = !!o.heavy, sm = !!o.smear;
   // 真上から足もとへ: (0, −46) を真下向きに通る、 半径 150 の弧 (ほぼまっすぐ・わずかに右へ反る)。 長さ 0.66 rad ≈ 100
-  const A = through(0, -46, Math.PI / 2, 1, 150, 0.66, 0.5, { W: big ? 17 : 13, t0: 0, sweep: 0.07, hold: big ? 0.12 : 0.08, trail: big ? 0.34 : 0.26, ramp: C });
-  const E = { ...A, R: A.R - A.W * 0.75, W: A.W * (big ? 0.38 : 0.28), t0: 0.02, hold: 0.06, trail: 0.24, ramp: C.slice(0, 6) };   // 内側の残像 (通常にも付ける・細く)
+  const A = sm
+    ? through(0, -46, Math.PI / 2, 1, 150, 0.66, 0.5, { W: big ? 22 : 17, t0: 0, sweep: 0.020, hold: 0.011, trail: big ? 0.17 : 0.145, ramp: C, snap: true, snapDur: 0.014, snapCut: 0.84, glowScale: big ? 1.15 : 0.90, traceFade: big ? 0.14 : 0.12, dotFade: true })
+    : through(0, -46, Math.PI / 2, 1, 150, 0.66, 0.5, { W: big ? 17 : 13, t0: 0, sweep: 0.07, hold: big ? 0.12 : 0.08, trail: big ? 0.34 : 0.26, ramp: C });
+  const E = sm
+    ? { ...A, R: A.R - A.W * 0.72, W: A.W * (big ? 0.34 : 0.26), t0: 0.005, sweep: 0.018, hold: 0.008, trail: 0.055, ramp: C.slice(0, 6), snap: true, snapDur: 0.012, snapCut: 0.86, glowScale: big ? 0.80 : 0.65, traceFade: 0.015, dotFade: false }
+    : { ...A, R: A.R - A.W * 0.75, W: A.W * (big ? 0.38 : 0.28), t0: 0.02, hold: 0.06, trail: 0.24, ramp: C.slice(0, 6) };   // 内側の残像 (通常にも付ける・細く)
   const end = slashEnd(A);
   let t = 0, landed = false;
+  const kp = !!o.keepParticles;
   return {
     update(dt) {
       t += dt;
       if (!landed && t >= A.sweep) {
         landed = true;
-        // 着いた所から左右へ走る火花・軌跡の外へ飛ぶ削り屑
-        for (let i = 0; i < (big ? 26 : 14); i++) { const a = (Rg.chance(0.5) ? 0 : Math.PI) + Rg.range(-0.5, 0.5), sp = Rg.range(120, 340); ps.spawn(P.SPARK, end.x, end.y, Math.cos(a) * sp, Math.sin(a) * sp - Rg.range(20, 90), Rg.range(0.14, 0.38)); }
-        shavings(ps, Rg, A, big ? 26 : 14, [C[4], C[5]], 0.2);
+        if (sm && !kp) {
+          for (let i = 0; i < (big ? 10 : 6); i++) {
+            const a = (Rg.chance(0.5) ? 0 : Math.PI) + Rg.range(-0.45, 0.45), sp = Rg.range(120, 300);
+            ps.spawn(P.SPARK, end.x, end.y, Math.cos(a) * sp, Math.sin(a) * sp - Rg.range(15, 70), Rg.range(0.06, 0.14));
+          }
+          const lives = [0.12, 0.155, 0.19, 0.225], fracs = [0.50, 0.66, 0.82, 0.96];
+          for (let i = 0; i < lives.length; i++) {
+            const tr = travel(A, A.span * fracs[i]), sp = Rg.range(45, 85);
+            ps.spawn(P.MOTE, tr.x, tr.y, tr.dx * sp, tr.dy * sp, lives[i], i & 1 ? C[5] : C[4], 0.6);
+          }
+        } else {
+          // 着いた所から左右へ走る火花・軌跡の外へ飛ぶ削り屑
+          for (let i = 0; i < (big ? 26 : 14); i++) { const a = (Rg.chance(0.5) ? 0 : Math.PI) + Rg.range(-0.5, 0.5), sp = Rg.range(120, 340); ps.spawn(P.SPARK, end.x, end.y, Math.cos(a) * sp, Math.sin(a) * sp - Rg.range(20, 90), Rg.range(0.14, 0.38)); }
+          shavings(ps, Rg, A, big ? 26 : 14, [C[4], C[5]], 0.2);
+        }
       }
       ps.update(dt);
+      if (sm && !kp) for (const m of ps.list) if (m.k === P.MOTE) { m.vx -= m.vx * 6.5 * dt; m.vy -= m.vy * 6.5 * dt; }
     },
     draw(p) {
       const bl = o.bloom ?? (big ? 1.9 : 1.1);
+      if (sm) {
+        if (E) glowSlash(p, E, t, o.flow, bl * 0.45);
+        glowSlash(p, A, t, o.flow, bl * (big ? 0.72 : 0.85));
+        const g = t - A.sweep * 0.6;
+        if (kp) {
+          if (g > 0 && g < 0.22) sparkle(p, end.x, end.y, (big ? 12 : 9) * ease.outBack(Math.min(1, g / 0.05)) * (1 - g / 0.22), C[5], C[3], 0.6);
+          if (t < 0.3) { const [x, y] = onSwing(A, A.R - 4, A.span * ease.outExpo(clamp(t / A.sweep))); p.glow(x, y, 46, C[3], 0.6 * (1 - t / 0.3)); p.glow(x, y, 16, C[5], 0.5 * (1 - t / 0.3)); }
+        } else {
+          if (g > 0 && g < 0.08) sparkle(p, end.x, end.y, (big ? 9 : 7) * ease.outBack(Math.min(1, g / 0.025)) * (1 - g / 0.08), C[5], C[3], 0.55);
+          if (t > 0 && t < 0.075) {
+            const [x, y] = onSwing(A, A.R - 4, A.span * ease.outExpo(clamp(t / A.sweep)));
+            const k = 1 - t / 0.075;
+            p.glow(x, y, big ? 12 : 10, C[3], (big ? 0.42 : 0.36) * k);
+            p.glow(x, y, big ? 6 : 5, C[5], (big ? 0.38 : 0.32) * k);
+          }
+        }
+        ps.draw(p);
+        return;
+      }
       if (E) chopSlash(p, E, t, o.flow, bl * 0.6);
       chopSlash(p, A, t, o.flow, bl);
       const g = t - A.sweep * 0.6;

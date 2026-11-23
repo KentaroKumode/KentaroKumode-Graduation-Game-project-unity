@@ -5,7 +5,8 @@
 // The crescent, trace, glint and spark recipe is adapted from Sprite Fusion's open-source slash
 // (https://www.spritefusion.com/pixel-art-vfx/slash), MIT License, Copyright (c) 2026 Hugo Duprez.
 import { Particles, Lights, P, Rng, fit, sparkle, flare, clamp, ease, rand, WHITE } from "../../core/index.js";
-import { through, smear, trace, glowAlong, slashEnd, shavings, sliver } from "../melee/_lib.js";
+import { through, smear, trace, glowAlong, slashEnd, shavings, sliver, onSwing, travel } from "../melee/_lib.js";
+import { glowSlash } from "./_blade.js";
 
 export const meta = {
   name: "Cross slash (DICE BOUND)",
@@ -20,6 +21,7 @@ export const meta = {
   options: {
     palette: ["#2a0a22", "#5e1238", "#a01f4e", "#e0386a", "#ff86a6", "#ffd2dd", "#ffffff"],
     sparks: ["#fff3a6", "#ffe26b", "#ff8a2a", "#f2561d"],
+    smear: false,
     seed: 6,
   },
 };
@@ -35,7 +37,53 @@ const FLARE = 0.3;   // ×が閉じてから、 白く光って、 細って、 
 export function ringSlash(p, s, t, tFlare) {
   const u = t - s.t0;
   if (u < 0) return;
-  const R = s.ramp, n = R.length, head = ease.outExpo(clamp(u / s.sweep)), U = s.span * head, f = (t - tFlare) / FLARE;
+  const R = s.ramp, n = R.length, head = ease.outExpo(clamp(u / s.sweep)), U = s.span * head;
+  if (s.wideSnap) {
+    const fd = s.flareDur ?? FLARE, f = (t - tFlare) / fd;
+    const passed = (frac) => s.sweep * Math.min(1, -Math.log2(Math.max(1e-3, 1 - frac)) / 10);
+    if (f < 0 && U > 0.02) {
+      smear(p, s, 0, U, s.W, (uu, r, out) => {
+        const age = Math.max(0, u - passed(uu / s.span)), lead = U - uu;
+        const w = s.W * Math.pow(clamp(lead / (s.span * 0.35)), 1.15) * (0.45 + 0.55 * Math.exp(-age / 0.075)) * Math.pow(clamp(uu / (s.span * 0.40)), 1.25);
+        if (w < 0.45) return;
+        const q = (s.R - r) / w;
+        if (q < 0 || q > 1) return;
+        const ci = q < 0.28 && age < 0.06 ? 0 : Math.round(q * (n - 1) * 0.68 + age * 10 + 0.35);
+        out.c = R[n - 1 - clamp(ci, 0, n - 1)];
+        out.a = Math.min(1, uu / (s.span * 0.25) + 0.25);
+      });
+      glowAlong(p, s, s.R - s.W * 0.25, 0, U, 8, R[4], (uu) => 0.34 * Math.pow(Math.sin(Math.PI * clamp(uu / s.span)), 1.4), 0, 0.25);
+    } else if (f >= 0 && f < 1) {
+      // 次のコマで即座に極細の金線へ落とし、冷めながら細る
+      const RR = s.R + 0.6 * ease.outCubic(f), th = Math.max(0.85, s.W * 0.14 * Math.pow(1 - f, 1.3) + 0.35), S = { ...s, R: RR };
+      const step = f < 0.25 ? 6 : f < 0.52 ? 5 : f < 0.78 ? 4 : 3;
+      smear(p, S, 0, U, th, (uu, r, out) => {
+        const w = th * Math.pow(Math.sin(Math.PI * clamp(uu / s.span)), s.sharp ? 1.5 : 0.5);
+        if (w < 0.35) return;
+        const q = (RR - r) / w;
+        if (q < 0 || q > 1) return;
+        out.c = f < 0.25 ? (q < 0.6 ? WHITE : R[5]) : q < 0.45 ? R[step] : R[step - 1];
+        out.a = f < 0.55 ? 1 : 1.55 - f;
+      });
+      glowAlong(p, S, RR - 1, 0, U, 5.5, R[4], (uu) => 0.26 * Math.pow(1 - f, 1.3) * Math.pow(Math.sin(Math.PI * clamp(uu / s.span)), 1.5), 0, 0.25);
+    }
+    // 終盤の点間引き (純点線時は発光なし)
+    const df = clamp((f - 0.38) / 0.95);
+    if (f >= 0.38 && df < 1) {
+      const baseStep = 1.1 / Math.max(4, s.R);
+      for (let idx = 0; ; idx++) {
+        const uu = idx * baseStep;
+        if (uu > s.span) break;
+        const pos = uu / s.span, edge = Math.sin(Math.PI * pos);
+        const keep = 0.2 + 0.8 * edge;
+        if (rand(idx * 17 + 3, 11, 29) < Math.pow(df, 0.85) / keep) continue;
+        const [x, y] = onSwing(s, s.R - 0.5, uu);
+        p.dot(x, y, df < 0.55 ? R[4] : R[3], Math.max(0.28, (1 - df * 0.65) * (0.45 + 0.55 * edge)));
+      }
+    }
+    return;
+  }
+  const f = (t - tFlare) / FLARE;
   const passed = (frac) => s.sweep * Math.min(1, -Math.log2(Math.max(1e-3, 1 - frac)) / 10);   // 縁が、 弧の frac の所を通った時刻 (outExpo の逆)
   if (f < 0 && U > 0.02) {
     smear(p, s, 0, U, s.W, (uu, r, out) => {
@@ -73,43 +121,106 @@ const cut = (x, y, th, dir, span, extra) => through(x, y, th, dir, R0, span, 0.5
 
 export function create(o) {
   const C = fit(o.palette, 7), Rg = new Rng(o.seed), ps = new Particles({ rng: Rg, ground: () => 0, sparks: o.sparks }), lights = new Lights();
-  const X = 34, Y = -23;
-  const down = cut(X, Y, 0.72, 1, 0.84, { W: 10, t0: 0, sweep: 0.06, hold: 0.07, trail: 0.24, ramp: C, lens: true });
+  const X = 34, Y = -23, sm = !!o.smear;
+  const upT0 = sm ? 0.080 : UP;
+  const down = sm
+    ? cut(X, Y, 0.72, 1, 0.84, { W: 13.5, t0: 0, sweep: 0.018, hold: 0.012, trail: 0.215, ramp: C, lens: true, snap: true, snapDur: 0.014, snapCut: 0.82, glowScale: 1.05, traceFade: 0.14, dotFade: true })
+    : cut(X, Y, 0.72, 1, 0.84, { W: 10, t0: 0, sweep: 0.06, hold: 0.07, trail: 0.24, ramp: C, lens: true });
   // 2 太刀目は、 1 太刀目を左右に返した物 (2026-11-14: 元は右下から左上へ斬り上げる・角度も太さも 1 太刀目と違う ── 横から見た剣士の動きには合うが、 正面から見ると×が歪んで見える)。
   //   右上から左下へ、 同じ角度・同じ反り・同じ太さで。 交点は弧のちょうど同じ所
-  const up = cut(X, Y, Math.PI - 0.72, -1, 0.84, { W: 10, t0: UP, sweep: 0.06, hold: 0.07, trail: 0.24, ramp: C, lens: true });
+  const up = sm
+    ? cut(X, Y, Math.PI - 0.72, -1, 0.84, { W: 13.5, t0: upT0, sweep: 0.018, hold: 0.012, trail: 0.17, ramp: C, lens: true, snap: true, snapDur: 0.014, snapCut: 0.82, glowScale: 1.05, traceFade: 0.19, dotFade: true })
+    : cut(X, Y, Math.PI - 0.72, -1, 0.84, { W: 10, t0: UP, sweep: 0.06, hold: 0.07, trail: 0.24, ramp: C, lens: true });
   const ends = [slashEnd(down), slashEnd(up)], slivers = [-2.4, -1.1, 0.2, 1.6].map((a) => ({ a: a + Rg.range(-0.2, 0.2), r: Rg.range(5, 8), v: Rg.range(70, 120), arc: Rg.range(0.4, 0.7) }));
-  const CLOSE = UP + 0.012;
+  const CLOSE = upT0 + 0.012;
   let t = 0, cut1 = false, cut2 = false, closed = false;
   return {
     update(dt) {
       t += dt;
       if (!cut1 && t >= down.sweep) {
         cut1 = true;
-        shavings(ps, Rg, down, 10, [C[4], C[5]]);
-        for (let i = 0; i < 6; i++) {
-          const a = Math.atan2(ends[0].dy, ends[0].dx) + Rg.range(-0.5, 0.5), sp = Rg.range(120, 300);
-          ps.spawn(P.SPARK, ends[0].x, ends[0].y, Math.cos(a) * sp, Math.sin(a) * sp, Rg.range(0.12, 0.3));
+        if (sm) {
+          for (let i = 0; i < 4; i++) {
+            const a = Math.atan2(ends[0].dy, ends[0].dx) + Rg.range(-0.45, 0.45), sp = Rg.range(120, 260);
+            ps.spawn(P.SPARK, ends[0].x, ends[0].y, Math.cos(a) * sp, Math.sin(a) * sp, Rg.range(0.05, 0.11));
+          }
+          const lives = [0.11, 0.145, 0.18, 0.215], fracs = [0.55, 0.70, 0.84, 0.95];
+          for (let i = 0; i < lives.length; i++) {
+            const tr = travel(down, down.span * fracs[i]), sp = Rg.range(45, 85);
+            ps.spawn(P.MOTE, tr.x, tr.y, tr.dx * sp, tr.dy * sp, lives[i], i & 1 ? C[5] : C[4], 0.55);
+          }
+        } else {
+          shavings(ps, Rg, down, 10, [C[4], C[5]]);
+          for (let i = 0; i < 6; i++) {
+            const a = Math.atan2(ends[0].dy, ends[0].dx) + Rg.range(-0.5, 0.5), sp = Rg.range(120, 300);
+            ps.spawn(P.SPARK, ends[0].x, ends[0].y, Math.cos(a) * sp, Math.sin(a) * sp, Rg.range(0.12, 0.3));
+          }
         }
       }
       if (!closed && t >= CLOSE) {
         closed = true;
-        lights.add(X, Y, 56, C[3], 0.45, 0.4);
-        lights.add(X, Y, 18, WHITE, 0.6, 0.08);
-        for (let i = 0; i < 18; i++) {
-          const a = Rg.range(-Math.PI, Math.PI) * 0.8, sp = Rg.range(140, 360);
-          ps.spawn(P.SPARK, X, Y, Math.cos(a) * sp, Math.sin(a) * sp - 40, Rg.range(0.14, 0.4));
+        if (sm) {
+          // ×の後ろの濁った大きな光の塊を削り、交点に締まった閃光だけ置く
+          lights.add(X, Y, 11, C[3], 0.36, 0.08);
+          lights.add(X, Y, 6, WHITE, 0.50, 0.04);
+          for (let i = 0; i < 10; i++) {
+            const a = Rg.range(-Math.PI, Math.PI) * 0.85, sp = Rg.range(130, 300);
+            ps.spawn(P.SPARK, X, Y, Math.cos(a) * sp, Math.sin(a) * sp - 20, Rg.range(0.06, 0.14));
+          }
+        } else {
+          lights.add(X, Y, 56, C[3], 0.45, 0.4);
+          lights.add(X, Y, 18, WHITE, 0.6, 0.08);
+          for (let i = 0; i < 18; i++) {
+            const a = Rg.range(-Math.PI, Math.PI) * 0.8, sp = Rg.range(140, 360);
+            ps.spawn(P.SPARK, X, Y, Math.cos(a) * sp, Math.sin(a) * sp - 40, Rg.range(0.14, 0.4));
+          }
+          for (let i = 0; i < 5; i++) ps.spawn(P.STAR, X + Rg.range(-14, 14), Y + Rg.range(-12, 12), 0, -4, Rg.range(0.2, 0.4), Rg.chance(0.5) ? C[5] : WHITE, Rg.range(1, 2.2), Rg.range(0.05, 0.2));
         }
-        for (let i = 0; i < 5; i++) ps.spawn(P.STAR, X + Rg.range(-14, 14), Y + Rg.range(-12, 12), 0, -4, Rg.range(0.2, 0.4), Rg.chance(0.5) ? C[5] : WHITE, Rg.range(1, 2.2), Rg.range(0.05, 0.2));
       }
-      if (!cut2 && t >= UP + up.sweep) {
+      if (!cut2 && t >= upT0 + up.sweep) {
         cut2 = true;
-        shavings(ps, Rg, up, 12, [C[4], C[5]]);
+        if (sm) {
+          const lives = [0.11, 0.145, 0.18, 0.215], fracs = [0.55, 0.70, 0.84, 0.95];
+          for (let i = 0; i < lives.length; i++) {
+            const tr = travel(up, up.span * fracs[i]), sp = Rg.range(45, 85);
+            ps.spawn(P.MOTE, tr.x, tr.y, tr.dx * sp, tr.dy * sp, lives[i], i & 1 ? C[5] : C[4], 0.55);
+          }
+        } else {
+          shavings(ps, Rg, up, 12, [C[4], C[5]]);
+        }
       }
       ps.update(dt);
+      if (sm) for (const m of ps.list) if (m.k === P.MOTE) { m.vx -= m.vx * 6.5 * dt; m.vy -= m.vy * 6.5 * dt; }
       lights.update(dt);
     },
     draw(p) {
+      if (sm) {
+        glowSlash(p, down, t, 3.2, 1.15);
+        glowSlash(p, up, t, 3.2, 1.15);
+        for (const [s, e] of [[down, ends[0]], [up, ends[1]]]) {
+          const g = t - s.t0 - s.sweep * 0.6;
+          if (g > 0 && g < 0.08) sparkle(p, e.x, e.y, 6 * ease.outBack(Math.min(1, g / 0.02)) * (1 - g / 0.08), C[5], C[3], 0.5);
+        }
+        const q = t - CLOSE;
+        if (q >= 0 && q < 0.10) {
+          const k = q / 0.10;
+          flare(p, X, Y, 17 * Math.pow(1 - k, 1.4), 1 - k, C);
+          p.glow(X, Y, 10, C[4], 0.32 * (1 - k));
+        }
+        if (q >= 0.015 && q < 0.105) {
+          const k = (q - 0.015) / 0.09;
+          for (const s of slivers) sliver(p, X, Y, s.a, s.r + s.v * (q - 0.015), s.arc * (1 - 0.4 * k), k < 0.4 ? C[6] : k < 0.7 ? C[5] : C[4], 1 - k);
+        }
+        for (const s of [down, up]) {
+          const u = t - s.t0;
+          if (u <= 0 || u >= 0.065) continue;
+          const e = slashEnd({ ...s, span: s.span * ease.outExpo(clamp(u / s.sweep)) });
+          p.glow(e.x, e.y, 9, C[3], 0.30 * (1 - u / 0.065));
+        }
+        ps.draw(p);
+        lights.draw(p);
+        return;
+      }
       // both strokes flash white for two frames when the X closes
       const flash = t >= CLOSE && t < CLOSE + 0.07 ? 1 : 0;
       down.hot = up.hot = flash;

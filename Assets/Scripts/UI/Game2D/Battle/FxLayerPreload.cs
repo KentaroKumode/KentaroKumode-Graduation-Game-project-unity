@@ -61,7 +61,7 @@ namespace UI.Game2D.Battle
                 else
                 {
                     if (gm.CurrentPhase == GameManager.GamePhase.MapNavigation) BeginLayer(run);
-                    // 層の途中で武器の家系が替わった (店・報酬): 武器の絵 2 枚だけ読み足す
+                    // 層の途中で武器の家系か段 4 かが替わった (店・報酬): 武器の絵 2 枚だけ読み足す
                     if (_lastRun == run && run.equippedWeaponId != _weaponId)
                     {
                         _weaponId = run.equippedWeaponId;
@@ -111,13 +111,24 @@ namespace UI.Game2D.Battle
             yield return "weapon-" + fam + "-normal"; yield return "weapon-" + fam + "-crit";
         }
 
-        /// <summary>武器の絵の家系: items.json の family が剣・斧・短剣・盾の時だけ (id を綴りで切らない)。 素手・竜閃・それ以外は null (手描きの演出のまま)。</summary>
+        /// <summary>段 4 (LEGENDARY) の武器の絵の家系に付ける印 (weapon-sword-legend-normal など・2026-11-24)。</summary>
+        public const string LegendSuffix = "-legend";
+        /// <summary>段 4 の武器の段 (items.json の tier)。</summary>
+        public const int LegendTier = 4;
+
+        /// <summary>武器の絵の家系: items.json の family が剣・斧・短剣・盾の時だけ (id を綴りで切らない)。 tier が 4 なら「家系-legend」(名のある 4 本の絵)。
+        /// 素手・竜閃・それ以外は null (手描きの演出のまま)。 絵の名前は "weapon-" + これ + "-normal" / "-crit"。</summary>
         public static string WeaponFamilyOf(string id)
         {
             if (string.IsNullOrEmpty(id) || id == ItemIds.Ryusen) return null;
-            var f = ItemSystem.ItemDatabase.Instance?.GetItem(id)?.family;
-            return f == "sword" || f == "axe" || f == "dagger" || f == "shield" ? f : null;
+            var d = ItemSystem.ItemDatabase.Instance?.GetItem(id); var f = d?.family;
+            if (!(f == "sword" || f == "axe" || f == "dagger" || f == "shield")) return null;
+            return d.tier == LegendTier ? f + LegendSuffix : f;
         }
+
+        /// <summary><see cref="WeaponFamilyOf"/> の値から素の家系 (音・揺れ・瓦礫の出し分けに使う) を返す。</summary>
+        public static string BaseFamily(string sheetFam)
+            => sheetFam != null && sheetFam.EndsWith(LegendSuffix) ? sheetFam.Substring(0, sheetFam.Length - LegendSuffix.Length) : sheetFam;
 
         /// <summary>QA の口 (層を経ずに戦闘へ入る): その敵と今の武器の絵を、 その場で止まって読む (戦闘中に読み込みで止まらないように)。 層の一覧には入れない (戦闘が終われば捨てる)。</summary>
         public static void LoadForEnemyNow(string enemyId, string weaponId)

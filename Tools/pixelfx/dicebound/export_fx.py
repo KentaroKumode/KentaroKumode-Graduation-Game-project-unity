@@ -84,9 +84,15 @@ add("move-judge-flame", "dicebound/moves", "holy", {"move": "judge-flame"})
 add("move-chev-thrust", "dicebound/moves", "steel", {"move": "chev-thrust"})
 add("move-chev-stance", "dicebound/moves", "steel", {"move": "chev-stance"})
 # ── #355 プレイヤーの武器 (weapons_preview.py: 通常 = steel・会心 = holy) ──
+# 会心に使う weapons.js の版 (2026-11-24: 短剣・斧・盾は v2 を Claude の判断で採用。 戻すときは "-crit" に)
+CRIT = {"sword": "-crit", "axe": "-crit-v2", "dagger": "-crit-v2", "shield": "-crit-v2"}
 for fam in ("sword", "axe", "dagger", "shield"):
     add("weapon-%s-normal" % fam, "dicebound/weapons", "steel", {"weapon": fam + "-normal"})
-    add("weapon-%s-crit" % fam, "dicebound/weapons", "holy", {"weapon": fam + "-crit"})
+    add("weapon-%s-crit" % fam, "dicebound/weapons", "holy", {"weapon": fam + CRIT[fam]})
+# 段 4 (LEGENDARY) は武器ごとの色の組 (lcd_frames.mjs の INKS・通常も会心も同じ組)
+for fam, ink in (("sword", "durandal"), ("axe", "ketsutei"), ("dagger", "noctaria"), ("shield", "dawnbringer")):
+    for k in ("normal", "crit"):
+        add("weapon-%s-legend-%s" % (fam, k), "dicebound/weapons", ink, {"weapon": "%s-legend-%s" % (fam, k)})
 
 PACK_W = 2048
 

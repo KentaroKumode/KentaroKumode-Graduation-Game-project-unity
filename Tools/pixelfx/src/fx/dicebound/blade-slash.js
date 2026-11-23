@@ -20,6 +20,7 @@ export const meta = {
     palette: ["#212f6b", "#2c58aa", "#3a8bd8", "#62c8f4", "#b8c9e8", "#e8f1ff", "#ffffff"],
     sparks: ["#fff3a6", "#ffe26b", "#ff8a2a", "#f2561d"],
     radius: 42,
+    smear: false,
     seed: 2,
   },
 };
@@ -50,11 +51,24 @@ function crescent(p, s, ta, L, W, age) {
     // brightest step at the rim while it's young, then darker steps inward, with age and towards the tail
     const ci = q < 0.22 && age < 0.5 ? 0 : Math.round(q * (n - 1) * 0.75 + age * 2.4 - v * 0.8 + 0.4 + (strand > 0.48 ? -1 : strand < -0.55 ? 0.9 : 0));
     out.c = R[n - 1 - clamp(ci, 0, n - 1)];
-    out.a = Math.min(1, v / 0.4);
+    out.a = Math.min(1, v / 0.4) * (s.snap ? (1 - smooth(0.8, 1, age) * 0.55) : 1);
   });
-  for (let u = 0; u <= span; u += 0.3) {
-    const [x, y] = onArc(s, s.R - W * 0.4, ta + dir * u);
-    p.glow(x, y, 5 + W, R[n - 3], 0.22 * (1 - age) * (u / span));
+  const gs = s.glowScale ?? 1;
+  if (s.snap) {
+    // 弧の外縁に沿って光らせ、細い弧へ落ちたら太さ (W / s.W) に合わせて弱める (1 コマで光が消えて明滅しないよう下限を残す)
+    const wr = clamp(W / s.W, 0.15, 1), wg = (0.45 + 0.55 * wr) * gs, wk = (0.42 + 0.58 * wr) * gs;
+    for (let u = 0; u <= span; u += 0.28) {
+      const fU = u / span;
+      const [bx, by] = onArc(s, s.R - W * 0.25, ta + dir * u);
+      p.glow(bx, by, (4.5 + W * 0.6) * wg, R[n - 3], 0.26 * wk * (1 - age * 0.85) * fU);
+      const [rx, ry] = onArc(s, s.R - 0.5, ta + dir * u);
+      p.glow(rx, ry, 5 * wg, R[n - 1], 0.38 * wk * (1 - age * 0.85) * Math.min(1, fU * 1.8));
+    }
+  } else {
+    for (let u = 0; u <= span; u += 0.3) {
+      const [x, y] = onArc(s, s.R - W * 0.4, ta + dir * u);
+      p.glow(x, y, (5 + W) * gs, R[n - 3], 0.22 * gs * (1 - age) * (u / span));
+    }
   }
 }
 
@@ -63,14 +77,43 @@ function drawSlash(p, s, t) {
   if (u < 0) return;
   const span = s.a1 - s.a0, head = ease.outExpo(clamp(u / s.sweep)), tail = smooth(s.sweep + s.hold, s.sweep + s.hold + s.trail, u);
   const age = clamp(u / (s.sweep + s.hold + s.trail));
-  if (tail < 1) crescent(p, s, s.a0 + span * tail, span * (head - tail), s.W * (1 - tail * 0.55), age);
+  const endTaper = s.snap ? (1 - smooth(0.45, 1, tail) * 0.78) : 1;
+  const wNow = s.snap
+    ? s.W * (1 - clamp((u - s.sweep - s.hold) / (s.snapDur ?? 0.055), 0, 1) * (s.snapCut ?? 0.8)) * endTaper
+    : s.W * (1 - tail * 0.55);
+  if (tail < 1) crescent(p, s, s.a0 + span * tail, span * (head - tail), wNow, age);
   // a dotted trace of the blade's path lingers where the smear has already gone
-  const th = 0.7 * (1 - clamp((u - s.sweep - s.hold) / (s.trail + 0.2)));
-  if (tail > 0.02 && th > 0)
-    for (let k = 0; k <= tail; k += 0.6 / (Math.abs(span) * s.R)) {
-      const [x, y] = onArc(s, s.R - 0.5, s.a0 + span * k);
-      p.dot(x, y, s.ramp[1], th * (0.4 + 0.6 * k));
+  const f = clamp((u - s.sweep - s.hold) / (s.trail + (s.traceFade ?? 0.2)));
+  const th = 0.7 * (1 - f);
+  if (tail > 0.02 && th > 0) {
+    if (s.dotFade) {
+      const baseStep = 1.2 / (Math.abs(span) * s.R), kStart = tail * smooth(0.2, 0.95, f) * 0.72;
+      for (let idx = 0; ; idx++) {
+        const k = idx * baseStep;
+        if (k > tail) break;
+        if (k < kStart) continue;
+        const h = (((idx * 2654435761) >>> 0) % 1000) / 1000;
+        const keep = 0.25 + 0.75 * k;
+        if (h < Math.pow(f, 0.85) / keep) continue;
+        const [x, y] = onArc(s, s.R - 0.5, s.a0 + span * k);
+        const col = f < 0.55 ? s.ramp[3] : s.ramp[2];
+        p.dot(x, y, col, Math.max(0.28, (1 - f * 0.65) * (0.45 + 0.55 * k)));
+      }
+      // 細い弧が残っている間だけ、斬った跡の弧に沿って弱めのブルームを乗せる (点線のみになったら消す)
+      if (tail < 1) {
+        const gs = s.glowScale ?? 1, tb = (1 - tail) * gs;
+        for (let k = kStart; k <= tail; k += 0.28 / Math.abs(span)) {
+          const [x, y] = onArc(s, s.R - 0.5, s.a0 + span * k);
+          p.glow(x, y, 5.5 * gs, s.ramp[s.ramp.length - 3], 0.24 * tb * (0.4 + 0.6 * k));
+        }
+      }
+    } else {
+      for (let k = 0; k <= tail; k += 0.6 / (Math.abs(span) * s.R)) {
+        const [x, y] = onArc(s, s.R - 0.5, s.a0 + span * k);
+        p.dot(x, y, s.ramp[1], th * (0.4 + 0.6 * k));
+      }
     }
+  }
 }
 
 function tipOf(s) {
@@ -81,10 +124,14 @@ function tipOf(s) {
 
 export function create(o) {
   const C = fit(o.palette, 7), Rg = new Rng(o.seed), ps = new Particles({ rng: Rg, ground: () => 0, sparks: o.sparks });
-  const R0 = o.radius, a0 = -2.55, a1 = 0.95;
+  const R0 = o.radius, a0 = -2.55, a1 = 0.95, sm = !!o.smear;
   // the main smear, and a thinner echo just inside it a beat behind
-  const A = { cx: 6, cy: -26, R: R0, sy: 0.6, rot: -0.38, a0, a1, W: 12, t0: 0, sweep: 0.06, hold: 0.06, trail: 0.24, ramp: C };
-  const E = { ...A, R: R0 * (33 / 42), W: R0 * (4.5 / 42), a0: a0 + (a1 - a0) * 0.1, a1: a1 - (a1 - a0) * (0.15 / 3.5), t0: 0.017, hold: 0.03, trail: 0.2, ramp: C.slice(0, 6) };
+  const A = sm
+    ? { cx: 6, cy: -26, R: R0, sy: 0.6, rot: -0.38, a0, a1, W: 20, t0: 0, sweep: 0.020, hold: 0.012, trail: 0.155, ramp: C, snap: true, snapDur: 0.018, snapCut: 0.82, glowScale: 0.9, traceFade: 0.135, dotFade: true }
+    : { cx: 6, cy: -26, R: R0, sy: 0.6, rot: -0.38, a0, a1, W: 12, t0: 0, sweep: 0.06, hold: 0.06, trail: 0.24, ramp: C };
+  const E = sm
+    ? { ...A, R: R0 * (33 / 42), W: R0 * (4.5 / 42), a0: a0 + (a1 - a0) * 0.1, a1: a1 - (a1 - a0) * (0.15 / 3.5), t0: 0.006, sweep: 0.018, hold: 0.008, trail: 0.07, ramp: C.slice(0, 6), snap: true, snapDur: 0.016, snapCut: 0.85, glowScale: 0.75, traceFade: 0.02, dotFade: false }
+    : { ...A, R: R0 * (33 / 42), W: R0 * (4.5 / 42), a0: a0 + (a1 - a0) * 0.1, a1: a1 - (a1 - a0) * (0.15 / 3.5), t0: 0.017, hold: 0.03, trail: 0.2, ramp: C.slice(0, 6) };
   const tip = tipOf(A);
   let t = 0, landed = false;
   return {
@@ -93,28 +140,43 @@ export function create(o) {
       if (!landed && t >= A.sweep) {
         landed = true;
         // sparks off the edge where it stops, and bright shavings flung off the arc
-        for (let i = 0; i < 10; i++) {
+        const nSp = sm ? 5 : 10, spMin = sm ? 0.05 : 0.12, spMax = sm ? 0.11 : 0.35;
+        for (let i = 0; i < nSp; i++) {
           const a = Math.atan2(tip.dy, tip.dx) + Rg.range(-0.5, 0.5), sp = Rg.range(150, 400);
-          ps.spawn(P.SPARK, tip.x, tip.y, Math.cos(a) * sp, Math.sin(a) * sp, Rg.range(0.12, 0.35));
+          ps.spawn(P.SPARK, tip.x, tip.y, Math.cos(a) * sp, Math.sin(a) * sp, Rg.range(spMin, spMax));
         }
-        for (let i = 0; i < 16; i++) {
-          const a = a0 + (a1 - a0) * Rg.range(0.3, 1), [x, y] = onArc(A, A.R, a);
-          const ox = x - A.cx, oy = y - A.cy, l = Math.hypot(ox, oy) || 1, sp = Rg.range(30, 100);
-          ps.spawn(P.MOTE, x, y, (ox / l) * sp, (oy / l) * sp - 10, Rg.range(0.25, 0.55), C[4 + Rg.int(0, 1)], 0.6);
+        if (sm) {
+          // 振り抜いた向き（接線方向）に流れて止まる粒を 4 個、段階的に消える寿命で配置 (実時間 0.20〜0.36s = 効果時間 0.13〜0.23s)
+          const lives = [0.13, 0.165, 0.20, 0.235];
+          const fracs = [0.58, 0.72, 0.85, 0.96];
+          for (let i = 0; i < lives.length; i++) {
+            const a = a0 + (a1 - a0) * fracs[i];
+            const [x, y] = onArc(A, A.R - 1.5, a), [x2, y2] = onArc(A, A.R - 1.5, a + 0.05);
+            const l = Math.hypot(x2 - x, y2 - y) || 1, sp = Rg.range(55, 95);
+            ps.spawn(P.MOTE, x, y, ((x2 - x) / l) * sp, ((y2 - y) / l) * sp, lives[i], C[4 + (i & 1)], 0.6);
+          }
+        } else {
+          for (let i = 0; i < 16; i++) {
+            const a = a0 + (a1 - a0) * Rg.range(0.3, 1), [x, y] = onArc(A, A.R, a);
+            const ox = x - A.cx, oy = y - A.cy, l = Math.hypot(ox, oy) || 1, sp = Rg.range(30, 100);
+            ps.spawn(P.MOTE, x, y, (ox / l) * sp, (oy / l) * sp - 10, Rg.range(0.25, 0.55), C[4 + Rg.int(0, 1)], 0.6);
+          }
         }
       }
       ps.update(dt);
+      if (sm) for (const m of ps.list) if (m.k === P.MOTE) { m.vx -= m.vx * 6.5 * dt; m.vy -= m.vy * 6.5 * dt; }
     },
     draw(p) {
       drawSlash(p, E, t);
       drawSlash(p, A, t);
       // the tip glints as the edge arrives
-      const g = t - A.sweep * 0.6;
-      if (g > 0 && g < 0.22) sparkle(p, tip.x, tip.y, 9 * ease.outBack(Math.min(1, g / 0.05)) * (1 - g / 0.22), C[5], C[3], 0.6);
+      const g = t - A.sweep * 0.6, gLife = sm ? 0.08 : 0.22;
+      if (g > 0 && g < gLife) sparkle(p, tip.x, tip.y, (sm ? 7 : 9) * ease.outBack(Math.min(1, g / (sm ? 0.025 : 0.05))) * (1 - g / gLife), C[5], C[3], sm ? 0.55 : 0.6);
       // light rides the head of the swing
-      if (t < 0.3) {
+      const lDur = sm ? 0.08 : 0.3;
+      if ((sm ? t > 0 : true) && t < lDur) {
         const [x, y] = onArc(A, A.R - 4, A.a0 + (A.a1 - A.a0) * ease.outExpo(clamp(t / A.sweep)));
-        p.glow(x, y, 40, C[3], 0.5 * (1 - t / 0.3));
+        p.glow(x, y, sm ? 14 : 40, C[3], (sm ? 0.40 : 0.5) * (1 - t / lDur));
       }
       ps.draw(p);
     },

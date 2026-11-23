@@ -35,6 +35,11 @@ const INKS = {
   iron: ["#0c0c10", "#3a3840", "#77747e", "#b9b6c0", "#f2f0f6"],
   celadon: ["#0b1211", "#536862", "#93ada5", "#c9dad3", "#f7fdfa"],   // 鏡: 薄い青磁 (作者: 色味はもう少し薄く)
   earth: ["#1a120c", "#4a3626", "#8a6844", "#c8a878", "#f4e8d0"],   // 土
+  // 段 4 LEGENDARY 武器 4 本 (アイコンの色から抽出・暗→中→主→明→芯の 6 段・通常/会心共通)
+  durandal: ["#1a1d32", "#515689", "#d93343", "#eb5f76", "#ffb9ab", "#ffffff"],     // デュランダル: 暗藍→鋼→深紅→桃→薄桜→白芯
+  ketsutei: ["#1a1821", "#690612", "#8d0e1c", "#af1d2d", "#c4b7f0", "#e4def9"],     // 血帝廻天: 闇鉄→血→深血→紅→淡紫銀→白紫芯
+  noctaria: ["#12133c", "#291186", "#9b75ff", "#31c9ff", "#6cf1ff", "#f3feff"],     // ノクタリア: 夜藍→深紫→紫→電光シアン→氷光→蒼白芯
+  dawnbringer: ["#111d6b", "#486db5", "#e09836", "#ffd072", "#fff2bc", "#ffffff"],  // ドーンブリンガー: 深夜藍→空青→暁琥珀→夜明け金→朝光→白芯
 };
 const RAMP = (INKS[flags.ink ?? "warm"]).map(rgb3), BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5], LIGHT_GAIN = 1.6;
 const lum = (R, G, B) => (0.299 * R + 0.587 * G + 0.114 * B) / 255, step = (L) => Math.max(0, Math.min(RAMP.length - 1, Math.round(L * (RAMP.length - 1))));
