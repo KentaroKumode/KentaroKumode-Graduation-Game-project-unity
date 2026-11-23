@@ -124,6 +124,8 @@ namespace AutoTest.EditorTests
                 else Assert.That(d.cost, Is.GreaterThan(0), d.id);
             }
             Assert.That(ach, Is.EqualTo(10));
+            var cv = MetaBoard.Get("mod_caravan").stats;
+            Assert.That((cv.gold, cv.saleSlots, cv.skipCashPct), Is.EqualTo((15, 1, 15)), "商隊ネットワーク (2026-11-23)");
             Assert.That(MetaPanel.TerminalTunePerDie, Is.EqualTo(2), "攻撃・防御端子調律は出目 1 個につき +2 (2026-11-23)");
         }
     }

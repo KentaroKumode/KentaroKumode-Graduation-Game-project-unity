@@ -21,7 +21,7 @@
     { "id": "unit_farm_offer",   "name": "試運転ブースター", "shape": "I2", "source": "achievement", "achievement": "boss_5", "stats": { "farmOffer": 1 } },
 
     { "id": "mod_heavy_frame",  "name": "重装フレーム",     "shape": "L3", "source": "shop", "cost": 120, "stats": { "hp": 10, "defense": 3 } },
-    { "id": "mod_caravan",      "name": "商隊ネットワーク", "shape": "I3", "source": "shop", "cost": 120, "stats": { "gold": 25, "saleSlots": 2, "skipCashPct": 15 } },
+    { "id": "mod_caravan",      "name": "商隊ネットワーク", "shape": "I3", "source": "shop", "cost": 120, "stats": { "gold": 15, "saleSlots": 1, "skipCashPct": 15 } },
     { "id": "mod_opener_scan",  "name": "先制解析ユニット", "shape": "I3", "source": "shop", "cost": 120, "stats": { "openerFights": 2, "openerAtkCutPct": 25, "handTurn1": 1 } },
     { "id": "mod_forge_manual", "name": "熟練の整備書",     "shape": "L3", "source": "achievement", "achievement": "weapon_top",  "stats": { "materialCutPct": 30, "hp": 10, "damagePct": 5 } },
     { "id": "mod_radar",        "name": "探査レーダー",     "shape": "I3", "source": "achievement", "achievement": "pursuer_win", "stats": { "vision": 1, "outpostSupplyPct": 80, "gold": 15 } },
