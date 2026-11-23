@@ -5,17 +5,14 @@ using UnityEngine;
 namespace UI.Game2D
 {
     /// <summary>
-    /// 整備盤 (docs/GAME.md §15-1・2026-11-23) の窓 (<b>仮置き・文字だけ</b>)。 タイトルの「SKILL TREE」から開く。
-    /// 頁: マス (9 マスを中心 → 辺 → 角の順にトークンで開く) / パネル (買う・置く・外す)。 置き方は仮に「置ける所の最初」を使う
-    /// (回転と位置を選ぶ盤の画面は別の仕事)。 ゲームの処理は <see cref="MetaProgressManager"/> の口だけ。
+    /// 整備盤 (docs/GAME.md §15-1・2026-11-23) の窓。 タイトルの「SKILL TREE」から開く。 中身 (盤・棚・詳細・ボタン) は <see cref="MetaBoardView"/> が描く。
+    /// ゲームの処理は <see cref="MetaProgressManager"/> の口だけ。
     /// パネルの名前・形・効果の数字は <see cref="MetaBoard"/> (Resources/meta_board_panels.json) から組む。 挑戦 (§23-25) は「挑戦」ボタンの窓。
     /// </summary>
     public static class Game2DMetaPanel
     {
         private static string N(float v) => v.ToString("0.#", CultureInfo.InvariantCulture);
 
-        private static readonly string[] PageNames = { "マス", "パネル" };
-        private static readonly string[] CellNames = { "左上", "上", "右上", "左", "中心", "右", "左下", "下", "右下" };
 
         /// <summary>モジュールの説明 (主方針・補助・種火の効果)。</summary>
         private static string ModuleDesc(MetaModule m) => m switch
@@ -72,29 +69,27 @@ namespace UI.Game2D
             return string.Join("・", parts);
         }
 
-        private static string ShapeName(string shape) => shape switch
-        {
-            "1" => "1 マス", "I2" => "2 マス (I)", "I3" => "3 マス (I)", "L3" => "3 マス (L)",
-            "T" => "4 マス (T)", "O" => "4 マス (2×2)", "S" => "4 マス (S)", "Z" => "4 マス (Z)", _ => shape,
-        };
-
-        private static int _page;
         private static Game2DModal _modal;
+        private static MetaBoardView _view;
 
         /// <summary>窓を開く。 開けなければ false (モーダルが無い・メタ進行が無い)。</summary>
         public static bool Open()
         {
             if (_modal == null) _modal = Object.FindObjectOfType<Game2DModal>();
             if (_modal == null || MetaProgressManager.Instance == null || MetaProgressManager.Instance.State == null) return false;
-            _page = 0;
+            _view = new MetaBoardView { onClose = Close, onChallenge = () => Game2DChallengePanel.Show(_modal) };
             SpriteButton.InputLocked = true;      // 後ろのタイトルのボタンを押さない
             _modal.Open(Build());
             Game2DTutorial.Request(TutorialTopics.MetaPanel);      // 手引き「整備パネル」: 初めて開いた時 (issue #86)
             return true;
         }
 
-        /// <summary>整備盤の頁へ戻す (挑戦の窓の「整備へ」)。</summary>
-        internal static void Show() => _modal.Replace(Build());
+        /// <summary>整備盤の窓へ戻す (挑戦の窓の「整備へ」)。</summary>
+        internal static void Show()
+        {
+            if (_view == null) _view = new MetaBoardView { onClose = Close, onChallenge = () => Game2DChallengePanel.Show(_modal) };
+            _modal.Replace(Build());
+        }
 
         internal static void Close()
         {
@@ -102,96 +97,10 @@ namespace UI.Game2D
             _modal.Close();
         }
 
-        /// <summary>仮の置き方: そのパネルが今の盤で置ける最初の所 (開いたマスだけ・ほかのパネルと重ならない)。 置けなければ null。</summary>
-        private static BoardPlacement FirstFit(MetaProgressState st, string id)
-        {
-            int used = 0;
-            foreach (var q in st.ValidPlacements) if (q.id != id) used |= MetaBoard.MaskOf(MetaBoard.CellsOf(q));
-            foreach (var p in MetaBoard.AllPlacements(id))
-            {
-                int m = MetaBoard.MaskOf(MetaBoard.CellsOf(p));
-                if ((m & ~st.boardOpenMask) == 0 && (m & used) == 0) return p;
-            }
-            return null;
-        }
+        /// <summary>[確かめ用] 今の盤の画面の中身 (スクリーンショットの状態を作る)。</summary>
+        internal static MetaBoardView View => _view;
 
         private static ScreenDef Build()
-        {
-            var mpm = MetaProgressManager.Instance; var st = mpm.State;
-            var d = new ScreenDef { id = "meta_panel", jp = true, w = 472, cols = 1, rowH = 15, title = "整備盤 ― " + PageNames[_page] };
-            d.sub = "トークン " + st.tokens + "  " + st.DescribeBoard();
-            var panels = MetaBoard.All;
-            if (_page == 0)
-            {
-                for (int c = 0; c < MetaBoard.Cells; c++)
-                {
-                    bool open = (st.boardOpenMask & 1 << c) != 0;
-                    int cost = MetaBoard.OpenCost(st.boardOpenMask, c);
-                    string on = "";
-                    foreach (var q in st.ValidPlacements) if (System.Array.IndexOf(MetaBoard.CellsOf(q), c) >= 0) on = MetaBoard.Get(q.id)?.name ?? q.id;
-                    d.Items.Add(new ModalItem
-                    {
-                        name = CellNames[c], disabled = !open && cost < 0,
-                        value = open ? (on.Length > 0 ? on : "開") : cost >= 0 ? cost + "" : "―",
-                        desc = open ? (on.Length > 0 ? "置いている: " + on : "空き") : cost >= 0 ? "トークン " + cost + " で開く" : "まだ開けない (中心 → 辺 → 角の順)",
-                    });
-                }
-                d.buttons.Add(new ModalBtn { label = "マスを開く", action = "open", primary = true });
-                d.footer = "中心 → 上下左右 → 四隅の順に開く。 開けた個数で値段が上がる";
-            }
-            else
-            {
-                foreach (var p in panels)
-                {
-                    bool own = st.OwnsPanel(p.id), placed = st.ValidPlacements.Exists(q => q.id == p.id);
-                    d.Items.Add(new ModalItem
-                    {
-                        name = p.name + " [" + ShapeName(p.shape) + "]", disabled = !own && p.FromAchievement,
-                        value = placed ? "置いた" : own ? "持" : p.FromAchievement ? "実績" : p.cost + "",
-                        desc = Describe(p) + "。" + (own ? "" : p.FromAchievement ? " 実績〈" + (MetaProgression.Achievements.AchievementCatalog.Get(p.achievement)?.displayName ?? p.achievement) + "〉で手に入る。" : " トークン " + p.cost + " で買う。"),
-                    });
-                }
-                d.buttons.Add(new ModalBtn { label = "買う・置く・外す", action = "use", primary = true });
-                d.footer = "パネルは買い切り・置き直しは無料 (もう一度押すと外す)。 回転と位置を選ぶ盤の画面は未実装 (仮に置ける所の最初へ置く)";
-            }
-            d.buttons.Add(new ModalBtn { label = "次へ (" + PageNames[(_page + 1) % PageNames.Length] + ")", action = "page" });
-            d.buttons.Add(new ModalBtn { label = "挑戦", action = "challenge" });
-            d.buttons.Add(new ModalBtn { label = "閉じる", action = "close" });
-            d.onAction = (a, sel) =>
-            {
-                switch (a)
-                {
-                    case "close": Close(); return;
-                    case "challenge": Game2DChallengePanel.Show(_modal); return;
-                    case "page": _page = (_page + 1) % PageNames.Length; break;
-                    case "open":
-                        if (sel < 0 || sel >= MetaBoard.Cells) break;
-                        if (mpm.TryOpenCell(sel)) Game2DSfx.Play("ui_confirm");
-                        else _modal.ShowError(MetaBoard.OpenCost(st.boardOpenMask, sel) < 0 ? "このマスはまだ開けない" : "トークンが足りない");
-                        break;
-                    case "use":
-                    {
-                        if (sel < 0 || sel >= panels.Count) break;
-                        var p = panels[sel];
-                        if (!st.OwnsPanel(p.id))
-                        {
-                            if (p.FromAchievement) _modal.ShowError("実績で手に入るパネル");
-                            else if (mpm.TryBuyPanel(p.id)) Game2DSfx.Play("ui_confirm");
-                            else _modal.ShowError("トークンが足りない (" + p.cost + ")");
-                        }
-                        else if (st.ValidPlacements.Exists(q => q.id == p.id)) { mpm.RemovePanel(p.id); Game2DSfx.Play("ui_click"); }
-                        else
-                        {
-                            var fit = FirstFit(st, p.id);
-                            if (fit != null && mpm.TryPlacePanel(fit)) Game2DSfx.Play("ui_click");
-                            else _modal.ShowError("置ける所が無い (マスを開くか、 ほかのパネルを外す)");
-                        }
-                        break;
-                    }
-                }
-                _modal.Replace(Build());
-            };
-            return d;
-        }
+            => new ScreenDef { id = "meta_board", jp = true, w = MetaBoardView.W, h = MetaBoardView.H, title = "整備盤", canvas = _view };
     }
 }
