@@ -101,6 +101,7 @@ namespace UI.Game2D
         internal static MetaBoardView View => _view;
 
         private static ScreenDef Build()
-            => new ScreenDef { id = "meta_board", jp = true, w = MetaBoardView.W, h = MetaBoardView.H, title = "整備盤", canvas = _view };
+            => new ScreenDef { id = "meta_board", jp = true, w = MetaBoardView.W, h = MetaBoardView.H, title = "整備盤", canvas = _view,
+                 onAction = (a, s) => { } };      // 窓の Esc は使わない (中身が受ける・確かめの間は確かめだけ閉じる)
     }
 }

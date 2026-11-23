@@ -52,8 +52,28 @@ namespace UI.Game2D
             for (int i = 0; i < b.px.Length; i++)
             {
                 var p = b.px[i]; int l = p.r + p.g + p.b;
-                if (p.a < 128 || l * 100 < maxL * 55) { s.px[i] = p; continue; }
+                int x = i % b.w, y = i / b.w, edge = Mathf.Min(Mathf.Min(x, y), Mathf.Min(b.w - 1 - x, b.h - 1 - y));
+                if (p.a < 128 || edge > 3 || l * 100 < maxL * 55) { s.px[i] = p; continue; }      // 外側 4 dot の明るいドット (縁) だけ染める
                 float k = l / (float)maxL;
+                s.px[i] = new Color32((byte)(c.r * k), (byte)(c.g * k), (byte)(c.b * k), 255);
+            }
+            _cache[key] = s;
+            return s;
+        }
+
+        /// <summary>明るさを保ったまま、 色だけ <paramref name="c"/> へ寄せた写し (緑の面を灰とはっきり分ける・2026-11-23)。</summary>
+        public static KitSrc Recolor(string name, Color32 c)
+        {
+            string key = name + "#re" + c.r + "," + c.g + "," + c.b;
+            if (_cache.TryGetValue(key, out var s)) return s;
+            var b = Get(name);
+            if (b == null) return null;
+            int maxL = 1; foreach (var q in b.px) if (q.a >= 128) maxL = Mathf.Max(maxL, q.r + q.g + q.b);
+            s = new KitSrc { w = b.w, h = b.h, px = new Color32[b.px.Length] };
+            for (int i = 0; i < b.px.Length; i++)
+            {
+                var q = b.px[i]; if (q.a < 128) { s.px[i] = q; continue; }
+                float k = Mathf.Clamp01((q.r + q.g + q.b) / (float)maxL * 1.15f);
                 s.px[i] = new Color32((byte)(c.r * k), (byte)(c.g * k), (byte)(c.b * k), 255);
             }
             _cache[key] = s;
@@ -81,8 +101,8 @@ namespace UI.Game2D
     {
         // ── 寸法 (窓の座標・480×270 の液晶の窓 472×258) ──
         public const int W = 472, H = 258;
-        private const int PlateX = 20, PlateY = 40, PlateS = 112, CellX = PlateX + 11, CellY = PlateY + 11, Pitch = 30, CellS = 28;
-        private const int SumX = 18, SumY = PlateY + PlateS + 4, SumW = 128;
+        private const int PlateX = 16, PlateY = 38, PlateS = 130, CellX = PlateX + 12, CellY = PlateY + 12, Pitch = 36, CellS = 34, Gap = Pitch - CellS;
+        private const int SumX = 16, SumY = PlateY + PlateS + 4, SumW = 132;
         private const int RX = 152, RW = 304, TabY = 40, TabH = 16, ShelfY = 60, RowH = 20, ShelfRows = 5;
         private const int DetY = ShelfY + ShelfRows * RowH + 6, BtnY = 222, BtnW = 70, BtnH = 20, BtnGap = 6;
 
@@ -100,6 +120,11 @@ namespace UI.Game2D
         public System.Action onClose;
         /// <summary>「挑戦」を押した時 (挑戦の窓へ)。</summary>
         public System.Action onChallenge;
+
+        /// <summary>キー・マウスの押下 (既定は Input)。 確かめで差し替える (PlayMode で実際の入力の代わりに押す)。</summary>
+        internal static System.Func<KeyCode, bool> KeyDown = Input.GetKeyDown;
+        internal static System.Func<int, bool> MouseDown = Input.GetMouseButtonDown;
+        internal static System.Func<float> Wheel = () => Input.mouseScrollDelta.y;
 
         private static MetaProgressManager Mgr => MetaProgressManager.Instance;
         private static MetaProgressState St => Mgr?.State;
@@ -161,7 +186,7 @@ namespace UI.Game2D
             {
                 case "1": return MetaBoardArt.Get("face_gray");
                 case "I2": return MetaBoardArt.Get("face_blue");
-                case "I3": case "L3": return MetaBoardArt.Get("face_green");
+                case "I3": case "L3": return MetaBoardArt.Recolor("face_green", new Color32(0x7c, 0xb0, 0x6a, 255));
                 case "T": return MetaBoardArt.Get("face_amber");
                 case "S": case "Z": return MetaBoardArt.Get("face_purple");
                 case "O": return MetaBoardArt.Tinted("face_spark", SparkColor(d.Module));
@@ -189,6 +214,72 @@ namespace UI.Game2D
             }
         }
 
+        private const int Band = 6;      // 面の絵の縁の帯 (この内側を中の模様として敷き詰める)
+
+        /// <summary>パネル 1 枚を形で描く: マスと、 同じパネルの隣り合うマスの間 (溝) を 1 つの面にして、 外周だけに縁を描く。
+        /// 縁は面の絵の縁の帯 (外から何 dot か) を、 中は面の絵の内側を敷き詰めて打つ (絵を縮めない)。
+        /// alpha &lt; 1 は半透明 (影)。 edge が付くと、 外周 2 dot をその色へ edgeA の割合で寄せる。</summary>
+        private static void DrawShape(KitPix p, int[] cells, KitSrc face, float alpha, Color32? edge, float edgeA)
+        {
+            if (cells == null || cells.Length == 0) return;
+            int S = 3 * Pitch; var m = new bool[S * S];
+            void Mark(int x0, int y0, int w, int h) { for (int y = y0; y < y0 + h; y++) for (int x = x0; x < x0 + w; x++) if (x >= 0 && y >= 0 && x < S && y < S) m[y * S + x] = true; }
+            bool Has(int r, int c) => r >= 0 && c >= 0 && r < 3 && c < 3 && System.Array.IndexOf(cells, r * 3 + c) >= 0;
+            foreach (int c in cells)
+            {
+                int r = c / 3, k = c % 3, x = k * Pitch, y = r * Pitch;
+                Mark(x, y, CellS, CellS);
+                if (Has(r, k + 1)) Mark(x + CellS, y, Gap, CellS);                       // 右の溝
+                if (Has(r + 1, k)) Mark(x, y + CellS, CellS, Gap);                       // 下の溝
+                if (Has(r, k + 1) && Has(r + 1, k) && Has(r + 1, k + 1)) Mark(x + CellS, y + CellS, Gap, Gap);   // 2×2 の真ん中
+            }
+            for (int y = 0; y < S; y++) for (int x = 0; x < S; x++)
+            {
+                if (!m[y * S + x]) continue;
+                int dt = 0, db = 0, dl = 0, dr = 0;
+                while (dt < Band && y - dt - 1 >= 0 && m[(y - dt - 1) * S + x]) dt++;
+                while (db < Band && y + db + 1 < S && m[(y + db + 1) * S + x]) db++;
+                while (dl < Band && x - dl - 1 >= 0 && m[y * S + x - dl - 1]) dl++;
+                while (dr < Band && x + dr + 1 < S && m[y * S + x + dr + 1]) dr++;
+                int d = Mathf.Min(Mathf.Min(dt, db), Mathf.Min(dl, dr));
+                Color32 c;
+                if (face == null) c = Game2DKit.Faint;
+                else if (d >= Band) c = Inner(face);
+                else if (d == dt) c = face.px[d * face.w + face.w / 2];
+                else if (d == db) c = face.px[(face.h - 1 - d) * face.w + face.w / 2];
+                else if (d == dl) c = face.px[(face.h / 2) * face.w + d];
+                else c = face.px[(face.h / 2) * face.w + face.w - 1 - d];
+                if (c.a < 128) c = face.px[(face.h / 2) * face.w + face.w / 2];
+                int px = CellX + x, py = CellY + y;
+                if (edge.HasValue && d < 2) Blend(p, px, py, edge.Value, edgeA);
+                else if (alpha >= 1f) p.Set(px, py, new Color32(c.r, c.g, c.b, 255));
+                else Blend(p, px, py, c, alpha);
+            }
+        }
+
+        private static readonly Dictionary<KitSrc, Color32> _inner = new Dictionary<KitSrc, Color32>();
+        /// <summary>面の中の色 = 縁の帯の内側で一番多い色 (中の模様 (鋲など) を敷き詰めると形の中に点が並ぶので、 中は 1 色で塗る)。</summary>
+        private static Color32 Inner(KitSrc f)
+        {
+            if (_inner.TryGetValue(f, out var c)) return c;
+            var n = new Dictionary<int, int>(); int best = 0; c = f.px[(f.h / 2) * f.w + f.w / 2];
+            for (int y = Band; y < f.h - Band; y++) for (int x = Band; x < f.w - Band; x++)
+            {
+                var q = f.px[y * f.w + x]; if (q.a < 128) continue;
+                int k = q.r << 16 | q.g << 8 | q.b; n.TryGetValue(k, out int v); n[k] = ++v;
+                if (v > best) { best = v; c = q; }
+            }
+            _inner[f] = c;
+            return c;
+        }
+
+        private static void Blend(KitPix p, int x, int y, Color32 c, float a)
+        {
+            if (x < 0 || y < 0 || x >= p.w || y >= p.h) return;
+            int i = (p.h - 1 - y) * p.w + x; var d = p.px[i];
+            p.px[i] = new Color32((byte)(d.r + (c.r - d.r) * a), (byte)(d.g + (c.g - d.g) * a), (byte)(d.b + (c.b - d.b) * a), 255);
+        }
+
         /// <summary>半透明に重ねる (影)。 tint の色へ寄せてから a の割合で混ぜる。</summary>
         private static void Overlay(KitPix p, KitSrc s, RectInt box, Color32 tint, float a)
         {
@@ -213,29 +304,28 @@ namespace UI.Game2D
         public bool Draw(KitPix p, RectInt area, int glintTick)
         {
             var st = St; if (st == null) return false;
-            // 盤
-            var plate = MetaBoardArt.Get("board_plate", false);
-            if (plate != null) p.Sprite(plate, PlateX, PlateY, plate.w, plate.h); else p.Box(PlateX, PlateY, PlateS, PlateS, Game2DKit.Off, Game2DKit.Faint);
+            if (_confirmCell >= 0 && MetaBoard.OpenCost(st.boardOpenMask, _confirmCell) < 0) _confirmCell = -1;      // 確かめの間に開いた・順番が来ていない (操作の確認で見つけた)
+            // 盤 (台は 9 分割で大きさに合わせる)
+            p.NineSlice(MetaBoardArt.Get("board_plate", false), 18, Game2DKit.Off, PlateX, PlateY, PlateS, PlateS);
             for (int c = 0; c < MetaBoard.Cells; c++)
             {
                 var r = CellRect(c);
                 bool open = (st.boardOpenMask & 1 << c) != 0;
-                string pid = open ? PanelAt(c) : null;
                 if (!open)
                 {
                     Center(p, MetaBoardArt.Get("cell_locked"), r);
                     int cost = MetaBoard.OpenCost(st.boardOpenMask, c);
                     if (cost >= 0) { string s = cost.ToString(); int tw = Game2DKit.TextWidth(s); p.Rect(r.x + (r.width - tw) / 2 - 1, r.yMax - Game2DJpFont.Cell - 1, tw + 2, Game2DJpFont.Cell + 1, Game2DKit.Dark); p.Text(s, r.x + (r.width - tw) / 2, r.yMax - Game2DJpFont.Cell, Game2DKit.Amber); }
                 }
-                else if (pid == null) Center(p, MetaBoardArt.Get("cell_empty"), r);
-                else { Center(p, MetaBoardArt.Get("cell_base"), r); Center(p, FaceOf(MetaBoard.Get(pid)), r); }
+                else Center(p, MetaBoardArt.Get(PanelAt(c) == null ? "cell_empty" : "cell_base"), r);
             }
-            // 影
+            foreach (var q in st.ValidPlacements) { var d = MetaBoard.Get(q.id); if (d != null) DrawShape(p, MetaBoard.CellsOf(q), FaceOf(d), 1f, null, 0f); }
+            // 影 (置こうとしている形: 面を半透明で塗り、 縁を明るく)
             if (_ghostOn && Selected != null && !Unknown(Selected) && _confirmCell < 0)
             {
                 bool ok = GhostFits();
                 var cells = MetaBoard.CellsOf(Ghost);
-                if (cells != null) foreach (int c in cells) Overlay(p, MetaBoardArt.Get(ok ? "ghost_ok" : "ghost_bad"), CellRect(c), ok ? Game2DKit.Ivory : Game2DKit.Red, 0.55f);
+                if (cells != null) DrawShape(p, cells, ok ? FaceOf(Selected) : MetaBoardArt.Get("ghost_bad"), 0.5f, ok ? Game2DKit.Ivory : Game2DKit.Red, 0.9f);
             }
             // 盤全体の効果の合計
             var e = st.BoardEffects;
@@ -262,19 +352,25 @@ namespace UI.Game2D
                 p.TextC(TabNames[i], r, i == _tab ? Game2DKit.Dark : i == _hoverTab ? Game2DKit.Ivory : Game2DKit.Dim);
                 tx += w + 2;
             }
-            // 棚
+            // 棚 (列ごとの状態: 盤に置いてある = 明るい字と緑の印「盤」/ 持っている = 普通の字と「持」/ 未所持 = 暗めの字と値段 ◆ / 実績で未解禁 = 影の形と「実績」)
             for (int k = 0; k < ShelfRows; k++)
             {
                 int i = _top + k; if (i >= _list.Count) break;
                 var d = _list[i]; var r = ShelfRow(k);
                 bool sel = i == _sel, own = st.OwnsPanel(d.id), unknown = Unknown(d), placed = st.ValidPlacements.Exists(q => q.id == d.id);
                 Plate(p, sel ? "shelf_card_sel" : "shelf_card", r.x, r.y, r.width, r.height, 4);
-                var ink = sel ? Game2DKit.Ivory : unknown ? Game2DKit.Faint : i == _hoverRow ? Game2DKit.Ivory : Game2DKit.Ink;
-                MiniShape(p, d, r.x + 4, r.y + 3, unknown ? Game2DKit.Faint : MetaBoardArt.Mean(FaceOf(d), Game2DKit.Dim));
-                p.Text(unknown ? "？？？" : d.name, r.x + 22, r.y + (r.height - Game2DJpFont.Cell) / 2 + 1, ink);
-                string v = placed ? "置いた" : own ? "持" : unknown ? "実績" : d.cost.ToString();
-                p.TextR(v, r.xMax - (own || unknown ? 6 : 18), r.y + (r.height - Game2DJpFont.Cell) / 2 + 1, own ? Game2DKit.Green : Game2DKit.Gold);
-                if (!own && !unknown) Token(p, r.xMax - 16, r.y + 5);
+                var face = FaceOf(d);
+                var mean = Inner(face ?? MetaBoardArt.Get("face_gray"));
+                var shapeCol = unknown ? Game2DKit.Off : placed || own ? Brighten(mean, 1.25f) : Darken(mean, 0.7f);
+                MiniShape(p, d, r.x + 5, r.y + 3, shapeCol, unknown);
+                var ink = unknown ? Game2DKit.Faint : placed ? Game2DKit.Ivory : own ? Game2DKit.Ink : Game2DKit.Dim;
+                if (i == _hoverRow && !sel && !unknown) ink = Game2DKit.Ivory;
+                int ty = r.y + (r.height - Game2DJpFont.Cell) / 2 + 1;
+                p.Text(unknown ? "？？？" : d.name, r.x + 30, ty, ink);
+                if (placed) { var tag = new RectInt(r.xMax - 30, r.y + 3, 24, r.height - 6); p.Rect(tag.x, tag.y, tag.width, tag.height, Game2DKit.Green); p.TextC("盤", tag, Game2DKit.Dark); }
+                else if (own) p.TextR("持", r.xMax - 10, ty, Game2DKit.Ink);
+                else if (unknown) p.TextR("実績", r.xMax - 8, ty, Game2DKit.Faint);
+                else { p.TextR(d.cost.ToString(), r.xMax - 18, ty, st.tokens >= d.cost ? Game2DKit.Gold : Game2DKit.Red); Token(p, r.xMax - 16, r.y + 5); }
             }
             if (_list.Count > ShelfRows)
             {
@@ -333,10 +429,21 @@ namespace UI.Game2D
             "1" => "1 マス", "I2" => "2 マス", "I3" => "3 マス (I)", "L3" => "3 マス (L)", "T" => "4 マス (T)", "O" => "4 マス (2×2)", "S" => "4 マス (S)", "Z" => "4 マス (Z)", _ => shape,
         };
 
-        private static void MiniShape(KitPix p, BoardPanelDef d, int x, int y, Color32 col)
+        /// <summary>棚の形の小さな絵 (1 マス 6 dot (暗い縁つき) + 隙間 1)。 hollow = 未解禁 (縁だけ)。</summary>
+        private static void MiniShape(KitPix p, BoardPanelDef d, int x, int y, Color32 col, bool hollow)
         {
-            foreach (var c in MetaBoard.Rotated(d.shape, 0)) p.Rect(x + c.c * 5, y + c.r * 5, 4, 4, col);
+            var cells = MetaBoard.Rotated(d.shape, 0);
+            int hr = 0; foreach (var c in cells) hr = Mathf.Max(hr, c.r);
+            int oy = y + (2 - (hr + 1)) * 3;      // 1 段の形は縦の真ん中へ
+            foreach (var c in cells)
+            {
+                int cx = x + c.c * 7, cy = oy + c.r * 7;
+                if (hollow) p.Box(cx, cy, 6, 6, Game2DKit.Dark, Game2DKit.Faint); else p.Box(cx, cy, 6, 6, col, Game2DKit.Dark);
+            }
         }
+
+        private static Color32 Darken(Color32 c, float k) => new Color32((byte)(c.r * k), (byte)(c.g * k), (byte)(c.b * k), 255);
+        private static Color32 Brighten(Color32 c, float k) => new Color32((byte)Mathf.Min(255, c.r * k), (byte)Mathf.Min(255, c.g * k), (byte)Mathf.Min(255, c.b * k), 255);
 
         private RectInt ShelfRow(int k) => new RectInt(RX, ShelfY + k * RowH, RW, RowH - 1);
 
@@ -359,7 +466,7 @@ namespace UI.Game2D
         /// <summary>[置く] を押せるか: 影が今の場所に置ける (影を盤に出していなければ、 どこかに置ける所がある)。</summary>
         private bool GhostFitsSomewhere()
         {
-            if (_ghostOn) return GhostFits();
+            if (_ghostOn && GhostFits()) return true;
             int keepR = _ar, keepC = _ac;
             for (_ar = 0; _ar < 3; _ar++) for (_ac = 0; _ac < 3; _ac++) if (GhostFits()) { _ar = keepR; _ac = keepC; return true; }
             _ar = keepR; _ac = keepC; return false;
@@ -376,10 +483,10 @@ namespace UI.Game2D
 
         private void Rotate() { if (Selected == null || Unknown(Selected)) return; _rot = (_rot + 1) % 4; ClampAnchor(); _ghostOn = true; Game2DSfx.Play("ui_hover", 0.7f); }
 
-        private void Place()
+        private void Place(bool searchIfBad = false)
         {
             var g = Ghost; if (g == null) return;
-            if (!_ghostOn)
+            if (!_ghostOn || (searchIfBad && !GhostFits()))
             {   // 影を出していない時は、 置ける最初の所へ (盤の左上から)
                 for (int r = 0; r < 3; r++) for (int c = 0; c < 3; c++) { _ar = r; _ac = c; ClampAnchor(); if (GhostFits()) goto found; }
                 Game2DSfx.Play("ui_error"); return;
@@ -403,7 +510,7 @@ namespace UI.Game2D
             switch (b)
             {
                 case 0: Rotate(); break;
-                case 1: Place(); break;
+                case 1: Place(searchIfBad: true); break;      // [置く] は影が置けない所なら置ける最初の所へ (Enter・クリックは影の所だけ)
                 case 2: Remove(Selected?.id); break;
                 case 3: Buy(); break;
                 case 4: onChallenge?.Invoke(); break;
@@ -438,8 +545,8 @@ namespace UI.Game2D
                 if (!_ghostOn || r0 != _ar || c0 != _ac) { _ar = r0; _ac = c0; ClampAnchor(); _ghostOn = true; dirty = true; }
             }
             else if (_ghostOn && inside && cell < 0 && x < RX) { _ghostOn = false; dirty = true; }
-            if (inside && Input.GetMouseButtonDown(1)) { Rotate(); return true; }
-            float wheel = Input.mouseScrollDelta.y;
+            if (inside && MouseDown(1)) { Rotate(); return true; }
+            float wheel = Wheel();
             if (inside && wheel != 0f && x >= RX) { int t = Mathf.Clamp(_top - (int)Mathf.Sign(wheel), 0, Mathf.Max(0, _list.Count - ShelfRows)); if (t != _top) { _top = t; dirty = true; } }
             if (!click) return dirty;
             if (hb >= 0) { Press(hb); return true; }
@@ -454,9 +561,10 @@ namespace UI.Game2D
                     else Game2DSfx.Play("ui_error");
                     return true;
                 }
-                if (Selected != null && St.OwnsPanel(Selected.id) && _ghostOn && GhostFits()) { Place(); return true; }
+                // 置いたパネルの上を押したら外す (選んでいるパネルが同じ所に置いてあっても、 置き直しでなく外す・操作の確認で見つけた)
                 string pid = PanelAt(cell);
-                if (pid != null) { Remove(pid); return true; }
+                if (pid != null) { Remove(pid); _ghostOn = false; return true; }
+                if (Selected != null && St.OwnsPanel(Selected.id) && _ghostOn && GhostFits()) { Place(); return true; }
                 Game2DSfx.Play("ui_error");
                 return true;
             }
@@ -473,14 +581,14 @@ namespace UI.Game2D
         {
             if (_confirmCell >= 0)
             {
-                if (Input.GetKeyDown(KeyCode.Escape)) { _confirmCell = -1; return true; }
-                if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)) { ConfirmOpen(); return true; }
+                if (KeyDown(KeyCode.Escape)) { _confirmCell = -1; return true; }
+                if (KeyDown(KeyCode.Return) || KeyDown(KeyCode.KeypadEnter)) { ConfirmOpen(); return true; }
                 return false;
             }
-            if (Input.GetKeyDown(KeyCode.Escape)) { onClose?.Invoke(); return false; }
-            if (Input.GetKeyDown(KeyCode.R)) { Rotate(); return true; }
-            int dx = Input.GetKeyDown(KeyCode.LeftArrow) ? -1 : Input.GetKeyDown(KeyCode.RightArrow) ? 1 : 0;
-            int dy = Input.GetKeyDown(KeyCode.UpArrow) ? -1 : Input.GetKeyDown(KeyCode.DownArrow) ? 1 : 0;
+            if (KeyDown(KeyCode.Escape)) { onClose?.Invoke(); return false; }
+            if (KeyDown(KeyCode.R)) { Rotate(); return true; }
+            int dx = KeyDown(KeyCode.LeftArrow) ? -1 : KeyDown(KeyCode.RightArrow) ? 1 : 0;
+            int dy = KeyDown(KeyCode.UpArrow) ? -1 : KeyDown(KeyCode.DownArrow) ? 1 : 0;
             if (dx != 0 || dy != 0)
             {
                 if (Selected != null && !Unknown(Selected) && St.OwnsPanel(Selected.id))
@@ -496,13 +604,13 @@ namespace UI.Game2D
                 }
                 return false;
             }
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+            if (KeyDown(KeyCode.Return) || KeyDown(KeyCode.KeypadEnter))
             {
                 var d = Selected; if (d == null) return false;
                 if (!St.OwnsPanel(d.id)) Buy(); else Place();
                 return true;
             }
-            if (Input.GetKeyDown(KeyCode.Tab)) { _tab = (_tab + 1) % TabNames.Length; _top = 0; Rebuild(); return true; }
+            if (KeyDown(KeyCode.Tab)) { _tab = (_tab + 1) % TabNames.Length; _top = 0; Rebuild(); return true; }
             return false;
         }
 
