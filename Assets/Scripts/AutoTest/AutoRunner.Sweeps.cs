@@ -98,17 +98,12 @@ namespace AutoTest
 
         private IEnumerator RunChallengeFixedSweep()
         {
-            bool prevSuppress = MetaProgression.MetaBuffApplicator.SuppressRelicGrant;
-            MetaProgression.MetaBuffApplicator.SuppressRelicGrant = true;
+            bool prevSuppress = MetaProgression.MetaBuffApplicator.SuppressMetaRewards;
+            MetaProgression.MetaBuffApplicator.SuppressMetaRewards = true;
             var prevPickMode = itemPickMode;
             itemPickMode = ItemPickMode.BuildFocused;
             _ascensionPersonaLock = true;
             _currentPersona = BuildPersona.Standard;
-            _pendingRelicExplicit = true;
-            // 既定は理論最良遺物。 forceNoRelic (⑥) を立てると**遺物なし**で同じ挑戦ptを測る。
-            //   遺物の寄与を挑戦ptと分離して読むための対照アーム (2026-08-17)。
-            _pendingPresetRelic = forceNoRelic
-                ? null : RelicPresets.Build(RelicPresets.Preset.TheoreticalBestCursed);
             // 5層裏ボスは BOT のレイピア運で 5層の難度を二分するため、 挑戦スコアの効きを
             // 測る上では純粋な分散源。 基準値測定と同じく遮断する (2026-08-05)。
             bool prevHidden5 = GameLoop.GameManager.SuppressLayer5HiddenBoss;
@@ -126,9 +121,7 @@ namespace AutoTest
             sb.AppendLine("=== 固定難易度スイープ ===");
             sb.AppendLine($"日時    : {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
             sb.AppendLine($"配線AI  : {WiringSkillLine()}");
-            sb.AppendLine($"ペルソナ Standard 固定 / 遺物 "
-                        + (forceNoRelic ? "**なし** (対照アーム)"
-                           : "TheoreticalBest (心眼 3 個・30 段) 固定"));
+            sb.AppendLine("ペルソナ Standard 固定");
             sb.AppendLine($"1 段階 {runs} ラン / 決定論シード: 0000 0000 0000 0000");
             sb.AppendLine("※ 挑戦の点数は 2026-11-10 から難易度 × 5 で読み替え (50 点 = 難易度 10)");
             sb.AppendLine();
@@ -208,33 +201,11 @@ namespace AutoTest
             bool previousBladeDanceGrant)
         {
             _pendingChallengeDifficulty = -1;
-            _pendingPresetRelic = null;
             _ascensionPersonaLock = false;
             itemPickMode = previousPickMode;
-            MetaProgression.MetaBuffApplicator.SuppressRelicGrant = previousRelicSuppression;
+            MetaProgression.MetaBuffApplicator.SuppressMetaRewards = previousRelicSuppression;
             GameLoop.GameManager.SuppressLayer5HiddenBoss = previousHiddenBossSuppression;
             GameLoop.GameManager.GrantBladeDanceOnFloor5Clear = previousBladeDanceGrant;
-        }
-
-        /// <summary>遺物 単軸スイープ。 **軸 1 本だけを載せて、その軸の寄与を切り出す。**
-        ///
-        /// プリセットスイープは「遺物の総量」を振るので、 個々の軸が単位 (期待与ダメ 6%) に
-        /// 揃っているかは分からない。 ここでは **メイン枠 1 本のみ・段N** の遺物を全軸ぶん作り、
-        /// 遺物なし (None) を基準に差分を見る。 軸間の強弱が直接読める。
-        ///
-        /// **1〜3F の与ダメ/被ダメも採る。** 到達層だけだと、 攻撃系と防御系が同じ深度に
-        /// 落ち着いたときに「両方 6 単位」なのか「両方測れていない」のかを区別できない。
-        ///
-        /// 高難易度限定軸 (渇き/刻限/背水) は条件付きなので、 挑戦 0 では条件が
-        /// 揃わず低く出る可能性がある ── その場合は軸が弱いのではなく **BOT が条件を
-        /// 踏みに行かない**（回復目標が高く低HP/低物資に留まらない）ことを疑うこと。</summary>
-        private IEnumerator RunRelicAxisSweep()
-        {
-            // 2026-11-10: 遺物の再編 (3 部位・セット・強化・§15-5) で「メイン枠 1 本だけの遺物」が作れなくなったので撤去した。
-            //   新しい遺物の軸ごとの寄与を測るときは、 RelicPresets で 3 部位の組を作って比べる (遺物のバランス調整の issue)。
-            _relicAxisSweepReport = "=== 遺物 単軸スイープ ===\n2026-11-10 の遺物の再編で撤去 (§15-5)。\n";
-            Debug.LogWarning("[AutoRunner] 遺物の単軸スイープは 2026-11-10 の再編で撤去した");
-            yield break;
         }
 
         // ============================================================
@@ -877,8 +848,8 @@ namespace AutoTest
         /// (500 ランでも 5層クリアの標準誤差は ±2.2pt あり、 平均どうしでは数pt の差が読めない)。</summary>
         private IEnumerator RunPersonaSweep()
         {
-            bool prevSuppress = MetaProgression.MetaBuffApplicator.SuppressRelicGrant;
-            MetaProgression.MetaBuffApplicator.SuppressRelicGrant = true;
+            bool prevSuppress = MetaProgression.MetaBuffApplicator.SuppressMetaRewards;
+            MetaProgression.MetaBuffApplicator.SuppressMetaRewards = true;
             var prevPickMode = itemPickMode;
             itemPickMode = ItemPickMode.BuildFocused;   // ペルソナ選好を効かせるため
             var prevMetaMode = metaBuffMode;
@@ -924,7 +895,6 @@ namespace AutoTest
                     RebuildRunRng(runIdx);
                     _currentPersona = persona;
                     _pendingChallengeDifficulty = loadout;
-                    _pendingPresetRelic = null;
                     yield return RunOne(runIdx);
 
                     var rec = _records.Count > 0 ? _records[_records.Count - 1] : null;
@@ -974,7 +944,7 @@ namespace AutoTest
             itemPickMode = prevPickMode;
             metaBuffMode = prevMetaMode;
             GameLoop.GameManager.SuppressLayer5HiddenBoss = prevHidden5;
-            MetaProgression.MetaBuffApplicator.SuppressRelicGrant = prevSuppress;
+            MetaProgression.MetaBuffApplicator.SuppressMetaRewards = prevSuppress;
         }
 
         private static string Trunc(string s, int n)
@@ -1021,8 +991,8 @@ namespace AutoTest
                      ? wiringSkillCompareArms
                      : new[] { WiringSkill.Optimal, WiringSkill.Super };
 
-            bool prevSuppress = MetaProgression.MetaBuffApplicator.SuppressRelicGrant;
-            MetaProgression.MetaBuffApplicator.SuppressRelicGrant = true;
+            bool prevSuppress = MetaProgression.MetaBuffApplicator.SuppressMetaRewards;
+            MetaProgression.MetaBuffApplicator.SuppressMetaRewards = true;
             var prevPickMode = itemPickMode;
             itemPickMode = ItemPickMode.BuildFocused;
             var prevSkill = wiringSkill;
@@ -1031,11 +1001,6 @@ namespace AutoTest
             bool prevHidden5 = GameLoop.GameManager.SuppressLayer5HiddenBoss;
             GameLoop.GameManager.SuppressLayer5HiddenBoss = true;
 
-            // 挑戦スコアを載せるときは**固定難易度スイープと同条件**へ揃える (遺物 理論最良)。
-            //   0pt の基準値条件と混ぜると「遺物なしの 30pt」という別物を測ってしまう。
-            _pendingRelicExplicit = true;   // 0pt 側は **遺物なしを強制** する (null = 触らない ではない)
-            var cmpRelic = wiringSkillCompareScore > 0
-                ? RelicPresets.Build(RelicPresets.Preset.TheoreticalBestCursed) : null;
             // **0pt でも必ず非 null を渡す。** null は「0pt」ではなく「挑戦設定に触らない」を
             //   意味するので、 前の状態が残る。 単軸スイープは常に代入していて、
             //   それが両者で唯一残った前処理の差だった (2026-08-10 の乖離調査)。
@@ -1088,7 +1053,6 @@ namespace AutoTest
                     UnityEngine.Random.InitState(runIdx);
                     RebuildRunRng(runIdx);
                     _currentPersona = BuildPersona.Standard;
-                    _pendingPresetRelic = cmpRelic;
                     _pendingChallengeDifficulty = cmpLoadout;
                     yield return RunOne(runIdx);
 
@@ -1163,10 +1127,8 @@ namespace AutoTest
             usePowerBudget = true;
             itemPickMode = prevPickMode;
             _ascensionPersonaLock = false;
-            _pendingPresetRelic = null;
-            _pendingRelicExplicit = false;
             _pendingChallengeDifficulty = -1;
-            MetaProgression.MetaBuffApplicator.SuppressRelicGrant = prevSuppress;
+            MetaProgression.MetaBuffApplicator.SuppressMetaRewards = prevSuppress;
             GameLoop.GameManager.SuppressLayer5HiddenBoss = prevHidden5;
 
             _skillSweepReport = sb.ToString();
@@ -1183,122 +1145,6 @@ namespace AutoTest
             double y = 1.0 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t
                               - 0.284496736) * t + 0.254829592) * t * Math.Exp(-x * x);
             return Math.Max(0.0, Math.Min(1.0, 1.0 - y));
-        }
-
-        private IEnumerator RunRelicPresetSweep()
-        {
-            // **遺物なしがバランスの基準値** (2026-08-04 決定)。 遺物は周回引継ぎなので初回
-            //   プレイヤーは 0 個。 最良遺物を前提に調整すると、 遺物が報酬ではなく
-            //   「持っていないと基準に届かない前提条件」になる。 素の 7 層クリア率の目標は 2 割強。
-            //   baselineOnly は調整ループ用 ── 1/5 のラン数で基準値だけを速く出す。
-            var presets = relicSweepBaselineOnly
-                ? new[] { RelicPresets.Preset.None }
-                : new[]
-                {
-                    RelicPresets.Preset.None,
-                    RelicPresets.Preset.Mid,
-                    RelicPresets.Preset.High,
-                    RelicPresets.Preset.TheoreticalBest,
-                    RelicPresets.Preset.TheoreticalBestCursed,
-                };
-
-            bool prevSuppress = MetaProgression.MetaBuffApplicator.SuppressRelicGrant;
-            MetaProgression.MetaBuffApplicator.SuppressRelicGrant = true;
-            var prevPickMode = itemPickMode;
-            itemPickMode = ItemPickMode.BuildFocused;
-            _ascensionPersonaLock = true;
-            _currentPersona = BuildPersona.Standard;      // ペルソナ固定 = 交絡を断つ
-            // 5層裏ボスを遮断する。 レイピアを引いたランだけ 5層の難度が跳ね上がり、
-            // 基準値の分散源になるため (2026-08-05)。 **基準値測定のときだけ。**
-            // 2026-08-15: Begin() が既定 true を敷くようになったので、 非基準アームは
-            //   ここで明示的に false へ戻す (遺物の効きを裏ボス込みで見るのが本来の意図)。
-            bool prevHidden5 = GameLoop.GameManager.SuppressLayer5HiddenBoss;
-            GameLoop.GameManager.SuppressLayer5HiddenBoss = relicSweepBaselineOnly;
-
-            int runs = Mathf.Max(50, relicSweepRuns);
-            ResetScreenProgress(presets.Length * runs, "遺物プリセット");
-            var sb = new StringBuilder();
-            sb.AppendLine("=== 遺物プリセットスイープ (§15-5) ===");
-            sb.AppendLine($"日時    : {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-            sb.AppendLine($"ペルソナ Standard 固定 / 挑戦スコア 0 固定 / 1 プリセット {runs} ラン");
-            sb.AppendLine("決定論シード: 0000 0000 0000 0000");
-            sb.AppendLine();
-            sb.AppendLine("プリセット             pt/枠 | 平均到達層 | 5層クリア | 7層クリア | 到達層分布 1F〜7F");
-            var effRows = new List<string>();
-
-            for (int pi = 0; pi < presets.Length; pi++)
-            {
-                var preset = presets[pi];
-                curArmIndex = pi + 1; curArmCount = presets.Length;
-                curRunsPerArm = runs; curArmLabel = preset.ToString();
-                var relic = RelicPresets.Build(preset);
-                var reach = new int[9];
-                int cleared5 = 0, cleared7 = 0;
-                double sumFloor = 0;
-                // **序盤ファーム効率**をプリセットごとに切り出す。 生存だけでは
-                // 「強い遺物で序盤を効率よく回せるのか」に答えられない。
-                int recBase = _records.Count;
-                CombatStats.ResetFloorDamage();
-
-                for (int i = 0; i < runs; i++)
-                {
-                    curRunInArm = i + 1;
-                    // **BeginRun を必ず呼ぶ** (理由は RunChallengeFixedSweep 側のコメント参照)。
-                    int runIdx = pi * runs + i;
-                    GameLoop.GameRng.BeginRun(runIdx);
-                    RebuildRunRng(runIdx);
-                    _currentPersona = BuildPersona.Standard;
-                    _pendingPresetRelic = relic;             // RunOne 内の ResetAll 直後に適用される
-                    yield return RunOne(runIdx);
-
-                    var rec = _records.Count > 0 ? _records[_records.Count - 1] : null;
-                    int reached = rec != null ? rec.reachedFloor : 1;
-                    bool died = rec == null || rec.outcome == Outcome.GameOver;
-                    int clearedFloor = died ? reached - 1 : reached;
-                    reach[Mathf.Clamp(reached, 0, 8)]++;
-                    sumFloor += reached;
-                    if (clearedFloor >= 5) cleared5++;
-                    if (clearedFloor >= 7) cleared7++;
-
-                    if ((i + 1) % Mathf.Max(1, runsPerYield) == 0) yield return null;
-                }
-
-                int pts = RelicPresets.TotalSteps(relic);
-                int slots = relic != null ? relic.Count : 0;
-                var dist = new StringBuilder();
-                for (int f = 1; f <= 7; f++) dist.Append($"{reach[f] * 100.0 / runs,5:F1}%");
-                sb.AppendLine($"{preset,-22} {pts,2}/{slots} | {sumFloor / runs,10:F2} | "
-                            + $"{cleared5 * 100.0 / runs,8:F1}% | {cleared7 * 100.0 / runs,8:F1}% |{dist}");
-
-                // ── 序盤ファーム効率 ──
-                double gold = 0, buys = 0; int n = 0;
-                for (int r = recBase; r < _records.Count; r++)
-                { gold += _records[r].totalGoldGained; buys += _records[r].shopPurchases; n++; }
-                var fd = CombatStats.FloorDamage;
-                // 1〜3F の通常+エリート戦だけを見る (ボスは長さの性質が違うので除く)
-                double atk = 0, fights = 0, dmgSum = 0;
-                for (int f = 1; f <= 3; f++)
-                    for (int k = 0; k < 2; k++)
-                    { atk += fd[f, k, 0]; fights += fd[f, k, 6]; dmgSum += fd[f, k, 1]; }
-                effRows.Add($"{preset,-22} {pts,2}/{slots} | {(n > 0 ? gold / n : 0),9:F1} | "
-                          + $"{(n > 0 ? buys / n : 0),8:F2} | {(fights > 0 ? atk / fights : 0),9:F2} | "
-                          + $"{(atk > 0 ? dmgSum / atk : 0),10:F1}");
-            }
-
-            sb.AppendLine();
-            sb.AppendLine("=== 経済と序盤効率 (GOLD/購入は**ラン全体**・ターン/与ダメは1〜3F通常+エリートのみ) ===");
-            sb.AppendLine("プリセット             pt/枠 | GOLD総獲得 | 購入回数 | 平均ターン | 1攻撃与ダメ");
-            foreach (var row in effRows) sb.AppendLine(row);
-
-            sb.AppendLine();
-            sb.AppendLine("※ 遺物以外は完全に同一。 深度が動かないなら「強い遺物で押し切る」は成立しない。");
-            _relicSweepReport = sb.ToString();
-
-            _pendingPresetRelic = null;
-            _ascensionPersonaLock = false;
-            itemPickMode = prevPickMode;
-            MetaProgression.MetaBuffApplicator.SuppressRelicGrant = prevSuppress;
-            GameLoop.GameManager.SuppressLayer5HiddenBoss = prevHidden5;
         }
 
         /// <summary>周回モード (§15-5): ペルソナごとに独立したラインを走らせる。

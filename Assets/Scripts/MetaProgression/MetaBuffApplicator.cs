@@ -14,14 +14,24 @@ namespace MetaProgression
     {
         private static MetaProgressState S => MetaProgressManager.Instance?.State;
 
-        /// <summary>効いている基礎整備の段 (「基礎整備を切る」の間は 0)。</summary>
-        private static int Tier => S?.EffectiveBaseTier ?? 0;
+        /// <summary>整備盤の効いているパネルの数値の合計 (2026-11-23・<see cref="MetaBoard"/>)。 メタ進行が無ければ全部 0。</summary>
+        private static BoardStats B => S?.BoardEffects ?? Empty;
+        private static readonly BoardStats Empty = new BoardStats();
 
-        /// <summary>そのモジュールが開いた枠に挿さっているか。</summary>
-        private static bool Has(MetaModule m) => S?.IsActive(m) ?? false;
+        /// <summary>そのモジュール (主方針・補助・種火の効果) を持つパネルが盤で効いているか。</summary>
+        private static bool Has(MetaModule m) => S?.BoardHas(m) ?? false;
 
-        /// <summary>今の整備パネルの構成 (ログ・測定の実効状態)。</summary>
-        public static string Describe() => S?.DescribePanel() ?? "(メタ進行なし)";
+        /// <summary>今の整備盤の構成と効いている数値 (ログ・測定の実効状態)。 例 "盤9/9 core_last_stand@0,0r0 … [HP+15 防+3 与ダメ+10% 特売+0 金+0 主=LastStand,AttackTune]"。</summary>
+        public static string Describe()
+        {
+            var s = S;
+            if (s == null) return "(メタ進行なし)";
+            var b = s.BoardEffects;
+            var mods = new System.Collections.Generic.List<string>();
+            foreach (MetaModule m in System.Enum.GetValues(typeof(MetaModule))) if (s.BoardHas(m)) mods.Add(m.ToString());
+            return s.DescribeBoard() + $" [HP+{b.hp} 防+{b.defense} 与ダメ+{b.damagePct}% 特売+{b.saleSlots} 金+{b.gold} 充電+{b.chargeOpening} 1T手札+{b.handTurn1}"
+                 + $" 1T防+{b.blockTurn1} 会心+{b.critPct}% モジュール={(mods.Count > 0 ? string.Join(",", mods) : "-")}]";
+        }
 
         // ============================================================
         //  RunState 初期化時の補正
@@ -34,55 +44,21 @@ namespace MetaProgression
             var s = S;
             if (s == null) return;
 
-            int hpBonus  = MetaPanel.BaseHp(Tier);
-            // 遺物 (§15-5) 最大HP+N。 ラン開始時に 1 回だけ。 刻印の毎ターン条件は
-            // この時点でまだ判定材料が無いので成立扱い (RelicApplicator の規約)。
-            int relicHp  = Relics.RelicApplicator.GetMaxHpBonus(run);
-            int hp       = baseHP + hpBonus + relicHp;
+            int hpBonus  = B.hp;
+            int hp       = baseHP + hpBonus;
             run.playerMaxHP = hp;
             run.playerHP    = hp;
 
-            int startGold = MetaPanel.BaseGold(Tier);
-            GoldIncome.GainExempt(run, startGold, "整備パネル(基礎整備)");
+            int startGold = B.gold;
+            GoldIncome.GainExempt(run, startGold, "整備盤");
 
             // 開幕の秘宝 (〈開幕厳選〉)・戦術消耗品 (〈戦術の懐刀〉) の付与は GameManager 側 (アイテムDB と重複排除が要るため)。
 
-            Debug.Log($"[MetaBuff] 開幕補正: HP {baseHP}→{hp} (遺物 +{relicHp}), "
-                    + $"Gold +{startGold}, 開幕の秘宝 {GetStartingPassiveCount()} 本 / {Describe()}");
-            if (Relics.RelicApplicator.DescribeEquipped() != "遺物なし")
-                Debug.Log($"[遺物] 持ち込み: {Relics.RelicApplicator.DescribeEquipped()}");
+            Debug.Log($"[MetaBuff] 開幕補正: HP {baseHP}→{hp}, Gold +{startGold}, 開幕の秘宝 {GetStartingPassiveCount()} 本 / {Describe()}");
         }
 
-        /// <summary>遺物の自動獲得を止めるフラグ。 **AutoRunner のバッチ中は必ず true にする。**
-        ///
-        /// バッチは 1 万ラン規模で回るので、 毎ラン AddRelic + PlayerPrefs.Save() が走ると
-        /// (1) セーブが数千個の遺物で膨れ、 (2) ディスク I/O でバッチが極端に遅くなる。
-        /// 周回モード (AscensionLoop) は自前で RelicRoller を呼ぶので、 自動獲得は不要。</summary>
-        public static bool SuppressRelicGrant;
-
-        /// <summary>直近のランの終わりに入手した遺物 (結果画面が見せる)。 次のランの開始まで残る。</summary>
-        public static readonly System.Collections.Generic.List<Relics.Relic> LastRunRelics = new System.Collections.Generic.List<Relics.Relic>();
-
-        /// <summary>ラン終了時に遺物を獲得する (§15-5・2026-11-10 再編)。 クリア・死亡いずれでも呼ぶ。
-        /// ordinal は見せる層 (1〜5)。 落ちる数は 3 層以下 1 / 4 層 2 / 5 層到達 3。 難易度は挑戦カードの目盛り (8 で頭打ち)。</summary>
-        public static void GrantRelicOnRunEnd(int ordinal, bool cleared)
-        {
-            LastRunRelics.Clear();
-            if (SuppressRelicGrant) return;
-            var s = S;
-            if (s == null) return;
-            int diff = s.challengeDifficulty;
-            var got = Relics.RelicRoller.RollRunEnd(GameLoop.GameRng.RunIndex, ordinal, diff, s.relicTargetSet);
-            foreach (var relic in got)
-            {
-                if (relic == null || !relic.IsValid()) { Debug.LogWarning($"[遺物] 生成に失敗 (層{ordinal} 難易度{diff})"); continue; }
-                s.AddRelic(relic);
-                LastRunRelics.Add(relic);
-                Achievements.AchievementService.NoteRelicAcquired(relic);
-                Debug.Log($"[遺物] 獲得: {relic.Describe()}  (層{ordinal}{(cleared ? "クリア" : "")} / 難易度{diff} / 所持{s.ownedRelics.Count}個)");
-            }
-            MetaProgressManager.Instance?.Save();
-        }
+        /// <summary>メタ進行の報酬 (実績・実績のパネル・ランの保存) を止めるフラグ。 **AutoRunner のバッチ中は必ず true にする** (旧 SuppressMetaRewards・2026-11-23 に遺物と一緒に改名)。</summary>
+        public static bool SuppressMetaRewards;
 
         // ============================================================
         //  戦闘関連
@@ -107,8 +83,8 @@ namespace MetaProgression
         /// <summary>兵站 r10〈補給線〉: この層で一度着いた前哨基地・店のあいだを物資 1 で跳べる。 兵站は 2026-11-10 に枠から外した (常に false・呼ぶ側の形を保つ)。</summary>
         public static bool IsSupplyLineUnlocked() => false;
 
-        /// <summary>基礎整備 2 段目: 防御 +N。 戦闘開始時に防御の土台へ足す。</summary>
-        public static int GetArmorDefense() => MetaPanel.BaseDefense(Tier);
+        /// <summary>整備盤の防御 +N。 戦闘開始時に防御の土台へ足す。</summary>
+        public static int GetArmorDefense() => B.defense;
 
         /// <summary>〈不動〉: 被ダメージ −N (防御の後に引く)。</summary>
         public static int GetArmorFlatReduction() => Has(MetaModule.Immovable) ? MetaPanel.ImmovableFlatReduction : 0;
@@ -123,9 +99,9 @@ namespace MetaProgression
         //  ショップ
         // ============================================================
 
-        /// <summary>店の特売枠の数 = 素の <see cref="MetaPanel.BaseSaleSlots"/> + 基礎整備 3・6 段目 + 〈99% 特売〉。</summary>
+        /// <summary>店の特売枠の数 = 素の <see cref="MetaPanel.BaseSaleSlots"/> + 整備盤のパネル + 〈99% 特売〉。</summary>
         public static int GetSaleItemCount()
-            => MetaPanel.BaseSaleSlots + MetaPanel.BaseSaleSlotsBonus(Tier) + (Has(MetaModule.Sale99) ? MetaPanel.Sale99SlotBonus : 0);
+            => MetaPanel.BaseSaleSlots + B.saleSlots + (Has(MetaModule.Sale99) ? MetaPanel.Sale99SlotBonus : 0);
 
         /// <summary>特売の割引率を重み付きで 1 つ引く (2026-09-12)。
         /// 段は <see cref="MetaPanel.SaleTiers"/> (既定 {15,30,50} / 〈99% 特売〉で 99 が加わる)。
@@ -199,8 +175,8 @@ namespace MetaProgression
         //  与ダメ% (出力トラック 0..50)
         // ============================================================
 
-        /// <summary>与ダメ % (池に足す): 基礎整備 5 段目。 (挑戦カード〈与ダメ +N%〉は 2026-11-22 に撤去)</summary>
-        public static int GetOutgoingDamagePct() => MetaPanel.BaseDamagePct(Tier);
+        /// <summary>与ダメ % (池に足す): 整備盤のパネル。 (挑戦カード〈与ダメ +N%〉は 2026-11-22 に撤去)</summary>
+        public static int GetOutgoingDamagePct() => B.damagePct;
 
         /// <summary>〈戦意〉が挿さっているか。</summary>
         public static bool IsBattleSpiritUnlocked() => Has(MetaModule.BattleSpirit);
@@ -278,7 +254,7 @@ namespace MetaProgression
         /// (旧: 精密トラックの段あたり会心率 MetaPanel.PrecisionCritRatePct を足していたが、 2026-09-10 の撤去で常に 0f だった。
         ///  0f + x は x と同じ値なので 2026-11-12 に外した)</summary>
         public static float GetCritRatePctBonus()
-            => ChallengeCards.Value(ChallengeCards.Crit) / 100f;
+            => (ChallengeCards.Value(ChallengeCards.Crit) + B.critPct) / 100f;      // + 整備盤〈精密較正ピン〉(2026-11-23)
 
         /// <summary>攻撃端子調律: 攻撃の端子に挿した出目 1 個あたりの加算。 呼び出し側で個数を掛けること。 (挑戦カードの端子の札は 2026-11-22 に撤去)</summary>
         public static int GetAttackTerminalPerDice() => Has(MetaModule.AttackTune) ? MetaPanel.TerminalTunePerDie : 0;
@@ -286,9 +262,7 @@ namespace MetaProgression
         /// <summary>防御端子調律: 防御の端子に挿した出目 1 個あたりの加算。 呼び出し側で個数を掛けること。</summary>
         public static int GetBlockTerminalPerDice() => Has(MetaModule.BlockTune) ? MetaPanel.TerminalTunePerDie : 0;
 
-        /// <summary>〈軸引きの手形〉: 店の軸指定リロールの追加から引く額。
-        /// <b>未接続</b> ── 追加の額は ShopManager.AxisRerollSurchargeFor が決めるが、 ShopManager は並行作業 (8 軸化) の区域なので Stage D では触っていない。
-        /// 接続は AxisRerollSurchargeFor の式から <c>MetaBuffApplicator.GetAxisRerollDiscount()</c> を引く 1 か所 (下限 0)。</summary>
+        /// <summary>〈軸引きの手形〉: 店の軸指定リロールの追加から引く額 (ShopManager.AxisRerollSurchargeFor が引く・下限 0)。</summary>
         public static int GetAxisRerollDiscount()
             => (Has(MetaModule.AxisTicket) ? MetaPanel.AxisTicketDiscount : 0) + (int)ChallengeCards.Value(ChallengeCards.Regular);   // 挑戦カード〈顔なじみ〉(III は 999 = 無料・下限 0 は呼び手)
 
@@ -303,7 +277,7 @@ namespace MetaProgression
         /// <summary>挿している種火の軸 (items.json の axis・"充電" など)。 ランの始めに出現の枠 (RunState.lockedAxes) の 1 つ目へ入る。 種火が無ければ null。</summary>
         public static string GetSparkAxis()
         {
-            var m = S?.Equipped(MetaSlot.Spark);
+            var m = S?.BoardSpark();
             return m.HasValue ? SparkStarterPicker.AxisOf(MetaPanel.SparkKeyword(m.Value)) : null;
         }
 
@@ -312,7 +286,7 @@ namespace MetaProgression
 
         /// <summary>種火・充電 + 挑戦カード〈予備電源〉: 戦闘開始時に得る充電。</summary>
         public static int GetChargeOpening()
-            => (Has(MetaModule.SparkCharge) ? MetaPanel.ChargeOpening : 0) + (int)ChallengeCards.Value(ChallengeCards.Charge);
+            => (Has(MetaModule.SparkCharge) ? MetaPanel.ChargeOpening : 0) + B.chargeOpening + (int)ChallengeCards.Value(ChallengeCards.Charge);
 
         /// <summary>種火・臨界: 戦闘終了時にメーターの何割を次戦闘へ持ち越すか (0 or 0.5)。</summary>
         public static float GetRinkaiCarryoverRatio() => Has(MetaModule.SparkRinkai) ? MetaPanel.RinkaiCarryoverRatio : 0f;
@@ -321,11 +295,48 @@ namespace MetaProgression
         public static int GetPoisonApplyBonus() => Has(MetaModule.SparkPoison) ? MetaPanel.PoisonApplyBonus : 0;
 
         /// <summary>種火・山札 (2026-11-21): 戦闘の 1 ターン目に多く引く端子の枚数 (CombatManager.BeginTerminalDeck)。</summary>
-        public static int GetSparkDeckOpeningDraw() => Has(MetaModule.SparkDeck) ? MetaPanel.DeckOpeningDraw : 0;
+        public static int GetSparkDeckOpeningDraw() => (Has(MetaModule.SparkDeck) ? MetaPanel.DeckOpeningDraw : 0) + B.handTurn1;   // + 整備盤のパネル (予備スロット端子など)
 
         /// <summary>種火・役 (2026-11-21): 各戦闘で、 最初から数えて無料になる振り直しの回数 (CombatManager.FreeRerollsLeft)。</summary>
         public static int GetSparkRoleFreeRerolls()
-            => (Has(MetaModule.SparkRole) ? MetaPanel.RoleFreeRerolls : 0) + (int)ChallengeCards.Value(ChallengeCards.Role);   // 挑戦カード〈手馴染み〉も同じ数え方 (各戦闘の最初から)
+            => (Has(MetaModule.SparkRole) ? MetaPanel.RoleFreeRerolls : 0) + B.freeRerolls + (int)ChallengeCards.Value(ChallengeCards.Role);   // 挑戦カード〈手馴染み〉も同じ数え方 (各戦闘の最初から)
+
+        // === 整備盤のパネルだけの効果 (2026-11-23・meta_board_panels.json の stats) ===
+
+        /// <summary>〈緊急冷却ピン〉: 各戦闘の 1 ターン目のブロック +N (CombatManager.FinalBlockSum)。</summary>
+        public static int GetOpeningBlock() => B.blockTurn1;
+
+        /// <summary>〈端数回収回路〉〈商隊ネットワーク〉: 秘宝の見送り換金 +N% (MetaDebuffApplicator.ApplySkipGold が挑戦カードの後に掛ける)。</summary>
+        public static int GetSkipCashPct() => B.skipCashPct;
+
+        /// <summary>〈試運転ブースター〉: 0 層〈支給の秘宝〉の提示数の上乗せ。</summary>
+        public static int GetFarmOfferBonus() => B.farmOffer;
+
+        /// <summary>〈補給ユニット〉: 休憩の回復量 +N% (回復量 × (1 + N/100))。</summary>
+        public static int GetRestHealPct() => B.restHealPct;
+
+        /// <summary>〈補給ユニット〉〈探査レーダー〉: 前哨基地の物資の補給 +N% (切り上げ)。</summary>
+        public static int GetOutpostSupplyPct() => B.outpostSupplyPct;
+
+        /// <summary>〈探査レーダー〉: 地図の視界 +N 歩。</summary>
+        public static int GetVisionBonus() => B.vision;
+
+        /// <summary>〈熟練の整備書〉: 店の武器の強化素材の値段 −N% (切り上げ)。</summary>
+        public static int GetMaterialCutPct() => B.materialCutPct;
+
+        /// <summary>〈先制解析ユニット〉: 各層の最初の通常戦の数と、 その戦闘の敵の攻撃の削り (%)。</summary>
+        public static int GetOpenerFights() => B.openerFights;
+        public static int GetOpenerAtkCutPct() => B.openerAtkCutPct;
+
+        /// <summary>〈均衡モジュール〉: 出現の枠が 4 つ埋まった瞬間 (AxisPool.NoteAcquired)、 最大 HP +N・HP 全回復。</summary>
+        public static void OnAxisLockCompleted(RunState run)
+        {
+            int hp = MetaProgressManager.Existing?.State?.BoardEffects?.lockHp ?? 0;   // 管理を作らない (AxisPool のテストは EditMode で通る)
+            if (run == null || hp <= 0) return;
+            run.playerMaxHP += hp;
+            run.playerHP = run.playerMaxHP;
+            Debug.Log($"[MetaBuff] 均衡モジュール: 出現の枠が埋まった → 最大 HP +{hp}・全回復 ({run.playerHP}/{run.playerMaxHP})");
+        }
 
         /// <summary>種火・出血: 敵の出血が閾値以上で敵攻撃値 −N。 CombatManager 予告後・敵攻撃前で減算。</summary>
         public static int GetBleedWeakenAttack(int enemyBleedStacks)

@@ -742,7 +742,6 @@ namespace AutoTest
                 if (slayer > 0 && node != null && node.EffectiveType.ToEnemyKind() == EnemyKind.Elite) metaPct += slayer;
             }
             outMul += metaPct * 0.01f;
-            outMul += MetaProgression.Relics.RelicApplicator.GetOutgoingPct(run, ctx);
             if (ctx.polishArmed) outMul += 1.5f;
             if (ctx.consDmgMultPct > 0) outMul += ctx.consDmgMultPct / 100f;
             return outMul;
@@ -755,7 +754,7 @@ namespace AutoTest
             st.atkPower = System.Math.Max(0, cm?.PlayerAttackPower ?? 2);
             st.atkPenalty = System.Math.Max(0, atkPenalty);
             int consAtk = ctx.consDiceRoll;
-            st.atkFlat = ctx.mutualAttackBonus + consAtk + MetaProgression.Relics.RelicApplicator.GetAttackBonus(run, ctx);
+            st.atkFlat = ctx.mutualAttackBonus + consAtk;
             st.atkPerDie = MetaProgression.MetaBuffApplicator.GetAttackTerminalPerDice();
             st.igCut = (run != null && run.HasFlaw(GameLoop.GateFlaw.IncompleteIgnition)) ? System.Math.Max(0f, GameLoop.GateFlaws.IgnitionAttackCutPct) : 0f;
             st.dmgBonus = (int)ctx.GetBuff("damageBonus");

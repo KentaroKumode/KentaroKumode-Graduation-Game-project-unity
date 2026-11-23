@@ -59,8 +59,6 @@ namespace CombatSystem
             public HeatItems items;
             public int meter, threshold, kilnCut, coalUsed, burstsTurn, burstsTotal, stack, flat, enemyDefense;
             public bool doubled, enemyDown;
-            /// <summary>遺物〈炉温〉2 個: 臨界の獲得量 +% (切り上げ)。</summary>
-            public float relicPct;
         }
 
         /// <summary>1 回の爆発。 damage = 敵の防御の前 / landed = 敵の防御の後 (最終与ダメ倍率・ダウンの ×1.5 は HP を減らす口 HpLossDiag が掛ける)。</summary>
@@ -97,7 +95,6 @@ namespace CombatSystem
             if (n <= 0 || s.threshold <= 0) return 0;
             if (Has(s.items, HeatItems.Coal) && s.coalUsed < CoalMax) { n += CoalAdd; s.coalUsed++; }
             if (s.doubled) n *= 2;
-            if (s.relicPct > 0f) n += (int)System.Math.Ceiling(n * s.relicPct);
             s.meter += n;
             return n;
         }

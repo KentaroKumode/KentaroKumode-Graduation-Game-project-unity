@@ -68,7 +68,6 @@ namespace ItemSystem.PassiveSkills.Keywords
                 burstsTotal = (int)ctx.GetAccumulated(BurstTotalKey), stack = ctx.burstStackBonus, flat = ctx.burstFlatBonus, enemyDefense = ctx.enemyDefense,
                 doubled = ctx.currentTurn > 0 && (int)ctx.GetAccumulated(CombatSystem.HeatCore.DoubleTurnKey) == ctx.currentTurn,
                 enemyDown = CombatSystem.BossDown.ActiveNow,
-                relicPct = MetaProgression.Relics.RelicApplicator.GetHeatGainPct(),   // 遺物 炉温 2 個: 臨界の獲得量 +20% (切り上げ)
             };
         }
 
@@ -135,8 +134,6 @@ namespace ItemSystem.PassiveSkills.Keywords
                 }
                 Raise(ctx, PassiveSkillTrigger.OnRinkaiBurst, b.threshold);
                 if (b.super) Raise(ctx, PassiveSkillTrigger.OnSuperBurst, b.landed);
-                int relicSh = MetaProgression.Relics.RelicApplicator.GetBurstShield();   // 遺物 炉温 3 個: 爆発のたびにシールド +6
-                if (relicSh > 0) { ctx.consShield += relicSh; ctx.shieldGainedTotal += relicSh; CombatSystem.ShieldDiag.Note("遺物〈炉温〉3", relicSh); }
                 s = HeatState(ctx);   // 出来事の品が臨界を動かしても、 続きは今の値から
             }
         }

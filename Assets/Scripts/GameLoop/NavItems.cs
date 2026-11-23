@@ -59,6 +59,8 @@ namespace GameLoop
             if (Has(run, ItemIds.NavBirdCompass)) mask |= 1 << 6;
             if (Has(run, ItemIds.NavOutpostFlag)) mask |= 1 << 7;
             if (Has(run, ItemIds.NavOiledBoots))  mask |= 1 << 8;
+            int metaVision = MetaProgression.MetaBuffApplicator.GetVisionBonus();     // 整備盤〈探査レーダー〉: 視界 +N 歩 (2026-11-23)
+            if (metaVision > 0) mask |= (metaVision & 0xF) << 16;
             if (mask == 0) return FreeMapPerks.None;
             if (mask == _cacheMask && _cache != null) return _cache;
             var p = new FreeMapPerks
@@ -68,7 +70,7 @@ namespace GameLoop
                 sketchRadius  = (mask & 1 << 2) != 0 ? SketchRadius : 0,
                 traceLifeMul  = (mask & 1 << 3) != 0 ? TraceLifeMul : 1.0,
                 familiarSee   = (mask & 1 << 4) != 0 ? MirrorFamiliarSee : FreeMapParams.FamiliarSee,
-                vision        = (mask & 1 << 5) != 0 ? NightVision : FreeMapParams.Vision,
+                vision        = ((mask & 1 << 5) != 0 ? NightVision : FreeMapParams.Vision) + metaVision,
                 goalwardHalf  = (mask & 1 << 6) != 0,
                 beaconCharges = (mask & 1 << 7) != 0 ? 1 : 0,
                 ignoreSand    = (mask & 1 << 8) != 0,
@@ -88,7 +90,11 @@ namespace GameLoop
 
         /// <summary>前哨基地の物資。 〈補給商の割符〉で ×1.5 (切り上げ)。</summary>
         public static int OutpostSupply(RunState run)
-            => Has(run, ItemIds.NavSupplyTally) ? (int)System.Math.Ceiling(FreeMapParams.RewardOutpost * OutpostSupplyMul) : FreeMapParams.RewardOutpost;
+        {
+            int n = Has(run, ItemIds.NavSupplyTally) ? (int)System.Math.Ceiling(FreeMapParams.RewardOutpost * OutpostSupplyMul) : FreeMapParams.RewardOutpost;
+            int pct = MetaProgression.MetaBuffApplicator.GetOutpostSupplyPct();      // 整備盤〈補給ユニット〉〈探査レーダー〉 +N% (切り上げ・2026-11-23)
+            return pct > 0 ? (int)System.Math.Ceiling(n * (1 + pct / 100.0)) : n;
+        }
 
         /// <summary>逃げた後の所持金。 素は半減、 〈逃げ足の護符〉で失うのが 1/4 (切り捨て)。</summary>
         public static int GoldAfterFlee(RunState run, int coins, int halved)

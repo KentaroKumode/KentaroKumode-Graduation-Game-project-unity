@@ -737,14 +737,6 @@ namespace AutoTest
              : enableAllDebuffs ? MetaProgression.ChallengeCards.MaxDifficulty
              : challengeCardDifficulty;
 
-        [Header("遺物プリセットスイープ")]
-        [Tooltip("true で ペルソナ/挑戦スコアを固定したまま遺物プリセットだけを振り、深度が動くかを測る")]
-        public bool relicPresetSweep = false;
-        [Tooltip("1 プリセットあたりのラン数")]
-        public int relicSweepRuns = 300;
-        [Tooltip("遺物なし(None)だけを回す。 バランス基準値を速く出す調整ループ用")]
-        public bool relicSweepBaselineOnly = false;
-
         /// <summary>技量帯の実測 (ADR-0010 Verification ①)。 **配線方策だけを振る**。
         /// 条件は基準値測定と同じ (遺物なし・挑戦0pt・ペルソナ Standard・5層裏ボス遮断)。</summary>
         public bool wiringSkillCompare = false;
@@ -891,14 +883,10 @@ namespace AutoTest
         {
             var st = MetaProgression.MetaProgressManager.Instance?.State;
             if (st == null) return "[実効状態] MetaProgressState が null";
-            var eqRelics = MetaProgression.Relics.RelicApplicator.Override ?? st.EquippedRelics();
-            int relicCount = eqRelics.Count;
-            int relicPts = RelicPresets.TotalSteps(eqRelics);
             return $"[実効状態] 挑戦の難易度 {st.challengeDifficulty} "
                  + $"/ 学習の帯 {(string.IsNullOrEmpty(LearnedPriorityProvider.LoadedRoot) ? "(未読み込み)" : BandFolderName(LearnedPriorityProvider.LoadedRoot))}"
                  + $"{(LearnedPriorityProvider.UsingFallback ? " **手書きの序列 (学習データなし)**" : "")} "
                  + $"/ 山札の先読み {(deckLookahead && EffectiveWiringSkill != WiringSkill.Naive ? "ON" : "OFF")} (deckLookahead={deckLookahead}) "
-                 + $"/ 遺物 持ち込み {relicCount}個 計{relicPts}段 "
                  + $"/ メタ {MetaProgression.MetaBuffApplicator.Describe()} 攻撃端子+{MetaProgression.MetaBuffApplicator.GetAttackTerminalPerDice()} "
                  + $"/ 追跡者 縄張りの外へ{(pursuerLeavesTerritory ? "出る (旧い作り)" : "出ない")} "
                  + $"/ 縄張りを避ける道の保証 {(pursuerLeavesTerritory ? "効かない (旧い作り)" : territoryKeepBypass ? "あり (縄張りを削る)" : "なし (削らない・旧い作り)")} (territoryKeepBypass={territoryKeepBypass}) "
@@ -970,13 +958,6 @@ namespace AutoTest
             //   更新されず、 その判断は端子の山札の後は呼ばれないので、 常に初期値 1 だった (2026-11-12 に畳んだ)。
             return RunPowerBudget.Gap(run, run.Depth, 1f, dice, mean);
         }
-        private string _relicSweepReport;
-        /// <summary>次ランに流し込む固定遺物。 ResetAll 直後に State へ入れる (周回モードと同じ位置)。</summary>
-        private System.Collections.Generic.List<MetaProgression.Relics.Relic> _pendingPresetRelic;
-        /// <summary>遺物構成をスイープ側が**明示的に管理する**か。 true なら毎ラン作り直し、
-        /// <see cref="_pendingPresetRelic"/> が null なら **遺物なしを強制**する。
-        /// false のときだけ従来どおり「触らない」。</summary>
-        private bool _pendingRelicExplicit;
 
         [Tooltip("【計測用】出目パーツを陳列しない。天井AIのロールアウトがパーツを理解しない問題の切り分け")]
         public bool suppressFacePartOffers = false;
@@ -1011,32 +992,6 @@ namespace AutoTest
         private System.Random _exploreRng = new System.Random(12345);
         /// <summary>足切りを通った候補の添字 (1 決定ぶん・使い回し)。</summary>
         private readonly List<int> _exploreCandidates = new List<int>();
-
-        [Header("遺物")]
-        /// <summary>通常バッチでも**遺物なしを強制**する (2026-08-17)。
-        ///
-        /// <para>既定 false は「触らない」＝ 保存された MetaProgressState の遺物を引き継ぐ。
-        /// バランスの正式な基準は**遺物なし**（周回引継ぎなので初回プレイヤーは 0 個）なので、
-        /// 基準値を採るときはこれを立てる。 立てないまま「遺物なし」を名乗ると、
-        /// 前セッションで転がった遺物込みの数字を基準として扱ってしまう
-        /// ── 実際に 2026-08-17 の 1000 ラン測定は 13pt の遺物込みで走っていた。</para>
-        ///
-        /// <para><b>実効値はサマリー冒頭の `[実効状態]` 行で必ず確認すること。</b>
-        /// 名前で判断しない。</para></summary>
-        public bool forceNoRelic = false;
-
-        /// <summary><b>通常バッチで遺物を理論値 (TheoreticalBestCursed / 29pt) に固定する。</b>
-        ///
-        /// <para>アイテム学習用 (2026-09-04)。 遺物なしだと 6F/7F 到達が 15% 前後しかなく、
-        /// 終盤の情報がほとんど溜まらない ── 到達したランの数がそのまま推定精度になるので、
-        /// 学習は「クリアが起きる領域」で回した方が同じラン数から採れる情報が多い。
-        /// 実測でも遺物 29pt は 7層クリア率をおよそ 2 倍にする ([[project_difficulty_curve_20260817]])。</para>
-        ///
-        /// <para><see cref="forceNoRelic"/> と同時に立てないこと。 両方立った場合は
-        /// <b>遺物なしを優先</b>する (基準値測定の方が壊れると影響が大きい)。</para>
-        ///
-        /// <para><b>実効値はサマリー冒頭の `[実効状態]` 行で必ず確認すること。</b></para></summary>
-        public bool forceTheoreticalRelic = false;
 
         /// <summary><b>武器家系をクラス開始武器に固定する</b> (計測用・既定 OFF)。
         /// <see cref="GameLoop.Loadout.LockWeaponFamily"/> へ流す。
@@ -1524,11 +1479,12 @@ namespace AutoTest
         public int challengeCardDifficulty = 0;
         /// <summary>[測定] 物資の素の上限を差し替える。 0 = 差し替えない (2026-11-09・上限を振る測定の口)。</summary>
         public int provisionMaxOverride = 0;
-        /// <summary>[測定] 遺物の持ち込みを固定する (2026-11-10)。 "プリセット:セット" (例 "TheoreticalBest:Kessho")。 空 = 触らない (セーブ・スイープの遺物を使う)。</summary>
-        public string relicLoadoutSpec = "";
         /// <summary>[測定] 挑戦カードを 1 枚ずつ測る: "層:カードの id" を ; で並べる (例 "1:D:狂暴化:1" / "3:B:Plunder.gold:3")。
         /// 指定した層の入口で、 難易度の引き方の代わりにそのカードを受ける。 空 = 使わない。 層は見せる層 (1..5)。</summary>
         public string challengeForce = "";
+        /// <summary>[測定 2026-11-23] 品の知識を一部だけ持つ人: ランごとに品の N% (0〜100) の ITT を隠す。 隠した品は同じレアリティの品の平均の値
+        /// (取れなければ序列の中央の値) で買う。 乱数は GameRng を消費しない (シード・ラン番号・品の id のハッシュ)。 0 = 隠さない (既定)。</summary>
+        public int ittMaskPct = 0;
         /// <summary>挑戦カードの 2 枚の選び方。 true = バフが自分の軸に合う方 (BotHooks.ChooseChallengeByAxis)、 false = 先頭 (配る順は乱数なので実質無作為)。</summary>
         public bool challengeCardPickByAxis = true;
 
@@ -1551,22 +1507,11 @@ namespace AutoTest
             return layer => byLayer.TryGetValue(layer, out var l) ? l : null;
         }
 
-        /// <summary>[測定 2026-11-12・#95] 止める遺物の接辞 (RelicStat の名前を , で並べる・例 "Defense,OpeningPoison")。 空 = 止めない。
-        /// 主ステもサブもその接辞の分だけ 0 になる (<see cref="GameHooks.RelicStatOffMask"/>)。 <see cref="relicLoadoutSpec"/> と組で使う。</summary>
-        public string relicStatOff = "";
-        /// <summary>[測定 2026-11-12・#95] 止める遺物のセット効果 ("セット:2" か "セット:3" を , で並べる・セットは RelicSet の名前か * = 全部・例 "Kenro:3" / "*:2")。
-        /// 空 = 止めない (<see cref="GameHooks.RelicSetBonusOffMask"/>)。</summary>
-        public string relicSetBonusOff = "";
         /// <summary>[測定 2026-11-12・#20/#41] 敵の固定削り (プレイヤーの防御を固定値で引く) を差し替える。 "対象:値" を ; で並べる。
         /// 対象 = 敵の id (例 "boss_layer6") か "boss" (ヴェスカの 4 段を含む全ボス・<see cref="GameLoop.BossIds.IsBoss"/>)。 id の指定が "boss" より先に効く。
         /// 例 "boss_layer5:99;boss_layer6:99" / "boss:8"。 空 = 差し替えない (データの値)。 知らない id は腕ごと止める。</summary>
         public string enemyArmorPenSpec = "";
 
-        /// <summary>[実効値] ランの始めに本体へ入れる遺物の接辞の止め (ビット = (int)RelicStat)。 監視リスト用 ── ワーカーは Begin() の前に読むので、
-        /// GameHooks の今の値ではなく、 入れる値をフィールドから作って返す (書式の誤りはここで例外になり、 腕が止まる)。</summary>
-        public int RelicStatOffMaskApplied => ParseRelicStatOff(relicStatOff);
-        /// <summary>[実効値] ランの始めに本体へ入れるセット効果の止め (ビット = セット × 2 + (3 個なら 1))。 監視リスト用。</summary>
-        public int RelicSetBonusOffMaskApplied => ParseRelicSetBonusOff(relicSetBonusOff);
         /// <summary>[実効値] 固定削りの差し替えの中身 (3 層・5 層・6 層のボスとヴェスカの 4 段の値を「id=値」で並べる・差し替えなしは空)。 監視リスト用。</summary>
         public string EnemyArmorPenOverrideApplied
         {
@@ -1583,40 +1528,6 @@ namespace AutoTest
                 }
                 return sb.ToString().TrimEnd();
             }
-        }
-
-        private static int ParseRelicStatOff(string spec)
-        {
-            if (string.IsNullOrWhiteSpace(spec)) return 0;
-            int mask = 0;
-            foreach (var part in spec.Split(','))
-            {
-                var t = part.Trim(); if (t.Length == 0) continue;
-                if (!Enum.TryParse(t, true, out MetaProgression.Relics.RelicStat s) || !Enum.IsDefined(typeof(MetaProgression.Relics.RelicStat), s))
-                    throw new ArgumentException("[relicStatOff] 知らない接辞: " + t);
-                mask |= 1 << (int)s;
-            }
-            return mask;
-        }
-
-        private static int ParseRelicSetBonusOff(string spec)
-        {
-            if (string.IsNullOrWhiteSpace(spec)) return 0;
-            int mask = 0;
-            foreach (var part in spec.Split(','))
-            {
-                var t = part.Trim(); if (t.Length == 0) continue;
-                int colon = t.IndexOf(':');
-                if (colon <= 0 || !int.TryParse(t.Substring(colon + 1).Trim(), out int n) || (n != 2 && n != 3))
-                    throw new ArgumentException("[relicSetBonusOff] 書式は セット:2 か セット:3 : " + t);
-                string name = t.Substring(0, colon).Trim();
-                int bit = n == 3 ? 1 : 0;
-                if (name == "*") { for (int k = 0; k < MetaProgression.Relics.RelicCatalog.SetCount; k++) mask |= 1 << (k * 2 + bit); continue; }
-                if (!Enum.TryParse(name, true, out MetaProgression.Relics.RelicSet set) || !Enum.IsDefined(typeof(MetaProgression.Relics.RelicSet), set))
-                    throw new ArgumentException("[relicSetBonusOff] 知らないセット: " + name);
-                mask |= 1 << ((int)set * 2 + bit);
-            }
-            return mask;
         }
 
         private static Func<string, int, int> ParseEnemyArmorPen(string spec)
@@ -1698,19 +1609,6 @@ namespace AutoTest
         private readonly List<string> _grantLog = new List<string>();
         /// <summary>付与抽選の専用乱数。 **GameRng を消費しない**。</summary>
         private System.Random _grantRng;
-
-        [Header("遺物 単軸スイープ")]
-        [Tooltip("true で 全 16 軸を『その軸 1 本だけ・段N』の遺物として個別に回し、軸ごとの寄与を切り出す")]
-        public bool relicAxisSweep = false;
-        [Tooltip("1 軸あたりのラン数")]
-        public int relicAxisSweepRuns = 300;
-        [Tooltip("測る段。 実測では挑戦25pt以上のメインは段8・9 が 6 割強なので 9 が実態に近い")]
-        public int relicAxisSweepStep = 9;
-        [Tooltip("挑戦スコア。 0 なら遺物なし基準値 (§13-5) と直接比較できる")]
-        public int relicAxisSweepChallengeScore = 0;
-        [Tooltip("診断モード: [基準]攻撃3 とこの軸の 2 アームだけを回す。 -1 で全軸。 jsonl から死因を追う用")]
-        public int relicAxisSweepOnlyAxis = -1;
-        private string _relicAxisSweepReport;
 
         [Header("挑戦 単軸スイープ")]
         [Tooltip("true で 挑戦デバフを『その軸 1 本だけ・段N』で個別に回し、軸ごとの重さを切り出す")]
@@ -1898,24 +1796,8 @@ namespace AutoTest
                 Debug.Log($"[AutoRunner] 探索 ON: ホールドアウト {exploreHoldoutRate:P0} / サンプル加点 "
                         + $"{LearnedPriorityProvider.ExplorationWeight:F2} (n<{LearnedPriorityProvider.ExplorationSatN})");
 
-            // 遺物なしの強制 (2026-08-17)。 **null は「無し」ではなく「触らない」**なので、
-            //   明示フラグを立てた上で preset を null にする必要がある。 ラン中の付与も止める。
-            if (forceNoRelic)
-            {
-                _pendingRelicExplicit = true;
-                _pendingPresetRelic = null;
-                MetaProgression.MetaBuffApplicator.SuppressRelicGrant = true;
-                Debug.Log("[AutoRunner] 遺物なしを強制 (基準条件)");
-            }
-            else if (forceTheoreticalRelic)
-            {
-                // 学習条件: 遺物を理論値で固定する。 ラン中の付与も止めて構成を動かさない
-                //   ── 途中で遺物が増えると、 同じバッチ内で難度が変わって値付けが混ざる。
-                _pendingRelicExplicit = true;
-                _pendingPresetRelic = RelicPresets.Build(RelicPresets.Preset.TheoreticalBestCursed);
-                MetaProgression.MetaBuffApplicator.SuppressRelicGrant = true;
-                Debug.Log("[AutoRunner] 遺物を理論値固定 (TheoreticalBest・心眼 3 個・30 段)");
-            }
+            // メタ進行の報酬 (実績・実績のパネル・ランの保存) をバッチ中は止める (旧: forceNoRelic が立てていた・遺物は 2026-11-23 に撤去)
+            MetaProgression.MetaBuffApplicator.SuppressMetaRewards = true;
 
             // 計測モード: 武器家系の乗り換え禁止。 **static はドメインリロードで消える**ので
             //   MonoBehaviour のフィールドから毎バッチ流し込む (エディタメニューから直接
@@ -2051,6 +1933,7 @@ namespace AutoTest
                 if (ItemSystem.ItemDatabase.Instance?.GetItem(bid) == null) Debug.LogError($"[AutoRunner] botBanItemIds: 品が無い「{bid}」");
                 BotHooks.BanIds.Add(bid);
             }
+            LearnedPriorityProvider.IttMaskPct = Mathf.Clamp(ittMaskPct, 0, 100);   // 品の知識を一部だけ持つ人 (2026-11-23)
             LearnedPriorityProvider.BuyTierCount = isSuperSkill ? superBuyTiers : optimalBuyTiers;
             wiringMistakeRate = isSuperSkill ? 0f : optimalMistakeRate;
             LearnedPriorityProvider.GateRaw = v3.tierGateRaw;
@@ -2481,14 +2364,6 @@ namespace AutoTest
             if (ascensionMode)
                 yield return RunAscension();
 
-            // 遺物プリセットスイープ: 遺物の強さだけを振って深度が動くかを見る。
-            if (relicPresetSweep)
-                yield return RunRelicPresetSweep();
-
-            // 遺物 単軸スイープ: 軸ごとの寄与を 1 本ずつ切り出す。
-            if (relicAxisSweep)
-                yield return RunRelicAxisSweep();
-
             // アイテム アブレーション: 同一シードで「開幕付与あり/なし」の対を作る。
             if (metaAxisAblation)
                 yield return RunMetaAxisAblation();
@@ -2584,16 +2459,6 @@ namespace AutoTest
                 }
                 catch (Exception ex) { Debug.LogWarning($"[AutoRunner] 挑戦単軸スイープ出力失敗: {ex.Message}"); }
             }
-            if (relicPresetSweep && !string.IsNullOrEmpty(_relicSweepReport))
-            {
-                try
-                {
-                    File.WriteAllText(Path.Combine(dir, "relic_preset_sweep.txt"), _relicSweepReport, new UTF8Encoding(false));
-                    File.WriteAllText(Path.Combine(Path.GetDirectoryName(dir) ?? dir,
-                        $"relicsweep_{DateTime.Now:yyyyMMdd_HHmmss}.txt"), _relicSweepReport, new UTF8Encoding(false));
-                }
-                catch (Exception ex) { Debug.LogWarning($"[AutoRunner] 遺物スイープ出力失敗: {ex.Message}"); }
-            }
             if (randomGrantTrial && _grantLog.Count > 0)
             {
                 // 割り当てログ。 **学習ディレクトリには置かない** ── ランダム付与のランを
@@ -2656,16 +2521,6 @@ namespace AutoTest
                         $"itemablation_{DateTime.Now:yyyyMMdd_HHmmss}.txt"), _itemAblationReport, new UTF8Encoding(false));
                 }
                 catch (Exception ex) { Debug.LogWarning($"[AutoRunner] アブレーション出力失敗: {ex.Message}"); }
-            }
-            if (relicAxisSweep && !string.IsNullOrEmpty(_relicAxisSweepReport))
-            {
-                try
-                {
-                    File.WriteAllText(Path.Combine(dir, "relic_axis_sweep.txt"), _relicAxisSweepReport, new UTF8Encoding(false));
-                    File.WriteAllText(Path.Combine(Path.GetDirectoryName(dir) ?? dir,
-                        $"axissweep_{DateTime.Now:yyyyMMdd_HHmmss}.txt"), _relicAxisSweepReport, new UTF8Encoding(false));
-                }
-                catch (Exception ex) { Debug.LogWarning($"[AutoRunner] 単軸スイープ出力失敗: {ex.Message}"); }
             }
             if (personaSweep && !string.IsNullOrEmpty(_personaSweepReport))
             {

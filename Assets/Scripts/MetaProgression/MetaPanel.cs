@@ -1,12 +1,9 @@
 namespace MetaProgression
 {
     /// <summary>
-    /// 整備パネル (2026-11-20 刷新・docs/GAME.md §15-1・system-overhaul-spec §1) の<b>数値の正本</b>。
-    /// 二階建て: <b>基礎整備</b> (トークンで買い切る 6 段・安全網) ＋ <b>作戦の枠</b> 3 つ (主方針 / 補助 / 種火・モジュールを 1 つずつ挿す・ラン前に無料で組み替え)。
-    /// 状態は <see cref="MetaProgressState"/>、 購入の口は <see cref="MetaProgressManager"/>、 効果は <see cref="MetaBuffApplicator"/> が getter で配る。
-    /// 画面の説明文は Game2DMetaPanel。 <b>数値はすべて仮</b> (最後の 3 段階の測定で合わせる)。
-    /// <para>旧: 24 点の配点式 (n 個目の点 = 8n トークン・数値 8 本 ×10 段 + 宣言 7 本 ×3 段) は 2026-11-20 に撤去 (§24)。
-    /// 旧い段の名前 (<see cref="MetaPanelKind"/>) はセーブの返金と測定の旧い指定の読み替えにだけ残す。</para>
+    /// 整備盤 (2026-11-23・docs/GAME.md §15-1) のパネルが持つ<b>モジュールの効果の数値の正本</b> (主方針・補助・種火)。
+    /// 盤・パネル・マスの値段は <see cref="MetaBoard"/> と Resources/meta_board_panels.json、 状態は <see cref="MetaProgressState"/>、 効果は <see cref="MetaBuffApplicator"/> が getter で配る。
+    /// <para>旧: 24 点の配点式 (2026-11-20 撤去)・基礎整備 6 段 + 作戦の枠 3 つ (2026-11-23 撤去・§24)。 旧い段の名前 (<see cref="MetaPanelKind"/>) は測定の旧い指定の読み替えにだけ残す。</para>
     /// </summary>
     public static class MetaPanel
     {
@@ -19,40 +16,8 @@ namespace MetaProgression
         public const int BaseSaleSlots = 1;
 
         // ============================================================
-        //  基礎整備 (6 段・買い切り・§1-2 B)
+        //  モジュール (整備盤のパネルが持つ効果・MetaBoard / Resources/meta_board_panels.json)
         // ============================================================
-
-        public const int BaseTierCount = 6;
-
-        /// <summary>n 段目 (1 起点) を買うトークン (仮)。 1〜2 周で 1 段目に届く程度。</summary>
-        public static readonly int[] BaseTierCost = { 40, 60, 120, 160, 240, 320 };
-
-        /// <summary>1 段目と 4 段目の最大 HP。</summary>
-        public const int BaseTier1Hp = 6, BaseTier4Hp = 4;
-        /// <summary>2 段目の防御。</summary>
-        public const int BaseTier2Defense = 2;
-        /// <summary>3 段目の開幕ゴールド (特売枠 +1 と一緒)。</summary>
-        public const int BaseTier3Gold = 10;
-        /// <summary>5 段目の与ダメ % (与ダメ % の池に足す)。</summary>
-        public const int BaseTier5DamagePct = 10;
-
-        /// <summary>段 <paramref name="tier"/> まで買った時の最大 HP の上乗せ。</summary>
-        public static int BaseHp(int tier) => (tier >= 1 ? BaseTier1Hp : 0) + (tier >= 4 ? BaseTier4Hp : 0);
-        public static int BaseDefense(int tier) => tier >= 2 ? BaseTier2Defense : 0;
-        public static int BaseGold(int tier) => tier >= 3 ? BaseTier3Gold : 0;
-        /// <summary>特売枠の上乗せ (3 段目と 6 段目で +1 ずつ)。</summary>
-        public static int BaseSaleSlotsBonus(int tier) => (tier >= 3 ? 1 : 0) + (tier >= 6 ? 1 : 0);
-        public static int BaseDamagePct(int tier) => tier >= 5 ? BaseTier5DamagePct : 0;
-
-        // ============================================================
-        //  作戦の枠 (3 つ・§1-2 C)
-        // ============================================================
-
-        /// <summary>n 枠目 (1 起点) を開くトークン (仮)。 開く順は <see cref="MetaSlot"/> の並び (主方針 → 補助 → 種火)。</summary>
-        public static readonly int[] SlotOpenCost = { 50, 150, 300 };
-
-        /// <summary>モジュールを解禁するトークン (仮)。 解禁は買い切り、 挿すのは無料。</summary>
-        public static int ModuleCost(MetaModule m) => SlotOf(m) == MetaSlot.Main ? 120 : 80;
 
         /// <summary>モジュールが挿さる枠。 <b>新しい種火は <see cref="SparkKeyword"/> と一緒にここへ足す。</b></summary>
         public static MetaSlot SlotOf(MetaModule m) => m switch
@@ -133,12 +98,12 @@ namespace MetaProgression
         // ---- 補助 (戦術パーツ) ----
 
         /// <summary>攻撃 / 防御の端子調律: その端子に挿した出目 1 個につき +N。</summary>
-        public const int TerminalTunePerDie = 1;
+        public const int TerminalTunePerDie = 2;      // 2026-11-23 整備盤の段階 1 の後 1 → 2 (作者の承認)
         /// <summary>〈軸引きの手形〉: 店の軸指定リロールの追加から引く額。</summary>
         public const int AxisTicketDiscount = 5;
     }
 
-    /// <summary>作戦の枠。 <b>並びが開く順</b> (1 枠目 = 主方針・2 枠目 = 補助・3 枠目 = 種火)。 セーブの equippedModules の添え字なので並べ替えない。</summary>
+    /// <summary>モジュールの種類 (主方針 = T 字のコア / 補助 = I2 / 種火 = 2×2)。 旧い作戦の枠の名残り (返金の値段と種火の判定に使う)。</summary>
     public enum MetaSlot { Main, Support, Spark }
 
     /// <summary>作戦のモジュール。 <b>セーブは int で持つので並べ替えも削除もしない</b> (足すのは末尾)。 枠は <see cref="MetaPanel.SlotOf"/>。</summary>

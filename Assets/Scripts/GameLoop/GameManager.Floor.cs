@@ -111,6 +111,7 @@ namespace GameLoop
 
             // 層突入のパッシブ (2026-09-15)。
             ItemSystem.PassiveItems.PassiveItemManager.OnFloorEnter(Run);
+            Run.layerNormalFights = 0;      // 整備盤〈先制解析ユニット〉の数え (2026-11-23)
 
             // 層デバフ取得
             ActiveModifier = FloorModifierDatabase.Get(Run.Depth);

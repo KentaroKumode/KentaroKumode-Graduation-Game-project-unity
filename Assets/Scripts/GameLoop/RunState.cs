@@ -423,6 +423,8 @@ namespace GameLoop
         /// 与ダメが <c>MetaPanel.BattleSpiritPctPerWin</c>% × これ だけ伸びる (ラン中のみ)。
         /// 極点が未解禁でも数えるが、 参照されないので無害。</summary>
         public int battleSpiritWins;
+        /// <summary>この層で始めた通常戦 (エリート・ボスでない) の数 (整備盤〈先制解析ユニット〉・層に入るたびに 0・2026-11-23)。</summary>
+        public int layerNormalFights;
 
         /// <summary>戦闘開始時HPのスナップショット。戦闘終了時HPと比較してHP収支(マイナス=物資減少)を判定する。</summary>
         public int combatStartHP;
@@ -627,10 +629,9 @@ namespace GameLoop
         /// 各所に足すのではなく choke point へ寄せる。 二重呼び出しは isRunActive で弾く。</summary>
         public void EndRun()
         {
-            if (!isRunActive) return;   // 二重終了で遺物が 2 個出るのを防ぐ
+            if (!isRunActive) return;   // 二重終了を防ぐ
             isRunActive = false;
             CombatSystem.TerminalDiag.NoteRunEnd(terminalDeck);   // [計装 #106] ランの終わりの山札
-            MetaProgression.MetaBuffApplicator.GrantRelicOnRunEnd(currentFloor, bossDefeatedThisFloor);
         }
     }
 }

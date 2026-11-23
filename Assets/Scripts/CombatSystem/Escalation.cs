@@ -73,6 +73,8 @@ namespace CombatSystem
 
         /// <summary>いまの戦闘がボス戦か (CombatManager が戦闘開始時に立てる)。 挑戦カード「ボス戦ではエスカレーションが毎ターン進む」が読む。</summary>
         public static bool BossFight;
+        /// <summary>整備盤〈先制解析ユニット〉: この戦闘の敵の攻撃の削り (%・0 = なし)。 CombatManager が戦闘の始めに立てる (2026-11-23)。</summary>
+        public static int OpenerCutPct;
 
         /// <summary>i 段目の閾値ターン。 挑戦カード〈刻限〉: 閾値を N ターン前へ (5/10/15/20 → 4/9/14/19・3/8/13/18)、 III はボス戦で毎ターン進む (閾値 1/2/3/4)。</summary>
         private static int ThresholdAt(int i)
@@ -103,7 +105,8 @@ namespace CombatSystem
                  * (1f + MetaProgression.MetaDebuffApplicator.GetOpenerPct(phaseTurn, BossFight) / 100f)            // 〈先手必殺〉
                  * (1f + MetaProgression.MetaDebuffApplicator.GetWrathAttackPct(phaseTurn, BossFight) / 100f)       // コルヴェンの憤怒
                  * (1f + MetaProgression.MetaDebuffApplicator.GetEnvyPct() / 100f)                                 // ヤルノクの嫉妬 (今の HP の割合で決まる)
-                 * (1f + MetaProgression.MetaDebuffApplicator.GetGreedAttackPct() / 100f);                         // ムシュファの強欲 (持っている秘宝の数で決まる)
+                 * (1f + MetaProgression.MetaDebuffApplicator.GetGreedAttackPct() / 100f)                          // ムシュファの強欲 (持っている秘宝の数で決まる)
+                 * (1f - OpenerCutPct / 100f);                                                                    // 整備盤〈先制解析ユニット〉(この戦闘だけ・CombatManager が立てる)
         }
 
         /// <summary>いまの形態が始まったターン (CombatManager が戦闘開始時に 1、 ヴェスカの形態を替えるたびに立てる)。 「形態の最初の N ターン」を数える。</summary>

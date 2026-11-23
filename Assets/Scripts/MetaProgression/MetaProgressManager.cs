@@ -5,7 +5,7 @@ namespace MetaProgression
     /// <summary>
     /// メタ進行のシングルトン。State の保持・購入処理・保存/ロードを担当。
     ///
-    /// 整備パネル (2026-11-20 刷新・MetaPanel): トークンで基礎整備の段・作戦の枠・モジュールを買い切り、 モジュールは無料で挿し替える。
+    /// 整備盤 (2026-11-23・MetaBoard): トークンで盤のマスとパネルを買い切り、 パネルは無料で置き直す。
     ///   ・旧 58 段トラックの API (TryPurchase / NextLevel ほか) は 2026-11-13 に削除 (#132・読んでいたのは旧 SkillTreeView だけ)。
     /// </summary>
     public class MetaProgressManager : MonoBehaviour
@@ -34,6 +34,9 @@ namespace MetaProgression
         }
 
         public MetaProgressState State { get; private set; }
+
+        /// <summary>今ある管理 (作らない・EditMode のテストで GameObject を作らないため)。</summary>
+        public static MetaProgressManager Existing => _shuttingDown ? null : _instance;
 
         public System.Action OnStateChanged;
 
@@ -120,6 +123,7 @@ namespace MetaProgression
             if (src == BackedPrefs.LoadSource.Backup || src == BackedPrefs.LoadSource.CorruptReset) GameLoop.SaveGuard.Save();   // 退避した値をディスクへ (SaveGuard の間は書かない)
             State.MigrateFromLegacyTrackIfNeeded();
             State.MigrateFromPointPanelIfNeeded();   // 旧い 24 点の整備パネルの分を全額返す (2026-11-20)
+            State.MigrateToBoardIfNeeded();          // 旧い基礎整備・作戦の枠を全額返し、 遺物 10・素材 5 トークンに換える (2026-11-23)
             State.EnsurePanelInitialized();
 #endif
         }
@@ -145,58 +149,64 @@ namespace MetaProgression
         }
 
         // ============================================================
-        //  整備パネル (2026-11-20 刷新・docs/GAME.md §15-1)
+        //  整備盤 (2026-11-23・docs/GAME.md §15-1・MetaBoard)
         // ============================================================
 
-        /// <summary>次に買う基礎整備の段のトークン。 全部買っていれば int.MaxValue。</summary>
-        public int NextBaseTierCost
-            => State == null || State.baseTier >= MetaPanel.BaseTierCount ? int.MaxValue : MetaPanel.BaseTierCost[State.baseTier];
+        /// <summary>マスを開くトークン (開けられなければ −1・<see cref="MetaBoard.OpenCost"/>)。</summary>
+        public int CellOpenCost(int cell) => State == null ? -1 : MetaBoard.OpenCost(State.boardOpenMask, cell);
 
-        /// <summary>次の作戦の枠を開くトークン。 全部開いていれば int.MaxValue。</summary>
-        public int NextSlotCost
-            => State == null || State.slotsOpen >= MetaPanel.SlotOpenCost.Length ? int.MaxValue : MetaPanel.SlotOpenCost[State.slotsOpen];
-
-        /// <summary>基礎整備の次の段を買う (段は順に買う)。</summary>
-        public bool TryBuyBaseTier() => TrySpend(NextBaseTierCost, () => State.baseTier++, "基礎整備の段");
-
-        /// <summary>作戦の次の枠を開く (開く順は MetaSlot の並び)。</summary>
-        public bool TryOpenSlot() => TrySpend(NextSlotCost, () => State.slotsOpen++, "作戦の枠");
-
-        /// <summary>モジュールを解禁する (買い切り)。</summary>
-        public bool TryUnlockModule(MetaModule m)
+        /// <summary>マスを開く (中心 → 辺 → 角の順・開けた個数で値段が上がる)。</summary>
+        public bool TryOpenCell(int cell)
         {
-            if (State == null || State.IsUnlocked(m)) return false;
-            return TrySpend(MetaPanel.ModuleCost(m), () => State.unlockedModules.Add((int)m), "モジュール " + m);
+            int cost = CellOpenCost(cell);
+            if (cost < 0) return false;
+            return TrySpendBoard(cost, () => State.boardOpenMask |= 1 << cell, $"盤のマス {cell}");
         }
 
-        /// <summary>解禁済みのモジュールを、 その枠へ挿す (同じ物を押すと外す・無料)。 枠が閉じている・未解禁なら false。</summary>
-        public bool TryToggleEquip(MetaModule m)
+        /// <summary>パネルを買う (常設の物だけ・実績のパネルは実績で手に入る)。</summary>
+        public bool TryBuyPanel(string id)
         {
-            if (State == null || !State.IsUnlocked(m)) return false;
-            var slot = MetaPanel.SlotOf(m);
-            if (!State.IsSlotOpen(slot)) return false;
-            if (State.Equipped(slot) == m) State.Unequip(slot); else State.ForceEquip(m);
+            var d = MetaBoard.Get(id);
+            if (State == null || d == null || d.FromAchievement || State.OwnsPanel(id)) return false;
+            return TrySpendBoard(d.cost, () => State.GrantPanel(id), $"パネル {d.name}");
+        }
+
+        /// <summary>持っているパネルを置く・置き直す (無料)。</summary>
+        public bool TryPlacePanel(BoardPlacement p)
+        {
+            if (State == null || !State.PlacePanel(p)) return false;
             Changed();
+            Achievements.AchievementService.NoteBoardChanged(State);   // 実績〈一枚目〉
             return true;
         }
 
-        /// <summary>「基礎整備を切る」(縛り) を切り替える。 買った段は残る。</summary>
-        public void ToggleBaseDisabled()
+        /// <summary>パネルを盤から外す (無料)。</summary>
+        public void RemovePanel(string id)
         {
             if (State == null) return;
-            State.baseDisabled = !State.baseDisabled;
+            State.RemovePanel(id);
             Changed();
         }
 
-        private bool TrySpend(int cost, System.Action apply, string what)
+        /// <summary>実績を解いた時: その実績のパネルを持たせる (AchievementService.Unlock が呼ぶ)。</summary>
+        public void GrantAchievementPanels(string achievementId)
         {
-            if (State == null || cost == int.MaxValue || State.tokens < cost) return false;
+            if (State == null) return;
+            bool any = false;
+            foreach (var d in MetaBoard.ForAchievement(achievementId))
+                if (!State.OwnsPanel(d.id)) { State.GrantPanel(d.id); any = true; Debug.Log($"[MetaProgress] 実績 {achievementId} でパネル〈{d.name}〉を手に入れた"); }
+            if (any) Changed();
+        }
+
+        private bool TrySpendBoard(int cost, System.Action apply, string what)
+        {
+            if (State == null || cost < 0 || State.tokens < cost) return false;
             State.tokens -= cost;
             apply();
-            State.EnsurePanelInitialized();
+            State.BoardChanged();
             Changed();
-            Achievements.AchievementService.NotePanelAssigned(State);   // 実績〈整備完了〉
-            Debug.Log($"[MetaProgress] {what} を買った (-{cost}): {State.DescribePanel()}");
+            Achievements.AchievementService.NoteBoardChanged(State);   // 盤の実績
+            Debug.Log($"[MetaProgress] {what} を買った (-{cost}): {State.DescribeBoard()}");
             return true;
         }
 

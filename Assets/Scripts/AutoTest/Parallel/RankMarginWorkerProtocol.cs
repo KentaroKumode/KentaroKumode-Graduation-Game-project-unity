@@ -475,7 +475,7 @@ namespace AutoTest.ParallelSweep
             string[] watched =
             {
                 "wiringSkill", "metaBuffMode", "itemPickMode",
-                "enableAllDebuffs", "forceNoRelic", "forceTheoreticalRelic",
+                "enableAllDebuffs",
                 "shieldAbsorbsUnmitigable", "suppressFacePartOffers", "robberyBlocksShops",
                 "challengeScoreTarget", "masterSeed", "rawTierRatio",
                 "learnBotAi", "learnTier",
@@ -537,10 +537,11 @@ namespace AutoTest.ParallelSweep
                 "deckLookahead", "deckLookaheadBossOnly", "deckLookaheadTopK", "deckLookaheadSamples", "deckLookaheadProbe",
                 // 2026-11-12: 挑戦カードを 1 枚ずつ受ける測定の口 (〈金で殴る〉の BOT の値は 2026-11-22 に札ごと撤去)
                 "challengeForce",
+                // 2026-11-23: 品の知識を一部だけ持つ人 (ITT の N% を隠す)
+                "ittMaskPct",
                 // 2026-11-12 (#118): 挑戦の難易度 (v3_queue の腕が振る値) と、 BOT が読む学習の帯の固定・欠けたら止めるか
                 "challengeCardDifficulty", "botLearningBandOverride", "failOnMissingLearning",
                 // 2026-11-12 (#95 / #20 / #41 / #102 / #108): 腕ごとに切り替える測定の口。 送った値と、 ラン開始時に本体へ入れる値
-                "relicLoadoutSpec", "relicStatOff", "RelicStatOffMaskApplied", "relicSetBonusOff", "RelicSetBonusOffMaskApplied",
                 "enemyArmorPenSpec", "EnemyArmorPenOverrideApplied",
                 "challengeCardPickByAxis",
                 "terminalsLeaveDeck", "randomGrantTerminals",

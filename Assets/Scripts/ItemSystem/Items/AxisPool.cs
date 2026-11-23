@@ -42,7 +42,7 @@ namespace ItemSystem
             if (run.lockedAxes == null) run.lockedAxes = new List<string>();
             if (run.lockedAxes.Contains(axis) || run.lockedAxes.Count >= LockSlots) return;
             run.lockedAxes.Add(axis);
-            if (run.lockedAxes.Count == LockSlots) { LocksCompleted++; LockFloorSum += run.currentFloor; }
+            if (run.lockedAxes.Count == LockSlots) { LocksCompleted++; LockFloorSum += run.currentFloor; MetaProgression.MetaBuffApplicator.OnAxisLockCompleted(run); }   // 整備盤〈均衡モジュール〉
             if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[出現の枠] {axis} を登録 ({run.lockedAxes.Count}/{LockSlots}{(run.lockedAxes.Count == LockSlots ? "・ロック成立" : "")})");
         }
 

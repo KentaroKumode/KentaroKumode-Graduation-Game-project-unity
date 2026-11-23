@@ -314,8 +314,6 @@ namespace AutoTest.EditorTools
             cfg["wiringSkill"] = ((int)skill).ToString(CultureInfo.InvariantCulture);
             cfg["metaBuffMode"] = ((int)AutoRunner.MetaBuffMode.Standard).ToString(CultureInfo.InvariantCulture);
             cfg["itemPickMode"] = ((int)AutoRunner.ItemPickMode.TierBased).ToString(CultureInfo.InvariantCulture);
-            cfg["forceNoRelic"] = "True";
-            cfg["forceTheoreticalRelic"] = "False";
             cfg["lockWeaponFamily"] = "True";
             cfg["enableAllDebuffs"] = "False";
             cfg["sweepAllMetaAxes"] = "False";

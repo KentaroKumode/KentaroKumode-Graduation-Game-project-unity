@@ -122,13 +122,6 @@ namespace GameLoop
         /// 層を作る時と中断セーブから戻す時に読む (MapManager)。 AutoRunner.stormClock が毎ランの始めに入れ、 ラン終了で Instability へ戻す。</summary>
         public static MapSystem.FreeMove.StormClock StormClock = MapSystem.FreeMove.StormClock.Instability;
 
-        /// <summary>[測定 2026-11-12・#95] 遺物の効果を止める接辞 (ビット = <c>(int)RelicStat</c>・0 = 何も止めない)。
-        /// 主ステもサブも、 その接辞の分だけを 0 にする (段の値 1 つあたりの価値を、 理論値の持ち込みから 1 接辞ずつ抜いて測る口)。
-        /// AutoRunner.relicStatOff が毎ランの始めに入れる。</summary>
-        public static int RelicStatOffMask;
-        /// <summary>[測定 2026-11-12・#95] 遺物のセット効果を止める (ビット = セット × 2 が 2 個の効果・セット × 2 + 1 が 3 個の効果・0 = 止めない)。
-        /// AutoRunner.relicSetBonusOff が毎ランの始めに入れる。</summary>
-        public static int RelicSetBonusOffMask;
         /// <summary>[測定 2026-11-12・#20/#41] 敵がプレイヤーの防御を削る固定値 (EnemyData.armorPen) を差し替える。
         /// 引数 (敵の id, データの値) → 使う値。 null = 差し替えない (本番)。 AutoRunner.enemyArmorPenSpec が毎ランの始めに入れる。</summary>
         public static Func<string, int, int> EnemyArmorPenOverride;
@@ -222,8 +215,6 @@ namespace GameLoop
             MeasureRunPower = null;
             OnCritRateResolved = null;
             EnemyArmorPenOverride = null;
-            RelicStatOffMask = 0;
-            RelicSetBonusOffMask = 0;
             TerminalHealMulOverride = 0;
             TerminalArresterNeedOverride = 0;
             TerminalFirstAidLeavesRunDeck = false;

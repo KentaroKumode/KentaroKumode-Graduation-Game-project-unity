@@ -177,7 +177,7 @@ namespace AutoTest
                 else
                 {
                     // 周回モード: **ここが ResetAll の直後**。 上の MetaAllocationPresets.Apply は
-                    // ResetAll() で MetaProgressState を作り直すので、 遺物と挑戦構成の流し込みは
+                    // ResetAll() で MetaProgressState を作り直すので、 挑戦構成の流し込みは
                     // 必ずこの位置で行う。 これより前に置くと毎ラン消える。
                     _ascension?.BeforeRun();
                 }
@@ -185,48 +185,11 @@ namespace AutoTest
                 // 測定の差し込み口
                 {
                     GameHooks.ProvisionMaxOverride = provisionMaxOverride;
-                    MetaProgression.Relics.RelicApplicator.Override = RelicPresets.Parse(relicLoadoutSpec);
-                    GameHooks.RelicStatOffMask = ParseRelicStatOff(relicStatOff);           // [#95] 既定 "" = 0 (止めない)
-                    GameHooks.RelicSetBonusOffMask = ParseRelicSetBonusOff(relicSetBonusOff);
                     GameHooks.EnemyArmorPenOverride = ParseEnemyArmorPen(enemyArmorPenSpec); // [#20/#41] 既定 "" = null (データの値)
                     GameHooks.ForcedChallengeCards = ParseChallengeForce(challengeForce);
                     GameHooks.ChooseChallengeCard = challengeCardPickByAxis ? BotHooks.ChooseChallengeByAxis : (System.Func<IReadOnlyList<string>, int>)null;
                 }
 
-                // 遺物プリセット / 挑戦構成をここで流し込む。
-                //
-                // **2026-09-05 修正: この流し込みは `_ascensionPersonaLock` の else 側に入っていた。**
-                //   ＝ 周回/スイープモードでしか実行されず、 **通常バッチでは遺物が一度も乗らなかった**。
-                //   `forceTheoreticalRelic` を立てて「遺物を理論値固定」とログに出しても、
-                //   State には 1 個も入らない。 25 万ラン の学習を丸ごと「遺物なし」で回して発覚した
-                //   (サマリーの `[実効状態]` 行が `遺物 0個 計0pt` を出し続けていた ── **設定ログではなく
-                //   実効状態の行を読むこと**)。 if/else の外へ出して両方の経路で通す。
-                //
-                // **遺物の有無と挑戦構成は独立に扱う** (2026-08-09 修正)。 旧実装は
-                //   丸ごと `if (_pendingPresetRelic != null)` の中にあったため、
-                //   **遺物なしアームだけ挑戦スコアが 0 に落ちていた**。 実測: 挑戦30pt の
-                //   単軸スイープで、 遺物なし行だけ 5層クリア 53.2% (他アームは 5% 前後) と
-                //   0pt の値がそのまま出ていた。
-
-                {
-                    var st = MetaProgression.MetaProgressManager.Instance?.State;
-                    if (st != null)
-                    {
-                        // **遺物は「明示的に管理する」と宣言したスイープでは必ず作り直す。**
-                        //   2026-08-10: 旧実装は `_pendingPresetRelic != null` のときだけ
-                        //   作り直していたため、 **null は「遺物なし」ではなく「触らない」**
-                        //   を意味していた。 結果、 前セッションでランダムに転がった遺物が
-                        //   そのまま残り、 「遺物なし」を名乗るスイープが遺物込みで走っていた。
-                        //   実測: 同一シード・同一職業・同一武器なのに開始 HP が 113 と 93 に割れ、
-                        //   0pt 基準値が 53.3% と 16.6% に分かれていた (合計 pt は両方 9pt で
-                        //   一致していたため、 合計だけ見ても気づけない ── 配点先の軸が違う)。
-                        if (_pendingRelicExplicit)
-                        {
-                            st.SetRelicLoadout(_pendingPresetRelic != null
-                                ? _pendingPresetRelic.ConvertAll(r => r.Clone()) : null);
-                        }
-                    }
-                }
             }
             catch (Exception e) { Debug.LogWarning($"[AutoRunner] Meta pattern={metaPattern}: {e.Message}"); }
 
@@ -303,7 +266,7 @@ namespace AutoTest
                 var mst = MetaProgression.MetaProgressManager.Instance?.State;
                 if (mst != null)
                 {
-                    _cur.metaRanks = mst.DescribePanel();   // 2026-11-20〜 基礎整備・枠・モジュール (旧: トラック:段)
+                    _cur.metaRanks = mst.DescribeBoard();   // 2026-11-23〜 整備盤 (開いたマス・置き方)・旧: 基礎整備・枠・モジュール
                 }
                 _cur.startClass = gm.Run != null ? gm.Run.playerClass.ToString() : "";
                 _cur.policySig = PolicySignature();   // [計装 2026-11-17] 実際に効いていた方策の設定 (腕の取り違えを runs の記録で確かめる)
@@ -324,8 +287,7 @@ namespace AutoTest
                           ? string.Join("+", r.permanentDebuffs) : "なし";
                 _probeRunConfig = $"{GameLoop.GameManager.SelectedClass}"
                                 + $"/max{r?.playerMaxHP}"
-                                + $"/整備パネルHP+{MetaProgression.MetaPanel.BaseHp(MetaProgression.MetaProgressManager.Instance?.State?.EffectiveBaseTier ?? 0)}"
-                                + $"/遺物HP+{MetaProgression.Relics.RelicApplicator.GetMaxHpBonus(r)}"
+                                + $"/整備盤HP+{MetaProgression.MetaProgressManager.Instance?.State?.BoardEffects?.hp ?? 0}"
                                 + $"/メタ{metaBuffMode}"
                                 + $"/恒久:{pd}";
             }

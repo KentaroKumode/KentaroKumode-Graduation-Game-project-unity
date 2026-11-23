@@ -104,15 +104,7 @@ namespace CombatSystem
             // [14] は旧「アイテム副次ステータスの与ダメ%」。 2026-09-15 に副次を全廃したので
             //      書き手が居なくなった。 添字は他段の意味を保つため詰めない (常に 0)。
 
-            // 遺物 (§15-5) 与ダメージ+N%。 同じ pool に additive (純倍率にするとインフレするため)。
-            float relicOut = MetaProgression.Relics.RelicApplicator
-                             .GetOutgoingPct(GameLoop.GameManager.Instance?.Run, ctx);
-            if (relicOut > 0f)
-            {
-                if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
-                ctx.outgoingDamageMultiplier += relicOut;
-                DmgSourceDiag.Note("遺物〈与ダメ%〉", DmgSourceDiag.Out, relicOut);
-            }
+            // (遺物 (§15-5) の与ダメージ +N% は 2026-11-23 に遺物ごと撤去・[15] は常に 0)
             CombatStats.DamageBreakdown[15] += ctx.outgoingDamageMultiplier - _ovPrev;
             CombatStats.DamageBreakdown[16] += ctx.outgoingDamageMultiplier;
 
@@ -313,17 +305,7 @@ namespace CombatSystem
                 if (GuardDiag.InVesca()) GuardDiag.Cut7F[5] += bf - totalDmg;   // [計装 2026-11-11]
             }
 
-            // 遺物 (§15-5) 被ダメージ−N%。 **割合軽減**であって定額ではない。
-            //   定額だと参照被ダメ 7.7/T に対し段6 が 78% 軽減になり、 序盤の敵 (baseAttack 2〜10) を
-            //   丸ごと無力化していた。 割合なら敵が弱いほど軽減の絶対量も小さくなる (§24)。
-            float relicRed = MetaProgression.Relics.RelicApplicator
-                             .GetDamageReductionPct(GameLoop.GameManager.Instance?.Run, ctx);
-            if (relicRed > 0f && totalDmg > 0)
-            {
-                int bf = totalDmg;
-                totalDmg = Mathf.Max(1, Mathf.CeilToInt(totalDmg * (1f - relicRed)));
-                if (GuardDiag.InVesca()) GuardDiag.Cut7F[6] += bf - totalDmg;   // [計装 2026-11-11]
-            }
+            // (遺物 (§15-5) の被ダメージ −N% は 2026-11-23 に遺物ごと撤去・Cut7F[6] は常に 0)
 
             // [撤去 2026-09-13] 整備パネル〈防御〉の割合軽減。 このトラックは
             //   リスク軸〈剛胆〉へ完全リワークし、 被ダメには一切触れなくなった。

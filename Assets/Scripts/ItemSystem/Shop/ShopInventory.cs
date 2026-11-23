@@ -26,7 +26,8 @@ namespace ItemSystem.Shop
 
         /// <summary>強化素材スロットの現在価格 = base × 2^purchaseCount × priceMultiplier</summary>
         public int CurrentMaterialPrice
-            => UnityEngine.Mathf.CeilToInt(materialBasePrice * (1 << materialPurchaseCount) * priceMultiplier);
+            => UnityEngine.Mathf.CeilToInt(materialBasePrice * (1 << materialPurchaseCount) * priceMultiplier
+                * (1f - MetaProgression.MetaBuffApplicator.GetMaterialCutPct() / 100f));   // 整備盤〈熟練の整備書〉 −N% (2026-11-23)
 
         /// <summary>このショップで実施したリロール回数。</summary>
         public int rerollCount;

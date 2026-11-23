@@ -803,6 +803,68 @@ namespace AutoTest
             return _tierVals[_tierVals.Length - 1];
         }
 
+        // ===== 品の知識を一部だけ持つ人 (2026-11-23・AutoRunner.ittMaskPct) =====
+
+        /// <summary>ランごとに品の N% (0〜100) の ITT を「知らない」ことにする。 0 = 全部知っている (既定・今と同じ)。 AutoRunner が流し込む。</summary>
+        public static int IttMaskPct = 0;
+
+        /// <summary>品のレアリティ (items.json の rarity の整数)。 取れなければ null。 テストが差し替える。</summary>
+        public static Func<string, int?> RarityOf = id =>
+        {
+            var d = string.IsNullOrEmpty(id) ? null : ItemSystem.ItemDatabase.Instance?.GetItem(id);
+            return d != null ? (int?)(int)d.rarity : null;
+        };
+
+        /// <summary>品 <paramref name="id"/> がこのランで隠れるか。 GameRng を消費しない ── マスターシード・ラン番号・品の id のハッシュだけで決まる
+        /// (同じシードなら同じ品が隠れ、 1 ランの中では隠れたまま)。</summary>
+        public static bool IsMasked(string id, int pct, ulong masterSeed, int runIndex)
+        {
+            if (pct <= 0 || string.IsNullOrEmpty(id)) return false;
+            if (pct >= 100) return true;
+            ulong h = 1469598103934665603UL;      // FNV-1a
+            foreach (char c in id) { h ^= c; h *= 1099511628211UL; }
+            unchecked
+            {
+                h ^= masterSeed + 0x9E3779B97F4A7C15UL + ((ulong)(long)runIndex << 1);
+                h ^= h >> 30; h *= 0xBF58476D1CE4E5B9UL; h ^= h >> 27; h *= 0x94D049BB133111EBUL; h ^= h >> 31;   // splitmix64 の仕上げ
+            }
+            return (int)(h % 10000UL) < pct * 100;
+        }
+
+        /// <summary>隠した品に渡す値: 序列 <paramref name="table"/> の、 同じレアリティの品 (隠していない品も含む全品) の平均。
+        /// レアリティが取れない・同じレアリティの品が無ければ序列の中央の値 (未学習の −9 にはしない ── それだと「知らない」でなく「避ける」になる)。</summary>
+        public static double MaskedValue(Dictionary<string, double> table, string id, Func<string, int?> rarityOf)
+        {
+            if (table == null || table.Count == 0) return 0;
+            int? r = rarityOf?.Invoke(id);
+            if (r.HasValue)
+            {
+                double sum = 0; int n = 0;
+                foreach (var kv in table) { if (rarityOf(kv.Key) == r) { sum += kv.Value; n++; } }
+                if (n > 0) return sum / n;
+            }
+            var all = new List<double>(table.Values);
+            all.Sort();
+            int m = all.Count;
+            return m % 2 == 1 ? all[m / 2] : (all[m / 2 - 1] + all[m / 2]) / 2;
+        }
+
+        // 隠した品の値の控え (序列の表とレアリティごと・表が替わったら作り直す)
+        private static Dictionary<string, double> _maskFor;
+        private static readonly Dictionary<string, double> _maskCache = new Dictionary<string, double>();
+
+        /// <summary>このランで <paramref name="id"/> が隠れていれば <see cref="MaskedValue"/>、 そうでなければ <paramref name="v"/>。 PowerScore と RawScore (購入・報酬・開幕の品・所持価値の全部) が通る。</summary>
+        private static double MaskIfHidden(string id, double v)
+        {
+            if (IttMaskPct <= 0 || !IsMasked(id, IttMaskPct, GameLoop.GameRng.MasterSeed, GameLoop.GameRng.RunIndex)) return v;
+            var table = ScoresNow();
+            if (!ReferenceEquals(_maskFor, table)) { _maskCache.Clear(); _maskFor = table; }
+            int? r = RarityOf(id);
+            string key = r.HasValue ? r.Value.ToString() : "-";
+            if (!_maskCache.TryGetValue(key, out double mv)) _maskCache[key] = mv = MaskedValue(table, id, RarityOf);
+            return mv;
+        }
+
         /// <summary>[診断] 丸める前の準パワー。</summary>
         public static float RawPowerScore(string id)
         {
@@ -832,6 +894,7 @@ namespace AutoTest
                 //   全品が足切りされ、 統計が永久に溜まらない。
                 if (!_baseScore.TryGetValue(id, out v)) return Unlearned;
             }
+            v = MaskIfHidden(id, v);
             if (BuyTierCount > 0) return TierValue((float)v);
             return (float)v;
         }
@@ -888,6 +951,7 @@ namespace AutoTest
             //   Lv 補正も入れない ── 旧 RawScore と同じく素の Tier 相当だけを見る。
             if (!ScoresNow().TryGetValue(id, out double v)
                 && !_baseScore.TryGetValue(id, out v)) return 0;
+            v = MaskIfHidden(id, v);
             for (int i = 0; i < PowerCuts.Length; i++)
                 if (v >= PowerCuts[i]) return PowerCuts.Length - i;   // [0]→4 … [3]→1
             return 0;

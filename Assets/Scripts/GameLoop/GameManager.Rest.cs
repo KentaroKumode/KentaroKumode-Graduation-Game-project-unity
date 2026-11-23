@@ -22,7 +22,8 @@ namespace GameLoop
             float ratio = (ActiveModifier?.restHealMultiplier ?? 0.3f) + TakeRestHealBonus();
             // 〈遅い回復〉: **あらゆる回復に掛かる**ので休憩地点にも適用する。
                 int heal = Mathf.CeilToInt(Run.playerMaxHP * ratio
-                                           * MetaProgression.MetaDebuffApplicator.GetHealMultiplier());
+                                           * MetaProgression.MetaDebuffApplicator.GetHealMultiplier()
+                                           * (1f + MetaProgression.MetaBuffApplicator.GetRestHealPct() / 100f));   // 整備盤〈補給ユニット〉 (2026-11-23)
             int beforeRestHP = Run.playerHP;
             Run.playerHP = Mathf.Min(Run.playerMaxHP, Run.playerHP + heal);
             RunChronicle.Rest(Run, Run.playerHP - beforeRestHP, beforeRestHP, Run.playerMaxHP);

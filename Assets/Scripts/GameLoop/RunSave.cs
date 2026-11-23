@@ -129,7 +129,7 @@ namespace GameLoop
 
         /// <summary>BOT・計測の最中か (保存・読み込み・削除をしない)。</summary>
         public static bool Disabled
-            => Application.isBatchMode || GameHooks.BotDriving || MetaProgression.MetaBuffApplicator.SuppressRelicGrant;
+            => Application.isBatchMode || GameHooks.BotDriving || MetaProgression.MetaBuffApplicator.SuppressMetaRewards;
 
         /// <summary>中断セーブのファイル (本番・控え・書きかけのどれか) があるか (中身が読めるかは <see cref="TryRead"/> で確かめる)。
         /// 控え・書きかけだけが残るのは、 書き込みの途中で落ちた時 (<see cref="Write"/>)。</summary>
@@ -538,16 +538,14 @@ namespace GameLoop
         //  メタの指紋
         // ============================================================
 
-        /// <summary>整備パネルの構成 (基礎整備・枠・挿したモジュール)・装備中の遺物・難易度の指紋。 中断中に変えると再開したランの効き方が変わるので、 再開時に知らせるために持つ。</summary>
+        /// <summary>整備盤の構成 (開いたマス・置き方)・難易度の指紋。 中断中に変えると再開したランの効き方が変わるので、 再開時に知らせるために持つ。</summary>
         public static string MetaFingerprint()
         {
             var st = MetaProgression.MetaProgressManager.Instance?.State;
             if (st == null) return "";
             var sb = new System.Text.StringBuilder();
-            sb.Append(st.DescribePanel());
-            sb.Append('|').Append(st.challengeDifficulty).Append('|');
-            var relics = st.EquippedRelics();
-            if (relics != null) foreach (var r in relics) sb.Append(r != null ? JsonUtility.ToJson(r) : "-").Append(';');
+            sb.Append(st.DescribeBoard());
+            sb.Append('|').Append(st.challengeDifficulty);
             return sb.ToString();
         }
     }

@@ -25,8 +25,8 @@ namespace AutoTest
             ResetBatchStatics();
             // 自動獲得を止める。 周回モードは自前で RelicRoller を呼ぶので二重取得になるうえ、
             // 毎ラン PlayerPrefs.Save() が走るとバッチが極端に遅くなる。
-            bool prevSuppress = MetaProgression.MetaBuffApplicator.SuppressRelicGrant;
-            MetaProgression.MetaBuffApplicator.SuppressRelicGrant = true;
+            bool prevSuppress = MetaProgression.MetaBuffApplicator.SuppressMetaRewards;
+            MetaProgression.MetaBuffApplicator.SuppressMetaRewards = true;
 
             // 周回モードはペルソナを固定するので、 ラン毎の抽選を止める。
             // itemPickMode は BuildFocused でなければペルソナがアイテム選好に効かないので合わせる。
@@ -85,7 +85,7 @@ namespace AutoTest
             _ascension = null;
             _ascensionPersonaLock = false;
             itemPickMode = prevPickMode;
-            MetaProgression.MetaBuffApplicator.SuppressRelicGrant = prevSuppress;
+            MetaProgression.MetaBuffApplicator.SuppressMetaRewards = prevSuppress;
             WriteAscensionReport();
         }
 

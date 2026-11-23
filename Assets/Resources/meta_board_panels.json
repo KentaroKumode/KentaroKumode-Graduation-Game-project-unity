@@ -1,0 +1,51 @@
+{
+  "_note": "整備盤 (3×3) のパネルの正本 (2026-11-23・neon answer23 + answer24・docs/GAME.md §15-1)。 shape = 1 / I2 / I3 / L3 / T / O (2×2) / S / Z。 source = shop (トークンで買う) / achievement (実績で手に入る・無料)。 module = 今の主方針・補助・種火の効果 (MetaModule の名前・空 = なし)。 stats は 0 の欄を書かなくてよい。",
+  "panels": [
+    { "id": "chip_hp",   "name": "外装プレート",   "shape": "1", "source": "shop", "cost": 20, "stats": { "hp": 5 } },
+    { "id": "chip_def",  "name": "防壁コンデンサ", "shape": "1", "source": "shop", "cost": 30, "stats": { "defense": 1 } },
+    { "id": "chip_sale", "name": "特売バイパス",   "shape": "1", "source": "shop", "cost": 40, "stats": { "saleSlots": 1 } },
+    { "id": "chip_gold", "name": "予備資金チップ", "shape": "1", "source": "shop", "cost": 30, "stats": { "gold": 10 } },
+    { "id": "chip_dmg",  "name": "出力アンプ",     "shape": "1", "source": "shop", "cost": 50, "stats": { "damagePct": 5 } },
+    { "id": "chip_chg",  "name": "初期蓄電セル",   "shape": "1", "source": "shop", "cost": 50, "stats": { "chargeOpening": 2 } },
+    { "id": "chip_blk",  "name": "緊急冷却ピン",   "shape": "1", "source": "achievement", "achievement": "boss_1",     "stats": { "blockTurn1": 3 } },
+    { "id": "chip_crit", "name": "精密較正ピン",   "shape": "1", "source": "achievement", "achievement": "first_role", "stats": { "critPct": 3 } },
+    { "id": "chip_skip", "name": "端数回収回路",   "shape": "1", "source": "achievement", "achievement": "events_50",  "stats": { "skipCashPct": 10 } },
+
+    { "id": "unit_atk_tune",     "name": "攻撃端子調律", "shape": "I2", "source": "shop", "cost": 80, "module": "AttackTune" },
+    { "id": "unit_blk_tune",     "name": "防御端子調律", "shape": "I2", "source": "shop", "cost": 80, "module": "BlockTune" },
+    { "id": "unit_axis_ticket",  "name": "軸引きの手形", "shape": "I2", "source": "shop", "cost": 80, "module": "AxisTicket" },
+    { "id": "unit_tactic_knife", "name": "戦術の懐刀",   "shape": "I2", "source": "shop", "cost": 80, "module": "TacticKnife" },
+    { "id": "unit_compression",  "name": "圧縮の心得",   "shape": "I2", "source": "shop", "cost": 80, "module": "Compression" },
+    { "id": "unit_supply",       "name": "補給ユニット", "shape": "I2", "source": "shop", "cost": 80, "stats": { "restHealPct": 15, "outpostSupplyPct": 50 } },
+    { "id": "unit_extra_draw",   "name": "予備スロット端子", "shape": "I2", "source": "achievement", "achievement": "boss_3", "stats": { "handTurn1": 1 } },
+    { "id": "unit_farm_offer",   "name": "試運転ブースター", "shape": "I2", "source": "achievement", "achievement": "boss_5", "stats": { "farmOffer": 1 } },
+
+    { "id": "mod_heavy_frame",  "name": "重装フレーム",     "shape": "L3", "source": "shop", "cost": 120, "stats": { "hp": 10, "defense": 3 } },
+    { "id": "mod_caravan",      "name": "商隊ネットワーク", "shape": "I3", "source": "shop", "cost": 120, "stats": { "gold": 15, "saleSlots": 1, "skipCashPct": 15 } },
+    { "id": "mod_opener_scan",  "name": "先制解析ユニット", "shape": "I3", "source": "shop", "cost": 120, "stats": { "openerFights": 2, "openerAtkCutPct": 25, "handTurn1": 1 } },
+    { "id": "mod_forge_manual", "name": "熟練の整備書",     "shape": "L3", "source": "achievement", "achievement": "weapon_top",  "stats": { "materialCutPct": 30, "hp": 10, "damagePct": 5 } },
+    { "id": "mod_radar",        "name": "探査レーダー",     "shape": "I3", "source": "achievement", "achievement": "pursuer_win", "stats": { "vision": 1, "outpostSupplyPct": 80, "gold": 15 } },
+    { "id": "mod_reroll_clk",   "name": "再調整クロック",   "shape": "L3", "source": "achievement", "achievement": "down_cancel", "stats": { "freeRerolls": 1, "chargeOpening": 4, "defense": 1 } },
+
+    { "id": "core_last_stand",    "name": "ラストスタンド", "shape": "T", "source": "shop", "cost": 150, "module": "LastStand",    "stats": { "hp": 5, "damagePct": 10 } },
+    { "id": "core_battle_spirit", "name": "戦意",           "shape": "T", "source": "shop", "cost": 150, "module": "BattleSpirit", "stats": { "hp": 5, "damagePct": 5 } },
+    { "id": "core_valor",         "name": "剛胆",           "shape": "T", "source": "shop", "cost": 150, "module": "Valor",        "stats": { "defense": 1 } },
+    { "id": "core_vault_bank",    "name": "貸金庫",         "shape": "T", "source": "shop", "cost": 150, "module": "VaultBank",    "stats": { "gold": 15 } },
+    { "id": "core_robbery",       "name": "ショップ強盗",   "shape": "T", "source": "shop", "cost": 150, "module": "Robbery",      "stats": { "gold": 10, "saleSlots": 1 } },
+    { "id": "core_sale99",        "name": "99% 特売",       "shape": "T", "source": "shop", "cost": 150, "module": "Sale99",       "stats": { "gold": 15 } },
+    { "id": "core_start_pick",    "name": "開幕厳選",       "shape": "T", "source": "shop", "cost": 150, "module": "StartPick",    "stats": { "hp": 5 } },
+    { "id": "core_immovable",     "name": "不動",           "shape": "T", "source": "shop", "cost": 150, "module": "Immovable",    "stats": { "hp": 8 } },
+
+    { "id": "spark_charge", "name": "種火・充電",     "shape": "O", "source": "shop", "cost": 160, "module": "SparkCharge", "stats": { "hp": 5, "saleSlots": 1 } },
+    { "id": "spark_rinkai", "name": "種火・臨界",     "shape": "O", "source": "shop", "cost": 160, "module": "SparkRinkai", "stats": { "hp": 5, "saleSlots": 1 } },
+    { "id": "spark_poison", "name": "種火・毒",       "shape": "O", "source": "shop", "cost": 160, "module": "SparkPoison", "stats": { "hp": 5, "saleSlots": 1 } },
+    { "id": "spark_bleed",  "name": "種火・出血",     "shape": "O", "source": "shop", "cost": 160, "module": "SparkBleed",  "stats": { "hp": 5, "saleSlots": 1 } },
+    { "id": "spark_shield", "name": "種火・シールド", "shape": "O", "source": "shop", "cost": 160, "module": "SparkShield", "stats": { "hp": 5, "saleSlots": 1 } },
+    { "id": "spark_crit",   "name": "種火・会心",     "shape": "O", "source": "shop", "cost": 160, "module": "SparkCrit",   "stats": { "hp": 5, "saleSlots": 1 } },
+    { "id": "spark_deck",   "name": "種火・山札",     "shape": "O", "source": "shop", "cost": 160, "module": "SparkDeck",   "stats": { "hp": 5, "saleSlots": 1 } },
+    { "id": "spark_role",   "name": "種火・役",       "shape": "O", "source": "shop", "cost": 160, "module": "SparkRole",   "stats": { "hp": 5, "saleSlots": 1 } },
+
+    { "id": "core_parallel", "name": "並列配線コア", "shape": "S", "source": "achievement", "achievement": "combat_wins_100", "stats": { "chargeOpening": 6, "handTurn1": 1, "freeRerolls": 1, "damagePct": 8 } },
+    { "id": "core_balance",  "name": "均衡モジュール", "shape": "Z", "source": "achievement", "achievement": "boss3_all",     "stats": { "lockHp": 15, "defense": 2 } }
+  ]
+}

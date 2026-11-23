@@ -1,13 +1,12 @@
 using System.Collections.Generic;
 using MetaProgression;
-using MetaProgression.Relics;
 
 namespace AutoTest
 {
     /// <summary>
     /// 周回モード（1 ペルソナぶんの 1 ライン）。 正本の設計: docs/GAME.md §15-5。
     ///
-    /// 目的は「遺物と難易度のフィードバックループが収束するか / 停滞するか / 発散するか」を、
+    /// 目的は「難易度のフィードバックループが収束するか / 停滞するか / 発散するか」を (遺物は 2026-11-23 に撤去・難易度だけ)、
     /// **実ゲームの到達層とクリア判定**から測ること。 抽象モデルで成否を決めると
     /// モデルの仮定がそのまま結論になるので、 判定は必ず AutoRunner の実ランへ委ねる。
     ///
@@ -44,11 +43,6 @@ namespace AutoTest
         public readonly int window;
 
         private readonly Queue<bool> _recent = new Queue<bool>();
-        /// <summary>このラインの所持品 (2026-11-10 再編: 3 部位・強化・分解)。 持ち込みは毎ラン RelicUtility.ChooseLoadout で選び直す。</summary>
-        private readonly List<Relic> _owned = new List<Relic>();
-        private Relic[] _equipped = new Relic[3];
-        private int _material;
-        private float _relicUtility;
         private int _runIndex;
 
         /// <summary>挑戦の難易度 (挑戦カードの目盛り 0..10) の**正本はここ**。 State 側には毎ラン入れ直す
@@ -61,9 +55,9 @@ namespace AutoTest
         /// <summary>難易度を上げた直後は成績が落ちるので、 窓が埋まるまで再判定しない。</summary>
         private int _cooldown;
 
-        /// <summary>今の持ち込み (表示用の 1 行)。</summary>
-        public string CurrentRelicText => RelicUtility.Explain(_equipped, persona);
-        public float CurrentUtility => _relicUtility;
+        /// <summary>[旧] 遺物の持ち込み (2026-11-23 に遺物ごと撤去・レポートの形を保つ)。</summary>
+        public string CurrentRelicText => "(遺物なし)";
+        public float CurrentUtility => 0f;
         public int SwapCount { get; private set; }
         public int DifficultyUpCount { get; private set; }
         public int DifficultyDownCount { get; private set; }
@@ -80,7 +74,7 @@ namespace AutoTest
         /// <summary>ライン開始時。 遺物なし・挑戦スコア 0 から始める。</summary>
         public void Reset()
         {
-            _recent.Clear(); _owned.Clear(); _equipped = new Relic[3]; _material = 0; _relicUtility = 0f;
+            _recent.Clear();
             _runIndex = 0; _cooldown = 0;
             SwapCount = DifficultyUpCount = DifficultyDownCount = 0;
             _difficulty = 0;
@@ -97,9 +91,6 @@ namespace AutoTest
         {
             var st = State;
             if (st == null) return;
-            var eq = new List<Relic>();
-            foreach (var r in _equipped) if (r != null) eq.Add(r);
-            st.SetRelicLoadout(eq);
             st.challengeDifficulty = _difficulty;
         }
 
@@ -108,22 +99,6 @@ namespace AutoTest
         public void AfterRun(int ordinalReached, bool cleared)
         {
             _runIndex++;
-
-            // ---- ① 遺物を引く (落ちる数は到達した層で決まる) ----
-            int diff = _difficulty;
-            var got = RelicRoller.RollRunEnd(_runIndex, ordinalReached, diff, (int)RelicUtility.PreferredSet(persona));
-            _owned.AddRange(got);
-            var prev = _equipped;
-            _equipped = RelicUtility.ChooseLoadout(_owned, persona);
-            for (int k = 0; k < 3; k++) if (_equipped[k] != prev[k]) { SwapCount++; break; }
-            // 持ち込みに使っていない遺物は分解して素材にし、 持ち込みを強化する
-            for (int i = _owned.Count - 1; i >= 0; i--)
-                if (System.Array.IndexOf(_equipped, _owned[i]) < 0) { _owned.RemoveAt(i); _material++; }
-            var rng = new System.Random(_runIndex * 7919 + 17);
-            foreach (var r in _equipped)
-                while (r != null && r.CanEnhance && _material > 0) { RelicRoller.Enhance(r, rng); _material--; }
-            var eqList = new List<Relic>(); foreach (var r in _equipped) if (r != null) eqList.Add(r);
-            _relicUtility = RelicUtility.ScoreLoadout(eqList, persona);
 
             // ---- ② 成績を窓へ積む ----
             // 「5 層クリア以上」を成功の基準にする ── §15-5 で層点が +3 跳ねる節目であり、
@@ -198,9 +173,7 @@ namespace AutoTest
         /// <summary>レポート 1 行。</summary>
         public string Summary()
         {
-            return $"{persona,-9} {policy,-12} 難易度{_difficulty,3}  効用{_relicUtility,5:F1}  "
-                 + $"乗換{SwapCount,3}回  難度↑{DifficultyUpCount,2} ↓{DifficultyDownCount,2}  "
-                 + CurrentRelicText;
+            return $"{persona,-9} {policy,-12} 難易度{_difficulty,3}  難度↑{DifficultyUpCount,2} ↓{DifficultyDownCount,2}";
         }
     }
 }
