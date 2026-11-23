@@ -1599,7 +1599,7 @@
       "floor": 7,
       "displayName": "ヴェスカ・天与",
       "description": "学者の落ち着きをかなぐり捨て、傷つくことすら楽しむように笑うヴェスカ。未知の強さを解き明かそうと、天変地異を呼ぶ異界の品を振るう。",
-      "maxHP": 2600,
+      "maxHP": 4100,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 12,
