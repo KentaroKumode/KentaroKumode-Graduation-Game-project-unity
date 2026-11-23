@@ -21,8 +21,17 @@ namespace MetaProgression
         /// <summary>そのモジュール (主方針・補助・種火の効果) を持つパネルが盤で効いているか。</summary>
         private static bool Has(MetaModule m) => S?.BoardHas(m) ?? false;
 
-        /// <summary>今の整備盤の構成 (ログ・測定の実効状態)。</summary>
-        public static string Describe() => S?.DescribeBoard() ?? "(メタ進行なし)";
+        /// <summary>今の整備盤の構成と効いている数値 (ログ・測定の実効状態)。 例 "盤9/9 core_last_stand@0,0r0 … [HP+15 防+3 与ダメ+10% 特売+0 金+0 主=LastStand,AttackTune]"。</summary>
+        public static string Describe()
+        {
+            var s = S;
+            if (s == null) return "(メタ進行なし)";
+            var b = s.BoardEffects;
+            var mods = new System.Collections.Generic.List<string>();
+            foreach (MetaModule m in System.Enum.GetValues(typeof(MetaModule))) if (s.BoardHas(m)) mods.Add(m.ToString());
+            return s.DescribeBoard() + $" [HP+{b.hp} 防+{b.defense} 与ダメ+{b.damagePct}% 特売+{b.saleSlots} 金+{b.gold} 充電+{b.chargeOpening} 1T手札+{b.handTurn1}"
+                 + $" 1T防+{b.blockTurn1} 会心+{b.critPct}% モジュール={(mods.Count > 0 ? string.Join(",", mods) : "-")}]";
+        }
 
         // ============================================================
         //  RunState 初期化時の補正
