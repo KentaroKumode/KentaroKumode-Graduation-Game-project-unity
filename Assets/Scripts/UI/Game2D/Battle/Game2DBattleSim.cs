@@ -387,7 +387,8 @@ namespace UI.Game2D.Battle
         {
             roles.Clear();
             if (p == null || ctx == null || p.playerDice == null) return;
-            YachtRoles.Evaluate(p.playerDice, p.playerFaceIdx, ctx.equippedFaceTiers, roles);
+            var cmr = CombatManager.Instance;
+            YachtRoles.Evaluate(cmr != null ? cmr.RoleDice(p.playerDice) : p.playerDice, p.playerFaceIdx, ctx.equippedFaceTiers, roles);   // 怠惰で引く前の目 (本体と同じ)
             for (int i = roles.Count - 1; i >= 0; i--)
                 if ((ctx.sealedRoleMask & (1 << (int)roles[i])) != 0) roles.RemoveAt(i);      // 〈凶運〉で封じられた役は成立しても効かない (ResolveRoles と同じ)
         }

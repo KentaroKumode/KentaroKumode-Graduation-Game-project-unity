@@ -63,6 +63,27 @@ namespace AutoTest.EditorTests
         }
 
         [Test]
+        public void Sloth_RolesUseDiceBeforePenalty_123IsNotYacht()
+        {
+            // クェシナの怠惰 (−2・下限 1) で 1・2・3 は全部 1 になるが、 役は引く前の目で決める (2026-11-23・〈極〉が 1/8 で立っていた不具合)
+            int[] raw = { 1, 2, 3 };
+            int[] after = new int[3], cut = new int[3];
+            for (int i = 0; i < 3; i++) { after[i] = System.Math.Max(1, raw[i] - 2); cut[i] = raw[i] - after[i]; }
+            Assert.That(after, Is.EqualTo(new[] { 1, 1, 1 }));
+            var yacht = YachtRoles.Of(1, true);
+            Assert.That(TerminalCards.RoleOf(after, new TerminalEnv()), Is.EqualTo(yacht), "引いた後の目そのままなら〈極〉 (判定の前提の確認)");
+            var roleDice = TerminalCards.RoleDiceOf(after, cut, after);
+            Assert.That(roleDice, Is.EqualTo(raw));
+            Assert.That(TerminalCards.RoleOf(roleDice, new TerminalEnv()), Is.Not.EqualTo(yacht));
+            var formed = new List<RoleKind>();
+            YachtRoles.Evaluate(roleDice, null, null, formed);
+            Assert.That(formed.Contains(yacht), Is.False);
+            // 目が変わったダイス (BOT が仮の目で試す・上書きされた) には足し戻さない
+            Assert.That(TerminalCards.RoleDiceOf(new[] { 4, 1, 1 }, cut, after), Is.EqualTo(new[] { 4, 2, 3 }));
+            Assert.That(TerminalCards.RoleDiceOf(after, null, null), Is.SameAs(after));
+        }
+
+        [Test]
         public void Deal_Sin_TwoPillarsWithoutBuff()
         {
             var offer = ChallengeCards.Deal(ChallengeCards.SinTier, new List<string>());

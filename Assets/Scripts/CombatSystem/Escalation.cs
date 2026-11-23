@@ -102,7 +102,8 @@ namespace CombatSystem
             return curve * (1f + MetaProgression.MetaDebuffApplicator.GetEnemyAttackPct() / 100f)                    // 〈猛攻〉
                  * (1f + MetaProgression.MetaDebuffApplicator.GetOpenerPct(phaseTurn, BossFight) / 100f)            // 〈先手必殺〉
                  * (1f + MetaProgression.MetaDebuffApplicator.GetWrathAttackPct(phaseTurn, BossFight) / 100f)       // コルヴェンの憤怒
-                 * (1f + MetaProgression.MetaDebuffApplicator.GetEnvyPct() / 100f);                                // ヤルノクの嫉妬 (今の HP の割合で決まる)
+                 * (1f + MetaProgression.MetaDebuffApplicator.GetEnvyPct() / 100f)                                 // ヤルノクの嫉妬 (今の HP の割合で決まる)
+                 * (1f + MetaProgression.MetaDebuffApplicator.GetGreedAttackPct() / 100f);                         // ムシュファの強欲 (持っている秘宝の数で決まる)
         }
 
         /// <summary>いまの形態が始まったターン (CombatManager が戦闘開始時に 1、 ヴェスカの形態を替えるたびに立てる)。 「形態の最初の N ターン」を数える。</summary>

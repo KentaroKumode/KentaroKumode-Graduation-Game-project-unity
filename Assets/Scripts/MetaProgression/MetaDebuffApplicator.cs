@@ -45,6 +45,14 @@ namespace MetaProgression
             if (ctx == null || ctx.playerMaxHP <= 0 || ctx.enemyMaxHP <= 0) return 0f;
             return ctx.playerCurrentHP * (long)ctx.enemyMaxHP > ctx.enemyCurrentHP * (long)ctx.playerMaxHP ? v : 0f;
         }
+        /// <summary>ムシュファの強欲 ── 持っている秘宝 1 つにつきの敵の攻撃の上乗せ (%) × 秘宝の数 (2026-11-23・Escalation.GetMultiplier で予告の前に掛ける)。 受けていなければ 0。</summary>
+        public static float GetGreedAttackPct()
+        {
+            float v = CardV(ChallengeCards.SinGreed);
+            if (v <= 0f) return 0f;
+            int n = GameManager.Instance?.Run?.ownedPassiveItems?.Count ?? 0;
+            return v * n;
+        }
         /// <summary>コルヴェンの憤怒 ── ボスの各形態の最初のターンに削る現在 HP (%)。 受けていなければ 0。</summary>
         public static float GetWrathHpCutPct() => CardV(ChallengeCards.SinWrath);
         /// <summary>クェシナの怠惰 ── 全部の出目から引く量 (下限 1)。</summary>

@@ -160,6 +160,7 @@ namespace CombatSystem
             e.chargeSpendsTurn = (int)ctx.GetAccumulated(CombatContext.ChargeSpendsThisTurnKey);   // 〈灼線鞭〉: 配線より前に充電を使った回数
             e.noAttack = GameLoop.Consumables.RapierContreOn(ctx);   // 〈シュヴァリエのレイピア〉のコントラタック中は攻撃の端子に挿せない
             e.sealedRoleMask = ctx.sealedRoleMask;                    // 立つ役 (TerminalCards.RoleOf) は ResolveRoles と同じ判定 (2026-11-21)
+            e.roleDiceCut = (int[])_slothCut.Clone(); e.roleDiceAt = (int[])_slothAt.Clone();   // クェシナの怠惰: 立つ役は引く前の目で決める (RoleDice と同じ)
             e.pairAsTriple = OmniPairNow(ctx);                        // 〈万象のゾロ目〉: このターン 2 個そろいをゾロ目として扱う (振り直しの後に決める)
             return e;
         }

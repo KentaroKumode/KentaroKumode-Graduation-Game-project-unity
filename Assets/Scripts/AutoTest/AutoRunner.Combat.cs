@@ -1854,7 +1854,7 @@ namespace AutoTest
 
             // ① 役が成立した手は捨てない
             var formed = new List<CombatSystem.RoleKind>(2);
-            CombatSystem.YachtRoles.Evaluate(dice, ctx.playerDiceFaceIdx, ctx.equippedFaceTiers, formed);
+            CombatSystem.YachtRoles.Evaluate(CombatManager.Instance != null ? CombatManager.Instance.RoleDice(dice) : dice, ctx.playerDiceFaceIdx, ctx.equippedFaceTiers, formed);   // 怠惰で引く前の目 (本体の ResolveRoles と同じ)
             if (formed.Count > 0) return null;
 
             var all = new List<int>(k);

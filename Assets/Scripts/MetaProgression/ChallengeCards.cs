@@ -95,9 +95,9 @@ namespace MetaProgression
             K(Bag, false, Family.Economy, null, T(2, 2, 1), T(0, 4, 0));                    // 浅い鞄: 1 戦闘で使える消耗品 N 個まで / v2 = 持てる数 (0 = 制限なし)
 
             // ── 七つの大罪 (IV・仕様書 §4 の値のまま・未較正) ──
-            K(SinPride, false, Family.Hand, null, IV(60), IV(25));       // 傲慢: 防御の端子に挿した出目 −N% / v2 = シールドの獲得 −N%
+            K(SinPride, false, Family.Hand, null, IV(80), IV(50));       // 傲慢 (2026-11-23: 60/25 → 80/50): 防御の端子に挿した出目 −N% / v2 = シールドの獲得 −N%
             K(SinEnvy, false, Family.Attack, null, IV(80));              // 嫉妬: 残り HP の割合が敵より高い間、 敵の攻撃 +N%
-            K(SinGreed, false, Family.Economy, null, IV(1));             // 強欲: 受けた時、 所持金と消耗品をすべて失う + 5 層の店を使えない
+            K(SinGreed, false, Family.Economy, null, IV(2));             // 強欲: 受けた時、 所持金と消耗品をすべて失う + 5 層の店を使えない + 持っている秘宝 1 つにつき敵の攻撃 +N% (2026-11-23)
             K(SinWrath, false, Family.Attack, null, IV(40), IV(120));    // 憤怒: ボスの各形態の 1 ターン目、 現在 HP −N% / v2 = そのターンの敵の攻撃 +N%
             K(SinSloth, false, Family.Hand, null, IV(2), IV(2));         // 怠惰: 全部の出目 −N (下限 1) / v2 = 各戦闘の 1 ターン目、 手札の端子が止まる枚数
             K(SinGluttony, false, Family.Durability, null, IV(100), IV(35));   // 暴食: 回復 −N% / v2 = 受けた時に最大 HP −N%
@@ -138,7 +138,7 @@ namespace MetaProgression
             new[] { 1, 1, 1, 2, 0 },
             new[] { 1, 1, 2, 2, 2 },
             new[] { 1, 1, 2, 2, 3 },
-            new[] { 1, 2, 2, 3, 3 },
+            new[] { 1, 1, 2, 3, 3 },      // Lv7 (2026-11-23・neon answer19: 旧 1, 2, 2, 3, 3)
             new[] { 2, 2, 2, 3, 3 },
             new[] { 2, 2, 3, 3, 3 },
             new[] { 2, 2, 3, 3, SinTier },
@@ -368,7 +368,7 @@ namespace MetaProgression
                 case Bag: return (v2 ? "消耗品は " + n2 + " 個までしか持てない・" : "") + "1 戦闘で使える消耗品は " + n + " 個まで";
                 case SinPride: return "防御の端子に挿した出目 −" + n + "%・シールドの獲得 −" + n2 + "%";
                 case SinEnvy: return "残り HP の割合が敵より高い間、 敵の攻撃 +" + n + "%";
-                case SinGreed: return "受けた時、 所持金と消耗品をすべて失う・5 層の店を使えない";
+                case SinGreed: return "受けた時、 所持金と消耗品をすべて失う・5 層の店を使えない・持っている秘宝 1 つにつき敵の攻撃 +" + n + "%";
                 case SinWrath: return "ボスの各形態の 1 ターン目、 現在 HP −" + n + "%（1 は残る）・そのターンの敵の攻撃 +" + n2 + "%";
                 case SinSloth: return "全部の出目 −" + n + "（1 より小さくならない）・各戦闘の 1 ターン目、 手札の端子 " + n2 + " 枚が止まる";
                 case SinGluttony: return "回復 −" + n + "%（吸血・回復薬・層の入口の全回復も）・受けた時に最大 HP −" + n2 + "%";

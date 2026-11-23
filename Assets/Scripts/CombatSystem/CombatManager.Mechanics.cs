@@ -141,9 +141,35 @@ namespace CombatSystem
         private void ReapplyDicePenaltiesAfterReroll(int[] playerDice, int[] playerFaceIdx, List<int> rerolled)
         {
             int sloth = MetaProgression.MetaDebuffApplicator.GetSlothDicePenalty();
-            if (sloth > 0) foreach (int i in rerolled) playerDice[i] = Math.Max(1, playerDice[i] - sloth);
+            foreach (int i in rerolled) ApplySlothCut(playerDice, i, sloth);
             ForceVescaDice(ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context, playerDice, rerolled);
         }
+
+        /// <summary>クェシナの怠惰で、 このターンの各ダイスから引いた量 (2026-11-23)。 役の判定 (<see cref="RoleDice"/>) は引く前の目で行う ──
+        /// 引いた後の目で判定すると 1・2・3 が全部 1 になり、 1・1・1 の〈極〉が 1/216 → 1/8 で立っていた。 攻撃・ブロックへの寄与は引いた後の目のまま。
+        /// 振った時 (Turn の 3.) に作り直し、 振り直したダイスはここで、 目を上書きする効果 (天与の指輪・避雷針) は 0 に戻す。</summary>
+        private int[] _slothCut = Array.Empty<int>();
+        /// <summary><see cref="_slothCut"/> を引いた後の目 (この目のままのダイスにだけ足し戻す)。</summary>
+        private int[] _slothAt = Array.Empty<int>();
+
+        /// <summary>ダイス <paramref name="i"/> に怠惰の −<paramref name="sloth"/> (下限 1) を掛け、 引いた量を <see cref="_slothCut"/> に残す。</summary>
+        private void ApplySlothCut(int[] playerDice, int i, int sloth)
+        {
+            if (_slothCut.Length != playerDice.Length) { _slothCut = new int[playerDice.Length]; _slothAt = new int[playerDice.Length]; }
+            int before = playerDice[i];
+            if (sloth > 0) playerDice[i] = Math.Max(1, before - sloth);
+            _slothCut[i] = before - playerDice[i];
+            _slothAt[i] = playerDice[i];
+        }
+
+        /// <summary>目を上書きした (天与の指輪・避雷針) ダイスは、 引く前の目が無いので 0 に戻す。</summary>
+        private void ClearSlothCut(int i) { if (i >= 0 && i < _slothCut.Length) _slothCut[i] = 0; }
+
+        /// <summary>役の判定に使う目 = 今の目 + 怠惰で引いた量 (引いていなければ <paramref name="dice"/> そのもの)。 ResolveRoles・〈万象のゾロ目〉・端子の解決 (TerminalEnv.roleDiceCut)・BOT・画面が同じ判定を通す。</summary>
+        public int[] RoleDice(int[] dice) => TerminalCards.RoleDiceOf(dice, _slothCut, _slothAt);
+
+        /// <summary>[テスト用] 怠惰で引いた量の今の値。</summary>
+        internal int[] SlothCutNow => _slothCut;
 
         /// <summary>[測定 2026-11-11] ヴェスカ連戦の間、 出目を <see cref="GameLoop.GameHooks.VescaDiceForce"/> に固定する (0 なら何もしない)。
         /// rerolled が null なら全部、 そうでなければ振り直したダイスだけ。</summary>
@@ -405,7 +431,7 @@ namespace CombatSystem
 
             YachtRoleEffects.TurnsEvaluated++;
             _formedRoles.Clear();
-            YachtRoles.Evaluate(playerDice, playerFaceIdx, ctx.equippedFaceTiers, _formedRoles);
+            YachtRoles.Evaluate(RoleDice(playerDice), playerFaceIdx, ctx.equippedFaceTiers, _formedRoles);   // 怠惰で引く前の目で判定する
 
             // 賽目の締めと【規則】の品 (2026-11-21・段 1-f・item-overhaul-spec §5 / §12-1)。 所持は戦闘の始めから変わらない
             var roleRun = GameLoop.GameManager.Instance?.Run;
@@ -494,7 +520,7 @@ namespace CombatSystem
         private void DecideOmniPair(CombatContext ctx, int[] dice)
         {
             if (ctx == null || _deck == null || !AxisRules.Owns(GameLoop.GameManager.Instance?.Run, GameLoop.ItemIds.RoleOmni)) return;
-            var k = TerminalCards.RoleOf(dice, new TerminalEnv { sealedRoleMask = ctx.sealedRoleMask });
+            var k = TerminalCards.RoleOf(RoleDice(dice), new TerminalEnv { sealedRoleMask = ctx.sealedRoleMask });
             if (k == null || YachtRoles.IsBig(k.Value)) return;
             float p = OmniPairChance(_deck.state.roleCount);
             if (p <= 0f || (p < 1f && !GameLoop.GameRng.Chance(p, OmniRngKey))) return;

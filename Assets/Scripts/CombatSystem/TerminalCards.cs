@@ -285,6 +285,10 @@ namespace CombatSystem
         /// 立つ役は <see cref="TerminalCards.RoleOf"/> (CombatManager.ResolveRoles と同じ判定)。</summary>
         public int sealedRoleMask;
         public bool pairAsTriple;
+        /// <summary>クェシナの怠惰で各ダイスから引いた量 (null = 引いていない・2026-11-23)。 立つ役は引く前の目 (<see cref="TerminalCards.RoleDiceOf"/>) で決める。 CombatManager.TerminalEnvNow が入れる。</summary>
+        public int[] roleDiceCut;
+        /// <summary><see cref="roleDiceCut"/> を引いた後の目 (この目のダイスにだけ足し戻す・BOT が仮の目で解決を試す時は足さない)。</summary>
+        public int[] roleDiceAt;
     }
 
     /// <summary>1 ターンの端子の結果。 本体がこれを攻撃・防御・充電・戦闘の情報へ反映する。</summary>
@@ -982,12 +986,13 @@ namespace CombatSystem
 
             // ── 5. 効果 ──
             //   このターンに立つ役 (振った目で決まる・CombatManager.ResolveRoles と同じ判定)。 〈役落とし〉と賽目の品 (6d) が読む
-            var roleKind = RoleOf(dice, env);
+            var roleDice = RoleDiceOf(dice, env.roleDiceCut, env.roleDiceAt);      // 怠惰で引く前の目 (引いていなければ dice そのもの)
+            var roleKind = RoleOf(roleDice, env);
             o.roleNow = roleKind == null ? 0 : YachtRoles.IsBig(roleKind.Value) ? 2 : 1;
             bool doubler = false;
             for (int s = 0; s < m; s++) if (defs[s]?.baseId == TerminalIds.Doubler && Plugged(o.slotOfDie, s)) doubler = true;
             // 連なりの賽 (2026-11-20): 3 つの目が連番のターン (役〈連なり〉)、 挿した端子がすべて倍化する (〈残響〉と同じ)
-            if (env.dieId == GameLoop.DieIds.Straight && YachtRoles.IsRun(v)) doubler = true;
+            if (env.dieId == GameLoop.DieIds.Straight && YachtRoles.IsRun(env.roleDiceCut != null ? RoleDiceOf(v, env.roleDiceCut, env.roleDiceAt) : v)) doubler = true;
             if (state.doubleAll) doubler = true;      // 〈倍化の共鳴玉〉(2026-11-20): このターン、 挿した端子がすべて 2 回働く (〈残響〉と同じ)
             //   〈剛腕〉(2026-11-20・説明文どおり): 攻撃の種類の端子に挿した出目を 2 倍にしてから、 その端子の効果に入れる (倍率の端子は 2 倍の目に掛かる)。
             //   条件 (2.) は挿した目そのもので見る。 〈剛腕〉1 枚 (効果 1 回) につき ×2 ── 〈残響〉で 2 回発動すれば ×4、 2 枚挿せば ×4。
@@ -1297,6 +1302,21 @@ namespace CombatSystem
         }
 
         [ThreadStatic] private static List<RoleKind> _roleBuf;
+
+        /// <summary>役の判定に使う目 = 目 + 怠惰で引いた量 (2026-11-23)。 足すのは目が <paramref name="at"/> (引いた後の目) と同じダイスだけ
+        /// (BOT が仮の目で試す時は足さない)。 足すものが無ければ <paramref name="dice"/> をそのまま返す。</summary>
+        public static int[] RoleDiceOf(int[] dice, int[] cut, int[] at)
+        {
+            if (dice == null || cut == null || at == null || cut.Length != dice.Length || at.Length != dice.Length) return dice;
+            int[] r = null;
+            for (int i = 0; i < dice.Length; i++)
+            {
+                if (cut[i] == 0 || dice[i] != at[i]) continue;
+                if (r == null) r = (int[])dice.Clone();
+                r[i] = dice[i] + cut[i];
+            }
+            return r ?? dice;
+        }
 
         /// <summary>〈万象のゾロ目〉: <paramref name="asTriple"/> なら 2 個そろいを同じ目のゾロ目にする (そのゾロ目が〈凶運〉で封じられていれば 2 個そろいのまま)。</summary>
         public static RoleKind UpgradePair(RoleKind k, bool asTriple, int sealedMask)

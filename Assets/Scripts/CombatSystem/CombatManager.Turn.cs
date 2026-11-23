@@ -548,14 +548,15 @@ namespace CombatSystem
             // クェシナの怠惰 (挑戦カード IV): 全部の出目 −N (下限 1)。 値を減らすだけで面は変えない (〈打ち直し〉の加算と同じ扱い)
             {
                 int sloth = MetaProgression.MetaDebuffApplicator.GetSlothDicePenalty();
-                if (sloth > 0) for (int i = 0; i < playerDice.Length; i++) playerDice[i] = Math.Max(1, playerDice[i] - sloth);
+                _slothCut = new int[playerDice.Length]; _slothAt = new int[playerDice.Length];      // 役の判定は引く前の目で行う (RoleDice・2026-11-23)
+                for (int i = 0; i < playerDice.Length; i++) ApplySlothCut(playerDice, i, sloth);
             }
 
             // 端子〈打ち直し〉(ADR-0014): 前ターンまでに溜めた分の、 この戦闘中の出目 +N (DrawTerminalHand が置く)。 出目を減らすデバフ (大罪:怠惰) の後に置く。
             {
                 int foundry = (int)ctx.GetAccumulated(FoundryBonusKey);
                 if (foundry > 0)
-                    for (int i = 0; i < playerDice.Length; i++) playerDice[i] += foundry;
+                    for (int i = 0; i < playerDice.Length; i++) { playerDice[i] += foundry; _slothAt[i] += foundry; }   // 怠惰の足し戻しの目も一緒にずらす
             }
             ForceVescaDice(ctx, playerDice, null);   // [測定 2026-11-11] ヴェスカ連戦の出目の固定 (既定は触らない)
 
@@ -569,6 +570,7 @@ namespace CombatSystem
                     if (playerDice[i] >= 3)
                     {
                         playerDice[i] = GameLoop.GameRng.Range(1, 3, "vesca.divineRing", RngIdx(i));
+                        ClearSlothCut(i);
                         crushed++;
                     }
                 if (Debug.unityLogger.logEnabled) Debug.Log($"[天与の指輪] 3 以上の出目 {crushed} 本を 1〜2 へ再抽選 ({playerDice.Length} 本中)");
@@ -589,6 +591,7 @@ namespace CombatSystem
                 int idx = GameLoop.GameRng.Range(0, playerDice.Length, "combat.lightning", RngIdx(4));
                 if (Debug.unityLogger.logEnabled) Debug.Log($"[落雷の避雷針] ダイス{idx + 1} を {playerDice[idx]} → {minFace} (最小面) に固定");
                 playerDice[idx] = minFace;
+                ClearSlothCut(idx);
                 // 上書き系なので面から降ろす (見放された運と同じ扱い)。
                 if (playerFaceIdx != null && idx < playerFaceIdx.Length) playerFaceIdx[idx] = -1;
             }
