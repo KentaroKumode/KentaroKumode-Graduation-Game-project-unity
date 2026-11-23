@@ -171,8 +171,6 @@ namespace CombatSystem
         public int FinalBlockSum(CombatContext ctx, int raw, int blockDice, int enemyAtk, bool log)
         {
             int b = raw;
-            float rbp = MetaProgression.Relics.RelicApplicator.GetBlockDicePct();      // 遺物 (§15-5) 堅牢の環: 防御の端子を挿した出目 +N% (切り上げ)
-            if (rbp > 0f && b > 0) b += Mathf.CeilToInt(b * rbp);
             float cut = MetaProgression.MetaDebuffApplicator.GetSinBlockCutPct();     // カイロスの傲慢 (挑戦カード IV): −N% (四捨五入・デバフの丸め)
             if (cut > 0f && b > 0) b = Mathf.RoundToInt(b * (1f - cut / 100f));
             b += blockDice * MetaProgression.MetaBuffApplicator.GetBlockTerminalPerDice();   // 端子調律メタバフ: 接続したダイス 1 本あたり +N

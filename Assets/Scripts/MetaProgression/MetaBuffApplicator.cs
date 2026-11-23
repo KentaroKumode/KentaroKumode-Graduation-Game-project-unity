@@ -36,10 +36,7 @@ namespace MetaProgression
             if (s == null) return;
 
             int hpBonus  = B.hp;
-            // 遺物 (§15-5) 最大HP+N。 ラン開始時に 1 回だけ。 刻印の毎ターン条件は
-            // この時点でまだ判定材料が無いので成立扱い (RelicApplicator の規約)。
-            int relicHp  = Relics.RelicApplicator.GetMaxHpBonus(run);
-            int hp       = baseHP + hpBonus + relicHp;
+            int hp       = baseHP + hpBonus;
             run.playerMaxHP = hp;
             run.playerHP    = hp;
 
@@ -48,42 +45,11 @@ namespace MetaProgression
 
             // 開幕の秘宝 (〈開幕厳選〉)・戦術消耗品 (〈戦術の懐刀〉) の付与は GameManager 側 (アイテムDB と重複排除が要るため)。
 
-            Debug.Log($"[MetaBuff] 開幕補正: HP {baseHP}→{hp} (遺物 +{relicHp}), "
-                    + $"Gold +{startGold}, 開幕の秘宝 {GetStartingPassiveCount()} 本 / {Describe()}");
-            if (Relics.RelicApplicator.DescribeEquipped() != "遺物なし")
-                Debug.Log($"[遺物] 持ち込み: {Relics.RelicApplicator.DescribeEquipped()}");
+            Debug.Log($"[MetaBuff] 開幕補正: HP {baseHP}→{hp}, Gold +{startGold}, 開幕の秘宝 {GetStartingPassiveCount()} 本 / {Describe()}");
         }
 
-        /// <summary>遺物の自動獲得を止めるフラグ。 **AutoRunner のバッチ中は必ず true にする。**
-        ///
-        /// バッチは 1 万ラン規模で回るので、 毎ラン AddRelic + PlayerPrefs.Save() が走ると
-        /// (1) セーブが数千個の遺物で膨れ、 (2) ディスク I/O でバッチが極端に遅くなる。
-        /// 周回モード (AscensionLoop) は自前で RelicRoller を呼ぶので、 自動獲得は不要。</summary>
-        public static bool SuppressRelicGrant;
-
-        /// <summary>直近のランの終わりに入手した遺物 (結果画面が見せる)。 次のランの開始まで残る。</summary>
-        public static readonly System.Collections.Generic.List<Relics.Relic> LastRunRelics = new System.Collections.Generic.List<Relics.Relic>();
-
-        /// <summary>ラン終了時に遺物を獲得する (§15-5・2026-11-10 再編)。 クリア・死亡いずれでも呼ぶ。
-        /// ordinal は見せる層 (1〜5)。 落ちる数は 3 層以下 1 / 4 層 2 / 5 層到達 3。 難易度は挑戦カードの目盛り (8 で頭打ち)。</summary>
-        public static void GrantRelicOnRunEnd(int ordinal, bool cleared)
-        {
-            LastRunRelics.Clear();
-            if (SuppressRelicGrant) return;
-            var s = S;
-            if (s == null) return;
-            int diff = s.challengeDifficulty;
-            var got = Relics.RelicRoller.RollRunEnd(GameLoop.GameRng.RunIndex, ordinal, diff, s.relicTargetSet);
-            foreach (var relic in got)
-            {
-                if (relic == null || !relic.IsValid()) { Debug.LogWarning($"[遺物] 生成に失敗 (層{ordinal} 難易度{diff})"); continue; }
-                s.AddRelic(relic);
-                LastRunRelics.Add(relic);
-                Achievements.AchievementService.NoteRelicAcquired(relic);
-                Debug.Log($"[遺物] 獲得: {relic.Describe()}  (層{ordinal}{(cleared ? "クリア" : "")} / 難易度{diff} / 所持{s.ownedRelics.Count}個)");
-            }
-            MetaProgressManager.Instance?.Save();
-        }
+        /// <summary>メタ進行の報酬 (実績・実績のパネル・ランの保存) を止めるフラグ。 **AutoRunner のバッチ中は必ず true にする** (旧 SuppressMetaRewards・2026-11-23 に遺物と一緒に改名)。</summary>
+        public static bool SuppressMetaRewards;
 
         // ============================================================
         //  戦闘関連
@@ -287,9 +253,7 @@ namespace MetaProgression
         /// <summary>防御端子調律: 防御の端子に挿した出目 1 個あたりの加算。 呼び出し側で個数を掛けること。</summary>
         public static int GetBlockTerminalPerDice() => Has(MetaModule.BlockTune) ? MetaPanel.TerminalTunePerDie : 0;
 
-        /// <summary>〈軸引きの手形〉: 店の軸指定リロールの追加から引く額。
-        /// <b>未接続</b> ── 追加の額は ShopManager.AxisRerollSurchargeFor が決めるが、 ShopManager は並行作業 (8 軸化) の区域なので Stage D では触っていない。
-        /// 接続は AxisRerollSurchargeFor の式から <c>MetaBuffApplicator.GetAxisRerollDiscount()</c> を引く 1 か所 (下限 0)。</summary>
+        /// <summary>〈軸引きの手形〉: 店の軸指定リロールの追加から引く額 (ShopManager.AxisRerollSurchargeFor が引く・下限 0)。</summary>
         public static int GetAxisRerollDiscount()
             => (Has(MetaModule.AxisTicket) ? MetaPanel.AxisTicketDiscount : 0) + (int)ChallengeCards.Value(ChallengeCards.Regular);   // 挑戦カード〈顔なじみ〉(III は 999 = 無料・下限 0 は呼び手)
 

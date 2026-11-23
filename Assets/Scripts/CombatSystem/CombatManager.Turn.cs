@@ -255,15 +255,13 @@ namespace CombatSystem
             bool resolving = ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.ResolvingKey) > 0;
             int hp = resolving ? enemyHP : ctx.enemyCurrentHP;
             if (hp <= 0) return false;
-            float rinPct = MetaProgression.Relics.RelicApplicator.GetRinkaiCurrentHpPct(GameLoop.GameManager.Instance?.Run, ctx);
-            int relicBurst = rinPct > 0f ? Mathf.FloorToInt(hp * rinPct) : 0;
             // [測定用の物差し 2026-11-10] 入る量だけに掛ける
-            int dmg = EnemyHpLedger.ProbePassive(landed) + EnemyHpLedger.ProbePassive(relicBurst);
+            int dmg = EnemyHpLedger.ProbePassive(landed);
             int before = hp;
             HpLossDiag.Lose(ref hp, dmg, "臨界の爆発");
             CombatStats.DamageBreakdown[22] += before - hp;   // [計装] 臨界の爆発
             if (resolving) enemyHP = hp; else ctx.enemyCurrentHP = hp;
-            if (Debug.unityLogger.logEnabled) Debug.Log($"[臨界爆発] {landed}{(relicBurst > 0 ? $" ＋遺物 {relicBurst} (現在HP {before} の {rinPct:P0})" : "")} → 敵HP {hp}");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[臨界爆発] {landed} → 敵HP {hp}");
             return hp <= 0;
         }
 
@@ -481,8 +479,6 @@ namespace CombatSystem
             {
                 // 整備パネル〈装甲〉: 被ダメージ −1/段 (防御の後に引く・逓減を受けない・2026-11-10)
                 ctx.playerFlatDamageReduction += MetaProgression.MetaBuffApplicator.GetArmorFlatReduction();
-                // 遺物 電流 3 個: 過充電の間、 被ダメ −3
-                ctx.playerFlatDamageReduction += MetaProgression.Relics.RelicApplicator.GetOverchargeFlatReduce(ctx);
                 ctx.lastDamageCause = ItemSystem.PassiveSkills.DeathCause.Normal;
             }
 
@@ -806,14 +802,6 @@ namespace CombatSystem
             //   OnWired / OnPreDealDamage から読める (OnPostRoll は配線より前なので読めない)。
             ctx.blockSumThisTurn = blockSum;
 
-            // 遺物 (§15-5) 充電の毎ターン成分 (段4 以上)。 開幕成分は通常戦・毎ターン成分はボス戦で効く。
-            // 充電端子へ 1 本も挿していないターンにも入る (「毎ターン」なので配線に依存しない)。
-            {
-                var relicRun = GameLoop.GameManager.Instance?.Run;
-                int rct = MetaProgression.Relics.RelicApplicator.GetChargePerTurn(relicRun, ctx);
-                if (rct > 0) ctx.AddCharge(rct);
-            }
-
             // --- 5b. 役 (ADR-0010) ---
             //   手札役 / 端子役 / 配線役 を判定し、 方策が「切る」と決めた役だけを適用する。
             //   **1 戦闘 1 役 1 回・発動は任意**。 オーバーロード (タイミング判定) の後継。
@@ -886,9 +874,7 @@ namespace CombatSystem
             // 2026-07-25: 消費 (cons_atk_*) の攻撃バフ。旧モデルでは consDiceRoll=勝敗判定のみだったが、
             // 相互攻撃モデルでは攻撃値に直接加算する。
             int consAtk = ctx.consDiceRoll;
-            // 遺物 (§15-5) 攻撃+N。 パッシブ由来の mutualAttackBonus と同じ枠へ足す。
-            int relicAtk = MetaProgression.Relics.RelicApplicator
-                           .GetAttackBonus(GameLoop.GameManager.Instance?.Run, ctx);
+            const int relicAtk = 0;   // (遺物 (§15-5) の攻撃 +N は 2026-11-23 に撤去・計装の欄 [5] / bd[17] の形を保つ)
             // ADR-0016: 攻撃は、 攻撃の端子 1 枚につき 1 回当たる。 1 撃の量 = その端子の出力 + 端子の外の攻撃 (武器の攻撃力・品の攻撃 +N・消耗品・遺物 = 毎回に乗せる)。
             //   端子の出力 = 端子の結果 (TerminalOutcome.attackHits) + 端子調律の 1 本あたり +N。
             //   端子に紐づかない攻撃の加算 (連係・変圧・溜めた攻撃・賽の加算・〈電流〉の②) は最初の 1 撃に入れる。
@@ -1059,7 +1045,6 @@ namespace CombatSystem
             // 画面: 主攻撃の倍率 (会心・与ダメ%・敵の防御まで全部込みの 最終 ÷ 倍率の前の攻撃値) を着弾の数字の横に出す (2026-11-11)
             LastHitMultPct = !skipAttack && atkBase > 0 && dealtDmg > 0 ? Mathf.RoundToInt(dealtDmg * 100f / atkBase) : 0;
             EnemyHpLedger.CommitMainMitigation(!skipAttack);   // [計装] 主攻撃の防御・敵の軽減で削った量
-            if (isCrit) ctx.accumulatedValues[MetaProgression.Relics.RelicApplicator.ShinganCritKey] = 1f;   // 遺物 心眼 3 個 (次のターンの会心率)
             if (_fleeRequested) dealtFixed = 0;
             // 敵の〈飛翔〉〈不動〉「追撃ダメージを受けない」: 上の ProcessDamage の中で敵の OnPrePursuitDamage が立てる (2026-11-11 #104)。
             //   いまの「追撃」のダメージは役〈追撃〉の追加ダメージだけなので、 それを入れない。
@@ -1292,7 +1277,6 @@ namespace CombatSystem
                 if (_diagKind == SkillDiag.Boss && currentEnemy != null)
                     SkillDiag.BossDmgOf(currentEnemy.id)[5] += Math.Min(bleedDmg, enemyHP);
                 RaiseDotDamage(DotKind.Bleed, Math.Min(bleedDmg, enemyHP));      // 入った分だけ (攻撃で倒れていれば 0 = 鳴らない)
-                RelicBloodOffering(Math.Min(bleedDmg, enemyHP));
                 CombatStats.DamageBreakdown[21] += Math.Max(0, Math.Min(bleedDmg, enemyHP));   // [計装] 出血
                 HpLossDiag.Lose(ref enemyHP, EnemyHpLedger.ProbePassive(bleedDmg), "出血");   // [測定用の物差し] 入る量だけ
             }

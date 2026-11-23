@@ -475,7 +475,7 @@ namespace AutoTest.ParallelSweep
             string[] watched =
             {
                 "wiringSkill", "metaBuffMode", "itemPickMode",
-                "enableAllDebuffs", "forceNoRelic", "forceTheoreticalRelic",
+                "enableAllDebuffs",
                 "shieldAbsorbsUnmitigable", "suppressFacePartOffers", "robberyBlocksShops",
                 "challengeScoreTarget", "masterSeed", "rawTierRatio",
                 "learnBotAi", "learnTier",
@@ -542,7 +542,6 @@ namespace AutoTest.ParallelSweep
                 // 2026-11-12 (#118): 挑戦の難易度 (v3_queue の腕が振る値) と、 BOT が読む学習の帯の固定・欠けたら止めるか
                 "challengeCardDifficulty", "botLearningBandOverride", "failOnMissingLearning",
                 // 2026-11-12 (#95 / #20 / #41 / #102 / #108): 腕ごとに切り替える測定の口。 送った値と、 ラン開始時に本体へ入れる値
-                "relicLoadoutSpec", "relicStatOff", "RelicStatOffMaskApplied", "relicSetBonusOff", "RelicSetBonusOffMaskApplied",
                 "enemyArmorPenSpec", "EnemyArmorPenOverrideApplied",
                 "challengeCardPickByAxis",
                 "terminalsLeaveDeck", "randomGrantTerminals",

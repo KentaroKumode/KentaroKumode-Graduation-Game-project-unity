@@ -48,8 +48,9 @@ namespace MetaProgression.Achievements
         public const string NoConsumableBoss5 = "no_consumable_boss_5", NoFleeBoss5 = "no_flee_boss_5", NoPurchaseBoss6 = "no_purchase_boss_6",
             NoRerollBoss6 = "no_reroll_boss_6", NoRelicConsumableClear7 = "no_relic_consumable_clear_7";
         // 遺物と整備パネル
-        public const string FirstRelic = "first_relic", RelicMainMax = "relic_main_max", RelicSubMax = "relic_sub_max",
-            RelicAllMax = "relic_all_max", CursedRelicClear7 = "cursed_relic_clear_7", RelicSetsAll = "relic_sets_all", PanelFull = "panel_full";
+        // 整備盤 (2026-11-23・遺物の 6 つと〈整備完了〉panel_full から差し替え。 持たざる者 no_relic_consumable_clear_7 は id を残して盤の条件に)
+        public const string BoardOpenCenter = "board_open_center", BoardFirstPanel = "board_first_panel", BoardCross = "board_cross",
+            BoardAllOpen = "board_all_open", BoardCoreClear = "board_core_clear", BoardFullClear = "board_full_clear", BoardShopAll = "board_shop_all";
         // 記録とイベント
         public const string Events50 = "events_50", EventsAll = "events_all", Observatory = "observatory", CodexHalf = "codex_half", CodexFull = "codex_full";
         // 遊び
@@ -90,7 +91,7 @@ namespace MetaProgression.Achievements
                 case C.Navigation: return "航行";
                 case C.ShopEconomy: return "店と経済";
                 case C.Restriction: return "縛り";
-                case C.RelicPanel: return "遺物と整備パネル";
+                case C.RelicPanel: return "整備盤";
                 case C.RecordEvent: return "記録とイベント";
                 case C.Play: return "遊び";
                 default: return c.ToString();
@@ -197,16 +198,16 @@ namespace MetaProgression.Achievements
             D(NoFleeBoss5, C.Restriction, 2, "猪突猛進", "一度も逃げずに、3層のボスを倒す"),
             D(NoPurchaseBoss6, C.Restriction, 3, "清貧", "店で品を何も買わずに、3層のボスを倒す"),
             D(NoRerollBoss6, C.Restriction, 3, "運命を受け入れるもの", "戦闘でも店でも振り直さずに、3層のボスを倒す"),
-            D(NoRelicConsumableClear7, C.Restriction, 4, "持たざる者", "遺物を持ち込まず、消耗品も使わずに、3層のボスを倒す"),
+            D(NoRelicConsumableClear7, C.Restriction, 4, "持たざる者", "整備盤にパネルを置かず、消耗品も使わずに、3層のボスを倒す"),
 
             // ── 遺物と整備パネル ──
-            D(FirstRelic, C.RelicPanel, 1, "小さなお守り", "初めて遺物を手に入れる"),
-            D(RelicMainMax, C.RelicPanel, 3, "主役の器", "★4の遺物を手に入れる"),
-            D(RelicSubMax, C.RelicPanel, 3, "極致の一片", "遺物のサブステータスを1つ、最大まで強化する"),
-            D(RelicAllMax, C.RelicPanel, 5, "完全無欠", "★4で、サブステータス3つがすべて最大の遺物を作る"),
-            D(CursedRelicClear7, C.RelicPanel, 3, "揃いの至宝", "同じセットの遺物を3個持ち込んで、3層のボスを倒す"),
-            D(RelicSetsAll, C.RelicPanel, 3, "六つの棚", $"{Relics.RelicCatalog.SetCount}つのセットの遺物を、すべて持つ"),
-            D(PanelFull, C.RelicPanel, 2, "整備完了", $"整備パネルの基礎整備を{MetaPanel.BaseTierCount}段すべて買い、 作戦の枠を3つとも開く"),
+            D(BoardOpenCenter, C.RelicPanel, 1, "火入れ", "整備盤の中心のマスを開く"),
+            D(BoardFirstPanel, C.RelicPanel, 1, "一枚目", "整備盤にパネルを初めて置く"),
+            D(BoardCross, C.RelicPanel, 2, "十字", "整備盤の中心と上下左右の5マスを開く"),
+            D(BoardAllOpen, C.RelicPanel, 3, "全開放", $"整備盤の{MetaBoard.Cells}マスをすべて開く"),
+            D(BoardCoreClear, C.RelicPanel, 2, "主柱", "4マスのパネルを整備盤に置いて、3層のボスを倒す"),
+            D(BoardFullClear, C.RelicPanel, 3, "隙間なし", $"整備盤の{MetaBoard.Cells}マスをすべてパネルで埋めて、3層のボスを倒す"),
+            D(BoardShopAll, C.RelicPanel, 4, "棚の全部", "トークンで買えるパネルを、すべて持つ"),
 
             // ── 記録とイベント ──
             D(Events50, C.RecordEvent, 2, "寄り道の常連", $"イベントを通算{EventsGoal}回終える"),

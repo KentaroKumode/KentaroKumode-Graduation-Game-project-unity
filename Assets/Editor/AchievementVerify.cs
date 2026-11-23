@@ -61,13 +61,13 @@ public static class AchievementVerify
         Require(state.unlockedAchievementIds != null, "unlock ID list not initialized");
         Require(state.achievementUnlockUtcTicks != null, "unlock timestamp list not initialized");
 
-        bool old = MetaBuffApplicator.SuppressRelicGrant;
+        bool old = MetaBuffApplicator.SuppressMetaRewards;
         try
         {
-            MetaBuffApplicator.SuppressRelicGrant = true;
+            MetaBuffApplicator.SuppressMetaRewards = true;
             Require(!AchievementService.Unlock(AchievementCatalog.FirstRun), "AutoRunner suppression failed");
         }
-        finally { MetaBuffApplicator.SuppressRelicGrant = old; }
+        finally { MetaBuffApplicator.SuppressMetaRewards = old; }
 
         Debug.Log($"[AchievementVerify] PASS: {all.Count} definitions, {AchievementCatalog.Categories.Count} categories, unique IDs, END1-5, wording rules, save defaults, AutoRunner guard");
     }

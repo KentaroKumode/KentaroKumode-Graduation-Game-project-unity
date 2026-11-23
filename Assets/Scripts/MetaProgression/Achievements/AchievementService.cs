@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using CombatSystem;
 using GameLoop;
 using ItemSystem.PassiveSkills;
-using MetaProgression.Relics;
 using UnityEngine;
 using Cat = MetaProgression.Achievements.AchievementCatalog;
 
@@ -21,11 +20,12 @@ namespace MetaProgression.Achievements
     {
         private sealed class RunProgress
         {
-            public bool active, usedConsumable, purchased, rerolled, playerFled, relicEquipped;
+            public bool active, usedConsumable, purchased, rerolled, playerFled, boardUsed;
             public int startMaxHp, damageTaken, combatRequestedHeal, hpOneStreak;
             public int shopPurchases, shopSales, shopRerolls;
             public int difficulty;
-            public bool cursedRelicEquipped;
+            /// <summary>整備盤に 4 マスのパネルを置いている / 9 マスをパネルで埋めている (ランの始め・再開の時の両方で)。</summary>
+            public bool boardCore, boardFull;
             public readonly HashSet<string> escapedEnemyIds = new HashSet<string>();
             // ── 層ごと (層に入るたびに 0・素通り / 忍び足) ──
             /// <summary>この層で、 ボスのほかに始めた戦闘の数 (追跡者・使い魔・イベント・値下げ交渉の戦闘も数える)。</summary>
@@ -42,10 +42,10 @@ namespace MetaProgression.Achievements
         private static RunProgress run;
         /// <summary>解除した時に鳴る (画面のお知らせ用)。 BOT が動かしている間は解除しないので鳴らない。</summary>
         public static event Action<AchievementDefinition> OnUnlocked;
-        /// <summary>解除しない間: 遺物の付与を止めた測定 (<see cref="MetaBuffApplicator.SuppressRelicGrant"/>) と、 BOT がランを動かしている間 (<see cref="GameHooks.BotDriving"/>・2026-11-17)。
+        /// <summary>解除しない間: 遺物の付与を止めた測定 (<see cref="MetaBuffApplicator.SuppressMetaRewards"/>) と、 BOT がランを動かしている間 (<see cref="GameHooks.BotDriving"/>・2026-11-17)。
         /// 記録 (codex・<c>CodexRecorder</c>) と同じく、 実績は人が遊んだ時だけ解除する。 2026-11-17 まではふつうのバッチでも解除し、 <see cref="OnUnlocked"/> も鳴っていた。
         /// <b>Note* を足す時は必ず <see cref="Ready"/> か Suppressed を通す。</b></summary>
-        private static bool Suppressed => MetaBuffApplicator.SuppressRelicGrant || GameHooks.BotDriving;
+        private static bool Suppressed => MetaBuffApplicator.SuppressMetaRewards || GameHooks.BotDriving;
 
         private static bool Ready => !Suppressed && run != null && run.active;
 
@@ -141,18 +141,25 @@ namespace MetaProgression.Achievements
                 startMaxHp = Math.Max(1, state.playerMaxHP),
                 difficulty = state.challengeDifficulty,
             };
-            ReadRelicLoadout(out run.relicEquipped, out run.cursedRelicEquipped);
+            ReadBoard(out run.boardUsed, out run.boardCore, out run.boardFull);
             Unlock(Cat.FirstRun);
         }
 
-        /// <summary>今の持ち込みの遺物: 1 個でも持ち込んでいるか / 同じセットを 3 個持ち込んでいるか。</summary>
-        private static void ReadRelicLoadout(out bool any, out bool fullSet)
+        /// <summary>今の整備盤: パネルを 1 枚でも置いているか / 4 マスのパネルを置いているか / 9 マスをパネルで埋めているか。</summary>
+        private static void ReadBoard(out bool any, out bool core, out bool full)
         {
-            var meta = Meta;
-            var relics = meta != null ? meta.EquippedRelics() : null;
-            any = relics != null && relics.Count > 0;
-            fullSet = false;
-            for (int s = 0; s < RelicCatalog.SetCount; s++) if (RelicApplicator.Has3((RelicSet)s)) fullSet = true;
+            var valid = Meta?.ValidPlacements;
+            any = valid != null && valid.Count > 0;
+            core = false; int cells = 0;
+            if (valid != null)
+                foreach (var p in valid)
+                {
+                    var d = MetaBoard.Get(p.id);
+                    int n = d != null ? d.CellCount : 0;
+                    cells += n;
+                    if (n >= 4) core = true;
+                }
+            full = cells >= MetaBoard.Cells;
         }
 
         public static void NoteFloorEntered(int depth)
@@ -361,8 +368,9 @@ namespace MetaProgression.Achievements
             if (!run.purchased) Unlock(Cat.NoPurchaseBoss6);
             if (!run.rerolled) Unlock(Cat.NoRerollBoss6);
             if (state.coins == 0) Unlock(Cat.ZeroGoldBoss6);
-            if (!run.relicEquipped && !run.usedConsumable) Unlock(Cat.NoRelicConsumableClear7);
-            if (run.cursedRelicEquipped) Unlock(Cat.CursedRelicClear7);
+            if (!run.boardUsed && !run.usedConsumable) Unlock(Cat.NoRelicConsumableClear7);
+            if (run.boardCore) Unlock(Cat.BoardCoreClear);
+            if (run.boardFull) Unlock(Cat.BoardFullClear);
         }
 
         /// <summary>七つの重荷 (隠し): ヴェスカを倒した時に背負っている「大罪:○○」の種類を通算で数え、 7 種そろったら解除。
@@ -558,12 +566,14 @@ namespace MetaProgression.Achievements
         public static void NoteBoardChanged(MetaProgressState s)
         {
             if (Suppressed || s == null) return;
-        }
-
-        public static void NotePanelAssigned(MetaProgressState s)
-        {
-            if (Suppressed || s == null) return;
-            if (s.baseTier >= MetaPanel.BaseTierCount && s.slotsOpen >= MetaPanel.SlotOpenCost.Length) Unlock(Cat.PanelFull);
+            int m = s.boardOpenMask;
+            if ((m & 1 << MetaBoard.Center) != 0) Unlock(Cat.BoardOpenCenter);
+            if ((m & 1 << MetaBoard.Center) != 0 && MetaBoard.CountOpen(m, MetaBoard.EdgeCells) == MetaBoard.EdgeCells.Length) Unlock(Cat.BoardCross);
+            if (MetaBoard.OpenCount(m) == MetaBoard.Cells) Unlock(Cat.BoardAllOpen);
+            if (s.ValidPlacements.Count > 0) Unlock(Cat.BoardFirstPanel);
+            bool all = true;
+            foreach (var d in MetaBoard.All) if (!d.FromAchievement && !s.OwnsPanel(d.id)) { all = false; break; }
+            if (all) Unlock(Cat.BoardShopAll);
         }
 
         // ============================================================
@@ -612,36 +622,6 @@ namespace MetaProgression.Achievements
         }
 
         // ============================================================
-        //  遺物 (ランの外)
-        // ============================================================
-
-        /// <summary>遺物を入手した・強化した時に呼ぶ (§15-5・2026-11-10)。 主ステ最大 = ★4 / サブ最大 = どれかのサブが 2 段 / 全部最大 = ★4・サブ 3 個がすべて 2 段。</summary>
-        public static void NoteRelicAcquired(Relic relic)
-        {
-            if (Suppressed || relic == null || !relic.IsValid()) return;
-            Unlock(Cat.FirstRelic);
-            bool mainMax = relic.stars >= RelicCatalog.MaxStars;
-            bool subMax = false, allMax = mainMax && relic.SubCount >= RelicCatalog.MaxSubs;
-            for (int i = 0; i < relic.SubCount; i++)
-            {
-                if (relic.subSteps[i] >= RelicCatalog.SubStepMax) subMax = true;
-                else allMax = false;
-            }
-            if (mainMax) Unlock(Cat.RelicMainMax);
-            if (subMax) Unlock(Cat.RelicSubMax);
-            if (allMax) Unlock(Cat.RelicAllMax);
-
-            // 六つの棚: 持っている遺物のセットが全部そろった
-            var owned = Meta?.ownedRelics;
-            if (owned != null)
-            {
-                int mask = 0;
-                foreach (var r in owned) if (r != null && r.IsValid() && r.set >= 0 && r.set < RelicCatalog.SetCount) mask |= 1 << r.set;
-                if (mask == (1 << RelicCatalog.SetCount) - 1) Unlock(Cat.RelicSetsAll);
-            }
-        }
-
-        // ============================================================
         //  ランの終わり
         // ============================================================
 
@@ -665,7 +645,7 @@ namespace MetaProgression.Achievements
         public sealed class RunProgressState
         {
             public bool present;
-            public bool active, usedConsumable, purchased, rerolled, playerFled, relicEquipped, cursedRelicEquipped;
+            public bool active, usedConsumable, purchased, rerolled, playerFled, boardUsed, boardCore, boardFull;
             public int startMaxHp, damageTaken, combatRequestedHeal, hpOneStreak, shopPurchases, shopSales, shopRerolls, difficulty;
             public List<string> escapedEnemyIds = new List<string>();
             public int floorFights, combatMaxEscStage;
@@ -678,7 +658,7 @@ namespace MetaProgression.Achievements
             if (run == null) return s;
             s.present = true;
             s.active = run.active; s.usedConsumable = run.usedConsumable; s.purchased = run.purchased; s.rerolled = run.rerolled;
-            s.playerFled = run.playerFled; s.relicEquipped = run.relicEquipped; s.cursedRelicEquipped = run.cursedRelicEquipped;
+            s.playerFled = run.playerFled; s.boardUsed = run.boardUsed; s.boardCore = run.boardCore; s.boardFull = run.boardFull;
             s.startMaxHp = run.startMaxHp; s.damageTaken = run.damageTaken; s.combatRequestedHeal = run.combatRequestedHeal;
             s.hpOneStreak = run.hpOneStreak; s.shopPurchases = run.shopPurchases; s.shopSales = run.shopSales;
             s.shopRerolls = run.shopRerolls; s.difficulty = run.difficulty;
@@ -695,18 +675,19 @@ namespace MetaProgression.Achievements
             run = new RunProgress
             {
                 active = s.active, usedConsumable = s.usedConsumable, purchased = s.purchased, rerolled = s.rerolled,
-                playerFled = s.playerFled, relicEquipped = s.relicEquipped, cursedRelicEquipped = s.cursedRelicEquipped,
+                playerFled = s.playerFled, boardUsed = s.boardUsed, boardCore = s.boardCore, boardFull = s.boardFull,
                 startMaxHp = s.startMaxHp, damageTaken = s.damageTaken, combatRequestedHeal = s.combatRequestedHeal,
                 hpOneStreak = s.hpOneStreak, shopPurchases = s.shopPurchases, shopSales = s.shopSales,
                 shopRerolls = s.shopRerolls, difficulty = s.difficulty,
                 floorFights = s.floorFights, floorFound = s.floorFound, combatMaxEscStage = s.combatMaxEscStage, combatBerserk = s.combatBerserk,
             };
             if (s.escapedEnemyIds != null) foreach (var id in s.escapedEnemyIds) run.escapedEnemyIds.Add(id);
-            // 持ち込みの遺物は再開の時に読み直す (中断の間に整備パネルで持ち込むと、 持たざる者を見逃していた・2026-11-17)。
-            //   持たざる者: どちらかの時点で 1 個でも持ち込んだら外れる。 揃いの至宝: 両方の時点で 3 個揃っている時だけ。
-            ReadRelicLoadout(out bool anyNow, out bool fullNow);
-            run.relicEquipped |= anyNow;
-            run.cursedRelicEquipped &= fullNow;
+            // 整備盤は再開の時に読み直す (中断の間に置き直すと、 持たざる者を見逃す・2026-11-17 の遺物と同じ)。
+            //   持たざる者: どちらかの時点で 1 枚でも置いたら外れる。 主柱・隙間なし: 両方の時点で置いている時だけ。
+            ReadBoard(out bool anyNow, out bool coreNow, out bool fullNow);
+            run.boardUsed |= anyNow;
+            run.boardCore &= coreNow;
+            run.boardFull &= fullNow;
         }
     }
 }

@@ -77,6 +77,41 @@ namespace AutoTest.EditorTests
         }
 
         [Test]
+        public void MeasureSpecs_RepresentativeBoardsAllFit()
+        {
+            foreach (var (spec, n, cells) in new[] { ("board:empty", 0, 0), ("board:s3", 2, 3), ("board:s5", 2, 5), ("board:s6", 2, 6), ("board:standard", 3, 9),
+                                                     ("stage:full", 3, 9), ("stage:none", 0, 0), ("spark:poison", 3, 9), ("board:standard,main:Valor", 3, 9),
+                                                     ("open:all,place:core_immovable@0.0r0,place:mod_heavy_frame@1.0r0,place:unit_blk_tune@1.2r1", 3, 9) })
+            {
+                var lo = MetaAllocationPresets.ParseSpec(spec);
+                Assert.That(lo, Is.Not.Null, spec);
+                var s = new MetaProgressState();
+                s.ForceBoard(lo.openMask, lo.placements);
+                Assert.That(s.ValidPlacements.Count, Is.EqualTo(n), spec + " → " + s.DescribeBoard());
+                Assert.That(MetaBoard.OpenCount(s.boardOpenMask), Is.EqualTo(cells), spec);
+            }
+            var v = MetaAllocationPresets.ParseSpec("board:standard,main:Valor");
+            Assert.That(v.placements.Exists(p => p.id == "core_valor"), Is.True);
+            var sp = new MetaProgressState(); var pl = MetaAllocationPresets.ParseSpec("spark:poison"); sp.ForceBoard(pl.openMask, pl.placements);
+            Assert.That(sp.BoardSpark(), Is.EqualTo(MetaModule.SparkPoison));
+        }
+
+        [Test]
+        public void Migration_RefundsOldPanelAndRelics_Idempotent()
+        {
+            // 旧いセーブ: 基礎 2 段・枠 1・モジュール 2 つ (主方針 120 + 補助 80)・遺物 2 個・素材 1
+            var s = UnityEngine.JsonUtility.FromJson<MetaProgressState>(
+                "{\"tokens\":5,\"baseTier\":2,\"slotsOpen\":1,\"unlockedModules\":[0,14],\"ownedRelics\":[{\"slot\":0,\"stars\":2},{\"slot\":1}],\"relicMaterial\":1}");
+            Assert.That(s.ownedRelics.Count, Is.EqualTo(2), "旧い遺物の数は読める");
+            s.MigrateToBoardIfNeeded();
+            Assert.That(s.tokens, Is.EqualTo(5 + 40 + 60 + 50 + 120 + 80 + 2 * MetaProgressState.LegacyRelicRefund + MetaProgressState.LegacyMaterialRefund));
+            int after = s.tokens;
+            s.MigrateToBoardIfNeeded();
+            Assert.That(s.tokens, Is.EqualTo(after), "2 回目は何も返さない");
+            Assert.That(s.baseTier + s.slotsOpen + s.unlockedModules.Count + s.ownedRelics.Count + s.relicMaterial, Is.EqualTo(0));
+        }
+
+        [Test]
         public void Catalog_41Panels_AchievementPanelsPointAtRealAchievements()
         {
             Assert.That(MetaBoard.All.Count, Is.EqualTo(41));

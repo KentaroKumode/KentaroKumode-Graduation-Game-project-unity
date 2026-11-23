@@ -594,9 +594,10 @@ namespace ItemSystem.PassiveSkills
         // ---- 軸の ① 数を参照・②【規則】の品が立てる値 (2026-11-07)。 どれも戦闘開始時に品が書く [persistent] ----
         /// <summary>[persistent] 毒がダメージを出したあとに残る割合 (%)。 基準 50 (半減)。 〈瘴気〉の②で上がる。</summary>
         public int poisonKeepPct = 50;
-        /// <summary>毒が残る割合 ＋ 遺物 (瘴気 3 個 +20%)。 上限 90% (2026-11-10: 〈腐れ沼の苔玉〉の 70% と重ねられるように)。</summary>
-        public int EffectivePoisonKeepPct
-            => System.Math.Min(MetaProgression.Relics.RelicCatalog.PoisonKeepCap, poisonKeepPct + MetaProgression.Relics.RelicApplicator.GetPoisonKeepBonus());
+        /// <summary>毒が残る割合。 上限 90% (2026-11-10: 〈腐れ沼の苔玉〉の 70% と重ねられるように・遺物の上乗せは 2026-11-23 に撤去)。</summary>
+        public int EffectivePoisonKeepPct => System.Math.Min(PoisonKeepCap, poisonKeepPct);
+        /// <summary>毒が残る割合の上限 (%)。</summary>
+        public const int PoisonKeepCap = 90;
         /// <summary>[persistent] 出血の比例減衰の割る数への上乗せ (AxisRules.BleedDecay)。 〈血晶〉の②。</summary>
         public int bleedDecayDivisorBonus;
         /// <summary>[persistent] 爆発の基礎への上乗せ (〈二度詰めの雷管〉が爆発のたびに +6・上限なし・減らない・CombatSystem.HeatCore)。</summary>
@@ -713,13 +714,10 @@ namespace ItemSystem.PassiveSkills
             get => _consShield;
             set
             {
-                // 遺物 (§15-5): シールドの獲得量 +N% (堅牢の符・堅牢 2 個)。 増えた分にだけ掛ける (切り捨て)
                 if (value > _consShield)
                 {
                     int asked = value;
                     if (shieldGainPct > 0) value += (value - _consShield) * shieldGainPct / 100;   // 〈二拍目の心臓〉: この戦闘のシールドの獲得量 ×1.5
-                    float sg = MetaProgression.Relics.RelicApplicator.GetShieldGainPct();
-                    if (sg > 0f) value += (int)((value - _consShield) * sg);
                     // カイロスの傲慢 (挑戦カード IV): シールドの獲得 −N% (四捨五入・デバフの丸め)
                     float prideCut = MetaProgression.MetaDebuffApplicator.GetSinShieldCutPct();
                     if (prideCut > 0f)
@@ -1057,25 +1055,6 @@ namespace ItemSystem.PassiveSkills
             criticalMultiplier = MetaProgression.MetaBuffApplicator.GetCriticalMultiplier()
                                  + MetaProgression.MetaBuffApplicator.GetCritDamageBonus();
 
-            // 遺物 (§15-5): 会心率 / 会心倍率。 リセット直後に載せる。
-            // 会心率は加算した分がそのまま乗る (逓減は 2026-09-15 に撤去・ResolveCritRate 参照)。
-            {
-                var relicRun = GameLoop.GameManager.Instance?.Run;
-                float dsRcr = MetaProgression.Relics.RelicApplicator.GetCritRatePct(relicRun, this);
-                float dsRcm = MetaProgression.Relics.RelicApplicator.GetCritMultBonus(relicRun, this);
-                critRatePctAdd     += dsRcr;
-                criticalMultiplier += dsRcm;
-                if (dsRcr > 0f) CombatSystem.DmgSourceDiag.Note("遺物〈会心率〉", CombatSystem.DmgSourceDiag.CritRate, dsRcr);
-                if (dsRcm > 0f) CombatSystem.DmgSourceDiag.Note("遺物〈会心倍率〉", CombatSystem.DmgSourceDiag.CritMul, dsRcm);
-                // 心眼 3 個: 前のターンに会心が出たら、 このターンの会心率 +20% (印は CombatManager が攻撃の後に立てる)
-                if (GetAccumulated(MetaProgression.Relics.RelicApplicator.ShinganCritKey) > 0f)
-                {
-                    accumulatedValues[MetaProgression.Relics.RelicApplicator.ShinganCritKey] = 0f;
-                    if (MetaProgression.Relics.RelicApplicator.HasShingan3)
-                        critRatePctAdd += MetaProgression.Relics.RelicCatalog.Shingan3NextCritPct * 0.01f;
-                }
-            }
-
             // パッシブが毎ターン再 set する値 (OnTurnStart / OnPostRoll で再評価される前提)
             outgoingDamageMultiplier = 1f;
             lifestealPct = 0f;
@@ -1086,12 +1065,6 @@ namespace ItemSystem.PassiveSkills
             playerArmorPen = playerArmorPenBase;
             enemyArmorPenNegate = 0;
 
-            // 遺物 (§15-5) 吸血。 吸命の牙などと同じ枠へ additive (主攻撃のダメージにだけ掛かる)。
-            lifestealPct += MetaProgression.Relics.RelicApplicator.GetLifestealPct();
-
-            // 遺物 (§15-5) 防御貫通 +N。 リセット直後に載せる。 余った貫通は何にもならない (無装甲の敵には 0)。
-            playerArmorPen += MetaProgression.Relics.RelicApplicator
-                              .GetArmorPen(GameLoop.GameManager.Instance?.Run, this);
             winMinDamage = 1;
             healBlocked = false;            // 狂暴化系
             enemyDamageTakenMultiplier = 1f;
@@ -1141,10 +1114,7 @@ namespace ItemSystem.PassiveSkills
             if (currentTurn > 1 && _consShield > 0 && !keepForDown && !keepForHeart)
             {
                 // 残る割合 50% + 上乗せ (〈油染みの盾革〉+20・最大 80%)
-                // 遺物 (§15-5) 堅牢 3 個: +25%。 遺物の分だけは上限 90% まで (それ以外の上乗せは 80% のまま)
-                int relicKeep = MetaProgression.Relics.RelicApplicator.GetShieldKeepBonus();
                 int keepPct = System.Math.Min(80, 50 + shieldKeepBonusPct + MetaProgression.MetaBuffApplicator.GetShieldKeepBonusPct());
-                if (relicKeep > 0) keepPct = System.Math.Min(90, keepPct + relicKeep);
                 int lost = _consShield - _consShield * keepPct / 100;
                 _consShield -= lost;
                 Keywords.Kw.Raise(this, PassiveSkillTrigger.OnShieldDecay, lost);

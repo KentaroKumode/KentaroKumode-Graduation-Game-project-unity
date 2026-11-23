@@ -5,10 +5,13 @@ namespace MetaProgression
     /// <summary>
     /// プレイヤーのメタ進行状態。PlayerPrefs に JSON で保存される。
     ///
-    /// 整備パネル (docs/GAME.md §15-1・2026-11-20 刷新): 基礎整備の段・開いた枠・解禁したモジュール・挿しているモジュールを持つ。
-    /// 効果の数値は持たない (MetaBuffApplicator が MetaPanel の値から都度出す)。
-    /// 旧いセーブ: 58 段トラック (currentLevel) と 24 点の配点式 (panelPointsPurchased) は、 払ったトークンを全額返す。
+    /// 整備盤 (docs/GAME.md §15-1・2026-11-23): 開いたマス・持っているパネル・置き方を持つ。 効果の数値は持たない (パネルの定義 MetaBoard から都度出す)。
+    /// 旧いセーブ: 58 段トラック (currentLevel)・24 点の配点式 (panelPointsPurchased)・基礎整備と作戦の枠 (baseTier ほか) は払ったトークンを全額返し、 遺物と素材はトークンに換える。
     /// </summary>
+    /// <summary>[旧] 遺物 1 個 (2026-11-23 に撤去)。 旧いセーブの ownedRelics の数を数えるためだけの空の型 (JsonUtility は知らない欄を捨てる)。</summary>
+    [System.Serializable]
+    public class LegacyRelicStub { }
+
     [System.Serializable]
     public class MetaProgressState
     {
@@ -90,99 +93,11 @@ namespace MetaProgression
         [System.Obsolete("GameLoop.ObservatoryState を使うこと")]
         public int observatoryMeetings;
 
-        /// <summary>所持している遺物 (§15-5・2026-11-10 再編)。 旧仕様の `relics` / `equippedRelicIndex` は捨てた (JsonUtility は未知の欄を黙って無視する)。
-        /// 所持の上限は無い。 JsonUtility は Dictionary 非対応だが List&lt;[Serializable]&gt; は通る。</summary>
-        public List<Relics.Relic> ownedRelics = new List<Relics.Relic>();
-
-        /// <summary>部位ごとに持ち込む遺物の index (冠 / 環 / 符)。 -1 = 空き。 持ち込みはコストなし。</summary>
-        public int[] equippedRelics = { -1, -1, -1 };
-
-        /// <summary>強化素材 (遺物 1 個の分解 = 1)。 強化 1 段に 1 使う。</summary>
+        // === 旧い遺物 (§15-5・2026-11-23 に撤去)。 旧いセーブを読んで返金するためだけに残す (移行で消す) ===
+        /// <summary>[旧] 持っていた遺物。 中身は読まない (数だけ・1 個 <see cref="LegacyRelicRefund"/> トークン)。</summary>
+        public List<LegacyRelicStub> ownedRelics = new List<LegacyRelicStub>();
+        /// <summary>[旧] 遺物の強化素材 (1 個 <see cref="LegacyMaterialRefund"/> トークン)。</summary>
         public int relicMaterial;
-
-        /// <summary>指名したセット (-1 = 指名なし)。 ランの終わりに落ちる遺物の半分がこのセットになる。</summary>
-        public int relicTargetSet = -1;
-
-        private void EnsureRelicSlots()
-        {
-            if (ownedRelics == null) ownedRelics = new List<Relics.Relic>();
-            if (equippedRelics == null || equippedRelics.Length != Relics.RelicCatalog.SlotCount) equippedRelics = new[] { -1, -1, -1 };
-        }
-
-        /// <summary>部位に持ち込んでいる遺物。 空き・破損・部位違いなら null。</summary>
-        public Relics.Relic EquippedRelicAt(Relics.RelicSlot slot)
-        {
-            EnsureRelicSlots();
-            int i = equippedRelics[(int)slot];
-            if (i < 0 || i >= ownedRelics.Count) return null;
-            var r = ownedRelics[i];
-            return r != null && r.IsValid() && r.Slot == slot ? r : null;
-        }
-
-        /// <summary>持ち込んでいる遺物 (0〜3 個)。</summary>
-        public List<Relics.Relic> EquippedRelics()
-        {
-            var list = new List<Relics.Relic>(3);
-            for (int k = 0; k < Relics.RelicCatalog.SlotCount; k++) { var r = EquippedRelicAt((Relics.RelicSlot)k); if (r != null) list.Add(r); }
-            return list;
-        }
-
-        /// <summary>遺物を 1 個追加する。 その部位が空いていれば持ち込みにも入れる。</summary>
-        public void AddRelic(Relics.Relic relic)
-        {
-            if (relic == null || !relic.IsValid()) return;
-            EnsureRelicSlots();
-            ownedRelics.Add(relic);
-            if (EquippedRelicAt(relic.Slot) == null) equippedRelics[relic.slot] = ownedRelics.Count - 1;
-        }
-
-        /// <summary>持ち込みを切り替える (同じ遺物を押すと外す)。</summary>
-        public void ToggleEquip(int index)
-        {
-            EnsureRelicSlots();
-            if (index < 0 || index >= ownedRelics.Count || ownedRelics[index] == null) return;
-            int s = ownedRelics[index].slot;
-            equippedRelics[s] = equippedRelics[s] == index ? -1 : index;
-        }
-
-        /// <summary>遺物を分解する (素材 +1)。 持ち込みの index をずらす。</summary>
-        public bool DismantleRelic(int index)
-        {
-            EnsureRelicSlots();
-            if (index < 0 || index >= ownedRelics.Count) return false;
-            ownedRelics.RemoveAt(index);
-            relicMaterial++;
-            for (int k = 0; k < equippedRelics.Length; k++)
-            {
-                if (equippedRelics[k] == index) equippedRelics[k] = -1;
-                else if (equippedRelics[k] > index) equippedRelics[k]--;
-            }
-            return true;
-        }
-
-        /// <summary>持ち込んでいない★maxStars 以下の遺物を全部分解する。 分解した数を返す。</summary>
-        public int DismantleUpToStars(int maxStars)
-        {
-            EnsureRelicSlots();
-            int n = 0;
-            for (int i = ownedRelics.Count - 1; i >= 0; i--)
-            {
-                var r = ownedRelics[i];
-                if (r == null || r.stars > maxStars) continue;
-                if (System.Array.IndexOf(equippedRelics, i) >= 0) continue;
-                if (DismantleRelic(i)) n++;
-            }
-            return n;
-        }
-
-        /// <summary>持ち込みを丸ごと差し替える (BOT・測定用)。 所持品も渡した遺物だけにする。</summary>
-        public void SetRelicLoadout(List<Relics.Relic> relics)
-        {
-            ownedRelics = new List<Relics.Relic>();
-            equippedRelics = new[] { -1, -1, -1 };
-            if (relics == null) return;
-            foreach (var r in relics) AddRelic(r);
-        }
 
         // === 整備盤 (2026-11-23・docs/GAME.md §15-1・MetaBoard) ===
         /// <summary>開いたマス (bit = マスの index 0〜8・4 = 中心)。</summary>
@@ -269,17 +184,13 @@ namespace MetaProgression
         /// <summary>旧 currentLevel。> 0 なら未マイグレーション状態 → Migrate() でトークン返却して 0 化。</summary>
         public int currentLevel;
 
-        // === 整備パネル (2026-11-20 刷新・docs/GAME.md §15-1): 基礎整備 + 作戦の枠 ===
-        /// <summary>買った基礎整備の段 (0..<see cref="MetaPanel.BaseTierCount"/>)。 順に買う。</summary>
+        // === 旧い整備パネル (基礎整備 6 段 + 作戦の枠 3 つ・2026-11-20〜11-23)。 旧いセーブを読んで返金するためだけに残す (移行で消す) ===
+        /// <summary>[旧] 買った基礎整備の段。</summary>
         public int baseTier;
-        /// <summary>「基礎整備を切る」(縛り)。 立っている間は基礎整備の段の効果が 0 (買った段は残る)。</summary>
-        public bool baseDisabled;
-        /// <summary>開いた作戦の枠の数 (0..3)。 開く順は <see cref="MetaSlot"/> の並び。</summary>
+        /// <summary>[旧] 開いた作戦の枠の数。</summary>
         public int slotsOpen;
-        /// <summary>解禁したモジュール (<see cref="MetaModule"/> の int)。</summary>
+        /// <summary>[旧] 解禁したモジュール (<see cref="MetaModule"/> の int)。</summary>
         public List<int> unlockedModules = new List<int>();
-        /// <summary>枠ごとに挿しているモジュール (index = <see cref="MetaSlot"/>・-1 = 空き)。</summary>
-        public int[] equippedModules = { -1, -1, -1 };
 
         // === 旧い整備パネル (24 点の配点式・2026-11-20 撤去)。 旧いセーブを読んで返金するためだけに残す ===
         /// <summary>[旧] 買った点の数。 > 0 なら <see cref="MigrateFromPointPanelIfNeeded"/> が全額返して 0 にする。</summary>
@@ -292,76 +203,14 @@ namespace MetaProgression
             EnsurePanelInitialized();
         }
 
-        /// <summary>整備パネルの欄を必要に応じて初期化・丸める (JsonUtility 復元後の欠損・範囲外の値の対応も兼ねる)。 冪等。</summary>
+        /// <summary>整備盤の欄を必要に応じて初期化する (JsonUtility 復元後の欠損の対応も兼ねる)。 冪等。</summary>
         public void EnsurePanelInitialized()
         {
-            if (unlockedModules == null) unlockedModules = new List<int>();
-            int slots = System.Enum.GetValues(typeof(MetaSlot)).Length;
-            if (equippedModules == null || equippedModules.Length != slots)
-            {
-                var old = equippedModules;
-                equippedModules = new int[slots];
-                for (int i = 0; i < slots; i++) equippedModules[i] = old != null && i < old.Length ? old[i] : -1;
-            }
-            baseTier = UnityEngine.Mathf.Clamp(baseTier, 0, MetaPanel.BaseTierCount);
-            slotsOpen = UnityEngine.Mathf.Clamp(slotsOpen, 0, slots);
-            // 挿してよいのは: 解禁済み・その枠のモジュール。 それ以外 (壊れた値・旧い番号) は外す
-            for (int i = 0; i < slots; i++)
-            {
-                int m = equippedModules[i];
-                if (m < 0) continue;
-                if (!System.Enum.IsDefined(typeof(MetaModule), m) || !unlockedModules.Contains(m) || (int)MetaPanel.SlotOf((MetaModule)m) != i)
-                    equippedModules[i] = -1;
-            }
-        }
-
-        // ============================================================
-        //  パネル API
-        // ============================================================
-
-        public bool IsUnlocked(MetaModule m) => unlockedModules != null && unlockedModules.Contains((int)m);
-
-        public bool IsSlotOpen(MetaSlot slot) => (int)slot < slotsOpen;
-
-        /// <summary>枠に挿しているモジュール (枠が閉じていれば null)。</summary>
-        public MetaModule? Equipped(MetaSlot slot)
-        {
-            // 戦闘中に何度も呼ばれる getter の下なので、 丸め (EnsurePanelInitialized) は通さない (読み込み・書き込みの側で済ませている)
-            if (equippedModules == null || (int)slot >= equippedModules.Length) return null;
-            int m = equippedModules[(int)slot];
-            return IsSlotOpen(slot) && m >= 0 ? (MetaModule)m : (MetaModule?)null;
-        }
-
-        /// <summary>そのモジュールが効いているか (開いた枠に挿している)。</summary>
-        public bool IsActive(MetaModule m) => Equipped(MetaPanel.SlotOf(m)) == m;
-
-        /// <summary>効いている基礎整備の段 (「基礎整備を切る」の間は 0)。</summary>
-        public int EffectiveBaseTier => baseDisabled ? 0 : UnityEngine.Mathf.Clamp(baseTier, 0, MetaPanel.BaseTierCount);
-
-        /// <summary>モジュールを解禁済みにして挿す (測定・移行用・トークンは払わない)。 枠は開いていなくても挿しておく (開いた時に効く)。</summary>
-        public void ForceEquip(MetaModule m)
-        {
-            EnsurePanelInitialized();
-            if (!IsUnlocked(m)) unlockedModules.Add((int)m);
-            equippedModules[(int)MetaPanel.SlotOf(m)] = (int)m;
-        }
-
-        /// <summary>枠の中身を外す。</summary>
-        public void Unequip(MetaSlot slot) { EnsurePanelInitialized(); equippedModules[(int)slot] = -1; }
-
-        /// <summary>今の作戦の構成の短い文 (ログ・実効状態・セーブの指紋)。 例 "基礎3/6 枠2 主方針=LastStand 補助=AttackTune 種火=-"。</summary>
-        public string DescribePanel()
-        {
-            EnsurePanelInitialized();
-            var sb = new System.Text.StringBuilder();
-            sb.Append("基礎").Append(baseTier).Append('/').Append(MetaPanel.BaseTierCount).Append(baseDisabled ? "(切)" : "").Append(" 枠").Append(slotsOpen);
-            foreach (MetaSlot sl in System.Enum.GetValues(typeof(MetaSlot)))
-            {
-                int m = equippedModules[(int)sl];
-                sb.Append(' ').Append(sl).Append('=').Append(m >= 0 ? ((MetaModule)m).ToString() : "-");
-                if (m >= 0 && !IsSlotOpen(sl)) sb.Append("(閉)");
-            }
-            return sb.ToString();
+            if (ownedPanels == null) ownedPanels = new List<string>();
+            if (boardPlacements == null) boardPlacements = new List<BoardPlacement>();
+            ownedPanels.RemoveAll(id => MetaBoard.Get(id) == null);      // 名前の変わった・消えたパネル
+            boardOpenMask &= (1 << MetaBoard.Cells) - 1;
+            BoardChanged();
         }
 
         // ============================================================
@@ -400,5 +249,34 @@ namespace MetaProgression
 
         /// <summary>旧い整備パネルの n 個目の点のトークン (旧 MetaPanel.PointCost = 8 × n)。 返金の計算にだけ使う。</summary>
         private static int LegacyPointCost(int n) => 8 * n;
+
+        // ---- 旧い整備パネル (基礎整備 + 作戦の枠) と遺物 → 整備盤 (2026-11-23) ----
+
+        /// <summary>[旧] 基礎整備の n 段目 (1 起点) のトークン。 返金の計算にだけ使う。</summary>
+        private static readonly int[] LegacyBaseTierCost = { 40, 60, 120, 160, 240, 320 };
+        /// <summary>[旧] 作戦の n 枠目のトークン。</summary>
+        private static readonly int[] LegacySlotOpenCost = { 50, 150, 300 };
+        /// <summary>[旧] モジュールの解禁 (主方針 120・補助と種火 80)。</summary>
+        private static int LegacyModuleCost(int m)
+            => System.Enum.IsDefined(typeof(MetaModule), m) && MetaPanel.SlotOf((MetaModule)m) == MetaSlot.Main ? 120 : 80;
+        /// <summary>旧い遺物 1 個 / 強化素材 1 個の換算 (作者の決定)。</summary>
+        public const int LegacyRelicRefund = 10, LegacyMaterialRefund = 5;
+
+        /// <summary>旧い整備パネル (基礎整備・作戦の枠・モジュール) に払ったトークンを全額返し、 遺物を 1 個 10・素材を 1 個 5 トークンに換えて、 旧い欄を消す。
+        /// 冪等 (返したら欄が 0 になる)。 呼び出しは Manager.Load 直後。</summary>
+        public void MigrateToBoardIfNeeded()
+        {
+            int refund = 0;
+            for (int n = 0; n < UnityEngine.Mathf.Clamp(baseTier, 0, LegacyBaseTierCost.Length); n++) refund += LegacyBaseTierCost[n];
+            for (int n = 0; n < UnityEngine.Mathf.Clamp(slotsOpen, 0, LegacySlotOpenCost.Length); n++) refund += LegacySlotOpenCost[n];
+            if (unlockedModules != null) foreach (int m in unlockedModules) refund += LegacyModuleCost(m);
+            int relics = ownedRelics?.Count ?? 0;
+            refund += relics * LegacyRelicRefund + System.Math.Max(0, relicMaterial) * LegacyMaterialRefund;
+            if (refund > 0)
+                UnityEngine.Debug.Log($"[MetaMigrate] 整備盤へ移行: 基礎{baseTier}段・枠{slotsOpen}・モジュール{unlockedModules?.Count ?? 0}・遺物{relics}個・素材{relicMaterial} → {refund} トークンを返却");
+            tokens += refund;
+            baseTier = 0; slotsOpen = 0; unlockedModules = new List<int>();
+            ownedRelics = new List<LegacyRelicStub>(); relicMaterial = 0;
+        }
     }
 }

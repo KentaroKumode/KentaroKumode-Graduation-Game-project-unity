@@ -243,16 +243,6 @@ namespace CombatSystem
         /// </summary>
         /// <param name="amount">回復量</param>
         /// <returns>実際に回復した量</returns>
-        /// <summary>遺物 (§15-5) 血晶の環〈血贄〉: 出血が与えたダメージの N% を回復 (切り捨て)。 敵味方問わず ── 今はプレイヤーに出血が無いので敵の出血だけ。</summary>
-        private void RelicBloodOffering(int bleedDealt)
-        {
-            if (bleedDealt <= 0) return;
-            float p = MetaProgression.Relics.RelicApplicator.GetBloodOfferingPct();
-            if (p <= 0f) return;
-            int heal = (int)(bleedDealt * p);
-            if (heal > 0) HealPlayer(heal);
-        }
-
         /// <summary>全部の戦闘の敵に〈狂暴化〉(<see cref="Berserk"/>) を足す (既に持っていれば何もしない・2026-11-21〜 ボス以外にも ── あらゆる膠着の最後の受け皿)。
         /// 戦闘の開始 (StartCombat) と、 ヴェスカの段の差し替え (SwapEnemy) の 2 か所が呼ぶ。
         /// 説明文は Berserk の定数から組む (<see cref="Berserk.Description"/>) ── 51 ターン目から、 この敵の攻撃 +10 (以後 5 ターンごとに +10・enemyDiceTotalBonus) ・
@@ -684,8 +674,7 @@ namespace CombatSystem
             {
                 ctx.enemyDefense = Math.Max(0, enemy.defense);
                 ctx.enemyArmorPen = GameLoop.GameHooks.EnemyArmorPen(enemy.id, enemy.armorPen);   // [測定] 差し替えの口 (既定 null = データの値)
-                ctx.playerDefenseBase = DefenseFormula.PlayerBaseDefense + _weaponDefense + MetaProgression.MetaBuffApplicator.GetArmorDefense()
-                                      + MetaProgression.Relics.RelicApplicator.GetDefense();   // 遺物 (§15-5) 防御 +N
+                ctx.playerDefenseBase = DefenseFormula.PlayerBaseDefense + _weaponDefense + MetaProgression.MetaBuffApplicator.GetArmorDefense();
                 ctx.playerArmorPenBase = _weaponArmorPen;
                 ctx.playerDefense = ctx.playerDefenseBase;
                 ctx.playerArmorPen = ctx.playerArmorPenBase;
@@ -727,8 +716,7 @@ namespace CombatSystem
                 var relicRun = GameLoop.GameManager.Instance?.Run;
                 // 整備パネル分は 2026-08-15 に割合軽減へ移したのでここには居ない
                 // (GetGuardDamageReductionPct)。 アイテム副次ステータスは 2026-09-15 に全廃。
-                // 残るのは遺物 (§15-5) だけ。
-                // 遺物の開幕シールドは 2026-11-10 の再編で撤去 (毎戦闘タダで配られ、 シールドバッシュで火力に化ける・§15-5)
+                // 遺物 (§15-5) は 2026-11-23 に撤去 (開幕シールドは 2026-11-10 に撤去済み)。
                 int openingShield = 0;   // (整備パネル〈装甲〉の開幕シールドは刻み 0 のまま 2026-11-20 に〈装甲〉ごと撤去)
                 // 〈剛胆〉: 前戦闘の残りシールドを持ち越す。 使い切ったら 0。
                 if (relicRun != null && relicRun.carriedShield > 0)
@@ -741,30 +729,11 @@ namespace CombatSystem
                 {
                     int gained = openingShield;
                     ctx.consShield += gained;
-                    ShieldDiag.Note("遺物・防御r10持ち越し", gained);
+                    ShieldDiag.Note("剛胆の持ち越し", gained);
                     ctx.shieldGainedTotal += gained;
                     // 開幕シールドは戦闘中持続
                     if (ctx.consShieldExpireTurn == 0) ctx.consShieldExpireTurn = -1;
-                    if (Debug.unityLogger.logEnabled) Debug.Log($"[MetaBuff] 開幕シールド +{gained} (遺物+持ち越し)");
-                }
-
-                // 遺物 (§15-5): 開幕の充電・出血・毒。 いずれも戦闘開始時に 1 回だけ。
-                // **出血は短期戦専用**(N ターンで枯れる)、**毒は減衰しないので長期戦向き**という対。
-                int rc = MetaProgression.Relics.RelicApplicator.GetOpeningCharge(relicRun);
-                if (rc > 0) { ctx.AddCharge(rc); Debug.Log($"[遺物] 開幕充電 +{rc}"); }
-
-                int rb = MetaProgression.Relics.RelicApplicator.GetOpeningBleed(relicRun);
-                if (rb > 0) { ctx.AddEnemyBleed(rb); Debug.Log($"[遺物] 開幕出血 +{rb}"); }
-
-                // 遺物 (§15-5) 敵の段階の遅れ (瘴気の環)。 役〈時間〉と同じ遅延の枠へ
-                int rdelay = MetaProgression.Relics.RelicApplicator.GetEscalationDelay();
-                if (rdelay > 0) { YachtRoleEffects.AddEscalationDelay(ctx, rdelay); Debug.Log($"[遺物] 敵の段階の遅れ +{rdelay}T"); }
-
-                int rp = MetaProgression.Relics.RelicApplicator.GetOpeningPoison(relicRun);
-                if (rp > 0)
-                {
-                    ctx.AddStatus(ItemSystem.PassiveSkills.StatusTarget.Enemy, "poison", rp);
-                    if (Debug.unityLogger.logEnabled) Debug.Log($"[遺物] 開幕毒 +{rp}");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[MetaBuff] 開幕シールド +{gained} (持ち越し)");
                 }
             }
             // 2026-07-25 v6: 種火 (充電/臨界/毒/出血) の r2 効果 - 戦闘開始時に適用

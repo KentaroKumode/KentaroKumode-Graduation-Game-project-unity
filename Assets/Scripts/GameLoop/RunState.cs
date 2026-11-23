@@ -629,10 +629,9 @@ namespace GameLoop
         /// 各所に足すのではなく choke point へ寄せる。 二重呼び出しは isRunActive で弾く。</summary>
         public void EndRun()
         {
-            if (!isRunActive) return;   // 二重終了で遺物が 2 個出るのを防ぐ
+            if (!isRunActive) return;   // 二重終了を防ぐ
             isRunActive = false;
             CombatSystem.TerminalDiag.NoteRunEnd(terminalDeck);   // [計装 #106] ランの終わりの山札
-            MetaProgression.MetaBuffApplicator.GrantRelicOnRunEnd(currentFloor, bossDefeatedThisFloor);
         }
     }
 }

@@ -372,8 +372,6 @@ namespace AutoTest.EditorTools
             Add("wiringSkill", WiringSkillPref().ToString(CultureInfo.InvariantCulture));
             Add("shieldAbsorbsUnmitigable",
                 (!EditorPrefs.GetBool(ShieldChipKey, false)).ToString());
-            Add("forceNoRelic", EditorPrefs.GetBool(NoRelicKey, false).ToString());
-            Add("forceTheoreticalRelic", EditorPrefs.GetBool(TheoRelicKey, false).ToString());
             Add("lockWeaponFamily", EditorPrefs.GetBool(LockFamKey, false).ToString());
             Add("useIttBeta", EditorPrefs.GetBool(IttKey, false).ToString());
             Add("challengeScoreTarget",

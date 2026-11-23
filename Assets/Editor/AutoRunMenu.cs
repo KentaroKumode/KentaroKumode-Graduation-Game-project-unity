@@ -1140,13 +1140,6 @@ namespace AutoTest.EditorTools
             Launch(1);
         }
 
-        [MenuItem("Tools/AutoRun/遺物プリセットスイープ (各300ラン)", priority = 12)]
-        public static void RunRelicPresetSweep()
-        {
-            SessionState.SetBool(RelicSweepKey, true);
-            Launch(1);
-        }
-
         /// <summary><b>ランダム付与試行 (2026-09-08)。</b> 1 ランに複数品をランダムに配り、
         /// <b>割り当てベクトルだけ</b>で回帰する ── 交絡の無い全品同時測定。
         ///
@@ -1861,16 +1854,6 @@ namespace AutoTest.EditorTools
             Launch(1);
         }
 
-        /// <summary>全 16 軸を「その軸 1 本だけ・段9」の遺物で個別に回す。
-        /// プリセットスイープが「遺物の総量」を測るのに対し、 こちらは **軸間の強弱**を測る。
-        /// 単位 (期待与ダメ 6% = 攻撃+1) に揃っているかの検算用。</summary>
-        [MenuItem("Tools/AutoRun/遺物 単軸スイープ (全16軸 × 各300ラン)", priority = 12)]
-        public static void RunRelicAxisSweep()
-        {
-            SessionState.SetBool(AxisSweepKey, true);
-            Launch(1);
-        }
-
         /// <summary>バランス基準値の測定。 **遺物なし・挑戦0pt が正式な調整基準** (2026-08-04)。
         /// 遺物は周回引継ぎなので初回プレイヤーは 0 個。 目標は 7 層クリア 2 割強。</summary>
         [MenuItem("Tools/AutoRun/基準値測定 (遺物なし・0pt・500ラン)", priority = 14)]
@@ -2043,8 +2026,6 @@ namespace AutoTest.EditorTools
             // ⑤ 対照群: EditorPrefs が立っているときだけ「肩代わりしない」で走らせる
             runner.shieldAbsorbsUnmitigable = !EditorPrefs.GetBool(ShieldChipKey, false);
             // 遺物なし強制 (⑥)。 既定 OFF ＝ 従来どおり「触らない」。
-            runner.forceNoRelic = EditorPrefs.GetBool(NoRelicKey, false);
-            runner.forceTheoreticalRelic = EditorPrefs.GetBool(TheoRelicKey, false);
             runner.lockWeaponFamily = EditorPrefs.GetBool(LockFamKey, false);
             runner.useIttBeta = EditorPrefs.GetBool(IttKey, false);
             runner.challengeScoreTarget = EditorPrefs.GetInt(ChalTargetKey, 0);
@@ -2109,9 +2090,6 @@ namespace AutoTest.EditorTools
                 runner.runCount = 0;
             }
             runner.simBoss5Sweep = sweep;
-            runner.relicPresetSweep = relicSweep;
-            runner.relicSweepBaselineOnly = relicBaseline;
-            if (relicBaseline) runner.relicSweepRuns = 500;   // 1 プリセットだけなので厚めに取る
             runner.challengeFixedSweep = chalSweep;
             if (SessionState.GetBool(SkillCmpKey, false))
             {
@@ -2159,7 +2137,6 @@ namespace AutoTest.EditorTools
                 SessionState.EraseString(ChalSweepScoresKey);
                 SessionState.EraseInt(ChalSweepRunsKey);
             }
-            runner.relicAxisSweep = axisSweep;
             // アイテム アブレーション。 **学習は切る** ── 開幕付与した品が
             //   「BOT が選んだ取得」として item_stats に入ると、 累積の学習データが汚れる。
             // **フラグ本体を必ず消す (2026-09-09)。** ここは SessionState なので Editor を
@@ -2281,15 +2258,8 @@ namespace AutoTest.EditorTools
             if (axisSweep)
             {
                 runner.stepsPerYield = 1000; runner.runsPerYield = 25;
-                runner.relicAxisSweepRuns = 500;   // ペア比較なので 300 でも読めるが、不一致ペアを厚く取る
                 // 診断は 2 アームだけなので jsonl を出せる (死因・死亡層・致死敵を追うため)。
                 runner.writeRunsJsonl = axisDiag;
-                runner.relicAxisSweepOnlyAxis =
-                    -1;   // 2026-11-10: 旧遺物の軸は撤去 (単軸スイープも撤去済み)
-                // 2026-08-09: **挑戦 30pt で測る**。 高難易度限定軸 (渇き/刻限/背水) は
-                //   25pt 以上でしか出ないので、 0pt の測定は「出ない軸を出た前提で測る」形だった。
-                //   30pt は RelicBonusCap = 30 ＝ 遺物の見返りが頭打ちになる実用上限でもある。
-                runner.relicAxisSweepChallengeScore = 30;
             }
             runner.autoLoopBatches = loopBatches;
             runner.rawTierRatio = EditorPrefs.GetInt(RatioKey, 50) / 100f;

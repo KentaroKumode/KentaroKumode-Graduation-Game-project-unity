@@ -4,56 +4,65 @@ using MetaProgression;
 namespace AutoTest
 {
     /// <summary>
-    /// 測定で当てる整備パネルの構成 (2026-11-20 刷新・docs/GAME.md §15-1)。 基礎整備の段・開いた枠の数・枠ごとのモジュール。
-    /// <para>枠のモジュール: -2 = 既定で埋める (<see cref="MetaAllocationPresets.DefaultModule"/>)・-1 = 空・0 以上 = <see cref="MetaModule"/>。
-    /// 枠は開いた数の分だけ効く (開く順は <see cref="MetaSlot"/> の並び = 主方針 → 補助 → 種火)。</para>
+    /// 測定で当てる整備盤の構成 (2026-11-23・docs/GAME.md §15-1): 開いたマスと置き方。 パネルは持たせてから置く (トークンは払わない)。
+    /// <para>代表の盤 (<see cref="Board"/>・neon answer24 §3): empty (0/9) / s3 (3/9・攻撃端子調律 I2 + 外装プレート 1×1) / s5 (5/9 十字・ラストスタンド T + 外装プレート) /
+    /// s6 (6/9 角 1・ラストスタンド T + 攻撃端子調律) / standard (9/9 標準の完成盤・ラストスタンド T + 重装フレーム L3 + 攻撃端子調律 I2)。</para>
     /// </summary>
     public sealed class MetaLoadout
     {
-        public const int Default = -2, Empty = -1;
-        public int baseTier;
-        public bool baseDisabled;
-        public int slots;
-        public int[] modules = { Default, Default, Default };
+        public const int AllOpen = (1 << MetaBoard.Cells) - 1;
+        public int openMask;
+        public List<BoardPlacement> placements = new List<BoardPlacement>();
 
-        /// <summary>3 段階 (system-overhaul-spec §1-3 の検証ゲート): none = 未解禁 (基礎 0・枠 0) / mid = 途中 (基礎 3・枠 2) / full = 完成 (基礎 6・枠 3)。</summary>
-        public static MetaLoadout Stage(string name)
+        private static int Mask(params int[] cells) { int m = 0; foreach (int c in cells) m |= 1 << c; return m; }
+
+        // 置き方 (row, col, rot は MetaBoard.Rotated の時計回りの回数)
+        private static BoardPlacement P(string id, int row, int col, int rot) => new BoardPlacement(id, rot, row, col);
+        private const string CoreLastStand = "core_last_stand", HeavyFrame = "mod_heavy_frame", AtkTune = "unit_atk_tune", ChipHp = "chip_hp", Caravan = "mod_caravan";
+
+        /// <summary>代表の盤。 知らない名前なら null。 full は standard と同じ。</summary>
+        public static MetaLoadout Board(string name)
         {
             switch ((name ?? "").Trim().ToLowerInvariant())
             {
-                case "none": return new MetaLoadout();
-                case "mid":  return new MetaLoadout { baseTier = 3, slots = 2 };
-                case "full": return new MetaLoadout { baseTier = MetaPanel.BaseTierCount, slots = 3 };
+                case "empty": case "none": return new MetaLoadout();
+                case "s3":       // 中心 + 上 + 下: 攻撃端子調律 (縦・上と中心) + 外装プレート (下)
+                    return new MetaLoadout { openMask = Mask(4, 1, 7), placements = { P(AtkTune, 0, 1, 1), P(ChipHp, 2, 1, 0) } };
+                case "s5":       // 十字: ラストスタンド (横の 3 マス + 上) + 外装プレート (下)
+                    return new MetaLoadout { openMask = Mask(4, 1, 3, 5, 7), placements = { P(CoreLastStand, 0, 0, 2), P(ChipHp, 2, 1, 0) } };
+                case "s6":       // 十字 + 左下: ラストスタンド + 攻撃端子調律 (下と左下)
+                    return new MetaLoadout { openMask = Mask(4, 1, 3, 5, 7, 6), placements = { P(CoreLastStand, 0, 0, 2), P(AtkTune, 2, 0, 0) } };
+                case "standard": case "full":   // 9/9: T (上の行 + 中心) + L3 (左下) + I2 (右の縦 2 マス)
+                    return new MetaLoadout { openMask = AllOpen, placements = { P(CoreLastStand, 0, 0, 0), P(HeavyFrame, 1, 0, 0), P(AtkTune, 1, 2, 1) } };
                 default: return null;
             }
         }
 
-        /// <summary>旧い 24 点の配点 (トラック → 段) を今の構造へ読み替える。 表は docs/GAME.md §15-1「旧い測定の指定の読み替え」。
-        /// 基礎整備 = 合計の点 ÷ 4 (24 点 → 6 段・12 点 → 3 段)・枠 = 24 点以上 3 / 12 点以上 2 / 1 点以上 1 / 0 点 0・
-        /// 主方針 = r10 のトラックの極点 (無ければ既定)・種火 = 段のある種火 (無ければ既定)・補助 = 段のある端子 (無ければ既定)。</summary>
+        /// <summary>旧い指定 stage:none / mid / full の読み替え: none = 空の盤・mid = 5/9 (十字)・full = 標準の完成盤。</summary>
+        public static MetaLoadout Stage(string name)
+        {
+            switch ((name ?? "").Trim().ToLowerInvariant())
+            {
+                case "none": return Board("empty");
+                case "mid": return Board("s5");
+                case "full": return Board("standard");
+                default: return null;
+            }
+        }
+
+        /// <summary>旧い 24 点の配点 (トラック → 段) の読み替え (旧いスイープの指定がそのまま走るように)。
+        /// 合計 24 点以上 = 標準の完成盤 (r10 の極点があればその T のコアに差し替え)・12 点以上 = 5/9・1 点以上 = 3/9・0 点 = 空。 種火は読まない。</summary>
         public static MetaLoadout FromLegacy(Dictionary<MetaPanelKind, int> ranks)
         {
-            var lo = new MetaLoadout();
-            if (ranks == null) return lo;
             int total = 0;
-            foreach (var kv in ranks) total += MetaAllocationPresets.LegacyCostOf(kv.Key, kv.Value);
-            lo.baseTier = System.Math.Min(MetaPanel.BaseTierCount, total / 4);
-            lo.slots = total >= MetaAllocationPresets.LegacyMaxPoints ? 3 : total >= 12 ? 2 : total > 0 ? 1 : 0;
+            if (ranks != null) foreach (var kv in ranks) total += MetaAllocationPresets.LegacyCostOf(kv.Key, kv.Value);
+            var lo = Board(total >= MetaAllocationPresets.LegacyMaxPoints ? "standard" : total >= 12 ? "s5" : total > 0 ? "s3" : "empty");
+            if (ranks == null) return lo;
             foreach (var kv in ranks)
             {
-                MetaModule? m = null;
-                if (kv.Value >= 10) m = LegacyKeystone(kv.Key);
-                else if (kv.Value >= 1) m = kv.Key switch
-                {
-                    MetaPanelKind.SparkCharge => MetaModule.SparkCharge, MetaPanelKind.SparkRinkai => MetaModule.SparkRinkai,
-                    MetaPanelKind.SparkPoison => MetaModule.SparkPoison, MetaPanelKind.SparkBleed => MetaModule.SparkBleed,
-                    MetaPanelKind.SparkShield => MetaModule.SparkShield, MetaPanelKind.SparkCrit => MetaModule.SparkCrit,
-                    MetaPanelKind.AttackTerm => MetaModule.AttackTune, MetaPanelKind.BlockTerm => MetaModule.BlockTune,
-                    _ => (MetaModule?)null,
-                };
-                if (m == null) continue;
-                int slot = (int)MetaPanel.SlotOf(m.Value);
-                if (lo.modules[slot] == Default) lo.modules[slot] = (int)m.Value;   // 同じ枠に 2 つ来たら enum の並びで先の方
+                if (kv.Value < 10) continue;
+                var m = LegacyKeystone(kv.Key);
+                if (m.HasValue) { lo.SwapPanel("T", m.Value); break; }
             }
             return lo;
         }
@@ -68,38 +77,46 @@ namespace AutoTest
             _ => (MetaModule?)null,
         };
 
-        public string Describe()
+        /// <summary>そのモジュールを持つ、 形 <paramref name="shape"/> のパネルの id (無ければ null)。</summary>
+        public static string PanelOf(MetaModule m, string shape)
         {
-            var parts = new List<string> { "base:" + baseTier + (baseDisabled ? "(切)" : ""), "slots:" + slots };
-            foreach (MetaSlot sl in System.Enum.GetValues(typeof(MetaSlot)))
-            {
-                int m = modules[(int)sl];
-                parts.Add(sl.ToString().ToLowerInvariant() + ":" + (m == Default ? "既定" : m == Empty ? "none" : ((MetaModule)m).ToString()));
-            }
-            return string.Join(",", parts);
+            foreach (var d in MetaBoard.All) if (d.Module == m && (shape == null || d.shape == shape)) return d.id;
+            return null;
         }
+
+        /// <summary>置いている形 <paramref name="shape"/> のパネルを、 同じ位置のまま <paramref name="m"/> のパネルへ差し替える。 無ければ false。</summary>
+        public bool SwapPanel(string shape, MetaModule m)
+        {
+            string id = PanelOf(m, shape);
+            if (id == null) return false;
+            for (int i = 0; i < placements.Count; i++)
+                if (MetaBoard.Get(placements[i].id)?.shape == shape) { var p = placements[i]; placements[i] = new BoardPlacement(id, p.rot, p.row, p.col); return true; }
+            return false;
+        }
+
+        public string Describe() => MetaBoard.Describe(openMask, placements);
     }
 
     /// <summary>
-    /// 測定で整備パネルの構成を当てる口 (2026-11-20 刷新)。 正本: docs/GAME.md §15-1。
-    /// <para>旧い 24 点の配分のプリセット (<see cref="Preset"/>・<see cref="Ranks"/>) と旧い指定 (<c>"Shell:10,Output:3"</c>) は残し、
-    /// 当てる時に <see cref="MetaLoadout.FromLegacy"/> で今の構造へ読み替える ── 旧いスイープ・メニュー・並列ランナーの指定がそのまま走る。</para>
+    /// 測定で整備盤の構成を当てる口 (2026-11-23・docs/GAME.md §15-1)。
+    /// <para>旧い 24 点の配分のプリセット (<see cref="Preset"/>・<see cref="Ranks"/>) と旧い指定 (<c>"Shell:10,Output:3"</c>・<c>"stage:full"</c>) は残し、
+    /// 当てる時に盤へ読み替える ── 旧いスイープ・メニュー・並列ランナーの指定がそのまま走る。</para>
     /// </summary>
     public static class MetaAllocationPresets
     {
         public enum Preset
         {
-            /// <summary>0pt。 → 未解禁 (基礎 0・枠 0)。</summary>
+            /// <summary>0pt。 → 空の盤。</summary>
             None,
-            /// <summary>旧: 予算を初めて使い切った標準形 (数値 8 本 × 3pt)。 → 完成 (基礎 6・枠 3・モジュールは既定)。 <b>Standard の既定。</b></summary>
+            /// <summary>旧: 予算を初めて使い切った標準形。 → 標準の完成盤。 <b>Standard の既定。</b></summary>
             Balanced,
-            /// <summary>旧: 出力 r10 ほか。 → 完成・主方針〈戦意〉。</summary>
+            /// <summary>旧: 出力 r10 ほか。 → 完成・〈戦意〉の T。</summary>
             Offense,
-            /// <summary>旧: 外殻 r10 ほか。 → 完成・主方針〈ラストスタンド〉。</summary>
+            /// <summary>旧: 外殻 r10 ほか。 → 完成・〈ラストスタンド〉の T。</summary>
             Defense,
-            /// <summary>旧: 金庫 r10 ほか。 → 完成・主方針〈貸金庫〉。</summary>
+            /// <summary>旧: 金庫 r10 ほか。 → 完成・〈貸金庫〉の T。</summary>
             Economy,
-            /// <summary>旧: 種火・出血 r3 ほか。 → 完成・種火 出血。</summary>
+            /// <summary>旧: 種火・出血 r3 ほか。 → 完成 (種火は読まない)。</summary>
             SparkBuild,
         }
 
@@ -115,16 +132,6 @@ namespace AutoTest
         };
 
         public static int LegacyCostOf(MetaPanelKind kind, int rank) => System.Math.Max(0, rank) * LegacyRankCost(kind);
-
-        /// <summary>枠を既定で埋める時のモジュール = 測定の標準 (旧 Standard と同じく軸に寄せない)。 主方針〈ラストスタンド〉(安全網)・補助 攻撃端子調律 (どのビルドにも効く)・
-        /// 種火は空 (<see cref="MetaLoadout.Empty"/>)。 2026-11-21: 種火 出血を既定にしていたら、 どの腕でも店が出血へ傾き、 軸どうしの比較が出血に有利に偏った。
-        /// 種火を測る時は spark:&lt;キーワード&gt; を明示する。</summary>
-        public static int DefaultModule(MetaSlot slot) => slot switch
-        {
-            MetaSlot.Main => (int)MetaModule.LastStand,
-            MetaSlot.Support => (int)MetaModule.AttackTune,
-            _ => MetaLoadout.Empty,
-        };
 
         /// <summary>旧いプリセットの配分表 (合計は <see cref="LegacyMaxPoints"/>)。 当てる時は <see cref="MetaLoadout.FromLegacy"/> で読み替わる。</summary>
         public static Dictionary<MetaPanelKind, int> Ranks(Preset p)
@@ -166,33 +173,26 @@ namespace AutoTest
             ApplyLoadout(MetaLoadout.FromLegacy(Ranks(p)), p.ToString());
         }
 
-        /// <summary>構成をメタ状態へ当てる (トークンは払わない)。 <b>ResetAll は呼ばない</b> ── 呼び出し側が先に呼ぶ。</summary>
+        /// <summary>構成をメタ状態へ当てる (マスを開き・パネルを持たせて置く・トークンは払わない)。 <b>ResetAll は呼ばない</b> ── 呼び出し側が先に呼ぶ。
+        /// 置けなかったパネル (閉じたマス・重なり) は警告を出す (実効状態の盤の文で確かめる)。</summary>
         public static void ApplyLoadout(MetaLoadout lo, string label)
         {
             var st = MetaProgressManager.Instance?.State;
             if (st == null || lo == null) return;
-            st.baseTier = System.Math.Max(0, System.Math.Min(MetaPanel.BaseTierCount, lo.baseTier));
-            st.baseDisabled = lo.baseDisabled;
-            st.slotsOpen = System.Math.Max(0, System.Math.Min(MetaPanel.SlotOpenCost.Length, lo.slots));
-            foreach (MetaSlot sl in System.Enum.GetValues(typeof(MetaSlot)))
-            {
-                int m = lo.modules[(int)sl];
-                if (m == MetaLoadout.Default) m = st.IsSlotOpen(sl) ? DefaultModule(sl) : MetaLoadout.Empty;
-                if (m < 0) { st.Unequip(sl); continue; }
-                if (!st.IsSlotOpen(sl))
-                    UnityEngine.Debug.LogWarning($"[MetaAllocationPresets] {label}: {(MetaModule)m} の枠 ({sl}) が閉じている (枠 {st.slotsOpen}) ので効かない");
-                st.ForceEquip((MetaModule)m);
-            }
-            st.EnsurePanelInitialized();
-            UnityEngine.Debug.Log($"[MetaAllocationPresets] {label} を適用: {st.DescribePanel()}");
+            st.ForceBoard(lo.openMask, lo.placements);
+            if (st.ValidPlacements.Count != lo.placements.Count)
+                UnityEngine.Debug.LogWarning($"[MetaAllocationPresets] {label}: 置けないパネルがある (指定 {lo.Describe()} / 効いている {st.DescribeBoard()})");
+            UnityEngine.Debug.Log($"[MetaAllocationPresets] {label} を適用: {st.DescribeBoard()}");
         }
 
-        private static readonly HashSet<string> LoadoutKeys = new HashSet<string> { "stage", "base", "baseoff", "slots", "main", "support", "spark" };
+        private static readonly HashSet<string> BoardKeys = new HashSet<string> { "stage", "board", "open", "place", "main", "support", "spark" };
 
-        /// <summary>測定の指定 (AutoRunner.metaRankSpec・並列ランナーの rankSpec) を構成へ。 解釈できなければ null (呼び手が止める)。
-        /// <para><b>今の構造の書き方</b>: <c>"stage:mid,main:Valor"</c>・<c>"base:6,slots:3,main:LastStand,support:Compression,spark:bleed"</c>・<c>"stage:full,baseoff:1"</c>。
-        /// stage (none/mid/full) を先に当て、 残りの鍵で上書きする。 枠の値は MetaModule の名前・種火はキーワード (bleed など) も可・none = 空。 書かなかった枠は既定で埋める。</para>
-        /// <para><b>旧い書き方</b> (<c>"Shell:10,Output:3"</c>) は <see cref="MetaLoadout.FromLegacy"/> で読み替える。 2 つを混ぜたら旧い方の鍵は捨てて警告する。</para></summary>
+        /// <summary>測定の指定 (AutoRunner.metaRankSpec・並列ランナーの rankSpec) を盤へ。 解釈できなければ null (呼び手が止める)。
+        /// <para><b>書き方</b> (, で並べる): <c>board:standard</c> (代表の盤 empty / s3 / s5 / s6 / standard)・<c>stage:full</c> (旧い書き方・none = 空 / mid = s5 / full = standard)・
+        /// <c>open:all</c> か <c>open:511</c> (開いたマスの bit・中心 = 16)・<c>place:core_valor@0.0r0</c> (パネルの id @ 行.列 r 回転・1 つ目の place で代表の盤の置き方を捨てる)・
+        /// <c>main:Valor</c> / <c>support:BlockTune</c> (置いている T / I2 を同じ位置のままそのモジュールのパネルへ差し替える)・
+        /// <c>spark:poison</c> (種火の盤へ: 2×2 の種火 (左上) + 攻撃端子調律 (右の縦 2 マス) + 商隊ネットワーク (下の行)・answer23 の P6)。</para>
+        /// <para><b>旧い書き方</b> (<c>"Shell:10,Output:3"</c>) は <see cref="MetaLoadout.FromLegacy"/> で読み替える。</para></summary>
         public static MetaLoadout ParseSpec(string spec)
         {
             if (string.IsNullOrWhiteSpace(spec)) return null;
@@ -200,11 +200,11 @@ namespace AutoTest
             bool newStyle = false;
             foreach (var tok in spec.Split(','))
             {
-                var kv = tok.Split(':');
-                if (kv.Length != 2) continue;
-                string k = kv[0].Trim(), v = kv[1].Trim();
+                int colon = tok.IndexOf(':');
+                if (colon <= 0) continue;
+                string k = tok.Substring(0, colon).Trim(), v = tok.Substring(colon + 1).Trim();
                 toks.Add((k, v));
-                if (LoadoutKeys.Contains(k.ToLowerInvariant())) newStyle = true;
+                if (BoardKeys.Contains(k.ToLowerInvariant())) newStyle = true;
             }
             if (!newStyle)
             {
@@ -218,50 +218,89 @@ namespace AutoTest
                 return d.Count > 0 ? MetaLoadout.FromLegacy(d) : null;
             }
 
-            var lo = new MetaLoadout();
+            var lo = MetaLoadout.Board("standard");
             foreach (var (k, v) in toks)
-                if (k.ToLowerInvariant() == "stage")
-                {
-                    lo = MetaLoadout.Stage(v);
-                    if (lo == null) { UnityEngine.Debug.LogWarning($"[MetaAllocationPresets] 未知の stage: {v} (none/mid/full)"); return null; }
-                }
+            {
+                string key = k.ToLowerInvariant();
+                if (key != "stage" && key != "board") continue;
+                lo = key == "stage" ? MetaLoadout.Stage(v) : MetaLoadout.Board(v);
+                if (lo == null) { UnityEngine.Debug.LogWarning($"[MetaAllocationPresets] 未知の盤: {k}:{v}"); return null; }
+            }
+            bool placedExplicit = false;
             foreach (var (k, v) in toks)
             {
                 switch (k.ToLowerInvariant())
                 {
-                    case "stage": break;
-                    case "base": if (!int.TryParse(v, out lo.baseTier)) return Bad(k, v); break;
-                    case "slots": if (!int.TryParse(v, out lo.slots)) return Bad(k, v); break;
-                    case "baseoff": lo.baseDisabled = v == "1" || v.ToLowerInvariant() == "true"; break;
-                    case "main": if (!SetModule(lo, MetaSlot.Main, v)) return Bad(k, v); break;
-                    case "support": if (!SetModule(lo, MetaSlot.Support, v)) return Bad(k, v); break;
-                    case "spark": if (!SetModule(lo, MetaSlot.Spark, v)) return Bad(k, v); break;
-                    default: UnityEngine.Debug.LogWarning($"[MetaAllocationPresets] 今の構造の指定に旧い鍵が混ざっている (捨てる): {k}"); break;
+                    case "stage": case "board": break;
+                    case "open":
+                        if (v.ToLowerInvariant() == "all") lo.openMask = MetaLoadout.AllOpen;
+                        else if (int.TryParse(v, out int om)) lo.openMask = om & MetaLoadout.AllOpen;
+                        else return Bad(k, v);
+                        break;
+                    case "place":
+                    {
+                        var p = ParsePlacement(v);
+                        if (p == null) return Bad(k, v);
+                        if (!placedExplicit) { lo.placements.Clear(); placedExplicit = true; }
+                        lo.placements.Add(p);
+                        break;
+                    }
+                    case "main":
+                        if (v.ToLowerInvariant() == "none") { lo.placements.RemoveAll(q => MetaBoard.Get(q.id)?.shape == "T"); break; }
+                        if (!System.Enum.TryParse(v, true, out MetaModule mm) || !lo.SwapPanel("T", mm)) return Bad(k, v);
+                        break;
+                    case "support":
+                        if (v.ToLowerInvariant() == "none") { lo.placements.RemoveAll(q => MetaBoard.Get(q.id)?.shape == "I2"); break; }
+                        if (!System.Enum.TryParse(v, true, out MetaModule sm) || !lo.SwapPanel("I2", sm)) return Bad(k, v);
+                        break;
+                    case "spark":
+                    {
+                        if (v.ToLowerInvariant() == "none") break;
+                        var m = SparkOf(v);
+                        string id = m.HasValue ? MetaLoadout.PanelOf(m.Value, "O") : null;
+                        if (id == null) return Bad(k, v);
+                        lo.openMask = MetaLoadout.AllOpen;
+                        lo.placements = new List<BoardPlacement>
+                        {
+                            new BoardPlacement(id, 0, 0, 0),                 // 2×2: 左上 (中心を含む)
+                            new BoardPlacement("unit_atk_tune", 1, 0, 2),    // I2: 右の縦 2 マス (上)
+                            new BoardPlacement("mod_caravan", 0, 2, 0),      // I3: 下の行
+                        };
+                        break;
+                    }
+                    default: UnityEngine.Debug.LogWarning($"[MetaAllocationPresets] 盤の指定に旧い鍵が混ざっている (捨てる): {k}"); break;
                 }
             }
             return lo;
+        }
+
+        /// <summary>"id@行.列r回転" (例 "core_valor@0.0r0")。 回転は省くと 0。 知らない id なら null。</summary>
+        public static BoardPlacement ParsePlacement(string v)
+        {
+            int at = v.IndexOf('@');
+            if (at <= 0) return null;
+            string id = v.Substring(0, at).Trim(), pos = v.Substring(at + 1).Trim();
+            if (MetaBoard.Get(id) == null) return null;
+            int rot = 0, r = pos.IndexOf('r');
+            if (r >= 0) { if (!int.TryParse(pos.Substring(r + 1), out rot)) return null; pos = pos.Substring(0, r); }
+            var rc = pos.Split('.');
+            if (rc.Length != 2 || !int.TryParse(rc[0], out int row) || !int.TryParse(rc[1], out int col)) return null;
+            return new BoardPlacement(id, rot, row, col);
+        }
+
+        /// <summary>種火のキーワード (bleed など) か MetaModule の名前 → 種火のモジュール。</summary>
+        private static MetaModule? SparkOf(string v)
+        {
+            if (System.Enum.TryParse(v, true, out MetaModule m) && MetaPanel.SlotOf(m) == MetaSlot.Spark) return m;
+            foreach (MetaModule x in System.Enum.GetValues(typeof(MetaModule)))
+                if (MetaPanel.SparkKeyword(x) == v.ToLowerInvariant()) return x;
+            return null;
         }
 
         private static MetaLoadout Bad(string k, string v)
         {
             UnityEngine.Debug.LogWarning($"[MetaAllocationPresets] 解釈できない指定: {k}:{v}");
             return null;
-        }
-
-        /// <summary>枠の値 (none / MetaModule の名前 / 種火のキーワード) を入れる。 枠違いのモジュールは false。</summary>
-        private static bool SetModule(MetaLoadout lo, MetaSlot slot, string v)
-        {
-            if (v.ToLowerInvariant() == "none") { lo.modules[(int)slot] = MetaLoadout.Empty; return true; }
-            if (!System.Enum.TryParse(v, true, out MetaModule m))
-            {
-                bool found = false;
-                foreach (MetaModule x in System.Enum.GetValues(typeof(MetaModule)))
-                    if (MetaPanel.SparkKeyword(x) == v.ToLowerInvariant()) { m = x; found = true; break; }
-                if (!found) return false;
-            }
-            if (MetaPanel.SlotOf(m) != slot) return false;
-            lo.modules[(int)slot] = (int)m;
-            return true;
         }
     }
 }
