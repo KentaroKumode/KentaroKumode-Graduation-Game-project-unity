@@ -184,6 +184,87 @@ namespace MetaProgression
             foreach (var r in relics) AddRelic(r);
         }
 
+        // === 整備盤 (2026-11-23・docs/GAME.md §15-1・MetaBoard) ===
+        /// <summary>開いたマス (bit = マスの index 0〜8・4 = 中心)。</summary>
+        public int boardOpenMask;
+        /// <summary>持っているパネルの id (買った物と実績で手に入れた物)。</summary>
+        public List<string> ownedPanels = new List<string>();
+        /// <summary>盤に置いているパネル (置き直しは無料)。 効くのは <see cref="MetaBoard.Valid"/> を通った物だけ。</summary>
+        public List<BoardPlacement> boardPlacements = new List<BoardPlacement>();
+
+        // 効果の控え (置き方・開いたマスを変える口が <see cref="BoardChanged"/> で捨てる)。 戦闘中に何度も読まれるので毎回は数えない
+        [System.NonSerialized] private BoardStats _boardStats;
+        [System.NonSerialized] private List<BoardPlacement> _boardValid;
+        [System.NonSerialized] private readonly HashSet<MetaModule> _boardModules = new HashSet<MetaModule>();
+
+        /// <summary>盤を変えたら呼ぶ (効果の控えを捨てる)。</summary>
+        public void BoardChanged() { _boardStats = null; _boardValid = null; }
+
+        private void EnsureBoard()
+        {
+            if (_boardStats != null) return;
+            if (ownedPanels == null) ownedPanels = new List<string>();
+            if (boardPlacements == null) boardPlacements = new List<BoardPlacement>();
+            _boardValid = MetaBoard.Valid(boardOpenMask, ownedPanels, boardPlacements);
+            _boardStats = MetaBoard.Sum(_boardValid, _boardModules);
+        }
+
+        /// <summary>効いているパネルの数値の合計。</summary>
+        public BoardStats BoardEffects { get { EnsureBoard(); return _boardStats; } }
+        /// <summary>効いている置き方 (持っている・開いたマスだけ・重ならない)。</summary>
+        public List<BoardPlacement> ValidPlacements { get { EnsureBoard(); return _boardValid; } }
+        /// <summary>そのモジュール (主方針・補助・種火の効果) を持つパネルが効いているか。</summary>
+        public bool BoardHas(MetaModule m) { EnsureBoard(); return _boardModules.Contains(m); }
+        /// <summary>効いている種火 (2×2 は中心を必ず使うので 1 枚まで)。 無ければ null。</summary>
+        public MetaModule? BoardSpark()
+        {
+            EnsureBoard();
+            foreach (var m in _boardModules) if (MetaPanel.SlotOf(m) == MetaSlot.Spark) return m;
+            return null;
+        }
+
+        public bool OwnsPanel(string id) => ownedPanels != null && ownedPanels.Contains(id);
+
+        /// <summary>パネルを持たせる (購入・実績・測定)。 持っていれば何もしない。</summary>
+        public void GrantPanel(string id)
+        {
+            if (string.IsNullOrEmpty(id) || MetaBoard.Get(id) == null) return;
+            if (ownedPanels == null) ownedPanels = new List<string>();
+            if (!ownedPanels.Contains(id)) ownedPanels.Add(id);
+            BoardChanged();
+        }
+
+        /// <summary>パネルを置く (同じパネルは置き直し)。 持っていない・はみ出す・閉じたマス・ほかのパネルと重なるなら false で何も変えない。</summary>
+        public bool PlacePanel(BoardPlacement p)
+        {
+            if (p == null || !OwnsPanel(p.id)) return false;
+            int m = MetaBoard.MaskOf(MetaBoard.CellsOf(p));
+            if (m == 0 || (m & ~boardOpenMask) != 0) return false;
+            if (boardPlacements == null) boardPlacements = new List<BoardPlacement>();
+            foreach (var q in boardPlacements)
+                if (q != null && q.id != p.id && (MetaBoard.MaskOf(MetaBoard.CellsOf(q)) & m) != 0) return false;
+            boardPlacements.RemoveAll(q => q == null || q.id == p.id);
+            boardPlacements.Add(new BoardPlacement(p.id, ((p.rot % 4) + 4) % 4, p.row, p.col));
+            BoardChanged();
+            return true;
+        }
+
+        /// <summary>パネルを盤から外す (持ち物には残る)。</summary>
+        public void RemovePanel(string id) { boardPlacements?.RemoveAll(q => q == null || q.id == id); BoardChanged(); }
+
+        /// <summary>盤を測定・移行の指定どおりにする (トークンは払わない): マスを開き、 パネルを持たせ、 置き方を丸ごと差し替える。</summary>
+        public void ForceBoard(int openMask, List<BoardPlacement> placements)
+        {
+            boardOpenMask = openMask & ((1 << MetaBoard.Cells) - 1);
+            boardPlacements = new List<BoardPlacement>();
+            BoardChanged();
+            if (placements == null) return;
+            foreach (var p in placements) { GrantPanel(p.id); PlacePanel(p); }
+        }
+
+        /// <summary>盤の短い文 (ログ・実効状態)。</summary>
+        public string DescribeBoard() => MetaBoard.Describe(boardOpenMask, ValidPlacements);
+
         // === レガシー (旧 58 段トラック時代の遺物・マイグレーション判定にのみ使用) ===
         /// <summary>旧 currentLevel。> 0 なら未マイグレーション状態 → Migrate() でトークン返却して 0 化。</summary>
         public int currentLevel;

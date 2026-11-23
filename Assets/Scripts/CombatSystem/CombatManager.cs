@@ -468,6 +468,17 @@ namespace CombatSystem
             // エスカレーションの「ボス戦」の旗 (挑戦カード「ボス戦ではエスカレーションが毎ターン進む」)
             Escalation.BossFight = enemy != null && GameLoop.BossIds.IsBoss(enemy.id);
             Escalation.PhaseStartTurn = 1;
+            // 整備盤〈先制解析ユニット〉(2026-11-23): 各層の最初の通常戦 N 回、 敵の攻撃 −M% (予告の前・Escalation.GetMultiplier)
+            Escalation.OpenerCutPct = 0;
+            {
+                var orun = GameLoop.GameManager.Instance?.Run;
+                if (orun != null && enemy != null && !enemy.elite && !Escalation.BossFight)
+                {
+                    orun.layerNormalFights++;
+                    if (orun.layerNormalFights <= MetaProgression.MetaBuffApplicator.GetOpenerFights())
+                        Escalation.OpenerCutPct = MetaProgression.MetaBuffApplicator.GetOpenerAtkCutPct();
+                }
+            }
             // 不安定化 (2026-11-13・GAME.md §5-12): エスカレーションの段が上がるたびに +1 (ボス戦は除く)。 この戦闘で見た一番高い段を 0 から数える
             _instabilityEscStage = 0; _cueEscStage = int.MinValue;
             GameLoop.GameManager.Instance?.NoteCombatStartedForInstability();

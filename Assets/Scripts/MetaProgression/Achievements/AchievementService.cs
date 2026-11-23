@@ -114,6 +114,7 @@ namespace MetaProgression.Achievements
             mgr.Save();
             mgr.OnStateChanged?.Invoke();
             Debug.Log($"[実績解除] {def.displayName} ({def.id})");
+            mgr.GrantAchievementPanels(id);   // 整備盤: その実績で手に入るパネル (2026-11-23)
             OnUnlocked?.Invoke(def);
             return true;
         }
@@ -553,6 +554,12 @@ namespace MetaProgression.Achievements
         // ============================================================
 
         /// <summary>整備パネルで段・枠・モジュールを買った (MetaProgressManager.TrySpend)。</summary>
+        /// <summary>整備盤のマスを開いた・パネルを買った時 (MetaProgressManager)。 盤の実績の判定 (段 2 で中身を入れる)。</summary>
+        public static void NoteBoardChanged(MetaProgressState s)
+        {
+            if (Suppressed || s == null) return;
+        }
+
         public static void NotePanelAssigned(MetaProgressState s)
         {
             if (Suppressed || s == null) return;

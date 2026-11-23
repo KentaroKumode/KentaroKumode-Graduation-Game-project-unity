@@ -139,6 +139,8 @@ namespace MetaProgression
             float low = CardV(ChallengeCards.Lowball), up = CardV(ChallengeCards.Appraise);
             if (low > 0f) gold = UnityEngine.Mathf.RoundToInt(gold * (1f - low / 100f));
             if (up > 0f) gold = UnityEngine.Mathf.CeilToInt(gold * (1f + up / 100f));
+            int meta = MetaBuffApplicator.GetSkipCashPct();      // 整備盤〈端数回収回路〉〈商隊ネットワーク〉 (2026-11-23・切り上げ)
+            if (meta > 0) gold = UnityEngine.Mathf.CeilToInt(gold * (1f + meta / 100f));
             return gold;
         }
     }

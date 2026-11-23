@@ -35,6 +35,9 @@ namespace MetaProgression
 
         public MetaProgressState State { get; private set; }
 
+        /// <summary>今ある管理 (作らない・EditMode のテストで GameObject を作らないため)。</summary>
+        public static MetaProgressManager Existing => _shuttingDown ? null : _instance;
+
         public System.Action OnStateChanged;
 
         void Awake()
@@ -186,6 +189,67 @@ namespace MetaProgression
             if (State == null) return;
             State.baseDisabled = !State.baseDisabled;
             Changed();
+        }
+
+        // ============================================================
+        //  整備盤 (2026-11-23・docs/GAME.md §15-1・MetaBoard)
+        // ============================================================
+
+        /// <summary>マスを開くトークン (開けられなければ −1・<see cref="MetaBoard.OpenCost"/>)。</summary>
+        public int CellOpenCost(int cell) => State == null ? -1 : MetaBoard.OpenCost(State.boardOpenMask, cell);
+
+        /// <summary>マスを開く (中心 → 辺 → 角の順・開けた個数で値段が上がる)。</summary>
+        public bool TryOpenCell(int cell)
+        {
+            int cost = CellOpenCost(cell);
+            if (cost < 0) return false;
+            return TrySpendBoard(cost, () => State.boardOpenMask |= 1 << cell, $"盤のマス {cell}");
+        }
+
+        /// <summary>パネルを買う (常設の物だけ・実績のパネルは実績で手に入る)。</summary>
+        public bool TryBuyPanel(string id)
+        {
+            var d = MetaBoard.Get(id);
+            if (State == null || d == null || d.FromAchievement || State.OwnsPanel(id)) return false;
+            return TrySpendBoard(d.cost, () => State.GrantPanel(id), $"パネル {d.name}");
+        }
+
+        /// <summary>持っているパネルを置く・置き直す (無料)。</summary>
+        public bool TryPlacePanel(BoardPlacement p)
+        {
+            if (State == null || !State.PlacePanel(p)) return false;
+            Changed();
+            return true;
+        }
+
+        /// <summary>パネルを盤から外す (無料)。</summary>
+        public void RemovePanel(string id)
+        {
+            if (State == null) return;
+            State.RemovePanel(id);
+            Changed();
+        }
+
+        /// <summary>実績を解いた時: その実績のパネルを持たせる (AchievementService.Unlock が呼ぶ)。</summary>
+        public void GrantAchievementPanels(string achievementId)
+        {
+            if (State == null) return;
+            bool any = false;
+            foreach (var d in MetaBoard.ForAchievement(achievementId))
+                if (!State.OwnsPanel(d.id)) { State.GrantPanel(d.id); any = true; Debug.Log($"[MetaProgress] 実績 {achievementId} でパネル〈{d.name}〉を手に入れた"); }
+            if (any) Changed();
+        }
+
+        private bool TrySpendBoard(int cost, System.Action apply, string what)
+        {
+            if (State == null || cost < 0 || State.tokens < cost) return false;
+            State.tokens -= cost;
+            apply();
+            State.BoardChanged();
+            Changed();
+            Achievements.AchievementService.NoteBoardChanged(State);   // 盤の実績
+            Debug.Log($"[MetaProgress] {what} を買った (-{cost}): {State.DescribeBoard()}");
+            return true;
         }
 
         private bool TrySpend(int cost, System.Action apply, string what)

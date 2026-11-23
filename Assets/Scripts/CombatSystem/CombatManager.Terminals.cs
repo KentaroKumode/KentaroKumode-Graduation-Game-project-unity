@@ -177,6 +177,7 @@ namespace CombatSystem
             if (cut > 0f && b > 0) b = Mathf.RoundToInt(b * (1f - cut / 100f));
             b += blockDice * MetaProgression.MetaBuffApplicator.GetBlockTerminalPerDice();   // 端子調律メタバフ: 接続したダイス 1 本あたり +N
             if (ctx != null) b += ctx.itemBlockBonus;                                  // 品のブロック +N (〈帯電の胸甲〉〈絶縁の外套〉〈避雷の杭〉ほか)
+            if (ctx != null && ctx.currentTurn == 1) b += MetaProgression.MetaBuffApplicator.GetOpeningBlock();   // 整備盤〈緊急冷却ピン〉: 各戦闘の 1 ターン目 +N (2026-11-23)
             //   〈貫きの錐〉(7層ヴェスカ): 敵の攻撃値 1 につきブロックを 2 削る (端子調律の本数ボーナスも削る対象なので加算の後)
             if (ctx != null && ctx.playerBlockIgnored && b > 0)
             {

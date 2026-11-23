@@ -110,7 +110,8 @@ namespace GameLoop
         private void OpenFarmSupply()
         {
             var cands = new List<string>();
-            for (int k = 0; k < FarmSupplyChoices; k++)
+            int choices = FarmSupplyChoices + MetaProgression.MetaBuffApplicator.GetFarmOfferBonus();   // 整備盤〈試運転ブースター〉 +1 (2026-11-23)
+            for (int k = 0; k < choices; k++)
             {
                 string id = EventSystem.EventEffectExecutor.PickRandomItemId(ItemSystem.ItemCategory.Passive, Run, cands);
                 if (!string.IsNullOrEmpty(id) && !cands.Contains(id)) cands.Add(id);
