@@ -107,7 +107,7 @@ namespace ItemSystem.Helpers
                 && (run.ownedPassiveItems.Contains(itemId)
                     || (run.seenPassiveItemIds != null && run.seenPassiveItemIds.Contains(itemId))))
             {
-                Debug.Log($"[PassiveAdd] 重複のため取得スキップ: {itemId}");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[PassiveAdd] 重複のため取得スキップ: {itemId}");
                 return false;
             }
 

@@ -23,11 +23,26 @@ namespace AutoTest.EditorTools
         // Keep the disposable worker outside Assets/Library so it can be rebuilt
         // without triggering an import or violating BuildPipeline's path guard.
         public static string BuildRoot => Path.GetFullPath(Path.Combine(
-            Application.dataPath, "..", "UltraProductionWorkerBuild"));
+            Application.dataPath, "..", UseDotnetWorker ? "HeadlessWorkerBuild" : "UltraProductionWorkerBuild"));
         public static string ExecutablePath => Path.Combine(BuildRoot,
-            "UltraProductionWorker.exe");
+            UseDotnetWorker ? "DiceBoundHeadless.exe" : "UltraProductionWorker.exe");
+
+        /// <summary>並列のワーカーを Unity を使わない .NET 8 のコンソールアプリ (Tools/headless/DiceBoundHeadless.csproj) で作る (2026-11-22)。
+        /// false = 今までどおり IL2CPP の Player。 起動引数・job.json・書き出すファイルはどちらも同じ (RankMarginWorkerBootstrap がそのまま走る)。
+        /// .NET 版は Assets/Scripts の .cs をリンクしてビルドするだけで、 シーンも PlayerSettings も触らない。 要: .NET SDK 8。</summary>
+        public const bool UseDotnetWorker = true;
+
+        /// <summary>ワーカーを起動する時の環境変数 (.NET 版だけ・runtimeconfig では指定できない GC の設定)。 gen0 の予算 64 MB (既定 16 MB 前後・1 プロセス 220 MB/秒 割り当てる)。
+        /// 2026-11-22 の実測 (22 並列・同じシードの対): 1 プロセスの秒数 −2〜4%・結果は全チャンクで一致。</summary>
+        public static void ApplyWorkerEnvironment(ProcessStartInfo start)
+        {
+            if (UseDotnetWorker) start.EnvironmentVariables["DOTNET_GCgen0size"] = "0x4000000";
+        }
         public static string DescriptorPath => Path.Combine(BuildRoot,
             "ultra-production-worker.json");
+
+        /// <summary>worker を IL2CPP で作る (false = Mono)。 作者が遊ぶ本体の PlayerSettings はビルド後に戻す。</summary>
+        public const bool UseIl2cpp = true;
 
         /// <summary>descriptor の actionFingerprint に入れる固定の印 (2026-11-13〜・#135)。
         /// 旧 Ultra の方策の組の候補集合のハッシュの代わり。 照合する側は無い。</summary>
@@ -46,6 +61,7 @@ namespace AutoTest.EditorTools
         public static bool EnsureBuilt(out string reason)
         {
             reason = null;
+            if (UseDotnetWorker) return BuildDotnetWorker(out reason);
             if (EditorApplication.isCompiling || EditorApplication.isUpdating)
             {
                 reason = "Unity is compiling or importing; refresh must finish first";
@@ -64,11 +80,24 @@ namespace AutoTest.EditorTools
 
             string oldCompany = PlayerSettings.companyName;
             string oldProduct = PlayerSettings.productName;
+            ScriptingImplementation oldBackend = PlayerSettings.GetScriptingBackend(BuildTargetGroup.Standalone);
+            ManagedStrippingLevel oldStripping = PlayerSettings.GetManagedStrippingLevel(BuildTargetGroup.Standalone);
+            // backend を変えると Unity が ProjectSettings.asset をその場で書き出すので、 ファイルごと戻す。
+            const string settingsPath = "ProjectSettings/ProjectSettings.asset";
+            byte[] oldSettingsFile = File.ReadAllBytes(settingsPath);
             try
             {
+                // 別の backend で作った出力先には Unity がビルドを拒むので、 切り替えた時だけ消す。
+                string otherBackendMark = Path.Combine(BuildRoot, UseIl2cpp ? "MonoBleedingEdge" : "GameAssembly.dll");
+                if (Directory.Exists(otherBackendMark) || File.Exists(otherBackendMark))
+                    FileUtil.DeleteFileOrDirectory(BuildRoot);
                 Directory.CreateDirectory(BuildRoot);
                 PlayerSettings.companyName = "UltraAI.IsolatedWorker";
                 PlayerSettings.productName = "UltraAI Production Worker";
+                PlayerSettings.SetScriptingBackend(BuildTargetGroup.Standalone,
+                    UseIl2cpp ? ScriptingImplementation.IL2CPP : ScriptingImplementation.Mono2x);
+                // 反射でフィールド名を引く (RankMarginWorkerProtocol) ので stripping は最小。
+                PlayerSettings.SetManagedStrippingLevel(BuildTargetGroup.Standalone, ManagedStrippingLevel.Minimal);
                 var options = new BuildPlayerOptions
                 {
                     scenes = new[] { ScenePath },
@@ -102,6 +131,54 @@ namespace AutoTest.EditorTools
             {
                 PlayerSettings.companyName = oldCompany;
                 PlayerSettings.productName = oldProduct;
+                PlayerSettings.SetScriptingBackend(BuildTargetGroup.Standalone, oldBackend);
+                PlayerSettings.SetManagedStrippingLevel(BuildTargetGroup.Standalone, oldStripping);
+                File.WriteAllBytes(settingsPath, oldSettingsFile);
+                AssetDatabase.ImportAsset(settingsPath, ImportAssetOptions.ForceUpdate);
+            }
+        }
+
+        /// <summary>.NET 版のワーカーを dotnet build で BuildRoot へ作る。 学習の写しと descriptor は IL2CPP 版と同じ手順。</summary>
+        private static bool BuildDotnetWorker(out string reason)
+        {
+            reason = null;
+            if (EditorApplication.isCompiling || EditorApplication.isUpdating)
+            {
+                reason = "Unity is compiling or importing; refresh must finish first";
+                return false;
+            }
+            try
+            {
+                string project = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Tools", "headless", "DiceBoundHeadless.csproj"));
+                string dotnet = File.Exists(@"C:\Program Files\dotnet\dotnet.exe") ? @"C:\Program Files\dotnet\dotnet.exe" : "dotnet";
+                Directory.CreateDirectory(BuildRoot);
+                var psi = new System.Diagnostics.ProcessStartInfo(dotnet,
+                    "build \"" + project + "\" -c Release -nologo -v q -o \"" + BuildRoot + "\"")
+                {
+                    UseShellExecute = false, CreateNoWindow = true,
+                    RedirectStandardOutput = true, RedirectStandardError = true,
+                };
+                using (var p = System.Diagnostics.Process.Start(psi))
+                {
+                    var stderr = p.StandardError.ReadToEndAsync();
+                    string stdout = p.StandardOutput.ReadToEnd();
+                    p.WaitForExit();
+                    if (p.ExitCode != 0)
+                    {
+                        reason = "dotnet build failed (" + p.ExitCode + "): " + stdout + stderr.Result;
+                        return false;
+                    }
+                }
+                CopyFrozenLearningSnapshot();
+                UltraProductionWorkerDescriptor descriptor = CreateDescriptor();
+                File.WriteAllText(DescriptorPath, JsonUtility.ToJson(descriptor, true), new UTF8Encoding(false));
+                Debug.Log("[Ultra] .NET worker ready: " + ExecutablePath + " / build=" + descriptor.fingerprints.buildFingerprint);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                reason = ex.GetType().Name + ": " + ex.Message;
+                return false;
             }
         }
 
@@ -178,8 +255,10 @@ namespace AutoTest.EditorTools
         private static UltraProductionWorkerDescriptor CreateDescriptor()
         {
             string exeHash = Sha256File(ExecutablePath);
-            string managed = Path.Combine(BuildRoot,
-                "UltraProductionWorker_Data", "Managed", "Assembly-CSharp.dll");
+            // IL2CPP ではコードが GameAssembly.dll に入る (Managed/ は前の Mono ビルドの残りかもしれない)。
+            string managed = UseDotnetWorker ? Path.Combine(BuildRoot, "DiceBoundHeadless.dll")
+                : UseIl2cpp ? Path.Combine(BuildRoot, "GameAssembly.dll")
+                : Path.Combine(BuildRoot, "UltraProductionWorker_Data", "Managed", "Assembly-CSharp.dll");
             string assemblyHash = File.Exists(managed) ? Sha256File(managed) : exeHash;
             // 旧: Ultra の方策の組の候補集合のハッシュ (UltraPortfolioProtocol.ComputeCandidateSetHash)。
             //   技量の Ultra ごと候補集合を消した (2026-11-13・#135) ので、 固定の印のハッシュを置く。

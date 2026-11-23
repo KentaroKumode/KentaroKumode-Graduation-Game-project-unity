@@ -105,6 +105,7 @@ namespace AutoTest
              .Append(" tiers=").Append(LearnedPriorityProvider.BuyTierCount)
              .Append(" priceK=").Append(LearnedPriorityProvider.IttPriceK.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture))
              .Append(" itt=").Append(string.IsNullOrEmpty(GrantItt.Variant) ? "base" : GrantItt.Variant)
+             .Append(LearnedPriorityProvider.IttTimingMul ? " tmul=" + (GrantItt.TimingLoaded ? "1" : "未読") : "")
              .Append(" mistake=").Append(wiringMistakeRate.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture))
              .Append(" freeBlock=").Append(FreeBlockRule ? 1 : 0)
              .Append(" def=").Append(v3.superDefense ? 1 : 0).Append(" cons=").Append(v3.superConsumables ? 1 : 0)
@@ -200,10 +201,12 @@ namespace AutoTest
             /// 超過会心率が倍率になった会心 / 〈天眼の鍔〉の処刑 / 〈必殺の照準器〉のもう 1 回 (CritOverflowFired / CritExecuteFired / CritRefireFired)。
             /// 使い捨ての端子を使った回数 / 山札の切り直し (DeckDisposeFired / DeckShuffleFired)。 役の成立 / 〈万象のゾロ目〉の格上げ (RoleFormedFired / RoleOmniFired)。
             /// 見送り換金の回数 / 額 (AxisPool.RunSkips / RunSkipGold・額は〈銭皿〉込み・金の出入りは goldKeys の「見送り(…)」と totalCoinsSpent)。
-            /// 武器の〈連刃〉の追撃 /〈処刑〉/〈画竜点睛〉/〈シールドバッシュ〉(CombatManager.WeaponChainFired ほか)。</summary>
-            public int rebootFired, overclockFired, detonateFired, justGuardFired, bleedSpendFired, bleedExecuteFired, burstFired, burstBreakFired, critOverflowFired, critExecuteFired, critRefireFired,
-                deckDisposeFired, deckShuffleFired, roleFormedFired, roleOmniFired, skipFired, skipGold,
-                weaponChainFired, weaponExecuteFired, weaponGaryoFired, weaponBashFired;
+            /// 武器の〈連刃〉の追撃 /〈処刑〉/〈画竜点睛〉/〈シールドバッシュ〉(CombatManager.WeaponChainFired ほか)。
+            /// [2026-11-22] 戦闘報酬の択を取った / 見送った回数 (rewardPicks / rewardSkips)・主軸 (所持が単独 1 位の軸) を引いた回数 (AxisPool.RunMainAxisPicks・2026-11-22 neon 収束で主軸共鳴の重みは撤去 = 今は供給の集中の計装)。</summary>
+            public int rebootFired, overclockFired, detonateFired, justGuardFired, bleedSpendFired, bleedExecuteFired, burstFired, burstBreakFired, critOverflowFired, critExecuteFired, critRefireFired, focusAttempted, focusCritted, renkiSpentTotal,
+                deckDisposeFired, deckShuffleFired, roleFormedFired, roleOmniFired, skipFired, skipGold, axisRerollFired,
+                rewardPicks, rewardSkips, mainAxisPicks,
+                weaponChainFired, weaponExecuteFired, weaponGaryoFired, weaponBashFired, guardEchoFired;
             public string chainPath = "", heatBurstInfo = "", attackSumInfo = "";
             public bool ashBaseOpened;
             /// <summary>[計装 2026-11-14] 〈徒労〉: 掛かった通常の戦闘の勝ちの数 (今の形 = 何も得られなかった戦闘 / 別の形 = 品を落とさなかった戦闘)・

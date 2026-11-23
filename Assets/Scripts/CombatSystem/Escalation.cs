@@ -74,11 +74,12 @@ namespace CombatSystem
         /// <summary>いまの戦闘がボス戦か (CombatManager が戦闘開始時に立てる)。 挑戦カード「ボス戦ではエスカレーションが毎ターン進む」が読む。</summary>
         public static bool BossFight;
 
-        /// <summary>i 段目の閾値ターン。 挑戦カードのボス戦の毎ターン進行 (閾値 1/2/3/4) を反映する。</summary>
+        /// <summary>i 段目の閾値ターン。 挑戦カード〈刻限〉: 閾値を N ターン前へ (5/10/15/20 → 4/9/14/19・3/8/13/18)、 III はボス戦で毎ターン進む (閾値 1/2/3/4)。</summary>
         private static int ThresholdAt(int i)
         {
             if (BossFight && MetaProgression.MetaDebuffApplicator.BossEscalatesEveryTurn()) return i + 1;
-            return Thresholds[i];
+            int shift = MetaProgression.MetaDebuffApplicator.GetEscalationShift();
+            return shift > 0 ? Math.Max(i + 1, Thresholds[i] - shift) : Thresholds[i];
         }
 
         /// <summary>次の段階閾値ターン。最終段階なら -1 (計器盤の残ターン表示用)。</summary>
@@ -96,16 +97,13 @@ namespace CombatSystem
         public static float GetMultiplier(string profile, int turn)
         {
             // 挑戦カード (§23-25): すべて予告の前に掛かる (ブロックで受けられる・BOT の先読みにも見える)
-            //   エスカレーションの上がり幅 +N%: 段の倍率の 1 を超えた分だけを伸ばす (段 0 は 1 のまま)
             float curve = CurveMultiplier(profile, turn);
-            float rise = MetaProgression.MetaDebuffApplicator.GetEscalationRisePct();
-            if (rise > 0f && curve > 1f) curve = 1f + (curve - 1f) * (1f + rise / 100f);
             int phaseTurn = turn - PhaseStartTurn + 1;
-            return curve * (1f + MetaProgression.MetaDebuffApplicator.GetEnemyAttackPct() / 100f)
-                 * (1f + MetaProgression.MetaDebuffApplicator.GetAmbushPct(phaseTurn) / 100f)                // 〈先手を取られる〉
-                 * (1f + MetaProgression.MetaDebuffApplicator.GetRagePct(phaseTurn) / 100f)                  // 〈怒り〉
-                 * (1f + MetaProgression.MetaDebuffApplicator.GetOpenerPct(phaseTurn, BossFight) / 100f)     // 〈開幕の大技〉
-                 * (1f + MetaProgression.MetaDebuffApplicator.GetEnvyPct() / 100f);                         // 大罪:嫉妬 (今の HP の割合で決まる)
+            return curve * (1f + MetaProgression.MetaDebuffApplicator.GetEnemyAttackPct() / 100f)                    // 〈猛攻〉
+                 * (1f + MetaProgression.MetaDebuffApplicator.GetOpenerPct(phaseTurn, BossFight) / 100f)            // 〈先手必殺〉
+                 * (1f + MetaProgression.MetaDebuffApplicator.GetWrathAttackPct(phaseTurn, BossFight) / 100f)       // コルヴェンの憤怒
+                 * (1f + MetaProgression.MetaDebuffApplicator.GetEnvyPct() / 100f)                                 // ヤルノクの嫉妬 (今の HP の割合で決まる)
+                 * (1f + MetaProgression.MetaDebuffApplicator.GetGreedAttackPct() / 100f);                         // ムシュファの強欲 (持っている秘宝の数で決まる)
         }
 
         /// <summary>いまの形態が始まったターン (CombatManager が戦闘開始時に 1、 ヴェスカの形態を替えるたびに立てる)。 「形態の最初の N ターン」を数える。</summary>

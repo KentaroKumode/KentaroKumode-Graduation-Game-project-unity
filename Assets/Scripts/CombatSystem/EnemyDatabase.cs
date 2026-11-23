@@ -49,7 +49,7 @@ namespace CombatSystem
                 database[enemy.id] = enemy;
             }
 
-            Debug.Log($"[EnemyDatabase] Loaded {database.Count} enemies.");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[EnemyDatabase] Loaded {database.Count} enemies.");
             ApplyStatOverrides();
         }
 
@@ -161,7 +161,7 @@ namespace CombatSystem
                 e.attackRollMax  = Mathf.Max(e.attackRollMin, Mathf.RoundToInt(e.attackRollMax * a));
                 e.threat         = Mathf.Max(0, Mathf.RoundToInt(e.threat * a));
             }
-            Debug.Log($"[EnemyDatabase] 攻撃側 ×{AttackScale:F2} を {database.Count} 体へ適用");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[EnemyDatabase] 攻撃側 ×{AttackScale:F2} を {database.Count} 体へ適用");
         }
 
         private static void ApplySpec()
@@ -180,7 +180,7 @@ namespace CombatSystem
                 }
                 int before = e.baseAttack;
                 e.baseAttack = atk;
-                Debug.Log($"[EnemyDatabase] 上書き {id}: baseAttack {before} → {atk}");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[EnemyDatabase] 上書き {id}: baseAttack {before} → {atk}");
             }
         }
 

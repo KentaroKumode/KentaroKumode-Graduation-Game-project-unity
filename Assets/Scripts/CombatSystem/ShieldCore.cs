@@ -30,7 +30,7 @@ namespace CombatSystem
         public const int PauldronShield = 12, PaddedShield = 6, PaddedNeed = 2, WornPerDie = 2, RivetNeed = 12, RivetHigh = 3, RivetLow = 0;
 
         /// <summary>ジャスト防御の許容幅。</summary>
-        public static int Width(ShieldItems f) => JustWidth + ((f & ShieldItems.Worn) != 0 ? WornWidth : 0);
+        public static int Width(ShieldItems f) => JustWidth + ((f & ShieldItems.Worn) != 0 ? WornWidth : 0) + CardRules.JustWidthAdd;   // 挑戦カード〈見切り〉III: +1
 
         /// <summary>【ジャスト防御】の判定 (予告 <paramref name="enemyAttack"/>・防御 <paramref name="guard"/> = ブロック + シールド)。 HP を失わなかったかは呼び手が見る。</summary>
         public static bool IsJustGuard(int enemyAttack, int guard, int width)

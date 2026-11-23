@@ -333,9 +333,10 @@ namespace MetaProgression.Achievements
                 if (run.difficulty >= ChallengeCards.MaxDifficulty) Unlock(Cat.ChallengeVescaD10);
                 CheckSinsAtVesca(state);
             }
-            // あと一ターンだけ: 〈最後の審判〉の刻限の 1 ターン前 (ラン通算の戦闘ターン・0 層は数えない) にボスを倒す
-            int deadline = MetaDebuffApplicator.GetJudgmentTurnThreshold();
-            if (deadline > 0 && state.totalCombatTurns == deadline - 1) Unlock(Cat.HiddenTurn124);
+            // あと一ターンだけ: 〈刻限〉を背負って、 エスカレーションの段が上がる直前のターン (閾値のターン) にボスを倒す
+            //   (2026-11-22: 旧〈最後の審判〉の札を撤去したので、 刻限の札へ付け替えた・id は据え置き)
+            if (ChallengeCards.Held(ChallengeCards.Deadline) != null && result.totalTurns > 0
+                && CombatSystem.Escalation.NextThresholdTurn(result.totalTurns) == result.totalTurns) Unlock(Cat.HiddenTurn124);
         }
 
         /// <summary>3 層 (深さ 5) のボスを倒した: 挑戦の難易度・職業・縛り・揃いの至宝。</summary>
@@ -387,7 +388,7 @@ namespace MetaProgression.Achievements
         {
             var l = new List<string>();
             foreach (var c in ChallengeCards.All)
-                if (!c.isBuff && !c.pending && ChallengeCards.IsSin(c.kind) && !l.Contains(c.kind)) l.Add(c.kind);
+                if (!c.isBuff && ChallengeCards.IsSin(c.kind) && !l.Contains(c.kind)) l.Add(c.kind);
             return l;
         }
 
@@ -474,7 +475,7 @@ namespace MetaProgression.Achievements
             if (meta.achievementBuffsTaken == null) meta.achievementBuffsTaken = new List<string>();
             AddMeta(meta.achievementBuffsTaken, buff.kind);
             foreach (var c in ChallengeCards.All)
-                if (c.isBuff && !c.pending && !meta.achievementBuffsTaken.Contains(c.kind)) return;   // 配られない (pending) バフは数えない
+                if (c.isBuff && !meta.achievementBuffsTaken.Contains(c.kind)) return;
             Unlock(Cat.BuffsAll);
         }
 

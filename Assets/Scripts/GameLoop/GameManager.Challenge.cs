@@ -6,7 +6,7 @@ namespace GameLoop
 {
     /// <summary>
     /// 挑戦カード (docs/GAME.md §23-25) のラン中の流れ。 層 d (1..5) に入るたび、 難易度の引き方 (<see cref="ChallengeCards.Schedule"/>) で
-    /// その場所に割り当てた回数だけ 2 枚から 1 枚を選ぶ。 BOT は <see cref="GameHooks.ChooseChallengeCard"/> (無ければ先頭) でその場で選び、
+    /// その場所に割り当てた 1 回 (各所 1 回まで・2026-11-22) だけ 2 枚から 1 枚を選ぶ。 BOT は <see cref="GameHooks.ChooseChallengeCard"/> (無ければ先頭) でその場で選び、
     /// 人が遊んでいる時は航行の画面の窓まで預ける (<see cref="PendingChallengeTiers"/>)。
     /// </summary>
     public partial class GameManager
@@ -52,7 +52,7 @@ namespace GameLoop
                     // "R:N" = この層で Tier N を本番と同じように 2 枚配って選ぶ (測定: Tier ごとの正味・2026-11-10)
                     if (c.StartsWith("R:") && int.TryParse(c.Substring(2), out int rt))
                     {
-                        var offer = ChallengeCards.Deal(rt, Run.challengePicks);
+                        var offer = ChallengeCards.Deal(rt, Run.challengePicks, Run);
                         if (offer.Count == 0) continue;
                         int pick = GameHooks.ChooseChallengeCard?.Invoke(offer) ?? 0;
                         TakeChallengeCard(offer[Mathf.Clamp(pick, 0, offer.Count - 1)]);
@@ -70,7 +70,7 @@ namespace GameLoop
             {
                 if (e.slot != slot) continue;
                 if (human) { PendingChallengeTiers.Add(e.tier); continue; }
-                var offer = ChallengeCards.Deal(e.tier, Run.challengePicks);
+                var offer = ChallengeCards.Deal(e.tier, Run.challengePicks, Run);
                 if (offer.Count == 0) continue;
                 int pick = GameHooks.ChooseChallengeCard?.Invoke(offer) ?? 0;
                 TakeChallengeCard(offer[Mathf.Clamp(pick, 0, offer.Count - 1)]);
@@ -83,7 +83,7 @@ namespace GameLoop
             get
             {
                 if (Run == null || PendingChallengeTiers.Count == 0) return null;
-                return _challengeOffer ??= ChallengeCards.Deal(PendingChallengeTiers[0], Run.challengePicks);
+                return _challengeOffer ??= ChallengeCards.Deal(PendingChallengeTiers[0], Run.challengePicks, Run);
             }
         }
 
@@ -102,58 +102,26 @@ namespace GameLoop
             Run.challengePicks.Add(card);
             Run.InvalidateCardChallenge();
             ChallengeCards.Split(card, out var deb, out var buf);
-            Log($"挑戦カード: − {ChallengeCards.Text(deb)} ／ + {ChallengeCards.Text(buf)}");
+            Log(buf != null ? $"挑戦カード: − {ChallengeCards.Text(deb)} ／ + {ChallengeCards.Text(buf)}" : $"挑戦カード (大罪): − {ChallengeCards.Text(deb)}");
             MetaProgression.Achievements.AchievementService.NoteChallengeCardTaken(buf);   // 実績〈品揃え〉
-            // 七つの大罪 (IV・2026-11-10): 受けた時に効く 2 枚
+            // 七つの大罪 (IV・2026-11-22): 受けた時に効く 2 柱
             if (deb != null && deb.kind == ChallengeCards.SinGreed)
             {
-                Log($"大罪:強欲: 所持金 {Run.coins}G と消耗品 {Run.ownedConsumables?.Count ?? 0} 個を失った");
+                Log($"{PermanentDebuffIds.Greed}: 所持金 {Run.coins}G と消耗品 {Run.ownedConsumables?.Count ?? 0} 個を失った (5 層の店は使えない)");
                 Run.coins = 0;
                 Run.ownedConsumables?.Clear();
-                // 最も高価なパッシブを失う (進行用の品と武器は除く)
-                var db = ItemSystem.ItemDatabase.Instance;
-                for (int k = 0; k < ChallengeCards.SinGreedPassives && db != null && Run.ownedPassiveItems != null; k++)
-                {
-                    int best = -1, bestPrice = -1;
-                    for (int i = 0; i < Run.ownedPassiveItems.Count; i++)
-                    {
-                        string id = Run.ownedPassiveItems[i];
-                        if (!ItemIds.CanBeTakenBySin(id)) continue;
-                        var it = db.GetItem(id);
-                        if (it == null || it.category == ItemSystem.ItemCategory.Weapon) continue;
-                        if (it.basePrice > bestPrice) { bestPrice = it.basePrice; best = i; }
-                    }
-                    if (best < 0) break;
-                    Log($"大罪:強欲: {Run.ownedPassiveItems[best]} を失った");
-                    Run.ownedPassiveItems.RemoveAt(best);
-                }
-                ItemSystem.PassiveSkills.RunPassiveSync.RefreshFromRun(Run);
-            }
-            if (deb != null && deb.kind == ChallengeCards.SinLust)
-            {
-                var cands = new List<string>();
-                if (Run.ownedPassiveItems != null)
-                    foreach (var id in Run.ownedPassiveItems)
-                        if (ItemIds.CanBeTakenBySin(id) && !Run.sinSealedPassives.Contains(id) && !cands.Contains(id)) cands.Add(id);
-                for (int k = 0; k < (int)deb.value && cands.Count > 0; k++)
-                {
-                    int at = GameRng.Range(0, cands.Count, "challenge.lust", k);
-                    Run.sinSealedPassives.Add(cands[at]); cands.RemoveAt(at);
-                }
-                ItemSystem.PassiveSkills.RunPassiveSync.RefreshFromRun(Run);
-                Log("大罪:色欲: 働かなくなった品 = " + string.Join("・", Run.sinSealedPassives));
             }
             if (deb != null && deb.kind == ChallengeCards.SinGluttony)
             {
-                int cut = Mathf.Max(1, Mathf.RoundToInt(Run.playerMaxHP * ChallengeCards.SinGluttonyMaxHpPct / 100f));
+                int cut = Mathf.Max(1, Mathf.RoundToInt(Run.playerMaxHP * deb.value2 / 100f));   // デバフの丸め (四捨五入)
                 Run.playerMaxHP = Mathf.Max(1, Run.playerMaxHP - cut);
                 Run.playerHP = Mathf.Min(Run.playerHP, Run.playerMaxHP);
-                Log($"大罪:暴食: 最大 HP −{cut} ({Run.playerHP}/{Run.playerMaxHP})");
+                Log($"{PermanentDebuffIds.Gluttony}: 最大 HP −{cut} ({Run.playerHP}/{Run.playerMaxHP})");
             }
             if (buf != null && buf.kind == ChallengeCards.MaxHp)
             {
-                // 最大 HP +N%: 受けた時に上げ、 上がった分だけ今の HP も増やす
-                int add = Mathf.Max(1, Mathf.RoundToInt(Run.playerMaxHP * buf.value / 100f));
+                // 〈地力〉最大 HP +N%: 受けた時に上げ、 上がった分だけ今の HP も増やす (バフの丸め = 切り上げ)
+                int add = Mathf.Max(1, Mathf.CeilToInt(Run.playerMaxHP * buf.value / 100f));
                 Run.playerMaxHP += add; Run.playerHP += add;
                 Log($"挑戦カード: 最大 HP +{add} ({Run.playerHP}/{Run.playerMaxHP})");
             }

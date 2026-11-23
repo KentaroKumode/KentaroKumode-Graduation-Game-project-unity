@@ -61,7 +61,7 @@ namespace GameLoop
             var dance = pool.FindAll(it => it != null && it.rarity == ItemSystem.ItemRarity.LEGENDARY && IsDance(it.internalName));
             if (dance.Count == 0 || !GameRng.Chance(ItemSystem.Shop.ShopManager.SaberWaltzShopBias, rngKey)) return picked;
             var d = dance[GameRng.RangeAuto(rngKey + ".pick", 0, dance.Count)];
-            UnityEngine.Debug.Log($"[剣の舞] LEGENDARY の枠を差し替え: {picked.internalName} → {d.internalName} ({rngKey})");
+            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[剣の舞] LEGENDARY の枠を差し替え: {picked.internalName} → {d.internalName} ({rngKey})");
             return d;
         }
 

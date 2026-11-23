@@ -71,7 +71,6 @@ namespace EventSystem.TimedEffects
             Register(new Effects.LiberatorEffect());
             Register(new Effects.MutualAidEffect());
             Register(new Effects.BeastBondEffect());
-            Register(new Effects.BeastFavorEffect());
             Register(new Effects.MissionEffect());
             Register(new Effects.CursedThirstEffect());
             Register(new Effects.DeadInvitationEffect());

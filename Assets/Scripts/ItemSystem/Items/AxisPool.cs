@@ -43,7 +43,22 @@ namespace ItemSystem
             if (run.lockedAxes.Contains(axis) || run.lockedAxes.Count >= LockSlots) return;
             run.lockedAxes.Add(axis);
             if (run.lockedAxes.Count == LockSlots) { LocksCompleted++; LockFloorSum += run.currentFloor; }
-            UnityEngine.Debug.Log($"[出現の枠] {axis} を登録 ({run.lockedAxes.Count}/{LockSlots}{(run.lockedAxes.Count == LockSlots ? "・ロック成立" : "")})");
+            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[出現の枠] {axis} を登録 ({run.lockedAxes.Count}/{LockSlots}{(run.lockedAxes.Count == LockSlots ? "・ロック成立" : "")})");
+        }
+
+        /// <summary>主軸: ロック成立後、 4 枠の軸のうち所持数 (<see cref="AxisRules.Count"/>) が単独 1 位の軸。 ロック前・同率 1 位・所持 0 なら null。
+        /// 計装だけ (<see cref="MainAxisPicks"/>)。 主軸共鳴 (主軸の重み ×2) は 2026-11-22 neon 収束 §4 で撤去し、 ロック後の 4 枠は均等 (1:1:1:1)。</summary>
+        public static string MainAxis(RunState run)
+        {
+            if (!IsLocked(run)) return null;
+            string best = null; int bestN = 0; bool tie = false;
+            foreach (var a in run.lockedAxes)
+            {
+                int n = AxisRules.Count(run, a);
+                if (n > bestN) { bestN = n; best = a; tie = false; }
+                else if (n == bestN && n > 0) tie = true;
+            }
+            return tie ? null : best;
         }
 
         /// <summary>画面に出す 4 枠 (「[毒][充電][？][？]」)。 地図と店の上に出す。</summary>
@@ -61,7 +76,7 @@ namespace ItemSystem
             ItemRarity.BRONZE => 15, ItemRarity.SILVER => 22, ItemRarity.GOLD => 35, _ => r >= ItemRarity.LEGENDARY ? 50 : 15,
         };
 
-        /// <summary>提示 (id の並び) を見送った時の額: 提示の中で一番高いレア度の額 (〈銭皿〉を持っていれば +50%・切り上げ・<see cref="PassiveSkills.Effects.CoinDish"/>)。
+        /// <summary>提示 (id の並び) を見送った時の額: 提示の中で一番高いレア度の額 (〈銭皿〉を持っていれば +100%・切り上げ・<see cref="PassiveSkills.Effects.CoinDish"/>)・挑戦カードの増減 (<see cref="MetaProgression.MetaDebuffApplicator.ApplySkipGold"/>)。
         /// 秘宝が 1 つも無ければ 0。 <paramref name="run"/> を省くと今のラン。</summary>
         public static int SkipGoldFor(IEnumerable<string> ids, RunState run = null)
         {
@@ -72,7 +87,7 @@ namespace ItemSystem
                 var d = ItemDatabase.Instance?.GetItem(id);
                 if (d != null && d.IsPassive) best = System.Math.Max(best, SkipGold(d.rarity));
             }
-            return PassiveSkills.Effects.CoinDish.Apply(run ?? GameManager.Instance?.Run, best);
+            return MetaProgression.MetaDebuffApplicator.ApplySkipGold(PassiveSkills.Effects.CoinDish.Apply(run ?? GameManager.Instance?.Run, best));   // 挑戦カード〈買い叩き〉〈目利き〉・クァディルの色欲 (0 = 見送れない)
         }
 
         /// <summary>見送りを受け取る (ゴールドを足して数える)。 実際に入った額を返す。</summary>
@@ -80,7 +95,7 @@ namespace ItemSystem
         {
             int gold = GoldIncome.Gain(run, SkipGoldFor(ids, run), "見送り(" + source + ")");
             Skips++; SkipGoldTotal += gold; RunSkips++; RunSkipGold += gold;
-            UnityEngine.Debug.Log($"[見送り] {source}: +{gold}G");
+            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[見送り] {source}: +{gold}G");
             return gold;
         }
 
@@ -116,16 +131,19 @@ namespace ItemSystem
                     && ax * (outside.Count + (FocusWeight - 1f) * outFocus.Count) < FocusWeight * outFocus.Count) return Note(Outside, outFocus);
                 return Note(Outside, outside);
             }
-            // 軸は Ranked の順に並べて重みで引く (辞書の列挙順に頼らない)
+            // 軸は Ranked の順に並べて重みで引く (辞書の列挙順に頼らない)。 指定の軸だけ ×FocusWeight (主軸共鳴の ×2 は 2026-11-22 neon 収束で撤去)
+            string main = MainAxis(run);      // 計装だけ
+            float W(string a) => a == focus ? FocusWeight : 1f;
             float total = 0f;
-            foreach (var a in AxisRules.Ranked) if (byAxis.ContainsKey(a)) total += a == focus ? FocusWeight : 1f;
+            foreach (var a in AxisRules.Ranked) if (byAxis.ContainsKey(a)) total += W(a);
             float r = ax * total; string pick = null;
             foreach (var a in AxisRules.Ranked)
             {
                 if (!byAxis.ContainsKey(a)) continue;
                 pick = a;
-                if ((r -= a == focus ? FocusWeight : 1f) < 0f) break;
+                if ((r -= W(a)) < 0f) break;
             }
+            if (pick == main && main != null) { MainAxisPicks++; RunMainAxisPicks++; }
             return Note(pick, byAxis[pick]);
         }
 
@@ -144,15 +162,23 @@ namespace ItemSystem
         /// <summary>第 1 段で選んだ軸 (と <see cref="Outside"/>) の回数。</summary>
         public static readonly Dictionary<string, long> Drawn = new Dictionary<string, long>();
         public static long Skips, SkipGoldTotal, LocksCompleted, LockFloorSum;
+        /// <summary>第 1 段で主軸 (<see cref="MainAxis"/>) を引いた回数 (バッチ累計・「主軸共鳴:回」の名前のまま)。 2026-11-22 neon 収束で重みは撤去したので、
+        /// 今は「均等の 4 枠から所持が一番多い軸がたまたま出た回数」= 供給の集中の計装 (重みのあった頃の値と比べない)。</summary>
+        public static long MainAxisPicks;
         /// <summary>今のランの見送り換金の回数と額 (ランの頭で BOT が 0 に戻す・ランの記録の skipFired / skipGold)。</summary>
         public static int RunSkips, RunSkipGold;
-        public static void ResetStats() { Drawn.Clear(); Skips = SkipGoldTotal = LocksCompleted = LockFloorSum = 0; }
+        /// <summary>今のランの店の軸指定リロールの回数 (GameManager.ShopReroll・ランの頭で BOT が 0 に戻す・ランの記録の axisRerollFired)。</summary>
+        public static int RunAxisRerolls;
+        /// <summary>今のランの第 1 段で主軸を引いた回数 (ランの頭で BOT が 0 に戻す・ランの記録の mainAxisPicks)。</summary>
+        public static int RunMainAxisPicks;
+        public static void ResetStats() { Drawn.Clear(); Skips = SkipGoldTotal = LocksCompleted = LockFloorSum = MainAxisPicks = 0; }
 
         /// <summary>計装を経路の集計 (PassiveSourceAudit.Counts) へ「軸抽選:」「見送り:」「ロック:」付きで混ぜる (並列ワーカーの返し・通常バッチのサマリー)。</summary>
         public static void WriteStats(Dictionary<string, int> into)
         {
             foreach (var kv in Drawn) into["軸抽選:" + kv.Key] = (int)System.Math.Min(int.MaxValue, kv.Value);
             into["見送り:回"] = (int)Skips; into["見送り:G"] = (int)SkipGoldTotal;
+            into["主軸共鳴:回"] = (int)System.Math.Min(int.MaxValue, MainAxisPicks);
             into["ロック:成立"] = (int)LocksCompleted; into["ロック:成立の層の和"] = (int)LockFloorSum;
         }
 

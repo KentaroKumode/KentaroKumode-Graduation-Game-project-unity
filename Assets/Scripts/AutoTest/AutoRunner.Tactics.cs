@@ -110,7 +110,7 @@ namespace AutoTest
             bool oil = own.Contains(ItemIds.TacticOil) && Consumables.CanUse(run, ItemIds.TacticOil);
             bool orb = own.Contains(ItemIds.TacticOrb) && Consumables.CanUse(run, ItemIds.TacticOrb);
             bool needle = own.Contains(ItemIds.TacticNeedle) && Consumables.CanUse(run, ItemIds.TacticNeedle);
-            bool swap = own.Contains(ItemIds.TacticSwap) && Consumables.CanUse(run, ItemIds.TacticSwap) && cm.CatPawSlot < 0;   // 猫の手が挿した場の添字を引き直しで崩さない
+            bool swap = own.Contains(ItemIds.TacticSwap) && Consumables.CanUse(run, ItemIds.TacticSwap);
             if (!oil && !orb && !needle && !swap) return;
             var ev = PrepareDeckEval(rolls, tele);
             var dice = (int[])rolls.Clone(); Array.Sort(dice);      // BestDeckUtilityOver は昇順の出目を取る

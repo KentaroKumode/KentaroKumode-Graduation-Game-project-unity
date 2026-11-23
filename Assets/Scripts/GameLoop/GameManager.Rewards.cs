@@ -152,9 +152,9 @@ namespace GameLoop
             MetaProgression.MetaTokenEarner.OnEnemyDefeated();
 
             bool isBossNodeForMeta = node != null && node.type == TileType.Boss;
-            int metaWinGold = (isBossNodeForMeta
+            int metaWinGold = isBossNodeForMeta
                 ? MetaProgression.MetaBuffApplicator.GetBossGoldBonus()
-                : 0) + MetaProgression.MetaBuffApplicator.GetWinGoldBonus();   // 挑戦カード: 戦闘に勝つたびゴールド +N
+                : 0;
 
             // ボス勝利 → フロアクリア
             if (node.type == TileType.Boss)
@@ -188,16 +188,14 @@ namespace GameLoop
                     }
                 }
 
-                // 1層ボス（トレジャーゴブリン）: 良質な武器/パッシブを1個ドロップ
-                if (Run.Depth == 1)
+                // ボスの報酬 (2026-11-22・neon 最終仕上げ §1-4): ファーム層と最終のボス (ヴェスカ) 以外は、 撃破で GOLD / LEGENDARY の秘宝の 3 択 (見送り換金あり)。
+                //   旧 1 層ボス (トレジャーゴブリン) の単発の品 (武器か秘宝・SILVER 以上) はこれへ統合した
+                pendingRewardChoices.Clear();
+                rewardChoiceIndex = 0;
+                if (!MapSystem.FreeMove.FloorPlan.IsFarm(Run.currentFloor) && (CurrentEnemy == null || !CurrentEnemy.id.StartsWith(BossIds.Layer7Prefix)))
                 {
-                    string dropId = PickTreasureGoblinDrop();
-                    if (!string.IsNullOrEmpty(dropId))
-                    {
-                        Loadout.Gain(Run, dropId);
-                        var dd = ItemDatabase.Instance?.GetItem(dropId);
-                        Log($"トレジャーゴブリン討伐報酬: {(dd != null ? dd.displayName : dropId)} を獲得");
-                    }
+                    var bossOffer = PickRewardOffer(passiveOnly: true, ItemRarity.GOLD, "reward.boss");
+                    if (bossOffer.Count > 0) pendingRewardChoices.Add(bossOffer);
                 }
 
                 int rewardBase = FloorManager.CalculateRewardCoins(Run.Depth, true, result.totalTurns) * 2;
@@ -298,20 +296,20 @@ namespace GameLoop
             if (!EventSystem.TimedEffects.BattleBoonRule.GrantsDrops(LastBattleBoon)) { RunStats.ToilBlockedDrops += drops; drops = 0; }   // [計装 2026-11-14] 止めた数を数えるだけ
             if (LastBattleBoon != EventSystem.TimedEffects.BattleBoon.None) Log(BattleBoonLine);
 
-            // 各ドロップを「同カテゴリ・同レア度の2択」として保留。
+            // 各ドロップを「同カテゴリ・同レア度の 3 択」として保留 (2026-11-22・旧 2 択)。 エリートは秘宝だけ (neon 最終仕上げ §1-4・レア度の縛りは 2026-11-22 に外した = ふつうのレア度の重み・作者の決定 C)。
             // 相方候補が無い場合のみ即時付与（単体ドロップにフォールバック）。
             pendingRewardChoices.Clear();
             rewardChoiceIndex = 0;
             for (int d = 0; d < drops; d++)
             {
-                var (a, b) = PickTreasureChoicePair();
-                if (string.IsNullOrEmpty(a)) continue;
-                if (string.IsNullOrEmpty(b))
+                var offer = eliteWin ? PickRewardOffer(passiveOnly: true, null, "reward.elite") : PickRewardOffer(passiveOnly: false, null, "reward");
+                if (offer.Count == 0) continue;
+                if (offer.Count == 1 && !ItemDatabase.Instance.GetItem(offer[0]).IsPassive)
                 {
-                    GrantRewardItem(a, eliteWin);
+                    GrantRewardItem(offer[0], eliteWin);
                     continue;
                 }
-                pendingRewardChoices.Add((a, b));
+                pendingRewardChoices.Add(offer);
             }
 
             SetPhase(GamePhase.Reward);
@@ -463,32 +461,6 @@ namespace GameLoop
             return picked?.internalName;
         }
 
-        /// <summary>1層ボス(トレジャーゴブリン)のドロップ抽選。武器+パッシブから、SILVER以上を優先。</summary>
-        private string PickTreasureGoblinDrop()
-        {
-            var db = ItemDatabase.Instance;
-            if (db == null) return null;
-            var all = db.GetAllItems();
-            if (all == null || all.Count == 0) return null;
-
-            var dedup = BuildDedupExclude();
-            var pool = new System.Collections.Generic.List<CompleteItemData>();
-            foreach (var it in all)
-            {
-                if (it == null) continue;
-                if (it.category != ItemCategory.Weapon && it.category != ItemCategory.Passive) continue;
-                if (!ItemSystem.Shop.EventOnlyItemFilter.IsAllowed(it)) continue;
-                if (dedup.Contains(it.internalName)) continue;   // ラン重複排除
-                pool.Add(it);
-            }
-            if (pool.Count == 0) return null;
-
-            // 「いい感じ」: SILVER 以上を優先抽選、該当無しなら全プール
-            var picked = ItemSystem.RarityWeightedPicker.Pick(pool, ItemRarity.SILVER)
-                         ?? ItemSystem.RarityWeightedPicker.Pick(pool);
-            return AxisPool.Repick(Run, picked, pool, "goblin.axis")?.internalName;   // 秘宝なら同じレア度の中で軸を均す
-        }
-
         /// <summary>報酬確認→マップに戻る or フロアクリア</summary>
         public void ConfirmReward()
         {
@@ -629,14 +601,17 @@ namespace GameLoop
             return picked?.internalName;
         }
 
-        /// <summary>戦闘後ドロップ用に「主候補 + 同カテゴリ・同レア度の相方」を抽選する。
-        /// 相方が存在しなければ b = null（単体ドロップ扱い）。</summary>
-        private (string a, string b) PickTreasureChoicePair()
+        /// <summary>報酬の候補の数 (2026-11-22・旧 2)。</summary>
+        public const int RewardOfferSize = 3;
+
+        /// <summary>戦闘報酬の提示 (主候補 + 同カテゴリ・同レア度の相方 最大 2 つ)。 <paramref name="passiveOnly"/> = 秘宝だけ (エリート・ボス)。
+        /// <paramref name="minRarity"/> = 最低のレア度 (ボス GOLD・エリートは縛りなし)。 相方が同じレア度で足りなければ minRarity 以上から足す。 候補が無ければ空。</summary>
+        private System.Collections.Generic.List<string> PickRewardOffer(bool passiveOnly, ItemRarity? minRarity, string key)
         {
+            var offer = new System.Collections.Generic.List<string>();
             var db = ItemDatabase.Instance;
-            if (db == null) return (null, null);
-            var all = db.GetAllItems();
-            if (all == null || all.Count == 0) return (null, null);
+            var all = db?.GetAllItems();
+            if (all == null || all.Count == 0) return offer;
 
             var dedup = BuildDedupExclude();
             var pool = new System.Collections.Generic.List<CompleteItemData>();
@@ -646,41 +621,40 @@ namespace GameLoop
                 if (it.category == ItemCategory.Weapon) continue;
                 if (it.category == ItemCategory.Quest) continue;
                 if (it.category == ItemCategory.Dice) continue;   // 賽は店とイベントの交換で装備する物 (所持の一覧に入れても働かない)
+                if (passiveOnly && !it.IsPassive) continue;
                 if (!ItemSystem.Shop.EventOnlyItemFilter.IsAllowed(it)) continue;
                 if (dedup.Contains(it.internalName)) continue;   // ラン重複排除
                 pool.Add(it);
             }
-            if (pool.Count == 0) return (null, null);
+            if (pool.Count == 0) return offer;
 
-            CompleteItemData first;
+            ItemRarity? minR = minRarity;
             if (Run != null && Run.nextLootMinRarity >= 0)
             {
-                var minR = (ItemRarity)Run.nextLootMinRarity;
+                var loot = (ItemRarity)Run.nextLootMinRarity;
                 Run.nextLootMinRarity = -1;
-                first = ItemSystem.RarityWeightedPicker.Pick(pool, minR)
-                        ?? ItemSystem.RarityWeightedPicker.Pick(pool);
+                if (!minR.HasValue || loot > minR.Value) minR = loot;
             }
-            else
-            {
-                first = ItemSystem.RarityWeightedPicker.Pick(pool);
-            }
+            CompleteItemData first = (minR.HasValue ? ItemSystem.RarityWeightedPicker.Pick(pool, minR) : null)
+                                     ?? ItemSystem.RarityWeightedPicker.Pick(pool, minRarity);
             // 秘宝: 同じレア度の中で軸を均す (秘宝と消耗品の割合・レア度の出方はそのまま・出現の枠の外の軸は出さない)
-            first = AxisPool.Repick(Run, first, pool, "reward.axis");
-            if (first == null) return (null, null);
+            first = AxisPool.Repick(Run, first, pool, key + ".axis");
+            if (first == null) return offer;
+            offer.Add(first.internalName);
 
-            // 同カテゴリ・同レア度の相方候補（自身は除外）
-            var partners = new System.Collections.Generic.List<CompleteItemData>();
-            foreach (var it in pool)
+            // 相方: 同カテゴリ・同レア度 (足りなければ minRarity 以上)。 秘宝は 1 つずつ軸均等で引く (別の軸になり得る)
+            var same = pool.FindAll(it => it.internalName != first.internalName && it.category == first.category && it.rarity == first.rarity);
+            if (same.Count < RewardOfferSize - 1 && minRarity.HasValue)
+                same = pool.FindAll(it => it.internalName != first.internalName && it.category == first.category && it.rarity >= minRarity.Value);
+            while (offer.Count < RewardOfferSize && same.Count > 0)
             {
-                if (it == null || it.internalName == first.internalName) continue;
-                if (it.category == first.category && it.rarity == first.rarity)
-                    partners.Add(it);
+                var cand = first.IsPassive ? AxisPool.Narrow(Run, same, key + ".axis") : same;
+                if (cand.Count == 0) break;
+                var p = cand[GameLoop.GameRng.RangeAuto("GameManager.8", 0, cand.Count)];
+                offer.Add(p.internalName);
+                same.Remove(p);
             }
-            if (first.IsPassive) partners = AxisPool.Narrow(Run, partners, "reward.axis");   // 相方も軸均等 (別の軸になり得る)
-            string b = partners.Count > 0
-                ? partners[GameLoop.GameRng.RangeAuto("GameManager.8", 0, partners.Count)].internalName
-                : null;
-            return (first.internalName, b);
+            return offer;
         }
 
         /// <summary>報酬アイテムを実際に付与（所持追加＋刻印ロール＋自動装備）。</summary>
@@ -693,29 +667,28 @@ namespace GameLoop
             AddRelicInstabilityIfPassive(itemId);   // 不安定化: 報酬で秘宝を得た +3 (2026-11-13)
         }
 
-        // ---- 戦闘後ドロップ2択: 公開API（UI / Bot から使用）----
+        // ---- 戦闘後ドロップの 3 択: 公開API（UI / Bot から使用）----
 
-        /// <summary>未解決のドロップ2択が残っているか。</summary>
+        /// <summary>未解決のドロップの択が残っているか。</summary>
         public bool HasPendingRewardChoice
             => CurrentPhase == GamePhase.Reward && rewardChoiceIndex < pendingRewardChoices.Count;
 
-        /// <summary>現在提示中の2択のアイテムID。残っていなければ (null,null)。</summary>
-        public (string a, string b) CurrentRewardChoice
-            => HasPendingRewardChoice ? pendingRewardChoices[rewardChoiceIndex] : (null, null);
+        /// <summary>現在提示中の択のアイテムID (最大 <see cref="RewardOfferSize"/>)。残っていなければ空。</summary>
+        public System.Collections.Generic.IReadOnlyList<string> CurrentRewardChoice
+            => HasPendingRewardChoice ? pendingRewardChoices[rewardChoiceIndex] : (System.Collections.Generic.IReadOnlyList<string>)System.Array.Empty<string>();
 
-        /// <summary>現在の2択から which(0/1) を選んで付与し、次の選択へ進める。 which が負 = 見送る (秘宝の 2 択だけ・見送り換金・full-item-rework-spec §1-3)。</summary>
+        /// <summary>現在の択から which (0..) を選んで付与し、次の選択へ進める。 which が負 = 見送る (秘宝の択だけ・見送り換金・full-item-rework-spec §1-3)。</summary>
         public void ResolveRewardChoice(int which)
         {
             if (!HasPendingRewardChoice) return;
-            var pair = pendingRewardChoices[rewardChoiceIndex];
-            if (which < 0 && AxisPool.SkipGoldFor(new[] { pair.a, pair.b }) > 0)
+            var offer = pendingRewardChoices[rewardChoiceIndex];
+            if (which < 0 && AxisPool.SkipGoldFor(offer) > 0)
             {
-                AxisPool.TakeSkip(Run, new[] { pair.a, pair.b }, "戦闘報酬");
+                AxisPool.TakeSkip(Run, offer, "戦闘報酬");
                 rewardChoiceIndex++;
                 return;
             }
-            string chosen = which == 1 ? pair.b : pair.a;
-            GrantRewardItem(chosen, eliteWin: false);
+            GrantRewardItem(offer[System.Math.Max(0, System.Math.Min(which, offer.Count - 1))], eliteWin: false);
             rewardChoiceIndex++;
         }
     }

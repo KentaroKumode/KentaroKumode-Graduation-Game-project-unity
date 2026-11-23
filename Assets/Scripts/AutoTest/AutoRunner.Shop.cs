@@ -214,7 +214,7 @@ namespace AutoTest
                 var s = inv.slots[_exploreCandidates[i]];
                 var data = (s != null && !string.IsNullOrEmpty(s.itemId)) ? db?.GetItem(s.itemId) : null;
                 float w = data != null
-                    ? 1f / Mathf.Max(0.001f, ItemSystem.Shop.ShopManager.TierOfferWeight(data.rarity))
+                    ? 1f / Mathf.Max(0.001f, ItemSystem.Shop.ShopManager.TierOfferWeight(data.rarity, data.IsPassive ? (GameManager.Instance?.Run?.Depth ?? 0) : 0))
                     : 4f;   // rarity 不明 (パーツ/素材) は 1/0.25
                 _exploreWeights.Add(w);
                 total += w;
@@ -447,6 +447,12 @@ namespace AutoTest
         private const int AbacusRerollReserve = 10;
         /// <summary>軸指定リロールを使う最も深い偏重 (仮)。</summary>
         public const int AxisFocusRerollMinDepth = 3;
+        /// <summary>フェーズ2c (余った金の軸指定リロール) を始める画面の層 (中盤から・仮)。</summary>
+        public const int AxisSurplusRerollMinFloor = 2;
+        /// <summary>フェーズ2c で 1 店に回す軸指定リロールの上限の回数 (仮)。</summary>
+        public const int AxisSurplusRerollPerShop = 1;
+        /// <summary>フェーズ2c で、 軸指定リロールの値段の上に残す額 (回した後に 1 品を買える額・仮)。</summary>
+        public const int AxisSurplusReserve = 12;
 
         /// <summary>リロールの直前に、 棚に残っているパッシブ (捨てられる枠) を数えてからリロールする。
         /// <paramref name="need"/> = 呼び手がリロールを決めたしきい値 (残金がこれ以上なら回す・−1 = 軸指定を考えない)。
@@ -467,6 +473,10 @@ namespace AutoTest
             // 〈目利きの紹介状〉: この店の最初の通常のリロールは無料 ── 軸指定にすると無料が使えないので、 先に無料の 1 回を通常で回す
             var shop = ItemSystem.Shop.ShopManager.Instance?.Current;
             if (shop != null && !shop.freeRerollUsed && run.OwnsPassive(ItemIds.MacroLetter)) return null;
+            // 寄せの軸 (buyAxisFocus) が出現の枠にあれば、 所持数に関わらずそれを指定する (2026-11-22・一番多い軸を掘ると寄せの腕で別の軸を掘っていた)
+            if (!string.IsNullOrEmpty(buyAxisFocus))
+                foreach (var a in buyAxisFocus.Split(',', '、'))
+                    if (run.lockedAxes.Contains(a.Trim())) return a.Trim();
             string best = null; int bestD = 0;
             foreach (var ax in run.lockedAxes)
             {
@@ -582,6 +592,8 @@ namespace AutoTest
                     if (s == null || s.sold
                         || s.price > GameLoop.ProvisionPayment.PolicyAffordable(run) - _shopReserve)
                         return false;
+                    if (s.kind == ItemSystem.Shop.ShopSlotKind.Passive && BotHooks.BlocksFocusSlot(run, s.itemId)) return false;   // 寄せる軸の最後の枠を残す
+                    if (BotHooks.IsBanned(s.itemId)) return false;   // 依存の測定 (botBanItemIds)
                     int before = run.coins;
                     string id = s.itemId;
                     gm.ShopBuy(i);
@@ -903,6 +915,7 @@ namespace AutoTest
                     if (s == null || s.sold) return false;
                     // 兵站 r10 (物資払い) を織り込んだ支払い可能額。 規則より保守的な PolicyFloor。
                     if (s.price > GameLoop.ProvisionPayment.PolicyAffordable(run) - _shopReserve) return false;
+                    if (BotHooks.IsBanned(s.itemId)) return false;   // 依存の測定 (botBanItemIds)
                     // **武器は装備判定を通す** (2026-08-10)。 主経路にゲートが無く素通りしていた。
                     if (s.kind == ShopSlotKind.Weapon && !WouldBuyWeapon(run, s.itemId)) return false;
                     // 賽は買うと今の賽と入れ替わる (ADR-0015)。 今の賽より良い時だけ買う (武器の装備判定と同じ関所)。
@@ -1327,6 +1340,31 @@ namespace AutoTest
                     NoteSurplusExit(exitWhy, run.coins);
                 }
                 }   // !RerollStopRule
+
+                // ============================================================
+                // フェーズ2c: 寄せの軸の軸指定リロール (2026-11-22・neon 最終仕上げ §1-2)
+                //   買い終えた後に、 中盤から (画面の層 AxisSurplusRerollMinFloor 以上) 余った金で 1 店に AxisSurplusRerollPerShop 回まで回す
+                //   (旧: 上のリロールが軸を指定するだけで 1 ランに約 1 回)。 指定する軸と残す額の判定は AxisRerollFocus (寄せの軸・無ければ偏重 3 以上の一番の軸)
+                // ============================================================
+                if (axisFocusReroll && run.currentFloor >= AxisSurplusRerollMinFloor)
+                {
+                    for (int k = 0; k < AxisSurplusRerollPerShop; k++)
+                    {
+                        int sb5 = 0;
+                        while (BuyPriorityPass(AutoTest.LearnedPriorityProvider.PowerCuts[3]) && sb5++ < 30) { }
+                        int price = inv.CurrentRerollPrice;
+                        if (price <= 0 || AxisRerollFocus(run, price + AxisSurplusReserve) == null) break;
+                        int beforeR = run.coins;
+                        NoteShelfDiscard();   // [計装] 捨てる棚を数える
+                        if (!AuditedReroll(gm, inv, price + AxisSurplusReserve)) break;
+                        if (_shopReserve > 0) _shopReserve = inv.CurrentRerollPrice;
+                        _cur.shopRerolls++;
+                        _cur.shopRerollCoins += (beforeR - run.coins);
+                        NoteReroll(1, beforeR - run.coins);
+                    }
+                    int sb6 = 0;
+                    while (BuyPriorityPass(AutoTest.LearnedPriorityProvider.PowerCuts[3]) && sb6++ < 30) { }
+                }
 
                 // (旧フェーズ2.5 の強盗判定はフェーズ0 へ移動 ── 買う前に撃つ)
 

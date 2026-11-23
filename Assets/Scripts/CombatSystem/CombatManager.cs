@@ -143,7 +143,6 @@ namespace CombatSystem
             _fleeRequested = true;
             return true;
         }
-        private bool wrathDiceOverrideArmed; // 恒久デバフ「憤怒」: 1T目のダイス最大化トリガー
         private int playerDiceCount;
         private int playerDiceMax;
         private int playerAttackPower = 2;            // #2 案A': 装備武器の素火力（勝利base = attackPower + floor(|差|/3)）
@@ -312,7 +311,7 @@ namespace CombatSystem
                 psm.Context.healAppliedTotal += actualHealed; // 検証計測
             }
 
-            Debug.Log($"[CombatManager] Player healed: {actualHealed} HP ({oldHP} → {playerHP})");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[CombatManager] Player healed: {actualHealed} HP ({oldHP} → {playerHP})");
             return actualHealed;
         }
 
@@ -480,7 +479,7 @@ namespace CombatSystem
             {
                 int before = enemy.maxHP;
                 enemy.maxHP = Mathf.Max(1, Mathf.RoundToInt(enemy.maxHP * thickSkin));
-                Debug.Log($"[厚い皮膚] {enemy.displayName} 最大HP {before} → {enemy.maxHP} (×{thickSkin:F2})");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[厚い皮膚] {enemy.displayName} 最大HP {before} → {enemy.maxHP} (×{thickSkin:F2})");
             }
             // T4-B〈鋼の皮膚〉: **ボスだけ**最大HP ×1.20。 厚い皮膚 (全敵) と対象を分ける。
             {
@@ -489,7 +488,7 @@ namespace CombatSystem
                 {
                     int before = enemy.maxHP;
                     enemy.maxHP = Mathf.Max(1, Mathf.RoundToInt(enemy.maxHP * bossHp));
-                    Debug.Log($"[鋼の皮膚] {enemy.displayName} 最大HP {before} → {enemy.maxHP} (×{bossHp:F2})");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[鋼の皮膚] {enemy.displayName} 最大HP {before} → {enemy.maxHP} (×{bossHp:F2})");
                 }
             }
 
@@ -629,7 +628,7 @@ namespace CombatSystem
                         foreach (var sp in secondaryEnemy.passiveSkills)
                             if (sp != null) enemySkills.Add(sp);
 
-                    Debug.Log($"[2体戦] 2体目: {secondaryEnemy.displayName} HP{secondaryHP} "
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[2体戦] 2体目: {secondaryEnemy.displayName} HP{secondaryHP} "
                             + $"攻{secondaryEnemy.EffectiveBaseAttack} "
                             + $"パッシブ{(secondaryEnemy.passiveSkills?.Count ?? 0)}件 (同名は1回のみ登録)");
                 }
@@ -672,7 +671,7 @@ namespace CombatSystem
             //   プレイヤーの土台 = 初期値 + 武器 + 整備パネル〈装甲〉。 アイテムの def / pen は毎ターン OnPostRoll で乗る。
             if (ctx != null)
             {
-                ctx.enemyDefense = Math.Max(0, enemy.defense) + MetaProgression.MetaDebuffApplicator.GetEnemyDefenseBonus();   // 挑戦カード: 敵の防御 +N
+                ctx.enemyDefense = Math.Max(0, enemy.defense);
                 ctx.enemyArmorPen = GameLoop.GameHooks.EnemyArmorPen(enemy.id, enemy.armorPen);   // [測定] 差し替えの口 (既定 null = データの値)
                 ctx.playerDefenseBase = DefenseFormula.PlayerBaseDefense + _weaponDefense + MetaProgression.MetaBuffApplicator.GetArmorDefense()
                                       + MetaProgression.Relics.RelicApplicator.GetDefense();   // 遺物 (§15-5) 防御 +N
@@ -724,7 +723,7 @@ namespace CombatSystem
                 if (relicRun != null && relicRun.carriedShield > 0)
                 {
                     openingShield += relicRun.carriedShield;
-                    Debug.Log($"[MetaBuff] シールド持ち越し +{relicRun.carriedShield} (〈剛胆〉)");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[MetaBuff] シールド持ち越し +{relicRun.carriedShield} (〈剛胆〉)");
                     relicRun.carriedShield = 0;
                 }
                 if (openingShield > 0)
@@ -735,7 +734,7 @@ namespace CombatSystem
                     ctx.shieldGainedTotal += gained;
                     // 開幕シールドは戦闘中持続
                     if (ctx.consShieldExpireTurn == 0) ctx.consShieldExpireTurn = -1;
-                    Debug.Log($"[MetaBuff] 開幕シールド +{gained} (遺物+持ち越し)");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[MetaBuff] 開幕シールド +{gained} (遺物+持ち越し)");
                 }
 
                 // 遺物 (§15-5): 開幕の充電・出血・毒。 いずれも戦闘開始時に 1 回だけ。
@@ -754,20 +753,20 @@ namespace CombatSystem
                 if (rp > 0)
                 {
                     ctx.AddStatus(ItemSystem.PassiveSkills.StatusTarget.Enemy, "poison", rp);
-                    Debug.Log($"[遺物] 開幕毒 +{rp}");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[遺物] 開幕毒 +{rp}");
                 }
             }
             // 2026-07-25 v6: 種火 (充電/臨界/毒/出血) の r2 効果 - 戦闘開始時に適用
             if (ctx != null)
             {
-                // 臨界の品を 1 つ以上持つ戦闘は臨界が動く (閾値 30・〈早沸かし釜〉〈恒温の竈〉は HeatCore の旗・品の OnBattleStart より前)
+                // 臨界の品を 1 つ以上持つ戦闘は臨界が動く (閾値 36・〈早沸かし釜〉〈恒温の竈〉は HeatCore の旗・品の OnBattleStart より前)
                 if (ctx.AxisDepth(ItemSystem.PassiveSkills.AxisRules.Heat) > 0) ItemSystem.PassiveSkills.Keywords.Kw.EnableHeat(ctx);
                 // 臨界 r2 保温炉: 前戦闘のメーターを持ち越し (RunState.pendingRinkaiCarryover 経由)
                 var runR = GameLoop.GameManager.Instance?.Run;
                 if (runR != null && runR.pendingRinkaiCarryover > 0)
                 {
                     ctx.rinkaiMeter += runR.pendingRinkaiCarryover;
-                    Debug.Log($"[MetaBuff] 臨界持ち越し: メーター +{runR.pendingRinkaiCarryover}");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[MetaBuff] 臨界持ち越し: メーター +{runR.pendingRinkaiCarryover}");
                     runR.pendingRinkaiCarryover = 0;
                 }
             }
@@ -817,23 +816,26 @@ namespace CombatSystem
             MetaProgression.Achievements.AchievementService.NoteCombatStarted(enemy.id);
 
             
-            // 恒久デバフ「コルヴェンの憤怒」: ボス戦の戦闘開始時、現在HP半減（1T目のダイス最大化は OnRoll で処理）
+            // コルヴェンの憤怒 (挑戦カード IV・2026-11-22): ボス戦の戦闘開始時、 現在 HP −N% (1 は残る)。 そのターンの敵の攻撃 +N% は Escalation.GetMultiplier
             var runForWrath = GameLoop.GameManager.Instance?.Run;
             var nodeForWrath = MapSystem.MapManager.Instance?.CurrentNode;
-            wrathDiceOverrideArmed = false;
-            if (runForWrath != null && nodeForWrath != null
-                && nodeForWrath.type == MapSystem.TileType.Boss
-                && MetaProgression.MetaDebuffApplicator.HasSinWrath)   // 大罪:憤怒 (挑戦カード IV)
-            {
-                int oldHp = playerHP;
-                playerHP = Mathf.Max(1, playerHP / 2); // 割合計算が先
-                wrathDiceOverrideArmed = true;
-                Debug.Log($"[CombatManager] 恒久デバフ {MetaProgression.PermanentDebuffIds.Wrath}: HP {oldHp}→{playerHP}, 1T目ダイス最大化を予約");
-            }
+            if (runForWrath != null && nodeForWrath != null && nodeForWrath.type == MapSystem.TileType.Boss)
+                ApplyWrathHpCut("戦闘開始");
 
-            Debug.Log($"[CombatManager] ===== COMBAT START: {enemy.displayName} =====");
-            Debug.Log($"  Player HP: {playerHP}/{this.playerMaxHP}, Dice: {playerDiceCount}d{playerDiceMax}, Crit: {playerCritBaseRate * 100f:F1}%");
-            Debug.Log($"  Enemy  HP: {enemyHP}/{enemy.maxHP}, Dice: {enemy.DiceNotation}, Threat: {enemy.threat}");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[CombatManager] ===== COMBAT START: {enemy.displayName} =====");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"  Player HP: {playerHP}/{this.playerMaxHP}, Dice: {playerDiceCount}d{playerDiceMax}, Crit: {playerCritBaseRate * 100f:F1}%");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"  Enemy  HP: {enemyHP}/{enemy.maxHP}, Dice: {enemy.DiceNotation}, Threat: {enemy.threat}");
+        }
+
+        /// <summary>コルヴェンの憤怒 (挑戦カード IV): 現在 HP −N% (四捨五入・1 は残る)。 札が無ければ何もしない。 削ったら true。</summary>
+        private bool ApplyWrathHpCut(string when)
+        {
+            float pct = MetaProgression.MetaDebuffApplicator.GetWrathHpCutPct();
+            if (pct <= 0f || playerHP <= 1) return false;
+            int oldHp = playerHP;
+            playerHP = Mathf.Max(1, playerHP - Mathf.RoundToInt(playerHP * pct / 100f));
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[{MetaProgression.PermanentDebuffIds.Wrath}] {when}: HP {oldHp}→{playerHP}");
+            return true;
         }
 
         /// <summary>戦闘中にエネミーを差し替える（ヴェスカの 4 連戦で使用）。
@@ -923,7 +925,7 @@ namespace CombatSystem
                 ctx.enemyDiceMax = newEnemy.EffectiveRollMax;
                 ctx.enemyDiceTotalBonus = 0;
                 ctx.bossDiceBonus = 0; // swapで一旦クリア。新形態の OnBattleStart パッシブ(刹那等)が再設定する
-                ctx.enemyDefense = Math.Max(0, newEnemy.defense) + MetaProgression.MetaDebuffApplicator.GetEnemyDefenseBonus();   // 新形態の防御値を反映 (ADR-0013)・挑戦カードの防御 +N も全段に
+                ctx.enemyDefense = Math.Max(0, newEnemy.defense);   // 新形態の防御値を反映 (ADR-0013)
                 ReapplyTacticAcid(ctx);   // 戦術消耗品〈鎧割りの酸瓶〉は「この戦闘中」なので後の段にも
                 ctx.enemyArmorPen = GameLoop.GameHooks.EnemyArmorPen(newEnemy.id, newEnemy.armorPen);
                 // [計装] 出ていく段の実長を締める。 currentTurn は連戦で通算なので、
@@ -937,15 +939,8 @@ namespace CombatSystem
                 }
                 ctx.phaseStartTurn = ctx.currentTurn + 1;
                 Escalation.PhaseStartTurn = ctx.phaseStartTurn;
-                // 大罪:憤怒 (挑戦カード IV・2026-11-10): ボスの**各形態**の最初のターンも、 現在 HP 半減・自ダイスを全て最大
-                if (MetaProgression.MetaDebuffApplicator.HasSinWrath && CombatSystem.BossParams.IsBoss(newEnemy.id))
-                {
-                    int oldHp = playerHP;
-                    playerHP = Mathf.Max(1, playerHP / 2);
-                    ctx.playerCurrentHP = playerHP;
-                    wrathDiceOverrideArmed = true;
-                    Debug.Log($"[大罪:憤怒] 形態の交代: HP {oldHp}→{playerHP}, 次のターンのダイス最大化を予約");
-                }
+                // コルヴェンの憤怒 (挑戦カード IV): ボスの**各形態**の最初のターンも、 現在 HP −N%
+                if (CombatSystem.BossParams.IsBoss(newEnemy.id) && ApplyWrathHpCut("形態の交代")) ctx.playerCurrentHP = playerHP;
                 ctx.bossId = CombatSystem.BossParams.IsBoss(newEnemy.id) ? newEnemy.id : "";
                 ctx.lastDamageCause = ItemSystem.PassiveSkills.DeathCause.Normal; // 形態swapで死因タグをリセット (前形態の残留防止)
                 // (ADR-0011: 役は毎ターン自動で効き、 使用済みの管理を持たないので、 形態交代で戻すものは無い。)
@@ -955,7 +950,7 @@ namespace CombatSystem
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnBattleStart);
 
             string label = string.IsNullOrEmpty(logLabel) ? newEnemy.displayName : logLabel;
-            Debug.Log($"[CombatManager] ━━ エネミー差し替え: {prevName} → {label} (HP:{enemyHP}/{newEnemy.maxHP}, Dice:{newEnemy.DiceNotation}, Threat:{newEnemy.threat})");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[CombatManager] ━━ エネミー差し替え: {prevName} → {label} (HP:{enemyHP}/{newEnemy.maxHP}, Dice:{newEnemy.DiceNotation}, Threat:{newEnemy.threat})");
 
             // 計測フック: 新フォームを「新エネミーとの遭遇」として通知
             // (AutoRunner 等がチェーン途中フォームのスタッツを取れるようにする)

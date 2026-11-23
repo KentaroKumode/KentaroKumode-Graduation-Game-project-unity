@@ -18,7 +18,7 @@ namespace EventSystem.TimedEffects.Effects
             if (ctx.currentTurn != 1) return;
             int original = ctx.playerDice[0];
             ctx.playerDice[0] = ctx.playerDiceMax;
-            Debug.Log($"[TimedEffect] 星の加護: 最初のダイスを最大値に固定 ({original}→{ctx.playerDiceMax})");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[TimedEffect] 星の加護: 最初のダイスを最大値に固定 ({original}→{ctx.playerDiceMax})");
         }
     }
 
@@ -101,7 +101,7 @@ namespace EventSystem.TimedEffects.Effects
             if (original < ctx.playerDiceMax)
             {
                 ctx.playerDice[minIdx] = ctx.playerDiceMax;
-                Debug.Log($"[TimedEffect] 時の凝視: ダイス[{minIdx}] {original}→{ctx.playerDiceMax}");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[TimedEffect] 時の凝視: ダイス[{minIdx}] {original}→{ctx.playerDiceMax}");
             }
         }
     }

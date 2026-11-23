@@ -274,19 +274,35 @@ namespace UI.Game2D
         private ScreenDef ChallengePick(GameManager gm)
         {
             var offer = gm.ChallengeOffer; int tier = gm.PendingChallengeTiers[0];
-            var d = New("試練をひとつ選ぶ", "Tier " + Game2DModal.ChallengeRomanOf(tier) + (gm.PendingChallengeTiers.Count > 1 ? "  残り " + gm.PendingChallengeTiers.Count : ""), 460);
-            d.body = "選んだ札のデバフとバフを、 両方受ける。";
+            bool sin = tier >= MetaProgression.ChallengeCards.SinTier;
+            var d = New(sin ? "大罪をひとつ背負う" : "試練をひとつ選ぶ", (sin ? "七つの大罪" : "Tier " + Game2DModal.ChallengeRomanOf(tier)) + (gm.PendingChallengeTiers.Count > 1 ? "  残り " + gm.PendingChallengeTiers.Count : ""), 460);
+            d.body = sin ? "裏の恩恵は無い。 5 層の間、 背負った罪が効き続ける。" : "選んだ札のデバフとバフを、 両方受ける。";
             d.bodyLines = 1;
             d.rowH = Game2DModal.ChallengeRowH;
             if (offer != null)
                 foreach (var card in offer)
                 {
                     MetaProgression.ChallengeCards.Split(card, out var deb, out var buf);
-                    d.Items.Add(new ModalItem { challengeTier = tier, deb = MetaProgression.ChallengeCards.Text(deb), buf = MetaProgression.ChallengeCards.Text(buf) });
+                    d.Items.Add(SinOrCardItem(tier, deb, buf));
                 }
             d.buttons.Add(B("受ける", "pick", true));
             d.onAction = (a, sel) => { if (a == "pick") { gm.ResolveChallengePick(Mathf.Clamp(sel, 0, d.Items.Count - 1)); Game2DSfx.Play("ui_confirm"); } Refresh(); };
             return d;
+        }
+
+        /// <summary>挑戦カードの行 (大罪は裏なし・2 段目はフレーバーの一節)。 持ち物のステータスの頁も使う。</summary>
+        internal static ModalItem SinOrCardItem(int tier, MetaProgression.ChallengeCards.Card deb, MetaProgression.ChallengeCards.Card buf)
+        {
+            if (buf == null && deb != null && MetaProgression.ChallengeCards.IsSin(deb.kind))
+                return new ModalItem { challengeTier = 4, deb = MetaProgression.ChallengeCards.Text(deb), buf = null, sub = FirstLine(MetaProgression.ChallengeCards.Flavor(deb)) };
+            return new ModalItem { challengeTier = tier, deb = MetaProgression.ChallengeCards.Text(deb), buf = MetaProgression.ChallengeCards.Text(buf) };
+        }
+
+        private static string FirstLine(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return "";
+            int nl = s.IndexOf((char)10);
+            return (nl >= 0 ? s.Substring(0, nl) : s).Trim();
         }
 
         // ── 休憩 ──
@@ -919,18 +935,20 @@ namespace UI.Game2D
             var d = New("報酬", _lastCoinsGained > 0 ? "+" + _lastCoinsGained + "G" : null);
             if (gm.HasPendingRewardChoice)
             {
-                var (a, b) = gm.CurrentRewardChoice;
-                bool relicPair = ItemSystem.AxisPool.SkipGoldFor(new[] { a, b }) > 0;
-                d.body = relicPair ? "どちらか 1 つを受け取る。 見送ればゴールドになる。" : "どちらか 1 つを受け取る。";
-                foreach (var id in new[] { a, b })
+                var offer = gm.CurrentRewardChoice;
+                bool relicPair = ItemSystem.AxisPool.SkipGoldFor(offer) > 0;
+                string pickLine = offer.Count >= 3 ? "3 つから 1 つを受け取る。" : offer.Count == 2 ? "どちらか 1 つを受け取る。" : "受け取るか選ぶ。";
+                d.body = relicPair ? pickLine + " 見送ればゴールドになる。" : pickLine;
+                foreach (var id in offer)
                 {
                     var data = ItemDatabase.Instance?.GetItem(id);
                     d.Items.Add(new ModalItem { name = data != null ? data.displayName : id, desc = data?.description });
                 }
-                AddInstabilityLine(gm, d, d.Items.Count);   // 不安定化: 2 つから選ぶ報酬の窓にも (2026-11-13)
+                AddInstabilityLine(gm, d, d.Items.Count);   // 不安定化: 択から選ぶ報酬の窓にも (2026-11-13)
                 d.buttons.Add(B("受け取る", "pick", true));
-                if (relicPair) d.buttons.Add(SkipButton(new[] { a, b }));
-                d.onAction = (act, sel) => { if (act == "pick") gm.ResolveRewardChoice(Mathf.Clamp(sel, 0, 1)); else if (act == "skip") gm.ResolveRewardChoice(-1); Refresh(); };
+                if (relicPair) d.buttons.Add(SkipButton(offer));
+                int n = offer.Count;
+                d.onAction = (act, sel) => { if (act == "pick") gm.ResolveRewardChoice(Mathf.Clamp(sel, 0, n - 1)); else if (act == "skip") gm.ResolveRewardChoice(-1); Refresh(); };
                 return d;
             }
             d.body = _lastCoinsGained > 0 ? _lastCoinsGained + "G を手に入れた。" : "戦利品を手に入れた。";

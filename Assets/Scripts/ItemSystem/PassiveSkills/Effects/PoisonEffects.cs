@@ -19,7 +19,7 @@ namespace ItemSystem.PassiveSkills.Effects
 
         public static int Count(CombatContext ctx, string key) => (int)ctx.GetAccumulated(key);
 
-        /// <summary>【起爆】: 敵の毒を半分 (切り上げ) 消費し、 消費量 × 倍率の軽減不可ダメージ (<see cref="PoisonCore.Damage"/>)。
+        /// <summary>【起爆】: 敵の毒を 1/3 (切り上げ) 消費し、 max(消費量 × 倍率, 消費量 × 敵の最大 HP × 0.25%) の軽減不可ダメージ (<see cref="PoisonCore.Damage"/>)。
         /// 起爆したターンの終わりに、 ボスの目盛りのひびが正規のダウンとして割れる (<see cref="ShattersCracksNow"/>)。 戻り値 = ダメージ。</summary>
         public static int Detonate(CombatContext ctx, string label)
         {
@@ -28,7 +28,7 @@ namespace ItemSystem.PassiveSkills.Effects
             int spent = PoisonCore.Spend(p);
             ctx.enemyStatusStacks["poison"] = p - spent;
             int before = Count(ctx, DetonateCountKey);
-            int dmg = PoisonCore.Damage(spent, PoisonCore.ItemsOf(Rw.Run), before, BossDown.ActiveNow);
+            int dmg = PoisonCore.Damage(spent, PoisonCore.ItemsOf(Rw.Run), before, BossDown.ActiveNow, ctx.enemyMaxHP);
             ctx.accumulatedValues[DetonateCountKey] = before + 1;
             ctx.accumulatedValues[DetonatedTurnKey] = ctx.currentTurn;
             CombatManager.DetonateFired++;
@@ -212,7 +212,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>毒棘の小盾: 防御の端子に挿したターン、 ブロック +4 (PoisonCore の旗・Resolve の 5d)。 そのターン、 ブロックで防いだダメージ 4 につき敵に毒 +1 (最大 +6)。</summary>
+    /// <summary>毒棘の小盾: 防御の端子に挿したターン、 ブロック +6 (2026-11-22・旧 +4・PoisonCore の旗・Resolve の 5d)。 そのターン、 ブロックで防いだダメージ 4 につき敵に毒 +1 (最大 +6)。</summary>
     public class ThornBuckler : IPassiveSkillEffect
     {
         public string SkillId => "毒棘の小盾";
@@ -229,7 +229,7 @@ namespace ItemSystem.PassiveSkills.Effects
 
     // ── G: 分岐 A〈蝕み〉/ 分岐 B〈起爆〉 ──
 
-    /// <summary>石抜きの毒指輪 (分岐 B): 敵の毒が 16 以上で攻撃が当たったとき、 自動で【起爆】(1 ターン 1 回)。</summary>
+    /// <summary>石抜きの毒指輪 (分岐 B): 敵の毒が 24 以上 (<see cref="PoisonCore.RingNeed"/>) で攻撃が当たったとき、 自動で【起爆】(1 ターン 1 回)。</summary>
     public class HollowPoisonRing : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "石抜きの毒指輪";
@@ -244,11 +244,11 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>岸上げの麻痺瓶 (分岐 A): 敵の毒 5 につき敵の攻撃 −1 (最大 −10・予告の前)。 敵の攻撃を受けきったターン (HP を失わなかった)、 敵に毒 +5。</summary>
+    /// <summary>岸上げの麻痺瓶 (分岐 A): 敵の毒 4 につき敵の攻撃 −1 (2026-11-22・旧 5 につき・最大 −10・予告の前)。 敵の攻撃を受けきったターン (HP を失わなかった)、 敵に毒 +5。</summary>
     public class Paralysis : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "岸上げの麻痺瓶";
-        public const int Every = 5, MaxCut = 10, Poison = 5;
+        public const int Every = 4, MaxCut = 10, Poison = 5;
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(System.Math.Min(MaxCut, ctx.EnemyPoison / Every));
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnTurnEnd };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
@@ -334,7 +334,7 @@ namespace ItemSystem.PassiveSkills.Effects
         {
             int p = ctx.EnemyPoison;
             if (p < PoisonCore.MantleEchoNeed) return;
-            int dmg = PoisonCore.Damage(PoisonCore.Spend(p), PoisonCore.ItemsOf(Rw.Run), Psn.Count(ctx, Psn.DetonateCountKey), BossDown.ActiveNow, PoisonCore.MantleEchoPct);
+            int dmg = PoisonCore.Damage(PoisonCore.Spend(p), PoisonCore.ItemsOf(Rw.Run), Psn.Count(ctx, Psn.DetonateCountKey), BossDown.ActiveNow, ctx.enemyMaxHP, PoisonCore.MantleEchoPct);
             Kw.DamageEnemy(ctx, dmg);
             Rw.Log($"[瘴気の外套] 毒 {p} → 消費せずに起爆の 50% ({dmg})");
         }

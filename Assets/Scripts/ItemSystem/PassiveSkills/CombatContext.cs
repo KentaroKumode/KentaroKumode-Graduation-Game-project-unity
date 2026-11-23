@@ -140,6 +140,15 @@ namespace ItemSystem.PassiveSkills
         /// <summary>[perTurn] (撃ごとに CombatManager が false に戻す) この撃は会心の乱数を引かない (〈必殺の照準器〉がもう 1 回発火した撃・会心は forceCritThisHit で決まる)。
         /// 乱数のキーの並びを崩さないため (発火した撃の分だけ引く数が増えないように)。</summary>
         public bool critSkipRoll;
+        /// <summary>[perTurn] (撃ごとに CombatManager が 0 に戻す) この 1 撃の会心率への乗算の上乗せ (小数・0.25 = 合算した会心率 ×1.25・〈測量師の片眼鏡〉が OnCriticalCheck で書く・2026-11-23)。
+        /// PassiveSkillManager.ProcessDamage が加算の合計に (1 + これ) を掛ける。 BeginNewTurn で 0。</summary>
+        public float hitCritRateMulAdd;
+        /// <summary>[perTurn] (撃ごとに CombatManager が false に戻す) この撃は【集中】の撃 (CritCore.FocusedRate・PassiveSkillManager.ProcessDamage が書く・2026-11-23)。 BeginNewTurn で false。</summary>
+        public bool hitIsFocused;
+        /// <summary>[perTurn] (撃ごとに CombatManager が 0 に戻す) この撃の集中会心で使った【練気】(集中会心でなければ 0・PassiveSkillManager.ProcessDamage が書く)。 BeginNewTurn で 0。</summary>
+        public int hitFocusSpentRenki;
+        /// <summary>[perTurn] (撃ごとに CombatManager が書く) この撃は〈必殺の照準器〉のもう 1 回の撃 (もう一度集中にならない・【練気】を使わない)。 BeginNewTurn で false。</summary>
+        public bool isRefireHit;
         /// <summary>この撃が本物の主攻撃の撃か (攻撃しないターンの空の 1 回ではない)。</summary>
         public bool IsRealHit => playerWonRoll && hitIndex < hitCount;
         public float criticalMultiplier; // [perTurn] (Phase B で基礎値 + メタ・遺物へ戻す) 会心倍率（既定 2.0。2026-07-26 に 3.0 へ上げ、2026-08-03 に 2.0 へ差し戻し）
@@ -221,8 +230,6 @@ namespace ItemSystem.PassiveSkills
         public bool halveFirstEnemyAttack;
         /// <summary>[persistent] (残り回数・被弾で減る) 獣の絆: 被弾を回数分無効化（>0時、被弾時にデクリメント）</summary>
         public int playerDamageNegateCharges;
-        /// <summary>[persistent] (戦闘開始で立てる) 獣の恩義: 1ターン目の敵ロールを0扱いに（適用後にfalse）</summary>
-        public bool nullifyFirstEnemyRoll;
         /// <summary>[persistent] 呪いの渇き: HP回復効果半減</summary>
         public bool healHalved;
         /// <summary>[perTurn] 狂暴化(ボス50T後): プレイヤーの回復を完全に封じる。毎ターン狂暴化パッシブが再set。BeginNewTurn でリセット。</summary>
@@ -407,7 +414,7 @@ namespace ItemSystem.PassiveSkills
         {
             if (enemyRecurrentTruth)
             {
-                UnityEngine.Debug.Log($"[回帰性真理] 最大HP変更 ({enemyMaxHP}→{value}) を拒否");
+                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[回帰性真理] 最大HP変更 ({enemyMaxHP}→{value}) を拒否");
                 return;
             }
             enemyMaxHP = value;
@@ -483,7 +490,7 @@ namespace ItemSystem.PassiveSkills
                 int absorbed = Keywords.Kw.AbsorbShield(this, dmg, isAttack: false);
                 dmg -= absorbed;
                 dbgShieldToChip += absorbed;
-                UnityEngine.Debug.Log($"[軽減無視] シールドが {absorbed} 肩代わり (残シールド {consShield})");
+                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[軽減無視] シールドが {absorbed} 肩代わり (残シールド {consShield})");
                 if (dmg <= 0) return 0;
             }
 
@@ -544,7 +551,7 @@ namespace ItemSystem.PassiveSkills
         public float shieldOnWinPct;
 
         // ==== 臨界メーター (Rinkai) 2026-07-16 追加 ====
-        /// <summary>[persistent] 臨界メーター: 攻撃の端子の合計 (attackSum) を毎ターンの終わりに足し、 品・端子の分はその時点で足す (Keywords.Kw.AddHeat)。
+        /// <summary>[persistent] 臨界メーター: 攻撃の端子に挿した出目の合計の半分 (HeatCore.EndGain) を毎ターンの終わりに足し、 品・端子の分はその時点で足す (Keywords.Kw.AddHeat)。
         /// 閾値に届くとその場で爆発する (式は CombatSystem.HeatCore)。</summary>
         public int rinkaiMeter;
         /// <summary>[persistent] 直近ターンにプレイヤーが与えた総ダメージ。
@@ -592,7 +599,7 @@ namespace ItemSystem.PassiveSkills
             => System.Math.Min(MetaProgression.Relics.RelicCatalog.PoisonKeepCap, poisonKeepPct + MetaProgression.Relics.RelicApplicator.GetPoisonKeepBonus());
         /// <summary>[persistent] 出血の比例減衰の割る数への上乗せ (AxisRules.BleedDecay)。 〈血晶〉の②。</summary>
         public int bleedDecayDivisorBonus;
-        /// <summary>[persistent] 爆発の基礎への上乗せ (〈二度詰めの雷管〉が爆発のたびに +10・最大 +80・減らない・CombatSystem.HeatCore)。</summary>
+        /// <summary>[persistent] 爆発の基礎への上乗せ (〈二度詰めの雷管〉が爆発のたびに +6・上限なし・減らない・CombatSystem.HeatCore)。</summary>
         public int burstStackBonus;
         /// <summary>[persistent] ターン開始の減衰で残るシールドへの上乗せ (% ポイント)。 〈油染みの盾革〉が +20 (50% → 70%)。 残る割合は最大 80%。</summary>
         public int shieldKeepBonusPct;
@@ -631,7 +638,7 @@ namespace ItemSystem.PassiveSkills
         public bool critExcessDouble;
         /// <summary>[persistent] 〈銑鉄棍〉: 会心しなかった撃に、 会心率 1% につき与ダメージ +1% (100% を上限に数える・与ダメ % の池へ足す・PassiveSkillManager.ProcessDamage)。 会心は普通に出る。</summary>
         public bool critToDamage;
-        /// <summary>[persistent] 〈天工開物〉: 爆発の基礎への上乗せ (武器を強化した回数 × 12・CombatSystem.HeatCore.Damage)。</summary>
+        /// <summary>[persistent] 〈天工開物〉: 爆発の基礎への上乗せ (武器を強化した回数 × 8・CombatSystem.HeatCore.Damage)。</summary>
         public int burstFlatBonus;
         /// <summary>[persistent] 〈重装兵の隠し刃〉: ボスのダウン中のターンは、 ターン開始時にシールドが半減しない (BeginNewTurn)。</summary>
         public bool shieldKeepOnBossDown;
@@ -713,9 +720,10 @@ namespace ItemSystem.PassiveSkills
                     if (shieldGainPct > 0) value += (value - _consShield) * shieldGainPct / 100;   // 〈二拍目の心臓〉: この戦闘のシールドの獲得量 ×1.5
                     float sg = MetaProgression.Relics.RelicApplicator.GetShieldGainPct();
                     if (sg > 0f) value += (int)((value - _consShield) * sg);
-                    // 大罪:傲慢 (挑戦カード IV): シールドの獲得 −N% (切り捨てた分を捨てる)
-                    if (MetaProgression.MetaDebuffApplicator.GetSinBlockCutPct() > 0f)
-                        value = _consShield + (int)((value - _consShield) * (1f - MetaProgression.ChallengeCards.SinPrideShieldCutPct / 100f));
+                    // カイロスの傲慢 (挑戦カード IV): シールドの獲得 −N% (四捨五入・デバフの丸め)
+                    float prideCut = MetaProgression.MetaDebuffApplicator.GetSinShieldCutPct();
+                    if (prideCut > 0f)
+                        value = _consShield + UnityEngine.Mathf.RoundToInt((value - _consShield) * (1f - prideCut / 100f));
                     // [計装 2026-11-12・#95] 呼び出し側は頼んだ量だけを shieldGainedTotal へ足すので、 遺物の上乗せと傲慢の削りの差をここで足す
                     //   (遺物なし・傲慢なしでは 0 ── 学習の条件では記録が変わらない)。
                     shieldGainedTotal += value - asked;
@@ -871,7 +879,10 @@ namespace ItemSystem.PassiveSkills
                 accumulatedValues[Keywords.Kw.BleedMaxKey] = enemyBleedStacks;   // 実績が読む
         }
 
-        /// <summary>〈回帰性真理〉: 敵に乗っている毒・出血の**蓄積を半減**する (切り捨て)。
+        /// <summary>〈回帰性真理〉が毎ターン残す毒の % (切り捨て・2026-11-22 neon 収束: 50 → 75)。</summary>
+        public const int RecurrentTruthPoisonKeepPct = 75;
+        /// <summary>〈回帰性真理〉: 敵に乗っている出血の蓄積を**半減**、 毒の蓄積を **3/4** にする (どちらも切り捨て・2026-11-22 neon 収束: 毒も半減 → 3/4。
+        /// 毒はターン開始の毒のダメージでも減るので、 半減を重ねると二重に減っていた)。
         /// ターン開始の DOT 判定が済んだ後に呼ぶ ── ダメージは通し、 累積だけを抑える。
         ///
         /// <para>切り捨てなので、 毎ターン +N を撃ち続けるビルドは概ね N 前後で平衡する
@@ -881,9 +892,10 @@ namespace ItemSystem.PassiveSkills
             int bleed = enemyBleedStacks;
             if (bleed > 0) enemyBleedStacks = bleed / 2;
             int poison = GetStatus(StatusTarget.Enemy, "poison");
-            if (poison > 0) enemyStatusStacks["poison"] = poison / 2;
+            int poisonAfter = poison * RecurrentTruthPoisonKeepPct / 100;
+            if (poison > 0) enemyStatusStacks["poison"] = poisonAfter;
             if (bleed > 0 || poison > 0)
-                UnityEngine.Debug.Log($"[回帰性真理] 毒/出血を半減 (毒 {poison}→{poison / 2} / 出血 {bleed}→{bleed / 2})");
+                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[回帰性真理] 出血を半減・毒を 3/4 (毒 {poison}→{poisonAfter} / 出血 {bleed}→{bleed / 2})");
         }
 
         /// <summary>現在スタック数（未付与は0）。</summary>
@@ -954,9 +966,6 @@ namespace ItemSystem.PassiveSkills
                 {
                     int now = dict.TryGetValue(def.id, out int nowStacks) ? nowStacks : stacks;
                     int keep = def.target == StatusTarget.Enemy ? EffectivePoisonKeepPct : 50;   // 〈瘴気〉の②は敵の毒だけ
-                    // 挑戦カード: 敵の毒が半減で減る量を N% 減らす (残る割合の足し算でなく減る量に掛けるので 100% を超えない)
-                    float cut = def.target == StatusTarget.Enemy ? MetaProgression.MetaBuffApplicator.GetPoisonDecayCut() : 0f;
-                    if (cut > 0f) keep = 100 - (int)((100 - keep) * (1f - cut));
                     dict[def.id] = now * keep / 100;
                 }
                 else dict[def.id] = System.Math.Max(0, stacks - decay);
@@ -995,7 +1004,7 @@ namespace ItemSystem.PassiveSkills
                     // 攻撃+10 (consDiceRoll: 攻撃値へ加算) / 最終与ダメージ+10 (consAtkBurst: 与ダメ倍率の後に加算) を流用
                     consDiceRoll += 10;
                     consAtkBurst += 10;
-                    UnityEngine.Debug.Log("[痛覚遮断剤] HP=1 維持確認 → 攻撃+10/最終与ダメージ+10。 攻撃終了時に死亡。");
+                    if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log("[痛覚遮断剤] HP=1 維持確認 → 攻撃+10/最終与ダメージ+10。 攻撃終了時に死亡。");
                 }
             }
 
@@ -1040,7 +1049,7 @@ namespace ItemSystem.PassiveSkills
             isCritical = false;
             forceCritical = false;
             forceCritThisHit = false;
-            hitIndex = 0; hitCount = 0; hitFinalDamagePct = 0; hitOutgoingPct = 0; hitIgnoreDefense = false; hitArmorPen = 0; hitFaceMax = 0; critSkipRoll = false;
+            hitIndex = 0; hitCount = 0; hitFinalDamagePct = 0; hitOutgoingPct = 0; hitIgnoreDefense = false; hitArmorPen = 0; hitFaceMax = 0; critSkipRoll = false; hitCritRateMulAdd = 0f; hitIsFocused = false; hitFocusSpentRenki = 0; isRefireHit = false;
             critSuppressed = false;
             lastCritAddPct = 0f;
             critRatePctAdd = 0f;
@@ -1136,9 +1145,6 @@ namespace ItemSystem.PassiveSkills
                 int relicKeep = MetaProgression.Relics.RelicApplicator.GetShieldKeepBonus();
                 int keepPct = System.Math.Min(80, 50 + shieldKeepBonusPct + MetaProgression.MetaBuffApplicator.GetShieldKeepBonusPct());
                 if (relicKeep > 0) keepPct = System.Math.Min(90, keepPct + relicKeep);
-                // 挑戦カード: 減衰で減る量を N% 減らす (減る量に掛けるので 100% を超えない)
-                float shCut = MetaProgression.MetaBuffApplicator.GetShieldDecayCut();
-                if (shCut > 0f) keepPct = 100 - (int)((100 - keepPct) * (1f - shCut));
                 int lost = _consShield - _consShield * keepPct / 100;
                 _consShield -= lost;
                 Keywords.Kw.Raise(this, PassiveSkillTrigger.OnShieldDecay, lost);

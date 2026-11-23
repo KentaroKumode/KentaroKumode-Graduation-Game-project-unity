@@ -46,8 +46,8 @@ namespace AutoTest.EditorTests
             Assert.That(BleedCore.CleaverKillLine(20, 1000, false), Is.EqualTo(240));
             Assert.That(BleedCore.CleaverKillLine(20, 1000, true), Is.EqualTo(120));
             Assert.That(BleedCore.CleaverKillLine(40, 1000, false), Is.EqualTo(250));
-            Assert.That(BleedCore.CrystalGain(3, 5, true), Is.EqualTo(6));
-            Assert.That(BleedCore.CrystalGain(3, 4, true), Is.EqualTo(3));
+            Assert.That(BleedCore.CrystalGain(3, BleedCore.CrystalNeed, true), Is.EqualTo(6));
+            Assert.That(BleedCore.CrystalGain(3, BleedCore.CrystalNeed - 1, true), Is.EqualTo(3));
             Assert.That(BleedCore.SakuraPct(12), Is.EqualTo(24));
             Assert.That(BleedCore.SakuraPct(80), Is.EqualTo(BleedCore.SakuraMaxPct));
             Assert.That(BleedCore.PressSpend(16), Is.EqualTo(6));

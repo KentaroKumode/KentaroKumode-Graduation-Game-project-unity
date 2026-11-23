@@ -346,8 +346,6 @@ namespace GameLoop
         public int challengeDifficulty;
         /// <summary>受けた挑戦カード ("デバフの id|バフの id")。 [persistent]</summary>
         public List<string> challengePicks = new List<string>();
-        /// <summary>大罪:色欲 (挑戦カード IV) で働かなくなった所持パッシブの id。 [persistent]</summary>
-        public List<string> sinSealedPassives = new List<string>();
         [System.NonSerialized] private Dictionary<string, MetaProgression.ChallengeCards.Card> _cardMap;
         /// <summary>カードを受けた後に呼ぶ (種類ごとの値を作り直させる)。</summary>
         public void InvalidateCardChallenge() => _cardMap = null;
@@ -471,7 +469,7 @@ namespace GameLoop
         /// <summary>前の戦闘が終わってからマップで進んだ歩数。 移動で貯まる品 (継ぎ革の旅靴・聖路の白靴・毒草摘みの杖・測量師の片眼鏡) が
         /// 次の戦闘の開始時に読む。 GameManager の点に入る前のフックで +1、 戦闘終了で 0。</summary>
         public int  stepsSinceBattle;
-        /// <summary>〈天工開物〉: このランで武器を強化した回数 (持っている間だけ数える)。 爆発の基礎 +12 × 回数 (HeatEffects.TenkouKaibutsu)。</summary>
+        /// <summary>〈天工開物〉: このランで武器を強化した回数 (持っている間だけ数える)。 爆発の基礎 +8 × 回数 (HeatEffects.TenkouKaibutsu)。</summary>
         public int  heavenlyCraftUpgrades;
         /// <summary>〈脈なしの鋼心臓〉の X: 戦闘開始時のシールド。 ランの始めに 12、 持っている間に戦闘に勝つたび +2 (2026-11-21)。</summary>
         public int  pulselessHeartShield = ItemSystem.PassiveSkills.Effects.PulselessHeart.StartShield;
@@ -481,9 +479,9 @@ namespace GameLoop
         public int  receiptRemovals;
         /// <summary>〈相場師の算盤〉: 持っている間に店でリロールした回数 (最大 10・戦闘開始時のブロック +2・最初の 1 撃 +1 × 回数)。</summary>
         public int  abacusStacks;
-        /// <summary>〈黄金の通行手形〉: 店で使ったゴールドの 80G に満たない端数 (店を出る時に足す)。</summary>
+        /// <summary>[使っていない・セーブ互換で残す] 旧〈黄金の通行手形〉(40G ごと・2026-11-22 final5 で作り直し) の端数。 読み書きしない。</summary>
         public int  passShopSpent;
-        /// <summary>〈黄金の通行手形〉: 秘宝の棚が 1 段上のレア度で並ぶ店の残り軒数 (店に入るたび 1 つ使う)。</summary>
+        /// <summary>[使っていない・セーブ互換で残す] 旧〈黄金の通行手形〉の残り軒数。 読み書きしない。</summary>
         public int  passShopsUp;
         /// <summary>〈避雷の天幕〉: 数えている層の深さ (違う層に入ったら数え直す) と、 その層で半分にした回数。</summary>
         public int  tentDepth = -1, tentUses;
@@ -554,7 +552,6 @@ namespace GameLoop
             sealedRoleMask = 0;
             challengeDifficulty = 0;
             if (challengePicks == null) challengePicks = new List<string>(); else challengePicks.Clear();
-            if (sinSealedPassives == null) sinSealedPassives = new List<string>(); else sinSealedPassives.Clear();
             _cardMap = null;
             if (chronicle == null) chronicle = new List<string>(); else chronicle.Clear();
             roleGoldBonusPct = 0;

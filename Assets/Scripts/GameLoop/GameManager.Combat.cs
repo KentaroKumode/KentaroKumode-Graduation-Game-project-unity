@@ -398,8 +398,6 @@ namespace GameLoop
             return boosted;
         }
 
-        /// <summary>武器の会心率 + 層補正の上限 (%)。</summary>
-        public const float MaxWeaponCritPct = 50f;
 
         /// <summary>装備中の武器・ダイスからステータスを取得</summary>
         private (int diceCount, int diceMax, float critRate, int[] diceFaces,
@@ -448,7 +446,7 @@ namespace GameLoop
                 // 層の会心補正は **武器の会心率だけ**に掛けて 0% で止める (旧: 分子で 0〜9 にクランプ)。
                 //   他の会心ソース (パッシブ・メタ) はこの後に足すので、 層のマイナスでは削れない。
                 if (ActiveModifier.critRatePctBonus != 0f)
-                    critRatePct = Mathf.Clamp(critRatePct + ActiveModifier.critRatePctBonus, 0f, MaxWeaponCritPct);
+                    critRatePct = Mathf.Max(0f, critRatePct + ActiveModifier.critRatePctBonus);   // 上限 50% は 2026-11-23 に撤去 (〈竜閃〉の 100% が層の補正で 50% に切られないように)
             }
 
             return (diceCount, diceMax, critRatePct / 100f, diceFaces, faceTiers, suppressTerminalRoles);

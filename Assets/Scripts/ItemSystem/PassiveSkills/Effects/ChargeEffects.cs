@@ -233,11 +233,11 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>絶縁の外套: 過充電 (充電 10 以上) でターンを開始したとき、 ブロック +8・このターンの被ダメージ −2。</summary>
+    /// <summary>絶縁の外套: 過充電 (充電 10 以上) でターンを開始したとき、 ブロック +5・このターンの被ダメージ −2 (answer14: ブロック +8 → +5)。</summary>
     public class InsulatedCloak : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "絶縁の外套";
-        public const int Block = 8, Cut = 2;
+        public const int Block = 5, Cut = 2;   // answer14: ブロック +8 → +5
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.IsOvercharged());
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
@@ -314,11 +314,11 @@ namespace ItemSystem.PassiveSkills.Effects
 
     // ── L: 規則破壊 ──
 
-    /// <summary>雷神槍: このターン充電を 8 以上消費したとき、 このターンの全攻撃の最終与ダメージ +(このターン消費した充電 × 5)% (撃ごと・ctx.hitFinalDamagePct・8 未満では何もしない)。</summary>
+    /// <summary>雷神槍: このターン充電を 8 以上消費したとき、 このターンの全攻撃の最終与ダメージ +(このターン消費した充電 × 6)% (2026-11-22・旧 × 5) (撃ごと・ctx.hitFinalDamagePct・8 未満では何もしない)。</summary>
     public class ThunderSpear : IPassiveSkillEffect
     {
         public string SkillId => "雷神槍";
-        public const int Need = 8, PctPer = 5;
+        public const int Need = 8, PctPer = 6;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {

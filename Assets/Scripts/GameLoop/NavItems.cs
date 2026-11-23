@@ -36,10 +36,9 @@ namespace GameLoop
 
         public static bool IsNavItem(string id) => !string.IsNullOrEmpty(id) && ItemIds.NavItems.Contains(id);
 
-        /// <summary>その品を持っていて、 働いているか (大罪〈色欲〉で封じられた品は働かない)。</summary>
+        /// <summary>その品を持っているか。</summary>
         public static bool Has(RunState run, string id)
-            => run?.ownedPassiveItems != null && run.ownedPassiveItems.Contains(id)
-               && (run.sinSealedPassives == null || !run.sinSealedPassives.Contains(id));
+            => run?.ownedPassiveItems != null && run.ownedPassiveItems.Contains(id);
 
         private static int _cacheMask = -1;
         private static FreeMapPerks _cache;

@@ -72,7 +72,7 @@ namespace CombatSystem
         }
 
         /// <summary>ターンの結果: 場に出た端子・発動した端子・対象に選ばれた端子。
-        /// [#106] <paramref name="wanted"/> = 方策 / 画面が返した挿し方 (Resolve が直す前・〈猫の手〉込み)。 null なら内訳は数えない。</summary>
+        /// [#106] <paramref name="wanted"/> = 方策 / 画面が返した挿し方 (Resolve が直す前)。 null なら内訳は数えない。</summary>
         public static void NoteTurn(List<string> board, TerminalOutcome o, int[] wanted = null)
         {
             if (board == null) return;

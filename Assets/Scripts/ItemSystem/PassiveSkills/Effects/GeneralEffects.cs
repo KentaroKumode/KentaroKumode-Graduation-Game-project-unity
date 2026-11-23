@@ -95,17 +95,17 @@ namespace ItemSystem.PassiveSkills.Effects
     //  多段・消耗品・ボスと大技・嵐
     // ============================================================
 
-    /// <summary>加重の拳套: 同じターンに 2 撃目以降の攻撃が通るたび、 その撃の与ダメージ +20% (与ダメ % の池・その撃だけ・ctx.hitOutgoingPct)。</summary>
+    /// <summary>加重の拳套: 同じターンに 2 撃目以降の攻撃が通るたび、 その撃の最終与ダメージ +25% (別枠・その撃だけ・ctx.hitFinalDamagePct・answer15: 旧 与ダメの池 +20%)。</summary>
     public class WeightingGauntlet : IPassiveSkillEffect, IRelicDisplay
     {
         public const string Id = "加重の拳套";
         public string SkillId => Id;
-        public const int Pct = 20;
+        public const int Pct = 25;
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.hitCount >= 2);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (ctx.IsRealHit && ctx.hitIndex >= 1) ctx.hitOutgoingPct += Pct;
+            if (ctx.IsRealHit && ctx.hitIndex >= 1) ctx.hitFinalDamagePct += Pct;
         }
     }
 
@@ -179,11 +179,11 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>崩しの一手: ボスの目盛りを割ってダウンさせたターン (通常攻撃でもひびでも・1 ターンに 1 回)、 次のターンの手札 +2 枚・次のターンの全撃の基礎攻撃 +6 (攻撃 +N・撃ごとに乗る)。</summary>
+    /// <summary>崩しの一手: ボスの目盛りを割ってダウンさせたターン (通常攻撃でもひびでも・1 ターンに 1 回)、 次のターンの手札 +2 枚・次のターンの全撃の基礎攻撃 +12 (攻撃 +N・撃ごとに乗る・answer15: 旧 +6)。</summary>
     public class BreakingMove : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => ItemIds.TacBreak;
-        public const int Draw = 2, Atk = 6;
+        public const int Draw = 2, Atk = 12;
         /// <summary>[persistent] ダウンさせたターンの番号 (次のターンに読む)。</summary>
         private const string Key = "tac.break.turn";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(Shd.LastTurn(ctx, Key));
@@ -377,7 +377,7 @@ namespace ItemSystem.PassiveSkills.Effects
         {
             int seed = System.Math.Min(99, System.Math.Max(0, floor) * 5);
             if (seed > kensaki) kensaki = seed;
-            UnityEngine.Debug.Log($"[無銘の剣舞譜] 取得時シード: floor={floor} → kensaki={kensaki}");
+            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[無銘の剣舞譜] 取得時シード: floor={floor} → kensaki={kensaki}");
         }
 
         public PassiveSkillTrigger[] Triggers => new[]
@@ -393,7 +393,7 @@ namespace ItemSystem.PassiveSkills.Effects
             {
                 case PassiveSkillTrigger.OnBattleStart:
                     kensaki = System.Math.Min(99, kensaki + 1);
-                    UnityEngine.Debug.Log($"[無銘の剣舞譜] 戦闘突入: 剣先スタック → {kensaki}");
+                    if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[無銘の剣舞譜] 戦闘突入: 剣先スタック → {kensaki}");
                     break;
                 case PassiveSkillTrigger.OnPostRoll:
                     // 旧: ダイス合計+剣先 / 新: 攻撃+剣先

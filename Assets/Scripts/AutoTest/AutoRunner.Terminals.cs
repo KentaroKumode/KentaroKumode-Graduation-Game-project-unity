@@ -89,7 +89,12 @@ namespace AutoTest
                 if (o.kindOfDie[i] == DiceTerminal.Block && rolls[i] > ws.maxBlockDie) ws.maxBlockDie = rolls[i];
                 if (o.kindOfDie[i] == DiceTerminal.Attack && rolls[i] > ws.atkFaceMax) ws.atkFaceMax = rolls[i];   // 〈鷹匠の革手袋〉(本体は MutualKeys.AttackDiceMax)
                 if (o.kindOfDie[i] != DiceTerminal.Attack && o.kindOfDie[i] != DiceTerminal.None) ws.otherDice += rolls[i];   // 竜閃〈無我無心〉
+                if (rolls[i] > ws.rolledMax) ws.rolledMax = rolls[i];                                                          // 竜閃〈画竜点睛〉
             }
+            //   武器の配線の後のブロック (2026-11-22): 竜閃〈無我無心〉攻撃の端子 1 枚なら防御の出目 1 個 +3 / 短剣〈連刃〉追撃するターン +4。
+            //   shortcut: 本体は品のブロック (遺物 % の後) に足すが、 ここは端子のブロックに足す (遺物・大罪の % がずれる)
+            if (s.rung.muga && ws.aHits == 1) ws.blockRaw += CombatSystem.CombatRules.MugaBlock(ws.bCount);
+            if (s.rung.chainRatePct > 0 && ws.aHits >= ItemSystem.PassiveSkills.Effects.ChainBlade.NeedTerminals) ws.blockRaw += ItemSystem.PassiveSkills.Effects.ChainBlade.Block;
             //   〈狙い目の刻み〉: 撃ごとの挿した目 (本体の撃の輪と同じ CritCore.HitFaceMax)
             if (s.aim && o.attackHits.Count > 0)
             {
@@ -137,13 +142,13 @@ namespace AutoTest
             if (sg.ring && o.attackHits.Count > 0)
             {
                 int pz = env.enemyPoison + o.poison;
-                if (pz >= PoisonCore.RingNeed) ws.extraDmg += PoisonCore.Damage(PoisonCore.Spend(pz), sg.poisonItems, sg.detonates, s.enemyDown);
+                if (pz >= PoisonCore.RingNeed) ws.extraDmg += PoisonCore.Damage(PoisonCore.Spend(pz), sg.poisonItems, sg.detonates, s.enemyDown, sg.enemyMaxHp);
             }
             // 出血の BOT の規則 (2026-11-21): 撃を順に追い、 撃の前の出血 (配線の時点 + それより前の撃の出血) で〈血の楔〉+40%・〈血桜〉(2 撃目から・出血 2 を使う) の撃の最終与ダメを、
             //   撃の後の出血で〈紅の搾り具〉(15 以上・1/3 を使う × 8・1 ターン 1 回) を足す。 〈涸れぬ血晶〉の倍は本体と同じ BleedCore.CrystalGain。
             //   shortcut: 1 撃の与ダメは 1 ターンの見込み ÷ 撃の数・撃が当たるかは見ない・使った出血が先のターンの出血のダメージから減る分は見ない
             int bleedGain = 0;
-            if (sg.bleedItems != BleedItems.None && o.attackHits.Count > 0)
+            if ((sg.bleedItems != BleedItems.None || CardRules.FirstStrikeBleed > 0) && o.attackHits.Count > 0)   // 挑戦カード〈初太刀〉の出血も数える
             {
                 bool crystal = (sg.bleedItems & BleedItems.Crystal) != 0, pressed = sg.pressed;
                 float perHit = DeckPerTurnDamage(in s, k) / o.attackHits.Count;
@@ -260,20 +265,23 @@ namespace AutoTest
             {
                 float per = DeckPerTurnDamage(in s, k);
                 if (sg.jgMirror) ws.extraDmg += jgE * (ItemSystem.PassiveSkills.Effects.MirrorBuckler.JustPct - ItemSystem.PassiveSkills.Effects.MirrorBuckler.Pct) / 100;
-                if (sg.jgBlade) ws.extraDmg += jgE;
+                if (sg.jgBlade) ws.extraDmg += jgE * ItemSystem.PassiveSkills.Effects.KnightsTrump.ReturnPct / 100;
                 if (sg.jgStandard) sightFlat += ItemSystem.PassiveSkills.Effects.BorderGuardStandard.PctPerGuard / 100f * per * Math.Max(0, turns - 1) * 0.5f + DeckDrawDmg;
+                //   〈防人の軍標〉EchoNeed (2) 回目以降: 次のターンの撃がもう 1 回ずつ = 次の攻撃 1 回分 (2026-11-22)
+                if (sg.jgStandard && turns > 1 && ItemSystem.PassiveSkills.Effects.Shd.Count(sg.jgCtx, ItemSystem.PassiveSkills.Effects.Shd.JustGuardCountKey) + 1 >= ItemSystem.PassiveSkills.Effects.BorderGuardStandard.EchoNeed)
+                    sightFlat += per * DeckFutureAttackShare;
                 if (sg.jgCatch) sightFlat += ItemSystem.PassiveSkills.Effects.CatchBracer.Atk * DeckFutureAttackShare;
                 if (sg.jgSilent && o.attackDice == 0)
                     sightFlat += (ItemSystem.PassiveSkills.Effects.SilentStance.JustPct - ItemSystem.PassiveSkills.Effects.SilentStance.Pct) / 100f * per * DeckFutureAttackShare;
                 if (sg.jgHero && env.heavyTurn) sightFlat += 0.5f * per;
             }
-            // 臨界の BOT の規則 (2026-11-21): 本体と同じ HeatCore.Forecast (端子の臨界 → 5g の品の臨界 → ターンの終わりの攻撃の端子の合計) で、
+            // 臨界の BOT の規則 (2026-11-21): 本体と同じ HeatCore.Forecast (端子の臨界 → 5g の品の臨界 → ターンの終わりの攻撃に挿した出目の合計の半分 HeatCore.EndGain) で、
             //   この配線で起きる爆発のダメージ (敵の防御の後) を軽減不可の分に足す。 溜まりの増減は 臨界 1 = 爆発の基礎 ÷ 閾値 × DeckGaugeShare (爆発で 0 に戻る分は負で相殺)。
             //   配線の時に爆発する (= 攻撃の前に【過熱】) か既に【過熱】なら、 〈二度目の打金〉の撃ごとの攻撃 +6・〈烈刃〉の撃の最終与ダメ % を足す。
             //   shortcut: 1 撃の与ダメは 1 ターンの見込み ÷ 撃の数・ボスの目盛りのひびと〈恒熱の炉壁〉のブロックは見ない
             if (sg.heat.threshold > 0 || o.heat > 0 || o.heatGains.Count > 0)
             {
-                var hf = HeatCore.Forecast(sg.heat, o, o.attackAdd);
+                var hf = HeatCore.Forecast(sg.heat, o);
                 ws.extraDmg += hf.landed;
                 int th = Math.Max(1, sg.heat.threshold > 0 ? sg.heat.threshold : HeatCore.StartThreshold(sg.heat.items));
                 flat += (hf.meterAfter - sg.heat.meter) * (HeatCore.BurstBase / (float)th) * DeckGaugeShare * dw;
@@ -282,7 +290,7 @@ namespace AutoTest
                 {
                     if (sg.secondStrike && (hot || sg.burstLastTurn)) sightFlat += ItemSystem.PassiveSkills.Effects.SecondStrike.Atk * o.attackHits.Count;
                     if (sg.fierceBlade && hot)
-                        sightFlat += Math.Min(ItemSystem.PassiveSkills.Effects.FierceBlade.MaxPct, ItemSystem.PassiveSkills.Effects.FierceBlade.PctPerBurst * (sg.heat.burstsTotal + hf.burstsWired)) / 100f
+                        sightFlat += ItemSystem.PassiveSkills.Effects.FierceBlade.PctPerBurst * (sg.heat.burstsTotal + hf.burstsWired) / 100f
                                    * DeckPerTurnDamage(in s, k);
                 }
             }
@@ -299,7 +307,7 @@ namespace AutoTest
 
         /// <summary>山札の挿し方を選ぶ (読むだけ・山札の状態は写しに掛ける)。 戻り値 = 出目ごとの挿し先 (場の添字・−1 = 挿さない)。
         /// <paramref name="bestU"/> = 選んだ挿し方の効用 (リロールの値付けが読む)。 山札で戦っていなければ null。
-        /// <paramref name="lookahead"/> = 実際の配線の判断の時だけ true (#105 の先読みを掛けてよい)。 振り直しの値付けと〈猫の手〉は false (重いので掛けない)。</summary>
+        /// <paramref name="lookahead"/> = 実際の配線の判断の時だけ true (#105 の先読みを掛けてよい)。 振り直しの値付けは false (重いので掛けない)。</summary>
         private int[] ChooseDeckWiring(int[] rolls, MutualTurnTelegraph tele, out float bestU, out int[] targets, bool lookahead = false, bool mayMistake = false)
         {
             bestU = float.NegativeInfinity; targets = null;
@@ -309,19 +317,17 @@ namespace AutoTest
             if (deck == null || k == 0) return null;
             var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
             var board = deck.board;
-            // 挑戦カード〈猫の手〉が先に挿した 1 組は固定 (外す挿し方を候補に入れない)。 振り直しの値付けの時は −1 (猫は配線の判断の頭で挿す)
-            int catDie = cm.CatPawDie, catSlot = cm.CatPawSlot;
 
             // 素朴版: 本体の既定 (素朴な点) と同じ。 旧い配線の素朴版 (出目降順の本数分割) に当たる「深く考えない」打ち方。
             if (CombatWiringSkill == WiringSkill.Naive)   // [アブレーション 2026-11-17] combatNaive も素朴版の配線
             {
                 bestU = 0f;
-                return TerminalWiring.Auto(board, rolls, cm.TerminalEnvNow(ctx, tele.enemyAttackValue), deck.state, catDie, catSlot);
+                return TerminalWiring.Auto(board, rolls, cm.TerminalEnvNow(ctx, tele.enemyAttackValue), deck.state);
             }
 
             var ev = PrepareDeckEval(rolls, tele);
             // 止まった端子 (ヴェスカ〈停滞する時間〉) へ挿す手は列挙しない (Resolve が外すので結果は「挿さない」と同じ)
-            var cands = TerminalWiring.Enumerate(board, k, deck.state, catDie, catSlot);
+            var cands = TerminalWiring.Enumerate(board, k, deck.state);
             int n = cands.Count;
             var us = new float[n];
             var outs = new OptimalTurnOutcome[n];
@@ -330,12 +336,15 @@ namespace AutoTest
             var afters = new TerminalBattleState[n];
             // 速度 (2026-11-21・判断は変えない): 同じ目の出目どうしを入れ替えただけの挿し方は、 端子ごとに入る目が同じなので解決も効用も同じ
             //   (Resolve は端子ごとに挿した目を数える・出目の添字は見ない)。 先に出た方の結果を写す (配列は全部埋める = 後ろの選び方・計装はそのまま)。
-            var seen = SameDiceSignatures(rolls) ? new Dictionary<long, int>() : null;
+            //   速度 (2026-11-22・判断は変えない): 必ず外れる組 (<see cref="SureMiss"/>) を「挿さない」に直した挿し方どうしも、 解決は同じ。 直してから同じ鍵で写す
+            var miss = SignatureOk(rolls) ? SureMiss(board, rolls, deck.state) : null;
+            var seen = SameDiceSignatures(rolls) || miss != null ? new Dictionary<long, int>() : null;
+            var canon = miss != null ? new int[k] : null;
             for (int i = 0; i < n; i++)
             {
                 if (seen != null)
                 {
-                    long sig = WiringSignature(rolls, cands[i]);
+                    long sig = WiringSignature(rolls, miss != null ? Canonical(cands[i], miss, canon) : cands[i]);
                     if (seen.TryGetValue(sig, out int j))
                     { us[i] = us[j]; outs[i] = outs[j]; touts[i] = touts[j]; tgts[i] = tgts[j]; afters[i] = afters[j]; continue; }
                     seen[sig] = i;
@@ -428,6 +437,46 @@ namespace AutoTest
         }
 
         /// <summary>出目に同じ目があって、 挿し方の鍵 (<see cref="WiringSignature"/>) で畳めるか (3 個まで・目と場の添字が鍵に収まる時だけ)。</summary>
+        /// <summary><see cref="WiringSignature"/> で鍵を作れる出目か (2〜3 個・0〜1023)。</summary>
+        private static bool SignatureOk(int[] rolls)
+        {
+            if (rolls == null || rolls.Length < 2 || rolls.Length > 3) return false;
+            foreach (int r in rolls) if (r < 0 || r >= 1024) return false;
+            return true;
+        }
+
+        /// <summary>速度 (2026-11-22・判断は変えない): 出目 i を場の s に挿すと<b>必ず外れる</b>か (<c>[i, s]</c>)。 外れる組が無いか、 下の前提が立たなければ null。
+        /// 前提 = 場に〈号令の剣〉が無い (Resolve の 2. 条件の前に出目が変わらない)・他の出目を見る条件 (〈共鳴〉SameElsewhere・対 PairSame) が無い・条件無視でない。
+        /// その時 Resolve の 2. 条件は出目ごとに <see cref="TerminalCards.CondOk"/> だけで外すので、 外れる組を「挿さない」に直した挿し方とは 2. の後の挿し方が同じ
+        /// (0. の挿せる数は列挙が守る)。 3. より後は直した後の挿し方しか読まないので、 結果も同じ。</summary>
+        private static bool[,] SureMiss(List<string> board, int[] rolls, TerminalBattleState state)
+        {
+            if (board == null || state == null || state.ignoreCond) return null;
+            int m = board.Count, k = rolls.Length;
+            for (int s = 0; s < m; s++)
+            {
+                var d = TerminalCards.Get(board[s]);
+                if (d == null) continue;
+                if (d.baseId == TerminalIds.Grinder || d.cond == TerminalCond.SameElsewhere || d.cond == TerminalCond.PairSame) return null;
+            }
+            bool[,] res = null;
+            for (int s = 0; s < m; s++)
+            {
+                var d = TerminalCards.Get(board[s]);
+                if (d == null || d.cond == TerminalCond.None) continue;
+                for (int i = 0; i < k; i++)
+                    if (!TerminalCards.CondOk(d.cond, rolls[i])) (res ??= new bool[k, m])[i, s] = true;
+            }
+            return res;
+        }
+
+        /// <summary><paramref name="slots"/> の必ず外れる組を −1 に直した写し (<paramref name="buf"/> に書いて返す)。</summary>
+        private static int[] Canonical(int[] slots, bool[,] miss, int[] buf)
+        {
+            for (int i = 0; i < slots.Length; i++) buf[i] = slots[i] >= 0 && miss[i, slots[i]] ? -1 : slots[i];
+            return buf;
+        }
+
         private static bool SameDiceSignatures(int[] rolls)
         {
             int k = rolls.Length;
@@ -499,7 +548,7 @@ namespace AutoTest
             }
         }
 
-        /// <summary>山札の挿し方の効用の入力 (盤面を 1 回だけ読んだもの)。 <see cref="ChooseDeckWiring"/> と〈猫の手〉の評価 (<see cref="CatPawPick"/>) が使う。</summary>
+        /// <summary>山札の挿し方の効用の入力 (盤面を 1 回だけ読んだもの)。 <see cref="ChooseDeckWiring"/> が使う。</summary>
         private struct DeckEval
         {
             public OptimalTurnState st;
@@ -540,7 +589,7 @@ namespace AutoTest
             /// <summary>〈石抜きの毒指輪〉: このターンまだ起爆していない (持っていなければ false)。 / 毒の品の旗・この戦闘で起爆した回数 (起爆のダメージの式 PoisonCore.Damage が読む)。</summary>
             public bool ring;
             public PoisonItems poisonItems;
-            public int detonates;
+            public int detonates, enemyMaxHp;
             /// <summary>出血の品の旗 (撃ごとの出血は Resolve の 5f が書く・〈血桜〉〈血の楔〉〈紅の搾り具〉〈涸れぬ血晶〉はここで見積もる) / 〈紅の搾り具〉をこのターンもう使った。</summary>
             public BleedItems bleedItems;
             public bool pressed;
@@ -562,6 +611,7 @@ namespace AutoTest
                 v.secondStrike = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.SecondStrike.Id); v.fierceBlade = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.FierceBlade.Id);
                 v.poisonItems = PoisonCore.ItemsOf(run);
                 v.detonates = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.Psn.DetonateCountKey);
+                v.enemyMaxHp = ctx.enemyMaxHP;      // 起爆の最大 HP の項 (本体と同じ ctx.enemyMaxHP)
                 v.bleedItems = BleedCore.ItemsOf(run);
                 v.pressed = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.CrimsonPress.TurnKey) == ctx.currentTurn;
                 v.ring = (v.poisonItems & PoisonItems.Ring) != 0 && (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.HollowPoisonRing.TurnKey) != ctx.currentTurn;
@@ -616,21 +666,6 @@ namespace AutoTest
             }
             WiredSums ws; using (BotTiming.Enter(BotTiming.Cat.EvalSums)) ws = DeckSums(in ev.st, rolls, ev.board, o, ev.deck.state, after, in ev.env, ev.counterPerFire);
             using (BotTiming.Enter(BotTiming.Cat.EvalUtil)) return OptimalUtilityCore(in ev.st, rolls.Length, in ws, out outc);
-        }
-
-        /// <summary>挑戦カード〈猫の手〉(#5) の評価 (<see cref="GameHooks.CatPawPick"/> の中身・<see cref="CatPawAdvisor"/> が Super の設定の写しで呼ぶ)。
-        /// この評価で最良の挿し方を選び (<see cref="ChooseDeckWiring"/> と同じ列挙と効用)、 その中で「外すと効用が一番落ちる 1 組」を返す
-        /// (選び方は本体の <see cref="TerminalWiring.MostValuablePair"/>)。 戻り値 <c>{ 出目, 場の添字 }</c>・挿す組が無ければ <c>{ -1, -1 }</c>・評価できなければ null。</summary>
-        internal int[] CatPawPick(int[] rolls, MutualTurnTelegraph tele)
-        {
-            var cm = CombatManager.Instance;
-            if (cm?.TerminalDeck == null || rolls == null || rolls.Length == 0) return null;
-            var best = ChooseDeckWiring(rolls, tele, out _, out var targets);
-            if (best == null) return null;
-            var ev = PrepareDeckEval(rolls, tele);
-            // 挿し方を直した後の値で数える (条件に合わず外れる組を猫が挿さないように)
-            var fixedUp = TerminalCards.Resolve(ev.board, best, rolls, ev.env, ev.deck.state.Clone(), targets, reboot: BotReboot, overclock: true).slotOfDie;
-            return TerminalWiring.MostValuablePair(fixedUp, w => EvalDeckWiring(ev, rolls, w, out _, out _, out _));
         }
 
         /// <summary>対象を取る端子の対象の方策 (読むだけ)。 影写し = 山札に増やして一番得な端子 (素の点の最大) / 火葬の剣 = 一番要らない端子 (最小) /
@@ -1108,8 +1143,6 @@ namespace AutoTest
             _lastChosenA = -1; _lastAttackCandExists = false;
             int[] slots, targets;
             using (BotTiming.Enter(BotTiming.Cat.WireChoose)) slots = ChooseDeckWiring(rolls, tele, out _, out targets, lookahead: true, mayMistake: true);
-            // 挑戦カード〈金で殴る〉(#6): 払う金額 (札が無ければ 0・とどめに合わせて挿し方を替えることがある)。 計装の見積もり (_lastPred*) も金の分で上書きする
-            int gold; using (BotTiming.Enter(BotTiming.Cat.WireGold)) gold = slots != null ? ChooseGoldPunch(rolls, tele, ref slots, ref targets) : 0;
             // [計装 2026-11-13] 攻撃の端子に挿さない手を選んだ割合 (素朴版は効用で選ばないので数えない)
             if (_lastChosenA >= 0)
             {
@@ -1125,7 +1158,7 @@ namespace AutoTest
             _fbDecided++; if (_lastFreeBlock) _fbTurns++; if (_lastKillsNow) _fbKillTurns++;
             _fbPrevHp = hpNow; _fbPrevExpTaken = _lastExpTaken;
             if (slots == null) return default;      // null なら本体が既定 (TerminalWiring.Auto) で挿す
-            var plan = WiringPlan.OfSlots(slots, targets, gold, keep);
+            var plan = WiringPlan.OfSlots(slots, targets, keep);
             plan.reboot = BotReboot; plan.overclock = true;      // 充電のコアアクション: 見積もり (下の Resolve) と同じ規則で本体も解く
             return plan;
         }
@@ -1134,117 +1167,6 @@ namespace AutoTest
         /// オーバークロックは使える時はいつも。 挿し方の見積もり (Resolve) にも同じ指定を渡すので、 再起動の撃・ブロックは効用に入る
         /// (オーバークロックの +60% と〈逆さ避雷針〉の被ダメ −6 は本体の撃の輪・被ダメの所で掛かるので効用には入らない)。</summary>
         private const int BotReboot = ChargeCore.RebootAuto;
-
-        // =====================================================================
-        //  挑戦カード〈金で殴る〉(#6・2026-11-12) の払い方 (効果の定義は ChallengeCards.GoldPunchAttack)
-        // =====================================================================
-        //  金の値段 = goldPunchHpPerGold (HP 相当 / 1G)。 既定 0.15 は〈賞金狩り〉の撃破ボーナスの値付け (DeckKillGoldWorth) と同じ ──
-        //  この BOT が金を HP に換える率は 1 つにそろえる。 効用 (HP の帳簿) で「金で上げた攻撃が減らす被ダメ」と「払った金 × 値段」を比べ、 得な方を取る。
-        //   A. とどめ: 攻撃する挿し方のうち、 所持金を全部払えば今ターン撃破できるものについて、 撃破に要る最小の金額 (二分探索) を払う案。
-        //      撃破のターンは敵が攻撃しないので、 今ターンの被ダメと先の被ダメの見込みが全部消える ── 金の主な使い道はここ。
-        //      とどめでは所持金を全部使ってよい (取り置き goldPunchReserve を割ってよい)。
-        //   B. 上乗せ: 貪欲で選んだ挿し方のまま、 (所持金 − 取り置き) の 1/4・1/2・全部を払う案。 撃破しない攻撃は、 1 ダメージが減らす
-        //      先の被ダメ (帳簿の ledgerFutureShare × 敵の攻撃 ÷ 1 ターンの与ダメ) が値段を超える時だけ得になる。
-        //   C. 払わない。
-        //  3 つの中で 効用 − 値段 × 払う金額 が最大の案。 計算量: 札を受けたランだけ、 1 判断で 挿し方 W 回の解き直し + 撃破できる挿し方ごとに二分探索 (≈ log2 所持金 回)。
-        //  未決 (作者の判断): 金の値段を店の残り (最後の店の後は 0 に近い) で変えるか・最後の戦闘で使い切るか。 今はどちらも見ない。
-
-        /// <summary>[#6] 〈金で殴る〉の金の値段 (HP 相当 / 1G・既定 0.15 = <see cref="DeckKillGoldWorth"/>)。 A/B で掃く口。</summary>
-        public float goldPunchHpPerGold = DeckKillGoldWorth;
-        /// <summary>[#6] 〈金で殴る〉の上乗せ (案 B) で残す所持金 (G・既定 40 = 店で端子を買う時の取り置き <see cref="TerminalShopReserve"/>)。 とどめ (案 A) には掛けない。</summary>
-        public int goldPunchReserve = TerminalShopReserve;
-
-        /// <summary>[#6 計装] 金を払った判断の数 / そのうち とどめ (案 A) / 払った金の累計。 ランをまたいで累計。</summary>
-        public int GoldPunchDecisions { get; private set; }
-        public int GoldPunchFinishers { get; private set; }
-        public long GoldPunchPaid { get; private set; }
-
-        /// <summary>払う金額を決める (読むだけ)。 とどめの案を選んだら <paramref name="slots"/> / <paramref name="targets"/> をその挿し方へ替える。 札が無い・素朴版・金が無いなら 0。</summary>
-        private int ChooseGoldPunch(int[] rolls, MutualTurnTelegraph tele, ref int[] slots, ref int[] targets)
-        {
-            if (!MetaProgression.MetaBuffApplicator.HasGoldPunch() || EffectiveWiringSkill == WiringSkill.Naive || rolls == null) return 0;
-            var run = GameManager.Instance?.Run;
-            int coins = run?.coins ?? 0;
-            var cm = CombatManager.Instance;
-            if (coins <= 0 || cm?.TerminalDeck == null) return 0;
-            var ev = PrepareDeckEval(rolls, tele);
-            float price = goldPunchHpPerGold * (ev.st.ledger ? 1f : ev.st.wDef);   // 帳簿は HP の単位・旧の効用は守りの重みで HP を測る (killBonus と同じ)
-
-            // C. 払わない (貪欲で選んだ挿し方のまま)
-            ResolveDeckCand(in ev, rolls, slots, out var o0, out var a0, out var t0);
-            int bestGold = 0; int[] bestSlots = slots, bestTgts = targets ?? t0;
-            float bestV = EvalWithGold(in ev, rolls, o0, a0, 0, out var bestOut);
-            bool finisher = false;
-
-            // B. 上乗せ (攻撃する挿し方の時だけ・本体は攻撃しないターンに払わない)
-            int spendable = Math.Max(0, coins - Math.Max(0, goldPunchReserve));
-            if (o0.attackDice > 0 && spendable > 0)
-                foreach (int g in new[] { spendable / 4, spendable / 2, spendable })
-                {
-                    if (g <= 0 || g == bestGold) continue;
-                    float v = EvalWithGold(in ev, rolls, o0, a0, g, out var oc) - price * g;
-                    if (v > bestV) { bestV = v; bestGold = g; bestOut = oc; }
-                }
-
-            // A. とどめ (全部払えば今ターン撃破できる挿し方だけ・撃破に要る最小の金額)
-            var cands = TerminalWiring.Enumerate(ev.board, rolls.Length, ev.deck.state, cm.CatPawDie, cm.CatPawSlot);
-            foreach (var c in cands)
-            {
-                ResolveDeckCand(in ev, rolls, c, out var o, out var a, out var tg);
-                if (o.attackDice <= 0) continue;
-                EvalWithGold(in ev, rolls, o, a, coins, out var full);
-                if (full.effDmg < ev.st.enemyHp) continue;
-                int lo = 0, hi = coins;      // 撃破できる最小の金額 (与ダメは金額に対して単調)
-                while (lo < hi)
-                {
-                    int mid = (lo + hi) / 2;
-                    EvalWithGold(in ev, rolls, o, a, mid, out var om);
-                    if (om.effDmg >= ev.st.enemyHp) hi = mid; else lo = mid + 1;
-                }
-                float v = EvalWithGold(in ev, rolls, o, a, lo, out var ol) - price * lo;
-                if (v > bestV) { bestV = v; bestGold = lo; bestSlots = c; bestTgts = tg; bestOut = ol; finisher = lo > 0; }
-            }
-
-            if (bestGold <= 0) return 0;
-            if (!ReferenceEquals(bestSlots, slots)) { slots = bestSlots; targets = bestTgts; }
-            // [計装] 選んだ案の見積もり (主攻撃の照合・防ぎ切りの数え) を金の分で上書きする
-            _lastKillsNow = bestOut.killsNow; _lastFreeBlock = bestOut.freeBlock && !bestOut.killsNow; _lastExpTaken = bestOut.taken;
-            _lastPredOld = bestOut.dmgOld; _lastPredNew = bestOut.dmgNew; _lastPredA = bestOut.aCount; _lastPredUsed = bestOut.dmgUsed; _lastPredRaw = bestOut.rawNew;
-            _lastChosenA = bestOut.aCount;
-            GoldPunchDecisions++; if (finisher) GoldPunchFinishers++; GoldPunchPaid += bestGold;
-            return bestGold;
-        }
-
-        /// <summary>挿し方 1 つを解く (端子の状態は写し・対象は方策で選び直す)。 <see cref="EvalDeckWiring"/> の前半と同じ。</summary>
-        private void ResolveDeckCand(in DeckEval ev, int[] rolls, int[] cand, out TerminalOutcome o, out TerminalBattleState after, out int[] tgts)
-        {
-            after = ev.deck.state.Clone();
-            o = TerminalCards.Resolve(ev.board, cand, rolls, ev.env, after, reboot: BotReboot, overclock: true);
-            tgts = ChooseDeckTargets(ev.board, o, ev.run, _recallPrefer);
-            if (tgts != null)
-            {
-                after = ev.deck.state.Clone();
-                o = TerminalCards.Resolve(ev.board, cand, rolls, ev.env, after, tgts, reboot: BotReboot, overclock: true);
-            }
-        }
-
-        /// <summary>解いた挿し方に <paramref name="gold"/> G を払った時の効用 (値段は引かない)。 金の攻撃は攻撃+N の枠 (本体の atkBase) へ入れる。</summary>
-        private float EvalWithGold(in DeckEval ev, int[] rolls, TerminalOutcome o, TerminalBattleState after, int gold, out OptimalTurnOutcome outc)
-        {
-            var st = GoldPunchState(in ev.st, gold);
-            var ws = DeckSums(in st, rolls, ev.board, o, ev.deck.state, after, in ev.env, ev.counterPerFire);
-            return OptimalUtilityCore(in st, rolls.Length, in ws, out outc);
-        }
-
-        /// <summary>金の攻撃を足した盤面 (旧の式の素の攻撃力と、 倍率を読む式の攻撃+N の両方へ・本体の atkBase と同じ位置)。
-        /// 効果の定義を替えたらここも直す (<see cref="MetaProgression.ChallengeCards.GoldPunchAttack"/>)。</summary>
-        private static OptimalTurnState GoldPunchState(in OptimalTurnState s, int gold)
-        {
-            var t = s;
-            int a = MetaProgression.ChallengeCards.GoldPunchAttack(gold);
-            if (a > 0) { t.atkBase += a; t.atkFlat += a; }
-            return t;
-        }
 
         // =====================================================================
         //  #105 山札の 2 ターン先読み (2026-11-12・既定 OFF)
@@ -1506,10 +1428,13 @@ namespace AutoTest
             var sums = new List<WiredSums>(cands.Count);
             float best = float.NegativeInfinity;
             bool anyAttack = false;
+            // 速度 (2026-11-22・結果は変えない): 必ず外れる組を含む挿し方は、 それを「挿さない」に直した挿し方 (列挙にある) と同じ結果なので解かない (最良と anyAttack は変わらない)
+            var miss = SureMiss(board, dice, state);
             foreach (var w in cands)
             {
                 bool dup = false;
                 for (int i = 1; i < k && !dup; i++) if (dice[i] == dice[i - 1] && w[i] < w[i - 1]) dup = true;
+                if (miss != null) for (int i = 0; i < k && !dup; i++) if (w[i] >= 0 && miss[i, w[i]]) dup = true;
                 if (dup) continue;
                 TerminalBattleState after; TerminalOutcome o;
                 using (BotTiming.Enter(BotTiming.Cat.EvalResolve))

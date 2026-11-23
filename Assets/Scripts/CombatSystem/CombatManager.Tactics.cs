@@ -25,7 +25,7 @@ namespace CombatSystem
             ctx.enemyCurrentHP = enemyHP;
             EnemyHpLedger.CtxOverwritten();   // [計装]
             NoteBossDownMainHit(dealt, ctx.currentTurn);
-            Debug.Log($"[目盛り削りの鑿] 敵に {dealt} (通常攻撃として目盛りを見る) → 敵HP {enemyHP}");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[目盛り削りの鑿] 敵に {dealt} (通常攻撃として目盛りを見る) → 敵HP {enemyHP}");
             return true;
         }
 

@@ -46,8 +46,8 @@ namespace CombatSystem
         public const int SakuraNeed = 12, SakuraSpend = 2, SakuraPctPer = 2, SakuraMaxPct = 120;
         /// <summary>〈紅の搾り具〉: 要る出血・使った出血 1 につきのダメージ。 使う量は 1/3 (切り上げ)。</summary>
         public const int PressNeed = 15, PressMul = 8;
-        /// <summary>〈涸れぬ血晶〉: 与える出血が倍になる出血。</summary>
-        public const int CrystalNeed = 5;
+        /// <summary>〈涸れぬ血晶〉: 与える出血が倍になる出血 (2026-11-22 neon 収束: 5 → 10 → final5: 14)。</summary>
+        public const int CrystalNeed = 14;
         /// <summary>〈血の楔〉: 全部の撃の最終与ダメ +% になる出血・その %。</summary>
         public const int WedgeNeed = 20, WedgePct = 40;
 

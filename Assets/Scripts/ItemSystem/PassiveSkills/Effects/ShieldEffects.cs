@@ -75,11 +75,11 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>重ね札の盾: シールドが 10 以上ある間、 受ける直接ダメージ −2 (敵の攻撃を受けるその時のシールドで判定)。</summary>
+    /// <summary>重ね札の盾: シールドが 12 以上ある間、 受ける直接ダメージ −3 (敵の攻撃を受けるその時のシールドで判定・2026-11-22 10 → 16・answer9: 16 / −2 → 12 / −3)。</summary>
     public class LayeredTagShield : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "重ね札の盾";
-        public const int Need = 10, Cut = 2;
+        public const int Need = 12, Cut = 3;
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.consShield >= Need);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreReceiveDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
@@ -91,14 +91,15 @@ namespace ItemSystem.PassiveSkills.Effects
 
     // ── S: エンジン・安定 ── (〈擦り減った小盾〉は端子の解決の中と許容幅だけ・ShieldCore の旗)
 
-    /// <summary>聖路の白靴: マップを 1 歩進むごとに蓄積 (最大 20)。 次の戦闘開始時、 蓄積分だけシールドを得て 0 に戻す (歩数は戦闘の終わりに 0・RunState.stepsSinceBattle)。</summary>
+    /// <summary>聖路の白靴: マップを 2 歩進むごとに 1 蓄積 (最大 20・2026-11-22 1 歩 +1 → 2 歩 +1)。 次の戦闘開始時、 蓄積分だけシールドを得て 0 に戻す (歩数は戦闘の終わりに 0・RunState.stepsSinceBattle)。</summary>
     public class HolyRoadShoes : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "聖路の白靴";
-        public const int Max = 20;
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(System.Math.Min(Max, Rw.Steps));
+        public const int Max = 20, StepsPer = 2;
+        public static int Stored(int steps) => System.Math.Min(Max, steps / StepsPer);
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Stored(Rw.Steps));
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => Rw.Shield(ctx, System.Math.Min(Max, Rw.Steps), SkillId);
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => Rw.Shield(ctx, Stored(Rw.Steps), SkillId);
     }
 
     /// <summary>英雄の意志: エリート戦・ボス戦で敵が大技の予告かチャージを出しているターン、 ターン開始時にシールド +18。
@@ -126,13 +127,16 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>油染みの盾革: ターン開始時のシールドの減衰で残る割合が 50% → 70% (ctx.shieldKeepBonusPct・残る割合の上限 80% は変えない)。</summary>
-    public class OiledShieldLeather : IPassiveSkillEffect
+    /// <summary>油染みの盾革: 前のターンに【ジャスト防御】か完封 (敵の攻撃を受けて HP を 1 も失わなかった) をしていたら、 ターン開始時のシールドの減衰で残る割合が 50% → 70%
+    /// (ctx.shieldKeepBonusPct をターンの終わりに立てる / 戻す・残る割合の上限 80% は変えない・2026-11-22 旧: 毎ターン 70%)。</summary>
+    public class OiledShieldLeather : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "油染みの盾革";
         public const int KeepBonus = 20;
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.shieldKeepBonusPct = System.Math.Max(ctx.shieldKeepBonusPct, KeepBonus);
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.shieldKeepBonusPct >= KeepBonus);
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
+            => ctx.shieldKeepBonusPct = Shd.JustGuardNow(ctx) || Psn.Shutout(ctx) ? KeepBonus : 0;   // 次のターンの頭の減衰 (BeginNewTurn) が読む
     }
 
     /// <summary>割れ盾の仕返し: シールドが割られて 0 になったとき、 割られる直前のシールド量の軽減不可ダメージを敵へ返し、 次のターンの与ダメージ +35% (与ダメ % の池)。</summary>
@@ -159,11 +163,11 @@ namespace ItemSystem.PassiveSkills.Effects
 
     // ── G: 分岐 (A = ジャスト防御・見切り / B = 余剰の持ち越し・要塞) ──
 
-    /// <summary>力みの小手: シールドを合計 12 得るたび【力み】+1。 攻撃の端子を挿したターン、 【力み】を全部使い、 1 つにつき全撃の基礎攻撃 +4 (攻撃 +N・撃ごとに乗る)。</summary>
+    /// <summary>力みの小手: シールドを合計 10 得るたび【力み】+1。 攻撃の端子を挿したターン、 【力み】を全部使い、 1 つにつき全撃の基礎攻撃 +5 (攻撃 +N・撃ごとに乗る・answer9: 旧 12 / +4)。</summary>
     public class StrainGauntlet : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "力みの小手";
-        public const int Every = 12, AtkPer = 4;
+        public const int Every = 10, AtkPer = 5;
         private const string Stk = "shd.strain", Tally = "shd.strainTally";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Shd.Count(ctx, Stk));
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnShieldGain, PassiveSkillTrigger.OnWired };
@@ -205,20 +209,21 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>重装兵の隠し刃: 【ジャスト防御】を成立させたとき、 敵の予告攻撃と同量の軽減不可ダメージ (防御も無視) を返す。
+    /// <summary>重装兵の隠し刃: 【ジャスト防御】を成立させたとき、 敵の予告攻撃の 150% の軽減不可ダメージ (防御も無視) を返す (answer14: 旧 100%)。
     /// さらにボスのダウン中はシールドがターン開始時に減衰しない (ctx.shieldKeepOnBossDown・BeginNewTurn)。</summary>
     public class KnightsTrump : IPassiveSkillEffect, IRelicDisplay
     {
         public const string Id = "重装兵の隠し刃";
         public string SkillId => Id;
+        public const int ReturnPct = 150;
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(BossDown.ActiveNow);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnJustGuard };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (t == PassiveSkillTrigger.OnBattleStart) { ctx.shieldKeepOnBossDown = true; return; }
-            int e = Kw.EventAmount(ctx);
+            int e = Kw.EventAmount(ctx) * ReturnPct / 100;
             Kw.DamageEnemy(ctx, e);
-            Rw.Log($"[重装兵の隠し刃] ジャスト防御 → 予告 {e} を返す");
+            Rw.Log($"[重装兵の隠し刃] ジャスト防御 → 予告の {ReturnPct}% {e} を返す");
         }
     }
 
@@ -259,12 +264,12 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>静寂の構え: 攻撃の端子に 1 つも挿さずに敵の攻撃を完封した (攻撃を受けて HP を 1 も失わなかった) 次のターン、 全撃の最終与ダメージ +60% (【ジャスト防御】だったなら +100%)。</summary>
+    /// <summary>静寂の構え: 攻撃の端子に 1 つも挿さずに敵の攻撃を完封した (攻撃を受けて HP を 1 も失わなかった) 次のターン、 全撃の最終与ダメージ +60% (【ジャスト防御】だったなら +130%・answer14: 旧 +100%)。</summary>
     public class SilentStance : IPassiveSkillEffect, IRelicDisplay
     {
         public const string Id = "静寂の構え";
         public string SkillId => Id;
-        public const int Pct = 60, JustPct = 100;
+        public const int Pct = 60, JustPct = 130;   // answer14: ジャスト防御 +100% → +130%
         private const string TurnKey = "shd.still", PctKey = "shd.stillPct";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(Shd.Count(ctx, TurnKey) == ctx.currentTurn);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd, PassiveSkillTrigger.OnPreDealDamage };
@@ -283,13 +288,13 @@ namespace ItemSystem.PassiveSkills.Effects
 
     // ── L: 規則破壊 ──
 
-    /// <summary>破城斧: シールドが 15 以上のターン (最初の 1 撃の時のシールドで決める)、 攻撃の端子 1 枚につき (撃ごとに) シールドを 8 使い、 その撃の最終与ダメージ +80%・敵の防御を全部無視。
-    /// 撃の途中でシールドが 8 を切ったら、 その後の撃には乗らない。 シールド 15 未満のターンは発動しない。</summary>
+    /// <summary>破城斧: シールドが 20 以上のターン (最初の 1 撃の時のシールドで決める)、 攻撃の端子 1 枚につき (撃ごとに) シールドを 6 使い、 その撃の最終与ダメージ +130% (final6: 旧 +110%)・敵の防御を全部無視。
+    /// 撃の途中でシールドが 6 を切ったら、 その後の撃には乗らない。 シールド 20 未満のターンは発動しない (2026-11-22 旧: 15 / 8 / +80%)。</summary>
     public class SiegeAxe : IPassiveSkillEffect, IRelicDisplay
     {
         public const string Id = "破城斧";
         public string SkillId => Id;
-        public const int MinShield = 15, PerHitShield = 8, FinalPct = 80;
+        public const int MinShield = 20, PerHitShield = 6, FinalPct = 130;
         private const string TurnKey = "shd.siegeAxe.turn";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.consShield >= MinShield);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
@@ -325,12 +330,12 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>脈なしの鋼心臓: 戦闘開始時、 シールド +X (X = <see cref="GameLoop.RunState.pulselessHeartShield"/>・ランの始めに 6・持っている間に戦闘に勝つたび +1)。
-    /// 現在のシールドが 35 以上の間、 ターン開始時にシールドが減衰しない (ctx.shieldNoDecayAt)。 勝ちを数えるのは CombatManager.FinishCombat (<see cref="NoteWin"/>)。</summary>
+    /// <summary>脈なしの鋼心臓: 戦闘開始時、 シールド +X (X = <see cref="GameLoop.RunState.pulselessHeartShield"/>・ランの始めに 4・持っている間に戦闘に勝つたび +1)。
+    /// 現在のシールドが 50 以上の間、 ターン開始時にシールドが減衰しない (ctx.shieldNoDecayAt・2026-11-22 旧: 6 / 35)。 勝ちを数えるのは CombatManager.FinishCombat (<see cref="NoteWin"/>)。</summary>
     public class PulselessHeart : IPassiveSkillEffect, IRelicDisplay
     {
         public const string Id = "脈なしの鋼心臓";
-        public const int StartShield = 6, PerWin = 1, NoDecayAt = 35;
+        public const int StartShield = 4, PerWin = 1, NoDecayAt = 50;
         public string SkillId => Id;
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Rw.Run?.pulselessHeartShield ?? StartShield);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
@@ -346,37 +351,72 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>落城の礎石: シールドが吸収またはターン開始の減衰で減るたび、 減った量 × 2 の軽減不可ダメージを敵に与え、 ボスの次の目盛りにひびを入れる
-    /// (ひびが既にあれば何もしない・ひびは猶予が切れたターンの終わりに割れる・CombatManager.CrackBossNotch)。</summary>
-    public class FallenCastleCornerstone : IPassiveSkillEffect
+    /// <summary>落城の礎石: 吸収またはターン開始の減衰で 1 ターンにシールドを 12 以上 (2026-11-22 neon 収束: 旧 20) 失ったとき、 次のターンの全撃の基礎攻撃 +「そのターンに失ったシールドの半分」(攻撃 +N・撃ごと)・
+    /// 全撃の最終与ダメージ +60%。 シールドが吸収か減衰で減るたび、 ボスの次の目盛りにひびを入れる (ひびが既にあれば何もしない・CombatManager.CrackBossNotch)。
+    /// 2026-11-22 (neon 最終仕上げ §2-2) 旧: 減るたび 減った量 × 2 の軽減不可ダメージ。</summary>
+    public class FallenCastleCornerstone : IPassiveSkillEffect, IRelicDisplay
     {
         public const string Id = "落城の礎石";
         public string SkillId => Id;
-        public const int Mul = 2;
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnShieldAbsorb, PassiveSkillTrigger.OnShieldDecay };
+        public const int Need = 12, FinalPct = 80;   // 2026-11-22 neon 収束: 失うシールド 20 → 12・final6: +60% → +80%
+        /// <summary>このターンに失ったシールド (Psn.TurnN) / 上乗せが働くターン / その攻撃 +N。</summary>
+        private const string LostKey = "shd.castle.lost", TurnKey = "shd.castle.turn", AtkKey = "shd.castle.atk";
+        public static bool Primed(CombatContext ctx) => ctx != null && ctx.currentTurn > 0 && Shd.Count(ctx, TurnKey) == ctx.currentTurn;
+        public static int AttackNow(CombatContext ctx) => Primed(ctx) ? Shd.Count(ctx, AtkKey) : 0;
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(Primed(ctx));
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnShieldAbsorb, PassiveSkillTrigger.OnShieldDecay, PassiveSkillTrigger.OnTurnEnd, PassiveSkillTrigger.OnWired, PassiveSkillTrigger.OnPreDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            int lost = Kw.EventAmount(ctx);
-            if (lost <= 0) return;
-            Kw.DamageEnemy(ctx, lost * Mul);
-            CombatManager.Instance?.CrackBossNotch(Id);
-            Rw.Log($"[落城の礎石] シールド −{lost} → 敵へ {lost * Mul} (軽減不可)");
+            switch (t)
+            {
+                case PassiveSkillTrigger.OnTurnEnd:
+                {
+                    int lost = Psn.TurnN(ctx, LostKey);
+                    if (lost < Need) return;
+                    ctx.accumulatedValues[TurnKey] = ctx.currentTurn + 1;
+                    ctx.accumulatedValues[AtkKey] = lost / 2;
+                    Rw.Log($"[落城の礎石] このターン シールド −{lost} → 次のターン 全撃の攻撃 +{lost / 2}・最終与ダメージ +{FinalPct}%");
+                    return;
+                }
+                case PassiveSkillTrigger.OnWired:
+                    if (Primed(ctx) && Shd.AttackedWithTerminal(ctx)) ctx.AddPlayerAttackOrDiceBonus(Shd.Count(ctx, AtkKey));
+                    return;
+                case PassiveSkillTrigger.OnPreDealDamage:
+                    if (ctx.IsRealHit && Primed(ctx)) ctx.hitFinalDamagePct += FinalPct;
+                    return;
+                default:
+                {
+                    int lost = Kw.EventAmount(ctx);
+                    if (lost <= 0) return;
+                    Psn.AddTurnN(ctx, LostKey, lost);
+                    CombatManager.Instance?.CrackBossNotch(Id);
+                    return;
+                }
+            }
         }
     }
 
-    /// <summary>防人の軍標【規則】: 【ジャスト防御】を成立させるたび、 この戦闘の最終与ダメージ倍率 +45% (累積・ctx.finalDamagePct) と、 次のターンの手札 +1 枚 (Rw.DrawNext)。</summary>
+    /// <summary>防人の軍標【規則】: 【ジャスト防御】を成立させるたび、 この戦闘の最終与ダメージ倍率 +45% (累積・ctx.finalDamagePct) と、 次のターンの手札 +1 枚 (Rw.DrawNext)。
+    /// この戦闘で 2 回目以降 (2026-11-22 neon 収束: 旧 3 回目以降) のジャスト防御を成立させた次のターン、 全部の撃がもう 1 回ずつ発火する (2 回当たる・本体の撃の輪 CombatManager.Turn が <see cref="EchoNow"/> を読む・2026-11-22)。</summary>
     public class BorderGuardStandard : IPassiveSkillEffect, IRelicDisplay
     {
         public const string Id = "防人の軍標";
         public string SkillId => Id;
-        public const int PctPerGuard = 45, Draw = 1;
+        public const int PctPerGuard = 45, Draw = 1, EchoNeed = 2;
+        /// <summary>[persistent] 撃がもう 1 回ずつ発火するターン。</summary>
+        public const string EchoKey = "shd.standard.echo";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Pct(ctx.finalDamagePct / 100f);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnJustGuard };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             ctx.finalDamagePct += PctPerGuard;
             Rw.DrawNext(Draw);
-            Rw.Log($"[防人の軍標] ジャスト防御 → 最終与ダメージ倍率 +{PctPerGuard}% (この戦闘 +{ctx.finalDamagePct}%)・次のターンの手札 +{Draw}");
+            bool echo = Shd.Count(ctx, Shd.JustGuardCountKey) >= EchoNeed;
+            if (echo) ctx.accumulatedValues[EchoKey] = ctx.currentTurn + 1;
+            Rw.Log($"[防人の軍標] ジャスト防御 → 最終与ダメージ倍率 +{PctPerGuard}% (この戦闘 +{ctx.finalDamagePct}%)・次のターンの手札 +{Draw}{(echo ? "・次のターン 全撃がもう 1 回発火" : "")}");
         }
+
+        /// <summary>このターン、 全部の撃がもう 1 回ずつ発火する (本体の撃の輪と BOT の見積もりが読む)。</summary>
+        public static bool EchoNow(CombatContext ctx) => ctx != null && ctx.currentTurn > 0 && Shd.Count(ctx, EchoKey) == ctx.currentTurn;
     }
 }

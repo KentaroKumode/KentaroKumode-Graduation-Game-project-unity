@@ -204,6 +204,8 @@ namespace ItemSystem
         public bool unique;
         /// <summary>パッシブの軸 (会心/出血/毒/臨界/充電/シールド/山札/役/金)。 軸を持たない品は空。 軸の深さ (CombatContext.AxisDepth) が数える。</summary>
         public string axis = "";
+        /// <summary>軸の中の分岐 ("A" / "B"・共通の品は空・2026-11-23・items.json の branch)。 構造は id の綴りから読まない。</summary>
+        public string branch = "";
         public List<PassiveEffect> weaponPassives = new List<PassiveEffect>();
         
         [Header("パッシブアイテムデータ")]

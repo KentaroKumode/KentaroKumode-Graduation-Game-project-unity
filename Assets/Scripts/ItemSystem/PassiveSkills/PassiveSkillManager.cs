@@ -152,7 +152,7 @@ namespace ItemSystem.PassiveSkills
                     skillDisplayNames[c.id] = c.display;
             }
 
-            Debug.Log($"[PassiveSkillManager] Active skills refreshed: {activeSkillNames.Count} skills (収集{collected.Count}, 同名抑制後{uniqueIds.Count})");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[PassiveSkillManager] Active skills refreshed: {activeSkillNames.Count} skills (収集{collected.Count}, 同名抑制後{uniqueIds.Count})");
         }
 
         /// <summary>効果 (スキルの internalName) → その効果を持つ品の id (最初に見つけた品・<see cref="RefreshActiveSkills"/> が作る)。 秘宝の発動の表示 (#320) が読む。</summary>
@@ -234,8 +234,8 @@ namespace ItemSystem.PassiveSkills
             
             triggeredPlayerSkills.Clear();
             triggeredEnemySkills.Clear();
-            Debug.Log($"[PassiveSkillManager] Combat started. Player skills: {activeSkillNames.Count}, Enemy skills: {enemySkillNames.Count}");
-            Debug.Log($"[PassiveSkillManager] Dice setup - Player: d{playerDiceMax}, Enemy: d{enemyDiceMax}, Threat: {enemyThreat}");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[PassiveSkillManager] Combat started. Player skills: {activeSkillNames.Count}, Enemy skills: {enemySkillNames.Count}");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[PassiveSkillManager] Dice setup - Player: d{playerDiceMax}, Enemy: d{enemyDiceMax}, Threat: {enemyThreat}");
         }
 
         /// <summary>
@@ -631,12 +631,34 @@ namespace ItemSystem.PassiveSkills
                 // **加算側で引く形を維持する** ── 下限 0 のクランプがここに要るのは変わらない。
                 critAdd = System.Math.Max(0f,
                     critAdd);
+                // 乗算の会心率の枠 (〈測量師の片眼鏡〉・2026-11-23): 加算の合計に (1 + 乗算の上乗せ) を掛ける
+                critAdd *= 1f + System.Math.Max(0f, context.hitCritRateMulAdd);
+                // 【集中】(2026-11-23・CritCore.FocusedRate): 集中の品 3 つ以上・攻撃の端子 1 枚の撃・照準器のもう 1 回でない・集中の会心率 1% 以上なら、 会心率から賭け金を引いた率で振る。
+                //   集中にならない時は賭け金も集中の効果も働かない (会心率はそのまま)
+                context.hitIsFocused = false;
+                if (context.IsRealHit && context.hitCount == 1 && !context.isRefireHit)
+                {
+                    var frun = GameLoop.GameManager.Instance?.Run;
+                    var fitems = CombatSystem.CritCore.FocusOf(frun);
+                    if (CombatSystem.CritCore.FocusCount(fitems) >= CombatSystem.CritCore.FocusNeedCount)
+                    {
+                        float bonus = Effects.QuickDrawArt.FocusRateBonus(context, frun, CombatSystem.CombatManager.Instance?.EnemyDownNow ?? false);
+                        float fr = CombatSystem.CritCore.FocusedRate(critAdd, true, false, fitems, CombatSystem.CritCore.CritRelicCount(frun), bonus);
+                        if (fr > 0f)
+                        {
+                            context.hitIsFocused = true;
+                            critAdd = fr;
+                            CombatSystem.CombatManager.FocusAttempted++;   // [計装]
+                            if (Debug.unityLogger.logEnabled) Debug.Log($"[集中] 集中の会心率 {fr:P0} (練気 {Effects.Crit.Renki(context)})");
+                        }
+                    }
+                }
 
                 // 逓減撤去後は実質クランプのみ。 加算した分がそのまま実効会心率になる。
                 float critRate = CombatContext.ResolveCritRate(critAdd);
                 GameLoop.GameHooks.OnCritRateResolved?.Invoke(critAdd, critRate);
 
-                //   〈必殺の照準器〉がもう 1 回発火した撃 (critSkipRoll) は乱数を引かない (会心は下の forceCritThisHit で確定)。 キーの並びを崩さない
+                //   critSkipRoll: 乱数を引かない撃 (2026-11-23 から立てる所は無い・〈必殺の照準器〉のもう 1 回も実際の会心率で振る)
                 context.isCritical = !context.critSkipRoll && critRate > 0f && GameLoop.GameRng.Value("PassiveSkillManager.2") < critRate;
                 context.lastCritAddPct = critAdd;
             }
@@ -653,6 +675,16 @@ namespace ItemSystem.PassiveSkills
             {
                 if (!attackerIsEnemy)
                 {
+                    // 【練気】(2026-11-23): 会心で +1、 集中会心ならその後で半分 (切り上げ) を使う。 OnCriticalDamage の品 (集中会心の品・〈白刃の鏡砥〉) が読むので先に
+                    int spent = Effects.Crit.GainOnCrit(context);
+                    //   【練気】の基礎の効果 (answer9 案 A): 会心した撃の会心倍率 +0.06 × 練気 (+1 した後・集中会心は使う前・会心の秘宝を持たない戦闘は 0)
+                    if (Effects.Crit.HitRenki(context) > 0 && CombatSystem.CritCore.CritRelicCount(GameLoop.GameManager.Instance?.Run) > 0)
+                        context.criticalMultiplier += CombatSystem.CritCore.RenkiMulPer * Effects.Crit.HitRenki(context);
+                    if (context.hitIsFocused)
+                    {
+                        CombatSystem.CombatManager.FocusCritted++; CombatSystem.CombatManager.RenkiSpentTotal += spent;   // [計装]
+                        if (Debug.unityLogger.logEnabled) Debug.Log($"[集中会心] 練気 {Effects.Crit.HitRenki(context)} → {spent} 使う (残 {Effects.Crit.Renki(context)})");
+                    }
                     Effects.Crit.Note(context);   // このターンの会心の数・会心を出したターン (会心の軸の品が読む)
                 }
                 FireTrigger(PassiveSkillTrigger.OnCriticalDamage);
@@ -660,9 +692,9 @@ namespace ItemSystem.PassiveSkills
                 //   ここで引く。 criticalMultiplier 自体を下げると BeginNewTurn の再構築と
                 //   その後の加算 (メタ精密 r10 還元・物資系) に押し流される。
                 //   下限 1.0 ── 会心が通常攻撃より弱くなるのは倒錯するため。
-                //   超過会心率 (100% を超えた分・1% ごとに +0.01・〈寸鉄〉で 2 倍) と〈天眼の鍔〉の確定会心 ×1.25 も、 ここで乗せる (CritCore.EffectiveMul・BOT と画面も同じ関数)
+                //   超過会心率 (100% を超えた分・1% ごとに +0.01・〈寸鉄〉で 2 倍) も、 ここで乗せる (CritCore.EffectiveMul・BOT と画面も同じ関数)
                 float effCritMul = CombatSystem.CritCore.EffectiveMul(context.criticalMultiplier, context.enemyCritMultReduction, context.lastCritAddPct,
-                    context.critExcessDouble, Effects.HeavenEyeGuard.Held(context));
+                    context.critExcessDouble);
                 if (!attackerIsEnemy && context.lastCritAddPct > 1f) CombatSystem.CombatManager.CritOverflowFired++;   // [計装] 超過会心率が倍率になった会心
                 totalDamage = (int)(totalDamage * effCritMul);
                 if (!attackerIsEnemy) context.accumulatedValues[Keywords.Kw.LastCritMulKey] = effCritMul;   // 〈天眼の鍔〉が読む (2026-11-20)

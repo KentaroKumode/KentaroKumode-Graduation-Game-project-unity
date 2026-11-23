@@ -495,6 +495,7 @@ namespace AutoTest
                 _cur.critOverflowFired = (int)CombatSystem.CombatManager.CritOverflowFired;
                 _cur.critExecuteFired = (int)CombatSystem.CombatManager.CritExecuteFired;
                 _cur.critRefireFired = (int)CombatSystem.CombatManager.CritRefireFired;
+                _cur.focusAttempted = (int)CombatSystem.CombatManager.FocusAttempted; _cur.focusCritted = (int)CombatSystem.CombatManager.FocusCritted; _cur.renkiSpentTotal = (int)CombatSystem.CombatManager.RenkiSpentTotal;
                 _cur.deckDisposeFired = (int)CombatSystem.CombatManager.DeckDisposeFired;
                 _cur.deckShuffleFired = (int)CombatSystem.CombatManager.DeckShuffleFired;
                 _cur.roleFormedFired = (int)CombatSystem.CombatManager.RoleFormedFired;
@@ -503,8 +504,11 @@ namespace AutoTest
                 _cur.weaponExecuteFired = (int)CombatSystem.CombatManager.WeaponExecuteFired;
                 _cur.weaponGaryoFired = (int)CombatSystem.CombatManager.WeaponGaryoFired;
                 _cur.weaponBashFired = (int)CombatSystem.CombatManager.WeaponBashFired;
+                _cur.guardEchoFired = (int)CombatSystem.CombatManager.GuardEchoFired;
                 _cur.skipFired = ItemSystem.AxisPool.RunSkips;
                 _cur.skipGold = ItemSystem.AxisPool.RunSkipGold;
+                _cur.axisRerollFired = ItemSystem.AxisPool.RunAxisRerolls;
+                _cur.mainAxisPicks = ItemSystem.AxisPool.RunMainAxisPicks;
                 _cur.chainPath = ItemSystem.PassiveSkills.PassiveSkillManager.ChainDeepestPath;
                 _cur.heatBurstInfo = ItemSystem.PassiveSkills.Keywords.Kw.HeatMaxBurstsOneAdd + "|" + ItemSystem.PassiveSkills.Keywords.Kw.HeatMaxBurstsInfo;
                 _cur.attackSumInfo = CombatSystem.CombatManager.AttackSumMaxInfo;

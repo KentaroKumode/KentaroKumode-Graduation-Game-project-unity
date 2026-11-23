@@ -111,7 +111,7 @@ namespace UI.Game2D
                 if (s.guardIn == 0) plan.Add("このターンは構え (防御が上がる)"); else if (s.guardIn > 0) plan.Add("構えまで " + s.guardIn + " ターン");
                 if (s.heavyIn == 0) plan.Add("このターンは大技" + (s.burst > 0 ? " (烈炎の分 " + s.burst + " は軽減無視)" : "")); else if (s.charging) plan.Add("このターンはチャージ (攻撃しない・次のターンが大技)"); else if (s.heavyIn > 0) plan.Add("大技まで " + s.heavyIn + " ターン");
                 // ボスのダウン (2026-11-13): ダウン中・後に続くダウン・次の目盛りまでの残り。 大技の取り消しはチャージか大技のターンに重なった時だけ (2026-11-14)
-                if (s.down) plan.Add((s.downWeak ? "このターンはひびのダウン (攻撃しない" : "このターンはダウン (攻撃しない・受けるダメージ ×" + CombatSystem.BossDown.TakenMul.ToString("0.0"))
+                if (s.down) plan.Add((s.downWeak ? "このターンはひびのダウン (攻撃しない" : "このターンはダウン (攻撃しない・受けるダメージ ×" + CombatSystem.BossDown.TakenMulCard.ToString("0.0#"))
                                      + (e.heavyPeriod > 0 && cm.Down.heavyCanceledNow ? "・大技は取り消し" : "") + ")");
                 if (s.downPending > 0) plan.Add("ダウンはあと " + s.downPending + " ターン続く" + (s.downNextWeak ? " (次はひびのダウン)" : ""));
                 // ひび (2026-11-14): 通常攻撃以外で下回った目盛り。 通常攻撃が当たれば割れる・猶予が切れるとひとりでに割れる (受けるダメージ ×1.5 は付かない)

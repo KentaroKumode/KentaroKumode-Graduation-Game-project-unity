@@ -45,7 +45,7 @@ namespace ItemSystem.PassiveSkills.Keywords
         /// <summary>【過熱】: このターンに爆発が起きた。</summary>
         public static bool Overheated(CombatContext ctx) => ctx != null && ctx.currentTurn > 0 && (int)ctx.GetAccumulated(BurstTurnKey) == ctx.currentTurn;
 
-        /// <summary>臨界を有効にする (臨界の品を持つ戦闘は戦闘開始時に本体が呼ぶ・端子が臨界を出した時も)。 閾値 30 (〈早沸かし釜〉−12)・〈恒温の竈〉は閾値の半分から。</summary>
+        /// <summary>臨界を有効にする (臨界の品を持つ戦闘は戦闘開始時に本体が呼ぶ・端子が臨界を出した時も)。 閾値 36 (〈早沸かし釜〉−6)・〈恒温の竈〉は閾値の半分から。</summary>
         public static void EnableHeat(CombatContext ctx)
         {
             if (ctx == null || ctx.rinkaiThreshold > 0) return;
@@ -123,7 +123,7 @@ namespace ItemSystem.PassiveSkills.Keywords
                 ctx.accumulatedValues[BurstTurnKey] = ctx.currentTurn;
                 ctx.accumulatedValues[BurstDamageNowKey] = b.landed;
                 CombatSystem.CombatManager.BurstFired++;   // [計装]
-                Debug.Log($"[臨界] 閾値{b.threshold} 到達 → {(b.super ? "超臨界" : "")}爆発 (溜まり {b.meterAt}・超過 {b.excess}・残 {s.meter}・ダメージ {b.damage} → 防御の後 {b.landed}・この戦闘 {s.burstsTotal} 回目)");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[臨界] 閾値{b.threshold} 到達 → {(b.super ? "超臨界" : "")}爆発 (溜まり {b.meterAt}・超過 {b.excess}・残 {s.meter}・ダメージ {b.damage} → 防御の後 {b.landed}・この戦闘 {s.burstsTotal} 回目)");
                 var pm = PassiveSkillManager.Instance;
                 var cm = pm != null && ReferenceEquals(pm.Context, ctx) ? CombatSystem.CombatManager.Instance : null;
                 if (cm != null)

@@ -301,7 +301,6 @@ namespace UI.Game2D.Battle
                 if (AutoWireOnTurnStart) AutoWire(false);
             }
             else ValidateSlots();
-            TakeCatPaw(p);
             RecomputePreview();
         }
 
@@ -341,17 +340,14 @@ namespace UI.Game2D.Battle
                         // 振り直しから配線へ進む時は必ず予告を写し直す (振り直しの判断の予告は仮組みで、 配線の予告と数字が違うことがある)。
                         //   攻撃の数字かダウンが変わったら、 人が見ないまま決めないよう、 写し直した所で止まる (もう一度押すと決まる)。
                         p = cm.PendingDecision;
-                        // 〈猫の手〉が挿した: 人が見ないまま決めないよう、 猫の 1 組を見せて止まる (もう一度押すと決まる)。 写し直す前の挿し方で見る
-                        bool catNew = p.kind == TurnPauseKind.Wiring && p.catDie >= 0 && (p.catDie >= slot.Length || slot[p.catDie] != p.catSlot);
                         SyncDecision(cm, false); Touch();
-                        if (catNew) { Game2DSfx.Play("wire", 1f, 1.1f); break; }
                         if (eatk != atkShown || down != downShown) { Game2DSfx.Play("ui_tab"); break; }
                     }
                     if (p.kind == TurnPauseKind.Wiring)
                     {
                         Game2DSfx.Play("decide");
                         int n = p.playerDice != null ? p.playerDice.Length : 0;
-                        cm.AnswerWiringSlots(BuildSlots(n), (int[])target.Clone(), 0, (bool[])keepMark.Clone(), rebootSel, overclockOn);   // 残す印は本体が KeepFromMarks で直す (挿した端子には効かない)
+                        cm.AnswerWiringSlots(BuildSlots(n), (int[])target.Clone(), (bool[])keepMark.Clone(), rebootSel, overclockOn);   // 残す印は本体が KeepFromMarks で直す (挿した端子には効かない)
                         if (!cm.IsAwaitingDecision) Resolve(cm);
                     }
                     break;
@@ -391,7 +387,8 @@ namespace UI.Game2D.Battle
         {
             roles.Clear();
             if (p == null || ctx == null || p.playerDice == null) return;
-            YachtRoles.Evaluate(p.playerDice, p.playerFaceIdx, ctx.equippedFaceTiers, roles);
+            var cmr = CombatManager.Instance;
+            YachtRoles.Evaluate(cmr != null ? cmr.RoleDice(p.playerDice) : p.playerDice, p.playerFaceIdx, ctx.equippedFaceTiers, roles);   // 怠惰で引く前の目 (本体と同じ)
             for (int i = roles.Count - 1; i >= 0; i--)
                 if ((ctx.sealedRoleMask & (1 << (int)roles[i])) != 0) roles.RemoveAt(i);      // 〈凶運〉で封じられた役は成立しても効かない (ResolveRoles と同じ)
         }
@@ -464,12 +461,12 @@ namespace UI.Game2D.Battle
             var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
             if (ctx != null) charge = ctx.GetCharge();
             // 戦術消耗品 (2026-11-20: 〈入れ替えの符〉〈複製の水銀〉・〈帯革の薬嚢〉) で場の手札が変わったら、 場を取り直す。
-            //   挿してあった出目は外す (同じ添字に別の端子が来るため・〈猫の手〉の 1 組は残す)
+            //   挿してあった出目は外す (同じ添字に別の端子が来るため)
             var dk = cm?.TerminalDeck;
             if (dk != null && !SameBoard(dk.board))
             {
                 TakeBoard(cm);
-                for (int i = 0; i < slot.Length; i++) if (!IsCatLocked(i)) slot[i] = -1;
+                for (int i = 0; i < slot.Length; i++) slot[i] = -1;
                 RecomputePreview();
             }
             Touch();
@@ -667,7 +664,7 @@ namespace UI.Game2D.Battle
             if (ctx == null || !TermInputs(out _, out _, out _)) return false;
             var s = ItemSystem.PassiveSkills.Keywords.Kw.HeatState(ctx);
             if (s.threshold <= 0 && (preview == null || (preview.heat <= 0 && preview.heatGains.Count == 0))) return false;
-            var f = preview != null ? HeatCore.Forecast(s, preview, preview.attackAdd) : default;
+            var f = preview != null ? HeatCore.Forecast(s, preview) : default;
             int n = f.burstsWired + f.burstsEnd;
             label = "臨界 " + s.meter + "/" + (s.threshold > 0 ? s.threshold : HeatCore.StartThreshold(s.items)) + (n > 0 ? " 爆発" + n : "");
             return n > 0;
@@ -687,7 +684,20 @@ namespace UI.Game2D.Battle
             {
                 if (!HasCrit) return "";
                 var hs = CombatManager.Instance.PreviewHudStats();
-                return "会心 " + Mathf.RoundToInt(hs.critRate * 100f) + "% ×" + hs.critMul.ToString("0.00");
+                string t = "会心 " + Mathf.RoundToInt(hs.critRate * 100f) + "% ×" + hs.critMul.ToString("0.00");
+                // 【練気】の数と、 この配線で【集中】になる時の集中の会心率と使う練気 (2026-11-23・仮置き・CritCore の同じ関数。 撃ごとの品と〈測量師の片眼鏡〉の乗算は入らない)
+                var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
+                var run = GameLoop.GameManager.Instance?.Run;
+                int renki = ItemSystem.PassiveSkills.Effects.Crit.Renki(ctx);
+                if (renki > 0) t += " 練" + renki;
+                var f = CritCore.FocusOf(run);
+                if (ctx != null && preview != null && preview.attackHits.Count == 1 && CritCore.FocusCount(f) >= CritCore.FocusNeedCount)
+                {
+                    float fr = CritCore.FocusedRate(hs.critRate, true, false, f, CritCore.CritRelicCount(run),
+                        ItemSystem.PassiveSkills.Effects.QuickDrawArt.FocusRateBonus(ctx, run, CombatManager.Instance.EnemyDownNow));
+                    if (fr > 0f) t += " 集中 " + Mathf.RoundToInt(fr * 100f) + "% (練-" + CritCore.RenkiSpend(renki + 1) + ")";
+                }
+                return t;
             }
         }
 
@@ -718,6 +728,7 @@ namespace UI.Game2D.Battle
             if (used >= d.capacity) return false;
             if (d.chargeCost > 0 && env.charge < d.chargeCost) return false;
             if (d.baseId == TerminalIds.BigDischarge && env.charge <= 0) return false;
+            if (!TerminalCards.SituationOk(d, in env, st)) return false;      // 発動の条件 (〈応急箱〉〈身代わり札〉〈焼却斬り〉・条件の無視でも外れない)
             if (st.ignoreCond) return true;
             // 〈号令の剣〉: 他の出目が号令の剣に挿さっていれば、 その数だけ +1 (強化した〈号令の剣＋〉は挿した出目も +1・TerminalCards.Resolve の 1.)
             int v = dice[i];
@@ -751,34 +762,11 @@ namespace UI.Game2D.Battle
 
         private bool IsDie(int i) => i >= 0 && i < slot.Length;
 
-        // ── 挑戦カード〈猫の手〉(#5) ──
-        //   本体が配線の判断の頭に 1 組 (出目 catDie → 場の catSlot) を先に挿したら、 その出目は動かせない (挿し替え・外す・おまかせでも残す)。
-
-        /// <summary>このターン〈猫の手〉が先に挿した出目 (−1 = 無し)。 画面の印に使う。</summary>
-        public int catDie = -1;
-        /// <summary>〈猫の手〉が挿した端子 (場の添字・−1 = 無し)。</summary>
-        public int catSlot = -1;
-
-        /// <summary>出目 i が〈猫の手〉に挿されていて動かせないか。</summary>
-        public bool IsCatLocked(int i) => catDie >= 0 && i == catDie;
-
-        /// <summary>判断の写しから猫の 1 組を読み、 挿し方に入れる (配線の判断の時だけ入る)。</summary>
-        private void TakeCatPaw(TurnPause p)
-        {
-            catDie = catSlot = -1;
-            if (p == null || p.kind != TurnPauseKind.Wiring || p.catDie < 0 || p.catSlot < 0 || p.catSlot >= board.Count || !IsDie(p.catDie)) return;
-            catDie = p.catDie; catSlot = p.catSlot;
-            // 猫の端子が挿せる数を超えるなら、 他の出目を後ろから外す (本体の TerminalWiring.WithPair と同じ規則)
-            var w = TerminalWiring.WithPair(slot, slot.Length, board, catDie, catSlot);
-            for (int i = 0; i < slot.Length; i++) slot[i] = w[i];
-        }
-
         /// <summary>出目 die へ端子 s を挿せるか (画面のドラッグ用)。 fromDie = つかんで動かしている元の出目 (手札からなら −1)。
         /// die に別の端子が挿さっていれば入れ替え (前の端子は手札へ戻る) とみなす。</summary>
         public bool CanPlug(int die, int s, int fromDie = -1)
         {
             if (!CanOperate || !IsDie(die) || s < 0 || s >= board.Count) return false;
-            if (IsCatLocked(die) || IsCatLocked(fromDie)) return false;      // 猫の出目は動かせない
             int keepFrom = IsDie(fromDie) ? slot[fromDie] : -1, keepDie = slot[die];
             if (IsDie(fromDie)) slot[fromDie] = -1;
             slot[die] = -1;
@@ -800,15 +788,15 @@ namespace UI.Game2D.Battle
         }
 
         /// <summary>新しい戦闘の画面 (<see cref="Game2DBattleLcd"/>・出目をつかんで札へ運ぶ): 出目 die を札 s へ挿せるか。
-        /// s がもう埋まっていれば、 先に挿さっていた出目 (〈猫の手〉の出目は除く・後ろから) を 1 個床へ戻せば挿せるかを見て、 その出目を bumped に返す (入れ替え)。</summary>
+        /// s がもう埋まっていれば、 先に挿さっていた出目 (後ろから) を 1 個床へ戻せば挿せるかを見て、 その出目を bumped に返す (入れ替え)。</summary>
         public bool CanPlugDie(int die, int s, out int bumped)
         {
             bumped = -1;
-            if (!CanOperate || !IsDie(die) || IsCatLocked(die) || s < 0 || s >= board.Count || slot[die] == s) return false;
+            if (!CanOperate || !IsDie(die) || s < 0 || s >= board.Count || slot[die] == s) return false;
             if (CanPlug(die, s)) return true;
             for (int j = slot.Length - 1; j >= 0; j--)
             {
-                if (j == die || slot[j] != s || IsCatLocked(j)) continue;
+                if (j == die || slot[j] != s) continue;
                 slot[j] = -1; bool ok = CanPlug(die, s); slot[j] = s;
                 if (ok) { bumped = j; return true; }
             }
@@ -828,7 +816,7 @@ namespace UI.Game2D.Battle
         /// <summary>出目 die から端子を外す (手札へ戻す)。</summary>
         public void Unplug(int die)
         {
-            if (!CanOperate || !IsDie(die) || slot[die] < 0 || IsCatLocked(die)) return;
+            if (!CanOperate || !IsDie(die) || slot[die] < 0) return;
             slot[die] = -1; Game2DSfx.Play("wire", 1f, 0.85f);
             RecomputePreview(); Touch();
         }
@@ -845,7 +833,7 @@ namespace UI.Game2D.Battle
 
         private void CycleSlot(int i, int dir)
         {
-            int m = board.Count; if (m == 0 || !IsDie(i) || IsCatLocked(i)) return;
+            int m = board.Count; if (m == 0 || !IsDie(i)) return;
             int n = m + 1, cur = slot[i] < 0 || slot[i] >= m ? m : slot[i];      // 並び: 0..m-1 → 挿さない (= m)
             for (int k = 1; k <= n; k++)
             {
@@ -869,7 +857,7 @@ namespace UI.Game2D.Battle
         {
             if (sound && !CanOperate) return;
             if (!TermInputs(out var dice, out var env, out var st)) return;
-            var w = TerminalWiring.Auto(board, dice, env, st, catDie, catSlot);      // 猫の 1 組は外さない
+            var w = TerminalWiring.Auto(board, dice, env, st);
             for (int i = 0; i < slot.Length; i++) slot[i] = w != null && i < w.Length ? w[i] : -1;
             focusSlot = -1;
             // 見込みは音の有無にかかわらず取り直す (2026-11-16: 音なしで呼ぶ口 ── ターンの頭・QaBattle ── の後に、 挿し方と見込みが食い違って

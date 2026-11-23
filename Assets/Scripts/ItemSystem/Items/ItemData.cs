@@ -144,6 +144,8 @@ namespace ItemSystem
         /// <summary>パッシブの軸 (会心 / 出血 / 毒 / 臨界 / 充電 / シールド / 出目 / 金)。 軸を持たない品は空。
         /// 品が<b>読む</b>資源 (発動の条件) の軸、 条件の無い品は作る資源の軸 (2026-11-06・GAME.md §8-7)。</summary>
         public string axis;
+        /// <summary>軸の中の分岐 ("A" / "B"・共通の品は空・2026-11-23)。 出どころは full-item-rework-ledger の役割の欄 (会心は crit_redesign answer8 の振り分け)。 BOT の分岐の寄せ (AutoRunner.buyBranchFocus) が読む。</summary>
+        public string branch;
     }
 
     /// <summary>

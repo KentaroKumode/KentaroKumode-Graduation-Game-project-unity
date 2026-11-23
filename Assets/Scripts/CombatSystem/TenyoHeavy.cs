@@ -63,7 +63,7 @@ namespace CombatSystem
             if (toHeavy == 1 && Escalation.IsChargeTurn(e, turn))
             {
                 if (Pending == Gift.None) Pending = Draw(turn);
-                UnityEngine.Debug.Log($"[天与] T{turn} チャージ: 次のターンは {NameOf(Pending)}");
+                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[天与] T{turn} チャージ: 次のターンは {NameOf(Pending)}");
                 return true;
             }
             if (toHeavy == 0)
@@ -75,16 +75,16 @@ namespace CombatSystem
                     {
                         int add = (int)System.Math.Round(ctx.playerMaxHP * BossParams.Param(e.id, BossParam.TenyoShieldPct) / 100f);
                         ctx.vescaShield += add;
-                        UnityEngine.Debug.Log($"[天与の盾] T{turn} シールド +{add} (最大 HP {ctx.playerMaxHP} の {BossParams.Param(e.id, BossParam.TenyoShieldPct)}%) → {ctx.vescaShield}");
+                        if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[天与の盾] T{turn} シールド +{add} (最大 HP {ctx.playerMaxHP} の {BossParams.Param(e.id, BossParam.TenyoShieldPct)}%) → {ctx.vescaShield}");
                         break;
                     }
                     case Gift.Sword:
                         ctx.vescaMaxHpBiteOnHit += BossParams.ParamInt(e.id, BossParam.TenyoSwordBite);
-                        UnityEngine.Debug.Log($"[天与の剣] T{turn} 大技の攻撃 + 当たったら最大 HP −{BossParams.ParamInt(e.id, BossParam.TenyoSwordBite)}");
+                        if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[天与の剣] T{turn} 大技の攻撃 + 当たったら最大 HP −{BossParams.ParamInt(e.id, BossParam.TenyoSwordBite)}");
                         break;
                     case Gift.Ring:
                         RingStopTurn = turn + 1;
-                        UnityEngine.Debug.Log($"[天与の指輪] T{turn} 次のターン (T{turn + 1}) は引いた端子が全部止まる");
+                        if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[天与の指輪] T{turn} 次のターン (T{turn + 1}) は引いた端子が全部止まる");
                         break;
                 }
                 Last = Pending;

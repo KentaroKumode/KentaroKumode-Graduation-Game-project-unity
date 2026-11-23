@@ -4,42 +4,21 @@ using System.Collections.Generic;
 namespace MetaProgression
 {
     /// <summary>
-    /// メタ層から付与される固有恒久デバフの ID 定数。
-    /// run.permanentDebuffs に格納される文字列キーとして使う。
-    /// 効果説明・大罪フレーバー本文も本ファイルに正本として持つ
-    /// (旧 docs/GAME.md §19-6 の本文をここへ移植済み)。
+    /// 七つの大罪の正式名とフレーバー本文の正本 (旧 docs/GAME.md §19-6 の本文をここへ移植済み)。
+    /// 大罪は挑戦カードの難易度 10・4→5 の札 (ChallengeCards の sin_*) で、 名前は <see cref="ChallengeCards.Name"/> がここを引く。
+    /// 定数は run.permanentDebuffs のキーとしても残る (旧の付与は撤去済み)。
     /// </summary>
     public static class PermanentDebuffIds
     {
-        public const string Pride    = "カイロスの傲慢";       // 通常戦闘の勝利報酬が0、エリート/ボス戦では2倍
-        public const string Envy     = "ヤルノクの嫉妬";       // 1ショップにつき1個しか購入できない
-        public const string Greed    = "ムシュファの強欲";     // 5層突入時にゴールドが0になる
-        public const string Wrath    = "コルヴェンの憤怒";     // ボス戦の1T目: 自ダイス全て最大値 + 現在HP半減
-        public const string Sloth    = "クェシナの怠惰";       // 戦闘開始から3T間、消費アイテム使用不可
-        public const string Gluttony = "トゥルハドの暴食";     // 飢餓ダメージ ×2
-        public const string Lust     = "クァディルの色欲";     // ショップ入店時、買える中で最も高価な品を強制購入
+        public const string Pride    = "カイロスの傲慢";
+        public const string Envy     = "ヤルノクの嫉妬";
+        public const string Greed    = "ムシュファの強欲";
+        public const string Wrath    = "コルヴェンの憤怒";
+        public const string Sloth    = "クェシナの怠惰";
+        public const string Gluttony = "トゥルハドの暴食";
+        public const string Lust     = "クァディルの色欲";
 
-        // ===== UI/Codex 表示用の効果説明 =====
-        //
-        // 【注記 2026-11-12・#115】 下の短い説明と、 上の定数の行末コメントは、 旧〈七つの大罪〉
-        // (メタ層が run.permanentDebuffs に付与していた頃・c89b942 で撤去) の効果のまま。
-        // いまの大罪は挑戦カード IV の sin_* (ChallengeCards.cs) で、 効果はそちらが正本。
-        // GetShortDescription は本体から呼ぶ所が無い。 フレーバー本文 (flavorTexts) は今も正本。
-
-        private static readonly Dictionary<string, string> shortDescriptions = new Dictionary<string, string>
-        {
-            { Pride,    "通常戦闘の勝利報酬が0、エリート・ボスは2倍" },
-            { Envy,     "1ショップにつき通常品1個まで" },
-            { Greed,    "5層突入時にゴールドが0" },
-            { Wrath,    "ボス1T目 自ダイス全最大＋現HP半減" },
-            { Sloth,    "開幕3T 消費アイテム使用不可" },
-            { Gluttony, "飢餓ダメージ×2" },
-            { Lust,     "入店時、買える中で最高額の品を強制購入" },
-        };
-
-        /// <summary>UI に出す簡易説明 (一行)。</summary>
-        public static string GetShortDescription(string id)
-            => id != null && shortDescriptions.TryGetValue(id, out var s) ? s : "";
+        // 効果の正本は挑戦カード IV の sin_* (ChallengeCards.cs・Effect)。 旧〈七つの大罪〉(メタ層が付与していた頃) の短い説明は 2026-11-22 に削除した。
 
         // ===== 大罪フレーバー本文 (旧 lore-endings.md §1-F 移植) =====
         //

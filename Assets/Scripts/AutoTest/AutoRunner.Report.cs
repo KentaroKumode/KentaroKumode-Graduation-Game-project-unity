@@ -1352,6 +1352,7 @@ namespace AutoTest
             {
                 var au = ItemSystem.Helpers.PassiveSourceAudit.Counts;
                 if (ItemSystem.AxisPool.Drawn.Count > 0) ItemSystem.AxisPool.WriteStats(au);   // [計装 2026-11-21] 逐次の通常バッチ (並列は worker が混ぜて返す)
+                if (MetaProgression.ChallengeCards.DealtAxisBuffs + MetaProgression.ChallengeCards.DealtGenericBuffs > 0) MetaProgression.ChallengeCards.WriteStats(au);   // [計装 2026-11-22] 挑戦カードの裏と出現の枠
                 if (au.Count > 0)
                 {
                     int tot = 0; foreach (var kv in au) tot += kv.Value;

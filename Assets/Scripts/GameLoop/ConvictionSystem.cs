@@ -65,7 +65,7 @@ namespace GameLoop
             int idx = run.ownedPassiveItems != null ? FindAnyConvictionIndex(run) : -1;
             if (idx < 0)
             {
-                Debug.Log($"[Conviction] エリート撃破 → stage{run.convictionStage} (確信の品なし)");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[Conviction] エリート撃破 → stage{run.convictionStage} (確信の品なし)");
                 return;
             }
             // エリート撃破は確信の強さだけを積む。層ゲートの名称変化は
@@ -77,11 +77,11 @@ namespace GameLoop
             if (oldId != newId)
             {
                 run.ownedPassiveItems[idx] = newId;
-                Debug.Log($"[Conviction] エリート撃破 → stage{run.convictionStage}: 「{oldId}」が「{newId}」に変化");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[Conviction] エリート撃破 → stage{run.convictionStage}: 「{oldId}」が「{newId}」に変化");
             }
             else
             {
-                Debug.Log($"[Conviction] エリート撃破 → stage{run.convictionStage} ({newId})");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[Conviction] エリート撃破 → stage{run.convictionStage} ({newId})");
             }
         }
 
@@ -112,7 +112,7 @@ namespace GameLoop
             if (idx >= 0) { run.ownedPassiveItems[idx] = newId; return; }
             if (run.convictionStage < 1 && !run.layer6Unlocked && !run.layer7Unlocked) return;
             bool added = ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(run, newId);
-            Debug.Log(added ? $"[Conviction] 確信の品が無いので「{newId}」を足した (資格は段・フラグが持つ)"
+            if (Debug.unityLogger.logEnabled) Debug.Log(added ? $"[Conviction] 確信の品が無いので「{newId}」を足した (資格は段・フラグが持つ)"
                             : $"[Conviction] 確信の品が無く「{newId}」も足せなかった (このランで手放し済み)");
         }
 

@@ -81,7 +81,7 @@ namespace GameLoop
         //   |                          |                                        | CanBeLost    → GameManager.LoseRandomPassiveItem (偽の商人に敗北)           |
         //   | Entrusted (預かり物)     | 止まらない時計                         | IsEntrusted  → ItemCards (持ち物の画面の印「預かり物」)                    |
         //   | ProgressionItems (進行用) | 確信の 3 品・時計・灯火・レイピア・    | CanOfferAtGate   → GameManager.OfferGateRelics (〈門〉で捧げない)          |
-        //   |                          | 初期装備・武器階梯 T2/T3 ほか          | CanBeTakenBySin  → GameManager.Challenge (大罪の強欲・色欲)               |
+        //   |                          | 初期装備・武器階梯 T2/T3 ほか          |                                                                          |
         //   |                          |                                        | (直接) AutoTest.ItemLearningStats.ExcludedFromLift (BOT の学習から外す)  |
         //
         //   | EndingKeyItems (結末に関わる品) | 確信の 3 品・時計               | HiddenInCodexUntilOwned → GalleryView (手に入れるまで影も出さない)・      |
@@ -143,8 +143,6 @@ namespace GameLoop
         public static bool HiddenInCodexUntilOwned(string id) => !string.IsNullOrEmpty(id) && EndingKeyItems.Contains(id);
         /// <summary>〈門〉で秘宝として捧げられるか。 進行用の品 (<see cref="ProgressionItems"/>) は false。</summary>
         public static bool CanOfferAtGate(string id) => !string.IsNullOrEmpty(id) && !ProgressionItems.Contains(id);
-        /// <summary>大罪 (強欲・色欲) が封じる・奪う対象になり得るか。 進行用の品 (<see cref="ProgressionItems"/>) は false。</summary>
-        public static bool CanBeTakenBySin(string id) => !string.IsNullOrEmpty(id) && !ProgressionItems.Contains(id);
 
         // === 初期装備 ===
         public const string DiceWood = "dice_wood";
@@ -238,7 +236,11 @@ namespace GameLoop
         // === 会心の軸の品で、 会心の式 (CombatSystem.CritCore)・本体の撃の輪・BOT の見積もりが読む品 (2026-11-21・full-item-rework-ledger §⑥) ===
         public const string CritFirstArrow = "一の矢", CritPommel = "渾身の柄頭", CritSniper = "必殺の照準器", CritHeaven = "天眼の鍔",
             CritSuntetsu = "寸鉄", CritIronClub = "銑鉄棍", CritPinpoint = "一点読みの片眼", CritQuickDraw = "抜き打ちの作法",
-            CritClairvoyant = "千里眼の水晶", CritMask = "死相の面頬", CritAim = "狙い目の刻み";
+            CritClairvoyant = "千里眼の水晶", CritMask = "死相の面頬", CritAim = "狙い目の刻み",
+            CritNick = "刃毀れの見立て", CritLapis = "瑠璃砥石", CritSurveyor = "測量師の片眼鏡";
+        /// <summary>会心の軸に 2026-11-23 (会心の仕組みの転換・crit_redesign answer8) に足した 6 品 (仮名・作者が名前を決めるまで)。</summary>
+        public const string CritPulse = "脈打ちの測り針", CritReadMark = "見切りの目印", CritWhiteBlade = "白刃の鏡砥",
+            CritFirstStroke = "初太刀の鍔留め", CritNarrow = "細目の覗き筒", CritOneFlash = "一閃の極意";
         // === ボス・大技の戦術の 4 品 (軸なし汎用) = GeneralEffects.cs ===
         public const string TacGapSpear = "隙衝きの短槍";
         public const string TacBreak = "崩しの一手", TacWedge = "大技殺しの楔", TacHourglass = "逆境の砂時計";
@@ -277,7 +279,7 @@ namespace GameLoop
 
         // === 進行用の品 ===
         /// <summary>**進行用の品**: 強さではなく進行度や配布条件を表す品。 〈門〉で秘宝として捧げられない
-        /// (<see cref="CanOfferAtGate"/>)・大罪 (強欲・色欲) の対象にならない (<see cref="CanBeTakenBySin"/>)。
+        /// (<see cref="CanOfferAtGate"/>)。 (旧: 大罪の強欲・色欲が奪う・封じる対象から外す ── 2026-11-22 に秘宝を奪う効果ごと撤去)
         /// BOT の lift 評価もこれを除外する (AutoTest.ItemLearningStats.ExcludedFromLift)。
         /// <b>売れる・取り替えに出せるかはこの集合では決まらない</b> (<see cref="Undroppable"/>) ── 〈ちいさな灯火〉〈シュヴァリエのレイピア〉は売れる (売値 0G)。</summary>
         public static readonly System.Collections.Generic.HashSet<string> ProgressionItems =

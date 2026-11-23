@@ -105,7 +105,7 @@ namespace ItemSystem
                         if (spriteRenderer != null && spriteRenderer.sprite != null)
                         {
                             item.icon = spriteRenderer.sprite;
-                            Debug.Log($"[ItemDatabaseEditor] {item.displayName}: 3Dモデルからアイコンを自動設定");
+                            if (Debug.unityLogger.logEnabled) Debug.Log($"[ItemDatabaseEditor] {item.displayName}: 3Dモデルからアイコンを自動設定");
                         }
                     }
                     

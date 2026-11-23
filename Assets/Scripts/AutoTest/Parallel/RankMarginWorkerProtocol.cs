@@ -86,7 +86,7 @@ namespace AutoTest.ParallelSweep
         /// <summary>[計装 2026-11-13] 基地の版 (true = 再訪)・選んだ選択肢・起きた時の深さ 6 の航行の手番 (起きていなければ -1)・手記の最後の頁を開いたか。</summary>
         public bool ashBaseRevisit;
         public int ashBaseChoice = -1, ashBaseTurn = -1;
-        public int chainMaxDepth, chainRepeats, chainGuardHits, rebootFired, overclockFired, detonateFired, justGuardFired, bleedSpendFired, bleedExecuteFired, burstFired, burstBreakFired, critOverflowFired, critExecuteFired, critRefireFired, deckDisposeFired, deckShuffleFired, roleFormedFired, roleOmniFired, skipFired, skipGold, weaponChainFired, weaponExecuteFired, weaponGaryoFired, weaponBashFired;
+        public int chainMaxDepth, chainRepeats, chainGuardHits, rebootFired, overclockFired, detonateFired, justGuardFired, bleedSpendFired, bleedExecuteFired, burstFired, burstBreakFired, critOverflowFired, critExecuteFired, critRefireFired, focusAttempted, focusCritted, renkiSpentTotal, deckDisposeFired, deckShuffleFired, roleFormedFired, roleOmniFired, skipFired, skipGold, axisRerollFired, rewardPicks, rewardSkips, mainAxisPicks, weaponChainFired, weaponExecuteFired, weaponGaryoFired, weaponBashFired, guardEchoFired;
         public string chainPath = "", heatBurstInfo = "", attackSumInfo = "";
         public bool ashBaseOpened;
         /// <summary>[計装 2026-11-14] 〈徒労〉の記録 (AutoRunner.RunRec と同じ意味): 掛かった通常の戦闘の勝ち・止めた品のドロップ・開けた宝箱・〈徒労〉で空だった宝箱。</summary>
@@ -126,7 +126,7 @@ namespace AutoTest.ParallelSweep
                 layerFlow = r.layerFlow != null ? r.layerFlow.ToArray() : Array.Empty<int>(),
                 metaRanks = r.metaRanks ?? "",
                 startClass = r.startClass ?? "",
-                ashBase = r.ashBase, ashBaseRevisit = r.ashBaseRevisit, ashBaseChoice = r.ashBaseChoice, chainMaxDepth = r.chainMaxDepth, chainRepeats = r.chainRepeats, chainGuardHits = r.chainGuardHits, rebootFired = r.rebootFired, overclockFired = r.overclockFired, detonateFired = r.detonateFired, justGuardFired = r.justGuardFired, bleedSpendFired = r.bleedSpendFired, bleedExecuteFired = r.bleedExecuteFired, burstFired = r.burstFired, burstBreakFired = r.burstBreakFired, critOverflowFired = r.critOverflowFired, critExecuteFired = r.critExecuteFired, critRefireFired = r.critRefireFired, deckDisposeFired = r.deckDisposeFired, deckShuffleFired = r.deckShuffleFired, roleFormedFired = r.roleFormedFired, roleOmniFired = r.roleOmniFired, skipFired = r.skipFired, skipGold = r.skipGold, weaponChainFired = r.weaponChainFired, weaponExecuteFired = r.weaponExecuteFired, weaponGaryoFired = r.weaponGaryoFired, weaponBashFired = r.weaponBashFired, chainPath = r.chainPath ?? "", heatBurstInfo = r.heatBurstInfo ?? "", attackSumInfo = r.attackSumInfo ?? "", ashBaseTurn = r.ashBaseTurn,
+                ashBase = r.ashBase, ashBaseRevisit = r.ashBaseRevisit, ashBaseChoice = r.ashBaseChoice, chainMaxDepth = r.chainMaxDepth, chainRepeats = r.chainRepeats, chainGuardHits = r.chainGuardHits, rebootFired = r.rebootFired, overclockFired = r.overclockFired, detonateFired = r.detonateFired, justGuardFired = r.justGuardFired, bleedSpendFired = r.bleedSpendFired, bleedExecuteFired = r.bleedExecuteFired, burstFired = r.burstFired, burstBreakFired = r.burstBreakFired, critOverflowFired = r.critOverflowFired, critExecuteFired = r.critExecuteFired, critRefireFired = r.critRefireFired, focusAttempted = r.focusAttempted, focusCritted = r.focusCritted, renkiSpentTotal = r.renkiSpentTotal, deckDisposeFired = r.deckDisposeFired, deckShuffleFired = r.deckShuffleFired, roleFormedFired = r.roleFormedFired, roleOmniFired = r.roleOmniFired, skipFired = r.skipFired, skipGold = r.skipGold, axisRerollFired = r.axisRerollFired, rewardPicks = r.rewardPicks, rewardSkips = r.rewardSkips, mainAxisPicks = r.mainAxisPicks, weaponChainFired = r.weaponChainFired, weaponExecuteFired = r.weaponExecuteFired, weaponGaryoFired = r.weaponGaryoFired, weaponBashFired = r.weaponBashFired, guardEchoFired = r.guardEchoFired, chainPath = r.chainPath ?? "", heatBurstInfo = r.heatBurstInfo ?? "", attackSumInfo = r.attackSumInfo ?? "", ashBaseTurn = r.ashBaseTurn,
                 ashBaseOpened = r.ashBaseOpened,
                 toilNothingBattles = r.toilNothingBattles, toilBlockedDrops = r.toilBlockedDrops, chestsOpened = r.chestsOpened, toilEmptyChests = r.toilEmptyChests,
                 shelves = r.shelves != null ? r.shelves.ToArray() : Array.Empty<string>(), policySig = r.policySig ?? "",
@@ -514,7 +514,7 @@ namespace AutoTest.ParallelSweep
                 // 計測でイベントを切っているか (2026-11-05)。 クリア率の意味が変わるので必ず印字する。
                 "suppressEvents", "suppressConvictionChain", "freeNavScout", "navLearnedDanger", "measureNoExplore",
                 // 2026-11-10: 配線が与ダメの倍率を読むか (−1 = 技量に従う) と実効値・軸に寄せる方策・配布の有無 (配布は使わない前提を確かめる)
-                "v3.readOutgoingMult", "ReadOutgoingMultEffective", "buyAxisFocus", "buyAxisFocusBonus",
+                "v3.readOutgoingMult", "ReadOutgoingMultEffective", "buyAxisFocus", "buyAxisFocusBonus", "buyBranchFocus", "botBanItemIds",
                 "axisPackageAxis", "axisPackageCount", "v3.hpLedger", "predTrace",
                 // 2026-11-10: 主攻撃の見積もりを実績の比で掛け直すか・2026-11-21: 最初の武器の指定
                 "v3.mainCorr", "weaponTierCap", "forceStartWeapon", "vescaDiceForce",
@@ -535,8 +535,8 @@ namespace AutoTest.ParallelSweep
                 "v3.readEnemyPassives", "ReadEnemyPassivesEffective", "v3.enemyPassiveMask",
                 // 2026-11-12 (#105): 山札の 2 ターン先読み (既定 OFF) と、 その範囲・候補数・標本数
                 "deckLookahead", "deckLookaheadBossOnly", "deckLookaheadTopK", "deckLookaheadSamples", "deckLookaheadProbe",
-                // 2026-11-12 (#6): 挑戦カードを 1 枚ずつ受ける測定の口と、〈金で殴る〉の BOT の金の値段・取り置き
-                "challengeForce", "goldPunchHpPerGold", "goldPunchReserve",
+                // 2026-11-12: 挑戦カードを 1 枚ずつ受ける測定の口 (〈金で殴る〉の BOT の値は 2026-11-22 に札ごと撤去)
+                "challengeForce",
                 // 2026-11-12 (#118): 挑戦の難易度 (v3_queue の腕が振る値) と、 BOT が読む学習の帯の固定・欠けたら止めるか
                 "challengeCardDifficulty", "botLearningBandOverride", "failOnMissingLearning",
                 // 2026-11-12 (#95 / #20 / #41 / #102 / #108): 腕ごとに切り替える測定の口。 送った値と、 ラン開始時に本体へ入れる値

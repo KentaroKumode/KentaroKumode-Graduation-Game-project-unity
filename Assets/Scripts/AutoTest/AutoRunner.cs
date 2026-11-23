@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
@@ -190,7 +190,7 @@ namespace AutoTest
         /// <summary>[測定 2026-11-14] 〈徒労〉の別の形 (LayerLong) で宝箱が空になる確率 (%・既定 50)。 本体の GameHooks.ToilChestEmptyPct へ流す。 Stacks・UntilKing では効かない。</summary>
         public int toilChestEmptyPct = EventSystem.TimedEffects.BattleBoonRule.DefaultChestEmptyPct;
         /// <summary>[測定 2026-11-14] 〈徒労〉の戦闘のデバフ (%・既定 = 本体の既定 50・0 を入れればデバフなし)。 本体の GameHooks.ToilDamageDownPct へ流す (ラン終了で本体の既定へ)。
-        /// 〈徒労〉を持っている間、 すべての戦闘でプレイヤーが敵に与えるダメージ −N% (大罪:怠惰と同じ枠・重なったら厳しい方)。 形 (toilMode) を問わない。
+        /// 〈徒労〉を持っている間、 すべての戦闘でプレイヤーが敵に与えるダメージ −N% (旧 大罪:怠惰と同じ枠)。 形 (toilMode) を問わない。
         /// 〈徒労〉を受けるのは「はじめて」の版だけなので、 ashKingBeatenEver = False の腕で振る。</summary>
         public int toilDamageDownPct = EventSystem.TimedEffects.BattleBoonRule.DefaultToilDamageDownPct;
         /// <summary>[2026-11-14] 航行が〈徒労〉を読むか。 true (既定) = 〈徒労〉で通常の戦闘の報酬が止まっている間 (<see cref="ToilNavRule.RewardlessLeft"/>)、
@@ -201,7 +201,7 @@ namespace AutoTest
         /// <summary>[2026-11-14・#140 の 2] 航行が嵐 (不安定化の時計) を読むか。 false = 旧い動き (乱数の消費も同じ・終点の位置を知っている・フェーズ 3 で出口へ)。
         /// <b>2026-11-18〜 既定 true</b> (測定の基準を「嵐あり + 嵐を読む BOT (T2 = この口と第 2 巡の 3 つ)」に切り替えた・GAME.md §13-5)。
         /// 根拠: 嵐あり・Super・同じシード 4,000 ランで、 読まない 2.1% → T2 9.7% (53 対 356・p=3e-56)。 読まない BOT は嵐を値付けしないので、 嵐ありの測定がゲームでなく BOT の穴を測っていた。
-        /// 旧い基準の数字 (読まない・嵐なし) と比べる腕は false を明示する。 BOT の口なので、 ゲームの挙動は変わらない (猫の手の写しは配線しか使わない)。
+        /// 旧い基準の数字 (読まない・嵐なし) と比べる腕は false を明示する。 BOT の口なので、 ゲームの挙動は変わらない。
         /// true = Optimal / Super (追跡者を避ける方策) が、 嵐の層で <see cref="StormNavView"/> の見方を使う ──
         /// 隠れたボスの点を読まない (候補から探す)・点を取る価値から「溜まるポイントで嵐が早まる代償」を引く・「まだ取る」と「出口へ」を値で比べる (フェーズ 3 の規則は外す)・
         /// 嵐の中の 1 歩の HP を道の費用に入れる。 Naive は読まない (嵐を読まない下限)。 手番の時計 (stormClock=Turns)・嵐の無い層では効かない。 乱数は引かない。</summary>
@@ -364,6 +364,11 @@ namespace AutoTest
         public string buyAxisFocus = "";
         /// <summary>軸に寄せる加点 (序列の段の数・店では × StepPerTier の準パワー)。 1 = 「同じ値段帯なら軸の品を先に取る」程度。</summary>
         public int buyAxisFocusBonus = 1;
+        /// <summary>[2026-11-23] 寄せる軸の中の分岐 ("" / "A" / "B")。 <see cref="buyAxisFocus"/> と一緒に使う: その軸の品のうち指定した分岐の品の加点を 2 倍にし、
+        /// もう一方の分岐の品の加点を 0 にする (禁止はしない・共通の品は今と同じ)。 分岐は items.json の branch (BotHooks.BranchAdj)。</summary>
+        public string buyBranchFocus = "";
+        /// <summary>[2026-11-23] BOT が選ばない品 (品名のカンマ区切り・空 = 無効)。 依存の測定 (その品を取れない腕を同じシードで比べる) の口。 BotHooks.BanIds へ入れる。</summary>
+        public string botBanItemIds = "";
 
         /// <summary>品 <paramref name="itemId"/> が <see cref="buyAxisFocus"/> の軸か (items.json の axis を読む・id の綴りは読まない)。</summary>
         private bool IsAxisFocusItem(string itemId)
@@ -626,7 +631,7 @@ namespace AutoTest
         private int PersonaBonus(string itemId)
         {
             // [2026-11-10] 軸に寄せる方策 (buyAxisFocus): ペルソナとは独立に足す
-            int axisFocus = IsAxisFocusItem(itemId) ? buyAxisFocusBonus : 0;
+            int axisFocus = IsAxisFocusItem(itemId) ? buyAxisFocusBonus * (1 + BotHooks.BranchAdj(itemId)) : 0;   // 分岐の寄せ (buyBranchFocus)
             if (!useBuildPersonas || _currentPersona == BuildPersona.RawTier) return axisFocus;
             return BuildPersonaProfiles.ScoreBonusForItem(_currentPersona, itemId) + axisFocus;
         }
@@ -1673,6 +1678,9 @@ namespace AutoTest
         public float superIttPriceK = 0.1f;
         /// <summary>Super は自分の方策で測った ITT の序列 (itt_clear.super.json) を使う (2026-11-06)。 k は金の価値が約 10 倍になったので 0.1。</summary>
         public bool superOwnItt = true;
+        /// <summary>[2026-11-22・ハイブリッド案] ITT の Δ に群 × 取得の時期の倍率 (itt_timing.&lt;版&gt;.json・有意な群だけ) を掛けて序列を作る。
+        /// 既定 true (2026-11-22・同じシード 8,000 対でクリア +1.49 pp [+0.45, +2.53]・作者の決定)。 寄せの軸 (buyAxisFocus) の秘宝は上げる側だけ (GrantItt.FocusAxes)。 <see cref="LearnedPriorityProvider.IttTimingMul"/>。</summary>
+        public bool ittTimingMul = true;
         /// <summary>付与試行のラン番号オフセット。 <b>並列プロセスごとに区間を分けるためにある</b>。
         /// runIdx = 90000 + これ + i。 0 のとき従来と完全に同じ。</summary>
         [Tooltip("付与試行の開始オフセット (並列時にプロセスごとの担当区間を分ける)")]
@@ -2014,10 +2022,17 @@ namespace AutoTest
             if (treasurePassiveRate >= 0f) GameLoop.CombatRewards.TreasurePassiveRate = treasurePassiveRate;
             float priceK = ittPriceK >= 0f ? ittPriceK : (wiringSkill == WiringSkill.Super ? superIttPriceK : 0f);
             string ittVariant = wiringSkill == WiringSkill.Super && superOwnItt ? "super" : "";
-            if (!Mathf.Approximately(LearnedPriorityProvider.IttPriceK, priceK) || GrantItt.Variant != ittVariant)
+            var focusAxes = new HashSet<string>(System.StringComparer.Ordinal);
+            if (!string.IsNullOrEmpty(buyAxisFocus))
+                foreach (var a in buyAxisFocus.Split(',', '、')) if (a.Trim().Length > 0) focusAxes.Add("秘宝・" + a.Trim());
+            bool focusChanged = !GrantItt.FocusAxes.SetEquals(focusAxes);
+            if (focusChanged) { GrantItt.FocusAxes.Clear(); GrantItt.FocusAxes.UnionWith(focusAxes); }
+            if (!Mathf.Approximately(LearnedPriorityProvider.IttPriceK, priceK) || GrantItt.Variant != ittVariant
+                || LearnedPriorityProvider.IttTimingMul != ittTimingMul || (focusChanged && ittTimingMul))
             {
                 LearnedPriorityProvider.IttPriceK = priceK;
                 GrantItt.Variant = ittVariant;
+                LearnedPriorityProvider.IttTimingMul = ittTimingMul;
                 LearnedPriorityProvider.Reload(TierLearningRoot, writeMarkdown: false);
             }
             bool isSuperSkill = wiringSkill == WiringSkill.Super;
@@ -2027,6 +2042,15 @@ namespace AutoTest
             // [2026-11-10] 軸に寄せる方策を本体の差し込み口 (開幕の品・挑戦カード) へも渡す。 空なら無効。
             BotHooks.AxisFocus = buyAxisFocus ?? "";
             BotHooks.AxisFocusBonus = buyAxisFocusBonus;
+            BotHooks.BranchFocus = buyBranchFocus ?? "";
+            BotHooks.BanIds.Clear();
+            foreach (var t in (botBanItemIds ?? "").Split(',', '、'))
+            {
+                string bid = t.Trim();
+                if (bid.Length == 0) continue;
+                if (ItemSystem.ItemDatabase.Instance?.GetItem(bid) == null) Debug.LogError($"[AutoRunner] botBanItemIds: 品が無い「{bid}」");
+                BotHooks.BanIds.Add(bid);
+            }
             LearnedPriorityProvider.BuyTierCount = isSuperSkill ? superBuyTiers : optimalBuyTiers;
             wiringMistakeRate = isSuperSkill ? 0f : optimalMistakeRate;
             LearnedPriorityProvider.GateRaw = v3.tierGateRaw;
@@ -2377,6 +2401,7 @@ namespace AutoTest
             // パッシブ取得の経路別計装をバッチ単位で数え直す (前バッチの値を持ち越さない)。
             ItemSystem.Helpers.PassiveSourceAudit.Reset();
             ItemSystem.AxisPool.ResetStats();
+            MetaProgression.ChallengeCards.ResetStats();
             ItemSystem.PassiveSkills.Effects.MirrorTwinsResponse.ResetStats();
 
             // **マスターシードはスイープ経路にも適用する** (2026-08-05)。

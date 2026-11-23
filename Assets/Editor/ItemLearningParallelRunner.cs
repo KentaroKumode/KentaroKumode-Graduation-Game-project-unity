@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -42,6 +42,10 @@ namespace AutoTest.EditorTools
             public int round;          // 走らせている (または次に走らせる) ラウンド
             public int rounds;
             public int runsPerRound;
+            /// <summary>1 回目だけのラン数 (0 = runsPerRound と同じ)。 ITT の 1 回目が 1 万だと品の処置ランが MinTreatedRuns に届かず、 回 2 の BOT が序列なし同然になる (2026-11-22)。</summary>
+            public int firstRoundRuns;
+            public int RunsOf(int r) => r == 0 && firstRoundRuns > 0 ? firstRoundRuns : runsPerRound;
+            public long OffsetOf(int r) => r == 0 ? 0 : RunsOf(0) + (long)(r - 1) * runsPerRound;
             public string learningRoot = "";
             public string configKeysJoined = "";
             public string configValuesJoined = "";
@@ -160,15 +164,15 @@ namespace AutoTest.EditorTools
                     ["v3.mainCorr"] = "True", ["v3.readOutgoingMult"] = "-1" });
         }
 
-        /// <summary>ITT (Super の方策) を 10,000 ラン × 20 回 = 合計 200,000 ラン (2026-11-10)。
+        /// <summary>ITT (Super の方策) を 1 回目 20,000 + 10,000 ラン × 8 回 = 合計 100,000 ラン (2026-11-10・1 回目を 2 万に・20 万 → 10 万に 2026-11-22: BOT の序列は 10 万ランで頭打ち (その先 +0.03 ± 0.17 pp)・作者の決定)。
         /// <b>回ごとにラン番号をずらす</b> (同じ割り当てを引き直さない) ・<b>割り当ては積み上げて合算</b>し、 回の終わりごとに
         /// 序列を作り直す (次の回はその序列で買う)。 精度は 20 万ラン 1 回と同じで、 買い方だけが途中で更新される。
         /// 条件は今の測定と同じ: 主攻撃の見積もりの補正 (v3.mainCorr)。 物差しは掛けない。</summary>
-        [MenuItem("Tools/AutoRun/■ ITT 並列 (Super の方策): 10000ラン × 20 回 (合算 20万)", priority = 8)]
+        [MenuItem("Tools/AutoRun/■ ITT 並列 (Super の方策): 20000 + 10000ラン × 8 回 (合算 10万)", priority = 8)]
         private static void LaunchIttSuperPooled()
         {
             AutoTest.GrantItt.Variant = "super";
-            LaunchWith(0, AutoRunner.WiringSkill.Super, 10000, itt: true, ittRounds: 20,
+            LaunchWith(0, AutoRunner.WiringSkill.Super, 10000, itt: true, ittRounds: 9, firstRoundRuns: 20000,
                 overrides: new Dictionary<string, string> { ["useIttBeta"] = "True", ["lockWeaponFamily"] = "True",
                     ["v3.mainCorr"] = "True", ["v3.readOutgoingMult"] = "-1" });
         }
@@ -293,7 +297,7 @@ namespace AutoTest.EditorTools
         private static void LaunchWith(int fightTraceRuns,
             AutoRunner.WiringSkill skill = AutoRunner.WiringSkill.Optimal, int runsPerRound = RunsPerRound, bool scout = false,
             bool learnedDanger = false, bool itt = false, bool useItt = true, Dictionary<string, string> overrides = null, bool ab = false,
-            int ittRounds = 1)
+            int ittRounds = 1, int firstRoundRuns = 0)
         {
             if (_running) { Debug.LogWarning("[学習並列] すでに走っている"); return; }
             if (EditorApplication.isPlayingOrWillChangePlaymode)
@@ -352,7 +356,7 @@ namespace AutoTest.EditorTools
             Directory.CreateDirectory(_root);
             _st = new State
             {
-                round = 0, rounds = itt ? Math.Max(1, ittRounds) : ab ? 1 : Rounds, runsPerRound = runsPerRound, mode = itt ? "itt" : "learn", noMerge = ab,
+                round = 0, rounds = itt ? Math.Max(1, ittRounds) : ab ? 1 : Rounds, runsPerRound = runsPerRound, firstRoundRuns = firstRoundRuns, mode = itt ? "itt" : "learn", noMerge = ab,
                 learningRoot = MetaProfileHelper.BotLearningRoot(0),
                 configKeysJoined = string.Join("\n", ks),
                 configValuesJoined = string.Join("\n", vs),
@@ -433,7 +437,8 @@ namespace AutoTest.EditorTools
             _slots.Clear(); _pending.Clear();
             _maxParallel = Mathf.Max(1, SystemInfo.processorCount - 2);
             int chunks = _maxParallel;
-            int baseRuns = _st.runsPerRound / chunks, extra = _st.runsPerRound % chunks, offset = 0;
+            int roundRuns = _st.RunsOf(_st.round);
+            int baseRuns = roundRuns / chunks, extra = roundRuns % chunks, offset = 0;
             string[] keys = _st.configKeysJoined.Split('\n');
             string[] values = _st.configValuesJoined.Split('\n');
             for (int c = 0; c < chunks; c++)
@@ -448,13 +453,13 @@ namespace AutoTest.EditorTools
                 {
                     jobKeys = new string[keys.Length + 1]; jobValues = new string[values.Length + 1];
                     System.Array.Copy(keys, jobKeys, keys.Length); System.Array.Copy(values, jobValues, values.Length);
-                    jobKeys[keys.Length] = "randomGrantStartIndex"; jobValues[values.Length] = (_st.round * _st.runsPerRound + offset).ToString(CultureInfo.InvariantCulture);   // 回ごとにもずらす (同じ割り当てを引き直さない)
+                    jobKeys[keys.Length] = "randomGrantStartIndex"; jobValues[values.Length] = (_st.OffsetOf(_st.round) + offset).ToString(CultureInfo.InvariantCulture);   // 回ごとにもずらす (同じ割り当てを引き直さない)
                 }
                 var job = new RankMarginWorkerJob
                 {
                     label = $"learn r{_st.round + 1}",
                     runs = size,
-                    seedStart = SeedBase + _st.round * _st.runsPerRound + offset,
+                    seedStart = SeedBase + (int)_st.OffsetOf(_st.round) + offset,
                     configKeys = jobKeys,
                     configValues = jobValues,
                     responsePath = slot.responsePath,
@@ -470,7 +475,7 @@ namespace AutoTest.EditorTools
             }
             _roundStartUtc = DateTime.UtcNow;
             _lastReport = 0;
-            Debug.Log($"[学習並列] ラウンド {_st.round + 1}/{_st.rounds} 開始: {_st.runsPerRound:N0} ラン / {_slots.Count} プロセス");
+            Debug.Log($"[学習並列] ラウンド {_st.round + 1}/{_st.rounds} 開始: {roundRuns:N0} ラン / {_slots.Count} プロセス");
             Pump();
         }
 
@@ -500,7 +505,7 @@ namespace AutoTest.EditorTools
             while (active < _maxParallel && _pending.Count > 0)
             {
                 Slot s = _pending.Dequeue();
-                s.process = Process.Start(new ProcessStartInfo
+                var start = new ProcessStartInfo
                 {
                     FileName = UltraProductionWorkerBuild.ExecutablePath,
                     Arguments = "-batchmode -nographics -logFile " + Quote(s.logPath)
@@ -509,7 +514,9 @@ namespace AutoTest.EditorTools
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     WindowStyle = ProcessWindowStyle.Hidden,
-                });
+                };
+                UltraProductionWorkerBuild.ApplyWorkerEnvironment(start);
+                s.process = Process.Start(start);
                 if (s.process == null) { Debug.LogError("[学習並列] 起動失敗: " + s.jobPath); s.done = s.failed = true; continue; }
                 active++;
             }
@@ -553,7 +560,7 @@ namespace AutoTest.EditorTools
                 if (elapsed - _lastReport >= 30)
                 {
                     _lastReport = elapsed;
-                    long all = (long)_st.rounds * _st.runsPerRound, doneAll = (long)_st.round * _st.runsPerRound + completed;
+                    long all = _st.OffsetOf(_st.rounds), doneAll = _st.OffsetOf(_st.round) + completed;
                     string pl = $"{DateTime.Now:HH:mm:ss} ラウンド {_st.round + 1}/{_st.rounds}: {completed:N0}/{total:N0} ラン"
                               + $" / {completed / Math.Max(1.0, elapsed):F1} ラン/秒 / 全体 {doneAll:N0}/{all:N0} ({100.0 * doneAll / Math.Max(1, all):F1}%)";
                     Debug.Log("[学習並列] " + pl);
@@ -568,6 +575,43 @@ namespace AutoTest.EditorTools
             }
         }
 
+        private static System.Threading.Tasks.Task<ParsedRound> _parse;
+
+        private sealed class ParsedRound
+        {
+            public string error;
+            public List<AutoRunner.RunRec> recs;
+            public List<(string, double, bool)> danger = new List<(string, double, bool)>();   // 戦闘名ごとの危険度の学習 (2026-11-05)
+            public List<IList<int>> stormLayers = new List<IList<int>>();                     // [計装 2026-11-13] 不安定化の内訳
+            public List<(int, int, bool)> stormFights = new List<(int, int, bool)>();
+        }
+
+        /// <summary>別スレッド: ワーカーの記録を読んで、 合流に要る形へまとめる。 Unity の API は呼ばない (JsonUtility は別スレッドで使える)。</summary>
+        private static ParsedRound ParseRound(List<(string path, int runs)> jobs, int capacity)
+        {
+            var r = new ParsedRound { recs = new List<AutoRunner.RunRec>(capacity) };
+            foreach (var (path, runs) in jobs)
+            {
+                var file = JsonUtility.FromJson<LearnRunFile>(File.ReadAllText(path, Encoding.UTF8));
+                if (file?.runs == null || file.runs.Length != runs)
+                { r.error = $"記録の本数が合わない: {path} ({file?.runs?.Length ?? 0}/{runs})"; return r; }
+                foreach (var row in file.runs)
+                {
+                    r.recs.Add(row.ToRunRec());
+                    if (row.stormLayers != null) r.stormLayers.Add(row.stormLayers);
+                    if (row.fights != null)
+                        foreach (var f in row.fights)
+                        {
+                            if (!f.end) continue;
+                            r.stormFights.Add((f.escRises, f.instEsc, f.isBoss));
+                            if (!string.IsNullOrEmpty(f.key) && f.maxHp > 0)
+                                r.danger.Add((f.key, (double)(f.hpBefore - f.hpAfter) / f.maxHp, !f.won));
+                        }
+                }
+            }
+            return r;
+        }
+
         /// <summary>ラウンドの記録を合流させる。 <b>1 本でも欠けたら止める</b> ──
         /// 欠けたまま積むと、 落ちやすい区間 (= 長いラン) だけ抜けた偏った学習になる。</summary>
         private static void FinishRound()
@@ -577,25 +621,21 @@ namespace AutoTest.EditorTools
 
             if (_st.mode == "itt") { FinishItt(); return; }
 
-            var recs = new List<AutoRunner.RunRec>(_st.runsPerRound);
-            var danger = new List<(string, double, bool)>();   // 戦闘名ごとの危険度の学習 (2026-11-05)
-            var stormLayers = new List<IList<int>>(); var stormFights = new List<(int, int, bool)>();   // [計装 2026-11-13] 不安定化の内訳
-            foreach (var s in _slots)
+            // 記録の読み込み (16,000 ランで 800 MB 台の JSON) は別スレッドで。 メインで読むと腕の終わりにエディタが固まる (2026-11-22)。
+            //   Poll が毎フレーム呼ぶので、 終わるまでは何もせずに返る。
+            if (_parse == null)
             {
-                var file = JsonUtility.FromJson<LearnRunFile>(File.ReadAllText(s.learnPath, Encoding.UTF8));
-                if (file?.runs == null || file.runs.Length != s.runs)
-                { Stop($"記録の本数が合わない: {s.learnPath} ({file?.runs?.Length ?? 0}/{s.runs})"); return; }
-                foreach (var row in file.runs)
-                {
-                    recs.Add(row.ToRunRec());
-                    if (row.stormLayers != null) stormLayers.Add(row.stormLayers);
-                    if (row.fights != null) foreach (var f in row.fights) if (f.end) stormFights.Add((f.escRises, f.instEsc, f.isBoss));
-                    if (row.fights != null)
-                        foreach (var f in row.fights)
-                            if (f.end && !string.IsNullOrEmpty(f.key) && f.maxHp > 0)
-                                danger.Add((f.key, (double)(f.hpBefore - f.hpAfter) / f.maxHp, !f.won));
-                }
+                var jobs = new List<(string path, int runs)>();
+                foreach (var s in _slots) jobs.Add((s.learnPath, s.runs));
+                _parse = System.Threading.Tasks.Task.Run(() => ParseRound(jobs, _st.RunsOf(_st.round)));
+                return;
             }
+            if (!_parse.IsCompleted) return;
+            var task = _parse; _parse = null;
+            if (task.IsFaulted) { Stop("記録の読み込みで例外: " + task.Exception?.InnerException); return; }
+            var parsed = task.Result;
+            if (parsed.error != null) { Stop(parsed.error); return; }
+            var recs = parsed.recs; var danger = parsed.danger; var stormLayers = parsed.stormLayers; var stormFights = parsed.stormFights;
 
             int valid = 0, clears = 0;
             foreach (var r in recs) if (r.bandScore >= 0) { valid++; if (r.bandScore >= 11) clears++; }
@@ -694,6 +734,7 @@ namespace AutoTest.EditorTools
         private static void Stop(string note)
         {
             EditorApplication.update -= Poll;
+            _parse = null;
             _running = false;
             SessionState.EraseString(ActiveKey);
             string msg = $"[学習並列] {note} — {_st?.round ?? 0}/{_st?.rounds ?? 0} ラウンド" + (_st != null && _st.noMerge ? "完了 (学習には合流していない)" : "合流済み") + $"\n  {_root}";

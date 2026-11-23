@@ -194,7 +194,7 @@ namespace ItemSystem
                 itemDict = null;
                 Initialize();
                 
-                Debug.Log($"[ItemDatabase] Loaded {items.Count} items from JSON");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[ItemDatabase] Loaded {items.Count} items from JSON");
                 
                 #if UNITY_EDITOR
                 UnityEditor.EditorUtility.SetDirty(this);
@@ -229,6 +229,7 @@ namespace ItemSystem
             item.consFamily = jsonItem.consFamily ?? "";
             item.unique     = jsonItem.unique;
             item.axis       = jsonItem.axis ?? "";
+            item.branch     = jsonItem.branch ?? "";
 
             // サイズ (sizeX/sizeY) は 2026-09-19 に items.json から削除、 型ごと 2026-10-28 に削除 (グリッドの廃止)。
 
@@ -268,8 +269,8 @@ namespace ItemSystem
                 };
             }
             
-            // 会心率 (%)。 5% 刻み・上限 50%
-            item.critRatePct = Mathf.Clamp(jsonItem.critRatePct, 0f, GameLoop.GameManager.MaxWeaponCritPct);
+            // 会心率 (%)。 上限なし (2026-11-23: 上限 50% を撤去・〈竜閃〉は 100%)
+            item.critRatePct = Mathf.Max(0f, jsonItem.critRatePct);
 
             // 武器の素火力（#2 案A'）
             item.attackPower = Mathf.Max(0, jsonItem.attackPower);

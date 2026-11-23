@@ -20,11 +20,11 @@ namespace CombatSystem
         private void ResetBossDown(EnemyData enemy, bool newCombat)
         {
             bool clock = GameLoop.VescaClock.Held(GameLoop.GameManager.Instance?.Run);
-            _down.Reset(BossParams.DownNotches(enemy?.id, clock));
+            _down.Reset(BossDown.WidenNotches(BossParams.DownNotches(enemy?.id, clock), (int)MetaProgression.MetaDebuffApplicator.GetDownNotchSpacingPct()));   // 挑戦カード〈受身〉III: 目盛りの間隔 +N%
             VescaClockActive = clock && _down.Enabled && GameLoop.BossIds.VescaStageOf(enemy?.id) > 0;   // ダウンを止めた測定の口では効かない
             // 戦闘の始めの地の文 (最初の段だけ 1 回)。 戦闘の画面に文の欄が無いので戦闘ログの行として出す (2026-11-13)。 ヴェスカの台詞は置かない (作者の決定)
             if (VescaClockActive && newCombat && enemy?.id == GameLoop.BossIds.VescaP1)
-                Debug.Log("[戦闘] " + GameLoop.VescaClock.BattleLine);
+                if (Debug.unityLogger.logEnabled) Debug.Log("[戦闘] " + GameLoop.VescaClock.BattleLine);
             if (VescaClockActive) Debug.Log($"[ダウン] 〈{GameLoop.VescaClock.Name}〉: {enemy?.displayName} の目盛りに {BossParams.VescaClockNotch * 100f:0}% を足した");
             BossDown.ActiveNow = false; BossDown.TakenMulNow = false;
             if (newCombat) { Escalation.HeavyCycleOffset = 0; Escalation.StageOffset = 0; Escalation.HeavyHpRatio = 1f; TenyoHeavy.Reset(); }
@@ -106,7 +106,7 @@ namespace CombatSystem
         public bool BreakBossCrack(string label)
         {
             if (!_down.Enabled || currentEnemy == null || enemyHP <= 0 || !_down.BreakTopCrack()) return false;
-            Debug.Log($"[{label}] ボスの目盛りのひびを割った (満額のダウン・割った目盛り {_down.broken})");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[{label}] ボスの目盛りのひびを割った (満額のダウン・割った目盛り {_down.broken})");
             return true;
         }
 
@@ -114,7 +114,7 @@ namespace CombatSystem
         public bool BreakBossNotch(string label)
         {
             if (!_down.Enabled || currentEnemy == null || enemyHP <= 0 || !_down.BreakTopNotch()) return false;
-            Debug.Log($"[{label}] ボスの目盛りを直接 1 段割った (満額のダウン・割った目盛り {_down.broken})");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[{label}] ボスの目盛りを直接 1 段割った (満額のダウン・割った目盛り {_down.broken})");
             return true;
         }
 
@@ -123,7 +123,7 @@ namespace CombatSystem
         {
             int turn = PassiveSkillManager.Instance?.Context?.currentTurn ?? 0;
             if (!_down.Enabled || currentEnemy == null || enemyHP <= 0 || !_down.CrackTopNotch(turn)) return false;
-            Debug.Log($"[{label}] ボスの次の目盛りにひびを入れた (T{turn})");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[{label}] ボスの次の目盛りにひびを入れた (T{turn})");
             return true;
         }
 
@@ -150,7 +150,7 @@ namespace CombatSystem
             BossDown.ActiveNow = true;
             BossDown.TakenMulNow = !_down.downWeakNow;   // ひびで割れた弱いダウン (2026-11-14) は受けるダメージ ×1.5 なし
             BossDownDiag.NoteDown(hadHeavy, canceled, toHeavyAtDown, _down.downWeakNow);
-            Debug.Log($"[ダウン] T{ctx.currentTurn} {currentEnemy?.displayName}: 行動不能" + (_down.downWeakNow ? "・ひびのダウン (受けるダメージは普段どおり)" : $"・受けるダメージ ×{BossDown.TakenMul:0.0}")
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[ダウン] T{ctx.currentTurn} {currentEnemy?.displayName}: 行動不能" + (_down.downWeakNow ? "・ひびのダウン (受けるダメージは普段どおり)" : $"・受けるダメージ ×{BossDown.TakenMulCard:0.00}")
                     + (canceled ? "・大技は取り消し (周期は頭から)" : hadHeavy ? (always ? "・(大技は溜まっていない)" : "・大技の周期はそのまま進む") : "")
                     + (_down.pending > 0 ? $" (あと {_down.pending} ターン続く)" : ""));
         }
@@ -198,7 +198,7 @@ namespace CombatSystem
             MetaProgression.Achievements.AchievementService.NoteBossDownBroken(d);   // 実績〈二枚抜き〉(1 回の攻撃で 2 つ)
             RaiseBossEvent(PassiveSkillManager.Instance?.Context, PassiveSkillTrigger.OnBossDown, d, false);   // 通常攻撃で割った (2026-11-21)
             BossDownDiag.NoteMainBreak(d, crackedBroken, waitSum);
-            Debug.Log($"[ダウン] 通常攻撃で目盛りを {d} つ割った (HP {enemyHP}/{currentEnemy.maxHP}"
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[ダウン] 通常攻撃で目盛りを {d} つ割った (HP {enemyHP}/{currentEnemy.maxHP}"
                     + (crackedBroken > 0 ? $"・うちひびの入った目盛り {crackedBroken}" : "") + $") → 次のターンからダウン {_down.pending} ターン");
             return d;
         }
@@ -217,7 +217,7 @@ namespace CombatSystem
                 {
                     BossDownDiag.NoteAnyDamageBreak(d, System.Math.Min(d, _downMainWouldBreak));
                     RaiseBossEvent(PassiveSkillManager.Instance?.Context, PassiveSkillTrigger.OnBossDown, d, false);   // 旧い判定はひびが無い (通常攻撃の扱い)
-                    Debug.Log($"[ダウン] 目盛りを {d} つ割った (HP {enemyHP}/{currentEnemy.maxHP}) → 次のターンからダウン {_down.pending} ターン");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[ダウン] 目盛りを {d} つ割った (HP {enemyHP}/{currentEnemy.maxHP}) → 次のターンからダウン {_down.pending} ターン");
                 }
                 _downMainWouldBreak = 0;
                 return;
@@ -237,7 +237,7 @@ namespace CombatSystem
                 while (_down.BreakTopCrack()) sh++;
                 if (sh > 0)
                 {
-                    Debug.Log($"[起爆] ボスの目盛りのひびを {sh} つ割った (正規のダウン) → 次のターンからダウン {_down.pending} ターン");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[起爆] ボスの目盛りのひびを {sh} つ割った (正規のダウン) → 次のターンからダウン {_down.pending} ターン");
                     RaiseBossEvent(PassiveSkillManager.Instance?.Context, PassiveSkillTrigger.OnBossDown, sh, false);   // 通常攻撃と同じ扱い (正規のダウン)
                 }
             }
@@ -303,7 +303,7 @@ namespace CombatSystem
                 ctx.AddPlayerDamageSource(DeathCause.Judgment, dmg);
                 if (playerHP <= 0) ctx.lastDamageCause = DeathCause.Judgment;
             }
-            Debug.Log($"[業火] 烈炎 {stacks} × {BossParams.ParamInt(currentEnemy.id, BossParam.BlazeBurstPerStack)} = {raw} (軽減無視・シールド {absorbed} 肩代わり) → HP {playerHP} / 烈炎は 0 へ");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[業火] 烈炎 {stacks} × {BossParams.ParamInt(currentEnemy.id, BossParam.BlazeBurstPerStack)} = {raw} (軽減無視・シールド {absorbed} 肩代わり) → HP {playerHP} / 烈炎は 0 へ");
             return dmg;
         }
     }

@@ -26,6 +26,23 @@ namespace AutoTest
         /// <summary>軸に寄せる加点 (序列の段の数・× StepPerTier)。</summary>
         public static int AxisFocusBonus = 1;
 
+        /// <summary>[2026-11-23] 寄せる軸の中の分岐 (AutoRunner.buyBranchFocus・"A" / "B"・空 = 無効)。</summary>
+        public static string BranchFocus = "";
+
+        /// <summary>[2026-11-23] BOT が選ばない品 (AutoRunner.botBanItemIds・依存の測定)。 空 = 無効。 店・提示の択・戦闘報酬・開幕の品で選ばない (配られる品は止めない)。</summary>
+        public static readonly HashSet<string> BanIds = new HashSet<string>();
+        public static bool IsBanned(string id) => BanIds.Count > 0 && id != null && BanIds.Contains(id);
+
+        /// <summary>寄せる軸の品の分岐の加減 (加点の倍数): 指定した分岐の品 +1 (= 加点 2 倍)・もう一方の分岐の品 −1 (= 加点 0・禁止はしない)・共通の品と分岐の指定なしは 0。
+        /// 分岐は items.json の branch (id の綴りは読まない)。</summary>
+        public static int BranchAdj(string id)
+        {
+            if (string.IsNullOrEmpty(BranchFocus) || string.IsNullOrEmpty(id)) return 0;
+            var it = ItemSystem.ItemDatabase.Instance?.GetItem(id);
+            if (it == null || string.IsNullOrEmpty(it.branch) || !InFocus(it.axis)) return 0;
+            return it.branch == BranchFocus ? 1 : -1;
+        }
+
         private static bool IsFocusItem(string id)
             => !string.IsNullOrEmpty(id) && InFocus(ItemSystem.ItemDatabase.Instance?.GetItem(id)?.axis);
 
@@ -49,31 +66,34 @@ namespace AutoTest
             GameHooks.OnCritRateResolved = CritRateCensus.Note;
         }
 
-        /// <summary>挑戦カードの 2 枚から、 バフが自分の軸 (品の数が一番多い軸) に合う方を取る (2026-11-09)。
-        /// 軸の札は「その軸の品の数」、 汎用の札は 1 で比べ、 同点は先頭。 デバフは見ない (方策は最小限・比べるための基準)。</summary>
+        /// <summary>挑戦カードの 2 枚から、 裏のバフが自分の軸 (品の数が一番多い軸) に合う方を取る (2026-11-09・裏の軸は Card.axis・2026-11-22)。
+        /// 軸の札は「その軸の品の数」、 汎用の札は 1 で比べ、 同点は先頭。 表は見ない (方策は最小限・比べるための基準)。
+        /// <para>七つの大罪 (裏なし・難易度 10 の 4→5): ムシュファの強欲だけ所持金と消耗品を見る ── 失う物が少ない
+        /// (所持金 <see cref="GreedCheapCoins"/>G 以下・消耗品 1 個以下) なら強欲を取り、 多ければ避ける。 ほかの 6 柱は同点 (先頭)。</para></summary>
         public static int ChooseChallengeByAxis(System.Collections.Generic.IReadOnlyList<string> offer)
         {
             var run = GameManager.Instance?.Run;
             int best = 0; float bestScore = float.MinValue;
             for (int i = 0; i < offer.Count; i++)
             {
-                MetaProgression.ChallengeCards.Split(offer[i], out _, out var buf);
-                string axis = buf == null ? null : buf.kind switch
+                MetaProgression.ChallengeCards.Split(offer[i], out var deb, out var buf);
+                float score;
+                if (buf == null && deb != null && MetaProgression.ChallengeCards.IsSin(deb.kind))
+                    score = deb.kind != MetaProgression.ChallengeCards.SinGreed ? 1f
+                          : (run?.coins ?? 0) <= GreedCheapCoins && (run?.ownedConsumables?.Count ?? 0) <= 1 ? 2f : 0f;
+                else
                 {
-                    MetaProgression.ChallengeCards.Poison => ItemSystem.PassiveSkills.AxisRules.Poison,
-                    MetaProgression.ChallengeCards.Bleed => ItemSystem.PassiveSkills.AxisRules.Bleed,
-                    MetaProgression.ChallengeCards.Heat => ItemSystem.PassiveSkills.AxisRules.Heat,
-                    MetaProgression.ChallengeCards.Charge => ItemSystem.PassiveSkills.AxisRules.Charge,
-                    MetaProgression.ChallengeCards.Shield => ItemSystem.PassiveSkills.AxisRules.Shield,
-                    MetaProgression.ChallengeCards.Crit => ItemSystem.PassiveSkills.AxisRules.Crit,
-                    _ => null,
-                };
-                float score = axis != null ? ItemSystem.PassiveSkills.AxisRules.Count(run, axis) : 1f;
-                if (InFocus(axis)) score += 1000f;   // [2026-11-10] 軸に寄せる方策
+                    string axis = buf?.axis;
+                    score = axis != null ? ItemSystem.PassiveSkills.AxisRules.Count(run, axis) : 1f;
+                    if (InFocus(axis)) score += 1000f;   // [2026-11-10] 軸に寄せる方策
+                }
                 if (score > bestScore) { bestScore = score; best = i; }
             }
             return best;
         }
+
+        /// <summary>BOT がムシュファの強欲を「安い」と見る所持金 (G・仮)。</summary>
+        public const int GreedCheapCoins = 60;
 
         public static void Uninstall()
         {
@@ -101,7 +121,7 @@ namespace AutoTest
             for (int i = 0; i < offers.Count; i++)
             {
                 float sc = LearnedPriorityProvider.BuyScore(offers[i]);
-                if (IsFocusItem(offers[i])) sc += AxisFocusBonus * LearnedPriorityProvider.StepPerTier;
+                if (IsFocusItem(offers[i])) sc += AxisFocusBonus * (1 + BranchAdj(offers[i])) * LearnedPriorityProvider.StepPerTier;
                 if (sc < bestScore) { bestScore = sc; best = i; }
             }
             return best;
@@ -113,6 +133,8 @@ namespace AutoTest
         /// 乱数は引かない。</summary>
         public static bool WantsPassive(RunState run, string id)
         {
+            if (IsBanned(id)) return false;
+            if (BlocksFocusSlot(run, id)) return false;
             var d = ItemSystem.ItemDatabase.Instance?.GetItem(id);
             if (d == null || !d.IsPassive || !ItemSystem.AxisPool.IsRanked(d.axis) || InFocus(d.axis)) return true;
             int first = 0, second = 0, held = 0;
@@ -125,13 +147,24 @@ namespace AutoTest
             }
             if (held < 2) return true;
             int mine = ItemSystem.PassiveSkills.AxisRules.Count(run, d.axis);
-            // 〈銭皿〉(見送り換金 +50%): 一番の軸でない BRONZE は見送る (23G の方が重い)
+            // 〈銭皿〉(見送り換金 +100%): 一番の軸でない BRONZE は見送る (23G の方が重い)
             if (d.rarity == ItemSystem.ItemRarity.BRONZE && mine < first && run.OwnsPassive(ItemIds.GoldCoinDish)) return false;
             return mine >= second;
         }
 
+        /// <summary>寄せる軸 (<see cref="AxisFocus"/>) がまだ出現の枠に無く、 空きが残り 1 枠の時、 枠に無い別の軸の品か (取ると寄せる軸が枠に入れず、 以後その軸が出ない)。
+        /// 2026-11-22: 毒の寄せで 19% のランが枠に入れず自軸 0 個だった (G5)。 full-item-rework-spec §1-3 の「4 枠の純度を守る」。</summary>
+        public static bool BlocksFocusSlot(RunState run, string id)
+        {
+            if (string.IsNullOrEmpty(AxisFocus) || run?.lockedAxes == null) return false;
+            if (run.lockedAxes.Count != ItemSystem.AxisPool.LockSlots - 1) return false;
+            foreach (var a in run.lockedAxes) if (InFocus(a)) return false;
+            var d = ItemSystem.ItemDatabase.Instance?.GetItem(id);
+            return d != null && d.IsPassive && ItemSystem.AxisPool.IsRanked(d.axis) && !InFocus(d.axis) && !run.lockedAxes.Contains(d.axis);
+        }
+
         /// <summary>提示から、 欲しい品 (<see cref="WantsPassive"/>) の中で買いの点が一番の品を選ぶ。 欲しい品が無ければ −1 (見送り換金)。</summary>
-        private static int ChooseOrSkip(IReadOnlyList<string> offers)
+        public static int ChooseOrSkip(IReadOnlyList<string> offers)
         {
             var run = GameManager.Instance?.Run;
             int best = -1; float bestScore = float.NegativeInfinity;
@@ -139,7 +172,7 @@ namespace AutoTest
             {
                 if (!WantsPassive(run, offers[i])) continue;
                 float sc = LearnedPriorityProvider.BuyScore(offers[i]);
-                if (IsFocusItem(offers[i])) sc += AxisFocusBonus * LearnedPriorityProvider.StepPerTier;
+                if (IsFocusItem(offers[i])) sc += AxisFocusBonus * (1 + BranchAdj(offers[i])) * LearnedPriorityProvider.StepPerTier;
                 if (sc > bestScore) { bestScore = sc; best = i; }
             }
             return best;
@@ -150,11 +183,12 @@ namespace AutoTest
             int best = 0; float bestScore = float.NegativeInfinity;
             for (int i = 0; i < offers.Count; i++)
             {
+                if (IsBanned(offers[i])) continue;
                 float sc = LearnedPriorityProvider.BuyScore(offers[i]);
-                if (IsFocusItem(offers[i])) sc += AxisFocusBonus * LearnedPriorityProvider.StepPerTier;   // [2026-11-10] 軸に寄せる方策
+                if (IsFocusItem(offers[i])) sc += AxisFocusBonus * (1 + BranchAdj(offers[i])) * LearnedPriorityProvider.StepPerTier;   // [2026-11-10] 軸に寄せる方策
                 if (sc > bestScore) { bestScore = sc; best = i; }
             }
-            return best;
+            return best < offers.Count && IsBanned(offers[best]) ? -1 : best;   // 禁止の品しか無い = 見送り
         }
 
         /// <summary>家系パッシブの価値。 素のステータスには現れないので学習値から引く。
