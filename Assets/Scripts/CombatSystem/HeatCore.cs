@@ -42,7 +42,7 @@ namespace CombatSystem
         public const int StoneTwo = 8, StoneAll = 16, BreastHeat = 4, BreastBlock = 2, PokerPerDie = 6, SpannerPerHit = 3, WhetPerHit = 2;   // 過熱石 +6/+12 → +8/+16・スパナ +2 → +4・荒砥 +1 → +2 (final4)・スパナ +4 → +3 (final6)
         public const int OvenRestart = 8, PrimerAdd = 4, CoalAdd = 1, CoalMax = 6, MoldPerExcess = 3, LedgerMax = 5, KettleCut = 4;   // 炭 +2 → +1・釜 −8 → −6 (2026-11-22 段 3 の較正 2)・雷管 +6/48 → +4/32・鋳型 +3 → +2 (neon 収束)・雷管 +4/32 → +6/上限なし (final4) → +3/上限なし (final5) → +5 (answer9)・answer12: 雷管 +4・鋳型 +3・釜 −4
         public const int SparkPctPerBurst = 10,   // 2026-11-22 段 3 の較正 2: 15 → 8 (長い戦闘で伸び続ける) → neon 収束 5 → final4 8 → final5 5 → answer9 7 → answer13 10
-                          AshenNeed = 40, AshenMulPct = 175, FlintPctPerBurst = 25, KilnStep = 4, KilnMax = 16, PillarDownMulPct = 250;   // 柱折り ×2.0 → ×2.5 (final6)
+                          AshenNeed = 40, AshenMulPct = 175, FlintPctPerBurst = 40, KilnStep = 4, KilnMax = 16, PillarDownMulPct = 250, LedgerChainPct = 30;   // 柱折り ×2.0 → ×2.5 (final6)・answer14: 燧石 25 → 40・帳簿外 同じターンの 2 回目以降 +30% ずつ
         /// <summary>〈燧石の指輪〉: 攻撃の撃 (攻撃の端子の発動・【再起動】の撃も 1 つ) がこの数以上のターン (2026-11-22 neon 収束: 攻撃の端子 2 枚 → 3 撃)。</summary>
         public const int FlintAttackHits = 3;
         /// <summary>ターンの終わりの臨界 = 攻撃の端子に挿した出目の合計 (<see cref="TerminalOutcome.attackPips"/>) ÷ これ (切り捨て・2026-11-22 neon 収束: 旧 攻撃の端子の合計 attackAdd)。</summary>
@@ -127,12 +127,13 @@ namespace CombatSystem
         }
 
         /// <summary>爆発 1 回の敵の防御の前のダメージ (<see cref="TryBurst"/> が回数を進めた後に呼ぶ)。
-        /// 基礎 30 + 〈二度詰めの雷管〉+ 〈天工開物〉+ 〈溢れ取りの鋳型〉→ 超臨界 → 〈火花読みの眼鏡〉→ 〈燧石の指輪〉→ 〈八日目の灰燼〉→ 〈柱折りの発破筒〉(切り捨て)。</summary>
+        /// 基礎 30 + 〈二度詰めの雷管〉+ 〈天工開物〉+ 〈溢れ取りの鋳型〉→ 超臨界 → 〈火花読みの眼鏡〉→ 〈帳簿外の爆薬〉→ 〈燧石の指輪〉→ 〈八日目の灰燼〉→ 〈柱折りの発破筒〉(切り捨て)。</summary>
         public static int Damage(in State s, in Burst b)
         {
             long d = BurstBase + CardRules.BurstBaseAdd + s.stack + s.flat + (Has(s.items, HeatItems.Mold) ? MoldPerExcess * b.excess : 0);   // 挑戦カード〈予熱〉III: 基礎 +10
             if (b.super) d = d * (Has(s.items, HeatItems.Kiln) ? KilnSuperMulPct : SuperMulPct) / 100;
             if (Has(s.items, HeatItems.Spark)) d = d * (100 + SparkPctPerBurst * s.burstsTotal) / 100;
+            if (Has(s.items, HeatItems.Ledger) && s.burstsTurn > 1) d = d * (100 + LedgerChainPct * (s.burstsTurn - 1)) / 100;   // 〈帳簿外の爆薬〉(answer14)
             if (Has(s.items, HeatItems.Flint) && s.doubled) d = d * (100 + FlintPctPerBurst * (s.burstsTurn - 1)) / 100;
             if (Has(s.items, HeatItems.Ashen) && b.meterAt >= AshenNeed) d = d * AshenMulPct / 100;
             if (Has(s.items, HeatItems.Pillar) && s.enemyDown) d = d * PillarDownMulPct / 100;

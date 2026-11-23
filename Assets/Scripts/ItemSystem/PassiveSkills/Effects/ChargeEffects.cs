@@ -233,11 +233,11 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>絶縁の外套: 過充電 (充電 10 以上) でターンを開始したとき、 ブロック +8・このターンの被ダメージ −2。</summary>
+    /// <summary>絶縁の外套: 過充電 (充電 10 以上) でターンを開始したとき、 ブロック +5・このターンの被ダメージ −2 (answer14: ブロック +8 → +5)。</summary>
     public class InsulatedCloak : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "絶縁の外套";
-        public const int Block = 8, Cut = 2;
+        public const int Block = 5, Cut = 2;   // answer14: ブロック +8 → +5
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.IsOvercharged());
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)

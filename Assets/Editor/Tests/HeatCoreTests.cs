@@ -45,6 +45,17 @@ namespace AutoTest.EditorTests
             Assert.That(l.meter, Is.EqualTo(300 - HeatCore.Threshold * HeatCore.LedgerMax));
         }
 
+        /// <summary>〈帳簿外の爆薬〉(answer14): 同じターンの 2 回目以降の爆発 +30% ずつ (2 回目 ×1.3・3 回目 ×1.6)。 1 回目は変わらない。</summary>
+        [Test]
+        public void Ledger_ChainBonus()
+        {
+            var b = new HeatCore.Burst();
+            int D(HeatItems f, int n) => HeatCore.Damage(new HeatCore.State { items = f, burstsTurn = n, burstsTotal = n }, in b);
+            Assert.That(D(HeatItems.Ledger, 1), Is.EqualTo(D(HeatItems.None, 1)));
+            Assert.That(D(HeatItems.Ledger, 2), Is.EqualTo(D(HeatItems.None, 2) * 130 / 100));
+            Assert.That(D(HeatItems.Ledger, 3), Is.EqualTo(D(HeatItems.None, 3) * 160 / 100));
+        }
+
         private static int CountBursts(ref HeatCore.State s) { int n = 0; while (HeatCore.TryBurst(ref s, out _)) n++; return n; }
 
         [Test]

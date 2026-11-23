@@ -26,7 +26,7 @@ namespace CombatSystem
         /// <summary>〈過負荷チューナー〉: 過充電の間、 充電を払う量 (2 以上の物) から引く量 (最低 1)。</summary>
         public const int TunerCut = 2;
         /// <summary>〈二股の導線〉【再起動】の充電 (1 ターン 1 回)。</summary>
-        public const int RebootCost = 7;   // answer13: 5 → 7
+        public const int RebootCost = 6;   // answer13: 5 → 7・answer14: 7 → 6
         /// <summary>〈逆さ避雷針〉: 払う充電 / 被ダメージから引く量 (1 ターン 1 回)。</summary>
         public const int RodCost = 5, RodCut = 6;
         /// <summary>〈雷鳴の太鼓〉: 充電の上限の上乗せ / オーバークロックに要る充電 / 払う充電 / 最初の 1 撃の最終与ダメージ +% (1 ターン 1 回)。</summary>

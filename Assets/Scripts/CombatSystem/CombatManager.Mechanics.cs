@@ -478,7 +478,7 @@ namespace CombatSystem
         /// この戦闘の役の回数がこれ以上なら確率 <see cref="OmniPctMid"/>・<see cref="OmniNeedFull"/> 以上なら 100%。</summary>
         private const string OmniTurnKey = "role.omniTurn";
         public const string OmniRngKey = "role.omni";
-        public const int OmniNeedMid = 2, OmniNeedFull = 4;   // final6: 3 / 5 → 4 / 7 → answer9: 2 / 4
+        public const int OmniNeedMid = 3, OmniNeedFull = 5;   // final6: 3 / 5 → 4 / 7 → answer9: 2 / 4 → answer14: 3 / 5
         public const float OmniPctMid = 0.5f;
 
         /// <summary>〈万象のゾロ目〉: この戦闘の役の回数 <paramref name="roles"/> での、 2 個そろいをゾロ目として扱う確率。</summary>
@@ -489,7 +489,7 @@ namespace CombatSystem
             => ctx != null && ctx.currentTurn > 0 && (int)ctx.GetAccumulated(OmniTurnKey) == ctx.currentTurn;
 
         /// <summary>〈万象のゾロ目〉(2026-11-21): 出目が決まった所 (振り直しと出目を書き換える効果の後・配線の前) で、 立つ役が 2 個そろいなら、
-        /// この戦闘で役が 2 回以上成立した後は確率 50%・4 回以上なら 100% (answer9・final6: 4 / 7) でこのターンそれをゾロ目として扱う。 配線の前に決めるので、 配線の判断 (人・BOT) はその結果を見て挿せる。
+        /// この戦闘で役が 3 回以上成立した後は確率 50%・5 回以上なら 100% (answer14・answer9: 2 / 4・final6: 4 / 7) でこのターンそれをゾロ目として扱う。 配線の前に決めるので、 配線の判断 (人・BOT) はその結果を見て挿せる。
         /// 100% の時は乱数を引かない。</summary>
         private void DecideOmniPair(CombatContext ctx, int[] dice)
         {

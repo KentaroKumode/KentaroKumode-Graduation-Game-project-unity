@@ -88,10 +88,10 @@ namespace AutoTest.EditorTests
             Assert.That(Run(RoleItems.Clapper, triple, lastFace: 4).outgoingPctAdd - b.outgoingPctAdd, Is.EqualTo(TerminalCards.ClapperPct).Within(1e-4));
             Assert.That(Run(RoleItems.Clapper, triple, lastFace: 3).outgoingPctAdd, Is.EqualTo(b.outgoingPctAdd).Within(1e-4));
             Assert.That(Run(RoleItems.Clapper, triple).outgoingPctAdd, Is.EqualTo(b.outgoingPctAdd).Within(1e-4));
-            Assert.That(CombatManager.OmniPairChance(1), Is.EqualTo(0f));   // answer9: 2 回で 50%・4 回で 100%
-            Assert.That(CombatManager.OmniPairChance(2), Is.EqualTo(0.5f));
+            Assert.That(CombatManager.OmniPairChance(2), Is.EqualTo(0f));   // answer14: 3 回で 50%・5 回で 100%
             Assert.That(CombatManager.OmniPairChance(3), Is.EqualTo(0.5f));
-            Assert.That(CombatManager.OmniPairChance(4), Is.EqualTo(1f));
+            Assert.That(CombatManager.OmniPairChance(4), Is.EqualTo(0.5f));
+            Assert.That(CombatManager.OmniPairChance(5), Is.EqualTo(1f));
         }
 
         /// <summary>役の端子〈役落とし〉〈賽振り台〉は賽目でなく、 この戦闘の役の回数 (このターンを含む) を読む (Phase 3i)。</summary>

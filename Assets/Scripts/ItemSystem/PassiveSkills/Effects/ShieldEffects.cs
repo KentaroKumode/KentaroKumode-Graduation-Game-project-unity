@@ -209,20 +209,21 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>重装兵の隠し刃: 【ジャスト防御】を成立させたとき、 敵の予告攻撃と同量の軽減不可ダメージ (防御も無視) を返す。
+    /// <summary>重装兵の隠し刃: 【ジャスト防御】を成立させたとき、 敵の予告攻撃の 150% の軽減不可ダメージ (防御も無視) を返す (answer14: 旧 100%)。
     /// さらにボスのダウン中はシールドがターン開始時に減衰しない (ctx.shieldKeepOnBossDown・BeginNewTurn)。</summary>
     public class KnightsTrump : IPassiveSkillEffect, IRelicDisplay
     {
         public const string Id = "重装兵の隠し刃";
         public string SkillId => Id;
+        public const int ReturnPct = 150;
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(BossDown.ActiveNow);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnJustGuard };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (t == PassiveSkillTrigger.OnBattleStart) { ctx.shieldKeepOnBossDown = true; return; }
-            int e = Kw.EventAmount(ctx);
+            int e = Kw.EventAmount(ctx) * ReturnPct / 100;
             Kw.DamageEnemy(ctx, e);
-            Rw.Log($"[重装兵の隠し刃] ジャスト防御 → 予告 {e} を返す");
+            Rw.Log($"[重装兵の隠し刃] ジャスト防御 → 予告の {ReturnPct}% {e} を返す");
         }
     }
 
@@ -263,12 +264,12 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>静寂の構え: 攻撃の端子に 1 つも挿さずに敵の攻撃を完封した (攻撃を受けて HP を 1 も失わなかった) 次のターン、 全撃の最終与ダメージ +60% (【ジャスト防御】だったなら +100%)。</summary>
+    /// <summary>静寂の構え: 攻撃の端子に 1 つも挿さずに敵の攻撃を完封した (攻撃を受けて HP を 1 も失わなかった) 次のターン、 全撃の最終与ダメージ +60% (【ジャスト防御】だったなら +130%・answer14: 旧 +100%)。</summary>
     public class SilentStance : IPassiveSkillEffect, IRelicDisplay
     {
         public const string Id = "静寂の構え";
         public string SkillId => Id;
-        public const int Pct = 60, JustPct = 100;
+        public const int Pct = 60, JustPct = 130;   // answer14: ジャスト防御 +100% → +130%
         private const string TurnKey = "shd.still", PctKey = "shd.stillPct";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(Shd.Count(ctx, TurnKey) == ctx.currentTurn);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd, PassiveSkillTrigger.OnPreDealDamage };

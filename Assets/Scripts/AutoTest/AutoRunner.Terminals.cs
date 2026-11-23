@@ -265,7 +265,7 @@ namespace AutoTest
             {
                 float per = DeckPerTurnDamage(in s, k);
                 if (sg.jgMirror) ws.extraDmg += jgE * (ItemSystem.PassiveSkills.Effects.MirrorBuckler.JustPct - ItemSystem.PassiveSkills.Effects.MirrorBuckler.Pct) / 100;
-                if (sg.jgBlade) ws.extraDmg += jgE;
+                if (sg.jgBlade) ws.extraDmg += jgE * ItemSystem.PassiveSkills.Effects.KnightsTrump.ReturnPct / 100;
                 if (sg.jgStandard) sightFlat += ItemSystem.PassiveSkills.Effects.BorderGuardStandard.PctPerGuard / 100f * per * Math.Max(0, turns - 1) * 0.5f + DeckDrawDmg;
                 //   〈防人の軍標〉EchoNeed (2) 回目以降: 次のターンの撃がもう 1 回ずつ = 次の攻撃 1 回分 (2026-11-22)
                 if (sg.jgStandard && turns > 1 && ItemSystem.PassiveSkills.Effects.Shd.Count(sg.jgCtx, ItemSystem.PassiveSkills.Effects.Shd.JustGuardCountKey) + 1 >= ItemSystem.PassiveSkills.Effects.BorderGuardStandard.EchoNeed)
