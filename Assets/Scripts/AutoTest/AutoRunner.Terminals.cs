@@ -1160,7 +1160,27 @@ namespace AutoTest
             if (slots == null) return default;      // null なら本体が既定 (TerminalWiring.Auto) で挿す
             var plan = WiringPlan.OfSlots(slots, targets, keep);
             plan.reboot = BotReboot; plan.overclock = true;      // 充電のコアアクション: 見積もり (下の Resolve) と同じ規則で本体も解く
+            plan.plugRank = BotPlugRank(slots, targets, rolls, tele);
             return plan;
+        }
+
+        /// <summary>撃の順 (2026-11-25) の BOT の規則: 攻撃の端子のうち撃の大きい端子から先に挿す (最初の 1 撃に乗る物 ── オーバークロック・〈抜き打ちの作法〉など ── を大きい撃へ)。
+        /// 撃の大きさは本体と同じ Resolve (場の順) で見る。 shortcut: 全部の順 (k!) を効用で比べない ── 効用 (DeckSums) は撃の順をほぼ見ないので差が出ない。 撃ごとの効用を持ったら順も列挙する。</summary>
+        private static int[] BotPlugRank(int[] slots, int[] targets, int[] rolls, MutualTurnTelegraph tele)
+        {
+            var cm = CombatManager.Instance; var deck = cm?.TerminalDeck;
+            if (deck == null || slots == null) return null;
+            var env = cm.TerminalEnvNow(ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context, tele.enemyAttackValue);
+            var o = TerminalCards.Resolve(deck.board, slots, rolls, env, deck.state.Clone(), targets, reboot: BotReboot, overclock: true);
+            int c = o.attackHits.Count; if (c < 2) return null;
+            var order = new List<int>(c);      // 撃の添字を、 大きい順 (同じなら場の順) に
+            for (int h = 0; h < c; h++) if (o.attackHitSlot.IndexOf(o.attackHitSlot[h]) == h) order.Add(h);      // 【再起動】の撃 (同じ端子の 2 つ目) は数えない
+            order.Sort((a, b) => o.attackHits[a] != o.attackHits[b] ? o.attackHits[b].CompareTo(o.attackHits[a]) : a.CompareTo(b));
+            var rank = new int[rolls.Length];
+            for (int i = 0; i < rank.Length; i++) rank[i] = -1;
+            for (int r = 0; r < order.Count; r++)
+                for (int i = 0; i < rank.Length; i++) if (o.slotOfDie[i] == o.attackHitSlot[order[r]]) rank[i] = r;
+            return rank;
         }
 
         /// <summary>充電のコアアクション (2026-11-21) の BOT の規則: 再起動は払える時はいつも、 対象はおまかせ (<see cref="ChargeCore.AutoValue"/> の最大)・

@@ -46,12 +46,14 @@ namespace CombatSystem
         /// <summary>〈二股の導線〉【再起動】の対象 (場の添字・<see cref="ChargeCore.RebootNone"/> = しない) / 〈雷鳴の太鼓〉【オーバークロック】を使う。</summary>
         internal int reboot = ChargeCore.RebootNone;
         internal bool overclock;
+        /// <summary>撃の順 (2026-11-25): 出目ごとの挿した順 (<see cref="WiringPlan.plugRank"/> と同じ)。 null = 場の順。</summary>
+        internal int[] plugRank;
 
         internal void Set(TurnPauseKind k, int[] dice, int[] faceIdx, MutualTurnTelegraph t)
         {
             kind = k; playerDice = dice; playerFaceIdx = faceIdx; tele = t;
             rerollCost = 0; reroll = false; rerollKeep = -1; slots = null; targets = null; keep = null; board = null; terminalEnv = default; terminalState = null;
-            reboot = ChargeCore.RebootNone; overclock = false;
+            reboot = ChargeCore.RebootNone; overclock = false; plugRank = null;
         }
     }
 
@@ -101,11 +103,12 @@ namespace CombatSystem
         /// <summary>端子の山札 (ADR-0014) の配線に答える。 出目ごとの挿し先 (場の端子の添字・−1 = 挿さない)。 規則に合わない挿し方は挿さなかった扱いになる。
         /// targets = 〈影写し〉〈火葬の剣〉〈有効活用〉の対象 (添字 = その端子の場の位置・値 = 対象の場の位置)。 null / −1 / 候補でない対象は左端の候補。
         /// keep = 手札の規則 Pick の、 次のターンも手札に残す印 (添字 = 場の位置・null = 何も残さない)。 BOT の WiringPlan.keep と同じ口。
-        /// reboot / overclock = 充電のコアアクション (〈二股の導線〉の再起動の対象・〈雷鳴の太鼓〉のオーバークロック・品が無ければ無視)。</summary>
-        public void AnswerWiringSlots(int[] slots, int[] targets = null, bool[] keep = null, int reboot = ChargeCore.RebootNone, bool overclock = false)
+        /// reboot / overclock = 充電のコアアクション (〈二股の導線〉の再起動の対象・〈雷鳴の太鼓〉のオーバークロック・品が無ければ無視)。
+        /// plugRank = 出目ごとの挿した順 (撃の順・2026-11-25・BOT の WiringPlan.plugRank と同じ口)。 null = 場の順。</summary>
+        public void AnswerWiringSlots(int[] slots, int[] targets = null, bool[] keep = null, int reboot = ChargeCore.RebootNone, bool overclock = false, int[] plugRank = null)
         {
             if (_activeTurn == null || _pause.kind != TurnPauseKind.Wiring) return;
-            _pause.slots = slots; _pause.targets = targets; _pause.keep = keep; _pause.reboot = reboot; _pause.overclock = overclock;
+            _pause.slots = slots; _pause.targets = targets; _pause.keep = keep; _pause.reboot = reboot; _pause.overclock = overclock; _pause.plugRank = plugRank;
             Advance();
         }
 

@@ -747,19 +747,19 @@ namespace CombatSystem
             TerminalOutcome term;
             {
                 var tenv = TerminalEnvNow(ctx, enemyAtkValue);
-                int[] slots = null, targets = null; bool[] keepMarks = null;
+                int[] slots = null, targets = null, plugRank = null; bool[] keepMarks = null;      // plugRank = 撃の順 (挿した順・null = 場の順・2026-11-25)
                 int reboot = ChargeCore.RebootNone; bool overclock = false;      // 充電のコアアクション (人 = 画面 / BOT = 方策・2026-11-21)
                 if (_interactiveTurn)
                 {
                     _pause.Set(TurnPauseKind.Wiring, playerDice, playerFaceIdx, tele);
                     _pause.board = _deck.board; _pause.terminalEnv = tenv; _pause.terminalState = _deck.state;
                     yield return _pause;
-                    slots = _pause.slots; targets = _pause.targets; keepMarks = _pause.keep; reboot = _pause.reboot; overclock = _pause.overclock;
+                    slots = _pause.slots; targets = _pause.targets; keepMarks = _pause.keep; reboot = _pause.reboot; overclock = _pause.overclock; plugRank = _pause.plugRank;
                 }
-                else if (WiringPolicy != null) { var plan = WiringPolicy(playerDice, tele); slots = plan.slots; targets = plan.targets; keepMarks = plan.keep; reboot = plan.reboot ?? ChargeCore.RebootNone; overclock = plan.overclock; }
+                else if (WiringPolicy != null) { var plan = WiringPolicy(playerDice, tele); slots = plan.slots; targets = plan.targets; keepMarks = plan.keep; reboot = plan.reboot ?? ChargeCore.RebootNone; overclock = plan.overclock; plugRank = plan.plugRank; }
                 if (slots == null) slots = TerminalWiring.Auto(_deck.board, playerDice, tenv, _deck.state);
                 // 〈影写し〉〈火葬の剣〉〈有効活用〉の対象: 人 = 画面で選んだ端子 / BOT = 方策 / どちらも無ければ左端の候補
-                term = TerminalCards.Resolve(_deck.board, slots, playerDice, tenv, _deck.state, targets, logAttack: true, reboot: reboot, overclock: overclock);
+                term = TerminalCards.Resolve(_deck.board, slots, playerDice, tenv, _deck.state, targets, logAttack: true, reboot: reboot, overclock: overclock, plugRank: plugRank);
                 _termWanted = (int[])slots.Clone();   // [計装 #106] 直す前の挿し方 (挿したが不発の数え)
                 mutualWiring = term.kindOfDie;
                 _termOutcome = term;

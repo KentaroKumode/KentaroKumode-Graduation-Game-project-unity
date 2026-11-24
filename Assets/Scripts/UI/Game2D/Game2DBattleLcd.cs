@@ -775,6 +775,9 @@ namespace UI.Game2D
                 else if (q == 0 && !string.IsNullOrEmpty(d.condLabel)) Txt(d.condLabel, sr.x + 2, sr.y + 4, dim ? Half(kc) : kc, false);
             }
             if (stopped) Rect(r.x + 2, r.y + BattleLcdLayout.ArtY + BattleLcdLayout.ArtH / 2, r.width - 4, 1, StopMark);      // 止まっている = 横切る 1 本の線
+            //   撃の番号 (仮・2026-11-25): 攻撃の端子は挿した順に当たる。 絵の窓の左上に小さな札で 1 2 3 (液晶の字に ①②③ が無いので数字)
+            int hitNo = d.kind == TerminalKind.Attack && plugged ? sim.HitNo(s) : 0;
+            if (hitNo > 0) { int bx = r.x + BattleLcdLayout.ArtX + 1, by = r.y + BattleLcdLayout.ArtY + 1, bw = Game2DJpFont.Width(hitNo.ToString()) + 3; Box(bx, by, bw, Game2DJpFont.Cell + 2, Edge, Gold2); TxtC(hitNo.ToString(), bx + bw / 2, by + 1, Gold2, false); }
             // 札の上の印 (仮の字): 停止 / 対象・候補 / 不発 / 残す / 残り (2 個挿せる札)
             bool kept = sim.CanOperate && sim.IsKept(s);
             string label = stopped ? "停止" : cand ? (chosen ? "対象" : "候補") : plugged && !fires ? "不発" : kept ? "残す" : cap >= 2 && sim.Remaining(s) > 0 && plugged ? "残" + sim.Remaining(s) : null;

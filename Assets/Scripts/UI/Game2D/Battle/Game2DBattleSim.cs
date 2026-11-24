@@ -347,7 +347,7 @@ namespace UI.Game2D.Battle
                     {
                         Game2DSfx.Play("decide");
                         int n = p.playerDice != null ? p.playerDice.Length : 0;
-                        cm.AnswerWiringSlots(BuildSlots(n), (int[])target.Clone(), (bool[])keepMark.Clone(), rebootSel, overclockOn);   // 残す印は本体が KeepFromMarks で直す (挿した端子には効かない)
+                        cm.AnswerWiringSlots(BuildSlots(n), (int[])target.Clone(), (bool[])keepMark.Clone(), rebootSel, overclockOn, PlugRank(n));   // 残す印は本体が KeepFromMarks で直す (挿した端子には効かない)
                         if (!cm.IsAwaitingDecision) Resolve(cm);
                     }
                     break;
@@ -535,16 +535,42 @@ namespace UI.Game2D.Battle
 
         private int[] BuildSlots(int n)
         {
+            SyncPlugSeq();
             var s = new int[n];
             for (int i = 0; i < n; i++) s[i] = i < slot.Length ? slot[i] : -1;
             return s;
         }
 
+        // 撃の順 (2026-11-25・作者の決定): 攻撃の端子の撃は出目を挿した順に当たる。 slot が変わった出目に、 変わった時の通し番号を振る
+        //   (挿し方を変える口が多いので、 前に見た slot と比べて拾う ── 外して挿し直すと最後になる)。
+        private int[] _plugSeq = new int[0], _seenSlot = new int[0];
+        private int _plugClock;
+        private void SyncPlugSeq()
+        {
+            if (_plugSeq.Length != slot.Length)
+            {
+                System.Array.Resize(ref _plugSeq, slot.Length); int old = _seenSlot.Length;
+                System.Array.Resize(ref _seenSlot, slot.Length); for (int i = old; i < slot.Length; i++) { _seenSlot[i] = -1; _plugSeq[i] = -1; }
+            }
+            for (int i = 0; i < slot.Length; i++)
+                if (slot[i] != _seenSlot[i]) { _seenSlot[i] = slot[i]; _plugSeq[i] = slot[i] >= 0 ? ++_plugClock : -1; }
+        }
+        /// <summary>出目ごとの挿した順 (Resolve の plugRank・AnswerWiringSlots へ渡す)。</summary>
+        private int[] PlugRank(int n)
+        {
+            SyncPlugSeq();
+            var r = new int[n];
+            for (int i = 0; i < n; i++) r[i] = i < _plugSeq.Length ? _plugSeq[i] : -1;
+            return r;
+        }
+        /// <summary>札 s の撃の番号 (1 から・見込みで撃にならない札は 0)。 札の上に出す。</summary>
+        public int HitNo(int s) => preview != null ? preview.attackHitSlot.IndexOf(s) + 1 : 0;
+
         private void RecomputePreview()
         {
             if (lastOutcome != null) { preview = lastOutcome; return; }
             if (!TermInputs(out var dice, out var env, out var st)) { preview = null; return; }
-            preview = TerminalCards.Resolve(board, BuildSlots(dice.Length), dice, env, st.Clone(), target, reboot: rebootSel, overclock: overclockOn);
+            preview = TerminalCards.Resolve(board, BuildSlots(dice.Length), dice, env, st.Clone(), target, reboot: rebootSel, overclock: overclockOn, plugRank: PlugRank(dice.Length));
         }
 
         // ── 充電のコアアクション (2026-11-21・ChargeCore・仮置き) ──
@@ -564,7 +590,7 @@ namespace UI.Game2D.Battle
         {
             if (!CanOperate || !HasReboot) return;
             var cands = new List<int>();
-            var o = TermInputs(out var dice, out var env, out var st) ? TerminalCards.Resolve(board, BuildSlots(dice.Length), dice, env, st.Clone(), target) : null;
+            var o = TermInputs(out var dice, out var env, out var st) ? TerminalCards.Resolve(board, BuildSlots(dice.Length), dice, env, st.Clone(), target, plugRank: PlugRank(dice.Length)) : null;
             if (o != null)
                 foreach (int s in o.fired)
                 {

@@ -888,7 +888,7 @@ namespace CombatSystem
         }
 
         public static TerminalOutcome Resolve(List<string> board, int[] wantSlot, int[] dice, TerminalEnv env, TerminalBattleState state, int[] wantTarget = null, bool logAttack = false,
-                                              int reboot = ChargeCore.RebootNone, bool overclock = false)
+                                              int reboot = ChargeCore.RebootNone, bool overclock = false, int[] plugRank = null)
         {
             int n = dice.Length, m = board.Count;
             var o = new TerminalOutcome { slotOfDie = new int[n], kindOfDie = new DiceTerminal[n], logAttack = logAttack };
@@ -1063,6 +1063,10 @@ namespace CombatSystem
                 fSum[s] = sum; fRaw[s] = raw; fNum[s] = num; atkD[s] = o.attackAdd - atkBefore; blkD[s] = o.blockAdd - blkBefore;
             }
 
+            // ── 5a. 撃の順 = 攻撃の端子に出目を挿した順 (2026-11-25・作者の決定)。 端子の効果は場の順で解いたまま、 撃の並びだけ挿した順へ並べ替える。
+            //   これより後 (【再起動】の撃・〈雷鳴の太鼓〉の最初の 1 撃・5d〜5g・本体の撃の輪) は並べ替えた後の順を読む。 plugRank が無ければ場の順 (今までどおり)
+            if (plugRank != null && o.attackHits.Count > 1) SortHitsByPlug(o, plugRank, n);
+
             // ── 5c. 充電のコアアクション (2026-11-21・ChargeCore・full-item-rework-ledger §①) ──
             //   再起動 = 発動した端子の効果を、 控えた量 (挿した出目の合計) でもう 1 回走らせる。 ダイスは足さない (個数・端子調律の 1 本あたりは増えない)。
             //   攻撃の端子なら撃が 1 つ増える (attackHits に足す)。 〈残響〉の倍化は掛けない (1 回だけ走る)。 〈裁きの雷〉は払う物が無いので対象にしない。
@@ -1176,6 +1180,29 @@ namespace CombatSystem
             for (int i = 0; i < n; i++)
                 o.kindOfDie[i] = o.slotOfDie[i] >= 0 ? LegacyKind(defs[o.slotOfDie[i]].kind) : DiceTerminal.None;
             return o;
+        }
+
+        /// <summary>Resolve の 5a: 撃 (attackHits と同じ並びの表すべて) を、 その端子に今挿さっている出目のうち最も早く挿した出目の順 (plugRank の小さい順) に並べる。
+        /// plugRank = 出目ごとの挿した順 (小さいほど先・負 = 分からない = 後ろ)。 同じ順位は場の順のまま (安定)。</summary>
+        private static void SortHitsByPlug(TerminalOutcome o, int[] plugRank, int n)
+        {
+            int c = o.attackHits.Count;
+            var key = new int[c];
+            for (int h = 0; h < c; h++)
+            {
+                int k = int.MaxValue, s = o.attackHitSlot[h];
+                for (int i = 0; i < n && i < plugRank.Length; i++) if (o.slotOfDie[i] == s && plugRank[i] >= 0 && plugRank[i] < k) k = plugRank[i];
+                key[h] = k;
+            }
+            for (int a = 1; a < c; a++)
+                for (int j = a; j > 0 && key[j - 1] > key[j]; j--)
+                {
+                    (key[j - 1], key[j]) = (key[j], key[j - 1]);
+                    (o.attackHits[j - 1], o.attackHits[j]) = (o.attackHits[j], o.attackHits[j - 1]);
+                    (o.attackHitDice[j - 1], o.attackHitDice[j]) = (o.attackHitDice[j], o.attackHitDice[j - 1]);
+                    (o.attackHitIds[j - 1], o.attackHitIds[j]) = (o.attackHitIds[j], o.attackHitIds[j - 1]);
+                    (o.attackHitSlot[j - 1], o.attackHitSlot[j]) = (o.attackHitSlot[j], o.attackHitSlot[j - 1]);
+                }
         }
 
         /// <summary>山札の品のうち、 全部の発動が決まった後に効く物 (Resolve の 6c)。 旗は <see cref="TerminalBattleState.deckItems"/>。</summary>
