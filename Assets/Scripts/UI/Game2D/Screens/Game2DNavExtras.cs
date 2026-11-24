@@ -406,6 +406,8 @@ namespace UI.Game2D
 
         private static readonly Color32 BarEdge = new Color32(10, 8, 10, 255), BarEmpty = new Color32(38, 30, 30, 255), Bone = new Color32(242, 236, 216, 255),
             HpC = new Color32(104, 170, 108, 255), HpHi = new Color32(160, 214, 160, 255), SupC = new Color32(0xd8, 0xa8, 0x2c, 255), SupHi = new Color32(0xf0, 0xc9, 0x3c, 255);
+        /// <summary>下の帯の地 (neon の配置 §A-1 の暗い平たい帯 #15171C)。</summary>
+        private static readonly Color32 BandBg = new Color32(0x15, 0x17, 0x1c, 255);
         private const int BarW = BattleLcdLayout.MBarX1 - BattleLcdLayout.MBarX0, SupX = 104;
 
         private void RedrawBottom(FreeMapSim sim, RunState run, float preFrac, bool blinkOn)
@@ -413,6 +415,7 @@ namespace UI.Game2D
             if (_bottom == null) return;
             Ensure(ref _tb, _bottom, BottomR);
             var p = new KitPix(BottomR.width, BottomR.height);
+            p.Rect(0, 0, BottomR.width, BottomR.height, BandBg);      // 地図の点や道の上でも字が読めるよう、 平たい暗い地を敷く
             if (run == null) { p.Apply(_tb); return; }
             int ny = BattleLcdLayout.MNumY - BottomR.y, by = BattleLcdLayout.MBarY - BottomR.y, hx = BattleLcdLayout.MBarX0 - BottomR.x;
             int max = Mathf.Max(1, run.playerMaxHP), hp = Mathf.Clamp(run.playerHP, 0, max);

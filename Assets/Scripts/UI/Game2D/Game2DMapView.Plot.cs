@@ -327,11 +327,14 @@ namespace UI.Game2D
             }
         }
 
-        // ── 読み出し (左下: EXIT の方角・縮尺・自艦の格子位置・経過ターン / 上: 天候) ──
+        // ── 読み出し (下の帯の右: 出口の方角・縮尺・自艦の格子位置 / 上の帯の下: 出現の枠・宝の知らせ) ──
+        //   経過ターン・天候・嵐の時計は航行の計器の上の帯 (Game2DNavExtras) が出すので、 ここでは描かない (2026-11-24・二重に出していた)
         private static readonly string[] Compass = { "北", "北北東", "北東", "東北東", "東", "東南東", "南東", "南南東", "南", "南南西", "南西", "西南西", "西", "西北西", "北西", "北北西" };
 
-        /// <summary>縄張りの宝の知らせの左上 (dot)。 上の帯 (高さ 30・Game2DNavExtras.TopR) の下 4 dot。</summary>
-        private const int TreasureNoteX = 96, TreasureNoteTop = 34;
+        /// <summary>縄張りの宝の知らせの左上 (dot)。 上の帯 (y 9〜36・Game2DNavExtras.TopR) の下 4 dot・左の列 (所持品・x 16〜55) の右。</summary>
+        private const int TreasureNoteX = 64, TreasureNoteTop = 41;
+        /// <summary>出口の方角・縮尺・現在の格子位置の左端 (dot)。 航行の計器の下の帯 (HP・物資・x 15〜198) の右。</summary>
+        private const int ReadoutX = 212;
 
         private void Readout(FreeMapSim sim)
         {
@@ -342,7 +345,7 @@ namespace UI.Game2D
             float b = (Mathf.Atan2((float)(ex.x - me.x), -(float)(ex.y - me.y)) + Mathf.PI * 2) % (Mathf.PI * 2);
             int sec = Mathf.RoundToInt(b / (Mathf.PI * 2 / 16)) % 16;
             float ang = sec * Mathf.PI * 2 / 16 - Mathf.PI / 2;
-            float cx0 = 96 + 118, cy0 = H - 17, Rr = 9;
+            float cx0 = ReadoutX + 118, cy0 = H - 17, Rr = 9;
             for (int k = 0; k < 16; k++) { float ak = k * Mathf.PI * 2 / 16 - Mathf.PI / 2; Put(Mathf.RoundToInt(cx0 + Mathf.Cos(ak) * Rr), Mathf.RoundToInt(cy0 + Mathf.Sin(ak) * Rr), _lc.dim); }
             Rect((int)cx0, (int)(cy0 - Rr - 1), 1, 2, _lc.hi);                                     // 北の目印
             if (!exitHidden)
@@ -350,23 +353,12 @@ namespace UI.Game2D
                 Rect(Mathf.RoundToInt(cx0 + Mathf.Cos(ang) * Rr) - 1, Mathf.RoundToInt(cy0 + Mathf.Sin(ang) * Rr) - 1, 3, 3, _lc.hot);
                 for (int r = 1; r < Rr - 1; r++) Put(Mathf.RoundToInt(cx0 + Mathf.Cos(ang) * r), Mathf.RoundToInt(cy0 + Mathf.Sin(ang) * r), _lc.dim);   // 針
             }
-            Text("出口 " + (exitHidden ? "？" : Compass[sec]), 96, H - 35, _lc.mid, Align.Left);
-            Text("縮尺 " + _zoom + "倍", 96, H - 22, _lc.dim, Align.Left);
+            Text("出口 " + (exitHidden ? "？" : Compass[sec]), ReadoutX, H - 35, _lc.mid, Align.Left);
+            Text("縮尺 " + _zoom + "倍", ReadoutX, H - 22, _lc.dim, Align.Left);
             char col = (char)('A' + Mathf.Clamp(Mathf.FloorToInt((float)me.x / 2f), 0, 25));
             int row = Mathf.FloorToInt((float)me.y / 2f) + 1;
-            Text("現在 " + col + row, 96, H - 9, _lc.dim, Align.Left);
-            Text("ターン " + Mathf.Min(999, sim.Turn).ToString("000"), 96 + 8 * 4 * Pxs, H - 9, _lc.dim, Align.Left);      // 「ターン」とは書かない (2026-11-11)
+            Text("現在 " + col + row, ReadoutX, H - 9, _lc.dim, Align.Left);
 
-            if (sim.StormMode)
-            {
-                // 嵐 (2026-11-13): 静かな時間は「嵐まで N」、 嵐の間は「嵐 フェーズ k・次まで N」と種類の名前
-                Text(StormLabel(sim), W - 8 - 89, 8, sim.StormPhase == 0 ? _lc.mid : _lc.warn, Align.Right);
-            }
-            else
-            {
-                bool calm = !(sim.Weather != WeatherKind.None && !double.IsNegativeInfinity(sim.Front));
-                Text("天気 " + (calm ? "凪" : sim.Weather.DisplayName()), W - 8 - 89, 8, calm ? _lc.dim : _lc.hi, Align.Right);
-            }
             // 出現の枠 (動的 4 枠ロック・2026-11-21・full-item-rework-spec §1-5): 右上の上の帯の真下に「出現 [毒][充電][？][？]」。 4 つ埋まったら明るい色と「ロック」
             var runL = GameLoop.GameManager.Instance?.Run;
             if (runL != null)
@@ -378,7 +370,7 @@ namespace UI.Game2D
                 Text(slots, W - 8 - 89, TreasureNoteTop + sh / 2f, lk ? _lc.hot : _lc.mid, Align.Right);
             }
             // 縄張りの宝を取った後 (2026-11-12・仮置き): 何を得たかを左上に出す (航行のまま渡すので、 専用の画面は挟まない)
-            //   液晶の上端 (y 0〜29) は x 96〜387 が上の帯 (Game2DNavExtras の TopR / StatusR) に覆われるので、 その真下に、
+            //   液晶の上端 (y 9〜36) は上の帯 (Game2DNavExtras の TopR) に覆われるので、 その真下に、
             //   地図の点や道と重なっても読めるよう地の色の下敷きを敷いて出す (y = 8 だと上の帯の裏で見えなかった)。
             if (sim.TreasureTaken)
             {
