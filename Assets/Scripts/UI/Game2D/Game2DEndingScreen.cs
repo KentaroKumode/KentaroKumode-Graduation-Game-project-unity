@@ -191,7 +191,10 @@ namespace UI.Game2D
             if (!_active && gm.CurrentPhase == GameManager.GamePhase.RunClear && gm.Run != null && gm.Run != _doneRun)
             {
                 _doneRun = gm.Run;
-                Play(Endings.Resolve(gm.Run));
+                // ラン指定の絵の列 (チュートリアルの締め・RunSpec.slides): 結末の本文の代わりに流し、 終わったらタイトルへ
+                var slides = RunSpec.Current?.slides;
+                if (slides != null && slides.Length > 0) StartSlides(slides, gm.ReturnToTitle);
+                else Play(Endings.Resolve(gm.Run));
             }
         }
 
@@ -218,6 +221,7 @@ namespace UI.Game2D
             Subscribe();
             CheckPhase();                                                     // 取りこぼし用 (購読より前に変わっていた時)
             if (!_active) return;
+            if (_slides != null) { StepSlides(); return; }      // 絵の列 (入力は受けない・決まった時間で流れる)
 
             float dt = Mathf.Min(0.05f, Time.unscaledDeltaTime);
             _t += dt; _fadeT += dt;
@@ -309,13 +313,21 @@ namespace UI.Game2D
         private bool LoadArt(string name)
         {
             _artPx = null; _backPx = null; _backK = -1f; _artName = name;
-            if (string.IsNullOrEmpty(name)) return false;
+            _artPx = LoadLcd(name);
+            return _artPx != null;
+        }
+
+        /// <summary>Resources/<see cref="ArtDir"/>name.png.bytes を読み、 液晶の大きさ (W×H・下の行から) に写す (見せ方は <see cref="LoadArt"/> の説明)。 無い・読めないなら null。
+        /// 結びの絵と絵の列 (<see cref="ShowSlides"/>) が同じ写し方を使う (480×270 の絵は 1 倍・1 画素 1 dot)。</summary>
+        private static Color32[] LoadLcd(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return null;
             var a = Resources.Load<TextAsset>(ArtDir + name + ".png");
-            if (a == null) { Debug.LogWarning("[Game2DEndingScreen] Resources/" + ArtDir + name + ".png.bytes が無い"); return false; }
+            if (a == null) { Debug.LogWarning("[Game2DEndingScreen] Resources/" + ArtDir + name + ".png.bytes が無い"); return null; }
             var t = new Texture2D(2, 2, TextureFormat.RGBA32, false);
             bool ok = t.LoadImage(a.bytes) && t.width > 0 && t.height > 0;
             Resources.UnloadAsset(a);
-            if (!ok) { Debug.LogWarning("[Game2DEndingScreen] " + name + " を読めない"); Destroy(t); return false; }
+            if (!ok) { Debug.LogWarning("[Game2DEndingScreen] " + name + " を読めない"); Destroy(t); return null; }
             int sw = t.width, sh = t.height; var src = t.GetPixels32();                      // 下の行から
             Destroy(t);
             int s = Mathf.Max(1, Mathf.Max(Mathf.CeilToInt((float)W / sw), Mathf.CeilToInt((float)H / sh)));
@@ -332,8 +344,7 @@ namespace UI.Game2D
                     dst[(H - 1 - y) * W + x] = c;                                              // Texture2D は下の行から
                 }
             }
-            _artPx = dst;
-            return true;
+            return dst;
         }
 
         /// <summary>結びの絵の明るくなる進み (0..1)。 確認用に止めていればその値。 絵の無い結末はいつも 1。</summary>
@@ -463,9 +474,175 @@ namespace UI.Game2D
             foreach (var d in dots) p.Rect(x + (d.x - x) * scale, y + (d.y - y) * scale, scale, scale, c);
         }
 
+        // =====================================================================
+        //  絵の列 (スライドショー・2026-11-24・チュートリアルの締め・docs/GAME.md §23-35)
+        // =====================================================================
+        //   作者が承認したたたき台 Captures/tutorial/backdrops/work/slideshow_draft.py の時間を、 同じ式・同じ丸めで写す (24 コマ/秒)。
+        //   止め絵: 暗転明け 0.75 秒 (明るさ 6 段・3 コマごと) → 見せる → 暗転 0.75 秒 (1 場面 5 秒) → 真っ暗 0.5 秒。
+        //   窓の場面: 窓の枠 (frame) の開口に絵を置き、 秒 18 dot で横に流す (位置は 2 dot 刻み)。 arrive の場面は最後の 1.5 秒で減速して止まる。 揺れなし。
+        //   最後の絵 (adapt): 切り替えなしに白飛びした絵を出し、 2 秒で目が慣れる (暖かい白を加算で足し引き・4 コマごと) → 3 秒止めて見せる。 文字は出さない。
+
+        /// <summary>絵の列の時間割と色の式 (画面に依らない計算・EditMode のテストが読む)。 値と式は slideshow_draft.py と同じ名前。</summary>
+        public static class SlideClock
+        {
+            public const int Fps = 24, Fade = 18, Black = 12, Show = 120, Arrive = 36, Adapt = 48, Hold = 72, Ox = 100;
+            public const double Speed = 0.75;
+            /// <summary>明転の白 (原色の白にしない・昼の大穴の光の色へ寄せた暖かい白)。</summary>
+            public static readonly Color32 Warm = new Color32(255, 246, 222, 255);
+
+            /// <summary>1 枚が使うコマの数 (止め絵・窓 = 場面 + 真っ暗 / 最後の絵 = 目が慣れる + 止めて見せる)。</summary>
+            public static int FramesOf(RunSpec.Slide s) => s.adapt ? Adapt + Hold : Show + Black;
+
+            public static int Total(RunSpec.Slide[] ss) { int n = 0; foreach (var s in ss) n += FramesOf(s); return n; }
+
+            /// <summary>通しのコマ f が何枚目の何コマ目か。 列を過ぎたら false。</summary>
+            public static bool Locate(RunSpec.Slide[] ss, int f, out int slide, out int i)
+            {
+                for (slide = 0; slide < ss.Length; slide++) { int n = FramesOf(ss[slide]); if (f < n) { i = f; return true; } f -= n; }
+                i = 0; return false;
+            }
+
+            /// <summary>場面の i コマ目 (全 n コマ) の明るさ 0..1 (段で上がって段で落ちる)。 slideshow_draft.py の level。</summary>
+            public static double Level(int i, int n)
+                => i < Fade ? System.Math.Min(1.0, (i / 3 + 1) / (double)(Fade / 3))
+                 : i >= n - Fade ? System.Math.Min(1.0, ((n - 1 - i) / 3) / (double)(Fade / 3)) : 1.0;
+
+            /// <summary>窓の場面の i コマ目で、 窓の左端に映る絵の x (2 dot 刻み)。 丸めは偶数丸め (Python の round と同じ)。</summary>
+            public static int PanX(RunSpec.Slide s, int i)
+            {
+                double Pos(int k) => System.Math.Round(s.mid - Show * Speed / 2 + Speed * k);
+                double p = Pos(i);
+                if (s.arrive && i >= Show - Arrive)
+                {
+                    double t = (i - (Show - Arrive) + 1) / (double)Arrive;
+                    p = Pos(Show - Arrive) + System.Math.Round(Arrive * Speed * (t - t * t / 2));
+                }
+                int vx = (int)p;
+                return vx - vx % 2;
+            }
+
+            /// <summary>最後の絵の i コマ目 (0..Adapt−1) の白飛びの強さ (段で下がる・最後は 0)。</summary>
+            public static double AdaptK(int i) => 0.92 * (1 - (i / 4 + 1) / (double)(Adapt / 4));
+
+            /// <summary>色 c を k 倍 (段の暗転・切り捨て)。</summary>
+            public static Color32 Dim(Color32 c, double k)
+                => k >= 1 ? c : new Color32((byte)(int)(c.r * k), (byte)(int)(c.g * k), (byte)(int)(c.b * k), 255);
+
+            /// <summary>白飛び: 明るい所から先に暖かい白へ飛ぶ加算 (k 0..1)。 slideshow_draft.py の bright。</summary>
+            public static Color32 Bright(Color32 c, double k)
+            {
+                if (k <= 0) return c;
+                if (k >= 1) return Warm;
+                int Ch(int v, int w) => System.Math.Min(255, (int)(v + k * w * 1.25 * (0.35 + 0.65 * v / 255 + 0.9 * System.Math.Pow(k, 3))));
+                return new Color32((byte)Ch(c.r, Warm.r), (byte)Ch(c.g, Warm.g), (byte)Ch(c.b, Warm.b), 255);
+            }
+        }
+
+        private RunSpec.Slide[] _slides; private System.Action _slidesDone; private float _slideT; private int _slideShown = -1;
+        private readonly Dictionary<string, Color32[]> _slidePx = new Dictionary<string, Color32[]>();
+
+        /// <summary>任意の絵の列を液晶の全面に流す公開の入口 (絵は Resources/<see cref="ArtDir"/>・時間は <see cref="SlideClock"/>)。 終わったら onDone (null 可) を呼んで閉じる。
+        /// 流している間は入力を受けない (飛ばせない)。 画面の部品が無い・列が空なら false。</summary>
+        public static bool ShowSlides(RunSpec.Slide[] slides, System.Action onDone)
+        {
+            var s = FindObjectOfType<Game2DEndingScreen>();
+            return s != null && s.StartSlides(slides, onDone);
+        }
+
+        private bool StartSlides(RunSpec.Slide[] slides, System.Action onDone)
+        {
+            if (slides == null || slides.Length == 0 || !EnsureQuad()) return false;
+            foreach (var sl in slides) if (sl == null) return false;
+            if (_active) Stop();
+            _slidePx.Clear();
+            foreach (var sl in slides) { Lcd(sl.art); Lcd(sl.frame); }      // 先に全部読む (流している間に読み込みで止まらないように)
+            _slides = slides; _slidesDone = onDone; _slideT = 0f; _slideShown = -1;
+            _pages.Clear(); _closing = false; _inArt = false; _fadeT = FadeSec; _active = true; Track = null;      // 網目の入りは使わない (たたき台は暗転明けから始まる)
+            var gm = GameManager.Instance; _playPhase = gm != null ? gm.CurrentPhase : GameManager.GamePhase.Title; _playRun = gm != null ? gm.Run : null;
+            GameManager.InputBlockedByScreen = true;
+            if (_tex == null) { _tex = new Texture2D(W, H, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp, name = "Game2DEnding" }; _pix = new KitPix(W, H); }
+            SetBlend(); _quad.enabled = true;
+            DrawSlide(0); ApplyFade();
+            return true;
+        }
+
+        /// <summary>絵 name の液晶の大きさの写し (無い・読めなければ null)。 列を流す間だけ持つ。</summary>
+        private Color32[] Lcd(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return null;
+            if (!_slidePx.TryGetValue(name, out var px)) { px = LoadLcd(name); _slidePx[name] = px; }
+            return px;
+        }
+
+        private void StepSlides()
+        {
+            GameManager.ScreenUsedSpaceFrame = Time.frameCount;      // 押した入力を後ろへ流さない
+            _slideT += Mathf.Min(0.1f, Time.unscaledDeltaTime);
+            int f = Mathf.FloorToInt(_slideT * SlideClock.Fps);
+            if (f >= SlideClock.Total(_slides))
+            {
+                var done = _slidesDone;
+                _slidesDone = null;
+                done?.Invoke();                 // タイトルへ戻る (フェーズが変わって Stop が走る)
+                if (_active) Stop();
+                return;
+            }
+            if (f != _slideShown) DrawSlide(f);
+        }
+
+        /// <summary>通しのコマ f を描く (KitPix と同じ下の行からの並び)。</summary>
+        private void DrawSlide(int f)
+        {
+            _slideShown = f;
+            if (!SlideClock.Locate(_slides, f, out int k, out int i)) return;
+            var px = _pix.px; var black = new Color32(0, 0, 0, 255);
+            var sl = _slides[k];
+            var art = Lcd(sl.art);
+            if (sl.adapt)
+            {
+                double b = i < SlideClock.Adapt ? SlideClock.AdaptK(i) : 0;
+                for (int j = 0; j < px.Length; j++) px[j] = art != null ? SlideClock.Bright(art[j], b) : black;
+            }
+            else if (i >= SlideClock.Show)
+            {
+                for (int j = 0; j < px.Length; j++) px[j] = black;      // 場面の間の真っ暗
+            }
+            else
+            {
+                double lv = SlideClock.Level(i, SlideClock.Show);
+                var frame = Lcd(sl.frame);
+                if (frame == null)
+                {
+                    for (int j = 0; j < px.Length; j++) px[j] = art != null ? SlideClock.Dim(art[j], lv) : black;
+                }
+                else
+                {
+                    // 窓の場面: 絵を (Ox − 窓の x, −yoff) に置き、 枠を上に重ねる (枠の透けた所 = 開口だけ絵が見える)
+                    int dx = SlideClock.Ox - SlideClock.PanX(sl, i), dy = -sl.yoff;
+                    for (int y = 0; y < H; y++)
+                        for (int x = 0; x < W; x++)
+                        {
+                            int j = (H - 1 - y) * W + x;
+                            var fc = frame[j];
+                            Color32 c;
+                            if (fc.a == 255) c = fc;
+                            else
+                            {
+                                int bx = x - dx, by = y - dy;
+                                c = art != null && bx >= 0 && by >= 0 && bx < W && by < H ? art[(H - 1 - by) * W + bx] : black;
+                                if (fc.a > 0) c = new Color32((byte)((fc.r * fc.a + c.r * (255 - fc.a) + 127) / 255), (byte)((fc.g * fc.a + c.g * (255 - fc.a) + 127) / 255), (byte)((fc.b * fc.a + c.b * (255 - fc.a) + 127) / 255), 255);
+                            }
+                            px[j] = SlideClock.Dim(c, lv);
+                        }
+                }
+            }
+            _tex.SetPixels32(px); _tex.Apply(false);
+        }
+
         private void Stop()
         {
             _active = false; _endFrame = Time.frameCount; _closing = false; _inArt = false; _qaRise = -1f; Track = null; ClosedSerial++;
+            _slides = null; _slidesDone = null; _slidePx.Clear();
             GameManager.InputBlockedByScreen = false;
             if (_quad != null) _quad.enabled = false;
         }
@@ -491,6 +668,15 @@ namespace UI.Game2D
             if (_active) s.Stop();
             s.Play(e);
             return _active;
+        }
+
+        /// <summary>[実機の確認用・2026-11-24] ラン指定 (Resources/RunSpecs/name.json) の絵の列だけを流す (フェーズもランも変えない・セーブを止める・終わったら元の画面)。
+        /// 例: <c>UI.Game2D.Game2DEndingScreen.QaShowSlides("tutorial")</c>。 指定・列が無ければ false。</summary>
+        public static bool QaShowSlides(string specName)
+        {
+            SaveGuard.Suppressed = true;
+            var spec = RunSpec.Load(specName);
+            return spec != null && ShowSlides(spec.slides, null);
         }
 
         /// <summary>[確認用・2026-11-16] 本文の後ろの絵の係数 (<see cref="BackdropDim"/>・0..1 に丸める) を替え、 出ている頁 (または結びの絵の段) をすぐ描き直す。

@@ -240,7 +240,8 @@ namespace UI.Game2D
         {
             var gm = GameManager.Instance;
             if (gm == null) { if (_cur != null) Hide(); SyncInput(); return; }
-            if (Application.isBatchMode || GameHooks.BotDriving)
+            // ラン指定で手引きの文を止める間 (チュートリアルのラン・RunSpec.hide): BOT の時と同じく出さず、 見た印も付けない (本編でまた出る)
+            if (Application.isBatchMode || GameHooks.BotDriving || RunSpec.Hides(RunSpec.HideHandbook))
             {
                 _queue.Clear();
                 if (_cur != null) Hide();          // 印は付けない (人が遊ぶ時にまた出る)

@@ -153,7 +153,7 @@ namespace UI.Game2D
             }
             _hoverCard = HandUp ? CardAt(d, -1) : -1;
             _hoverRelic = ExtrasUp ? RelicAt(d) : -1;
-            _hoverZone = In(d, HeadRect()) ? Zone.Head : In(d, OrbRect()) || In(d, RerollRect()) ? Zone.Orb : In(d, HpRect()) ? Zone.Hp : In(d, DeckRect()) ? Zone.Deck : Zone.None;
+            _hoverZone = In(d, HeadRect()) ? Zone.Head : ShowCharge && (In(d, OrbRect()) || In(d, RerollRect())) ? Zone.Orb : In(d, HpRect()) ? Zone.Hp : In(d, DeckRect()) ? Zone.Deck : Zone.None;
             if (Input.GetMouseButtonDown(0))
             {
                 int die = HandUp ? DieAt(d) : -1;
@@ -165,7 +165,7 @@ namespace UI.Game2D
                 }
                 if (_hoverCard >= 0) { if (sim.CanOperate) { _pressCard = _hoverCard; _pressDot = d; _moved = false; } return; }
                 if (ExtrasUp && In(d, InvRect())) { OpenInventory(); return; }
-                if (ExtrasUp && sim.CanOperate && (In(d, OrbRect()) || In(d, RerollRect()))) { if (sim.CanRerollNow) sim.Reroll(); else Game2DSfx.Play("ui_click"); return; }
+                if (ExtrasUp && sim.CanOperate && ShowCharge && (In(d, OrbRect()) || In(d, RerollRect()))) { if (sim.CanRerollNow) sim.Reroll(); else Game2DSfx.Play("ui_click"); return; }
                 if (ExtrasUp && sim.CanOperate)
                 {
                     if (In(d, SideRect(0))) { sim.AutoWire(); return; }
@@ -418,8 +418,8 @@ namespace UI.Game2D
                 if (t == null) { xr = cx + 4; }
                 else { int w = Game2DJpFont.Width(t); Txt(t, cx - w / 2, yI, Heavy); xr = cx - w / 2 + w + 3; }
             }
-            // 激化の段 (数字は出さない・小さな四角を 5 つ・点いている数が段)
-            for (int i = 0; i < BattleLcdLayout.PipMax; i++)
+            // 激化の段 (数字は出さない・小さな四角を 5 つ・点いている数が段)。 ラン指定で隠せる (チュートリアル・RunSpec.hide)
+            for (int i = 0; !RunSpec.Hides(RunSpec.HideEscalation) && i < BattleLcdLayout.PipMax; i++)
             {
                 int px = xr + i * BattleLcdLayout.PipStep, py = yI + 4;
                 Rect(px - 1, py - 1, BattleLcdLayout.PipSize + 2, BattleLcdLayout.PipSize + 2, Edge);
@@ -496,6 +496,7 @@ namespace UI.Game2D
             if (_handOff < BattleLcdLayout.HandHide && s.board.Count > 0) for (int k = 0; k < s.board.Count; k++) DrawCard(k);
             if (_spHand.tgt < 0.5f) DrawFloor();      // 床の出目は札と一緒には動かさない (振り始めから見せる)
             DrawDragGhost();
+            DrawHint();
             DrawTip();
         }
 
@@ -537,7 +538,8 @@ namespace UI.Game2D
                            + (_hs.toilCutPct > 0 ? (_hs.consOutgoingPct > 0 ? " " : "") + EventSystem.TimedEffects.BattleBoonRule.ToilName + "−" + _hs.toilCutPct + "%" : "");
                 Txt(Game2DJpFont.Clip(add, 78), BattleLcdLayout.LeftX + ox, BattleLcdLayout.ModY, Gold2);
             }
-            // 充電の玉: 中の数 = 今の充電・扇 = 充電 30 で満ちる (旧画面のランプ 10 個 × 3)
+            // 充電の玉: 中の数 = 今の充電・扇 = 充電 30 で満ちる (旧画面のランプ 10 個 × 3)。 出番の無い時 (山札に充電の端子が無く充電も 0) は玉も振り直すも出さない
+            if (!ShowCharge) return;
             int cx = BattleLcdLayout.OrbX + ox, cy = BattleLcdLayout.OrbY, r = BattleLcdLayout.OrbR;
             float frac = Mathf.Clamp01(s.charge / 30f);
             for (int j = -r - 1; j <= r + 1; j++)
@@ -601,6 +603,81 @@ namespace UI.Game2D
         }
 
         private bool AnyPlugged() { foreach (var v in _sim.slot) if (v >= 0) return true; return false; }
+
+        /// <summary>充電の玉と「振り直す」を出すか (2026-11-24・docs/GAME.md §23-35): 今の充電が 1 以上か、 ランの山札に充電の種類の端子がある時だけ。 出番の無いゲージは見せない。</summary>
+        private bool ShowCharge
+        {
+            get
+            {
+                if (_sim.charge > 0) return true;
+                var deck = GameManager.Instance?.Run?.terminalDeck;
+                if (deck == null) return true;      // ランが無い戦闘 (単体の確認) は今までどおり出す
+                foreach (var id in deck) if (TerminalCards.Get(id)?.kind == TerminalKind.Charge) return true;
+                return false;
+            }
+        }
+
+        // ── ラン指定の光る枠 (2026-11-24・チュートリアル・RunSpec.hints) ──
+        //   今の敵・ターン (またはチャージ / 大技のターン) に合う行の部品を、 並びの順に 1 つずつ光らせる。 済んだ部品は飛ばす:
+        //   出目 = どれかを挿した / 攻撃・防御・充電 = その種類の札に挿した / 振り直す = このターンに振り直した / 予告・充電の玉 = 1 秒見せた / 決める = 済まない (最後に置く)。
+        //   光るのは判断の間だけ。 点滅は 8 コマ/秒の拍で 5 コマ点いて 3 コマ消える。 字は出さない。
+        private string _hintKey; private float _hintAt;
+        private const float HintLookSec = 1f;
+
+        private void DrawHint()
+        {
+            var s = _sim; var foe = CombatManager.Instance?.CurrentEnemy;
+            if (!s.CanOperate || !HandUp || foe == null) return;
+            var parts = RunSpec.HintParts(foe.id, s.turn, s.charging, s.heavyIn == 0);
+            if (parts == null) return;
+            string key = foe.id + "/" + s.turn;
+            if (key != _hintKey) { _hintKey = key; _hintAt = Time.unscaledTime; }
+            float seen = Time.unscaledTime - _hintAt, look = 0f;
+            foreach (var p in parts)
+            {
+                bool done;
+                switch (p)
+                {
+                    case RunSpec.PartIntent: case RunSpec.PartOrb: look += HintLookSec; done = seen >= look; break;
+                    case RunSpec.PartDice: done = AnyPlugged(); break;
+                    case RunSpec.PartAttack: done = KindPlugged(TerminalKind.Attack); break;
+                    case RunSpec.PartBlock: done = KindPlugged(TerminalKind.Block); break;
+                    case RunSpec.PartCharge: done = KindPlugged(TerminalKind.Charge); break;
+                    case RunSpec.PartReroll: done = (ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context?.rerollsThisTurn ?? 0) > 0; break;
+                    default: done = false; break;
+                }
+                if (done) continue;
+                if ((int)(Time.unscaledTime * 8f) % 8 < 5)
+                    foreach (var r in HintRects(p)) { Frame1(r.x - 3, r.y - 3, r.width + 6, r.height + 6, Edge); Frame1(r.x - 2, r.y - 2, r.width + 4, r.height + 4, Amber); }
+                return;
+            }
+        }
+
+        /// <summary>種類 k の札に出目を挿しているか。</summary>
+        private bool KindPlugged(TerminalKind k)
+        {
+            foreach (var c in _sim.slot) if (c >= 0 && c < _sim.board.Count && TerminalCards.Get(_sim.board[c])?.kind == k) return true;
+            return false;
+        }
+
+        /// <summary>光らせる部品の範囲 (札は、 その種類の札を全部)。</summary>
+        private IEnumerable<RectInt> HintRects(string part)
+        {
+            TerminalKind k;
+            switch (part)
+            {
+                case RunSpec.PartDice: { var r = FocusRect(Part.Ports, false); if (r.HasValue) yield return r.Value; yield break; }
+                case RunSpec.PartIntent: yield return HeadRect(); yield break;
+                case RunSpec.PartOrb: yield return OrbRect(); yield break;
+                case RunSpec.PartReroll: yield return RerollRect(); yield break;
+                case RunSpec.PartGo: if (GoVisible) yield return GoRect(); yield break;
+                case RunSpec.PartAttack: k = TerminalKind.Attack; break;
+                case RunSpec.PartBlock: k = TerminalKind.Block; break;
+                case RunSpec.PartCharge: k = TerminalKind.Charge; break;
+                default: yield break;
+            }
+            for (int c = 0; c < _sim.board.Count; c++) if (TerminalCards.Get(_sim.board[c])?.kind == k) yield return CardRect(c);
+        }
 
         /// <summary>右上: 山と捨て札 (と外した札) の枚数。 左上: [持ち物] (仮)。</summary>
         private void DrawInvAndDeck()

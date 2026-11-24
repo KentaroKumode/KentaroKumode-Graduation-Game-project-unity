@@ -93,11 +93,19 @@ namespace UI
             BeginNewRunFlow();
         }
 
-        /// <summary>新しいランを始める流れ (職業選択 → ラン開始)。</summary>
+        /// <summary>新しいランを始める流れ (職業選択 → ラン開始)。 チュートリアルを終えていなければ、 職業選択を挟まずチュートリアルのラン (RunSpec) を始める (2026-11-24・docs/GAME.md §23-35)。</summary>
         private void BeginNewRunFlow()
         {
             var gm = GameManager.Instance;
             if (gm == null || gm.CurrentPhase != GameManager.GamePhase.Title) return;
+
+            var tutorial = _classSelectOpen ? null : RunSpec.FirstRunTutorial();
+            if (tutorial != null)
+            {
+                Debug.Log("[TitleMenuRouter] 初回: チュートリアルのラン指定で開始");
+                gm.StartNewRun(tutorial);
+                return;
+            }
 
             // 職業選択が配線されていれば、 ラン開始前に提示 (マップ侵入は受理スタンプ後)
             if (classSelect != null)
