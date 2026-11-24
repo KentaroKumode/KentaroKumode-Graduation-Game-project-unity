@@ -252,15 +252,12 @@ namespace GameLoop
         /// <summary>囮罠 (items.json の id ＝ 表示名)。 2026-10-18 に旧〈囮〉〈罠〉を統合 (旧 id の対応表は 2026-11-14 に削除)。</summary>
         public const string Lure = "囮罠";
 
-        // === 航行アイテム 13 品 (2026-11-11・docs/design/nav-items.md) ===
+        // === 航行アイテム 10 品 (2026-11-11・docs/design/nav-items.md・2026-11-24 に〈魔石の欠片〉〈羅盤の針〉〈忍びの外套〉を削除 ── 魔石と痕跡が無くなり効果が成り立たない) ===
         //   どれもパッシブ (〈前哨の旗〉だけ層に 1 回「使う」)。 効果は GameLoop.NavItems が係数 (FreeMapPerks) にして航行の規則へ渡す。
         //   FreeMapSim はこれらの id を見ない。
         public const string NavSmokeBall    = "煙玉";
         public const string NavOiledBoots   = "油布の靴";
-        public const string NavStoneShard   = "魔石の欠片";
         public const string NavMapSketch    = "地図売りの走り書き";
-        public const string NavCompassNeedle = "羅盤の針";
-        public const string NavStealthCloak = "忍びの外套";
         public const string NavMirrorCharm  = "鏡の護符";
         public const string NavNightRing    = "夜目の指輪";
         public const string NavSupplyTally  = "補給商の割符";
@@ -269,11 +266,11 @@ namespace GameLoop
         public const string NavHunterBlade  = "追っ手殺しの刃";
         public const string NavOutpostFlag  = "前哨の旗";
 
-        /// <summary>航行アイテム 13 品の id。</summary>
+        /// <summary>航行アイテム 10 品の id。</summary>
         public static readonly System.Collections.Generic.HashSet<string> NavItems =
             new System.Collections.Generic.HashSet<string>
         {
-            NavSmokeBall, NavOiledBoots, NavStoneShard, NavMapSketch, NavCompassNeedle, NavStealthCloak, NavMirrorCharm,
+            NavSmokeBall, NavOiledBoots, NavMapSketch, NavMirrorCharm,
             NavNightRing, NavSupplyTally, NavBirdCompass, NavFleetCharm, NavHunterBlade, NavOutpostFlag,
         };
 

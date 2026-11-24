@@ -46,6 +46,7 @@ static partial class T
             {
                 // 〈灰に埋もれた基地〉の前の版にだけある欄 (riftGate = ボスの隣の点) は、 空なら同じとみなす (深さ 6 はイベントなしの測定の形で比べる・TurnGen)
                 if (fb.Name == "riftGate" && fb.GetValue(b) is System.Collections.ICollection rc && rc.Count == 0) continue;
+                if (fb.Name == "trace" || fb.Name == "flareTurnsLeft") continue;   // 2026-11-24 に消した欄 (痕跡・照明の残り)
                 return path + "." + fb.Name + "(無い)";
             }
             var d = Deep(fa.GetValue(a), fb.GetValue(b), path + "." + fb.Name, depth + 1);
@@ -76,7 +77,7 @@ static partial class T
         var La = FreeMapGenerator.Generate(floor, fp, true);
         GameLoop.GameRng.Salt = (ulong)salt * 7919;
         var Lb = TurnGen(floor, fp, true);
-        bool foe = FloorPlan.HasWanderer(floor);
+        bool foe = false /* 追跡者なしで比べる (2026-11-24 に見つかる規則を変えたので、 追跡者の動きは比べる版と違って当然) */;
         var wa = new Wallet { Provision = 8, Hp = 60 }; var wb = new TurnWallet { Provision = 8, Hp = 60 };
         var a = new FreeMapSim(La, wa, foe, null, null, null);
         var b = new TR.FreeMapSim(Lb, wb, foe, null, null, null);
@@ -101,8 +102,7 @@ static partial class T
                 else { int j = na[(h / 100) % na.Count]; ea = (int)a.MoveTo(j); eb = (int)b.MoveTo(j); a.MarkDone(j); b.MarkDone(j); }
             }
             else if (op < 65) { ea = (int)a.Wait(); eb = (int)b.Wait(); }
-            else if (op < 70) { ea = (int)a.Recon(); eb = (int)b.Recon(); }
-            else if (op < 73) { ea = (int)a.UseFlare(); eb = (int)b.UseFlare(); }
+            else if (op < 73) { ea = (int)a.Wait(); eb = (int)b.Wait(); }   // 旧い偵察・照明の手 (2026-11-24 に測量へ・旧い版に無いので待つで比べる)
             else if (op < 76) { ea = (int)a.PlaceLure(); eb = (int)b.PlaceLure(); }
             else if (op < 80) { int n = ((h / 100) % 9) - 4; ea = (int)a.ShiftFront(n); eb = (int)b.ShiftFront(n); }
             else if (op < 83) { a.GrantFreeMoves(1); b.GrantFreeMoves(1); ea = eb = 0; }
@@ -169,16 +169,16 @@ static partial class T
                 foreach (int floor in StormDepths)
                 {
                     GameLoop.GameRng.Salt = (ulong)salt * 7919; GameLoop.GameRng.Draws.Clear();
-                    var a = new FreeMapSim(FreeMapGenerator.Generate(floor, floor == AshBase.Depth, true), new Wallet(), FloorPlan.HasWanderer(floor), null, null, null);
+                    var a = new FreeMapSim(FreeMapGenerator.Generate(floor, floor == AshBase.Depth, true), new Wallet(), false /* 追跡者なしで比べる (2026-11-24 に見つかる規則を変えたので、 追跡者の動きは比べる版と違って当然) */, null, null, null);
                     a.ConfigureStorm(StormClock.Turns);
                     for (int k = 0; k < 60 && !a.InFight; k++) { var nb = a.Neighbors(a.Me); a.MoveTo(nb[H(salt, floor, k) % nb.Count]); }
                     var da = SnapDraws();
                     GameLoop.GameRng.Salt = (ulong)salt * 7919; GameLoop.GameRng.Draws.Clear();
-                    var b = new TR.FreeMapSim(TurnGen(floor, floor == AshBase.Depth, true), new TurnWallet(), FloorPlan.HasWanderer(floor), null, null, null);
+                    var b = new TR.FreeMapSim(TurnGen(floor, floor == AshBase.Depth, true), new TurnWallet(), false, null, null, null);
                     for (int k = 0; k < 60 && !b.InFight; k++) { var nb = b.Neighbors(b.Me); b.MoveTo(nb[H(salt, floor, k) % nb.Count]); }
                     if (!SameDraws(da, SnapDraws())) drawBad++;
                 }
-            Check(bad == 0 && drawBad == 0, $"嵐の時計 Turns: 航行の中身は storm-boss と同じ動き ({runs} 層 × 200 手・違い {bad}{(first != null ? " 最初 " + first : "")}・引く回数の違い {drawBad}/800)");
+            Check(bad == 0 && drawBad == 0, $"嵐の時計 Turns: 航行の中身は storm-boss と同じ動き (追跡者なし・{runs} 層 × 200 手・違い {bad}{(first != null ? " 最初 " + first : "")}・引く回数の違い {drawBad}/800)");
         }
 
         // ── 3. 溜まり方の表 (1 か所の関数) ──
@@ -251,7 +251,7 @@ static partial class T
             Check(ph && bad == 0, $"不安定化: 境目 0〜{P1 - 1} 静か / {P1} フェーズ 1 (全部を含む輪・地図の中心) / {P2} フェーズ 2 (60%) / {P3} フェーズ 3 (30%・中心はボスをずらした点) / {P4} フェーズ 4 (ボスの点のほか全部)・段の途中は線形・ボスの点はいつも外 ({layers} 層・違反 {bad}{(first != null ? " 最初 " + first : "")})");
         }
 
-        // ── 5. 崩れ始める前は歩いても溜まらない / 後は 1 歩・待つ・偵察で溜まる (雪の嵐の中へは +2・近道と〈補給線〉は 0) / 深さ 6 は崩れ始める境目から / 深さ 0・7 は溜まらない ──
+        // ── 5. 崩れ始める前は歩いても溜まらない / 後は 1 歩・待つで溜まる (測量は 0) (雪の嵐の中へは +2・近道と〈補給線〉は 0) / 深さ 6 は崩れ始める境目から / 深さ 0・7 は溜まらない ──
         {
             bool quiet = true, after = true, snow = true, free = true, d6 = true, d07 = true, ext = true; int layers = 0;
             foreach (int floor in new[] { 1, 3, 5 })
@@ -264,7 +264,7 @@ static partial class T
                     {
                         if (s.InFight) { if (s.Contact == FreeMapSim.ContactKind.Body) s.ResolveBodyWon(); else s.ResolveFamiliarFight(false); continue; }
                         int op = H(salt, floor, k) % 4;
-                        if (op == 0) s.Wait(); else if (op == 1) s.Recon(); else { var nb = s.Neighbors(s.Me); s.MoveTo(nb[H(salt, k, floor) % nb.Count]); }
+                        if (op == 0) s.Wait(); else if (op == 1) s.Survey(); else { var nb = s.Neighbors(s.Me); s.MoveTo(nb[H(salt, k, floor) % nb.Count]); }
                     }
                     quiet &= s.Instability == 0 && s.InstabilityParts.All(x => x == 0);
                     ext &= s.PassTurnsExternal(2) >= 0 && s.Instability == 0;                                // 休憩の「多めに回復」は 0
@@ -278,7 +278,8 @@ static partial class T
                     s.MoveTo(cand[0]); if (s.InFight) continue;
                     after &= s.Instability == p0 + wantStep; p0 += wantStep - 1;
                     s.Wait(); if (s.InFight) continue; after &= s.Instability == p0 + 2;
-                    s.Recon(); if (s.InFight) continue; after &= s.Instability == p0 + 3;
+                    s.Wait(); if (s.InFight) continue; after &= s.Instability == p0 + 3;
+                    { int ps = s.Instability; s.Survey(); after &= s.Instability == ps; }                    // 測量は 0 (2026-11-24)
                     s.GrantFreeMoves(1); int p1 = s.Instability;
                     s.MoveTo(s.Neighbors(s.Me).First(v => v != s.Layout.goal)); if (s.InFight) continue;
                     free &= s.Instability == p1;                                                               // 近道の 1 歩は 0
@@ -326,7 +327,7 @@ static partial class T
                 d07 &= !s.StormMode && !s.InstabilityMode && s.Instability == 0 && s.StormPhase == 0;
             }
             Check(quiet && after && snow && free && d6 && d07 && ext,
-                $"不安定化: 崩れ始める前は歩く・待つ・偵察で溜まらない ({layers} 層)・後は 1 歩・待つ・偵察で +1 (雪の嵐の中へは +2)・近道と〈補給線〉と休憩の手番は 0・イベントのターン+3 は +3・深さ 6 は {FreeMapParams.InstabilityDepth6Start} から・深さ 0/7 は溜まらない ({quiet}/{after}/{snow}/{free}/{ext}/{d6}/{d07})");
+                $"不安定化: 崩れ始める前は歩く・待つ・測量で溜まらない ({layers} 層)・後は 1 歩・待つで +1・測量は 0 (雪の嵐の中へは +2)・近道と〈補給線〉と休憩の手番は 0・イベントのターン+3 は +3・深さ 6 は {FreeMapParams.InstabilityDepth6Start} から・深さ 0/7 は溜まらない ({quiet}/{after}/{snow}/{free}/{ext}/{d6}/{d07})");
         }
 
         // ── 6. 遠ざける / 近づける・段の知らせ・フェーズ 3 でボスが見える ──

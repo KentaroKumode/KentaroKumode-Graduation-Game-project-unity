@@ -223,7 +223,7 @@ namespace ItemSystem.PassiveSkills
             Register(new LuckyCoin()); Register(new BlastPrize()); Register(new MacroReceipt()); Register(new MacroAbacus()); Register(new SampleBox());
         }
 
-        /// <summary>軸なし汎用の 36 品のうち効果クラスを持つ 13 品 (2026-11-21・GeneralEffects.cs)。 残りは戦闘の外で働く (探索・嵐・報酬・特殊戦術)。</summary>
+        /// <summary>軸なし汎用の 33 品のうち効果クラスを持つ 13 品 (2026-11-21・GeneralEffects.cs)。 残りは戦闘の外で働く (探索・嵐・報酬・特殊戦術)。</summary>
         private static void RegisterGeneral()
         {
             Register(new WeightingGauntlet()); Register(new BeltPouch()); Register(new BottomlessVial()); Register(new GapSpear());

@@ -530,7 +530,7 @@ namespace AutoTest
                 return -V_CAUGHT_BODY * V_SHAKE_CHASED * (hpPct < 0.65f ? 1.8f : 1f);
             }
             // 捕捉は縄張りの中でしか起きない (2026-11-13・縄張りの番人): 縄張りの外に居れば「近い」は撒く理由にならない
-            return sim.Stone().level >= 1 && !sim.OutsideFoeReach ? V_SHAKE_NEAR : 0f;
+            return sim.HopsFrom(sim.Me)[sim.FoeNode] <= MapSystem.FreeMove.FreeMapParams.FoeNearHops && !sim.OutsideFoeReach ? V_SHAKE_NEAR : 0f;
         }
 
         private static float ScorePush(int steps)
@@ -549,8 +549,8 @@ namespace AutoTest
             if (sim.Eta().Valid) return V_TURN_CHASED * steps;
             int d = sim.HopsFrom(sim.Me)[sim.FoeNode];
             int after = d == int.MaxValue ? int.MaxValue : UnityEngine.Mathf.Max(1, d - steps);
-            // 捕捉される距離まで来るなら、 捕まる見込みの半分 (捕捉されても逃げ切れることがある)
-            if (after <= sim.DetectHops) return 0.5f * V_CAUGHT_BODY;
+            // 見つかる距離 (隣) まで来るなら、 捕まる見込みの半分 (見つかっても逃げ切れることがある)
+            if (after <= MapSystem.FreeMove.FreeMapParams.DetectRange) return 0.5f * V_CAUGHT_BODY;
             return V_TURN_FOE_PATROL * steps;
         }
 

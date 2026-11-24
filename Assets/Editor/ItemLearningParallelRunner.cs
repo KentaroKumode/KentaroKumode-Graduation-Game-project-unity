@@ -124,16 +124,16 @@ namespace AutoTest.EditorTools
         [MenuItem("Tools/AutoRun/診断: 並列 Super 1000ラン + 1層の戦闘のターン記録", priority = 14)]
         private static void LaunchSuperDiag() => LaunchWith(8, AutoRunner.WiringSkill.Super, 1000);
 
-        /// <summary>診断: 航行で偵察・照明を使う学習ラウンド。 使わない既定との比較用 (2026-11-05 は使う方が悪化)。</summary>
-        [MenuItem("Tools/AutoRun/診断: 並列 学習ラウンド (偵察・照明あり)", priority = 14)]
+        /// <summary>診断: 航行で測量を使う学習ラウンド。 使わない既定との比較用 (2026-11-05 は使う方が悪化)。</summary>
+        [MenuItem("Tools/AutoRun/診断: 並列 学習ラウンド (測量あり)", priority = 14)]
         private static void LaunchWithScout() => LaunchWith(0, AutoRunner.WiringSkill.Optimal, RunsPerRound, scout: true);
 
         /// <summary>診断: 戦闘名の危険度の学習値で足切りする学習ラウンド (2026-11-05)。 学習値を先に積んでから使うこと。</summary>
         [MenuItem("Tools/AutoRun/診断: 並列 学習ラウンド (戦闘名の学習値を使う)", priority = 14)]
         private static void LaunchLearnedDanger() => LaunchWith(0, AutoRunner.WiringSkill.Optimal, RunsPerRound, scout: false, learnedDanger: true);
 
-        /// <summary>診断: 偵察・照明を使い、 戦闘名の学習値で足切りする学習ラウンド (2026-11-05)。 戦闘名は偵察・照明で見つけた点にしか出ないので、 学習値だけでは効かない。</summary>
-        [MenuItem("Tools/AutoRun/診断: 並列 学習ラウンド (偵察・照明あり + 戦闘名の学習値)", priority = 14)]
+        /// <summary>診断: 測量を使い、 戦闘名の学習値で足切りする学習ラウンド (2026-11-05)。 戦闘名は偵察・照明で見つけた点にしか出ないので、 学習値だけでは効かない。</summary>
+        [MenuItem("Tools/AutoRun/診断: 並列 学習ラウンド (測量あり + 戦闘名の学習値)", priority = 14)]
         private static void LaunchScoutAndLearned() => LaunchWith(0, AutoRunner.WiringSkill.Optimal, RunsPerRound, scout: true, learnedDanger: true);
 
         /// <summary>**ITT 本走・全種プール (並列・2026-11-05)。** 消耗品・武器・出目パーツまで 1 ランあたり期待 7 品を無作為に付与し、

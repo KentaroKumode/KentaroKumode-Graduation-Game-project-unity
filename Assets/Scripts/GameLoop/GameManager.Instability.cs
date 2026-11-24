@@ -15,7 +15,7 @@ namespace GameLoop
     /// 通常の戦闘 (使い魔・イベントの戦闘) に勝つ → <see cref="InstabilitySource.Battle"/>・
     /// イベントで持ち物が増える (ゴールド・消耗品・素材・物資・品・フラグ・Instability.CountsAsEventGain) → <see cref="InstabilitySource.EventGain"/> (秘宝を得た時は数えない)・
     /// 戦闘のエスカレーションの段が上がる → <see cref="InstabilitySource.Escalation"/> (ボス戦は除く)・
-    /// イベントの「ターン+N」→ <see cref="InstabilitySource.EventTurns"/>。 歩く・待つ・偵察・嵐を動かす は <see cref="FreeMapSim"/> の中で溜まる。</para>
+    /// イベントの「ターン+N」→ <see cref="InstabilitySource.EventTurns"/>。 歩く・待つ・嵐を動かす は <see cref="FreeMapSim"/> の中で溜まる。</para>
     ///
     /// <para>溜まらない: 店で買う・交換マス・強盗・偽の商人・逃げた戦闘・負けて救済された戦闘・ボス戦・端子の報酬・休憩・照明・〈補給線〉・近道の 1 歩。</para>
     /// </summary>

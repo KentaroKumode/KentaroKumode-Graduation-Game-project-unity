@@ -38,7 +38,7 @@ namespace GameLoop
         public static class Stats
         {
             // 2026-11-12: 書く所の無くなった combatLoss / composureGain / marchLoss / foodGain / rerollLoss を削除。
-            public static int travelLoss;     // 移動の消費（自由移動マップ・照明）
+            public static int travelLoss;     // 移動の消費（自由移動マップ・測量）
             public static int evilLoss;       // 悪選択コスト
             public static int supplyGain;     // 補給（戦闘の報酬・補給庫・前哨基地・ショップ）
 

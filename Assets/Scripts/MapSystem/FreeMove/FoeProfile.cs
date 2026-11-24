@@ -3,8 +3,8 @@ namespace MapSystem.FreeMove
     /// <summary>
     /// 追跡者の性質 (ターン制・2026-10-18)。 層ごとに 1 つ引く。 参照実装は docs/design/map-grid-prototype.html の <c>PROFILES</c>。
     ///
-    /// <para>追跡者は全員「巡回 → (痕跡に気づいて) 警戒 → (捕捉して) 追跡 → 見失う」を行い、
-    /// 性質は<b>味変</b>として使い魔の有無・足の速さ・捕まった時の戦闘の重さだけを変える。
+    /// <para>追跡者は全員「巡回 → (隣の点に来て見つけて) 追跡 → 見失う」を行い (2026-11-24・見つける歩数は性質によらず 1)、
+    /// 性質は<b>味変</b>として使い魔の有無・足の速さ・捕まった時の戦闘の重さだけを変える (地図の上の動きの違いは残す・作者の決定)。
     /// 新しい性質は特性の組み合わせで足す。</para>
     ///
     /// <para><b>プレイヤーには性質が明かされない</b>（見え方から推理する）。 BOT も読まない。</para>
@@ -24,8 +24,6 @@ namespace MapSystem.FreeMove
         public bool summons;
         /// <summary>猟犬: 最初から居る足の速い使い魔。 倒しても消えず本体の元へ戻る。</summary>
         public bool hound;
-        /// <summary>捕捉の歩数。 0 = 既定 (<see cref="FreeMapParams.DetectRange"/>)。</summary>
-        public int detectRange;
         /// <summary>捕まった時の戦闘が重い (表示・推理の手がかり用。 戦闘の中身は GameManager.PursuerFightOf が性質の id で決める)。</summary>
         public bool heavyFight;
 
@@ -35,10 +33,10 @@ namespace MapSystem.FreeMove
 
         // ── 性質 ──────────────────────────────────────────────
 
-        /// <summary>召喚者: 動かない代わりに遠くから気づく (2026-11-04)。 捕捉すると数手ごとに使い魔を放つ。</summary>
+        /// <summary>召喚者: 動かない。 見つけると数手ごとに使い魔を放つ (遠くから気づく 5 歩は 2026-11-24 に廃止・隣の点で見つける)。</summary>
         public static FoeProfile Summoner => new FoeProfile
-        { id = "summoner", displayName = "召喚者", description = "動かない代わりに遠くから気づき、数手ごとに使い魔を放つ",
-          foeSteps = 0, familiarSteps = 1, summons = true, detectRange = FreeMapParams.SummonerDetectRange };
+        { id = "summoner", displayName = "召喚者", description = "動かない。見つけると数手ごとに使い魔を放つ",
+          foeSteps = 0, familiarSteps = 1, summons = true };
 
         /// <summary>猟犬使い: 足の速い使い魔 (1 手に 2 歩) と 2 体で最短距離から追う。</summary>
         public static FoeProfile Houndmaster => new FoeProfile

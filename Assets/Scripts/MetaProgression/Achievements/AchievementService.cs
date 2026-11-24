@@ -441,8 +441,9 @@ namespace MetaProgression.Achievements
             if (depth == Depth(0)) return;
             if (sim != null && sim.StormMode && sim.StormPhase >= StormLastPhase) Unlock(Cat.StormBoss);
             if (state.provision <= 0) Unlock(Cat.ProvisionZeroBoss);
-            // 忍び足: 追跡者のいる層で、 ボスを倒した時に追跡者がまだいて、 一度も見つかっていない (追跡者を倒した = 捕まった = 見つかった)
-            if (sim != null && sim.HasFoe && MapSystem.FreeMove.FloorPlan.HasWanderer(depth) && !run.floorFound) Unlock(Cat.PursuerUnseen);
+            // 忍び足 (2026-11-24 仮・作者の承認待ち): 追跡者のいる層で縄張りの宝を取り、 ボスを倒すまで一度も見つかっていない (追跡者を倒した = 捕まった = 見つかった)。
+            //   縄張りを避ける道は必ずあり (§5-9)、 見つかるのは隣の点に来た時だけなので、 宝を取らずに抜けるだけでは緩すぎる
+            if (sim != null && sim.HasFoe && sim.TreasureTaken && MapSystem.FreeMove.FloorPlan.HasWanderer(depth) && !run.floorFound) Unlock(Cat.PursuerUnseen);
             if (depth >= Depth(2) && run.floorFights == 0) Unlock(Cat.BossOnlyFloor);
         }
 

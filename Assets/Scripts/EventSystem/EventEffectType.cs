@@ -46,18 +46,18 @@ namespace EventSystem
 
         /// <summary>地図を明かす+N: 今いる点から道で N 歩以内の点の種類を明かす (戦闘名は出さない)。</summary>
         RevealMap,
-        /// <summary>戦闘を見抜く+N: 道で N 歩以内の点を完全公開する (偵察と同じ・戦闘名まで)。</summary>
+        /// <summary>戦闘を見抜く+N: 道で N 歩以内の点を完全公開する (測量と同じ・戦闘名まで)。</summary>
         RevealEncounters,
         /// <summary>補給の場所が分かる: この層の店と休憩の点を完全公開する。</summary>
         RevealSupplies,
-        /// <summary>追跡者を撒く: 捕捉を外す (巡回へ戻り、 しばらく捕捉しない・使い魔は消える)。</summary>
+        /// <summary>追跡者を撒く: 捕捉を外す (巡回へ戻り、 しばらく見つけない・使い魔は消える)。</summary>
         ShakeOffPursuer,
         /// <summary>追跡者を遠ざける+N: 追跡者の本体を道で N 歩遠ざける。</summary>
         PushPursuer,
         /// <summary>追跡者を呼ぶ+N (代償): 追跡者の本体が道で N 歩近づく (隣で止まる)。</summary>
         PullPursuer,
         /// <summary>近道+N: この後の移動 N 回ぶん、 物資を使わずターンも進まない (どこへ動くかは遊ぶ人が選ぶ・自動では動かない)。
-        /// 待つ・偵察・〈補給線〉には効かない。 層を出たら残りは消える。 中身は <c>FreeMapSim.GrantFreeMoves</c>。</summary>
+        /// 待つ・〈補給線〉には効かない。 層を出たら残りは消える。 中身は <c>FreeMapSim.GrantFreeMoves</c>。</summary>
         Shortcut,
         /// <summary>前線を遠ざける+N / 前線を近づける+N: 天候の前線を N 段戻す / 進める。 amount は符号つき (近づける = 正)。</summary>
         ShiftFront,

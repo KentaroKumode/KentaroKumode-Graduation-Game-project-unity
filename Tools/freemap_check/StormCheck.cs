@@ -110,6 +110,7 @@ static partial class T
         if (a.instability != 0 || (a.instabilityParts != null && a.instabilityParts.Any(x => x != 0))) return "instability";
         foreach (var fb in b.GetType().GetFields())
         {
+            if (fb.Name == "trace" || fb.Name == "flareTurnsLeft") continue;   // 2026-11-24 に消した欄 (痕跡・照明の残り)
             var fa = a.GetType().GetField(fb.Name);
             if (fa == null) return "missing " + fb.Name;
             object va = fa.GetValue(a), vb = fb.GetValue(b);
@@ -124,6 +125,19 @@ static partial class T
         return null;
     }
 
+    /// <summary>from から見た to の方角 0..7 (東から反時計回り・上 = 北 = y が小さい側・45° ずつ)。 2026-11-24 まで FreeMapSim.Bearing (魔石の方角) だったものを検算の側へ移した。</summary>
+    static int Bearing(FreeMapLayout L, int from, int to)
+    {
+        double dx = L.pos[to].x - L.pos[from].x, dy = L.pos[from].y - L.pos[to].y;
+        if (dx == 0 && dy == 0) return 0;
+        double ax = Math.Abs(dx), ay = Math.Abs(dy); const double T = 0.41421356237;
+        int sector = ay <= T * ax ? 0 : ax <= T * ay ? 2 : 1;
+        if (dx >= 0 && dy >= 0) return sector;
+        if (dx < 0 && dy >= 0) return sector == 0 ? 4 : sector == 1 ? 3 : 2;
+        if (dx < 0 && dy < 0) return sector == 0 ? 4 : sector == 1 ? 5 : 6;
+        return sector == 0 ? 0 : sector == 1 ? 7 : 6;
+    }
+
     static int H(int a, int b, int c) { unchecked { uint h = (uint)(a * 73856093) ^ (uint)(b * 19349663) ^ (uint)(c * 83492791); h ^= h >> 13; h *= 0x5bd1e995; h ^= h >> 15; return (int)(h & 0x7fffffff); } }
 
     /// <summary>同じ操作列を今の中身 (口を閉じた形) と main の中身に流し、 1 手ごとに起きたこと・写し・財布を比べる。 違った手の数を返す。</summary>
@@ -135,7 +149,7 @@ static partial class T
         bool fp = floor == AshBase.Depth;
         var La = FreeMapGenerator.Generate(floor, fp, false);
         var Lb = MainGen(floor, fp);
-        bool foe = FloorPlan.HasWanderer(floor);
+        bool foe = false /* 追跡者なしで比べる (2026-11-24 に見つかる規則を変えたので、 追跡者の動きは比べる版と違って当然) */;
         var wa = new Wallet { Provision = 8, Hp = 60 }; var wb = new MainWallet { Provision = 8, Hp = 60 };
         var a = new FreeMapSim(La, wa, foe, null, null, null);
         var b = new M.FreeMapSim(Lb, wb, foe, null, null, null);
@@ -159,8 +173,7 @@ static partial class T
                 else { int j = na[(h / 100) % na.Count]; ea = (int)a.MoveTo(j); eb = (int)b.MoveTo(j); a.MarkDone(j); b.MarkDone(j); }
             }
             else if (op < 65) { ea = (int)a.Wait(); eb = (int)b.Wait(); }
-            else if (op < 70) { ea = (int)a.Recon(); eb = (int)b.Recon(); }
-            else if (op < 73) { ea = (int)a.UseFlare(); eb = (int)b.UseFlare(); }
+            else if (op < 73) { ea = (int)a.Wait(); eb = (int)b.Wait(); }   // 旧い偵察・照明の手 (2026-11-24 に測量へ・旧い版に無いので待つで比べる)
             else if (op < 76) { ea = (int)a.PlaceLure(); eb = (int)b.PlaceLure(); }
             else if (op < 80) { int n = ((h / 100) % 5) - 2; ea = (int)a.ShiftFront(n); eb = (int)b.ShiftFront(n); }
             else if (op < 83) { a.GrantFreeMoves(1); b.GrantFreeMoves(1); ea = eb = 0; }
@@ -259,15 +272,15 @@ static partial class T
                 foreach (int floor in StormDepths)
                 {
                     GameLoop.GameRng.Salt = (ulong)salt * 7919; GameLoop.GameRng.Draws.Clear();
-                    var a = new FreeMapSim(FreeMapGenerator.Generate(floor, floor == AshBase.Depth, false), new Wallet(), FloorPlan.HasWanderer(floor), null, null, null);
+                    var a = new FreeMapSim(FreeMapGenerator.Generate(floor, floor == AshBase.Depth, false), new Wallet(), false /* 追跡者なしで比べる (2026-11-24 に見つかる規則を変えたので、 追跡者の動きは比べる版と違って当然) */, null, null, null);
                     for (int k = 0; k < 60 && !a.InFight; k++) { var nb = a.Neighbors(a.Me); a.MoveTo(nb[H(salt, floor, k) % nb.Count]); }
                     var da = SnapDraws();
                     GameLoop.GameRng.Draws.Clear();
-                    var b = new M.FreeMapSim(MainGen(floor, floor == AshBase.Depth), new MainWallet(), FloorPlan.HasWanderer(floor), null, null, null);
+                    var b = new M.FreeMapSim(MainGen(floor, floor == AshBase.Depth), new MainWallet(), false, null, null, null);
                     for (int k = 0; k < 60 && !b.InFight; k++) { var nb = b.Neighbors(b.Me); b.MoveTo(nb[H(salt, floor, k) % nb.Count]); }
                     if (!SameDraws(da, SnapDraws())) drawBad++;
                 }
-            Check(bad == 0 && drawBad == 0, $"嵐の口 False: 航行の中身は main と同じ動き (深さ 6 はイベントなしの測定の形・{runs} 層 × 160 手・違い {bad}{(first != null ? " 最初 " + first : "")}・引く回数の違い {drawBad}/800)");
+            Check(bad == 0 && drawBad == 0, $"嵐の口 False: 航行の中身は main と同じ動き (追跡者なし・深さ 6 はイベントなしの測定の形・{runs} 層 × 160 手・違い {bad}{(first != null ? " 最初 " + first : "")}・引く回数の違い {drawBad}/800)");
         }
 
         // ── 3. 口を開けた形: 始点 (外周)・ボス (内側)・距離・方角・保証 ──
@@ -332,8 +345,8 @@ static partial class T
                         else if (!TerritoryBypass.HasBypass(L, s.Territory.ToList()) || s.InTerritory(L.start) || s.InTerritory(L.goal)) bypassBad++;
                     }
                     hopsStorm[floor].Add(hg); hopsOld[floor].Add(Lo.Hops(Lo.goal)[Lo.start]);
-                    bearStorm[s.Bearing(L.start, L.goal)]++;
-                    var so = new FreeMapSim(Lo, new Wallet(), false, null, WeatherKind.None, null); bearOld[so.Bearing(Lo.start, Lo.goal)]++;
+                    bearStorm[Bearing(L, L.start, L.goal)]++;
+                    bearOld[Bearing(Lo, Lo.start, Lo.goal)]++;
                     if (salt <= 50) { startsDistinct.Add(floor * 1000 + L.start); goalsDistinct.Add(floor * 1000 + L.goal); }
                 }
             Check(startBad == 0 && bossBad == 0 && shapeBad == 0, $"嵐: 始点は最外周 (凸包の頂点)・道 2 本以上 / ボスは外周 2 層の外・縄張りの外・道 2 本以上・始点から下限以上 / 点・道・縄張りは変わらず種別は入れ替えと安全な帯のエリートだけ ({layers} 層・違反 {startBad}/{bossBad}/{shapeBad})");
@@ -528,7 +541,7 @@ static partial class T
                 }
                 ok &= s.Known[s.Layout.goal] && !s.FogHidden(s.Layout.goal);
             }
-            // 照明・隣で見える
+            // 測量・隣で見える
             int lit = 0, adj = 0;
             for (int salt = 1; salt <= 200; salt++)
             {
@@ -538,12 +551,12 @@ static partial class T
                     if (s.InFight) { if (s.Contact == FreeMapSim.ContactKind.Body) s.ResolveBodyWon(); else s.ResolveFamiliarFight(false); continue; }
                     if (s.Known[s.Layout.goal]) break;
                     int h = s.HopsFrom(s.Me)[s.Layout.goal];
-                    if (h <= FreeMapParams.FlareRange && (salt & 1) == 0) { s.UseFlare(); if (s.Known[s.Layout.goal]) lit++; break; }
+                    if (h <= FreeMapParams.SurveyRange && (salt & 1) == 0) { s.Survey(); if (s.Known[s.Layout.goal]) lit++; break; }
                     s.MoveTo(s.StepToward(s.Me, s.Layout.goal));
                     if (s.Known[s.Layout.goal]) { if (s.HopsFrom(s.Me)[s.Layout.goal] == 1) adj++; break; }
                 }
             }
-            Check(ok && lit > 0 && adj > 0, $"嵐: ボスの点は最初は伏せられ (照明で {lit}・隣で {adj} 層が見えた・フェーズ 3 で必ず見える)・霧は嵐の中の 2 歩以上離れた点だけを「?」に (隠れた点 {hidden})・ボスの点は隠れない");
+            Check(ok && lit > 0 && adj > 0, $"嵐: ボスの点は最初は伏せられ (測量で {lit}・隣で {adj} 層が見えた・フェーズ 3 で必ず見える)・霧は嵐の中の 2 歩以上離れた点だけを「?」に (隠れた点 {hidden})・ボスの点は隠れない");
         }
 
         // ── 9. 点も道も 1 つも消えない・終点へ必ず着ける・中断セーブの往復 ──

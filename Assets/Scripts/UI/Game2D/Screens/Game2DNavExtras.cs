@@ -10,7 +10,7 @@ namespace UI.Game2D
     /// <summary>
     /// 航行の計器 (2026-11-24 に作り直し・neon の配置 §A-1)。 液晶の安全域 (<see cref="LcdSafeArea"/>) の内側に、 戦闘・イベントの画面と同じ平たい暗い板と日本語の字で並べる。
     /// <list type="bullet">
-    /// <item>上の帯: 天気と嵐の時計 / 経過ターン・近道の残り・2 行目 (説明・捕捉中の警告・時限効果) / 所持金 (増減で点滅し、 増えた時は金の粒が上がって硬貨の音)</item>
+    /// <item>上の帯: 天気と嵐の時計 / 経過ターン・近道の残り・2 行目 (説明・見つかっている時の警告・時限効果) / 所持金 (増減で点滅し、 増えた時は金の粒が上がって硬貨の音)</item>
     /// <item>右の列: [測量] [囮罠] [待つ] と、 航行アイテムの 3 枠 (V / B / N・〈前哨の旗〉を立てる)</item>
     /// <item>下の帯: HP (戦闘の画面の左下と同じ位置・同じ棒 = 戦闘に入っても HP だけが同じ所に残る) と物資 (行き先の見込みの分が点滅)</item>
     /// <item>左の列: 所持品 (2 列 × 5 段・押すと持ち物の画面)</item>
@@ -160,7 +160,7 @@ namespace UI.Game2D
             float pre = sim != null && _view != null ? _view.SupplyPreview : 0f;
             bool jump = Time.unscaledTime < _jumpUntil;
             bool chase = sim != null && sim.FoeAlive && sim.FoeMode == FoeMode.Chase;
-            int blink = chase ? Mathf.FloorToInt(Time.unscaledTime * 2.5f) & 1 : 0;      // 捕捉中の警告は 2.5 回/秒で明滅
+            int blink = chase ? Mathf.FloorToInt(Time.unscaledTime * 2.5f) & 1 : 0;      // 見つかっている時の警告は 2.5 回/秒で明滅
             int preBlink = pre > 0f ? 1 + (Mathf.FloorToInt(Time.unscaledTime / 0.18f) & 1) : 0;      // 物資の見込みの点滅 (180ms ごと)
             int h = floor * 7 + passives * 31 + cons * 131 + (run != null ? run.playerHP * 389 + run.playerMaxHP * 13 + run.provision * 977 + run.provisionCap * 53 + run.coins * 7333 : 0)
                     + weather * 17 + (foe + 2) * 1009 + (sim != null ? sim.Version * 7919 : 0) + blink * 104729 + (_hoverSlot + 2) * 15485863 + (_hoverBtn + 2) * 179424673
@@ -173,9 +173,9 @@ namespace UI.Game2D
             RedrawBottom(sim, run, pre, preBlink == 1);
         }
 
-        // ── 上の帯: 天気・経過ターン・捕捉中の警告 (issue #69 / #72)・所持金 ──
+        // ── 上の帯: 天気・経過ターン・見つかっている時の警告 (issue #69 / #72)・所持金 ──
         //   状態の 1 行目 = 経過ターン (「ターン」とは書かない) と近道の残り (イベント「近道+N」・ただで動ける回数)。
-        //   2 行目 = 優先順に 「ボタン・枠の説明 (乗せている時)」→「捕捉中の ETA」→「時限効果」。
+        //   2 行目 = 優先順に 「ボタン・枠の説明 (乗せている時)」→「見つかっている時の ETA」→「時限効果」。
         //   まとめて進んだ分 (イベント・多めに休む) はターン数の横の「+N」(gui-needed.md #21)。
 
         private void RedrawTop(GameManager gm, FreeMapSim sim, RunState run, int weather, bool blinkOn)
@@ -206,24 +206,16 @@ namespace UI.Game2D
                 string tn = Mathf.Min(9999, sim.Turn).ToString(); int tx = x0 + 5 + Game2DJpFont.Width("ターン") + 4;
                 p.Text(tn, tx, 2, Game2DKit.Ink);
                 if (Time.unscaledTime < _jumpUntil) p.Text("+" + _jumpN, tx + Game2DJpFont.Width(tn) + 4, 2, Game2DKit.Amber);      // まとめて進んだ分
-                string flare = sim.FlareOn ? "測量 残り" + sim.FlareTurnsLeft : null;
-                string cut = sim.FreeMovesLeft > 0 ? "近道 " + sim.FreeMovesLeft + "回" : null;      // 時限バフ「近道」の残り (時限バフの「(N回)」と同じ数え方)
-                string right = flare != null && cut != null ? cut + " " + flare : flare ?? cut;
-                if (right != null) p.TextR(right, x0 + StatusW - 5, 2, Game2DKit.Amber);
+                if (sim.FreeMovesLeft > 0) p.TextR("近道 " + sim.FreeMovesLeft + "回", x0 + StatusW - 5, 2, Game2DKit.Amber);      // 時限バフ「近道」の残り (時限バフの「(N回)」と同じ数え方)
                 string line = null; var col = Game2DKit.Dim;
                 if (_hoverBtn >= 0) { line = BtnHint(sim, run, _hoverBtn); col = Game2DKit.Ink; }
                 else if (_hoverSlot >= 0) { line = SlotHint(gm, sim, run, _hoverSlot); col = Game2DKit.Ink; }
                 else if (sim.FoeAlive && sim.FoeMode == FoeMode.Chase)
                 {
-                    // 捕捉中: こちらが動かなかった場合に最短で何ターンで捕まるか (§5-9・FreeMapSim.Eta)。 誰が来るかは出さない (性質は明かさない)
+                    // 見つかっている: こちらが動かなかった場合に最短で何ターンで捕まるか (§5-9・FreeMapSim.Eta)。 誰が来るかは出さない (性質は明かさない)
                     var eta = sim.Eta();
-                    line = eta.Valid ? "捕捉中 あと" + eta.turns + "ターンで捕まる" : "捕捉中";
+                    line = eta.Valid ? "見つかった あと" + eta.turns + "ターンで捕まる" : "見つかった";
                     col = blinkOn ? Game2DKit.Red : Game2DKit.Off;
-                }
-                else if (NavItems.FineBearing(run))
-                {
-                    var st = sim.Stone();      // 〈羅盤の針〉: 魔石の方角を 8 方位の字で
-                    if (st.level > 0 && st.bearing >= 0) { line = "魔石 " + StoneReading.BearingNames[st.bearing]; col = st.level >= 2 ? Game2DKit.Amber : Game2DKit.Dim; }
                 }
                 if (string.IsNullOrEmpty(line))
                 {
@@ -294,7 +286,7 @@ namespace UI.Game2D
             if (run == null || !CanAct(gm, sim)) return false;
             switch (i)
             {
-                case 0: return !sim.FlareOn && run.provision >= FreeMapParams.FlareSupply;
+                case 0: return run.provision >= FreeMapParams.SurveySupply;
                 case 1: return CountLures(run) > 0;
                 default: return true;
             }
@@ -304,7 +296,7 @@ namespace UI.Game2D
         {
             switch (i)
             {
-                case 0: return "測量 物資" + FreeMapParams.FlareSupply + "・" + FreeMapParams.FlareTurns + "ターンのあいだ" + FreeMapParams.FlareRange + "歩先まで見る (F)";
+                case 0: return "測量 物資" + FreeMapParams.SurveySupply + "で" + FreeMapParams.SurveyRange + "歩先までを地図に書き込む (F)";
                 case 1: return "囮罠 今いる点に置く 残り" + CountLures(run) + "個 (L)";
                 default: return "待つ その場で1ターン (Space)";
             }
@@ -316,7 +308,7 @@ namespace UI.Game2D
             if (!BtnEnabled(gm, sim, run, i)) { Game2DSfx.Error(); return; }
             switch (i)
             {
-                case 0: gm.UseFlare(); break;
+                case 0: gm.Survey(); break;
                 case 1: Consumables.Use(run, ItemIds.Lure); break;      // 音は置けた時だけ (GameManager.NavFx.Lure・#323)
                 default: gm.WaitTurn(); break;                         // 音は WaitTurn の合図 (GameManager.NavFx.Wait・キーの Space と同じ・#321)
             }
@@ -324,7 +316,7 @@ namespace UI.Game2D
         }
 
         // ── 航行アイテムの 3 枠 (issue #10・gui-needed.md #20) ──
-        //   枠に入るのは「使う」か「回数のある」航行アイテムだけ: 〈前哨の旗〉(押すと立てる)・〈煙玉〉(捕捉された時に自動で弾ける・押しても何もしない)。
+        //   枠に入るのは「使う」か「回数のある」航行アイテムだけ: 〈前哨の旗〉(押すと立てる)・〈煙玉〉(見つかる時に自動で弾ける・押しても何もしない)。
         //   ほかの品は持っているだけで効くので、 持ち物の画面 (秘宝) で読む。 絵は無いので、 名前の最後の 1 字で出す。
 
         private int _hoverSlot = -1;
@@ -356,7 +348,7 @@ namespace UI.Game2D
             if (i >= items.Count) return "空き (" + SlotKeyNames[i] + ")";
             string id = items[i]; bool ready = SlotReady(gm, sim, id);
             if (id == ItemIds.NavOutpostFlag) return ready ? id + " 押すとここに立てる" : id + " この層は立て済み";
-            if (id == ItemIds.NavSmokeBall) return ready ? id + " 見つかった時に自動" : id + " この層は使用済み";
+            if (id == ItemIds.NavSmokeBall) return ready ? id + " 見つかる時に自動" : id + " この層は使用済み";
             return id;
         }
 

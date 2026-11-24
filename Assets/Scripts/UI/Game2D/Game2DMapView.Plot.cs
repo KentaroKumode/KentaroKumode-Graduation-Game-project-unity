@@ -8,7 +8,7 @@ namespace UI.Game2D
     /// 地図の作図 (map-prototype.html の <c>PLOT</c> と <c>drawLCD</c> の中身)。
     /// 地: 暗い色に、 中央ほど明るい点 (ディザ)。 陸 (山) は網点の面 + 明るい輪郭。 航路は影つきの細線。 点は 9×9 の絵。
     /// 自分は中心 1 dot ＋ 十字の腕。 追跡者・使い魔は赤、 囮罠は + の印。 液晶の端に読み出し (EXIT / SCALE / OWN / T+) と天候の名前。
-    /// 色は層ごとの地の色 (<see cref="Pals"/>) と共通のインクだけで、 半透明は照明・魔石の範囲の淡い塗りだけ。
+    /// 色は層ごとの地の色 (<see cref="Pals"/>) と共通のインクだけで、 半透明は淡い塗り (ボスの点の赤い霞) だけ。
     /// </summary>
     public partial class Game2DMapView
     {
@@ -66,7 +66,7 @@ namespace UI.Game2D
         {
             var lay = sim.Layout; var t = lay.types[i];
             bool isStart = i == lay.start, isGoal = i == lay.goal;
-            // 嵐の層 (2026-11-13) の終点は、 照明・隣・嵐のフェーズ 3 で種別が分かるまで、 ほかの未確認の点と同じ「?」で描く
+            // 嵐の層 (2026-11-13) の終点は、 測量・隣・嵐のフェーズ 3 で種別が分かるまで、 ほかの未確認の点と同じ「?」で描く
             bool known = sim.Known[i] || isStart || (isGoal && !lay.storm);
             col = NodeInk;
             if (!known) return IcoUnknown;                                   // 種別が分からない点 = 疑問符 (色は到達済みと同じ)
@@ -167,21 +167,6 @@ namespace UI.Game2D
 
             bool blink = Mathf.FloorToInt(_now / 0.4f) % 2 == 0;
 
-            // 範囲: 照明の広がり (淡い塗り + 破線の輪)
-            if (sim.FlareOn)
-            {
-                float fr = FreeMapParams.FlareRange * _hopUnit * _ls;
-                Disc(_me.x, _me.y, fr, _lc.hi, 0.10f);
-                Ellipse(_me, fr, fr, 0, _lc.mid, new[] { 2, 1 });
-            }
-
-            // 気配 = 察知距離の円の波 (外へだけ振れるギザギザの 1 本線)。 段 = 察知距離 (2 / 3 / 4 以上)
-            {
-                int hops = sim.DetectHops;
-                int L = Mathf.Clamp(hops - 2, 0, 2);
-                DetectNoise(hops * _hopUnit * _ls, L, L >= 2 ? _lc.red : L >= 1 ? _lc.warn : _lc.mid);
-            }
-
             // 行き先の見込み (カーソルを乗せた点)
             if (_hover >= 0 && _hover != sim.Me && _hover < lay.Count && !sim.IsSunk(_hover))
             {
@@ -242,7 +227,7 @@ namespace UI.Game2D
             {
                 var q = Sp(lay.pos[sim.FoeNode]);
                 Glyph(IcoFoe, q.x, q.y, _lc.red);
-                string st = sim.FoeFreezeTurns > 0 ? "停止" : sim.FoeMode == FoeMode.Chase ? "追跡" : sim.FoeMode == FoeMode.Alert ? "警戒" : "巡回";
+                string st = sim.FoeFreezeTurns > 0 ? "停止" : sim.FoeMode == FoeMode.Chase ? "追跡" : "巡回";
                 Text(st, q.x, q.y - 6 * Pxs, _lc.red);
             }
             // 使い魔
@@ -252,7 +237,7 @@ namespace UI.Game2D
                 Rect(Mathf.FloorToInt(q.x) - (Pxs - 1), Mathf.FloorToInt(q.y) - (Pxs - 1), 2 * Pxs - 1, 2 * Pxs - 1, _lc.red);
             }
 
-            // 戦闘名 (2026-11-05): 種別が見えていて (視界・照明・偵察で発見済み) 戦闘名も開示済みの点は、
+            // 戦闘名 (2026-11-05): 種別が見えていて (視界・測量で発見済み) 戦闘名も開示済みの点は、
             //   カーソルを乗せると戦闘名を出す。 敵の名前は出さない ── 何が待っているかの「当たり」だけを渡す。
             //   名前は 2 体戦のプリセット → 単体戦・ボスの対応表 (EncounterPresets.SoloTitles) の順。 どちらにも無ければ出さない
             //   (FloorManager.EncounterTitle は敵の表示名へ落ちるが、 ここでは敵の名前を出さないので使わない)。
@@ -285,7 +270,7 @@ namespace UI.Game2D
             return GameLoop.EncounterPresets.SoloTitle(node.encounterEnemyA);
         }
 
-        /// <summary>自分: 青い十字 (中心 1 dot ＋ 腕)。 ノード (生成り) と見分けがつくよう青にし、 天候・照明・偵察の演出よりも<b>手前</b> (一番上) に描く。</summary>
+        /// <summary>自分: 青い十字 (中心 1 dot ＋ 腕)。 ノード (生成り) と見分けがつくよう青にし、 天候・測量の演出よりも<b>手前</b> (一番上) に描く。</summary>
         private static readonly Color32 SelfBlue = new Color32(84, 170, 255, 255), SelfBlueHi = new Color32(150, 208, 255, 255);
 
         private void DrawSelf()
@@ -300,23 +285,7 @@ namespace UI.Game2D
             Rect(cxp, cyp - 4 * u, 1, 2 * u, SelfBlue); Rect(cxp, cyp + 2 * u + 1, 1, 2 * u, SelfBlue);
         }
 
-        /// <summary>察知距離の円: 円周を 3 dot おきに区切り、 各点の高さを乱数で決めて直線でつなぐ。 その場で震える (段ごとに 4 / 10 / 20 回/秒)。</summary>
-        private void DetectNoise(float R, int level, Color32 col)
-        {
-            int[] fps = { 4, 10, 20 }; float[] amps = { 1.5f, 4f, 8f };
-            int frame = Mathf.FloorToInt(_now * fps[level]);
-            float amp = amps[level]; int n = Mathf.Max(48, Mathf.RoundToInt(Mathf.PI * 2 * R / 3));
-            bool has = false; Vector2 prev = default;
-            for (int i = 0; i <= n; i++)
-            {
-                float a = (float)i / n * Mathf.PI * 2, s = Rnd01(i % n, frame);
-                float h = amp * (s > 0.92f ? 1.6f + s : s * s);
-                var q = new Vector2(_me.x + Mathf.Cos(a) * (R + h), _me.y + Mathf.Sin(a) * (R + h));
-                if (has) Line(prev, q, col);
-                prev = q; has = true;
-            }
-        }
-
+        /// <summary>(i, frame) で決まる 0..1 の値 (嵐の輪のうごめき・Game2DMapView.Storm が使う)。</summary>
         private static float Rnd01(int i, int frame)
         {
             unchecked

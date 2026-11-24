@@ -63,9 +63,9 @@ namespace UI.Game2D
             d.body = "物資を安く買える拠点。 1 つ " + ProvisionSystem.DepotPrice + "G (数の限りは無い)。\n所持金 " + (run != null ? run.coins : 0) + "G";
             if (run != null)
             {
-                int flareCost = Mathf.Max(1, MapSystem.FreeMove.FreeMapParams.FlareSupply);
-                d.Items.Add(new ModalItem { name = "物資", value = run.provision + "/" + run.provisionCap, desc = "移動・照明・戦闘の消耗で減る。 層の始めの前哨基地と、 ショップの「物資の包」で増える。" });
-                d.Items.Add(new ModalItem { name = "照明", value = "あと " + run.provision / flareCost + " 回", desc = "照明は物資で払う (1 回 物資 " + flareCost + ")。 残りの回数は今の物資から数えた値。" });
+                int surveyCost = Mathf.Max(1, MapSystem.FreeMove.FreeMapParams.SurveySupply);
+                d.Items.Add(new ModalItem { name = "物資", value = run.provision + "/" + run.provisionCap, desc = "移動・測量・戦闘の消耗で減る。 層の始めの前哨基地と、 ショップの「物資の包」で増える。" });
+                d.Items.Add(new ModalItem { name = "測量", value = "あと " + run.provision / surveyCost + " 回", desc = "測量は物資で払う (1 回 物資 " + surveyCost + ")。 残りの回数は今の物資から数えた値。" });
                 d.Items.Add(new ModalItem { name = ItemSystem.ItemDatabase.DisplayNameOf(ItemIds.Lure), value = CountLures(run) + " 個", desc = "航行で置くと、 追跡者を罠の方へ引きつける。 ショップで買える。" });
                 d.Items.Add(new ModalItem { name = "HP", value = run.playerHP + "/" + run.playerMaxHP, desc = "休憩・前哨基地・消耗品で回復する。" });
             }

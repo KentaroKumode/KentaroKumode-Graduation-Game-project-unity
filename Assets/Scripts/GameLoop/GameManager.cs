@@ -534,14 +534,13 @@ namespace GameLoop
                     Debug.LogWarning($"[GameManager] G無視: フェーズが Title でない (現在={CurrentPhase})。/clear や autoStartRun=true で既に走っている可能性あり");
             }
 
-            // マップナビゲーション: 数字キーで移動先選択 (航行マップは Space 待つ (W/A/S/D は視点の移動なので使わない) / R 偵察 / F 照明 / L 囮罠)
+            // マップナビゲーション: 数字キーで移動先選択 (航行マップは Space 待つ (W/A/S/D は視点の移動なので使わない) / F 測量 / L 囮罠)
             if (CurrentPhase == GamePhase.MapNavigation)
             {
                 if (FreeMap != null)
                 {
                     if (Input.GetKeyDown(KeyCode.Space)) { WaitTurn(); return; }
-                    if (Input.GetKeyDown(KeyCode.R)) { ReconTurn(); return; }
-                    if (Input.GetKeyDown(KeyCode.F)) { UseFlare(); return; }
+                    if (Input.GetKeyDown(KeyCode.F)) { Survey(); return; }
                     if (Input.GetKeyDown(KeyCode.L)) { Consumables.Use(Run, ItemIds.Lure); return; }
                 }
                 var moves = MapManager.Instance?.GetAvailableMoves();

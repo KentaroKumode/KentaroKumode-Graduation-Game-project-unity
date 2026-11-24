@@ -10,9 +10,9 @@ namespace GameLoop
     /// (<see cref="MapManager.Sim"/>) で、 ここはゲームの規則 (到着した点の起動・追跡者との戦闘・
     /// 逃げる・囮罠・休憩) へ橋渡しする。
     ///
-    /// <para><b>時間を進める口は「1 歩動く」「待つ」「偵察」「休憩で多めに回復」だけ。</b> どれも
+    /// <para><b>時間を進める口は「1 歩動く」「待つ」「休憩で多めに回復」だけ。</b> どれも
     /// <see cref="FreeMapSim"/> の操作 1 回が 1 ターンぶん (雪の前線の内側は 2 ターン) で、
-    /// 戦闘・イベント・照明・囮罠はターンを使わない。 イベントの「近道+N」の残りがある間の 1 歩は 0 ターン (<see cref="FreeMapSim.FreeMovesLeft"/>)。
+    /// 戦闘・イベント・測量・囮罠はターンを使わない。 イベントの「近道+N」の残りがある間の 1 歩は 0 ターン (<see cref="FreeMapSim.FreeMovesLeft"/>)。
     /// 人も BOT も同じ口を同期的に叩く。</para>
     /// </summary>
     public partial class GameManager
@@ -26,10 +26,9 @@ namespace GameLoop
         /// <summary>操作ごとに起きたこと (None は流さない)。 表示・効果音・計器が購読する。</summary>
         public event System.Action<FreeMapEvent> OnFreeMapEvent;
 
-        /// <summary>航行の画面演出の合図 (偵察・照明)。 ターンを進めない照明や、 イベントを返さない偵察でも鳴る。 Game2DMapFx が購読する。</summary>
-        /// <summary>航行の操作の合図 (音を鳴らす係が拾う)。 ボタンでもキーでも同じ関数 (<see cref="ReconTurn"/>・<see cref="UseFlare"/>・<see cref="TryPlaceLure"/>・<see cref="WaitTurn"/>) が、
-        /// できた時だけ出す (#321・#323・2026-11-15 に Lure と Wait を足した)。</summary>
-        public enum NavFx { Recon, Flare, Lure, Wait }
+        /// <summary>航行の操作の合図 (画面の演出と音を鳴らす係が拾う)。 ボタンでもキーでも同じ関数 (<see cref="Survey"/>・<see cref="TryPlaceLure"/>・<see cref="WaitTurn"/>) が、
+        /// できた時だけ出す (#321・#323・2026-11-15 に Lure と Wait を足した・2026-11-24 に偵察と照明を測量 1 つへ)。</summary>
+        public enum NavFx { Survey, Lure, Wait }
         public event System.Action<NavFx> OnNavFx;
 
         /// <summary>航行で HP を払った (物資切れの歩行・嵐・雹・#318)。 引数 = 減った HP と理由 (<see cref="FreeMapSim.HpPayReason"/>)。 払いは MapManager の財布 (FreeMapSim の IFreeMapWallet) が行う。</summary>
@@ -97,25 +96,15 @@ namespace GameLoop
             return true;
         }
 
-        /// <summary>偵察 (1 ターン): 道で 2 歩先まで見える。</summary>
-        public bool ReconTurn()
+        /// <summary>測量 (2026-11-24・旧い偵察と照明を 1 つに): 物資 <see cref="FreeMapParams.SurveySupply"/>・ターンを使わない・
+        /// 今いる点から道で <see cref="FreeMapParams.SurveyRange"/> 歩先までの点の種別と戦闘名を地図に書き込む (その層の間ずっと消えない)。</summary>
+        public bool Survey()
         {
             var sim = FreeMapForAction();
             if (sim == null) return false;
-            Log("偵察（1ターン）");
-            RunFreeMapOp(s => s.Recon());
-            OnNavFx?.Invoke(NavFx.Recon);
-            return true;
-        }
-
-        /// <summary>照明 (ターンは使わない): 物資 −50 で 3 ターンのあいだ道で 3 歩先まで見える。</summary>
-        public bool UseFlare()
-        {
-            var sim = FreeMapForAction();
-            if (sim == null || sim.FlareOn) return false;
-            Log($"照明（物資 −{FreeMapParams.FlareSupply}・ターンは使わない・{FreeMapParams.FlareTurns}ターンのあいだ見える）");
-            RunFreeMapOp(s => s.UseFlare());
-            OnNavFx?.Invoke(NavFx.Flare);
+            Log($"測量（物資 −{FreeMapParams.SurveySupply}・ターンは使わない・{FreeMapParams.SurveyRange}歩先まで書き込む）");
+            RunFreeMapOp(s => s.Survey());
+            OnNavFx?.Invoke(NavFx.Survey);
             return true;
         }
 
@@ -173,7 +162,7 @@ namespace GameLoop
             sim.SetPerks(NavItems.PerksFor(Run));      // 層の途中で航行アイテムを得た・封じられた時も、 次の操作から効く
             var parts0 = sim.InstabilityMode ? (int[])sim.InstabilityParts.Clone() : null;
             var ev = op(sim);
-            if (parts0 != null) NoteSimInstability(sim, parts0);   // 不安定化: 歩く・待つ・偵察・イベントのターン・嵐を動かす で溜まった分をログと記録へ
+            if (parts0 != null) NoteSimInstability(sim, parts0);   // 不安定化: 歩く・待つ・イベントのターン・嵐を動かす で溜まった分をログと記録へ
             MapManager.Instance?.SyncFreeKnowledge();
             if (ev != FreeMapEvent.None) OnFreeMapEvent?.Invoke(ev);
             HandleFreeMapEvent(sim, ev);

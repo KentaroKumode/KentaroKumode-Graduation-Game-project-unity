@@ -409,7 +409,7 @@ namespace AutoTest
         private string CurrentNodeId()
         {
             var mm = MapManager.Instance;
-            // 航行マップの層では囮罠や照明のようにターンを使わない操作がある。 点が同じでも
+            // 航行マップの層では囮罠や測量のようにターンを使わない操作がある。 点が同じでも
             //   ターンが進んでいれば進展なので、 ターンを添えてストール検出に誤判定させない。
             if (mm != null && mm.IsFreeMap) return $"{mm.CurrentNode?.id ?? ""}@{mm.Sim.Turn}";
             return mm?.CurrentNode?.id ?? "";

@@ -98,13 +98,12 @@ namespace UI.Game2D
 
         private void OnDestroy() { Unhook(); if (_cueHooked) { CombatManager.OnCue -= OnCombatCue; _cueHooked = false; } }
 
-        /// <summary>航行の操作 (ボタンでもキーでも同じ関数を通る・#321): 測量・偵察・囮罠 (置けた時だけ・#323)・待つ。 測量と偵察は同じ 1 本の音 (2026-11-24)。</summary>
+        /// <summary>航行の操作 (ボタンでもキーでも同じ関数を通る・#321): 測量・囮罠 (置けた時だけ・#323)・待つ。 測量の音は旧い偵察の recon 1 本 (2026-11-24)。</summary>
         private void OnNavFx(GameManager.NavFx fx)
         {
             switch (fx)
             {
-                case GameManager.NavFx.Flare:
-                case GameManager.NavFx.Recon: Game2DSfx.Play("recon"); break;
+                case GameManager.NavFx.Survey: Game2DSfx.Play("recon"); break;
                 case GameManager.NavFx.Lure: Game2DSfx.Play("lure_set"); break;
                 case GameManager.NavFx.Wait: Game2DSfx.Play("ui_click"); break;
             }

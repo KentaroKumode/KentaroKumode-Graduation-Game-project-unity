@@ -179,7 +179,7 @@ namespace MetaProgression.Achievements
 
             // ── 航行 ──
             D(PursuerWin, C.Navigation, 2, "狩る側", "追跡者を倒す"),
-            D(PursuerUnseen, C.Navigation, 3, "忍び足", "追跡者のいる層を、一度も見つからずにボスまで抜ける"),
+            D(PursuerUnseen, C.Navigation, 3, "忍び足", "縄張りの宝を取り、一度も見つからずにボスまで抜ける"),      // 2026-11-24 仮 (縄張りは必ず避けられる + 隣で見つかるだけでは緩いので宝を条件に・作者の承認待ち)
             D(FamiliarWin, C.Navigation, 1, "猟犬払い", "使い魔を倒す"),
             D(LureHit, C.Navigation, 2, "罠師", "囮罠で、追跡者を足止めする"),
             D(StormBoss, C.Navigation, 4, "嵐の目", "嵐が最後の段まで進んだ層で、ボスを倒す"),

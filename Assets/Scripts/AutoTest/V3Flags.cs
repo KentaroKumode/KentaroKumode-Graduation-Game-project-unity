@@ -58,7 +58,7 @@ namespace AutoTest
         public bool superDefense;
         /// <summary>S3: 消耗品を読んで使う。 護符は開幕に使わず (毎ターン半減するので大技の前に消える)、 予告を見て足りない分を埋める最小のものを使う。 致死なら回復薬。</summary>
         public bool superConsumables;
-        /// <summary>S4: 航行。 次に向かう未知の点だけ偵察し、 見えた戦闘名の危険度で避ける (敗北率 10% 以上は基本的に避ける)。</summary>
+        /// <summary>S4: 航行。 次に向かう未知の点だけ測量し、 見えた戦闘名の危険度で避ける (敗北率 10% 以上は基本的に避ける)。</summary>
         public bool superNav;
         /// <summary>S4: この敗北率以上の戦闘名は HP に関わらず避ける。</summary>
         public float avoidLoseRate = 0.10f;

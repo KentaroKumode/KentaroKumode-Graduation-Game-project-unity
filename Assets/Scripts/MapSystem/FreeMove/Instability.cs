@@ -29,7 +29,7 @@ namespace MapSystem.FreeMove
         Escalation,
         /// <summary>イベントの「ターン+N」(N ごと)。</summary>
         EventTurns,
-        /// <summary>崩れ始めた後の 1 歩・待つ・偵察 (手番ごと)。</summary>
+        /// <summary>崩れ始めた後の 1 歩・待つ (手番ごと)。</summary>
         Walk,
         /// <summary>イベントの「嵐を遠ざける / 近づける+N」(符号つき)。</summary>
         Shift,
@@ -59,7 +59,7 @@ namespace MapSystem.FreeMove
         MaxHp,
         /// <summary>時限バフ。</summary>
         TimedBuff,
-        /// <summary>航行の効果 (地図を明かす・偵察の類・追跡者を撒く / 遠ざける・近道)。</summary>
+        /// <summary>航行の効果 (地図を明かす・測量の類・追跡者を撒く / 遠ざける・近道)。</summary>
         Navigation,
         /// <summary>次の店の値引き。</summary>
         ShopDiscount,
@@ -80,7 +80,7 @@ namespace MapSystem.FreeMove
     /// </summary>
     public static class Instability
     {
-        /// <summary>内訳の列: 取る (宝・秘宝・戦闘・イベントの得) / エスカレーション / 歩く (1 歩・待つ・偵察) / イベントのターン / 遠ざける・近づける (正味)。</summary>
+        /// <summary>内訳の列: 取る (宝・秘宝・戦闘・イベントの得) / エスカレーション / 歩く (1 歩・待つ) / イベントのターン / 遠ざける・近づける (正味)。</summary>
         public const int PartTake = 0, PartEscalation = 1, PartWalk = 2, PartEventTurns = 3, PartShift = 4, Parts = 5;
 
         /// <summary>理由 <paramref name="src"/> で <paramref name="n"/> 回ぶん溜まるポイント。 歩く・イベントのターン・遠ざける / 近づける は n がそのまま量 (符号つき)。</summary>
