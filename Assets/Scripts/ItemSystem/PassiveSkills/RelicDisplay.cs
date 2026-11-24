@@ -53,7 +53,7 @@ namespace ItemSystem.PassiveSkills
     }
 
     /// <summary>品 1 つの見え方を引く (#320)。 品の効果 (items.json の skills) の中に <see cref="IRelicDisplay"/> を持つ物があればその見え方、
-    /// 無ければ説明に【規則】がある品は <see cref="RelicMode.Quiet"/>、 それ以外は <see cref="RelicMode.Pulse"/>。 戦闘の値は読むだけ。</summary>
+    /// 無ければ items.json の quietRelic が立つ品は <see cref="RelicMode.Quiet"/>、 それ以外は <see cref="RelicMode.Pulse"/>。 戦闘の値は読むだけ。</summary>
     public static class RelicLookup
     {
         public static RelicMode ModeOf(string itemId, RelicEnv env, out RelicView view)
@@ -71,7 +71,7 @@ namespace ItemSystem.PassiveSkills
                     view = d.View(ctx, env);
                     if (view.known) return RelicMode.State;
                 }
-            return !string.IsNullOrEmpty(data.description) && data.description.Contains("【規則】") ? RelicMode.Quiet : RelicMode.Pulse;
+            return data.quietRelic ? RelicMode.Quiet : RelicMode.Pulse;   // 2026-11-25: 説明文の【規則】の字面でなく items.json の quietRelic
         }
 
         /// <summary>効果 (包み Inner をほどく) が見え方を持っていればそれ。</summary>
