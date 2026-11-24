@@ -743,7 +743,7 @@ namespace AutoTest
             }
             outMul += metaPct * 0.01f;
             if (ctx.polishArmed) outMul += 1.5f;
-            if (ctx.consDmgMultPct > 0) outMul += ctx.consDmgMultPct / 100f;
+            if (ctx.consDmgMultPct > 0) outMul *= 1f + ctx.consDmgMultPct / 100f;   // 〈油・膏薬〉は最終与ダメージ (2026-11-25・池の外で掛ける)
             return outMul;
         }
 

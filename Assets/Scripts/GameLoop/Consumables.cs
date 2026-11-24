@@ -239,7 +239,7 @@ namespace GameLoop
                 case ItemIds.Talisman3:
                 case ItemIds.Talisman4: return AddShield(run, ctx, ShieldAmount(id));
 
-                // 攻撃強化: 与ダメ +X% (その戦闘中)。 outgoingDamageMultiplier は**加算プール**
+                // 攻撃強化: 最終与ダメージ +X% (その戦闘中・2026-11-25 に与ダメの池から最終へ移した・CombatManager.Damage)。 旧: outgoingDamageMultiplier は**加算プール**
                 //   (実測 ×2.00) なので、 +75% でも最終与ダメは ×1.375 に薄まる。
                 case ItemIds.PowerOil1: return AddTimedDmgMult(run, ctx, 15, -1);
                 case ItemIds.PowerOil2: return AddTimedDmgMult(run, ctx, 30, -1);

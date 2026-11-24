@@ -1410,7 +1410,7 @@
     {
       "id": "鬼火の油",
       "name": "鬼火の油",
-      "description": "その戦闘中、与ダメージ+15%。",
+      "description": "その戦闘中、最終与ダメージ +15%",
       "flavorText": "塗ると刃が青白い炎をまとう。旧アルフォニアのある古い旅行記に「鬼の汗を集めた油」とあるが、真偽は知れない。",
       "category": "Consumable",
       "rarity": "BRONZE",
@@ -1421,7 +1421,7 @@
     {
       "id": "燐の油",
       "name": "燐の油",
-      "description": "その戦闘中、与ダメージ+30%。",
+      "description": "その戦闘中、最終与ダメージ +30%",
       "flavorText": "水に濡れても消えない。消えない、というだけで値が三倍になる。",
       "category": "Consumable",
       "rarity": "SILVER",
@@ -1432,7 +1432,7 @@
     {
       "id": "業火の膏薬",
       "name": "業火の膏薬",
-      "description": "その戦闘中、与ダメージ+50%。",
+      "description": "その戦闘中、最終与ダメージ +50%",
       "flavorText": "塗った翌日、指の腹の渦が消えていた。効いている証拠だと、売った者は言った。",
       "category": "Consumable",
       "rarity": "GOLD",
@@ -1443,7 +1443,7 @@
     {
       "id": "天火の膏薬",
       "name": "天火の膏薬",
-      "description": "その戦闘中、与ダメージ+75%。",
+      "description": "その戦闘中、最終与ダメージ +75%",
       "flavorText": "壷の底に古い字で「一度に半分まで」とある。半分がどこかは書かれていない。",
       "category": "Consumable",
       "rarity": "LEGENDARY",

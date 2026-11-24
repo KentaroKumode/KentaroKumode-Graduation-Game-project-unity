@@ -120,12 +120,11 @@ namespace CombatSystem
                 if (Debug.unityLogger.logEnabled) Debug.Log("[瞬間研磨剤] 与ダメージ+150%");
             }
 
-            // 消費: 鬼火の油 与ダメ+X%（全戦闘）。 **他の与ダメ% と同じプールへ加算** (2026-09-19)。
-            //   旧: 倍率を掛けた後の totalDmg に さらに ×(1+X%) を掛けており、 与ダメ% を重ねると掛け算で膨らんだ。
+            // 消費: 鬼火の油ほか 最終与ダメージ +X%（全戦闘）。 2026-11-25 作者の決定: 与ダメの池 (加算) から最終与ダメージへ
+            //   (池だと ほかの品の % と足されて薄まり、 BRONZE の +15% が秘宝の最弱より弱かった)。 下の ApplyFinalDamage で掛ける (この 1 撃の上乗せ・撃ごとに 0 へ戻る)。
             if (ctx.consDmgMultPct > 0)
             {
-                if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
-                ctx.outgoingDamageMultiplier += ctx.consDmgMultPct / 100f;
+                ctx.hitFinalDamagePct += ctx.consDmgMultPct;
                 DmgSourceDiag.Note("消費〈油・膏薬〉", DmgSourceDiag.Out, ctx.consDmgMultPct / 100f);
             }
 
