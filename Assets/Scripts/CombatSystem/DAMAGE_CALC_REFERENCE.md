@@ -598,7 +598,7 @@ Passive カテゴリのシナジー武器群。4枚がインベントリに揃�
 | EspadaPasodoble(エスパーダ・パソドブレ) | L | OnPostRoll / OnPreReceiveDamage | outgoing +=0.4 × s（2026-11-10・旧 出目 +50% と outgoing +0.2）／被弾時 finalDamage ×1.2（被ダメ+20%・s は掛けない） |
 | FleuretBallet(フルーレ・バレエ) | L | OnPostRoll | outgoing +=0.25 × s（2026-11-10・旧 出目 +30%）。敗北時の自壊+最大HP1生還は `LastStand.TryConsumeRevival`（灯火→ラストスタンド→フルーレ の順） |
 | FalconTango(ファコン・タンゴ) | L | OnPostRoll | outgoing +=0.2 × s（2026-11-10・旧 出目 +20%・[剣の舞]。4 枚揃うと〈無銘の剣舞譜〉へ変化） |
-| BladeDance(無銘の剣舞譜) | L(特殊) | OnBattleStart / OnPostRoll / OnPostDealDamage / OnPostReceiveDamage | 開戦毎に剣先スタック+1(最大99・ラン中持続/IRunResettable)。playerDiceTotal +剣先／与ダメ時 剣先分HP回復／被ダメ時 fixedDamageToEnemy +剣先 |
+| BladeDance(無銘の剣舞譜) | L(特殊) | OnBattleStart / OnPostRoll / OnPostDealDamage / OnPostReceiveDamage + 撃の輪 | 【2026-11-25 壊れ性能・凍結の例外】剣先: 開戦毎 +1・OnPostDealDamage で `IsRealHit && finalDamage > 0` の撃ごとに +1（もう 1 回の撃も数える）・**上限なし**（ラン中持続/IRunResettable・中断セーブも上限なし）・取得時 `SeedOnAcquire(層)` = 層 × 15 (`SeedPerFloor`)。OnPostRoll で `AddPlayerAttackOrDiceBonus(剣先)`（mutualAttackBonus = 全部の撃に乗る・撃の途中で増えた剣先は次のターンから）／当たった撃ごとに 剣先分 HP 回復／被ダメ時 fixedDamageToEnemy +剣先。撃の輪 (CombatManager.Turn・`BladeDance.Held(run)`): 本物の撃すべてに `forceCritThisHit = true`・`hitIgnoreDefense = true`、 〈防人の軍標〉の `echoAll` と同じ道で同じ撃をもう 1 回（会心・防御無視も同じ・軍標と重ねても 2 回・`GuardEchoFired` は軍標の時だけ数える） |
 
 s = `SwordDanceSet.SoloScale`（2026-11-20）: 持っている[剣の舞]（昇華を含む `OwnedCount`）が 1 枚で 1・2 枚で 1.5・3 枚で 2。 伸ばすのは与ダメージの分だけ。
 

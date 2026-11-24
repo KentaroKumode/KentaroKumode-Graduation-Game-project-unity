@@ -992,11 +992,15 @@ namespace CombatSystem
             bool refire = false; int sniperSpent = 0;
             //   〈防人の軍標〉(2026-11-22): 2 回目以降 (BorderGuardStandard.EchoNeed) のジャスト防御の次のターン、 全部の撃がもう 1 回ずつ発火する (同じ撃をすぐもう 1 回・会心は振り直す)。
             //   shortcut: 〈必殺の照準器〉がもう 1 回発火した撃には重ねない (照準器は攻撃の端子 1 枚のターンだけ)
-            bool echoAll = hitBases.Count > 0 && ItemSystem.PassiveSkills.Effects.BorderGuardStandard.EchoNow(ctx), echoing = false;
+            bool guardEcho = hitBases.Count > 0 && ItemSystem.PassiveSkills.Effects.BorderGuardStandard.EchoNow(ctx), echoing = false;
+            //   〈無銘の剣舞譜〉(2026-11-25 作者の決定): 毎ターン全部の撃が会心確定・敵の防御を無視・同じ撃がもう 1 回 (軍標と同じ道・重ねても 2 回)
+            bool bladeDance = hitBases.Count > 0 && ItemSystem.PassiveSkills.Effects.BladeDance.Held(GameLoop.GameManager.Instance?.Run);
+            bool echoAll = guardEcho || bladeDance;
             for (int h = 0; h < nHits; h++)
             {
                 ctx.hitIndex = h; ctx.forceCritThisHit = false; ctx.critSkipRoll = false; ctx.isRefireHit = refire; ctx.hitCritRateMulAdd = 0f; ctx.hitIsFocused = false; ctx.hitFocusSpentRenki = 0; ctx.hitFinalDamagePct = 0; ctx.hitOutgoingPct = 0; ctx.hitIgnoreDefense = h == chainHit; ctx.hitArmorPen = 0;   // 撃ごとの値 (〈抜き打ちの作法〉〈加重の拳套〉・〈連刃〉の追撃は防御を無視)
                 ctx.hitFaceMax = CritCore.HitFaceMax(term, playerDice, h);   // 〈狙い目の刻み〉が読む
+                if (bladeDance && h < hitBases.Count) { ctx.forceCritThisHit = true; ctx.hitIgnoreDefense = true; }
                 if (h > 0 || refire || echoing)
                 {
                     // 次の撃の前に固定ダメの枠を空にする ── 空にしないと 1 撃目の固定ダメ (毒・品が預けた分) が次の撃にも返って二重に入る。
@@ -1022,7 +1026,7 @@ namespace CombatSystem
                 hitFocus.Add(c && ctx.hitIsFocused); hitSpent.Add(ctx.hitFocusSpentRenki); hitRenki.Add(c ? ItemSystem.PassiveSkills.Effects.Crit.HitRenki(ctx) : 0);
                 dealtDmg += d; dealtFixed += f; isCrit |= c;
                 if (refire) { refire = false; CritRefireFired++; Debug.Log($"[必殺の照準器] 会心の撃をもう 1 回発火 → {d}"); }
-                else if (echoing) { echoing = false; GuardEchoFired++; Debug.Log($"[防人の軍標] {h + 1} 撃目をもう 1 回発火 → {d}"); }
+                else if (echoing) { echoing = false; if (guardEcho) GuardEchoFired++; Debug.Log($"[{(guardEcho ? "防人の軍標" : "無銘の剣舞譜")}] {h + 1} 撃目をもう 1 回発火 → {d}"); }
                 else if (sniper && c && h == 0 && ctx.hitIsFocused) { refire = true; sniperSpent = ctx.hitFocusSpentRenki; h--; }
                 else if (echoAll && h < hitBases.Count) { echoing = true; h--; }
             }

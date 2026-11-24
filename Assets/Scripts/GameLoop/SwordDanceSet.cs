@@ -122,7 +122,7 @@ namespace GameLoop
 
             ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(run, Finale);
 
-            // 取得時シード: 4枚集約完成への報酬として現在層 × 3 スタックを初期付与 (後半取得偏重の救済)
+            // 取得時シード: 4枚集約完成への報酬として現在層 × 15 の剣先を初期付与 (BladeDance.SeedPerFloor) (後半取得偏重の救済)
             var bd = ItemSystem.PassiveSkills.PassiveSkillRegistry.Get(Finale)
                      as ItemSystem.PassiveSkills.Effects.BladeDance;
             bd?.SeedOnAcquire(run.Depth);

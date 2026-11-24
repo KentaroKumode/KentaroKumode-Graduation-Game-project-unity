@@ -770,8 +770,9 @@ namespace AutoTest
             st.critRed = ctx.enemyCritMultReduction;
             st.critDouble = ctx.critExcessDouble || (run != null && run.OwnsPassive(ItemIds.CritSuntetsu));
             st.ironClub = ctx.critToDamage || (run != null && run.OwnsPassive(ItemIds.CritIronClub));
-            st.critOff = ctx.critSuppressed;
-            st.critOn = !st.critOff && ctx.forceCritical;
+            bool bladeDance = ItemSystem.PassiveSkills.Effects.BladeDance.Held(run);   // 〈無銘の剣舞譜〉: 全部の撃が会心確定・防御無視・もう 1 回 (本体 CombatManager.Turn の撃の輪)
+            st.critOff = ctx.critSuppressed && !bladeDance;
+            st.critOn = bladeDance || (!st.critOff && ctx.forceCritical);
             st.falconer = run != null && run.OwnsPassive(ItemSystem.PassiveSkills.Effects.FalconerGlove.Id);
             // 【練気】・【集中】(2026-11-23・本体と同じ CritCore の関数)
             st.renki = ItemSystem.PassiveSkills.Effects.Crit.Renki(ctx);
@@ -809,10 +810,10 @@ namespace AutoTest
             st.pinpointCut = ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.PinpointEye.NonCritCutKey) > 0f;
             st.outMul = OutgoingPoolNow(ctx, run);
             st.finalPct = ctx.finalDamagePct;
-            st.guardEcho = ItemSystem.PassiveSkills.Effects.BorderGuardStandard.EchoNow(ctx);
+            st.guardEcho = bladeDance || ItemSystem.PassiveSkills.Effects.BorderGuardStandard.EchoNow(ctx);
             st.consBurst = ctx.consAtkBurst;
             st.critPen = ctx.critArmorPen;
-            st.vitalIgnore = ItemSystem.PassiveSkills.Effects.VitalStrike.IgnoresDefense(ctx);
+            st.vitalIgnore = bladeDance || ItemSystem.PassiveSkills.Effects.VitalStrike.IgnoresDefense(ctx);   // 剣舞譜は会心確定なので「会心は防御を無視」と同じ見込み
             st.minDmg = ctx.winMinDamage;
             st.berserkMul = ctx.enemyDamageTakenMultiplier;
         }
