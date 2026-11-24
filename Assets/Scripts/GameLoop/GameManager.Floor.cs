@@ -363,6 +363,7 @@ namespace GameLoop
                     && !Run.ownedPassiveItems.Contains(SwordDanceSet.Finale))
                 {
                     ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, SwordDanceSet.Finale);
+                    (ItemSystem.PassiveSkills.PassiveSkillRegistry.Get(SwordDanceSet.Finale) as ItemSystem.PassiveSkills.Effects.BladeDance)?.SeedOnAcquire(Run.currentFloor);   // 製品の 4 枚集約と同じ取得時の剣先 (2026-11-25)
                     Log("[計測] 5層撃破 → 〈無銘の剣舞譜〉を強制付与");
                 }
 

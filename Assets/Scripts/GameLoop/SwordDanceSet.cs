@@ -125,7 +125,7 @@ namespace GameLoop
             // 取得時シード: 4枚集約完成への報酬として現在層 × 15 の剣先を初期付与 (BladeDance.SeedPerFloor) (後半取得偏重の救済)
             var bd = ItemSystem.PassiveSkills.PassiveSkillRegistry.Get(Finale)
                      as ItemSystem.PassiveSkills.Effects.BladeDance;
-            bd?.SeedOnAcquire(run.Depth);
+            bd?.SeedOnAcquire(run.currentFloor);   // 見せる層 (1〜5)。 run.Depth は旧い深さ (1/3/5/6/7/8) なので使わない (2026-11-25)
 
             UnityEngine.Debug.Log("[剣の舞] インベントリに4枚集約 → 全消滅し〈無銘の剣舞譜〉に変化");
             return true;
