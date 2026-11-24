@@ -36,14 +36,14 @@
     { "id": "core_start_pick",    "name": "初期選別フィルタ",       "shape": "T", "source": "shop", "cost": 150, "module": "StartPick",    "stats": { "hp": 5 } },
     { "id": "core_immovable",     "name": "過電流ブレーカ",           "shape": "T", "source": "shop", "cost": 150, "module": "Immovable",    "stats": { "hp": 8 } },
 
-    { "id": "spark_charge", "name": "オーバークロック・充電",     "shape": "O", "source": "shop", "cost": 160, "module": "SparkCharge", "stats": { "hp": 5, "saleSlots": 1 } },
-    { "id": "spark_rinkai", "name": "オーバークロック・臨界",     "shape": "O", "source": "shop", "cost": 160, "module": "SparkRinkai", "stats": { "hp": 5, "saleSlots": 1 } },
-    { "id": "spark_poison", "name": "オーバークロック・毒",       "shape": "O", "source": "shop", "cost": 160, "module": "SparkPoison", "stats": { "hp": 5, "saleSlots": 1 } },
-    { "id": "spark_bleed",  "name": "オーバークロック・出血",     "shape": "O", "source": "shop", "cost": 160, "module": "SparkBleed",  "stats": { "hp": 5, "saleSlots": 1 } },
-    { "id": "spark_shield", "name": "オーバークロック・シールド", "shape": "O", "source": "shop", "cost": 160, "module": "SparkShield", "stats": { "hp": 5, "saleSlots": 1 } },
-    { "id": "spark_crit",   "name": "オーバークロック・会心",     "shape": "O", "source": "shop", "cost": 160, "module": "SparkCrit",   "stats": { "hp": 5, "saleSlots": 1 } },
-    { "id": "spark_deck",   "name": "オーバークロック・山札",     "shape": "O", "source": "shop", "cost": 160, "module": "SparkDeck",   "stats": { "hp": 5, "saleSlots": 1 } },
-    { "id": "spark_role",   "name": "オーバークロック・役",       "shape": "O", "source": "shop", "cost": 160, "module": "SparkRole",   "stats": { "hp": 5, "saleSlots": 1 } },
+    { "id": "spark_charge", "name": "オーバーロード・充電",     "shape": "O", "source": "shop", "cost": 160, "module": "SparkCharge", "stats": { "hp": 5, "saleSlots": 1 } },
+    { "id": "spark_rinkai", "name": "オーバーロード・臨界",     "shape": "O", "source": "shop", "cost": 160, "module": "SparkRinkai", "stats": { "hp": 5, "saleSlots": 1 } },
+    { "id": "spark_poison", "name": "オーバーロード・毒",       "shape": "O", "source": "shop", "cost": 160, "module": "SparkPoison", "stats": { "hp": 5, "saleSlots": 1 } },
+    { "id": "spark_bleed",  "name": "オーバーロード・出血",     "shape": "O", "source": "shop", "cost": 160, "module": "SparkBleed",  "stats": { "hp": 5, "saleSlots": 1 } },
+    { "id": "spark_shield", "name": "オーバーロード・シールド", "shape": "O", "source": "shop", "cost": 160, "module": "SparkShield", "stats": { "hp": 5, "saleSlots": 1 } },
+    { "id": "spark_crit",   "name": "オーバーロード・会心",     "shape": "O", "source": "shop", "cost": 160, "module": "SparkCrit",   "stats": { "hp": 5, "saleSlots": 1 } },
+    { "id": "spark_deck",   "name": "オーバーロード・山札",     "shape": "O", "source": "shop", "cost": 160, "module": "SparkDeck",   "stats": { "hp": 5, "saleSlots": 1 } },
+    { "id": "spark_role",   "name": "オーバーロード・役",       "shape": "O", "source": "shop", "cost": 160, "module": "SparkRole",   "stats": { "hp": 5, "saleSlots": 1 } },
 
     { "id": "core_parallel", "name": "並列配線コア", "shape": "S", "source": "achievement", "achievement": "combat_wins_100", "stats": { "chargeOpening": 6, "handTurn1": 1, "freeRerolls": 1, "damagePct": 8 } },
     { "id": "core_balance",  "name": "リブートコア", "shape": "Z", "source": "achievement", "achievement": "boss3_all",     "stats": { "lockHp": 15, "defense": 2 } }
