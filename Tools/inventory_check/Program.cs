@@ -218,7 +218,7 @@ static class Program
             var lines = c.DetailLines(dw, Adv);
             var pages = InventoryLayout.Pages(lines, perPage, l => l.text.Length == 0);
             var got = NoSpace(string.Concat(pages.SelectMany(p => p).Select(l => l.text)));
-            var want = NoSpace(c.name + string.Join("", c.MetaParts()) + c.mark + "今は使えない:" + c.block + c.description + c.flavor);
+            var want = NoSpace(c.name + string.Join("", c.MetaParts()) + c.mark + "今は使えない:" + c.block + c.description + string.Join("", KeywordGlossary.In(c.description)) + c.flavor);   // 説明文の【】の言葉の説明 (2026-11-25)
             if (got != want) { lost++; Console.WriteLine($"  NG 字が落ちる: {it.id}\n     want {want}\n     got  {got}"); }
             foreach (var p in pages) { if (p.Count > perPage) lost++; foreach (var l in p) if (Width(l.text) > dw) { wide++; Console.WriteLine($"  NG 幅を超える行: {it.id} 「{l.text}」"); } }
             if (pages.Count > pagesMax) { pagesMax = pages.Count; pagesWhat = it.id + " (" + lines.Count + " 行)"; }
@@ -233,7 +233,7 @@ static class Program
         }
         Console.WriteLine($"items.json {items.Count} 品・詳細の欄の頁の最大 {pagesMax} ({pagesWhat})・吹き出しの高さの最大 {tipHMax} ({tipWhat})");
         if (missing.Count > 0) Console.WriteLine($"  (情報) ドット字に無い字 {missing.Count}: {string.Concat(missing)} ── items.json の文の字。 この画面で新しく足した字ではない");
-        Check(lost == 0 && wide == 0, $"全 {items.Count} 品の詳細 (品名・付記・印・説明文・フレーバー文) が、 幅 {dw} dot で折り返して 1 頁 {perPage} 行に割っても字を落とさない (NG {lost + wide})");
+        Check(lost == 0 && wide == 0, $"全 {items.Count} 品の詳細 (品名・付記・印・説明文・言葉の説明・フレーバー文) が、 幅 {dw} dot で折り返して 1 頁 {perPage} 行に割っても字を落とさない (NG {lost + wide})");
         Check(tipBad == 0, $"全 {items.Count} 品の吹き出し (品名 ×999 + 説明文) が幅 {InventoryLayout.TipMaxW}・窓の高さに入る (NG {tipBad})");
         Check(metaBad == 0, $"全 {items.Count} 品の付記 (売値・個数は最長の形) が項目の区切りで折り返す ── 項目が行をまたがない (NG {metaBad})");
         longestTip = tipWhat;

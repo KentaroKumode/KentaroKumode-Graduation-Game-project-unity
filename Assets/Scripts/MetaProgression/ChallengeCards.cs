@@ -374,7 +374,7 @@ namespace MetaProgression
                 case SinGluttony: return "回復 −" + n + "%（吸血・回復薬・層の入口の全回復も）・受けた時に最大 HP −" + n2 + "%";
                 case SinLust: return "1 ターンに挿せる出目は " + n + " 個まで・秘宝の見送り換金ができない";
                 case Charge: return "戦闘の始めの充電 +" + n + (v2 ? "・【再起動】【オーバークロック】の充電 −" + n2 + "（最低 1）" : "");
-                case Poison: return "【起爆】の倍率 +" + n;
+                case Poison: return "【劇症】の倍率 +" + n;
                 case Shield: return "【ジャスト防御】の時、 敵へ防御無視の " + n + " ダメージ" + (v2 ? "・許容幅 +" + n2 : "");
                 case Bleed: return "各戦闘の 1 ターン目、 撃が当たるたび敵に出血 +" + n;
                 case Heat: return "爆発が無視する敵の防御 +" + n + "%（計 " + System.Math.Min(100, CombatSystem.HeatCore.DefensePenPct + (int)c.value) + "%）" + (v2 ? "・爆発の基礎 +" + n2 : "");

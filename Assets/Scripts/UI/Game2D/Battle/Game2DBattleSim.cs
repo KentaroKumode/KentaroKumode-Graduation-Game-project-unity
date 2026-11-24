@@ -604,12 +604,12 @@ namespace UI.Game2D.Battle
             if ((PoisonFlags & PoisonItems.Ring) != 0)
             {
                 int p = env.enemyPoison + add;
-                label = "起爆 毒" + p + "/" + PoisonCore.RingNeed;
+                label = "劇症 毒" + p + "/" + PoisonCore.RingNeed;
                 return p >= PoisonCore.RingNeed && preview != null && preview.attackHits.Count > 0;
             }
             var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
             int g = (ctx != null ? ItemSystem.PassiveSkills.Effects.Psn.TurnN(ctx, ItemSystem.PassiveSkills.Effects.PoisonMagazine.GivenKey) : 0) + add;
-            label = "起爆 付与" + g + "/" + PoisonCore.MagazineGiven;
+            label = "劇症 付与" + g + "/" + PoisonCore.MagazineGiven;
             return g >= PoisonCore.MagazineGiven;
         }
         /// <summary>このターン起爆する見込み (金で出す)。 / 右の列の文字 (仮)。</summary>
