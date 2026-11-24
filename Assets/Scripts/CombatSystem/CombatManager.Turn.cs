@@ -555,6 +555,7 @@ namespace CombatSystem
                     for (int i = 0; i < playerDice.Length; i++) { playerDice[i] += foundry; _slothAt[i] += foundry; }   // 怠惰の足し戻しの目も一緒にずらす
             }
             ForceVescaDice(ctx, playerDice, null);   // [測定 2026-11-11] ヴェスカ連戦の出目の固定 (既定は触らない)
+            ForceRunSpecDice(ctx, playerDice, playerFaceIdx);   // ラン指定の出目の固定 (チュートリアルの「悪い目 → 振り直し」・指定が無ければ触らない)
 
             // 7層ヴェスカ〈天与の指輪〉: 3 以上の出目をすべて 1〜2 へ再抽選する。
             //   全出目 1 は本数ぶんの手が完全に死に、 その前の「行動不可」と重さが変わらなかった。

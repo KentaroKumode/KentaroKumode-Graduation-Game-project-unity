@@ -127,9 +127,10 @@ namespace GameLoop
         //  ファイル
         // ============================================================
 
-        /// <summary>BOT・計測の最中か (保存・読み込み・削除をしない)。</summary>
+        /// <summary>BOT・計測の最中か (保存・読み込み・削除をしない)。 ラン指定のラン (チュートリアル) も中断セーブを書かない ── 指定は写しに入らないので、
+        /// 続きから戻すと本編の規則で一本道を歩くことになる。 途中でやめたら次の PLAY でまた最初から。</summary>
         public static bool Disabled
-            => Application.isBatchMode || GameHooks.BotDriving || MetaProgression.MetaBuffApplicator.SuppressMetaRewards;
+            => Application.isBatchMode || GameHooks.BotDriving || MetaProgression.MetaBuffApplicator.SuppressMetaRewards || RunSpec.Current != null;
 
         /// <summary>中断セーブのファイル (本番・控え・書きかけのどれか) があるか (中身が読めるかは <see cref="TryRead"/> で確かめる)。
         /// 控え・書きかけだけが残るのは、 書き込みの途中で落ちた時 (<see cref="Write"/>)。</summary>

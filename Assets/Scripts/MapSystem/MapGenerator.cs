@@ -37,6 +37,14 @@ namespace MapSystem
         /// <summary>指定フロアのマップを生成</summary>
         public static FloorMap Generate(int floor)
         {
+            // ラン指定の一本道 (チュートリアル・GameLoop.RunSpec.map): 指定の形に、 指定の敵を点へ焼き付けて流す。 嵐・山岳・追跡者は無い
+            var spec = GameLoop.RunSpec.Current;
+            if (spec != null && spec.HasMap)
+            {
+                var m = FromLayout(spec.BuildLayout(floor));
+                spec.ApplyEncounters(m);
+                return m;
+            }
             if (!FloorPlan.IsFreeMap(floor)) return GenerateBossOnly(floor);
             // 深さ 6 の固定のイベントの点 (〈真理〉を持って入った層 = イベントなしの測定だけ・乱数を引かない・他の層では読まれない)。 正本は ConvictionSystem.KeepsFixedEventPoint
             //   嵐 (2026-11-13): 測定の口 GameHooks.StormEnabled が立っていれば、 嵐のある深さで始点を選び直す (FreeMove.Storm.Apply・乱数は専用のキー)

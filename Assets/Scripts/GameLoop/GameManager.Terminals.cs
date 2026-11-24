@@ -15,7 +15,7 @@ namespace GameLoop
         /// BOT は <see cref="GameHooks.ChooseTerminalReward"/> でその場で選ぶ (無ければ先頭)。</summary>
         private void OfferTerminalReward(bool elite, bool boss)
         {
-            if (Run == null) return;
+            if (Run == null || RunSpec.NoRewards) return;   // ラン指定の「報酬なし」(チュートリアル)
             if (boss && Run.currentFloor > TerminalBossRewardLastFloor) return;
             // 0 層の試練の木箱 (2026-11-20・docs/system-overhaul-spec.md §4-4) は 3 択 (エリートと同じ数)
             bool farm = Run.Depth == MapSystem.FreeMove.FloorPlan.FarmFloor;

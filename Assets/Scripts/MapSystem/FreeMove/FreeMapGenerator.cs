@@ -83,29 +83,9 @@ namespace MapSystem.FreeMove
         /// 山岳・追跡者・天候は無い (道が 1 本なので、 崩れたり沈んだりすると進めなくなる)。</summary>
         private static FreeMapLayout GenerateLinear(int floor)
         {
-            const double W = FreeMapParams.Width, H = FreeMapParams.Height;
-            var order = new[] { 0, 2, 3, 4, 5, 6, 7, 1 };
-            var types = new[] { TileType.Outpost, TileType.SupplyDepot, TileType.Shop, TileType.Treasure,
-                                TileType.Event, TileType.EliteBattle, TileType.Rest, FloorPlan.GoalType(floor) };
-            int n = order.Length;
-            var L = new FreeMapLayout { floor = floor, start = 0, goal = 1, pos = new Vec2[n], types = new TileType[n], adj = new List<int>[n] };
-            for (int i = 0; i < n; i++) L.adj[i] = new List<int>();
-            double x0 = FreeMapParams.StartX, x1 = W - 0.5;
-            for (int k = 0; k < n; k++)
-            {
-                int idx = order[k];
-                L.pos[idx] = new Vec2(F(x0 + (x1 - x0) * k / (n - 1)), F(H / 2));
-                L.types[idx] = types[k];
-            }
-            for (int k = 0; k + 1 < n; k++)
-            {
-                int a = order[k], b = order[k + 1];
-                L.roads.Add((a, b)); L.adj[a].Add(b); L.adj[b].Add(a);
-            }
-            L.gate = order[4];
-            // 追跡者は居ないが、 縄張りの欄は埋めておく (道の中ほどを中心に)
-            for (int k = 1; k < n - 1; k++) { L.territory.Add(order[k]); L.waypoints.Add(order[k]); }
-            L.home = order[n / 2];
+            var L = Line(floor, new[] { TileType.Outpost, TileType.SupplyDepot, TileType.Shop, TileType.Treasure,
+                                        TileType.Event, TileType.EliteBattle, TileType.Rest, FloorPlan.GoalType(floor) });
+            L.gate = LineIndex(4, L.Count);
             return L;
         }
 
@@ -113,27 +93,34 @@ namespace MapSystem.FreeMove
         /// 前哨基地 → 試練の木箱 (戦闘) → 支給の秘宝 (秘宝 3 択) → 倉庫の仕入れ (店) → 試運転のボス。 点の添字は始点 = 0・終点 = 1 の約束 (0, 2, 3, 4, 1)。
         /// 旧: 前哨基地 → 秘宝 → 戦闘 ×3 → ショップ → ボス (HP 100)。 山岳・追跡者・天候・〈門〉は無い。</summary>
         private static FreeMapLayout GenerateFarm(int floor)
+            => Line(floor, new[] { TileType.Outpost, TileType.Battle, TileType.Treasure, TileType.Shop, FloorPlan.GoalType(floor) });
+
+        /// <summary>道の順で k 番目 (0 = 始点・n − 1 = 終点) の点の添字。 始点 = 0・終点 = 1 の約束なので、 間の点は k + 1 (例 n = 5 → 0, 2, 3, 4, 1)。</summary>
+        public static int LineIndex(int k, int n) => k == 0 ? 0 : k == n - 1 ? 1 : k + 1;
+
+        /// <summary>乱数を使わない 1 本道 (5 層・0 層・ラン指定 GameLoop.RunSpec の地図が使う)。 types は道の順 (先頭 = 始点・末尾 = 終点・2 つ以上)。
+        /// 点は横一列に等間隔。 山岳・追跡者・天候・〈門〉は置かない (〈門〉は呼び手が L.gate を立てる)。 縄張りの欄は追跡者が居なくても埋めておく (道の中ほどを中心に)。</summary>
+        public static FreeMapLayout Line(int floor, TileType[] types)
         {
             const double W = FreeMapParams.Width, H = FreeMapParams.Height;
-            var order = new[] { 0, 2, 3, 4, 1 };
-            var types = new[] { TileType.Outpost, TileType.Battle, TileType.Treasure, TileType.Shop, FloorPlan.GoalType(floor) };
-            int n = order.Length;
+            int n = types.Length;
+            if (n < 2) throw new ArgumentException("1 本道には始点と終点の 2 つ以上の点が要る", nameof(types));
             var L = new FreeMapLayout { floor = floor, start = 0, goal = 1, pos = new Vec2[n], types = new TileType[n], adj = new List<int>[n] };
             for (int i = 0; i < n; i++) L.adj[i] = new List<int>();
             double x0 = FreeMapParams.StartX, x1 = W - 0.5;
             for (int k = 0; k < n; k++)
             {
-                int idx = order[k];
+                int idx = LineIndex(k, n);
                 L.pos[idx] = new Vec2(F(x0 + (x1 - x0) * k / (n - 1)), F(H / 2));
                 L.types[idx] = types[k];
             }
             for (int k = 0; k + 1 < n; k++)
             {
-                int a = order[k], b = order[k + 1];
+                int a = LineIndex(k, n), b = LineIndex(k + 1, n);
                 L.roads.Add((a, b)); L.adj[a].Add(b); L.adj[b].Add(a);
             }
-            for (int k = 1; k < n - 1; k++) { L.territory.Add(order[k]); L.waypoints.Add(order[k]); }
-            L.home = order[n / 2];
+            for (int k = 1; k < n - 1; k++) { L.territory.Add(LineIndex(k, n)); L.waypoints.Add(LineIndex(k, n)); }
+            L.home = LineIndex(n / 2, n);
             return L;
         }
 

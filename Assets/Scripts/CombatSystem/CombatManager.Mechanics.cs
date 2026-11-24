@@ -171,6 +171,23 @@ namespace CombatSystem
         /// <summary>[テスト用] 怠惰で引いた量の今の値。</summary>
         internal int[] SlothCutNow => _slothCut;
 
+        /// <summary>ラン指定 (GameLoop.RunSpec.dice) が今の敵・ターンの最初の出目を決めていれば、 その目にする (止まった面も同じ目の面へ合わせる・振り直した目は触らない)。
+        /// 指定が無ければ何もしない。 怠惰の引き算の記録も「引いていない」に戻す。</summary>
+        private void ForceRunSpecDice(ItemSystem.PassiveSkills.CombatContext ctx, int[] playerDice, int[] playerFaceIdx)
+        {
+            var forced = GameLoop.RunSpec.ForcedDice(currentEnemy?.id, ctx?.currentTurn ?? 0);
+            if (forced == null || playerDice == null) return;
+            var faces = ctx.equippedDiceFaces;
+            for (int i = 0; i < playerDice.Length && i < forced.Length; i++)
+            {
+                playerDice[i] = forced[i];
+                ClearSlothCut(i);
+                if (i < _slothAt.Length) _slothAt[i] = forced[i];
+                int fi = faces != null ? Array.IndexOf(faces, forced[i]) : -1;
+                if (fi >= 0 && playerFaceIdx != null && i < playerFaceIdx.Length) playerFaceIdx[i] = fi;
+            }
+        }
+
         /// <summary>[測定 2026-11-11] ヴェスカ連戦の間、 出目を <see cref="GameLoop.GameHooks.VescaDiceForce"/> に固定する (0 なら何もしない)。
         /// rerolled が null なら全部、 そうでなければ振り直したダイスだけ。</summary>
         private static void ForceVescaDice(ItemSystem.PassiveSkills.CombatContext ctx, int[] playerDice, List<int> rerolled)

@@ -45,7 +45,7 @@ namespace MetaProgression.Achievements
         /// <summary>解除しない間: 遺物の付与を止めた測定 (<see cref="MetaBuffApplicator.SuppressMetaRewards"/>) と、 BOT がランを動かしている間 (<see cref="GameHooks.BotDriving"/>・2026-11-17)。
         /// 記録 (codex・<c>CodexRecorder</c>) と同じく、 実績は人が遊んだ時だけ解除する。 2026-11-17 まではふつうのバッチでも解除し、 <see cref="OnUnlocked"/> も鳴っていた。
         /// <b>Note* を足す時は必ず <see cref="Ready"/> か Suppressed を通す。</b></summary>
-        private static bool Suppressed => MetaBuffApplicator.SuppressMetaRewards || GameHooks.BotDriving;
+        private static bool Suppressed => MetaBuffApplicator.SuppressMetaRewards || GameHooks.BotDriving || RunSpec.NoRewards;   // ラン指定の「報酬なし」(チュートリアル) も解除しない
 
         private static bool Ready => !Suppressed && run != null && run.active;
 

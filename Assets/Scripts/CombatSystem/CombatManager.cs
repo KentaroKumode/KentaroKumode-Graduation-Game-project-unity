@@ -768,6 +768,9 @@ namespace CombatSystem
             // 充電の種火 r2: 戦闘開始時の充電 (2026-11-07)
             if (combatCtx != null && MetaProgression.MetaBuffApplicator.GetChargeOpening() > 0)
                 combatCtx.AddCharge(MetaProgression.MetaBuffApplicator.GetChargeOpening());
+            // ラン指定の戦闘の始めの充電 (チュートリアルの狼戦: 2 ターン目に振り直せるように・指定が無ければ 0)
+            int specCharge = GameLoop.RunSpec.OpeningCharge(currentEnemy?.id);
+            if (combatCtx != null && specCharge > 0) combatCtx.AddCharge(specCharge);
 
             // パッシブ刻印: 戦闘開始時の効果を適用 (HP回復・シールド付与・ダイス補正等)
             // 敵の戦闘開始スキルによるHP減少適用

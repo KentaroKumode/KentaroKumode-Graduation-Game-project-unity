@@ -240,7 +240,7 @@ namespace GameLoop
             CombatManager.Instance.StartCombat(CurrentEnemy, Run.playerHP, dc, dm, cr, df, str_, ft_,
                                                CurrentEnemySecondary);
             // 逃げる (2026-09-28): 自由移動の層の戦闘・エリートだけ。
-            CombatManager.Instance.FleeAllowed = MapManager.Instance != null && MapManager.Instance.IsFreeMap;
+            CombatManager.Instance.FleeAllowed = MapManager.Instance != null && MapManager.Instance.IsFreeMap && !RunSpec.Hides(RunSpec.HideFlee);   // ラン指定で止められる (チュートリアル)
         }
 
         /// <summary>メタデバフ Lv5 偽の商人: ショップを装ったマスを踏んだ時の特殊エリート戦。

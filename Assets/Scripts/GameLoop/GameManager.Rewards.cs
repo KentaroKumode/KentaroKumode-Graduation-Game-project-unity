@@ -14,6 +14,23 @@ namespace GameLoop
     /// <summary>GameManager: 戦闘結果の確定・報酬とドロップ・宝箱・開幕パッシブの抽選。</summary>
     public partial class GameManager
     {
+        /// <summary>ラン指定のランのボスを倒した: 指定があれば初回の印を立て、 ランを閉じて、 絵の列があれば踏破 (RunClear) で流す
+        /// (UI.Game2D.Game2DEndingScreen が流し、 終わったらタイトルへ戻す)。 絵の列が無ければすぐタイトルへ。</summary>
+        private void FinishRunSpec()
+        {
+            var spec = RunSpec.Current;
+            Run.bossDefeatedThisFloor = true;
+            Run.lastBossId = CurrentEnemy?.id ?? Run.lastBossId;
+            if (spec.setsTutorialDone) RunSpec.MarkTutorialDone();
+            Log($"ラン指定 {spec.id}: ボスを倒した → " + (spec.slides != null && spec.slides.Length > 0 ? "絵の列からタイトルへ" : "タイトルへ"));
+            if (spec.slides != null && spec.slides.Length > 0)
+            {
+                Run.EndRun();
+                SetPhase(GamePhase.RunClear);
+            }
+            else ReturnToTitle();
+        }
+
         /// <summary>戦闘結果を確認→次へ</summary>
         public void ConfirmBattleResult()
         {
@@ -65,6 +82,17 @@ namespace GameLoop
             // 敗北 or HP0 → 救済（灯火→ラストスタンド）/ なければゲームオーバー
             if (!result.playerWon || Run.playerHP <= 0)
             {
+                // ラン指定の「負けたらやり直す」(チュートリアル・RunSpec.onDeath): ゲームオーバーにせず、 同じ点の戦闘を HP 満タンでやり直す (敵は点に焼き付けた同じ敵)
+                if (RunSpec.RetryOnDeath)
+                {
+                    Run.playerHP = Run.playerMaxHP;
+                    Log("ラン指定: 負けた戦闘を HP 満タンでやり直す");
+                    var retryNode = MapManager.Instance?.CurrentNode;
+                    if (retryNode != null && retryNode.type == TileType.Boss) StartBossTile();
+                    else StartBattleTile();
+                    return;
+                }
+
                 // イベント由来戦闘は勝敗問わずここで終了扱い。フラグを必ず解除する。
                 // 解除しないと「敗北→救済でマップ復帰」後にフラグが残存し、
                 // 後続のボス勝利時に下のイベント復帰ブロックを誤通過して
@@ -145,6 +173,10 @@ namespace GameLoop
 
             var mm = MapManager.Instance;
             var node = mm.CurrentNode;
+
+            // ラン指定のラン (チュートリアル): ボスを倒したらランを終える (絵の列 → タイトル)。 報酬なしの指定なら、 ふつうの戦闘の勝ちは報酬を通さず地図へ戻る
+            if (RunSpec.Current != null && node.type == TileType.Boss) { FinishRunSpec(); return; }
+            if (RunSpec.NoRewards) { SetPhase(GamePhase.MapNavigation); return; }
 
             // メタ: 敵撃破トークン + 戦闘勝利金
             // metaWinGold は最大3、全戦闘に加算すると経済を歪める(1/5 デノミ済み環境で +90G/ラン に到達)。

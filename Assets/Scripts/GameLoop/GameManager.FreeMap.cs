@@ -339,10 +339,11 @@ namespace GameLoop
             if (p >= 0) ActivateArrival(p);
         }
 
-        /// <summary>開始時の囮罠 (<see cref="FreeMapParams.StartLures"/> 個)。 StartNewRun から呼ぶ。</summary>
-        private void GrantStartingMapTools()
+        /// <summary>開始時の囮罠 (<see cref="FreeMapParams.StartLures"/> 個・ラン指定があればその数)。 StartNewRun から呼ぶ。</summary>
+        private void GrantStartingMapTools(RunSpec spec)
         {
-            for (int i = 0; i < FreeMapParams.StartLures; i++) Run.TryAddConsumable(ItemIds.Lure);
+            int n = spec != null ? spec.lures : FreeMapParams.StartLures;
+            for (int i = 0; i < n; i++) Run.TryAddConsumable(ItemIds.Lure);
         }
 
         // =====================================================================

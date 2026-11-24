@@ -1254,6 +1254,38 @@
       "attackRollMax": 0
     },
     {
+      "id": "tut_wolf_snow",
+      "displayName": "雪の狼",
+      "description": "群れからはぐれた狼。雪の上に残った足跡を、少し離れてついてくる。",
+      "floor": 99,
+      "maxHP": 70,
+      "criticalNumerator": 0,
+      "threat": 3,
+      "passiveSkills": [],
+      "baseAttack": 3,
+      "attackRollMin": 0,
+      "attackRollMax": 2,
+      "heavyPeriod": 3,
+      "heavyMul": 3.0,
+      "heavyLightMul": 1.0
+    },
+    {
+      "id": "boss_layer_tut",
+      "displayName": "穴持たず",
+      "description": "冬ごもりの穴を持てなかった熊。眠れないまま、凍った道を歩き続けている。",
+      "floor": 99,
+      "maxHP": 90,
+      "criticalNumerator": 0,
+      "threat": 5,
+      "passiveSkills": [],
+      "baseAttack": 5,
+      "attackRollMin": 0,
+      "attackRollMax": 1,
+      "heavyPeriod": 3,
+      "heavyMul": 3.0,
+      "heavyLightMul": 1.0
+    },
+    {
       "id": "boss_layer1",
       "displayName": "トレジャーゴブリン",
       "description": "遭難者の品や未鑑定の遺物を、自分の背丈ほどもある麻袋に詰め込んだ個体。重みで足取りは鈍いが、袋の口だけは死んでも離さない。",
