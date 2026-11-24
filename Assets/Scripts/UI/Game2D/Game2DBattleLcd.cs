@@ -30,7 +30,7 @@ namespace UI.Game2D
     /// 食われる分 = 予告の攻撃値 (ブロックの前・防御の後) + 〈業火〉の烈炎、 覆った分 = 見込みのブロック + シールド (旧画面の資源バーの「守り」と同じ値) を出す。
     /// 本当の見込みは本体に関数を足してから差し替える。</para>
     ///
-    /// <para>戦闘中は筐体の下の HP 帯とレーダーを常に隠す (<see cref="Game2DHud"/>)。 道具・〈有効活用〉・持ち物の窓は <see cref="BattleWindows"/>。
+    /// <para>戦闘中は航行の計器 (下の帯の HP・物資など) を引っ込める (<see cref="Game2DHud"/>)。 道具・〈有効活用〉・持ち物の窓は <see cref="BattleWindows"/>。
     /// BOT がランを動かしている間は戦闘の流れ (<see cref="Game2DBattleSim"/>) が動かないので、 この画面も出ない。</para>
     /// </summary>
     public class Game2DBattleLcd : MonoBehaviour

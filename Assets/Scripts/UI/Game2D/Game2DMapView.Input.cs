@@ -9,16 +9,14 @@ namespace UI.Game2D
     /// 航行の操作 (map-prototype.html の pointer / wheel / key イベント)。
     ///
     /// <list type="bullet">
-    /// <item>点にカーソルを乗せる = 行き先の見込み (半径 7 dot = HTML の 14 画素)。 GOLD の入れ物・ボタンの上、 ドラッグ中は出さない。</item>
-    /// <item>クリック = 隣の点へ 1 歩。 ドラッグした後のクリックは無効 / ボタン・GOLD の入れ物の上は、 そちらが先 (<see cref="Game2DNavPanel.Consumes"/>)。</item>
+    /// <item>点にカーソルを乗せる = 行き先の見込み (半径 7 dot = HTML の 14 画素)。 計器・ボタンの上、 ドラッグ中は出さない。</item>
+    /// <item>クリック = 隣の点へ 1 歩。 ドラッグした後のクリックは無効 / 計器・ボタンの上は、 そちらが先 (<see cref="Game2DNavExtras.Consumes"/>)。</item>
     /// <item>ホイール = X1 / X2 / X3 を 1 段ずつ (上 = 寄る・下 = 引く・140ms に 1 回)。 Z キー = X1→X2→X3 を回す。</item>
     /// <item>どの倍率でも (X1 でも) ドラッグ (5 画素以上動かすと始まる) か WASD (押している間・6 距離/秒) で視点を動かせる (視点は自分への追従を止める)。 C キーで追従に戻る。</item>
     /// </list>
     /// </summary>
     public partial class Game2DMapView
     {
-        [Tooltip("操作パネル (ボタン・GOLD の入れ物の上のクリックを地図が奪わないため)")] public Game2DNavPanel panel;
-
         private int _hover = -1, _hoverSfx = -1;
         private const float HoverRadius = 13f;              // dot (HTML は 14 画素 = 7 dot。 点どうしが離れているので、 約 2 倍に広げた)
         private const float PanSpeed = 6f;                  // 距離 / 秒
@@ -75,7 +73,7 @@ namespace UI.Game2D
             float wheel = Input.mouseScrollDelta.y;
             if (wheel != 0f && inside && Time.unscaledTime - _wheelAt >= 0.14f) { _wheelAt = Time.unscaledTime; ZoomTo(_zoom + (wheel > 0 ? 1 : -1)); }
 
-            bool consumes = inside && ((panel != null && panel.Consumes(d.x, d.y)) || Game2DNavExtras.Consumes(d));      // ボタン・計器の上のクリックは地図へ渡さない
+            bool consumes = inside && Game2DNavExtras.Consumes(d);      // ボタン・計器の上のクリックは地図へ渡さない
             // 地図の点の判定は、 湾曲を戻した位置で行う。 GUI を液晶の中身として合成している間 (既定) は TryDot が戻し済み (2026-11-16)・旧い提示の板の時だけここで戻す
             var dm = Game2DGuiRt.InLcd ? d : ScreenToMapDot(d);
 
@@ -123,7 +121,7 @@ namespace UI.Game2D
                 }
             }
 
-            // クリック (離した時): ドラッグした後・ボタン・GOLD の入れ物の上は無視
+            // クリック (離した時): ドラッグした後・計器・ボタンの上は無視
             if (Input.GetMouseButtonUp(0))
             {
                 bool wasDrag = _dragOn && _dragMoved; _dragOn = false;

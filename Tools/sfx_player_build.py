@@ -11,13 +11,12 @@ GROUPS = [
     ('【画面の中・8bit】戦闘の演出', [('slash_swing', '風切り (振りかぶり)'), ('hit_slash', 'ヒット (通常)'), ('hit_crit', 'ヒット (会心)'), ('hit_enemy', '被弾 (敵の攻撃)'), ('block', '防御'),
              ('hit_axe', 'ヒット 斧 (通常)'), ('crit_axe', 'ヒット 斧 (会心)'), ('charge_shield', '盾 チャージ (通常)'), ('charge_shield_crit', '盾 チャージ (会心)'), ('hit_shield', '盾 解放 (通常)'), ('crit_shield', '盾 解放 (会心)'),
              ('battle_start', '戦闘開始'), ('enemy_appear', '敵の登場'), ('victory', '勝利'), ('defeat', '敗北')]),
-    ('【画面の中・8bit】航行・地図上のできごと', [('step', '足音'), ('node_hover', 'ノード ホバー'), ('recon', '偵察'), ('flare_launch', '照明 打ち上げ'), ('flare_burst', '照明 開く'), ('lure_set', '囮罠 設置'),
+    ('【画面の中・8bit】航行・地図上のできごと', [('step', '足音'), ('node_hover', 'ノード ホバー'), ('recon', '測量'), ('flare_launch', '煙玉'), ('lure_set', '囮罠 設置'),
              ('lure_hit', '囮罠 作動'), ('chase_riser', '追跡者 捕捉 (上昇)'), ('chase_hit', '追跡者 捕捉 (衝撃)'), ('alert', '警戒'), ('lost', '見失い'), ('caught', '捕まる'),
              ('familiar', '使い魔'), ('hurt', '被ダメージ'), ('floor_up', '階層移動')]),
     # 2026-11-15 (#334): 天候の音は「嵐の段が進んだ時に、 その嵐の天候の音」(Game2DSfxHost.Weather)。 崩れる地平・沈み続ける湖面 (crumble / sink) は現象の廃止 (GAME.md §5-12) で鳴らないので外した
     ('【画面の中・8bit】嵐の段が進んだ (その嵐の天候)', [('wx_fog', '霧'), ('wx_sand', '削る砂'), ('wx_snow', '朱の雪'), ('wx_hail', '雹')]),
-    ('【画面の外・筐体の部品】ゴールドポット・パネル', [('nav_press', '航行ボタン (機械式スイッチ)'),
-             ('count_tick', '数字ドラム'), ('gui_in', 'GUI 入る (金属の板が滑る)'), ('gui_out', 'GUI 引っ込む'), ('radar_1', 'レーダー 弱 (ソナー)'), ('radar_2', 'レーダー 中'), ('radar_3', 'レーダー 強')]),
+    ('【画面の外】GUI の出し入れ', [('gui_in', 'GUI 入る (金属の板が滑る)'), ('gui_out', 'GUI 引っ込む')]),
     ('【画面の外・筐体の部品】戦闘パネル・メニュー', [('decide', '決定 (GO! / ROLL)'), ('dice_1', 'ダイス 1'), ('dice_2', 'ダイス 2'), ('dice_3', 'ダイス 3'), ('wire', '配線'),
            ('ui_hover', 'ホバー'), ('ui_click', 'クリック'), ('ui_confirm', '確定'), ('ui_open', '開く'), ('ui_close', '閉じる'), ('ui_tab', 'タブ')]),
 ]
@@ -46,8 +45,7 @@ for k, _l in REFS:
     if os.path.exists(p): data[k] = b64(p)
 
 # 実在の録音・生成した音 (Tools/sfx_real/<サブフォルダ>/*.mp3|wav): サブフォルダごとに 1 つの区分で並べる
-APPROVED_LABELS = {'wx_fog': '天候 霧 (8kHz・8bit)', 'wx_sand': '天候 砂嵐 (8kHz・8bit)', 'wx_snow': '天候 雪 (8kHz・8bit)', 'wx_hail': '天候 ひょう (8kHz・8bit・降り続ける)', 'radar_1': 'レーダー Lv1 遠い (間隔 1000ms)', 'radar_2': 'レーダー Lv2 かなり近い (間隔 700ms)', 'radar_3': 'レーダー Lv3 察知された (間隔 450ms)', 'gui_in': 'GUI 出る (カセットデッキ重ね)', 'gui_out': 'GUI 引っ込む (一斉にしまう 0.45 秒)', 'count_tick': '数字ドラム 1 つ進む (単発・連打で音程ばらつき)', 'nav_press': 'パネルのボタン (罠・照明・偵察)  カチッ + コトッ', 'pot_open': 'GOLD 入れ物 開 (カチッ + ガシャッ)', 'pot_close': 'GOLD 入れ物 閉 (衝突音 ↗ + レジのベル)',
-                   'coin_few_1': 'コイン 数枚 (1)  GOLD +1〜5', 'coin_few_2': 'コイン 数枚 (2)  ※ 1・2 をランダムに',
+APPROVED_LABELS = {'wx_fog': '天候 霧 (8kHz・8bit)', 'wx_sand': '天候 砂嵐 (8kHz・8bit)', 'wx_snow': '天候 雪 (8kHz・8bit)', 'wx_hail': '天候 ひょう (8kHz・8bit・降り続ける)', 'gui_in': 'GUI 出る (カセットデッキ重ね)', 'gui_out': 'GUI 引っ込む (一斉にしまう 0.45 秒)', 'coin_few_1': 'コイン 数枚 (1)  GOLD +1〜5', 'coin_few_2': 'コイン 数枚 (2)  ※ 1・2 をランダムに',
                    'coin_pour_1': 'コインの雨 1 秒  GOLD +6〜20', 'coin_pour_2': 'コインの雨 2 秒  GOLD +21〜30', 'coin_pour_3': 'コインの雨 3 秒  GOLD +31〜'}
 APPROVED_GROUP = []
 _ap = os.path.join(ROOT, 'sfx_real', 'approved')

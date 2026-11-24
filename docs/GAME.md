@@ -4312,7 +4312,9 @@ HP / 物資 / ターン / **充電ゲージ**（10 目盛り LED バー）/ **�
 （ターン数字 + 閾値ランプ）を常設。充電の消費予測はゲージの点滅表示。
 
 **計器盤は液晶の中身**（2026-11-16・作者の決定・§2-2）: 液晶の外の機構ではない。湾曲と液晶の効果が中身と同じに掛かる（§18-2「GUI も液晶の中身として合成する」）。
-四隅の部品（所持金の入れ物・左下の ITEMS・下の資源バー）が湾曲で寄って歪むのは許す（置き直さない）。旧い提示の板の影・上下の色調は捨てた。見た目の作り直しは見本を作って作者に見せてから。
+四隅の部品が湾曲で寄って歪むのは許す（置き直さない）。旧い提示の板の影・上下の色調は捨てた。見た目の作り直しは見本を作って作者に見せてから。
+
+**航行の計器（2026-11-24・羊皮紙の地図への移行の段 1・`Game2DNavExtras`・neon の配置 `Captures/nav_fantasy/answer_nav_parchment.md` §A-1）**: 旧い筐体の部品（錆びた GOLD の入れ物・TRAP/FLARE/RECON の金属のボタン盤・下の円いレーダー・金属の HP の計器（資源バー）・数字ドラム）は外し（§24）、戦闘・イベントの画面と同じ平たい暗い板と日本語の字で、液晶の安全域（`LcdSafeArea`・x 16〜464・y 9〜259）の内側に並べる。**上の帯**（y 9〜36）= 天気と嵐の時計 / 経過ターン・近道の残り・2 行目（ボタンの説明・捕捉中の警告・時限効果）/ 所持金。**右の列**（x 416〜464）= [測量] [囮罠（残りの数）] [待つ] と、航行アイテムの 3 枠（V / B / N）。**下の帯** = HP（戦闘の画面の左下と同じ位置・同じ棒 = `BattleLcdLayout.MBarX0`〜`MBarY`。戦闘に入っても HP だけが同じ所に残る）と物資（同じ形の棒・行き先の見込みの分を点滅させて −N）。**左の列**（x 16〜56）= 所持品（2 列 × 5 段・押すと持ち物の画面）。所持金は増えると数字が明るく点滅して金の粒（1 dot）が上がり、硬貨の音（`Game2DSfx.DiceCoin`）を鳴らす。減ると赤く点滅するだけ。戦闘中は 4 方向へ引っ込む（`Game2DHud` のばね）。地図の本体（紺の地・線・点）の見た目は段 3 で羊皮紙へ移す（今は触らない）。builder で作り直していないシーンに旧い部品の GameObject が残っていれば、`Game2DHud.Awake` が消す。
 
 ---
 
@@ -4327,7 +4329,7 @@ HP / 物資 / ターン / **充電ゲージ**（10 目盛り LED バー）/ **�
 
 ### 18-6. 音（2026-11-15・#327）
 
-**方針**: 画面の中（液晶の中: 地図・戦闘の演出・地図の上の出来事）= **8bit 音源**（`Tools/sfx_gba.py`・`Tools/sfx_chip.py`）。画面の外（筐体の部品: GOLD の入れ物・パネルのボタン・数字ドラム・レーダー・GUI の出し入れ・窓・ダイス）= **実物の音の作り**（`Tools/sfx_analog.py`・採用した録音や生成は `Tools/sfx_real_apply.py`）。作る順は sfx_gba → sfx_chip → sfx_analog → sfx_real_apply（同名を上書きする）。音は `Assets/Resources/Game2DSfx/<名前>.wav`（git の管理外・#325）、鳴らすのは `Game2DSfx.Play("名前")`（同じ音は 30 ms 以内に重ねない）。**名前を組み立てて鳴らす音**（`dice_`・`radar_`・`wx_`・`coin_few_`）の頭の表は `Game2DSfx.ComposedPrefixes` の 1 か所で、sfx_real_apply.py がそれを読んで「コードに名前が無い wav を消す」掃除から外す（#326）。今は鳴らさないが消さない音（`crumble`・`sink`）は sfx_real_apply.py の `KEEP_UNUSED`。
+**方針**: 画面の中（液晶の中: 地図・戦闘の演出・地図の上の出来事）= **8bit 音源**（`Tools/sfx_gba.py`・`Tools/sfx_chip.py`）。画面の外（GUI の出し入れ・窓・ダイス）= **実物の音の作り**（`Tools/sfx_analog.py`・採用した録音や生成は `Tools/sfx_real_apply.py`）。作る順は sfx_gba → sfx_chip → sfx_analog → sfx_real_apply（同名を上書きする）。音は `Assets/Resources/Game2DSfx/<名前>.wav`（git の管理外・#325）、鳴らすのは `Game2DSfx.Play("名前")`（同じ音は 30 ms 以内に重ねない）。**名前を組み立てて鳴らす音**（`dice_`・`wx_`・`coin_few_`）の頭の表は `Game2DSfx.ComposedPrefixes` の 1 か所で、sfx_real_apply.py がそれを読んで「コードに名前が無い wav を消す」掃除から外す（#326）。今は鳴らさないが消さない音（`crumble`・`sink`）は sfx_real_apply.py の `KEEP_UNUSED`。
 
 **音を鳴らす所の決まり**: 操作の音は**操作の関数か本体の出来事の側**で鳴らし、ボタンでもキーでも同じに鳴るようにする（#321）。成否のある操作は**できた時だけ**鳴らす（#323）。**できない操作**は `Game2DModal.ShowError`（失敗の音 `Game2DSfx.Error` = `ui_error`・無ければ `ui_click` を低く）で、選ぶ音と分ける（#324）。同じ出来事を 2 つの経路で鳴らさない（#322）。BOT がランを動かしている間（`GameHooks.BotDriving`）は、新しく足した合図の音（航行の HP・戦闘の合図）を鳴らさない。
 
@@ -4335,9 +4337,9 @@ HP / 物資 / ターン / **充電ゲージ**（10 目盛り LED バー）/ **�
 |---|---|---|---|
 | 窓（筐体） | 開く / 閉じる / ボタン / 確定 / 行・タブ / ホバー | `ui_open` / `ui_close` / `ui_click` / `ui_confirm` / `ui_tab` / `ui_hover` | `Game2DModal` |
 | 窓（筐体） | できない操作（買えない・足りない・使えない） | `ui_error` | `Game2DModal.ShowError` |
-| 筐体 | GUI の出し入れ / 航行のボタン / 数字ドラム / GOLD の入れ物の開閉 | `gui_in`・`gui_out` / `nav_press` / `count_tick` / `pot_open`・`pot_close` | `Game2DHud`・`Game2DNavPanel`・`Game2DCounter`・`Game2DGoldPot` |
-| 筐体 | GOLD が増えた（報酬・売却など全部） | `coin_few_1/2`・`coin_pour_1〜3`（増えた量で段階） | `Game2DGoldPot.Payout` だけ |
-| 筐体 | レーダーの気配 | `radar_1〜3` | `Game2DRadar` |
+| 計器 | GUI の出し入れ | `gui_in`・`gui_out` | `Game2DHud` |
+| 計器 | 所持金が増えた（報酬・売却など全部・2026-11-24〜 航行の計器の所持金） | `coin_few_1/2`・`coin_pour_1〜3`（増えた量で段階） | `Game2DNavExtras.NoteGold` だけ |
+| 計器 | 押せない操作のボタン（測量・囮罠） | `ui_error` | `Game2DNavExtras`（`Game2DSfx.Error`） |
 | 航行 | 歩いた（着いた点が雪の中なら低く・#331） | `step` | `Game2DSfxHost`（`FreeMapEvent.Arrived`・`WeatherAt(Me, Snow)`） |
 | 航行 | 偵察 / 照明 / 囮罠を置けた / 待つ | `recon` / `flare_launch` → `flare_burst` / `lure_set` / `ui_click` | `GameManager.OnNavFx`（`ReconTurn`・`UseFlare`・`TryPlaceLure`・`WaitTurn`） |
 | 航行 | 追跡者に見つかった / 警戒 / 見失った / 捕まった / 使い魔 / 囮罠を踏んだ | `chase_riser`→`chase_hit` / `alert` / `lost` / `caught` / `familiar` / `lure_hit` | `Game2DSfxHost`（`FreeMapEvent`） |
@@ -6096,6 +6098,7 @@ BOT の払い方（`AutoRunner.Terminals` の `ChooseGoldPunch`）は実装済�
 
 | 対象 | 時期 | 理由 |
 |---|---|---|
+| **旧い筐体の航行の部品: GOLD の入れ物（`Game2DGoldPot`・`Game2DGoldCore`・6 層の絵と金貨の粒）・TRAP / FLARE / RECON の金属のボタン盤（`Game2DNavPanel`・残数ランプ）・円いレーダー（`Game2DRadar`）・資源バー（`Game2DResBar`・`bar_layer1〜4`）・数字ドラム（`Game2DCounter`・`counter_strip`）と、その音（`nav_press`・`pot_open`・`pot_close`・`count_tick`・`radar_1〜3`）** | 2026-11-24 | 作者の決定「ちょっと近未来的過ぎる」（航行を羊皮紙の地図へ移す・neon `Captures/nav_fantasy/answer_nav_parchment.md` の段 1）。液晶の中の平たい暗い帯（`Game2DNavExtras`）へ置き換えた（§18-5）。押す所の座標変換 `Game2DPointer` は残して別のファイルへ移した |
 | **〈怠惰〉の出目の −N を役の判定にも通していたこと**（`CombatManager.Turn` 3. で引いた後の目を `ResolveRoles` が読んでいた） | 2026-11-23 | 不具合。 1・2・3 が全部 1 になり〈極〉が 1/8 で立った（怠惰のクリア 14.1% > 強制しない難易度 10 の 5.6%）。 役は引く前の目（`RoleDice`・`TerminalEnv.roleDiceCut`）で判定する |
 | **難易度 7 の並び I・II・II・III・III・〈傲慢〉−60% / −25%・〈強欲〉の敵の攻撃の上乗せなし** | 2026-11-23 | neon answer19 §2-1（作者の承認）。 Lv6→7 の急落（−2.89）と Lv7→8 の平坦（−0.12）・〈傲慢〉〈強欲〉が強制しない難易度 10 と同じくらい軽かった |
 | **整備パネル（基礎整備 6 段・「基礎整備を切る」・作戦の枠 3 つ・モジュールの解禁）と遺物（3 部位・セット・強化・分解・素材・`MetaProgression/Relics/`・遺物の窓・AutoTest の遺物の口 relicLoadoutSpec / relicStatOff / relicSetBonusOff / forceNoRelic / forceTheoreticalRelic・遺物のスイープ・周回モードの遺物）** | 2026-11-23 | 作者の承認（neon answer23 / answer24）。 ラン外の成長を 3×3 の整備盤とトークン 1 本へ統合（§15-1）。 遺物は初回の基準（遺物なし）と周回の成長の役割が整備パネルと被り、 2 本の成長が別々に調整を要した。 旧いセーブは払ったトークンを全額返し、 遺物 10・素材 5 トークンに換える |

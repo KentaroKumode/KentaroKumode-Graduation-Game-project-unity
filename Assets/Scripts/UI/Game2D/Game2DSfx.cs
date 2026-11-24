@@ -5,7 +5,7 @@ namespace UI.Game2D
 {
     /// <summary>
     /// Game2D の効果音 (2026-10-24)。 音は earshot の音のバンクから作った WAV (Assets/Resources/Game2DSfx/) で、 名前で鳴らす。
-    /// 音の対応: ui_hover / ui_click / ui_confirm / ui_open / ui_close / ui_tab / nav_press / pot_open / pot_close / gui_in / gui_out /
+    /// 音の対応: ui_hover / ui_click / ui_confirm / ui_open / ui_close / ui_tab / gui_in / gui_out /
     /// dice_1〜3 (ダイスの転がり) / wire / decide / swing / hit / crit / enemy_hit / block / enemy_appear / battle_start / victory / defeat。
     /// 鳴らす所は 2D の 1 つの AudioSource。 少し遅らせて鳴らす (<see cref="PlayDelayed"/>) 場合は <see cref="Game2DSfxHost"/> が時刻を見て鳴らす。
     /// </summary>
@@ -14,9 +14,9 @@ namespace UI.Game2D
         /// <summary>全体の音量 (0〜1)。</summary>
         public static float Volume = 0.8f;
 
-        /// <summary>名前を組み立てて鳴らす音の頭 (dice_1〜3・radar_1〜3・wx_霧など・coin_few_1/2)。 <b>音の名前を文字列で書かない呼び方を足したら、 ここに頭を足す</b>。
+        /// <summary>名前を組み立てて鳴らす音の頭 (dice_1〜3・wx_霧など・coin_few_1/2)。 <b>音の名前を文字列で書かない呼び方を足したら、 ここに頭を足す</b>。
         /// Tools/sfx_real_apply.py はコードに "名前" が無い wav を消すが、 この表の頭で始まる音は残す (表はこの 1 か所・道具がこの行を読む・#326)。</summary>
-        public static readonly string[] ComposedPrefixes = { "dice_", "radar_", "wx_", "coin_few_" };
+        public static readonly string[] ComposedPrefixes = { "dice_", "wx_", "coin_few_" };
         private static readonly Dictionary<string, AudioClip> Clips = new Dictionary<string, AudioClip>();
         private static readonly Dictionary<string, float> Last = new Dictionary<string, float>();
         private static Game2DSfxHost _host;
@@ -120,7 +120,7 @@ namespace UI.Game2D
             else Play("coin_few_" + Random.Range(1, 3), 1f, Random.Range(0.97f, 1.03f));
         }
 
-        /// <summary>GOLD の入れ物に GOLD が入る音 (<see cref="Reward"/> と同じ段階)。</summary>
+        /// <summary>所持金が増えた音 (<see cref="Reward"/> と同じ段階・鳴らすのは航行の計器の所持金 <see cref="Game2DNavExtras.NoteGold"/> だけ)。</summary>
         public static void DiceCoin(int delta) { Reward(delta); }
 
         /// <summary>ダイスが転がる音 (3 つの音をランダムに、 間をあけて数回)。</summary>

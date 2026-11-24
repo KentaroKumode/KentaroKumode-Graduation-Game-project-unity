@@ -113,14 +113,10 @@ add('ui_confirm', beeps([(note('A5'), 0.05), (note('D6'), 0.05), (note('A6'), 0.
 add('ui_open', sq(sweep_f(500, 1500, 0.1), 0.1, 0.25) * env(0.1, 0.003, 0.07), -10)
 add('ui_close', sq(sweep_f(1500, 480, 0.1), 0.1, 0.25) * env(0.1, 0.003, 0.07), -11)
 add('ui_tab', sq(1175, 0.032, 0.125) * env(0.032, 0.001, 0.02), -11)
-add('nav_press', beeps([(660, 0.03), (990, 0.06)], tau=0.04), -8)
 add('node_hover', sq(2349, 0.012, 0.25) * env(0.012, 0.001, 0.008), -20)
 add('wire', beeps([(1568, 0.022), (2093, 0.03)], tau=0.02), -10)
 x = np.zeros(n_of(0.09)); at(x, bp(noise(0.02), 900, 3200) * env(0.02, 0.0005, 0.006), 0.0); at(x, lp(bp(noise(0.03), 200, 900), 900) * env(0.03, 0.0005, 0.01) * 0.7, 0.004); at(x, bp(noise(0.02), 1200, 3800) * env(0.02, 0.0005, 0.005) * 0.6, 0.04)
 add('decide', x, -14, lowcut=130)      # 決定 (GO! / ROLL): 電子音ではなく、 小さなスイッチの「カチッ」。 雑音のみ
-add('count_tick', sq(3000, 0.005, 0.5) * env(0.005, 0.0005, 0.003), -24)
-add('pot_open', sq(sweep_f(300, 900, 0.14), 0.14, 0.25) * env(0.14, 0.003, 0.1), -9)
-add('pot_close', sq(sweep_f(900, 300, 0.14), 0.14, 0.25) * env(0.14, 0.003, 0.1), -9)
 add('gui_in', bp(noise(0.25), 700, 4200) * np.sin(np.linspace(0, np.pi, n_of(0.25))) ** 2, -14)
 add('gui_out', bp(noise(0.22), 900, 5000) * np.sin(np.linspace(0, np.pi, n_of(0.22))) ** 2, -14)
 
@@ -203,9 +199,6 @@ x = np.zeros(n_of(0.45))
 for i in range(5): at(x, sq(note('G5') * 2 ** (i / 12), 0.025, 0.5) * env(0.025, 0.001, 0.015), i * 0.07)
 add('recon', x, -11)
 x = np.zeros(n_of(0.6)); at(x, hp(noise(0.5), 1800) * np.linspace(0, 1, n_of(0.5)) * 0.6 + sq(sweep_f(400, 2400, 0.5), 0.5, 0.25) * np.linspace(0, 1, n_of(0.5)) * 0.5, 0); add('flare_launch', x, -9)
-x = np.zeros(n_of(0.9)); at(x, bp(noise(0.9), 2000, 9000) * env(0.9, 0.002, 0.22), 0)
-for i in range(6): at(x, sq(RNG.uniform(2500, 5200), 0.02, 0.25) * env(0.02, 0.001, 0.012) * 0.7, RNG.uniform(0.02, 0.5))
-add('flare_burst', x, -11)
 add('lure_set', beeps([(700, 0.03), (700, 0.03)], gap=0.03, tau=0.025), -9)
 x = bp(noise(0.16), 500, 6000) * env(0.16, 0.001, 0.05) + sq(sweep_f(1300, 200, 0.2), 0.2, 0.25)[:n_of(0.16)] * env(0.16, 0.001, 0.07) * 0.7
 add('lure_hit', x, -8)
@@ -220,9 +213,6 @@ add('caught', x, -7, lowcut=150)
 add('familiar', sq(sweep_f(1800, 500, 0.2), 0.2, 0.125) * env(0.2, 0.002, 0.12), -11)
 add('hurt', bp(noise(0.12), 500, 5000) * env(0.12, 0.001, 0.035) + sq(sweep_f(650, 160, 0.12), 0.12, 0.25) * env(0.12, 0.001, 0.045) * 0.7, -7, lowcut=150)
 add('floor_up', beeps([(note('C5'), 0.07), (note('G5'), 0.07), (note('C6'), 0.07), (note('E6'), 0.2)], tau=0.12, duty=0.25), -9)
-add('radar_1', sq(1397, 0.018, 0.25) * env(0.018, 0.001, 0.012), -16)
-add('radar_2', beeps([(1397, 0.02), (1397, 0.02)], gap=0.05, duty=0.25, tau=0.015), -14)
-add('radar_3', beeps([(1865, 0.018)] * 4, gap=0.03, duty=0.25, tau=0.012), -11)
 
 # ── 天候・地形 ──
 w = n_of(1.1); sh = np.sin(np.linspace(0, np.pi, w)) ** 2

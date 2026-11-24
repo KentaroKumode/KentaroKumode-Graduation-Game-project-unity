@@ -98,12 +98,12 @@ namespace UI.Game2D
 
         private void OnDestroy() { Unhook(); if (_cueHooked) { CombatManager.OnCue -= OnCombatCue; _cueHooked = false; } }
 
-        /// <summary>航行の操作 (ボタンでもキーでも同じ関数を通る・#321): 照明・偵察・囮罠 (置けた時だけ・#323)・待つ。</summary>
+        /// <summary>航行の操作 (ボタンでもキーでも同じ関数を通る・#321): 測量・偵察・囮罠 (置けた時だけ・#323)・待つ。 測量と偵察は同じ 1 本の音 (2026-11-24)。</summary>
         private void OnNavFx(GameManager.NavFx fx)
         {
             switch (fx)
             {
-                case GameManager.NavFx.Flare: Game2DSfx.Play("flare_launch"); Game2DSfx.PlayDelayed("flare_burst", 0.45f, 0.8f); break;
+                case GameManager.NavFx.Flare:
                 case GameManager.NavFx.Recon: Game2DSfx.Play("recon"); break;
                 case GameManager.NavFx.Lure: Game2DSfx.Play("lure_set"); break;
                 case GameManager.NavFx.Wait: Game2DSfx.Play("ui_click"); break;
@@ -111,7 +111,7 @@ namespace UI.Game2D
         }
         /// <summary>航行で HP を払った (物資切れの歩行・嵐・雹・#318)。</summary>
         private void OnNavHp(int dmg, string reason) { if (dmg > 0 && !GameHooks.BotDriving) Game2DSfx.Play("hurt"); }
-        // (戦闘の報酬の GOLD の音は GOLD の入れ物 (Game2DGoldPot.Payout) だけが鳴らす。 ここでも鳴らすと二重になった・#322)
+        // (所持金の音は航行の計器の所持金 (Game2DNavExtras.NoteGold) だけが鳴らす。 ここでも鳴らすと二重になった・#322)
         private void OnFloor(int floor) { Game2DSfx.Play("floor_up"); }
         private void OnTile(MapSystem.TileType t) { Game2DSfx.Play("ui_open", 0.8f, 0.9f); }
 
