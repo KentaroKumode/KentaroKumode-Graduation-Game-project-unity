@@ -149,6 +149,8 @@ namespace ItemSystem.PassiveSkills
         public int hitFocusSpentRenki;
         /// <summary>[perTurn] (撃ごとに CombatManager が書く) この撃は〈必殺の照準器〉のもう 1 回の撃 (もう一度集中にならない・【練気】を使わない)。 BeginNewTurn で false。</summary>
         public bool isRefireHit;
+        /// <summary>[perTurn] (撃ごとに CombatManager が書く) この撃は【再起動】で発動した撃 (〈灼線鞭〉〈溜め撃ちの誘導コイル〉が読む)。</summary>
+        public bool isRebootHit;
         /// <summary>この撃が本物の主攻撃の撃か (攻撃しないターンの空の 1 回ではない)。</summary>
         public bool IsRealHit => playerWonRoll && hitIndex < hitCount;
         public float criticalMultiplier; // [perTurn] (Phase B で基礎値 + メタ・遺物へ戻す) 会心倍率（既定 2.0。2026-07-26 に 3.0 へ上げ、2026-08-03 に 2.0 へ差し戻し）
@@ -581,6 +583,8 @@ namespace ItemSystem.PassiveSkills
         public int finalDamagePct;
         /// <summary>[persistent] 〈腐蝕の王冠〉: 敵の毒の上限 (99) が無くなり、 敵へ与える毒がすべて 1.5 倍 (切り上げ・<see cref="AddStatus"/>)。 段の交代で毒の半分が次の段へ残る (CombatManager.SwapEnemy)。</summary>
         public bool poisonCrown;
+        /// <summary>[persistent] 〈蓋付きの毒指輪〉: 戦闘開始から 5 ターン目まで敵へ与える毒 +2 (<see cref="AddStatus"/>)。</summary>
+        public bool poisonRingEarly;
         /// <summary>[persistent] 〈血の楔〉: 敵が得るシールドと回復の量、 敵の被ダメ軽減のパッシブで減る量を 出血 ÷ (出血 + 30) だけ弱める (<see cref="WedgeEnemyGain"/>)。</summary>
         public bool bleedWedge;
         /// <summary>[persistent] 〈涸れぬ血晶〉: 敵の出血が既に <see cref="CombatSystem.BleedCore.CrystalNeed"/> 以上ある時、 与える出血が 2 倍 (<see cref="AddEnemyBleed"/>)。</summary>
@@ -818,12 +822,20 @@ namespace ItemSystem.PassiveSkills
             // 2026-08-16: 〈回帰性真理〉のデバフ**付与拒否**は撤去した。
             //   毒/出血ビルドが最終ボスに参加できない状態になっていたため。
             //   累積の抑制は RecurrentTruth 側の「毎ターン半減」が担う。
-            if (stacks > 0 && target == StatusTarget.Enemy && id == "poison" && _poisonBonusTurn != currentTurn)
+            if (stacks > 0 && target == StatusTarget.Enemy && id == "poison")
             {
-                // 種火・毒 r2 (2026-11-07): 「毒を与えるたび +1」→「1 ターンに最初の 1 回だけ +2」。
-                //   毒の入り口を品ごとに増やしたので、 与えるたびだと入り口の +1 がすべて 2 倍になった。
-                int metaBonus = MetaProgression.MetaBuffApplicator.GetPoisonApplyBonus();
-                if (metaBonus > 0) { stacks += metaBonus; _poisonBonusTurn = currentTurn; }
+                if (_poisonBonusTurn != currentTurn)
+                {
+                    // 種火・毒 r2 (2026-11-07): 「毒を与えるたび +1」→「1 ターンに最初の 1 回だけ +2」。
+                    //   毒の入り口を品ごとに増やしたので、 与えるたびだと入り口の +1 がすべて 2 倍になった。
+                    int metaBonus = MetaProgression.MetaBuffApplicator.GetPoisonApplyBonus();
+                    if (metaBonus > 0) { stacks += metaBonus; _poisonBonusTurn = currentTurn; }
+                }
+                if ((poisonRingEarly || (currentTurn <= 1 && AxisRules.Owns(GameLoop.GameManager.Instance?.Run, GameLoop.ItemIds.PoisonRing)))
+                    && currentTurn <= CombatSystem.PoisonCore.RingAssassinTurns)
+                {
+                    stacks += CombatSystem.PoisonCore.RingBonusPoison;
+                }
             }
             if (poisonCrown && stacks > 0 && target == StatusTarget.Enemy && id == "poison") stacks = (stacks * 3 + 1) / 2;   // 〈腐蝕の王冠〉: 1.5 倍 (切り上げ)
             var dict = target == StatusTarget.Enemy ? enemyStatusStacks : playerStatusStacks;
@@ -1268,12 +1280,16 @@ namespace ItemSystem.PassiveSkills
         public static void ResetChargeStats()
             => ChargeGained = ChargeWasted = ChargeSpentTotal = ChargeSpendCalls = 0;
 
+        /// <summary>直近の <see cref="ConsumeCharge"/> 支払い前の充電 (〈過負荷チューナー〉が過充電中だったかを判定する)。</summary>
+        public int LastChargeBeforeSpend { get; private set; }
+
         /// <summary>充電を n 消費 (足りなければ false)。</summary>
         public bool ConsumeCharge(int n)
         {
             if (n <= 0) return true;
             int cur = GetCharge();
             if (cur < n) return false;
+            LastChargeBeforeSpend = cur;
             accumulatedValues["mutualCharge"] = cur - n;
             ChargeSpentTotal += n;
             ChargeSpendCalls++;

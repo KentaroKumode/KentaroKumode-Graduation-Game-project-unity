@@ -275,8 +275,8 @@ namespace CombatSystem
         public int enemyMaxDie;
         /// <summary>このターンが敵の大技か (兆し読みの賽)。</summary>
         public bool heavyTurn;
-        /// <summary>充電を払う量から引く量 (〈過負荷チューナー〉の過充電の間 <see cref="ChargeCore.TunerCut"/>・<see cref="ChargeCore.CostNow"/>)。 端子と再起動・オーバークロック・〈逆さ避雷針〉に掛ける。 「全部払う」端子には掛けない。</summary>
-        public int chargeCostCut;
+        /// <summary>充電を払う量から引く量 (旧〈過負荷チューナー〉の名残・現在 0)。 / 所持している充電の秘宝の数 (〈二股の導線〉のコスト計算) / 〈過負荷チューナー〉のこのターン残り還流回数。</summary>
+        public int chargeCostCut, chargeRelics, tunerLeft;
         /// <summary>このターン、 配線より前に充電を使った回数 (振り直し・ctx の ChargeSpendsThisTurnKey)。 〈灼線鞭〉の「2 回以上」が読む。</summary>
         public int chargeSpendsTurn;
         /// <summary>攻撃の種類の端子に挿せない (〈シュヴァリエのレイピア〉のコントラタック中・2026-11-20)。 挿した出目は「0.」で外す (止まった端子と同じ)。</summary>
@@ -318,6 +318,7 @@ namespace CombatSystem
         public int heal, selfDamage, shield, chargeSpend;
         /// <summary>充電の支払い 1 回ずつ (合計 = <see cref="chargeSpend"/>)。 本体は 1 回ごとに ctx.ConsumeCharge を呼ぶ (「充電を使うたび」の品が回数を数える)。</summary>
         public readonly List<int> chargePays = new List<int>();
+        internal int tunerLeft, chargeCapSim;
         /// <summary>【再起動】した端子 (場の添字・〈二股の導線〉〈逆さ避雷針〉〈灼線鞭〉の順・同じ端子が 2 回入ることもある)。 / 〈二股の導線〉で再起動した端子 (−1 = なし)。</summary>
         public readonly List<int> rebooted = new List<int>();
         public int rebootSlot = -1;
@@ -891,7 +892,7 @@ namespace CombatSystem
                                               int reboot = ChargeCore.RebootNone, bool overclock = false, int[] plugRank = null)
         {
             int n = dice.Length, m = board.Count;
-            var o = new TerminalOutcome { slotOfDie = new int[n], kindOfDie = new DiceTerminal[n], logAttack = logAttack };
+            var o = new TerminalOutcome { slotOfDie = new int[n], kindOfDie = new DiceTerminal[n], logAttack = logAttack, tunerLeft = env.tunerLeft, chargeCapSim = env.chargeCap > 0 ? env.chargeCap : 30 };
             if (logAttack) o.attackLog = new List<string>();
             o.stopped = state.stopped != null ? (bool[])state.stopped.Clone() : null;
             var v = Scratch(ref _sV, n);
@@ -1098,11 +1099,11 @@ namespace CombatSystem
                 return best;
             }
             var ci = state.chargeItems;
-            //   〈二股の導線〉【再起動】: 1 ターン 1 回・充電 6 (〈過負荷チューナー〉で減る)。 対象 = 人 / BOT の指定 (おまかせは AutoValue の最大)
+            //   〈二股の導線〉【再起動】: 1 ターン 1 回・充電 (12 − 充電秘宝数、最小 6)。 対象 = 人 / BOT の指定 (おまかせは AutoValue の最大)
             if ((ci & ChargeItems.Fork) != 0 && reboot != ChargeCore.RebootNone)
             {
                 int tgt = reboot == ChargeCore.RebootAuto ? Best(false, false) : Rebootable(reboot, false, false) ? reboot : -1;
-                int cost = CardRules.RebootCost(ChargeCore.CostNow(ChargeCore.RebootCost, env.chargeCostCut));   // 挑戦カード〈予備電源〉III: −N (最低 1)
+                int cost = CardRules.RebootCost(ChargeCore.CostNow(ChargeCore.ForkRebootCost(env.chargeRelics), env.chargeCostCut));   // 挑戦カード〈予備電源〉III: −N (最低 1)
                 if (tgt >= 0 && charge >= cost) { Pay(o, ref charge, cost); o.rebootSlot = tgt; Refire(tgt, "再起動"); }
             }
             //   〈逆さ避雷針〉: 敵の攻撃が来るターン、 充電 5 で被ダメ −6 と、 発動した防御の端子 (ブロックの最も多い 1 枚) の自動再起動 (1 ターン 1 回)
@@ -1122,11 +1123,18 @@ namespace CombatSystem
                 Pay(o, ref charge, CardRules.RebootCost(ChargeCore.CostNow(ChargeCore.OverclockCost, env.chargeCostCut)));
                 o.overclock = true;
             }
-            //   〈灼線鞭〉: このターン充電を 2 回以上使った (振り直しも数える) なら、 発動した中で最も攻撃の多い攻撃の端子を無料で再起動 (1 ターン 1 回)
-            if ((ci & ChargeItems.Whip) != 0 && env.chargeSpendsTurn + o.chargePays.Count >= 2)
+            //   〈灼線鞭〉: このターン充電を 2 回以上使った (振り直しも数える) なら、 発動した中で最も攻撃の多い攻撃の端子を無料で再起動。
+            //   さらに他の【再起動】が発動済みで充電を 4 回以上使ったターンなら、 もう 1 回無料で再起動 (2026-11-26 充電A上振れ強化)
+            if ((ci & ChargeItems.Whip) != 0 && env.chargeSpendsTurn + o.chargePays.Count >= ChargeCore.WhipSpendsFirst)
             {
+                bool hadOtherReboot = o.rebooted.Count > 0;
                 int tgt = Best(true, false);
-                if (tgt >= 0) Refire(tgt, "灼線鞭");
+                if (tgt >= 0)
+                {
+                    Refire(tgt, "灼線鞭");
+                    if (hadOtherReboot && env.chargeSpendsTurn + o.chargePays.Count >= ChargeCore.WhipSpendsSecond)
+                        Refire(tgt, "灼線鞭・連");
+                }
             }
 
             // ── 5d. 毒の品 (2026-11-21・PoisonCore・full-item-rework-ledger §②): 発動・再起動が決まった後に、 毒・回復・ブロック・被ダメ・防御無視を足す ──
@@ -1414,11 +1422,13 @@ namespace CombatSystem
             return l;
         }
 
-        /// <summary>充電を n 払う (解決の中の手元の充電から引き、 支払い 1 回として控える)。</summary>
+        /// <summary>充電を n 払う (解決の中の手元の充電から引き、 支払い 1 回として控える。 〈過負荷チューナー〉の条件を満たせば直後に +2 還流)。</summary>
         private static void Pay(TerminalOutcome o, ref int charge, int n)
         {
             if (n <= 0) return;
+            bool refund = o.tunerLeft > 0 && charge >= ChargeCore.OverchargeAt && n >= ChargeCore.TunerMinSpend;
             charge -= n; o.chargeSpend += n; o.chargePays.Add(n);
+            if (refund) { o.tunerLeft--; charge = Math.Min(o.chargeCapSim, charge + ChargeCore.TunerRefund); }
         }
 
         private static bool Plugged(int[] slotOfDie, int s)

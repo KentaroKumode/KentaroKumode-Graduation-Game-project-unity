@@ -35,12 +35,12 @@
         public const int DetonateMaxHpBp = 25, MagazineMaxHpBp = 32;
         /// <summary>起爆で消費する毒の割合の分母 (毒 ÷ これ・切り上げ・2026-11-22 neon 収束: 2 → 3)。</summary>
         public const int SpendDiv = 3;
-        /// <summary>〈蓋付きの毒指輪〉: 起爆に要る敵の毒 (2026-11-22 neon 収束: 16 → 24。 起爆の後も 16 残り、 〈瘴気の外套〉15・〈口縫いの毒糸〉10・〈麻痺の吹き矢〉12 が切れない)。</summary>
-        public const int RingNeed = 24;
-        /// <summary>〈劇毒の火薬庫〉: 1 ターンに与えた毒の合計がこれ以上なら、 ターンの終わりに起爆。</summary>
-        public const int MagazineGiven = 8;
-        /// <summary>〈遅効の毒刃〉: この戦闘で起爆した回数 1 回につき、 起爆のダメージ +%。</summary>
-        public const int SlowBladePctPerDetonate = 30;
+        /// <summary>〈蓋付きの毒指輪〉: 起爆に要る敵の毒 (2026-11-26: 24 → 20) / 開幕暗殺ターン数 / その間の付与毒 +N・劇症ダメージ +%。</summary>
+        public const int RingNeed = 20, RingAssassinTurns = 5, RingBonusPoison = 2, RingEarlyPct = 50;
+        /// <summary>〈劇毒の火薬庫〉: 1 ターンに与えた毒の合計がこれ以上、かつ敵の毒が <see cref="MagazineMinPoison"/> 以上なら、ターンの終わりに起爆 (2026-11-26 下限追加)。</summary>
+        public const int MagazineGiven = 8, MagazineMinPoison = 18;
+        /// <summary>〈遅効の毒刃〉: この戦闘で起爆した回数 1 回につき、 起爆のダメージ +% (最大 +150%・2026-11-26 上限追加) / 劇症後の即死ライン倍率 (毒 × 2、ボスは半分 = × 1)。</summary>
+        public const int SlowBladePctPerDetonate = 30, SlowBladeMaxPct = 150, SlowBladeKillMul = 2;
         /// <summary>〈骨溶かしの黒油〉: ダウン中の毒のダメージ・起爆の倍率。</summary>
         public const int OilDownMul = 2;
         /// <summary>【起爆】でボスの次の目盛りを上げる割合 (起爆のダメージの %) / 〈骨溶かしの黒油〉: ボスをダウンさせたとき敵に与える毒 (2026-11-25 neon answer_gauge)。</summary>
@@ -61,18 +61,23 @@
         public static int Spend(int poison) => poison > 0 ? (poison + SpendDiv - 1) / SpendDiv : 0;
 
         /// <summary>起爆 1 回のダメージ (消費量 <paramref name="spent"/>・この戦闘でここまでに起爆した回数 <paramref name="before"/>・ダウン中 <paramref name="down"/>・
-        /// 敵の最大 HP <paramref name="enemyMaxHp"/> (ctx.enemyMaxHP・ヴェスカは段ごとの最大 HP)・威力 <paramref name="powerPct"/>%)。 切り捨て。</summary>
-        public static int Damage(int spent, PoisonItems f, int before, bool down, int enemyMaxHp, int powerPct = 100)
+        /// 敵の最大 HP <paramref name="enemyMaxHp"/> (ctx.enemyMaxHP・ヴェスカは段ごとの最大 HP)・威力 <paramref name="powerPct"/>%・ターン <paramref name="turn"/>)。 切り捨て。</summary>
+        public static int Damage(int spent, PoisonItems f, int before, bool down, int enemyMaxHp, int powerPct = 100, int turn = 99)
         {
             if (spent <= 0) return 0;
             bool mag = (f & PoisonItems.Magazine) != 0;
             long d = System.Math.Max((long)spent * (mag ? MagazineMul : DetonateMul),
                                      (long)spent * System.Math.Max(0, enemyMaxHp) * (mag ? MagazineMaxHpBp : DetonateMaxHpBp) / 10000);
             if (CardRules.DetonateMulTenths > 0) d += (long)spent * CardRules.DetonateMulTenths / 10;   // 挑戦カード〈毒仕込み〉: 倍率 +0.5 / +1.0 / +1.5 (切り捨て・最大 HP の項との大きい方に足す)
-            if ((f & PoisonItems.SlowBlade) != 0 && before > 0) d = d * (100 + SlowBladePctPerDetonate * before) / 100;
+            if ((f & PoisonItems.Ring) != 0 && turn >= 1 && turn <= RingAssassinTurns) d = d * (100 + RingEarlyPct) / 100;   // 〈蓋付きの毒指輪〉: 1〜5 ターン目 +50%
+            if ((f & PoisonItems.SlowBlade) != 0 && before > 0) d = d * (100 + System.Math.Min(SlowBladeMaxPct, SlowBladePctPerDetonate * before)) / 100;
             if ((f & PoisonItems.Oil) != 0 && down) d *= OilDownMul;
             return (int)System.Math.Min(int.MaxValue, d * powerPct / 100);
         }
+
+        /// <summary>〈遅効の毒刃〉: 劇症ダメージ後の即死 HP ライン (現在の残り毒 × 2、ボスはその半分 = × 1)。 0 以下なら不発。</summary>
+        public static int SlowBladeKillLine(int currentPoison, bool boss)
+            => currentPoison <= 0 ? -1 : boss ? currentPoison : currentPoison * SlowBladeKillMul;
 
         /// <summary>所持品から毒の品の旗を作る (戦闘の始め)。</summary>
         public static PoisonItems ItemsOf(GameLoop.RunState run)

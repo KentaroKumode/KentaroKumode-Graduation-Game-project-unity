@@ -110,11 +110,49 @@ namespace ItemSystem.PassiveSkills.Keywords
             }
         }
 
+        /// <summary>配線フェーズの臨界（端子・5g秘宝群・攻撃出目の半分）を一括でメーターに足してから爆発判定を回す（2026-11-26・HeatCore.Forecast と一致）。</summary>
+        public static void AddWiredHeat(CombatContext ctx, CombatSystem.TerminalOutcome o)
+        {
+            if (ctx == null || o == null) return;
+            if (o.heatDouble) ctx.accumulatedValues[CombatSystem.HeatCore.DoubleTurnKey] = ctx.currentTurn;
+            if (o.heat > 0 || o.heatGains.Count > 0) EnableHeat(ctx);
+            if (ctx.rinkaiThreshold <= 0) return;
+            bool outer = _heatOuter == 0;
+            int meterBefore = ctx.rinkaiMeter, burstsBefore = (int)ctx.GetAccumulated(BurstTotalKey);
+            int added = 0;
+            _heatOuter++;
+            try
+            {
+                var s = HeatState(ctx);
+                added = CombatSystem.HeatCore.GainWired(ref s, o);
+                StoreHeat(ctx, in s);
+                if (added > 0) BurstPendingHeat(ctx, ref s);
+            }
+            finally
+            {
+                _heatOuter--;
+                if (outer && added > 0)
+                {
+                    int bursts = (int)ctx.GetAccumulated(BurstTotalKey) - burstsBefore;
+                    if (bursts > HeatMaxBurstsOneAdd)
+                    {
+                        HeatMaxBurstsOneAdd = bursts;
+                        HeatMaxBurstsInfo = $"配線一括 +{added} (溜まり {meterBefore}・閾値 {ctx.rinkaiThreshold}・ターン {ctx.currentTurn}) → 爆発 {bursts} 回";
+                    }
+                }
+            }
+        }
+
         private static void AddHeatCore(CombatContext ctx, int n)
         {
             var s = HeatState(ctx);
             CombatSystem.HeatCore.Gain(ref s, n);
             StoreHeat(ctx, in s);
+            BurstPendingHeat(ctx, ref s);
+        }
+
+        private static void BurstPendingHeat(CombatContext ctx, ref CombatSystem.HeatCore.State s)
+        {
             while (CombatSystem.HeatCore.TryBurst(ref s, out var b))
             {
                 StoreHeat(ctx, in s);

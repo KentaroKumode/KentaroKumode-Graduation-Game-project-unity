@@ -23,10 +23,20 @@ namespace CombatSystem
     {
         /// <summary>過充電 = 充電がこれ以上 (2026-11-21〜・旧 7)。 <see cref="ItemSystem.PassiveSkills.CombatContext.IsOvercharged"/> が読む。</summary>
         public const int OverchargeAt = 10;
-        /// <summary>〈過負荷チューナー〉: 過充電の間、 充電を払う量 (2 以上の物) から引く量 (最低 1)。</summary>
-        public const int TunerCut = 2;
-        /// <summary>〈二股の導線〉【再起動】の充電 (1 ターン 1 回)。</summary>
-        public const int RebootCost = 6;   // answer13: 5 → 7・answer14: 7 → 6
+        /// <summary>〈過負荷チューナー〉(2026-11-26 還流型へ変更): 過充電の間、 充電を <see cref="TunerMinSpend"/> 以上消費するたび直後に充電 +<see cref="TunerRefund"/> (1 ターン最大 <see cref="TunerMaxPerTurn"/> 回)。 旧コスト減算は 0。</summary>
+        public const int TunerCut = 0, TunerMinSpend = 3, TunerRefund = 2, TunerMaxPerTurn = 3;
+        /// <summary>〈二股の導線〉【再起動】の充電 (1 ターン 1 回): 基礎 12 − 所持している充電の秘宝の数 (最小 6・2026-11-26 変更)。</summary>
+        public const int RebootCost = 6, RebootCostBase = 12, RebootCostMin = 6;
+        public static int ForkRebootCost(int chargeRelicCount) => System.Math.Max(RebootCostMin, RebootCostBase - System.Math.Max(0, chargeRelicCount));
+        /// <summary>戦闘中・このターンの【再起動】回数キー (CombatManager.ApplyTerminalOutcome が書く)。</summary>
+        public const string RebootsBattleKey = "chg.rebootsBattle", RebootsTurnKey = "chg.rebootsTurn", RebootsTurnNumKey = "chg.rebootsTurn.t";
+        /// <summary>〈灼線鞭〉(2026-11-26 再起動連鎖強化): 充電 2 回消費で無料【再起動】1 回、 他の【再起動】が発動済みかつ 4 回以上消費ならさらにもう 1 回。
+        /// 【再起動】の撃の最終与ダメージ +(30 + このターンの【再起動】回数 × 25)% (上限 +130%)。</summary>
+        public const int WhipSpendsFirst = 2, WhipSpendsSecond = 4;
+        public const int WhipRebootBasePct = 30, WhipRebootPerCountPct = 25, WhipRebootMaxPct = 130;
+        public const int WhipRebootFinalPct = 55;
+        public static int WhipFinalPct(int rebootsThisTurn)
+            => rebootsThisTurn <= 0 ? 0 : System.Math.Min(WhipRebootMaxPct, WhipRebootBasePct + WhipRebootPerCountPct * rebootsThisTurn);
         /// <summary>〈逆さ避雷針〉: 払う充電 / 被ダメージから引く量 (1 ターン 1 回)。</summary>
         public const int RodCost = 5, RodCut = 6;
         /// <summary>〈雷鳴の太鼓〉: 充電の上限の上乗せ / オーバークロックに要る充電 / 払う充電 / 最初の 1 撃の最終与ダメージ +% (1 ターン 1 回)。</summary>

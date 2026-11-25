@@ -997,7 +997,8 @@ namespace CombatSystem
             bool echoAll = bladeDance;
             for (int h = 0; h < nHits; h++)
             {
-                ctx.hitIndex = h; ctx.forceCritThisHit = false; ctx.critSkipRoll = false; ctx.isRefireHit = refire; ctx.hitCritRateMulAdd = 0f; ctx.hitIsFocused = false; ctx.hitFocusSpentRenki = 0; ctx.hitFinalDamagePct = 0; ctx.hitOutgoingPct = 0; ctx.hitIgnoreDefense = h == chainHit; ctx.hitArmorPen = 0;   // 撃ごとの値 (〈抜き打ちの作法〉〈加重の拳套〉・〈連刃〉の追撃は防御を無視)
+                bool isReb = h < hitBases.Count && h < term.attackHitDice.Count && term.attackHitDice[h] == 0 && !refire && !echoing;
+                ctx.hitIndex = h; ctx.forceCritThisHit = false; ctx.critSkipRoll = false; ctx.isRefireHit = refire; ctx.isRebootHit = isReb; ctx.hitCritRateMulAdd = 0f; ctx.hitIsFocused = false; ctx.hitFocusSpentRenki = 0; ctx.hitFinalDamagePct = 0; ctx.hitOutgoingPct = 0; ctx.hitIgnoreDefense = h == chainHit; ctx.hitArmorPen = 0;   // 撃ごとの値 (〈抜き打ちの作法〉〈加重の拳套〉・〈連刃〉の追撃は防御を無視)
                 ctx.hitFaceMax = CritCore.HitFaceMax(term, playerDice, h);   // 〈狙い目の刻み〉が読む
                 ctx.hitFinalDamagePct += (int)ctx.GetAccumulated(DiePassives.RewindFinalPctKey);   // 逆巻きの賽: マイナスの段階の得 (このターン・最終与ダメージ)
                 if (bladeDance && h < hitBases.Count) { ctx.forceCritThisHit = true; ctx.hitIgnoreDefense = true; }
@@ -1015,6 +1016,9 @@ namespace CombatSystem
                 bool oc = term.overclock && h == 0 && h < hitBases.Count && !refire && !echoing;
                 if (refire) ctx.criticalMultiplier += CritCore.SniperMulAdd(sniperSpent);   // 〈必殺の照準器〉: もう 1 回の撃の会心倍率 +(0.50 ＋ 元の撃で使った【練気】× 0.25)
                 if (oc) { ctx.hitFinalDamagePct += ChargeCore.OverclockFinalPct; if (!needle) ctx.playerArmorPen += DefenseFormula.IgnoreAll; }
+                //   〈灼線鞭〉(2026-11-26): 【再起動】で発動した攻撃の撃の最終与ダメージ +(30 + このターンの再起動回数 × 25)%
+                if (_deck != null && (_deck.state.chargeItems & ChargeItems.Whip) != 0 && isReb)
+                    ctx.hitFinalDamagePct += ChargeCore.WhipFinalPct(term.rebooted.Count);
                 var (d, f, c) = psm.ProcessDamage(h < hitBases.Count ? hitBases[h] : 0, h == 0 ? ctx.pursuitDamage : 0, playerCritBaseRate);
                 d = ApplyWinDamageModifiers(d, ref f, ref c, lbStage, psm, ctx);
                 //   出血の品 (5f・BleedCore・2026-11-21): その撃が当たった直後に、 撃ごとの出血を入れる (次の撃は増えた出血を見る)
@@ -1031,7 +1035,7 @@ namespace CombatSystem
                 else if (echoAll && h < hitBases.Count) { echoing = true; h--; }
             }
             ctx.forceCritThisHit = false; ctx.critSkipRoll = false; ctx.hitFinalDamagePct = 0; ctx.hitOutgoingPct = 0; ctx.hitIgnoreDefense = false; ctx.hitArmorPen = 0;
-            ctx.isRefireHit = false; ctx.hitCritRateMulAdd = 0f; ctx.hitIsFocused = false; ctx.hitFocusSpentRenki = 0;
+            ctx.isRefireHit = false; ctx.isRebootHit = false; ctx.hitCritRateMulAdd = 0f; ctx.hitIsFocused = false; ctx.hitFocusSpentRenki = 0;
             if (nHits > 1)
             {
                 // この後の処理 (計装・画面の倍率) は 1 撃目の後の値を読む前提なので、 1 撃目の後の値へ戻す
@@ -1627,6 +1631,18 @@ namespace CombatSystem
             {
                 int pendingKw = ItemSystem.PassiveSkills.Keywords.Kw.TakePendingEnemyDamage(ctx);
                 if (pendingKw > 0) HpLossDiag.Lose(ref enemyHP, pendingKw, "品の直接(攻撃後)");
+                if (enemyHP > 0 && (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.Psn.SlowBladeExecTurnKey) == ctx.currentTurn && ctx.CanExecuteEnemy())
+                {
+                    int sbLine = PoisonCore.SlowBladeKillLine(ctx.EnemyPoison, currentEnemy != null && GameLoop.BossIds.IsBoss(currentEnemy.id));
+                    if (sbLine >= 0 && enemyHP <= sbLine)
+                    {
+                        int left = enemyHP;
+                        enemyHP = 0;
+                        HpLossDiag.Add("経路:処刑(遅効の毒刃)", left);
+                        EnemyHpLedger.Land("処刑(遅効の毒刃)", left, left);
+                        if (Debug.unityLogger.logEnabled) Debug.Log($"[遅効の毒刃] 劇症後 敵 HP {left} ≤ {sbLine} (毒 {ctx.EnemyPoison}) → 倒す");
+                    }
+                }
             }
             if (!roleOutcome.yachtFired)
             {

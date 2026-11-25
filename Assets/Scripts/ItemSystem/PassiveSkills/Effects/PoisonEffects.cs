@@ -14,8 +14,8 @@ namespace ItemSystem.PassiveSkills.Effects
     /// <summary>毒の品の小さな道具と【起爆】の本体の口。</summary>
     public static class Psn
     {
-        /// <summary>[persistent・戦闘で 0 から] この戦闘で起爆した回数 / 最後に起爆したターン。</summary>
-        public const string DetonateCountKey = "psn.detonates", DetonatedTurnKey = "psn.detonatedTurn";
+        /// <summary>[persistent・戦闘で 0 から] この戦闘で起爆した回数 / 最後に起爆したターン / 〈遅効の毒刃〉の劇症処刑を判定するターン。</summary>
+        public const string DetonateCountKey = "psn.detonates", DetonatedTurnKey = "psn.detonatedTurn", SlowBladeExecTurnKey = "psn.slowBladeExecTurn";
 
         public static int Count(CombatContext ctx, string key) => (int)ctx.GetAccumulated(key);
 
@@ -26,15 +26,36 @@ namespace ItemSystem.PassiveSkills.Effects
             int p = ctx.EnemyPoison;
             if (p <= 0) return 0;
             int spent = PoisonCore.Spend(p);
-            ctx.enemyStatusStacks["poison"] = p - spent;
+            int remPoison = p - spent;
+            ctx.enemyStatusStacks["poison"] = remPoison;
             int before = Count(ctx, DetonateCountKey);
-            int dmg = PoisonCore.Damage(spent, PoisonCore.ItemsOf(Rw.Run), before, BossDown.ActiveNow, ctx.enemyMaxHP);
+            var flags = PoisonCore.ItemsOf(Rw.Run);
+            int dmg = PoisonCore.Damage(spent, flags, before, BossDown.ActiveNow, ctx.enemyMaxHP, 100, ctx.currentTurn);
             ctx.accumulatedValues[DetonateCountKey] = before + 1;
             ctx.accumulatedValues[DetonatedTurnKey] = ctx.currentTurn;
             CombatManager.DetonateFired++;
             Kw.DamageEnemy(ctx, dmg);
+            if ((flags & PoisonItems.SlowBlade) != 0)
+            {
+                if (ctx.GetAccumulated(Kw.ResolvingKey) > 0)
+                {
+                    ctx.accumulatedValues[SlowBladeExecTurnKey] = ctx.currentTurn;
+                }
+                else if (ctx.enemyCurrentHP > 0 && ctx.CanExecuteEnemy())
+                {
+                    int line = PoisonCore.SlowBladeKillLine(ctx.EnemyPoison, Rw.IsBoss());
+                    if (line >= 0 && ctx.enemyCurrentHP <= line)
+                    {
+                        int left = ctx.enemyCurrentHP;
+                        ctx.enemyCurrentHP = 0;
+                        CombatSystem.HpLossDiag.Add("経路:処刑(遅効の毒刃)", left);
+                        CombatSystem.EnemyHpLedger.Land("処刑(遅効の毒刃)", left, left);
+                        Rw.Log($"[遅効の毒刃] 劇症後 敵 HP {left} ≤ {line} (毒 {ctx.EnemyPoison}) → 倒す");
+                    }
+                }
+            }
             CombatManager.Instance?.RaiseBossNextNotch(dmg * PoisonCore.DetonateNotchPct / 100);
-            Rw.Log($"[{label}] 【起爆】 毒 {p} → {p - spent} (消費 {spent}) → {dmg} の軽減不可ダメージ (この戦闘 {before + 1} 回目)");
+            Rw.Log($"[{label}] 【起爆】 毒 {p} → {remPoison} (消費 {spent}) → {dmg} の軽減不可ダメージ (この戦闘 {before + 1} 回目)");
             Kw.Raise(ctx, PassiveSkillTrigger.OnPoisonDetonate, dmg);
             return dmg;
         }
@@ -164,11 +185,11 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.poisonTickOnEnemyAttack = true;
     }
 
-    /// <summary>毒草摘みの杖: マップを 1 歩進むごとに 1 溜まる (最大 12)。 次の戦闘の開始時、 溜まった分だけ敵に毒 (歩数は戦闘のたび 0 に戻る)。</summary>
+    /// <summary>毒草摘みの杖 (分岐 B): マップを 1 歩進むごとに 1 溜まる (最大 16・2026-11-26: 12 → 16)。 次の戦闘の開始時、 溜まった分だけ敵に毒 (歩数は戦闘のたび 0 に戻る)。</summary>
     public class HerbStaff : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "毒草摘みの杖";
-        public const int Max = 12;
+        public const int Max = 16;
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(System.Math.Min(Max, Rw.Steps));
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => Rw.Poison(ctx, System.Math.Min(Max, Rw.Steps));
@@ -221,16 +242,17 @@ namespace ItemSystem.PassiveSkills.Effects
 
     // ── G: 分岐 A〈蝕み〉/ 分岐 B〈起爆〉 ──
 
-    /// <summary>蓋付きの毒指輪 (分岐 B): 敵の毒が 24 以上 (<see cref="PoisonCore.RingNeed"/>) で攻撃が当たったとき、 自動で【起爆】(1 ターン 1 回)。</summary>
+    /// <summary>蓋付きの毒指輪 (分岐 B・2026-11-26 暗殺特化): 戦闘開始から 5 ターン目まで敵へ与える毒 +2・【起爆】ダメージ +50%。 敵の毒が 20 以上 (<see cref="PoisonCore.RingNeed"/>) で攻撃が当たったとき、 自動で【起爆】(1 ターン 1 回)。</summary>
     public class HollowPoisonRing : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "蓋付きの毒指輪";
         /// <summary>[persistent] 起爆したターン (Rw.OncePerTurn・BOT の見積もりも読む)。</summary>
         public const string TurnKey = "psn.ring";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.EnemyPoison >= PoisonCore.RingNeed);
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage };
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnPostDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
+            if (t == PassiveSkillTrigger.OnBattleStart) { ctx.poisonRingEarly = true; return; }
             if (!Psn.Hit(ctx) || ctx.EnemyPoison < PoisonCore.RingNeed || !Rw.OncePerTurn(ctx, TurnKey)) return;
             Psn.Detonate(ctx, SkillId);
         }
@@ -285,7 +307,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.playerArmorPen += ctx.EnemyPoison / Every;
     }
 
-    /// <summary>劇毒の火薬庫 (分岐 B): 【起爆】の倍率が ×4 → ×5 (PoisonCore の旗)。 1 ターンに敵へ毒を合計 8 以上与えたターンの終わりに、 自動で【起爆】(1 ターン 1 回)。</summary>
+    /// <summary>劇毒の火薬庫 (分岐 B): 【起爆】の倍率が ×4 → ×5 (PoisonCore の旗)。 1 ターンに敵へ毒を合計 8 以上与え、かつ敵の毒が 18 以上のターンの終わりに、 自動で【起爆】(1 ターン 1 回・2026-11-26 下限追加)。</summary>
     public class PoisonMagazine : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "劇毒の火薬庫";
@@ -296,7 +318,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (t == PassiveSkillTrigger.OnPoisonGain) { Psn.AddTurnN(ctx, GivenKey, Kw.EventAmount(ctx)); return; }
-            if (Psn.TurnN(ctx, GivenKey) >= PoisonCore.MagazineGiven && Rw.OncePerTurn(ctx, "psn.magazine")) Psn.Detonate(ctx, SkillId);
+            if (Psn.TurnN(ctx, GivenKey) >= PoisonCore.MagazineGiven && ctx.EnemyPoison >= PoisonCore.MagazineMinPoison && Rw.OncePerTurn(ctx, "psn.magazine")) Psn.Detonate(ctx, SkillId);
         }
     }
 

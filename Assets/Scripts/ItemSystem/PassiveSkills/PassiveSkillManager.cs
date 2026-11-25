@@ -654,8 +654,10 @@ namespace ItemSystem.PassiveSkills
                     }
                 }
 
-                // 逓減撤去後は実質クランプのみ。 加算した分がそのまま実効会心率になる。
+                // 逓減撤去後は実質クランプのみ。 【集中】は実効会心率の上限 80% でクランプ (80% 超過分は EffectiveMul で倍率に変換)。
                 float critRate = CombatContext.ResolveCritRate(critAdd);
+                if (context.hitIsFocused && critRate > CombatSystem.CritCore.FocusMaxRate)
+                    critRate = CombatSystem.CritCore.FocusMaxRate;
                 GameLoop.GameHooks.OnCritRateResolved?.Invoke(critAdd, critRate);
 
                 //   critSkipRoll: 乱数を引かない撃 (2026-11-23 から立てる所は無い・〈必殺の照準器〉のもう 1 回も実際の会心率で振る)
@@ -694,8 +696,8 @@ namespace ItemSystem.PassiveSkills
                 //   下限 1.0 ── 会心が通常攻撃より弱くなるのは倒錯するため。
                 //   超過会心率 (100% を超えた分・1% ごとに +0.01・〈寸鉄〉で 2 倍) も、 ここで乗せる (CritCore.EffectiveMul・BOT と画面も同じ関数)
                 float effCritMul = CombatSystem.CritCore.EffectiveMul(context.criticalMultiplier, context.enemyCritMultReduction, context.lastCritAddPct,
-                    context.critExcessDouble);
-                if (!attackerIsEnemy && context.lastCritAddPct > 1f) CombatSystem.CombatManager.CritOverflowFired++;   // [計装] 超過会心率が倍率になった会心
+                    context.critExcessDouble, context.hitIsFocused);
+                if (!attackerIsEnemy && context.lastCritAddPct > (context.hitIsFocused ? CombatSystem.CritCore.FocusMaxRate : 1f)) CombatSystem.CombatManager.CritOverflowFired++;   // [計装] 超過会心率が倍率になった会心
                 totalDamage = (int)(totalDamage * effCritMul);
                 if (!attackerIsEnemy) context.accumulatedValues[Keywords.Kw.LastCritMulKey] = effCritMul;   // 〈白濁の義眼〉が読む (2026-11-20)
                 // [診断] 会心倍率は 3.0 固定ではない (メタ精密 r10 の逓減還元・一点集中 等)。
@@ -726,10 +728,16 @@ namespace ItemSystem.PassiveSkills
                 totalDamage = (int)(totalDamage * (1f + context.nonCritOutgoingMultiplier));
                 if (diag) CombatSystem.CombatStats.Stage(18, 1);
             }
-            // 〈一点読みの片眼〉の代価: 会心しなかった攻撃の与ダメ −40%。
+            // 〈一点読みの片眼〉の代価: 会心しなかった攻撃の与ダメ −45%。
             if (!context.isCritical && totalDamage > 0 && !attackerIsEnemy
                 && context.GetAccumulated(Effects.PinpointEye.NonCritCutKey) > 0f)
                 totalDamage = totalDamage * Effects.PinpointEye.NonCritKeepPct / 100;
+            // 【集中】失敗の反動 (2026-11-26 パチンコ化): 与ダメ −30%・このターンの被ダメージ +25%。
+            if (!context.isCritical && !attackerIsEnemy && context.hitIsFocused)
+            {
+                if (totalDamage > 0) totalDamage = totalDamage * CombatSystem.CritCore.FocusMissKeepPct / 100;
+                context.accumulatedValues[CombatSystem.CritCore.FocusMissVulnTurnKey] = context.currentTurn;
+            }
             if (diag) CombatSystem.CombatStats.Stage(4, totalDamage);   // 段 D
 
             // 8. ダメージ確定後トリガー

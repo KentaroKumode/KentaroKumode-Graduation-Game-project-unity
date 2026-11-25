@@ -635,8 +635,9 @@ namespace UI.Game2D.Battle
             }
             var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
             int g = (ctx != null ? ItemSystem.PassiveSkills.Effects.Psn.TurnN(ctx, ItemSystem.PassiveSkills.Effects.PoisonMagazine.GivenKey) : 0) + add;
+            int mp = env.enemyPoison + add;
             label = "劇症 付与" + g + "/" + PoisonCore.MagazineGiven;
-            return g >= PoisonCore.MagazineGiven;
+            return g >= PoisonCore.MagazineGiven && mp >= PoisonCore.MagazineMinPoison;
         }
         /// <summary>このターン起爆する見込み (金で出す)。 / 右の列の文字 (仮)。</summary>
         public bool DetonateLive => DetonateState(out _);

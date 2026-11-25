@@ -156,7 +156,9 @@ namespace CombatSystem
             if (_enemyDiceNow != null) foreach (int d in _enemyDiceNow) if (d > emax) emax = d;
             e.enemyMaxDie = emax;
             e.heavyTurn = Escalation.IsHeavyTurn(currentEnemy, ctx.currentTurn);
-            e.chargeCostCut = ctx.ChargeCostCut;   // 〈過負荷チューナー〉: 過充電の間 2 減る (最低 1)
+            e.chargeCostCut = ctx.ChargeCostCut;
+            e.chargeRelics = ItemSystem.PassiveSkills.AxisRules.Count(run, ItemSystem.PassiveSkills.AxisRules.Charge);
+            e.tunerLeft = ctx.overloadChargeCut ? Math.Max(0, ChargeCore.TunerMaxPerTurn - ItemSystem.PassiveSkills.Effects.OverloadTuner.UsedThisTurn(ctx)) : 0;
             e.chargeSpendsTurn = (int)ctx.GetAccumulated(CombatContext.ChargeSpendsThisTurnKey);   // 〈灼線鞭〉: 配線より前に充電を使った回数
             e.noAttack = GameLoop.Consumables.RapierContreOn(ctx);   // 〈シュヴァリエのレイピア〉のコントラタック中は攻撃の端子に挿せない
             e.sealedRoleMask = ctx.sealedRoleMask;                    // 立つ役 (TerminalCards.RoleOf) は ResolveRoles と同じ判定 (2026-11-21)
@@ -209,6 +211,14 @@ namespace CombatSystem
         {
             _termDamageMul = o.damageMul;
             DeckDisposeFired += o.disposedNow;      // [計装]
+            if (o.rebooted.Count > 0)
+            {
+                ctx.accumulatedValues[ChargeCore.RebootsBattleKey] = ctx.GetAccumulated(ChargeCore.RebootsBattleKey) + o.rebooted.Count;
+                int prevTurnReb = (int)ctx.GetAccumulated(ChargeCore.RebootsTurnNumKey) == ctx.currentTurn ? (int)ctx.GetAccumulated(ChargeCore.RebootsTurnKey) : 0;
+                ctx.accumulatedValues[ChargeCore.RebootsTurnNumKey] = ctx.currentTurn;
+                ctx.accumulatedValues[ChargeCore.RebootsTurnKey] = prevTurnReb + o.rebooted.Count;
+                ItemSystem.PassiveSkills.Effects.ScorchedWire.OnReboot(ctx, o.rebooted.Count);
+            }
             // 充電の支払いは 1 回ずつ (「充電を使うたび」の品が回数と量を数える・端子 → 再起動 → 〈逆さ避雷針〉 → オーバークロックの順)
             foreach (int pay in o.chargePays) ctx.ConsumeCharge(Math.Min(pay, ctx.GetCharge()));
             if (o.takenFlatCut > 0) ctx.playerFlatDamageReduction += o.takenFlatCut;      // 〈逆さ避雷針〉
@@ -237,15 +247,8 @@ namespace CombatSystem
                 ShieldDiag.Note("端子", o.shield);
             }
             if (o.poison > 0) ItemSystem.PassiveSkills.Effects.Rw.Poison(ctx, o.poison);
-            //   臨界: 〈燧石の指輪〉の倍を立ててから、 端子の分 → 品の分 (5g) を 1 つずつ → 攻撃に挿した出目の合計の半分 (HeatCore.EndGain・2026-11-25〜 配線のとき = 攻撃の前。 旧: ターンの終わり) (HeatCore.Forecast と同じ順)
-            if (o.heatDouble) ctx.accumulatedValues[HeatCore.DoubleTurnKey] = ctx.currentTurn;
-            if (o.heat > 0 || o.heatGains.Count > 0) ItemSystem.PassiveSkills.Keywords.Kw.EnableHeat(ctx);
-            if (o.heat > 0) ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, o.heat, "端子");
-            foreach (int g in o.heatGains) ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, g, "臨界の品(配線)");
-            {   // ここで閾値をまたげば、 そのターンの攻撃すべてに【過熱】が乗る (作者の決定 2026-11-25)
-                int pipHeat = HeatCore.EndGain(o);
-                if (ctx.rinkaiThreshold > 0 && pipHeat > 0) ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, pipHeat, "配線(攻撃に挿した出目の半分)");
-            }
+            //   臨界: 配線フェーズの臨界（端子・5g秘宝群・攻撃出目の半分）を一括でメーターに足してから爆発判定（2026-11-26・HeatCore.Forecast と同じ一括式。ここで閾値をまたげばそのターンの攻撃すべてに【過熱】が乗る）
+            ItemSystem.PassiveSkills.Keywords.Kw.AddWiredHeat(ctx, o);
             for (int r = 0; r < o.retreatStage; r++) YachtRoleEffects.AddEscalationDelay(ctx, YachtRoleEffects.TurnsToRetreatOneStage(ctx));
             if (o.escalationDelay > 0)      // 時計の賽 (ADR-0015)
             {

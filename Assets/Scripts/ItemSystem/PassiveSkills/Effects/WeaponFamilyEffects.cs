@@ -83,7 +83,7 @@ namespace ItemSystem.PassiveSkills.Effects
     //  斧 — 重撃・装甲粉砕・全力攻撃
     // ============================================================
 
-    /// <summary>猛り I/II/III: 経過ターン 1 ごとに全部の撃の攻撃 +1 (上限 +5/+9/+14)・ボスの目盛りへの削り +15/25/40% (撃のダメージの割合だけ次の目盛りを上げる)。</summary>
+    /// <summary>猛り I/II/III: 1 ターン目から毎ターン全部の撃の攻撃 +1 (上限 +5/+9/+14・2026-11-26 初速改善)・ボスの目盛りへの削り +15/25/40% (撃のダメージの割合だけ次の目盛りを上げる)。</summary>
     public class Fervor : IPassiveSkillEffect
     {
         public static readonly string[] Ids = { "猛りI", "猛りII", "猛りIII" };
@@ -95,17 +95,17 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (t == PassiveSkillTrigger.OnPostDealDamage) { Fam.Notch(ctx, NotchPct[_lv]); return; }
-            int n = System.Math.Min(System.Math.Max(0, ctx.currentTurn - 1), Caps[_lv]);
+            int n = System.Math.Min(System.Math.Max(1, ctx.currentTurn), Caps[_lv]);
             if (n > 0) ctx.AddPlayerAttackOrDiceBonus(n);
         }
     }
 
     /// <summary>鎧砕き I/II: 撃が当たるたび敵の防御 −2/−3 (1 ターン 3 回まで・下限 0・CombatManager の撃の輪が <see cref="OnHit"/> を呼ぶ)。
-    /// 自分で敵の防御を 0 にした後、 防御が 0 の間は全部の撃の最終与ダメージ +20/20% (2026-11-22・II 旧 35%)。</summary>
+    /// 敵の防御が 0 の間は全部の撃の最終与ダメージ +20/30% (2026-11-26: 元から防御 0 の敵にも有効化・II を +30% へ差別化)。</summary>
     public class ArmorBreak : IPassiveSkillEffect
     {
         public static readonly string[] Ids = { "鎧砕きI", "鎧砕きII" };
-        public static readonly int[] Amounts = { 2, 3 }, ShatterPct = { 20, 20 };
+        public static readonly int[] Amounts = { 2, 3 }, ShatterPct = { 20, 30 };
         public const int PerTurn = 3;
         /// <summary>[persistent] 持っている段の削り量・割った後の % / 割った印 / [perTurn 相当] 今のターンの番号と削った回数。</summary>
         public const string AmountKey = "axe.breakAmt", PctKey = "axe.breakPct", ShatteredKey = "axe.shattered", TurnKey = "axe.breakTurn", CountKey = "axe.breakN";
@@ -119,8 +119,8 @@ namespace ItemSystem.PassiveSkills.Effects
             if (Shattered(ctx)) Fam.Final(ctx, ShatterPct[_lv]);
         }
 
-        /// <summary>割った後の上乗せが今効く (自分で 0 にした・今の防御が 0)。</summary>
-        public static bool Shattered(CombatContext ctx) => ctx != null && ctx.GetAccumulated(ShatteredKey) > 0f && ctx.enemyDefense <= 0;
+        /// <summary>防御 0 時の上乗せが今効く (〈鎧砕き〉を持っていて、今の敵の防御が 0)。</summary>
+        public static bool Shattered(CombatContext ctx) => ctx != null && ctx.GetAccumulated(AmountKey) > 0f && ctx.enemyDefense <= 0;
 
         /// <summary>撃が当たった直後 (CombatManager.Turn の撃の輪・防御の計算の後)。 〈鎧砕き〉を持たなければ何もしない。</summary>
         public static void OnHit(CombatContext ctx)
@@ -147,23 +147,31 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) { if (Fam.NoBlock(ctx)) Fam.Final(ctx, Pct); }
     }
 
-    /// <summary>血令: 敵の攻撃で失った HP の 60% を「血」として溜める (ボスのダウンのたび +8)。 次に攻撃したターン、 血を全部使って全部の撃の攻撃 +血。
-    /// 攻撃が通ったら、 使った血の 1/3 だけ HP を回復する。 4 連戦の段替えでも血は持ち越す。</summary>
+    /// <summary>血令 (2026-11-26 狂戦士化強化): 敵の攻撃で失った HP の 80% を「血」として溜める (ボスのダウンのたび +15)。
+    /// 次に攻撃したターン、 血を全部解放して全部の撃の攻撃 +血。 解放した血が 18 以上なら、 そのターンの全攻撃の最終与ダメージ +(解放した血 × 2)% (最大 +90%)。
+    /// さらに解放した血の 1/4 (切り捨て) が戦闘終了まで永続の基礎攻撃力 (最大 +20) として積み上がり、 攻撃が通ったら使った血の 1/2 だけ HP を回復する。</summary>
     public class BloodEdict : IPassiveSkillEffect
     {
-        /// <summary>[persistent・戦闘開始で 0] 溜まっている血 / [perTurn] このターンの攻撃に使った血。</summary>
-        public const string BloodKey = "bloodEdictBlood", SpentKey = "bloodEdictSpent";
-        public const int StorePct = 60, DownBlood = 8, HealDiv = 3;
+        /// <summary>[persistent・戦闘開始で 0] 溜まっている血・永続攻撃力 / [perTurn] このターンの攻撃に使った血。</summary>
+        public const string BloodKey = "bloodEdictBlood", SpentKey = "bloodEdictSpent", PermAtkKey = "bloodEdictPermAtk", HealTurnKey = "bloodEdictHealTurn";
+        public const int StorePct = 80, DownBlood = 15, HealDiv = 2;
+        public const int BurstNeed = 18, BurstPctPerBlood = 2, BurstMaxPct = 90;
+        public const int PermDiv = 4, PermMax = 20;
         public string SkillId => "血令";
+        public static int BurstPctFor(int blood) => blood >= BurstNeed ? System.Math.Min(BurstMaxPct, blood * BurstPctPerBlood) : 0;
+        public static int BurstForecast(CombatContext ctx) => ctx == null ? 0 : BurstPctFor((int)ctx.GetAccumulated(BloodKey));
         public PassiveSkillTrigger[] Triggers => new[]
-        { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnWired, PassiveSkillTrigger.OnTurnEnd, PassiveSkillTrigger.OnBossDown };
+        {
+            PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnWired,
+            PassiveSkillTrigger.OnPreDealDamage, PassiveSkillTrigger.OnPostDealDamage, PassiveSkillTrigger.OnTurnEnd, PassiveSkillTrigger.OnBossDown
+        };
 
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             switch (t)
             {
                 case PassiveSkillTrigger.OnBattleStart:
-                    ctx.accumulatedValues[BloodKey] = 0f; ctx.accumulatedValues[SpentKey] = 0f;
+                    ctx.accumulatedValues[BloodKey] = 0f; ctx.accumulatedValues[SpentKey] = 0f; ctx.accumulatedValues[PermAtkKey] = 0f;
                     break;
                 case PassiveSkillTrigger.OnBossDown:
                     ctx.accumulatedValues[BloodKey] = ctx.GetAccumulated(BloodKey) + DownBlood;
@@ -172,18 +180,38 @@ namespace ItemSystem.PassiveSkills.Effects
                 {
                     ctx.accumulatedValues[SpentKey] = 0f;
                     int blood = (int)ctx.GetAccumulated(BloodKey);
-                    if (blood > 0) ctx.AddPlayerAttackOrDiceBonus(blood);   // 攻撃しないターンは攻撃値が使われないだけ (血は残る)
+                    int perm = (int)ctx.GetAccumulated(PermAtkKey);
+                    if (blood + perm > 0) ctx.AddPlayerAttackOrDiceBonus(blood + perm);   // 攻撃しないターンは攻撃値が使われないだけ (血と永続攻撃は残る)
                     break;
                 }
                 case PassiveSkillTrigger.OnWired:
+                {
                     if (ctx.GetAccumulated(MutualKeys.AttackDiceCount) <= 0f) return;
-                    ctx.accumulatedValues[SpentKey] = ctx.GetAccumulated(BloodKey);
+                    int spent = (int)ctx.GetAccumulated(BloodKey);
+                    ctx.accumulatedValues[SpentKey] = spent;
                     ctx.accumulatedValues[BloodKey] = 0f;
+                    if (spent >= PermDiv)
+                    {
+                        int perm = System.Math.Min(PermMax, (int)ctx.GetAccumulated(PermAtkKey) + spent / PermDiv);
+                        ctx.accumulatedValues[PermAtkKey] = perm;
+                    }
                     break;
-                case PassiveSkillTrigger.OnTurnEnd:
+                }
+                case PassiveSkillTrigger.OnPreDealDamage:
+                {
+                    int pct = BurstPctFor((int)ctx.GetAccumulated(SpentKey));
+                    if (pct > 0) Fam.Final(ctx, pct);
+                    break;
+                }
+                case PassiveSkillTrigger.OnPostDealDamage:
                 {
                     int spent = (int)ctx.GetAccumulated(SpentKey);
-                    if (spent >= HealDiv && ctx.lastPlayerDamage > 0 && ctx.playerCurrentHP > 0) Rw.Heal(ctx, spent / HealDiv);
+                    if (spent >= HealDiv && Psn.Hit(ctx) && ctx.playerCurrentHP > 0 && Rw.OncePerTurn(ctx, HealTurnKey))
+                        Rw.Heal(ctx, spent / HealDiv);
+                    break;
+                }
+                case PassiveSkillTrigger.OnTurnEnd:
+                {
                     ctx.accumulatedValues[SpentKey] = 0f;
                     int lost = (int)ctx.GetAccumulated(MutualKeys.HpLossFromEnemy);
                     if (lost > 0) ctx.accumulatedValues[BloodKey] = ctx.GetAccumulated(BloodKey) + lost * StorePct / 100;

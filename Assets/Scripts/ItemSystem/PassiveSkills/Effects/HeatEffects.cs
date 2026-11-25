@@ -67,11 +67,11 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => Kw.AddHeat(ctx, Stored);
     }
 
-    /// <summary>荒砥: 爆発するたび、 この戦闘中の与ダメージ +4% (次のターンの振り直しの後から・2026-11-22 final4: +5%・最大 +30% → +7%・上限なし → final5: +4%)。 撃ごとの臨界 +2 は HeatCore の旗 (5g)。</summary>
+    /// <summary>荒砥: 爆発するたび、 この戦闘中の与ダメージ +4% (次のターンの振り直しの後から・最大 +40%・2026-11-26 上限追加)。 撃ごとの臨界 +2 は HeatCore の旗 (5g)。</summary>
     public class RoughWhetstone : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => GameLoop.ItemIds.HeatWhetstone;
-        public const int PctPerBurst = 4;
+        public const int PctPerBurst = 4, MaxPct = 40;
         /// <summary>[persistent] 積もった与ダメージの % 。</summary>
         private const string Key = "heat.whet";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Pct(Rw.Count(ctx, Key) / 100f);
@@ -80,7 +80,8 @@ namespace ItemSystem.PassiveSkills.Effects
         {
             int cur = Rw.Count(ctx, Key);
             if (t == PassiveSkillTrigger.OnPostRoll) { if (cur > 0) ctx.AddOutgoingPct(cur / 100f); return; }
-            ctx.accumulatedValues[Key] = cur + PctPerBurst;
+            int add = System.Math.Min(PctPerBurst, MaxPct - cur);
+            if (add > 0) ctx.accumulatedValues[Key] = cur + add;
         }
     }
 
@@ -98,14 +99,14 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>余熱の炉壁: 爆発するたび、 その爆発のダメージ (敵の防御の後) の 12% (上限なし・final6: 旧 25%・最大 14) をそのターンのブロックとして得る (配線より後の爆発の分は CombatManager.Turn が敵の攻撃の前に足す)。</summary>
+    /// <summary>余熱の炉壁: 爆発するたび、 その爆発のダメージ (敵の防御の後) の 12% (1 回最大 20・2026-11-26 上限追加) をそのターンのブロックとして得る (配線より後の爆発の分は CombatManager.Turn が敵の攻撃の前に足す)。</summary>
     public class HeatWall : IPassiveSkillEffect
     {
         public string SkillId => "余熱の炉壁";
-        public const int Pct = 12;
+        public const int Pct = 12, MaxBlock = 20;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRinkaiBurst };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-            => ctx.itemBlockBonus += Rw.Count(ctx, Kw.BurstDamageNowKey) * Pct / 100;
+            => ctx.itemBlockBonus += System.Math.Min(MaxBlock, Rw.Count(ctx, Kw.BurstDamageNowKey) * Pct / 100);
     }
 
     /// <summary>二度目の打金: 【過熱】(爆発が起きたターン) と、 その次のターン、 すべての撃の攻撃 +3 (配線で起きた爆発はそのターンの撃に間に合う)。</summary>
@@ -212,13 +213,14 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>烈刃【規則】: 【過熱】の間、 すべての撃の最終与ダメージ +「この戦闘の爆発の回数 × 25%」(上限なし・answer13: 15%・最大 150% → 25%・上限なし)。</summary>
+    /// <summary>烈刃【規則】: 【過熱】の間、 すべての撃の最終与ダメージ +「この戦闘の爆発の回数 × 25%」(最大 +200%・2026-11-26 上限追加)。</summary>
     public class FierceBlade : IPassiveSkillEffect, IRelicDisplay
     {
         public const string Id = "烈刃";
         public string SkillId => Id;
-        public const int PctPerBurst = 25;
-        public static int PctNow(CombatContext ctx) => PctPerBurst * Rw.Count(ctx, Kw.BurstTotalKey);
+        public const int PctPerBurst = 25, MaxPct = 200;
+        public static int PctForBursts(int bursts) => System.Math.Min(MaxPct, PctPerBurst * bursts);
+        public static int PctNow(CombatContext ctx) => PctForBursts(Rw.Count(ctx, Kw.BurstTotalKey));
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(Kw.Overheated(ctx));
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)

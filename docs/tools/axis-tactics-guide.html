@@ -1,0 +1,1081 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>DICE BOUND — 8軸×戦術分岐(A/B) ループ・コンボ構造設計資料</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root {
+    --bg: #f6f4ef;
+    --panel: #ffffff;
+    --panel-2: #efece4;
+    --panel-3: #e6e1d5;
+    --ink: #1a1a1a;
+    --ink-2: #454545;
+    --ink-3: #76736b;
+    --line: #d9d4c7;
+    --accent: #b7472a;
+    --accent-soft: #f5dfd7;
+    --branch-a: #1f6feb;
+    --branch-a-bg: #e7f0fd;
+    --branch-b: #b84418;
+    --branch-b-bg: #faeae2;
+    --loop-col: #1a7f5a;
+    --loop-bg: #e3f5ee;
+    --r-bronze: #a15a2a;
+    --r-silver: #6e7681;
+    --r-gold:   #b58a1c;
+    --r-leg:    #c93c20;
+    --tag-bg: #ece7d8;
+    --tag-fg: #4a4a4a;
+    --shadow: 0 1px 0 rgba(0,0,0,0.03), 0 4px 14px rgba(30,20,10,0.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121418;
+      --panel: #1a1d23;
+      --panel-2: #22262e;
+      --panel-3: #2b303b;
+      --ink: #eae7e0;
+      --ink-2: #b9b6ae;
+      --ink-3: #827f77;
+      --line: #323742;
+      --accent: #e57a5d;
+      --accent-soft: #3a231e;
+      --branch-a: #6cb0ff;
+      --branch-a-bg: #192940;
+      --branch-b: #ff9466;
+      --branch-b-bg: #3b2219;
+      --loop-col: #4ac99b;
+      --loop-bg: #163329;
+      --r-bronze: #ce8e5e;
+      --r-silver: #c2c8d0;
+      --r-gold:   #ebd467;
+      --r-leg:    #ff7b61;
+      --tag-bg: #2a2f38;
+      --tag-fg: #c2bfb8;
+      --shadow: 0 1px 0 rgba(0,0,0,0.25), 0 6px 18px rgba(0,0,0,0.4);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f6f4ef; --panel: #ffffff; --panel-2: #efece4; --panel-3: #e6e1d5;
+    --ink: #1a1a1a; --ink-2: #454545; --ink-3: #76736b; --line: #d9d4c7;
+    --accent: #b7472a; --accent-soft: #f5dfd7;
+    --branch-a: #1f6feb; --branch-a-bg: #e7f0fd;
+    --branch-b: #b84418; --branch-b-bg: #faeae2;
+    --loop-col: #1a7f5a; --loop-bg: #e3f5ee;
+    --r-bronze: #a15a2a; --r-silver: #6e7681; --r-gold: #b58a1c; --r-leg: #c93c20;
+    --tag-bg: #ece7d8; --tag-fg: #4a4a4a;
+    --shadow: 0 1px 0 rgba(0,0,0,0.03), 0 4px 14px rgba(30,20,10,0.06);
+  }
+  :root[data-theme="dark"] {
+    --bg: #121418; --panel: #1a1d23; --panel-2: #22262e; --panel-3: #2b303b;
+    --ink: #eae7e0; --ink-2: #b9b6ae; --ink-3: #827f77; --line: #323742;
+    --accent: #e57a5d; --accent-soft: #3a231e;
+    --branch-a: #6cb0ff; --branch-a-bg: #192940;
+    --branch-b: #ff9466; --branch-b-bg: #3b2219;
+    --loop-col: #4ac99b; --loop-bg: #163329;
+    --r-bronze: #ce8e5e; --r-silver: #c2c8d0; --r-gold: #ebd467; --r-leg: #ff7b61;
+    --tag-bg: #2a2f38; --tag-fg: #c2bfb8;
+    --shadow: 0 1px 0 rgba(0,0,0,0.25), 0 6px 18px rgba(0,0,0,0.4);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); scroll-behavior: smooth; }
+  body {
+    font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Yu Gothic", "Meiryo", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 14px; line-height: 1.6;
+    font-feature-settings: "palt";
+  }
+
+  .app { display: grid; grid-template-columns: 270px 1fr; min-height: 100vh; }
+  @media (max-width: 980px) {
+    .app { grid-template-columns: 1fr; }
+    aside { position: static !important; height: auto !important; border-right: none !important; border-bottom: 1px solid var(--line); }
+  }
+
+  aside {
+    background: var(--panel);
+    border-right: 1px solid var(--line);
+    padding: 20px 16px;
+    position: sticky; top: 0; align-self: start;
+    height: 100vh; overflow-y: auto;
+  }
+  main { padding: 24px 30px 80px; max-width: 1380px; min-width: 0; }
+
+  h1 { font-size: 12px; letter-spacing: 0.1em; margin: 0; font-weight: 700; text-transform: uppercase; color: var(--accent); }
+  h1 .sub { display: block; font-size: 18px; color: var(--ink); text-transform: none; letter-spacing: 0; margin-top: 3px; line-height: 1.3; }
+  .meta { color: var(--ink-3); font-size: 12px; margin: 8px 0 16px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+
+  .ctrl-group { margin-bottom: 16px; display: flex; flex-direction: column; gap: 6px; }
+  .ctrl-label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); font-weight: 700; }
+  .btn-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .btn {
+    padding: 5px 10px; font-size: 12px; font-weight: 600; border-radius: 6px;
+    border: 1px solid var(--line); background: var(--panel-2); color: var(--ink-2);
+    cursor: pointer; transition: 0.15s;
+  }
+  .btn:hover { color: var(--ink); border-color: var(--ink-3); }
+  .btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  .nav-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 3px; }
+  .nav-link {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 7px 10px; border-radius: 6px; text-decoration: none; color: var(--ink-2);
+    font-size: 13px; font-weight: 600; border: 1px solid transparent; transition: 0.12s;
+  }
+  .nav-link:hover { background: var(--panel-2); color: var(--ink); }
+  .nav-link.active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+  .nav-sub { font-size: 11px; color: var(--ink-3); font-weight: 400; }
+
+  /* Sections */
+  .section-card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 22px 24px; margin-bottom: 28px; box-shadow: var(--shadow);
+  }
+  .axis-header {
+    display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
+    gap: 10px; border-bottom: 2px solid var(--line); padding-bottom: 12px; margin-bottom: 16px;
+  }
+  .axis-title { font-size: 22px; font-weight: 800; margin: 0; display: flex; align-items: center; gap: 10px; }
+  .axis-badge {
+    font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px;
+    background: var(--accent-soft); color: var(--accent);
+  }
+  .axis-count { font-size: 12px; color: var(--ink-3); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  /* Core Rule & Terminals Box */
+  .rule-grid {
+    display: grid; grid-template-columns: 1.35fr 1fr; gap: 14px; margin-bottom: 18px;
+  }
+  @media (max-width: 860px) { .rule-grid { grid-template-columns: 1fr; } }
+  .info-box {
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px;
+  }
+  .info-box h4 {
+    margin: 0 0 6px; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--ink-3); font-weight: 700;
+  }
+  .formula-list { margin: 0; padding-left: 18px; font-size: 13px; color: var(--ink); }
+  .formula-list li { margin-bottom: 4px; }
+  .term-card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+    padding: 7px 10px; margin-top: 6px; font-size: 12.5px;
+  }
+  .term-card strong { color: var(--accent); }
+  .term-up { color: var(--ink-3); font-size: 12px; display: block; margin-top: 2px; }
+
+  /* Shared Engine Pipeline */
+  .shared-strip {
+    background: var(--panel-2); border: 1px solid var(--line); border-left: 4px solid var(--loop-col);
+    border-radius: 8px; padding: 12px 15px; margin-bottom: 18px;
+  }
+  .shared-strip-title {
+    font-size: 12.5px; font-weight: 800; color: var(--loop-col); margin-bottom: 8px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .pipeline-stages {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+  }
+  @media (max-width: 860px) { .pipeline-stages { grid-template-columns: 1fr; } }
+  .pipe-stage {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 9px 11px; position: relative;
+  }
+  .pipe-stage-label { font-size: 11px; font-weight: 700; color: var(--ink-3); margin-bottom: 4px; display: block; }
+  .pipe-stage-body { font-size: 12.5px; line-height: 1.55; }
+
+  /* A vs B Side-by-Side */
+  .ab-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; }
+  @media (max-width: 960px) { .ab-grid { grid-template-columns: 1fr; } }
+
+  .branch-col {
+    border: 1px solid var(--line); border-radius: 10px; padding: 16px; background: var(--panel);
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .branch-col.br-a { border-top: 4px solid var(--branch-a); }
+  .branch-col.br-b { border-top: 4px solid var(--branch-b); }
+
+  .br-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .br-tag-a { background: var(--branch-a-bg); color: var(--branch-a); font-weight: 800; font-size: 12px; padding: 3px 8px; border-radius: 5px; }
+  .br-tag-b { background: var(--branch-b-bg); color: var(--branch-b); font-weight: 800; font-size: 12px; padding: 3px 8px; border-radius: 5px; }
+  .br-name { font-size: 16px; font-weight: 800; }
+  .br-archetype { font-size: 12px; color: var(--ink-3); font-weight: 600; }
+
+  /* Flowchart Nodes */
+  .flow-stack { display: flex; flex-direction: column; gap: 0; }
+  .flow-node {
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px;
+  }
+  .flow-node.loop-node {
+    border-color: var(--loop-col); background: var(--loop-bg);
+  }
+  .flow-node.finisher-node {
+    border-width: 1.5px; border-color: var(--accent); background: var(--accent-soft);
+  }
+  .flow-step-hdr {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;
+    font-size: 11.5px; font-weight: 800; letter-spacing: 0.03em;
+  }
+  .flow-node.loop-node .flow-step-hdr { color: var(--loop-col); }
+  .flow-node.finisher-node .flow-step-hdr { color: var(--accent); }
+  .flow-desc { font-size: 13px; line-height: 1.55; color: var(--ink); }
+  .flow-arrow {
+    text-align: center; font-size: 12px; font-weight: 700; color: var(--ink-3);
+    padding: 3px 0; user-select: none;
+  }
+  .flow-arrow.loop-back { color: var(--loop-col); }
+
+  /* Walkthrough Example Box */
+  .combo-example {
+    background: var(--panel-2); border: 1px dashed var(--line); border-radius: 8px;
+    padding: 11px 13px; font-size: 12.5px; line-height: 1.6;
+  }
+  .combo-example-title {
+    font-weight: 800; font-size: 12px; color: var(--ink-2); margin-bottom: 5px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .combo-math {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 5px;
+    padding: 6px 9px; margin-top: 6px; font-size: 12px; color: var(--ink);
+  }
+  .matchup-note { font-size: 12px; color: var(--ink-2); border-top: 1px solid var(--line); padding-top: 8px; margin-top: auto; }
+
+  /* Inline Item Pills with Pixel Icons */
+  .item-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 1px 6px 1px 4px; margin: 1px 2px; border-radius: 5px;
+    background: var(--panel); border: 1px solid var(--line);
+    font-size: 12.5px; font-weight: 700; vertical-align: baseline;
+    cursor: help; position: relative; white-space: nowrap;
+  }
+  .item-pill img {
+    width: 16px; height: 16px; image-rendering: pixelated; flex-shrink: 0;
+  }
+  .item-pill[data-rar="BRONZE"] { border-left: 3px solid var(--r-bronze); }
+  .item-pill[data-rar="SILVER"] { border-left: 3px solid var(--r-silver); }
+  .item-pill[data-rar="GOLD"]   { border-left: 3px solid var(--r-gold); }
+  .item-pill[data-rar="LEGENDARY"] { border-left: 3px solid var(--r-leg); }
+  .new-badge {
+    font-size: 10px; font-weight: 800; padding: 0 4px; border-radius: 3px;
+    background: var(--accent); color: #fff; margin-left: 2px;
+  }
+
+  /* Floating Tooltip */
+  #tooltip {
+    position: fixed; z-index: 9999; pointer-events: none; display: none;
+    max-width: 340px; background: var(--panel); color: var(--ink);
+    border: 1.5px solid var(--accent); border-radius: 8px; padding: 10px 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35); font-size: 12.5px; line-height: 1.5;
+  }
+  #tooltip .tt-head { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-weight: 800; font-size: 13.5px; }
+  #tooltip .tt-head img { width: 24px; height: 24px; image-rendering: pixelated; }
+  #tooltip .tt-meta { font-size: 11px; color: var(--ink-3); font-weight: 600; margin-bottom: 5px; }
+
+  /* Full Item Reference Grid inside each axis */
+  details.catalog-details {
+    border-top: 1px solid var(--line); padding-top: 12px; margin-top: 8px;
+  }
+  details.catalog-details summary {
+    cursor: pointer; font-weight: 700; font-size: 13px; color: var(--ink-2); user-select: none;
+  }
+  .cat-subhead {
+    font-size: 12px; font-weight: 800; color: var(--ink-3); margin: 12px 0 6px;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .relic-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 8px;
+  }
+  .relic-card {
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 7px;
+    padding: 8px 10px; display: flex; gap: 9px; align-items: flex-start;
+  }
+  .relic-card[data-rar="BRONZE"] { border-left: 3.5px solid var(--r-bronze); }
+  .relic-card[data-rar="SILVER"] { border-left: 3.5px solid var(--r-silver); }
+  .relic-card[data-rar="GOLD"]   { border-left: 3.5px solid var(--r-gold); }
+  .relic-card[data-rar="LEGENDARY"] { border-left: 3.5px solid var(--r-leg); }
+  .relic-icon-box {
+    width: 32px; height: 32px; border-radius: 5px; background: var(--panel);
+    border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .relic-icon-box img { width: 24px; height: 24px; image-rendering: pixelated; }
+  .relic-body { min-width: 0; flex: 1; }
+  .relic-title { font-weight: 800; font-size: 13px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .relic-rar { font-size: 10.5px; font-family: monospace; color: var(--ink-3); }
+  .relic-desc { font-size: 12px; color: var(--ink-2); margin-top: 3px; line-height: 1.45; }
+
+  /* Matrix Table */
+  .matrix-table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 10px; }
+  .matrix-table th, .matrix-table td {
+    border: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top;
+  }
+  .matrix-table th { background: var(--panel-2); font-weight: 800; }
+</style>
+</head>
+<body>
+<div id="tooltip"></div>
+<div class="app">
+  <aside>
+    <h1>DICE BOUND <span class="sub">8軸×戦術分岐(A/B)<br>ループ＆コンボ構造図鑑</span></h1>
+    <div class="meta">2026-11-26 最新コード・items.json 準拠<br>秘宝名にカーソルを合わせるとアイコンと効果全文を表示します。</div>
+
+    <div class="ctrl-group">
+      <span class="ctrl-label">表示モード</span>
+      <div class="btn-row">
+        <button id="mode-all" class="btn active" onclick="setViewMode('all')">全軸一覧</button>
+        <button id="mode-single" class="btn" onclick="setViewMode('single')">1軸集中</button>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <span class="ctrl-label">表示オプション</span>
+      <div class="btn-row">
+        <button class="btn" onclick="toggleTheme()">明暗テーマ切替</button>
+        <button class="btn" onclick="toggleAllCatalogs()">秘宝一覧 全開閉</button>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <span class="ctrl-label">セクション移動</span>
+      <ul id="nav-list" class="nav-list"></ul>
+    </div>
+  </aside>
+
+  <main id="main-content"></main>
+</div>
+
+<script id="items-json-data" type="application/json">[{"id":"猛斧","name":"猛斧","category":"Weapon","rarity":"SILVER","basePrice":12,"axis":null,"branch":null,"description":"〈猛り〉1 ターン目から毎ターン攻撃 +1（最大 +5）。攻撃が当たるたびボスの目盛りをそのダメージの 15% ぶん前進させる"},{"id":"血塗りの戦斧","name":"血塗りの戦斧","category":"Weapon","rarity":"GOLD","basePrice":16,"axis":null,"branch":null,"description":"〈猛り〉1 ターン目から毎ターン攻撃 +1（最大 +9）。攻撃が当たるたびボスの目盛りをそのダメージの 25% ぶん前進させる。〈鎧砕き〉攻撃が当たるたび敵の防御 −2。敵の防御が 0 の間は最終与ダメージ +20%"},{"id":"血帝廻天","name":"血帝廻天","category":"Weapon","rarity":"LEGENDARY","basePrice":20,"axis":null,"branch":null,"description":"〈猛り〉1 ターン目から毎ターン攻撃 +1（最大 +14）。攻撃が当たるたびボスの目盛りをそのダメージの 40% ぶん前進させる。〈鎧砕き〉攻撃が当たるたび敵の防御 −3。敵の防御が 0 の間は最終与ダメージ +30%。〈捨て身〉防御のカードに挿さないターン、最終与ダメージ +35%。〈血令〉被弾 HP の 80%（ボスダウン時 +15）を血に溜め、次の攻撃に上乗せ＆半量を HP 回復。解放した血が 18 以上なら最終与ダメージ +（血×2）%（最大 +90%）、さらに血の 1/4 が戦闘中の永続攻撃力（最大 +20）になる"},{"id":"鍛鉄の剣","name":"鍛鉄の剣","category":"Weapon","rarity":"SILVER","basePrice":12,"axis":null,"branch":null,"description":"〈間合〉攻撃のカードに挿した出目 +25%"},{"id":"銀の長剣","name":"銀の長剣","category":"Weapon","rarity":"GOLD","basePrice":16,"axis":null,"branch":null,"description":"〈間合〉攻撃のカードに挿した出目 +40%。〈一対一〉敵が 1 体の戦闘では、最終与ダメージ +10%・防御 +3"},{"id":"デュランダル","name":"デュランダル","category":"Weapon","rarity":"LEGENDARY","basePrice":20,"axis":null,"branch":null,"description":"〈間合〉攻撃のカードに挿した出目 +60%。〈一対一〉敵が 1 体の戦闘では、最終与ダメージ +18%・防御 +5。〈切り返し〉攻防両方に挿したターン、ブロック合計の 60% を攻撃に加える。〈不滅の刃〉攻防両方に挿すターンが続くたび、最終与ダメージ +12%（最大 +72%）"},{"id":"盗賊の短刀","name":"盗賊の短刀","category":"Weapon","rarity":"SILVER","basePrice":12,"axis":null,"branch":null,"description":"〈疾手〉最初の 5 ターン、攻撃 +4。1 ターン目の手札 +1"},{"id":"処刑人の曲刀","name":"処刑人の曲刀","category":"Weapon","rarity":"GOLD","basePrice":16,"axis":null,"branch":null,"description":"〈疾手〉最初の 5 ターン、攻撃 +6。1 ターン目の手札 +1。〈連刃〉攻撃のカードを 2 枚以上発動したターン、防御無視の追撃が 1 回"},{"id":"ノクタリア","name":"ノクタリア","category":"Weapon","rarity":"LEGENDARY","basePrice":20,"axis":null,"branch":null,"description":"〈疾手〉最初の 5 ターン、攻撃 +9。1 ターン目の手札 +2。〈連刃〉攻撃のカードを 2 枚以上発動したターン、防御無視の追撃が 1 回。〈急所〉会心と 2 回目以降の攻撃は敵の防御を無視。〈処刑〉HP 40% 以下の敵に最終与ダメージ +50%。15%（ボスは 10%）以下まで削れば倒す"},{"id":"鉄盾","name":"鉄盾","category":"Weapon","rarity":"SILVER","basePrice":12,"axis":null,"branch":null,"description":"〈城壁〉敵の攻撃を受け止めて余ったブロックの 60% をシールドへ（【ジャスト防御】ならシールド +8）"},{"id":"聖騎士の盾","name":"聖騎士の盾","category":"Weapon","rarity":"GOLD","basePrice":16,"axis":null,"branch":null,"description":"〈城壁〉敵の攻撃を受け止めて余ったブロックの 90% をシールドへ（【ジャスト防御】ならシールド +12）。〈シールドバッシュ〉防御のカードに挿さずに攻撃したターン、シールドの半分を攻撃に変える"},{"id":"ドーンブリンガー","name":"ドーンブリンガー","category":"Weapon","rarity":"LEGENDARY","basePrice":20,"axis":null,"branch":null,"description":"〈城壁〉敵の攻撃を受け止めて余ったブロックの 120% をシールドへ（【ジャスト防御】ならシールド +16）。〈シールドバッシュ〉防御のカードに挿さずに攻撃したターン、全シールドを攻撃に変える。〈堅守の構え〉防御のカードに出目を 2 個以上挿すとシールド +18（3 ターンに 1 回）。〈黎明〉HP を減らさず受け切ると、受けた攻撃の重さに応じて敵の最大 HP を削る"},{"id":"竜閃","name":"竜閃","category":"Weapon","rarity":"LEGENDARY","basePrice":20,"axis":null,"branch":null,"description":"会心率 100%。〈画竜点睛〉攻撃のカード 1 枚だけに、そのターンの最大の出目を挿すと最終与ダメージ +100%（ダイスの最大の出目なら +200% でボスの目盛りを割る）。〈無我無心〉攻撃 1 枚だけのとき、ほかのカードの出目も攻撃に加わる。2 枚以上発動すると武器の攻撃力が 0"},{"id":"百人切りの鉈","name":"百人切りの鉈","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"出血","branch":"B","description":"敵の出血が 12 以上の敵へ攻撃したとき、敵の HP が「敵の出血 × 1.2%」（ボスは半分・最大 25%）以下なら即座に処刑する。攻撃が当たったとき、出血 +1"},{"id":"力みの小手","name":"力みの小手","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"シールド","branch":"B","description":"シールドを累計 10 得るたび【力み】+1。攻撃カードを挿したターン、【力み】を全消費して 1 つにつき全撃の基礎攻撃 +5"},{"id":"血吸いの護石","name":"血吸いの護石","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"出血","branch":null,"description":"敵の出血が消費または自然減衰で減るたび、減った量と同量のブロックを得る（1 ターン最大 12・攻撃中に消費した分は次のターンに得る）"},{"id":"敗残兵の部隊章","name":"敗残兵の部隊章","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"シールド","branch":null,"description":"シールドを消費・吸収・減衰で 8 失うたび【反骨】+1（最大 10）。攻撃時、【反骨】1 つにつき与ダメージ +10%（戦闘中持続・減らない）"},{"id":"重装兵の隠し刃","name":"重装兵の隠し刃","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"シールド","branch":"A","description":"【ジャスト防御】を成立させたとき、敵の予告攻撃の 150% の防御無視反撃を与え、さらにボスのダウン中はシールドが減衰しない"},{"id":"工廠の材料箱","name":"工廠の材料箱","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"臨界","branch":null,"description":"爆発するたび、この戦闘中の自分の防御 +2（最大 +10）"},{"id":"無限モーター","name":"無限モーター","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"充電","branch":null,"description":"ブロックで敵の攻撃を完全に防いだターン、余って消えたブロックと同量（最大 +8）の充電を得る"},{"id":"呼雷粉","name":"呼雷粉","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"充電","branch":null,"description":"振り直しを 1 回行うたび、充電 +4（1 ターン最大 2 回）"},{"id":"点火スパナ","name":"点火スパナ","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"臨界","branch":null,"description":"攻撃のたび、臨界 +3。爆発したターン、次のターンの手札 +1 枚（1 ターン 1 回）"},{"id":"逆さ避雷針","name":"逆さ避雷針","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"充電","branch":"A","description":"敵の攻撃を受けるとき、充電 5 を消費して被ダメージを 6 減らし、このターン発動した防御の端子 1 枚を自動で再起動する（1 ターン 1 回）"},{"id":"過負荷チューナー","name":"過負荷チューナー","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"充電","branch":"A","description":"過充電（充電 10 以上）の間、充電を 3 以上消費する行動を行うたび、直後に充電 +2 を得る（1 ターン最大 3 回）"},{"id":"雷壷","name":"雷壷","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"充電","branch":"B","description":"【規則】充電の上限（30）が無くなる。代わりにターン終了時、30 を超えた分の 1/4（切り捨て）を失う"},{"id":"乾き火口箱","name":"乾き火口箱","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"臨界","branch":null,"description":"戦闘開始時、臨界 +14"},{"id":"炉番の外套","name":"炉番の外套","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"臨界","branch":null,"description":"敵が攻撃したターンの終わり、敵の攻撃（ブロックで受けた分を含む）の半分（最大 +12）の臨界を得る"},{"id":"過熱石","name":"過熱石","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"臨界","branch":null,"description":"攻撃のカードに 2 個以上挿したターン、臨界 +8（3 個とも攻撃なら +16）"},{"id":"溢れ取りの鋳型","name":"溢れ取りの鋳型","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"臨界","branch":"B","description":"爆発のとき、閾値を超えて溢れていた臨界 1 につき、その爆発のダメージ +3・次の 1 撃の最終与ダメージ +4%"},{"id":"帳簿外の爆薬","name":"帳簿外の爆薬","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"臨界","branch":"A","description":"【規則】爆発で臨界を 0 にせず閾値ぶんだけ減らし、溜まっていれば同じターンに何度でも連続で爆発する（1 ターン最大 5 回）。同じターンの 2 回目以降の爆発は、そのダメージ +30%（2 回目 +30%・3 回目 +60%…）"},{"id":"恒温の竈","name":"恒温の竈","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"臨界","branch":null,"description":"戦闘開始時、臨界が閾値の半分から始まる。爆発の後、臨界は 0 ではなく 8 から始まる"},{"id":"早沸かし釜","name":"早沸かし釜","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"臨界","branch":"A","description":"爆発の閾値が 5 下がる。敵が攻撃したターンの終わり、臨界 +1"},{"id":"余熱の炉壁","name":"余熱の炉壁","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"臨界","branch":null,"description":"爆発するたび、その爆発のダメージの 12% をそのターンのブロックとして得る（1 回最大 20）"},{"id":"八日目の灰燼","name":"八日目の灰燼","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"臨界","branch":"B","description":"致死ダメージを受けたとき臨界が 25 以上あれば HP 1 で踏みとどまり、全臨界を消費して消費量 × 3 の防御無視ダメージを敵へ与える（1 戦闘 1 回）。臨界 40 以上で起きた爆発のダメージ ×1.75"},{"id":"鉛入りの手斧","name":"鉛入りの手斧","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"出血","branch":null,"description":"攻撃のカードに 4 以上の出目を挿し、その攻撃が当たるたび、敵に出血 +2"},{"id":"破城斧","name":"破城斧","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"シールド","branch":"B","description":"シールドが 20 以上のターン、攻撃カード 1 枚につきシールドを 6 消費して、その攻撃の最終与ダメージ +130%・敵防御全無視（シールド 20 未満では発動しない）"},{"id":"銑鉄棍","name":"銑鉄棍","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"会心","branch":null,"description":"会心にならなかった攻撃は、その攻撃の会心率 1% につき与ダメージ +1%（100% まで）。会心は通常どおり発生する"},{"id":"毒棘の小盾","name":"毒棘の小盾","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"毒","branch":null,"description":"防御のカードに挿したターン、ブロック +6。そのターン、ブロックで防いだダメージ 4 につき敵に毒 +1（最大 +6）"},{"id":"焦げ導線","name":"焦げ導線","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"充電","branch":"A","description":"充電を消費するたび、消費した量 × 3 の防御無視ダメージを敵に与える（1 ターン最大 45）。このターン【再起動】が発動するたび、上限 +20・追加で 12 の防御無視ダメージを与える"},{"id":"加重の拳套","name":"加重の拳套","category":"Passive","rarity":"SILVER","basePrice":8,"axis":null,"branch":null,"description":"同じターンの 2 回目以降の攻撃が通るたび、その攻撃の最終与ダメージ +25%"},{"id":"避雷の鉢金","name":"避雷の鉢金","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"充電","branch":null,"description":"敵の攻撃を受けたターンの終了時（ブロックで防いだ場合を含む）、敵の予告攻撃 5 につき充電 +2（最大 +8）"},{"id":"緑染みの小刀","name":"緑染みの小刀","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"毒","branch":null,"description":"攻撃のカードを発動するたび、敵に毒 +3（1 ターン最大 3 回）"},{"id":"蛇血瓶","name":"蛇血瓶","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"毒","branch":null,"description":"攻撃のカードに 4 以上の出目を挿して発動するたび、敵に毒 +4（1 ターン最大 3 回）"},{"id":"主を看取る香炉","name":"主を看取る香炉","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"毒","branch":null,"description":"毒のダメージまたは【劇症】が発生するたび、この戦闘中の与ダメージ +6%（最大 +60%）"},{"id":"蓋付きの毒指輪","name":"蓋付きの毒指輪","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"毒","branch":"B","description":"戦闘開始から 5 ターン目までの間、敵へ与える毒 +2・【劇症】のダメージ +50%。毒が 20 以上の敵に攻撃が当たったとき、自動で【劇症】を起こす（1 ターン 1 回）"},{"id":"廃庭の霧吹き","name":"廃庭の霧吹き","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"毒","branch":null,"description":"敵が攻撃するときにも、毒のダメージ（威力 50%・毒は減らない）が 1 回入る（1 ターン 1 回）"},{"id":"水揚げの麻痺瓶","name":"水揚げの麻痺瓶","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"毒","branch":"A","description":"敵の毒 4 につき敵の攻撃 −1（最大 −10）。敵の攻撃を HP を失わずに受けきったターン、敵に毒 +5"},{"id":"雷鯰の棘","name":"雷鯰の棘","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"充電","branch":null,"description":"過充電（充電 10 以上）の間、攻撃は敵の防御を 8 無視し、攻撃が当たるたびボスの目盛りをそのダメージの 20% ぶん前進させる"},{"id":"血に澄む紅玉","name":"血に澄む紅玉","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"出血","branch":null,"description":"敵の出血が 6 以上のとき、各ターン最初の攻撃は基礎攻撃 +3・敵に出血 +3"},{"id":"鋸刃の山刀","name":"鋸刃の山刀","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"出血","branch":null,"description":"攻撃が当たるたび、敵に出血 +1。敵の HP が 50% 未満なら更に +1、25% 未満なら更に +3"},{"id":"逆締めの止血帯","name":"逆締めの止血帯","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"出血","branch":"A","description":"ターン終了時、このターンに攻撃が 2 回当たっていれば敵の出血 × 1、3 回以上なら × 2 の防御無視ダメージを与える"},{"id":"血桜","name":"血桜","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"出血","branch":"A","description":"敵の出血が 12 以上のとき、このターン 2 回目以降の攻撃の攻撃で敵の出血を 2 消費し、その攻撃の最終与ダメージ +（消費前の出血 × 2%・最大 +120%）"},{"id":"医書の隠し針","name":"医書の隠し針","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"出血","branch":"A","description":"敵の出血が自然減衰しなくなる。さらに敵の出血 10 につき、各攻撃の基礎攻撃 +2"},{"id":"血呼びの腕輪","name":"血呼びの腕輪","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"出血","branch":null,"description":"戦闘開始時、敵に出血 +3。さらに各ターン最初の攻撃が当たったとき、敵に出血 +1"},{"id":"雷神槍","name":"雷神槍","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"充電","branch":"B","description":"このターンに充電を 8 以上消費したとき、そのターンの全攻撃の最終与ダメージ +（消費した充電 × 6%）（消費 8 未満では発動しない）"},{"id":"貸与された時間","name":"貸与された時間","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"充電","branch":"A","description":"この戦闘で充電を累計 15 消費するたび、エスカレーションの進行を 1 ターン遅らせ、次のターンの手札 +1 枚（1 戦闘最大 4 回）"},{"id":"烈刃","name":"烈刃","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"臨界","branch":null,"description":"【過熱】の間、すべての攻撃の最終与ダメージ +「この戦闘の爆発の回数 × 25%」（最大 +200%）"},{"id":"帯電の胸甲","name":"帯電の胸甲","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"充電","branch":null,"description":"充電を 5 消費するたび、そのターンのブロック +5（1 ターン最大 3 回）"},{"id":"燻りの革胸当て","name":"燻りの革胸当て","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"臨界","branch":null,"description":"防御のカードを発動するたび、臨界 +4・そのターンのブロック +2"},{"id":"測量師の片眼鏡","name":"測量師の片眼鏡","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"会心","branch":null,"description":"前の戦闘からマップを 1 歩進むごとに歩数が蓄積する（戦闘終了時に 0 に戻る）。戦闘中、蓄積した歩数に応じて会心率 ×（1 + 0.05 × 歩数）・会心倍率 +（0.015 × 歩数、最大 +0.30）"},{"id":"毒固めの腕環","name":"毒固めの腕環","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"毒","branch":null,"description":"ターン開始時、敵の毒 6 につき、このターンのブロック +2（最大 +10）"},{"id":"火打ち底の旅靴","name":"火打ち底の旅靴","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"臨界","branch":null,"description":"マップを 1 歩進むごとに臨界 +2 を蓄積（最大 20）。次の戦闘開始時、蓄積分の臨界を得て 0 に戻す"},{"id":"聖路の白靴","name":"聖路の白靴","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"シールド","branch":null,"description":"マップを 2 歩進むごとにシールド +1 を蓄積（最大 20）。次の戦闘開始時、蓄積分のシールドを得て 0 に戻す"},{"id":"血車","name":"血車","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"出血","branch":"B","description":"秘宝の効果で敵の出血を消費するたび、消費量 × 2 の防御無視ダメージを与え、次のターンの手札 +1 枚（手札増加は 1 ターン 1 回）"},{"id":"腐し刃","name":"腐し刃","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"毒","branch":"A","description":"敵の毒 1 につき、攻撃の与ダメージ +1.5%（最大 +45%）。攻撃が当たるたび、敵に毒 +1"},{"id":"溶金の領主剣","name":"溶金の領主剣","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"金","branch":null,"description":"現在の所持ゴールド 50G ごとに与ダメージ +10%（最大 +80%）。さらに店で 100G 使うたび、このラン中のすべての攻撃の基礎攻撃 +2（累積）"},{"id":"天工開物","name":"天工開物","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"臨界","branch":"B","description":"武器を強化するたび、このラン中の爆発の基礎ダメージ +8（累積）。【過熱】のターン、攻撃は敵の防御を 12 無視する"},{"id":"二拍目の心臓","name":"二拍目の心臓","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"シールド","branch":null,"description":"戦闘中、初めて HP が 50% 以下になったとき、最大 HP の 30% のシールドを得る。以降、この戦闘中のシールド獲得量 ×1.5（1 戦闘 1 回）"},{"id":"灼線鞭","name":"灼線鞭","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"充電","branch":"A","description":"1 ターンに充電を 2 回以上消費したとき、発動した中で最も基礎攻撃が高い攻撃のカード 1 枚を無料で【再起動】する（他の【再起動】が発動済みで 4 回以上消費したターンならさらにもう 1 回）。【再起動】の攻撃の最終与ダメージ +（30 + このターンの【再起動】回数 × 25）%（最大 +130%）"},{"id":"毒草摘みの杖","name":"毒草摘みの杖","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"毒","branch":"B","description":"マップを 1 歩進むごとに毒 +1 を蓄積（最大 16）。次の戦闘開始時、蓄積分の毒を敵に与えて 0 に戻す"},{"id":"寸鉄","name":"寸鉄","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"会心","branch":"A","description":"超過会心率 1% ごとの会心倍率増加が 1.5 倍（+0.0225）になる。【練気】3 以上の攻撃が会心したとき、敵の防御を完全に無視する"},{"id":"戦果の天秤","name":"戦果の天秤","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"金","branch":null,"description":"戦闘勝利時の獲得ゴールド +10%（切り上げ）。エリート・ボスを倒したときはさらに +5G"},{"id":"脈打たぬ鋼の心臓","name":"脈打たぬ鋼の心臓","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"シールド","branch":null,"description":"戦闘開始時、シールドを得る（初期値 4・戦闘に勝利するたび +1 累積）。さらに現在のシールドが 50 以上の間、毎ターン開始時にシールドが減衰しない"},{"id":"血脈の災環","name":"血脈の災環","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"出血","branch":"B","description":"敵の出血が消費または自然減衰で減るたび、減った量 × 3 の防御無視ダメージを与え、その 20% 分 HP を回復する（回復は 1 ターン最大 10）"},{"id":"無害灯","name":"無害灯","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"臨界","branch":null,"description":"臨界 15 以上のとき、敵の直接攻撃による HP 減少を、臨界 15 を消費して無効にする（1 戦闘 1 回）。無効にしたとき、臨界を消費せずに爆発の 30% のダメージを敵に返す"},{"id":"毒塗りの楔","name":"毒塗りの楔","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"毒","branch":null,"description":"防御のカードに出目を 2 個以上挿したターン、敵の攻撃を受けたとき、敵に毒 +5"},{"id":"口縫いの毒糸","name":"口縫いの毒糸","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"毒","branch":null,"description":"敵の毒が 10 以上の間、大技を放つターンの敵の攻撃 −20%。毒が 20 以上なら、さらに敵の攻撃 −2"},{"id":"瑠璃砥石","name":"瑠璃砥石","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"会心","branch":null,"description":"会心率 +5%。同じターンの 2 回目以降の会心または集中会心を出すたび、この戦闘中の会心率 +4%・会心倍率 +0.04（最大 8 回・次の攻撃から適用）"},{"id":"遅効の毒刃","name":"遅効の毒刃","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"毒","branch":"B","description":"【劇症】のダメージが、この戦闘の【劇症】1 回につき +30%（最大 +150%）。攻撃が当たるたび、敵に毒 +2。【劇症】のダメージの後、敵の残り HP が「現在の毒 × 2（ボスはその半分）」以下なら倒す"},{"id":"医家の反り刃","name":"医家の反り刃","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"出血","branch":null,"description":"HP が満タン、または 50% 以下の敵に攻撃するたび、敵に出血 +2（1 ターン最大 3 回）"},{"id":"鏡返しの小盾","name":"鏡返しの小盾","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"シールド","branch":"A","description":"シールドまたはブロックで敵の攻撃を防いだとき、防いだ量の 60% のダメージを敵に返す。【ジャスト防御】なら 100% を返す"},{"id":"鎧縫いの針","name":"鎧縫いの針","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"出血","branch":null,"description":"敵の出血 1 につき、攻撃が敵の防御を 1 無視する。出血 15 以上なら、攻撃が当たるたびボスの目盛りをそのダメージの 20% ぶん前進させる"},{"id":"燧石の指輪","name":"燧石の指輪","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"臨界","branch":"A","description":"攻撃が 3 回以上起きたターン、臨界の獲得量がすべて 2 倍になり、爆発するたび同じターンの次の爆発のダメージ +40%（累積）"},{"id":"サーベル・ワルツ","name":"サーベル・ワルツ","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":null,"branch":null,"description":"[剣の舞]。[剣の舞]の所持数に応じて、与ダメージ +10%/15%/20%。ショップ・交換マス・宝箱の LEGENDARY 枠がまれに[剣の舞]に差し替わる。[剣の舞]が 4 枚揃うとすべて消え、〈無銘の剣舞譜〉に変化する"},{"id":"エスパーダ・パソドブレ","name":"エスパーダ・パソドブレ","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":null,"branch":null,"description":"[剣の舞]。[剣の舞]の所持数に応じて、与ダメージ +40%/60%/80%。受けるダメージ +20%。[剣の舞]が 4 枚揃うとすべて消え、〈無銘の剣舞譜〉に変化する"},{"id":"フルーレ・バレエ","name":"フルーレ・バレエ","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":null,"branch":null,"description":"[剣の舞]。[剣の舞]の所持数に応じて、与ダメージ +25%/37.5%/50%。戦闘に敗北したとき、このアイテムを廃棄し、最大 HP を 1 にして生還する。[剣の舞]が 4 枚揃うとすべて消え、〈無銘の剣舞譜〉に変化する"},{"id":"ファコン・タンゴ","name":"ファコン・タンゴ","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":null,"branch":null,"description":"[剣の舞]。[剣の舞]の所持数に応じて、与ダメージ +20%/30%/40%。[剣の舞]が 4 枚揃うとすべて消え、〈無銘の剣舞譜〉に変化する"},{"id":"無銘の剣舞譜","name":"無銘の剣舞譜","category":"Passive","rarity":"LEGENDARY","basePrice":0,"axis":null,"branch":null,"description":"戦闘に入るたび、また攻撃が当たるたびに剣先 +1（上限なし・手に入れた時に 層 × 15）。すべての攻撃が会心確定で敵の防御を無視し、同じ攻撃がもう 1 回当たる。すべての攻撃に +剣先。攻撃が当たるたび HP +剣先。攻撃を受けるたび、敵に剣先ぶんの軽減不可ダメージ"},{"id":"小回復薬","name":"小回復薬","category":"Consumable","rarity":"BRONZE","basePrice":4,"axis":null,"branch":null,"description":"HP を最大 HP の 25% 回復する。"},{"id":"回復薬","name":"回復薬","category":"Consumable","rarity":"SILVER","basePrice":5,"axis":null,"branch":null,"description":"HP を最大 HP の 40% 回復する。"},{"id":"上回復薬","name":"上回復薬","category":"Consumable","rarity":"GOLD","basePrice":6,"axis":null,"branch":null,"description":"HP を最大 HP の 60% 回復する。"},{"id":"完全回復薬","name":"完全回復薬","category":"Consumable","rarity":"LEGENDARY","basePrice":7,"axis":null,"branch":null,"description":"HP を完全回復する。"},{"id":"木の護符","name":"木の護符","category":"Consumable","rarity":"BRONZE","basePrice":4,"axis":null,"branch":null,"description":"シールド 15 を得る。戦闘中にも使用できる。"},{"id":"鉄の護符","name":"鉄の護符","category":"Consumable","rarity":"SILVER","basePrice":5,"axis":null,"branch":null,"description":"シールド 30 を得る。戦闘中にも使用できる。"},{"id":"銀の護符","name":"銀の護符","category":"Consumable","rarity":"GOLD","basePrice":6,"axis":null,"branch":null,"description":"シールド 50 を得る。戦闘中にも使用できる。"},{"id":"惜別の護符","name":"惜別の護符","category":"Consumable","rarity":"LEGENDARY","basePrice":7,"axis":null,"branch":null,"description":"シールド 80 を得る。戦闘中にも使用できる。"},{"id":"鬼火の油","name":"鬼火の油","category":"Consumable","rarity":"BRONZE","basePrice":4,"axis":null,"branch":null,"description":"その戦闘中、最終与ダメージ +15%"},{"id":"燐の油","name":"燐の油","category":"Consumable","rarity":"SILVER","basePrice":5,"axis":null,"branch":null,"description":"その戦闘中、最終与ダメージ +30%"},{"id":"業火の膏薬","name":"業火の膏薬","category":"Consumable","rarity":"GOLD","basePrice":6,"axis":null,"branch":null,"description":"その戦闘中、最終与ダメージ +50%"},{"id":"天火の膏薬","name":"天火の膏薬","category":"Consumable","rarity":"LEGENDARY","basePrice":7,"axis":null,"branch":null,"description":"その戦闘中、最終与ダメージ +75%"},{"id":"古い手紙","name":"古い手紙","category":"Consumable","rarity":"LEGENDARY","basePrice":7,"axis":null,"branch":null,"description":"次のターンの被ダメージを 0 にする。3 回まで使える。"},{"id":"風替わりの羽根","name":"風替わりの羽根","category":"Consumable","rarity":"BRONZE","basePrice":5,"axis":null,"branch":null,"description":"戦闘中に使う。今の手札をすべて捨て札へ送り、同じ枚数を山札から引き直す。"},{"id":"無銘の潤滑油","name":"無銘の潤滑油","category":"Consumable","rarity":"BRONZE","basePrice":5,"axis":null,"branch":null,"description":"戦闘中に使う。このターン、すべてのカードに出目の条件を無視して挿せる。"},{"id":"鎧割りの酸瓶","name":"鎧割りの酸瓶","category":"Consumable","rarity":"SILVER","basePrice":6,"axis":null,"branch":null,"description":"戦闘中に使う。この戦闘中、敵の防御を 12 下げる（下限 0）。"},{"id":"急所突きの針","name":"急所突きの針","category":"Consumable","rarity":"SILVER","basePrice":6,"axis":null,"branch":null,"description":"戦闘中に使う。次の攻撃は会心確定となり、敵の防御を無視する。"},{"id":"目盛り削りのノミ","name":"目盛り削りのノミ","category":"Consumable","rarity":"SILVER","basePrice":7,"axis":null,"branch":null,"description":"戦闘中に使う。敵に 15 ダメージ。ボスの目盛りは通常攻撃として割れる（亀裂の入った目盛りも、よろめきではなくダウンとして割れる）。"},{"id":"反転の砂","name":"反転の砂","category":"Consumable","rarity":"GOLD","basePrice":8,"axis":null,"branch":null,"description":"戦闘中に使う。エスカレーションの段階を 1 つ戻す（段階 0 のときは、次のターンに段階が進まない）。"},{"id":"倍化の共鳴玉","name":"倍化の共鳴玉","category":"Consumable","rarity":"GOLD","basePrice":9,"axis":null,"branch":null,"description":"戦闘中に使う。このターン、挿したカードがすべて 2 回発動する。"},{"id":"複製の水銀","name":"複製の水銀","category":"Consumable","rarity":"LEGENDARY","basePrice":10,"axis":null,"branch":null,"description":"戦闘中に使う。手札のカードを 1 枚選び、この戦闘中だけ、その写しを 2 枚手札に加える（使い捨ても写せる）。"},{"id":"囮罠","name":"囮罠","category":"Consumable","rarity":"BRONZE","basePrice":8,"axis":null,"branch":null,"description":"マップで使う。今いる点に仕掛けると、近くの追跡者の気を引き、踏んだ追跡者を 2 ターン足止めする。8 ターンで効果が切れる。"},{"id":"瞬間研磨剤","name":"瞬間研磨剤","category":"Consumable","rarity":"GOLD","basePrice":0,"axis":null,"branch":null,"description":"次の攻撃だけ、与ダメージ +150%。"},{"id":"不抜の聖紋","name":"不抜の聖紋","category":"Consumable","rarity":"GOLD","basePrice":0,"axis":null,"branch":null,"description":"戦闘中、HP 80% 以上を保っている間、被ダメージ −40%。一度でも 80% を割った時点で破棄する。"},{"id":"痛覚遮断剤","name":"痛覚遮断剤","category":"Consumable","rarity":"GOLD","basePrice":0,"axis":null,"branch":null,"description":"使用したターン、致死ダメージを受けても HP 1 で踏みとどまる。次のターン開始時に HP が 1 なら攻撃 +10・最終与ダメージ +50%、ただし攻撃終了時に死亡する。"},{"id":"仕込み刃","name":"仕込み刃","category":"Consumable","rarity":"GOLD","basePrice":0,"axis":null,"branch":null,"description":"次のターンに受けるダメージを 0 にし、その 5 倍を敵に軽減不可ダメージとして与える。"},{"id":"シュヴァリエのレイピア","name":"シュヴァリエのレイピア","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":null,"branch":null,"description":"戦闘中に使うと〈コントラタック〉を切り替える（消費しない）。発動中：攻撃のカードに挿せない代わり、ブロックとシールドで防いだダメージの 2 倍を軽減不可ダメージとして敵に返す。解除した次のターン：手札 +2 枚・そのターンの攻撃は会心確定（剣聖撃破済みなら会心倍率 +1.0）"},{"id":"十五年目の計測器","name":"十五年目の計測器","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"充電","branch":null,"description":"充電が上限に達したターン、次の攻撃の基礎攻撃 +6（1 ターン 1 回）"},{"id":"荒砥","name":"荒砥","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"臨界","branch":null,"description":"攻撃のたび、臨界 +2。爆発するたび、この戦闘中の与ダメージ +4%（次のターンから・最大 +40%）"},{"id":"肩当て","name":"肩当て","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"シールド","branch":null,"description":"防御のカードに出目を 3 個とも挿したターン、シールド +12"},{"id":"二度目の打金","name":"二度目の打金","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"臨界","branch":null,"description":"【過熱】（爆発が起きたターン）とその次のターン、すべての攻撃時、攻撃 +3"},{"id":"擦り減った小盾","name":"擦り減った小盾","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"シールド","branch":"A","description":"防御のカードに挿したダイス 1 個につきシールド +2。さらに【ジャスト防御】の許容幅を +2 広げる（余剰 0〜4 まで成立）"},{"id":"黄金色の封蝋","name":"黄金色の封蝋","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"金","branch":null,"description":"層に入るたび、ゴールド +18"},{"id":"合札","name":"合札","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"金","branch":null,"description":"同じショップで 2 品目以降を買うとき、価格 −10G（下限 1G）"},{"id":"銭皿","name":"銭皿","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"金","branch":null,"description":"秘宝を「見送り換金」したとき、獲得ゴールド +100%"},{"id":"爆破祭の小切手","name":"爆破祭の小切手","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"金","branch":null,"description":"3 ターン以内に戦闘に勝利したとき、追加でゴールド +6"},{"id":"ちいさな灯火","name":"ちいさな灯火","category":"Passive","rarity":"GOLD","basePrice":9,"axis":null,"branch":null,"description":"戦闘に敗北するとき一度だけ、HP を全回復して戦闘から離脱する。発動すると失われ、ボス戦では発動しない。"},{"id":"燐晶","name":"燐晶","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"臨界","branch":null,"description":"爆発を 2 回以上起こして戦闘に勝利したとき、最大 HP +2（永続）。【過熱】のターン終了時、HP +2"},{"id":"幸運の硬貨","name":"幸運の硬貨","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"金","branch":null,"description":"同じ出目が 2 個以上出たターン、ゴールド +3（1 戦闘最大 12G）"},{"id":"英雄の意志","name":"英雄の意志","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"シールド","branch":null,"description":"エリート・ボス戦で敵が大技予告またはチャージ中のターン開始時、シールド +18。このターン【ジャスト防御】が成立したら、次のダウンで敵が受けるダメージの倍率 +0.5（×1.5 → ×2.0・重ねて最大 +1.0）、そのダウンの開始時にシールド +20"},{"id":"激情の刃","name":"激情の刃","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"出血","branch":"A","description":"1 ターンに攻撃が 3 回以上当たったとき、そのターンの 3 回目以降の攻撃は「敵の出血の半分（最大 +15）」を基礎攻撃に加える"},{"id":"相棒の魂","name":"相棒の魂","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"シールド","branch":null,"description":"シールドが割られて 0 になったとき、割られる前の量の 70% で即座に張り直す（1 戦闘 1 回）。張り直した次のターン、基礎攻撃 +10"},{"id":"根拠のない確信","name":"根拠のない確信","category":"Passive","rarity":"SILVER","basePrice":8,"axis":null,"branch":null,"description":"結末の先へ導かれる。"},{"id":"決意","name":"決意","category":"Passive","rarity":"GOLD","basePrice":9,"axis":null,"branch":null,"description":"6 層へ進む資格。6 層の記録を読むと〈真理〉に変わる。"},{"id":"真理","name":"真理","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":null,"branch":null,"description":"7 層へ進む資格。"},{"id":"鷹匠の革手袋","name":"鷹匠の革手袋","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"会心","branch":null,"description":"攻撃のカードに 4 以上の出目を挿したターン、会心率 +12%・会心倍率 +0.15"},{"id":"斬り重ねの鞘","name":"斬り重ねの鞘","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"会心","branch":"A","description":"会心を出すたび、会心倍率 +0.08 が蓄積する（最大 8 層）。ターン開始時、蓄積分の半分を失う（前のターンに会心を 3 回以上出した場合、または【練気】4 以上なら失わない）"},{"id":"一点読みの片眼","name":"一点読みの片眼","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"会心","branch":null,"description":"会心率 +22%・会心倍率 +（0.25 + 現在の【練気】× 0.08）（最大 +0.89）。代わりに会心にならなかった攻撃の与ダメージ −45%"},{"id":"返し刃の留め金","name":"返し刃の留め金","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"出血","branch":null,"description":"攻撃のカードを 2 枚以上発動したターン、各攻撃で敵に出血 +1"},{"id":"毒見役の小匙","name":"毒見役の小匙","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"毒","branch":null,"description":"攻撃と防御の両方のカードに挿したターン、自分の HP +1・敵に毒 +3"},{"id":"火守りの火掻き棒","name":"火守りの火掻き棒","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"臨界","branch":null,"description":"攻撃以外のカード（防御・補助・充電）に挿したダイス 1 個につき、臨界 +6"},{"id":"二度詰めの雷管","name":"二度詰めの雷管","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"臨界","branch":null,"description":"爆発するたび、この戦闘中の爆発の基礎ダメージ +5（最大 +50・減らない）"},{"id":"継ぎ足しの蓄電瓶","name":"継ぎ足しの蓄電瓶","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"充電","branch":null,"description":"充電のカードに挿したダイス 1 個につき、充電 +3"},{"id":"当て布の籠手","name":"当て布の籠手","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"シールド","branch":"B","description":"防御のカードに出目を 2 個以上挿したターン、シールド +6"},{"id":"研ぎ師の見立て書","name":"研ぎ師の見立て書","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"会心","branch":"A","description":"会心を出すたび、そのターンのブロック +2。同じターンに 2 回以上会心を出したとき、さらにブロック +6（1 ターン 1 回）"},{"id":"重ね斬りの型","name":"重ね斬りの型","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"会心","branch":"A","description":"同じターンに会心が 2 回続いたとき、3 回目以降の攻撃は会心率 +25%・会心倍率 +0.30。さらに、その攻撃が会心したときブロック +8"},{"id":"血止め知らずの針箱","name":"血止め知らずの針箱","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"出血","branch":null,"description":"攻撃が 1 ターンに 2 回以上当たったとき、2 回目以降の攻撃の出血付与量 +1（累積せず固定 +1）"},{"id":"凝血の小瓶","name":"凝血の小瓶","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"出血","branch":null,"description":"敵の出血が 20 以上の間、敵の攻撃 −20%。出血が 30 以上ならさらにボスの大技倍率 −0.5"},{"id":"瘴気溜まりの壺","name":"瘴気溜まりの壺","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"毒","branch":null,"description":"ターン開始時の毒のダメージで敵の毒が減る直前、敵に毒 +4（毒が 1 以上あるときのみ）"},{"id":"腐れ沼の苔玉","name":"腐れ沼の苔玉","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"毒","branch":"A","description":"毒のダメージの後に残る毒の割合が 50% から 75% になる（【劇症】の消費には影響しない）"},{"id":"焚き足しの炭","name":"焚き足しの炭","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"臨界","branch":null,"description":"臨界を得るたび、獲得量 +1（1 ターン最大 6 回）"},{"id":"火花読みの眼鏡","name":"火花読みの眼鏡","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"臨界","branch":null,"description":"爆発のダメージが敵の防御を完全に無視し、さらにこの戦闘で爆発した回数 × 10% だけ増える（最大 +100%）"},{"id":"漏電する銅線","name":"漏電する銅線","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"充電","branch":null,"description":"充電を消費した次のターンの開始時、前のターンに消費した量の 30%（切り捨て・最大 +6）の充電を得る"},{"id":"二股の導線","name":"二股の導線","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"充電","branch":"A","description":"1 ターンに 1 回、充電 12（所持している充電の秘宝 1 つにつき −1、最小 6）を消費して、このターンに発動した攻撃か防御のカード 1 枚を【再起動】する"},{"id":"油染みの盾革","name":"油染みの盾革","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"シールド","branch":null,"description":"前のターンに、敵の攻撃を受けて HP を 1 も失わなかったなら、ターン開始時のシールドの減衰が 50% から 30% に減少する"},{"id":"盾押しの心得","name":"盾押しの心得","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"シールド","branch":"B","description":"攻撃のカードに挿したターン、現在のシールドの 35%（切り捨て）が全攻撃の基礎攻撃に加わる"},{"id":"狙い目の刻み","name":"狙い目の刻み","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"会心","branch":null,"description":"攻撃のカードに出目 4 を挿した攻撃は会心率 +10%、出目 5 なら +16%、出目 6 なら +26%"},{"id":"一の矢","name":"一の矢","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"会心","branch":"B","description":"【集中】集中会心時、その攻撃の会心倍率 +（0.90 + 使った【練気】× 0.25）。5 以上の出目を挿していればさらに +0.50"},{"id":"余韻の鈴","name":"余韻の鈴","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"会心","branch":"A","description":"前のターンに出した会心 1 回につき、このターンの会心率 +10%・ブロック +4"},{"id":"受け流しの扇","name":"受け流しの扇","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"会心","branch":null,"description":"防御のカードを 1 枚以上発動して敵の攻撃を完封した次のターン、会心率 +18%・ブロック +5。そのターン最初の会心攻撃で敵の防御 −8"},{"id":"刃こぼれの見立て","name":"刃こぼれの見立て","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"会心","branch":"B","description":"【集中】集中会心した攻撃は敵の防御を 12 無視し、ボスの目盛りをそのダメージの（35 ＋ 使った【練気】× 10）% ぶん前進させる"},{"id":"負け越しの賽","name":"負け越しの賽","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"役","branch":"B","description":"役が成立しなかったターン終了時、次のターンは最初の振り直しが無料になり、ブロック +6。さらにそのターンに振り直していたなら、次のターンの手札 +1 枚"},{"id":"連なる閃き","name":"連なる閃き","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"会心","branch":"A","description":"前のターンに会心を出しており、このターンも会心を出したとき、ブロック +6（1 ターン 1 回）・その攻撃と以降の攻撃の最終与ダメージ +12%（【練気】4 以上なら +20%）"},{"id":"抜き打ちの作法","name":"抜き打ちの作法","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"会心","branch":"B","description":"【集中】戦闘開始時に【練気】+5。集中時の会心率 −18%（会心の秘宝 1 つにつき 2% 相殺・最低賭け金 25%）。1 ターン目と敵のダウン中は集中時の会心率 +12%。集中会心時、その攻撃の会心倍率 +1.40"},{"id":"千里眼の水晶","name":"千里眼の水晶","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"会心","branch":"A","description":"1 ターンに会心を 2 回以上出したとき、または【練気】4 以上で会心したとき（1 ターン 1 回）、次のターンの手札 +1 枚・会心率 +35%・ブロック +8"},{"id":"予備の蓄電池","name":"予備の蓄電池","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"充電","branch":null,"description":"戦闘開始時、充電 +10"},{"id":"静電気の毛布","name":"静電気の毛布","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"充電","branch":null,"description":"防御のカードに挿したダイス 1 個につき、充電 +3"},{"id":"火打ちの針","name":"火打ちの針","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"充電","branch":null,"description":"攻撃のカードを発動するたび、充電 +2（1 ターン最大 3 回）"},{"id":"蓄電の小手","name":"蓄電の小手","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"充電","branch":null,"description":"このターンに充電を 5 消費するたび、このターンの全攻撃の基礎攻撃 +3（累積）"},{"id":"引き直しの撃鉄","name":"引き直しの撃鉄","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"充電","branch":null,"description":"ダイスを振り直すたび、このターンの次の攻撃の基礎攻撃 +5（このターン中累積）"},{"id":"絶縁の外套","name":"絶縁の外套","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"充電","branch":null,"description":"過充電（充電 10 以上）でターンを開始したとき、ブロック +5・このターンの被ダメージ −2"},{"id":"避雷の杭","name":"避雷の杭","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"充電","branch":null,"description":"1 ターンに充電を 8 以上消費したとき、ボスの目盛りを最大 HP の 5% ぶん前進させ、ブロック +6（1 ターン 1 回）"},{"id":"雷鳴の太鼓","name":"雷鳴の太鼓","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"充電","branch":"B","description":"充電上限 +15。攻撃のカードに挿したターンに充電が 15 以上あるとき、充電 12 を消費して【オーバークロック】する（最終与ダメージ +100%・1 ターン 1 回）"},{"id":"欠け刃のナイフ","name":"欠け刃のナイフ","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"出血","branch":null,"description":"攻撃のたび、敵に出血 +1"},{"id":"棘付きの籠手","name":"棘付きの籠手","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"出血","branch":null,"description":"ブロックで敵の攻撃を完全に防いだターン、敵に出血 +3。さらに次のターン最初の攻撃の基礎攻撃 +4"},{"id":"裂け目の楔","name":"裂け目の楔","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"出血","branch":null,"description":"攻撃のカードに 1〜3 の出目を挿し、その攻撃が当たるたび、敵に出血 +3"},{"id":"血の滴る刃先","name":"血の滴る刃先","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"出血","branch":null,"description":"敵の出血が 8 以上の間、攻撃のたび HP +1（1 ターン最大 3）"},{"id":"止血禁じの軟膏","name":"止血禁じの軟膏","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"出血","branch":null,"description":"敵の出血が自然減衰する際の割る数 +15（自然減衰が大幅に緩やかになる）"},{"id":"紅の搾り具","name":"紅の搾り具","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"出血","branch":"B","description":"敵の出血が 15 以上の敵へ攻撃が当たったとき、出血の 1/3（切り上げ）を消費し、消費量 × 8 の防御無視ダメージを与え、ボスの目盛りをそのダメージの 100% ぶん前進させる（1 ターン 1 回）"},{"id":"涸れぬ血晶","name":"涸れぬ血晶","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"出血","branch":"A","description":"敵の出血がすでに 14 以上あるとき、敵への出血付与量がすべて 2 倍になる"},{"id":"酸の小瓶","name":"酸の小瓶","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"毒","branch":null,"description":"敵が攻撃したとき、敵に毒 +2。敵の毒が 8 以上の間、敵の防御 −4"},{"id":"毒針の指輪","name":"毒針の指輪","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"毒","branch":null,"description":"各ターン最初の攻撃が当たったとき、敵に毒 +3（すでに敵に毒があるなら +4）"},{"id":"腐葉土の袋","name":"腐葉土の袋","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"毒","branch":null,"description":"ターン開始時、敵の毒が 12 未満なら敵に毒 +4、12 以上ならこのターンの攻撃 +4"},{"id":"麻痺の吹き矢","name":"麻痺の吹き矢","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"毒","branch":"A","description":"敵の毒 2 につき、敵の防御を 1 無視する。敵の毒が 12 以上なら、攻撃は敵の防御をすべて無視する"},{"id":"瘴気の外套","name":"瘴気の外套","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"毒","branch":"A","description":"敵の毒が 15 以上の間、敵の攻撃による被ダメージ −35%（固定ダメージは除く）。ターン終了時、敵の毒が 25 以上なら、毒を消費せずに【劇症】の 50% のダメージを与える"},{"id":"毒溜まりの主","name":"毒溜まりの主","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"毒","branch":"A","description":"敵の毒が 20 以上の間、ターン開始時の毒のダメージが 2 回入り、2 回目では毒が減らない"},{"id":"白濁の義眼","name":"白濁の義眼","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"会心","branch":"B","description":"【集中】集中時会心率 −24%（所持している会心の秘宝 1 つにつき、この低下を 3% 減らす）。集中会心の攻撃は敵の防御を完全に無視し、攻撃後、敵の HP が「（会心倍率 × 7 + 使った【練気】× 4）%」（ボスはその半分）以下なら倒す"},{"id":"死相の面頬","name":"死相の面頬","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"会心","branch":null,"description":"会心を出したターン、そのターンの敵の直接攻撃を「【練気】÷（【練気】+ 8）」の割合だけ減らす（上限 45%、敵の大技のターンは【練気】2 倍で計算・上限 55%）。【練気】3 以上の会心と集中会心は敵のシールドに吸収されない"},{"id":"戻り血の頭骨","name":"戻り血の頭骨","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"出血","branch":"B","description":"秘宝の効果で敵の出血を消費するたび、消費した量の 60%（切り捨て）が次のターン開始時に敵の出血として戻る（自然減衰では戻らない）"},{"id":"血の楔","name":"血の楔","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"出血","branch":null,"description":"敵が得るシールド・回復・被ダメージ軽減を「出血 ÷（出血 + 30）」の割合だけ弱める。また、敵の出血が 20 以上の間、すべての攻撃の最終与ダメージ +40%"},{"id":"腐蝕の王冠","name":"腐蝕の王冠","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"毒","branch":null,"description":"敵の毒の上限（99）が無くなり、敵へ与える毒がすべて 1.5 倍（切り上げ）になる。敵が形態変化するとき、前の形態の毒の半分を次の形態へ与える"},{"id":"骨溶かしの黒油","name":"骨溶かしの黒油","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"毒","branch":"B","description":"よろめき中の敵にも、ダウン中と同じく受けるダメージ ×1.5 が掛かる。ダウン中・よろめき中の敵への毒のダメージと【劇症】のダメージ ×2。ボスをダウンさせたとき、敵の毒 +8"},{"id":"暴れ窯の火床","name":"暴れ窯の火床","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"臨界","branch":"B","description":"閾値の 1.5 倍以上の臨界で起きた爆発（超臨界爆発）のダメージ ×2.6（通常は ×1.85）。超臨界爆発のたび、この戦闘の爆発の閾値 −4（最大 −16）"},{"id":"柱折りの発破筒","name":"柱折りの発破筒","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"臨界","branch":null,"description":"超臨界の爆発を起こしたとき、次のダウンを 1 ターン延ばす（1 回のダウンにつき 1 ターン・1 戦闘 2 回まで）。ダウン中の敵への爆発のダメージ ×3.0"},{"id":"溜め撃ちの誘導コイル","name":"溜め撃ちの誘導コイル","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"充電","branch":null,"description":"この戦闘で充電を消費した回数を数え、3 回ごとに「20 + この戦闘の【再起動】累計回数 × 12」（最大 140）の防御無視ダメージを与え、このターンの【再起動】の攻撃すべてと次の 1 撃の最終与ダメージ +50%（1 ターン最大 2 回）"},{"id":"黒錫のライデン瓶","name":"黒錫のライデン瓶","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"充電","branch":"B","description":"1 ターンに充電を 15 以上消費して終了したとき、消費した量 × 1%（最大 12%）の敵最大 HP 割合防御無視ダメージを与え、次のダウンで敵が受けるダメージの倍率 +0.5（×1.5 → ×2.0・重ねて最大 +1.0）、そのダウンの開始時に充電 +10（1 ターン 1 回）"},{"id":"落城の礎石","name":"落城の礎石","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"シールド","branch":"B","description":"吸収またはターン開始の減衰で 1 ターンにシールドを 12 以上失ったとき、次のターンの全攻撃の基礎攻撃を「失ったシールドの半分」だけ増加させ、最終与ダメージ +80%。失ったシールド 1 につき、ボスの目盛りを最大 HP の 0.5% ぶん前進させる（1 ターン最大 10%）"},{"id":"防人の軍標","name":"防人の軍標","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"シールド","branch":"A","description":"【ジャスト防御】を成立させるたび、この戦闘の最終与ダメージ +（持っているシールドの秘宝の数 × 9%）（累積・この品も数える）・次のターンの手札 +1 枚"},{"id":"帯革の薬嚢","name":"帯革の薬嚢","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":null,"branch":null,"description":"戦闘中に消耗品を使うたび、カードを 1 枚引いて手札に加え、ブロック +6"},{"id":"切り捨ての半券","name":"切り捨ての半券","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"山札","branch":"A","description":"使い捨てのカードを使うたび、そのターンの各攻撃の基礎攻撃 +4・ブロック +5（1 ターン 1 回）"},{"id":"二度点きの燐寸","name":"二度点きの燐寸","category":"Passive","rarity":"GOLD","basePrice":9,"axis":null,"branch":null,"description":"戦闘で最初に使った消耗品は消費されず、その戦闘中にもう 1 回使える（1 戦闘 1 回・もう 1 回使わなければ戦闘終了時に消える）"},{"id":"行商人の見本箱","name":"行商人の見本箱","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"金","branch":null,"description":"店の戦術消耗品の価格 −50%。戦闘開始時に消耗品が 0 個なら、BRONZE または SILVER の戦術消耗品を 1 個借りる（その戦闘中のみ）"},{"id":"嵐読みの風見鶏","name":"嵐読みの風見鶏","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":null,"branch":null,"description":"嵐の中の点での戦闘に勝つたび、ゴールド +8・不安定化 −3"},{"id":"気圧計のペンダント","name":"気圧計のペンダント","category":"Passive","rarity":"SILVER","basePrice":8,"axis":null,"branch":null,"description":"戦闘開始時、嵐のフェーズ 1 につきシールド +5・この戦闘の攻撃 +2（フェーズ 3 ならシールド +15・攻撃 +6）"},{"id":"防嵐の天幕","name":"防嵐の天幕","category":"Passive","rarity":"GOLD","basePrice":9,"axis":null,"branch":null,"description":"層に入るたび、その層で最初の 3 回の「取る」行動（宝・秘宝・戦闘の勝ち・イベントの得）で溜まる不安定化を半分（切り捨て）にする"},{"id":"研ぎ代の領収書","name":"研ぎ代の領収書","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"金","branch":null,"description":"店または休憩で山札からカードを 1 枚削除するたび、このラン中のすべての攻撃の基礎攻撃 +2（累積）"},{"id":"相場師の算盤","name":"相場師の算盤","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"金","branch":null,"description":"店でリロール（軸指定を含む）を 1 回行うたび、このラン中の戦闘開始時ブロック +3・最初の攻撃の基礎攻撃 +2（最大 10 回累積）"},{"id":"黄金の通行手形","name":"黄金の通行手形","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"金","branch":null,"description":"持っている間、店の秘宝・消耗品・武器・賽の価格 −25%（強化素材・物資・リロールは除く）。店に入ったときとリロールのたび、秘宝の棚の最初の 2 枠が 1 段上のレア度で並ぶ（LEGENDARY はそのまま）"},{"id":"目利きの紹介状","name":"目利きの紹介状","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"金","branch":null,"description":"店に入るたび、最初の 1 回の通常リロールが無料。軸指定リロールの追加費用 −3G（6G → 3G）"},{"id":"戦利の目録","name":"戦利の目録","category":"Passive","rarity":"SILVER","basePrice":8,"axis":null,"branch":null,"description":"戦闘後のカード報酬の選択肢 +1（通常 2→3・エリート 3→4）"},{"id":"古物商の交換帳","name":"古物商の交換帳","category":"Passive","rarity":"GOLD","basePrice":9,"axis":null,"branch":null,"description":"交換マスで受け取る秘宝の 2 択が、ロック済みの軸のうち所持数が最も多い軸の秘宝に確定する"},{"id":"焼き入れの挟み","name":"焼き入れの挟み","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"山札","branch":"A","description":"使い捨てのカードを使うたび、敵に 3 の防御無視ダメージを与え、このターンの各攻撃の基礎攻撃 +1"},{"id":"組み置きの配線束","name":"組み置きの配線束","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"山札","branch":null,"description":"戦闘の 1 ターン目、カードを 2 枚多く引く"},{"id":"留め金の栞","name":"留め金の栞","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"山札","branch":"B","description":"前のターンから「残す」で手札に残したカードを発動したターン、各攻撃の基礎攻撃 +6・ブロック +4"},{"id":"備えの鐘","name":"備えの鐘","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"山札","branch":null,"description":"補助のカードを発動するたび、そのターンのブロック +6（1 ターン最大 3 回）"},{"id":"空回りの錘","name":"空回りの錘","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"山札","branch":null,"description":"どのカードにも挿さなかった出目 1 個につき、次のターンにカードを 1 枚多く引く（1 ターン最大 2 枚）"},{"id":"灰払いの箒","name":"灰払いの箒","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"山札","branch":"A","description":"使い捨てのカードを使うたび、そのターンのブロック +3。1 ターンに 2 回以上使ったとき、次のターンにカードを 1 枚多く引く（1 ターン 1 回）"},{"id":"早回しのゼンマイ","name":"早回しのゼンマイ","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"山札","branch":null,"description":"山札を切り直したターン、切り直したカード 1 枚につき各攻撃の基礎攻撃 +1（最大 +10）・ブロック +6"},{"id":"仕込みの切替器","name":"仕込みの切替器","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"山札","branch":null,"description":"基本以外のカードを 3 枚発動したターン、次のターンにカードを 1 枚多く引き、そのターンは攻撃が当たるたびボスの目盛りをそのダメージの 20% ぶん前進させる"},{"id":"型合わせの古鍵","name":"型合わせの古鍵","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"山札","branch":"B","description":"条件のあるカード（奇数・3 以下など）を発動するたび、そのカードの攻撃・ブロック +6（補助のカードならブロック +8）"},{"id":"整理された工具箱","name":"整理された工具箱","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"山札","branch":null,"description":"戦闘開始時に山札が 12 枚以下なら、この戦闘の毎ターン、カードを 1 枚多く引く"},{"id":"再利用のるつぼ","name":"再利用のるつぼ","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"山札","branch":"A","description":"使い捨てのカードを使ったターン、この戦闘で使い捨てのカードを使った回数 × 2 を各攻撃の基礎攻撃に加える"},{"id":"無銘の設計図","name":"無銘の設計図","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"山札","branch":null,"description":"山札を切り直すたび、捨て札の基本のカード（攻撃・防御・充電）を 1 枚この戦闘から外す（山札が 3 枚以下なら外さない・最後の攻撃のカードは外さない）"},{"id":"継ぎ目のない導線","name":"継ぎ目のない導線","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"山札","branch":"B","description":"補助のカードを発動したターン、その枚数 1 枚につき各攻撃の基礎攻撃 +7・ブロック +3・最終与ダメージ +25%・攻撃は敵の防御を 8 無視する"},{"id":"取っておきの銀弾","name":"取っておきの銀弾","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"山札","branch":"B","description":"「残す」で手札に残したカードを発動したターン、最終与ダメージ +「続いたターン数 × 25%」（1 ターン目 +25%・3 ターン目 +75%・上限なし）"},{"id":"解体屋の袋","name":"解体屋の袋","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"山札","branch":"A","description":"この戦闘で使い捨てのカードを 4 回使うたび、この戦闘から外れた使い捨てのカード（最後に外れた 1 枚）を次のターンの手札に戻す（1 戦闘最大 5 回）"},{"id":"常設の作業台","name":"常設の作業台","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"山札","branch":"B","description":"戦闘開始時、山札の常設のカードをすべて場に出す。場の常設のカード 1 枚につき、毎ターン各攻撃の基礎攻撃 +5・ブロック +3・最終与ダメージ +25%（場の常設のカードが 0 枚では発動しない）"},{"id":"廃材組みの蒸気機関","name":"廃材組みの蒸気機関","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"山札","branch":"A","description":"この戦闘で使い捨てのカードを 3 回以上使っているとき、攻撃の最終与ダメージ +（使い捨てのカードを使った回数 × 9%）"},{"id":"永久機関の主軸","name":"永久機関の主軸","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"山札","branch":null,"description":"山札を切り直すたび、カードを 1 枚多く引く（1 ターン最大 2 枚）。この戦闘で切り直した回数が 2 の倍数になるたび、そのターン挿したカードがすべて 2 回発動する"},{"id":"擦り切れた賽袋","name":"擦り切れた賽袋","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"役","branch":"B","description":"戦闘の最初の振り直しは充電を消費しない（振り直しの回数にも数えない）。振り直しをしたターン、ブロック +5"},{"id":"潮目の木札","name":"潮目の木札","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"役","branch":null,"description":"4 の役〈攻め〉または 5 の役〈守り〉が成立したターン、各攻撃で攻撃 +1・ブロック +2"},{"id":"進軍の角笛","name":"進軍の角笛","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"役","branch":null,"description":"3 の役〈追撃〉または 4 の役〈攻め〉が成立したターン、各攻撃で攻撃 +（この戦闘で役が成立した回数 × 1・最大 6）（ゾロ目なら 2 倍）"},{"id":"欠け目の見立て","name":"欠け目の見立て","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"役","branch":"A","description":"1 の役〈特別〉か 2 の役〈封じ〉が成立したターン、攻撃は敵の防御を 12 無視し、攻撃が当たるたびボスの目盛りをそのダメージの 25% ぶん前進させる"},{"id":"揃いのメトロノーム","name":"揃いのメトロノーム","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"役","branch":"A","description":"同じ出目の役が 2 ターン以上続けて成立したターン、各攻撃の与ダメージ +25%・次のターンの手札 +1 枚・次のターンの最初の振り直しが無料（役が途切れるか出目が変わるまで毎ターン）"},{"id":"曇りの合わせ鏡","name":"曇りの合わせ鏡","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"役","branch":"A","description":"2 個そろいの役が成立したとき、1 つ小さい出目の 2 個そろいの効果も発動する"},{"id":"宿命の音叉","name":"宿命の音叉","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"役","branch":"A","description":"ゾロ目または〈連なり〉が成立したとき、または 2 ターン続けて役が成立したとき、その役の効果が次のターンにもう 1 回発動する"},{"id":"万象の賽盆","name":"万象の賽盆","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"役","branch":"B","description":"この戦闘で役が 3 回以上成立した後は、2 個そろいが確率 50% でゾロ目として扱われる（5 回以上なら 100%）"},{"id":"劇毒の火薬庫","name":"劇毒の火薬庫","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"毒","branch":"B","description":"【劇症】の倍率が ×4 から ×5 に、最大 HP の割合が 0.25% から 0.32% になる。1 ターンに敵へ毒を合計 8 以上与え、かつ敵の毒が 18 以上のターン終了時、自動で【劇症】を起こす（1 ターン 1 回）"},{"id":"追撃の弾帯","name":"追撃の弾帯","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"役","branch":"B","description":"振り直しをしたターンに役が成立したとき、そのターンの各攻撃で攻撃 +8（3 の役〈追撃〉またはゾロ目なら +10）"},{"id":"轟きの鉄球","name":"轟きの鉄球","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"役","branch":"B","description":"ゾロ目または〈連なり〉が成立したターン、最終与ダメージ +45%・ブロック +10。振り直しをしたターンに他の役が成立したときは、最終与ダメージ +35%・ブロック +10"},{"id":"必殺の照準器","name":"必殺の照準器","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"会心","branch":"B","description":"【集中】集中時会心率 −24%（会心の秘宝 1 つにつき 3% 相殺・最低賭け金 25%）。集中会心時（1 ターン 1 回）、その攻撃をもう 1 回発動する（もう 1 回は通常の会心率で判定・会心倍率 +（1.20 + 使った【練気】× 0.40）・【練気】は消費しない）"},{"id":"連勝の銀杯","name":"連勝の銀杯","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":"役","branch":null,"description":"役が成立したターン（ゾロ目・〈連なり〉も含む）、最終与ダメージ +（この戦闘で役が成立した回数 × 8%）"},{"id":"小口の錠前","name":"小口の錠前","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"役","branch":"A","description":"1 の役〈特別〉・2 の役〈封じ〉・3 の役〈追撃〉のいずれかが成立したターン、次のターンの手札 +1 枚・ブロック +4"},{"id":"渾身の鉄兜","name":"渾身の鉄兜","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"会心","branch":"B","description":"【集中】集中会心時、その攻撃の最終与ダメージ +（75 + 使った【練気】× 25）%"},{"id":"脈打ちの測り針","name":"脈打ちの測り針","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"会心","branch":null,"description":"直前の攻撃が会心だったとき、次の攻撃の会心率 +20%・会心倍率 +0.25（ターンをまたいで持ち越す・会心にならなかった攻撃で消える）"},{"id":"見切りの目印","name":"見切りの目印","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"会心","branch":"A","description":"同じターンに攻撃のカードを 2 枚以上発動したとき、2 回目以降の攻撃の会心率 +14%（【練気】3 以上なら +20%）"},{"id":"白刃の鏡砥","name":"白刃の鏡砥","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"会心","branch":"A","description":"会心した攻撃は、現在の【練気】1 ごとに会心倍率 +0.04（最大 +0.40）。同じターンに 2 回目以降の会心を出すたび、そのターンのブロック +6"},{"id":"初太刀の黒鞘","name":"初太刀の黒鞘","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"会心","branch":"B","description":"【集中】集中会心時、次のターン最初の攻撃の基礎攻撃 +（6 + 使った【練気】× 3）・会心率 +25%"},{"id":"細目の覗き筒","name":"細目の覗き筒","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"会心","branch":"B","description":"【集中】集中会心の攻撃は、敵の防御を（15 + 使った【練気】× 5）無視し、会心倍率 +0.35"},{"id":"一閃の極意","name":"一閃の極意","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"会心","branch":"B","description":"【集中】集中時会心率 −18%（会心の秘宝 1 つにつき 2% 相殺・最低賭け金 25%）。集中会心時、使った【練気】1 ごとにこの戦闘中の会心倍率 +0.22（最大 +1.76）"},{"id":"静止の振り子","name":"静止の振り子","category":"Passive","rarity":"GOLD","basePrice":9,"axis":"シールド","branch":"A","description":"攻撃のカードに 1 つも挿さずに敵の攻撃を完封した次のターン、すべての攻撃の最終与ダメージ +60%（【ジャスト防御】が成立していたなら +130%）"},{"id":"隙突きの短槍","name":"隙突きの短槍","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":null,"branch":null,"description":"敵がチャージ中またはダウン中のターン、与ダメージ +40%"},{"id":"崩しの一手","name":"崩しの一手","category":"Passive","rarity":"SILVER","basePrice":8,"axis":null,"branch":null,"description":"ボスの目盛りを割ってダウンさせたターン、次のターンの手札 +2 枚・次のターンのすべての攻撃の基礎攻撃 +12"},{"id":"構え崩しの鉄杭","name":"構え崩しの鉄杭","category":"Passive","rarity":"GOLD","basePrice":9,"axis":null,"branch":null,"description":"ダウンまたは〈封じ〉で敵の大技を取り消したとき、敵に最大 HP の 10% の軽減不可ダメージを与え、次のターンのブロック +15"},{"id":"背水の錨","name":"背水の錨","category":"Passive","rarity":"SILVER","basePrice":8,"axis":null,"branch":null,"description":"エスカレーションの段階が 2 以上の間、ターン開始時にブロック +4・与ダメージ +25%"},{"id":"鋲の胸当て","name":"鋲の胸当て","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"シールド","branch":null,"description":"敵の予告攻撃が 12 以上のターン、シールド +3"},{"id":"受け太刀の籠手","name":"受け太刀の籠手","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"シールド","branch":"A","description":"【ジャスト防御】を成立させたターン、次のターンの最初の攻撃の基礎攻撃 +8"},{"id":"重ね札の盾","name":"重ね札の盾","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":"シールド","branch":"B","description":"シールドが 12 以上ある間、受ける直接ダメージ −3"},{"id":"割れ盾の仕返し","name":"割れ盾の仕返し","category":"Passive","rarity":"SILVER","basePrice":8,"axis":"シールド","branch":null,"description":"シールドが割られて 0 になったとき、敵に「割られる直前のシールド量」の防御無視ダメージで反撃し、次のターンの与ダメージ +35%"},{"id":"煙玉","name":"煙玉","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":null,"branch":null,"description":"各層 1 回、追跡者に見つかる瞬間に自動で弾け、見つからなかったことにする。その後 2 ターンは発見されない。"},{"id":"油布の靴","name":"油布の靴","category":"Passive","rarity":"BRONZE","basePrice":7,"axis":null,"branch":null,"description":"嵐（砂）による移動時の追加の物資消費を無効化し、嵐（雹）の中を歩くときの HP 減少を 1 軽減する"},{"id":"地図売りの走り書き","name":"地図売りの走り書き","category":"Passive","rarity":"SILVER","basePrice":8,"axis":null,"branch":null,"description":"層に入った瞬間、前哨基地の近く（半径 5）の点の種類が分かる。戦闘名と敵は分からない。"},{"id":"鏡の護符","name":"鏡の護符","category":"Passive","rarity":"SILVER","basePrice":8,"axis":null,"branch":null,"description":"使い魔は、同じ点に重ならない限りこちらを見つけられない（見つける距離 1 歩→0 歩）。"},{"id":"夜目の指輪","name":"夜目の指輪","category":"Passive","rarity":"GOLD","basePrice":9,"axis":null,"branch":null,"description":"何もしなくても 2 歩先まで見える（点の種類・追跡者・使い魔）。ショップでの物資価格 −50%（〈補給商の割符〉とは重複しない）。"},{"id":"補給商の割符","name":"補給商の割符","category":"Passive","rarity":"GOLD","basePrice":9,"axis":null,"branch":null,"description":"前哨基地で得る物資 ×1.5。ショップでの物資価格 −50%（〈夜目の指輪〉とは重複しない）。"},{"id":"渡り鳥の羅盤","name":"渡り鳥の羅盤","category":"Passive","rarity":"GOLD","basePrice":9,"axis":null,"branch":null,"description":"終点へ近づく移動は、2 歩に 1 回物資を消費しない。"},{"id":"逃げ足の護符","name":"逃げ足の護符","category":"Passive","rarity":"GOLD","basePrice":9,"axis":null,"branch":null,"description":"戦闘から逃げたときに失うゴールドが半分から 1/4 になる。"},{"id":"追っ手殺しの刃","name":"追っ手殺しの刃","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":null,"branch":null,"description":"追跡者に捕まったときの戦闘に、手下や猟犬が加わらない。追跡者を倒したときの物資獲得量 ×1.5。"},{"id":"前哨の旗","name":"前哨の旗","category":"Passive","rarity":"LEGENDARY","basePrice":10,"axis":null,"branch":null,"description":"航行中に使う（各層 1 回・ターンを使わない）。今いる点に旗を立て、その層にいる間、旗から 3 歩先までの点の種類と戦闘名・追跡者・使い魔が常に見える。"},{"id":"止まらない時計","name":"止まらない時計","category":"Passive","rarity":"GOLD","basePrice":9,"axis":null,"branch":null,"description":"ヴェスカとの戦闘で、ダウンの目盛りが各段に 1 つ増える。"},{"id":"角の取れた賽","name":"角の取れた賽","category":"Dice","rarity":"BRONZE","basePrice":7,"axis":null,"branch":null,"description":"効果なし。誰もが最初に持つ賽。"},{"id":"軽石の賽","name":"軽石の賽","category":"Dice","rarity":"BRONZE","basePrice":7,"axis":null,"branch":null,"description":"効果なし。面が 3 つしかないので、出目がそろいやすい。"},{"id":"錆釘の賽","name":"錆釘の賽","category":"Dice","rarity":"BRONZE","basePrice":7,"axis":null,"branch":null,"description":"攻撃のカードに挿した出目が 5 以上なら、攻撃 +1。"},{"id":"拾い物の賽","name":"拾い物の賽","category":"Dice","rarity":"BRONZE","basePrice":7,"axis":null,"branch":null,"description":"① が出たターン終了時、ゴールド +2。"},{"id":"鈍色の賽","name":"鈍色の賽","category":"Dice","rarity":"BRONZE","basePrice":7,"axis":null,"branch":null,"description":"偶数なら防御 +2、奇数なら攻撃 +2（それぞれ対応するカードに挿したときのみ）。"},{"id":"残り火の賽","name":"残り火の賽","category":"Dice","rarity":"SILVER","basePrice":8,"axis":null,"branch":null,"description":"挿さずに捨てた出目の 2 倍を、次のターンの攻撃に加える（次のターンに攻撃のカードへ挿した出目があるときのみ・持ち越しは 1 ターン分）。"},{"id":"渡し守の賽","name":"渡し守の賽","category":"Dice","rarity":"SILVER","basePrice":8,"axis":null,"branch":null,"description":"振り直しの後に出た出目なら、攻撃 +2。"},{"id":"夜番の賽","name":"夜番の賽","category":"Dice","rarity":"SILVER","basePrice":8,"axis":null,"branch":null,"description":"防御のカードに挿した出目が敵の最大の出目より大きければ、シールド +（出目 × 2）。"},{"id":"秤の賽","name":"秤の賽","category":"Dice","rarity":"SILVER","basePrice":8,"axis":null,"branch":null,"description":"この賽の出目がほかの 2 つの出目の間の値なら、どのカードに挿しても +3。"},{"id":"逆目の賽","name":"逆目の賽","category":"Dice","rarity":"SILVER","basePrice":8,"axis":null,"branch":null,"description":"攻撃のカードに挿すと、攻撃 +（7 − 出目）÷ 2。"},{"id":"古銭の賽","name":"古銭の賽","category":"Dice","rarity":"GOLD","basePrice":9,"axis":null,"branch":null,"description":"⑧ が出るたび、ゴールド +2。さらにそのターンの役〈癒し〉（⑧ の役）の回復量 +1。"},{"id":"繋ぎの賽","name":"繋ぎの賽","category":"Dice","rarity":"GOLD","basePrice":9,"axis":null,"branch":null,"description":"ターンの終わりに、目を挿したカード 1 枚に「残す」の印を付けると、次のターンも手札に残る（使い捨てのカードは残らない）。"},{"id":"目利きの賽","name":"目利きの賽","category":"Dice","rarity":"GOLD","basePrice":9,"axis":null,"branch":null,"description":"振り直すとき、カードに挿してある出目を 1 つ残し、ほかの 2 つだけを振り直せる。"},{"id":"兆し読みの賽","name":"兆し読みの賽","category":"Dice","rarity":"GOLD","basePrice":9,"axis":null,"branch":null,"description":"敵の大技の予告が出ているターンは、カードに挿した出目が 1.5 倍"},{"id":"墓標の賽","name":"墓標の賽","category":"Dice","rarity":"GOLD","basePrice":9,"axis":null,"branch":null,"description":"HP が 0 になったとき一度だけ砕けて、HP 1 で踏みとどまる。砕けた後は〈角の取れた賽〉に戻る。"},{"id":"逆巻きの賽","name":"逆巻きの賽","category":"Dice","rarity":"LEGENDARY","basePrice":10,"axis":null,"branch":null,"description":"攻撃のカードに目を 3 つ挿したターン、エスカレーションの段階を 1 つ戻す。段階 0 で戻すとマイナスになり、マイナスの段階の間は最終与ダメージが上がる（−1 で +30%・−4 まで）。エスカレーションはふつうに進む。"},{"id":"時計の賽","name":"時計の賽","category":"Dice","rarity":"LEGENDARY","basePrice":10,"axis":null,"branch":null,"description":"場に〈時計〉のカードが置かれる。出目を挿すと、その出目の数だけエスカレーションの次の段階を先へ送る（一度に 1 つ）。"},{"id":"賭場の賽","name":"賭場の賽","category":"Dice","rarity":"LEGENDARY","basePrice":10,"axis":null,"branch":null,"description":"振り直しが無料。代わりに、振り直すたびに HP −1。"},{"id":"連なりの賽","name":"連なりの賽","category":"Dice","rarity":"LEGENDARY","basePrice":10,"axis":null,"branch":null,"description":"このランでは「3 つの連番」も役になる。〈連なり〉：そのターン、挿したカードがすべて 2 回発動する。"},{"id":"呪物の賽","name":"呪物の賽","category":"Dice","rarity":"LEGENDARY","basePrice":10,"axis":null,"branch":null,"description":"店以外で秘宝が出るとき、一定確率でその秘宝が呪われた LEGENDARY に変化する。呪われた LEGENDARY を取得すると、最大 HP −5"}]</script>
+
+<script>
+const RAW_ITEMS = JSON.parse(document.getElementById('items-json-data').textContent || '[]');
+const ITEM_MAP = {};
+for (const it of RAW_ITEMS) {
+  ITEM_MAP[it.name] = it;
+  ITEM_MAP[it.id] = it;
+}
+
+const UPDATED_ITEMS = new Set([
+  "二度詰めの雷管", "火花読みの眼鏡", "荒砥", "烈刃", "余熱の炉壁",
+  "劇毒の火薬庫", "蓋付きの毒指輪", "遅効の毒刃", "毒草摘みの杖",
+  "二股の導線", "過負荷チューナー", "溜め撃ちの誘導コイル", "灼線鞭",
+  "一点読みの片眼", "猛斧", "血塗りの戦斧", "血帝廻天"
+]);
+
+function esc(s) {
+  return (s == null ? '' : String(s)).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+
+function iconPath(it) {
+  if (!it) return '';
+  return `../../Assets/Resources/Icons/Items/${encodeURIComponent(it.id)}.png`;
+}
+
+// Convert double-bracket item tokens inside text into interactive pixel-art pills
+function richText(str) {
+  return esc(str).replace(/\[\[([^\]]+)\]\]/g, (_, name) => {
+    const it = ITEM_MAP[name];
+    const rar = it ? (it.rarity || '') : '';
+    const isNew = UPDATED_ITEMS.has(name);
+    const img = it
+      ? `<img src="${iconPath(it)}" alt="" onerror="this.style.display='none'">`
+      : '';
+    const badge = isNew ? `<span class="new-badge">★更新</span>` : '';
+    return `<span class="item-pill" data-item="${esc(name)}" data-rar="${esc(rar)}">${img}${esc(name)}${badge}</span>`;
+  }).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+}
+
+const SECTIONS = [
+  {
+    id: "overview",
+    navTitle: "§0 全体設計と乗算構造",
+    navSub: "4枠ロック・ダメージ階層",
+    isOverview: true
+  },
+  {
+    id: "heat",
+    axis: "臨界",
+    navTitle: "① 臨界（炉温・爆発）",
+    navSub: "A:高速連鎖 / B:高圧超臨界",
+    subtitle: "メーター蓄積 → 即時爆発＆【過熱】乗算軸",
+    coreFormulas: [
+      "<strong>基本閾値 30</strong>：配線フェーズの臨界（端子＋5g秘宝群＋<strong>攻撃に挿した出目合計 ÷ 2</strong>）を<strong>一括で合算</strong>してから爆発判定を行う（2026-11-26改定）。",
+      "<strong>爆発の基礎威力</strong>：<code>基礎 25 ＋ 雷管累積 ＋ 天工開物 ＋ 鋳型超過分</code>（敵の防御を標準で <strong>50% 無視</strong>）。入ったダメージの <strong>40%</strong> ぶんボスの次のダウン目盛りを前進させる。",
+      "<strong>【過熱】状態</strong>：爆発が起きたターンは【過熱】となり、配線時爆発なら<strong>そのターンの全主攻撃に即座に【過熱】ボーナスが乗る</strong>。",
+      "<strong>超臨界爆発</strong>：爆発直前の臨界が <strong>閾値の 1.5 倍（既定 45）以上</strong> なら威力 <strong>×1.85</strong>（[[暴れ窯の火床]]で <strong>×2.60</strong>）。"
+    ],
+    terminals: [
+      { name: "火種（補助）", normal: "臨界 +出目 +5（前Tか今Tに爆発していれば +10）", up: "強化＋：+出目 +8（爆発後なら +13）" },
+      { name: "爆炎斬り（攻撃）", normal: "出目を攻撃に。この戦闘の爆発 1 回につき攻撃 +2", up: "強化＋：爆発 1 回につき攻撃 +3" }
+    ],
+    sharedStages: [
+      { label: "Step 1: 初動・毎ターン充填", text: "[[恒温の竈]]で開幕15＆爆発後も8から再開。攻撃ごとに[[点火スパナ]](+3・次T手札+1)と[[荒砥]](+2)が刻み、[[焚き足しの炭]]が各獲得に+1を上乗せして毎ターン30〜50を安定供給。" },
+      { label: "Step 2: 戦闘中スケーリング", text: "爆発のたび[[二度詰めの雷管]](基礎+5・最大+50)、[[火花読みの眼鏡]](防御全無視＆爆発回数×10%・最大+100%)、[[荒砥]](与ダメ+4%・最大+40%)が段階的に火力を引き上げる。" },
+      { label: "Step 3: 攻防変換・耐久", text: "[[余熱の炉壁]]が爆発ダメージの12%（1回最大20）を即ブロック化し、[[無害灯]]が臨界15消費で直撃1回完全無効、[[二度目の打金]]が過熱と次Tの全撃に攻撃+3を付与。" }
+    ],
+    branchA: {
+      name: "高速連鎖バースト",
+      archetype: "閾値短縮 × 獲得2倍 × 同ターン最大5連発",
+      nodes: [
+        { step: "① 起点：閾値圧縮＆獲得2倍", kind: "normal", text: "[[早沸かし釜]]で閾値を <code>30 → 25</code> に短縮。攻撃3撃以上（再起動含む）で[[燧石の指輪]]が起動し、そのターンの全臨界獲得量が <strong>2倍</strong> に跳ね上がる。" },
+        { step: "② 回転ループ：残量持ち越し連続爆発", kind: "loop", loopLabel: "⟳ 閾値25を引いて残メーターで同ターン再爆発（最大5連）", text: "[[帳簿外の爆薬]]【規則】により、爆発しても臨界が0に戻らず<strong>閾値ぶん（25）だけ減算</strong>。一括充填で 60〜80 溜まれば同じ配線で 2〜3 連発し、[[恒温の竈]]で端数も8以上に保たれる。" },
+        { step: "③ コンボ増幅：同一ターン連撃乗算", kind: "normal", text: "同ターン2発目以降は[[帳簿外の爆薬]](+30%, +60%…)と[[燧石の指輪]](+40%, +80%…)が<strong>別枠乗算で重複</strong>。3発目の爆発は単発の約 <strong>2.9倍</strong> に達する。" },
+        { step: "④ フィニッシャー：過熱主攻撃の連打", kind: "finisher", text: "爆発連打で累計爆発数が一気に8回へ到達し、[[烈刃]]で過熱中の全攻撃が<strong>最終与ダメージ +200%（×3.0）</strong>＆端子〈爆炎斬り〉の基礎攻撃が爆発的に伸びて削り切る。" }
+      ],
+      exampleTitle: "1ターン連鎖コンボ実例（閾値25・累計6爆発時点）",
+      exampleText: "攻撃カード3枚に[4,5,6]を配線。3撃達成で[[燧石の指輪]]の獲得2倍が点灯！",
+      exampleMath: "充填: (過熱石16 + スパナ3×3 + 荒砥2×3 + 炭5 + 出目半分7) × 2倍 = +86 (残8と合算で 94)\n爆発1 (94→69, 超臨界!): 基礎55 × 1.85 × 眼鏡1.7 = 173 dmg\n爆発2 (69→44, 超臨界!): 173 × 爆薬1.3 × 燧石1.4 = 315 dmg\n爆発3 (44→19): 基礎55 × 眼鏡1.9 × 爆薬1.6 × 燧石1.8 = 301 dmg\n→ 配線だけで防御無視 789 dmg ＋ そのまま全主攻撃に【烈刃 ×3.0】が乗る！",
+      matchup: "得意：雑魚複数戦・道中〜ヴェスカまで安定 ／ 相性武器：短剣（連刃で3撃条件を即達成）・剣"
+    },
+    branchB: {
+      name: "高圧超臨界",
+      archetype: "寸止め一括充填 × 1.5倍超臨界 × ダウン3倍爆破",
+      nodes: [
+        { step: "① 起点：メーター寸止め＆一括大充填", kind: "normal", text: "前ターンを臨界 <code>20〜28</code> で終え、次ターンの配線一括充填（+22〜+30）で一気に <strong>45〜55（閾値1.5倍以上）</strong> の超臨界領域へ叩き込む。" },
+        { step: "② 変換ループ：超過エネルギーの次撃転写", kind: "loop", loopLabel: "⟳ 超臨界ごとに閾値−4短縮 → 次ターンの超臨界ライン(1.5倍)が45→39→33へ低下！", text: "[[暴れ窯の火床]]で超臨界を起こすたび閾値が −4（最大−16、下限14まで）低下し、<strong>後半ほど少ない臨界で毎回超臨界が出る</strong>加速ループに入る。" },
+        { step: "③ コンボ増幅：超過加算＋高圧乗算の三重掛け", kind: "normal", text: "[[溢れ取りの鋳型]]が閾値超過1ごとに爆発基礎 <code>+3</code> ＆ <strong>次の1撃の最終与ダメ +4%</strong> を付与。さらに臨界40以上なら[[八日目の灰燼]](<strong>×1.75</strong>)、超臨界で[[暴れ窯の火床]](<strong>×2.60</strong>)が直乗算される。" },
+        { step: "④ フィニッシャー：ダウン延長＆3倍発破", kind: "finisher", text: "超臨界で[[柱折りの発破筒]]がボスの次ダウンを <strong>+1ターン延長</strong>。ダウン中に超臨界を叩き込むと <code>火床2.6 × 灰燼1.75 × 発破筒3.0 × ダウン1.5</code> の一撃必殺砲となる。" }
+      ],
+      exampleTitle: "ボスのダウン中・超臨界1発コンボ実例（メーター26 → +24充填 = 50）",
+      exampleText: "閾値30に対し臨界50（超過20・40以上・1.5倍超臨界）で爆発し、直後に主攻撃1撃目を振る：",
+      exampleMath: "基礎: 25 + 雷管30 + 天工16 + 鋳型(超過20×3=60) = 131\n超臨界乗算: 131 × 火床2.6 × 眼鏡1.6 × 灰燼1.75 × 発破筒(ダウン中3.0) = 2,861 (防御無視!)\nさらに直後の主攻撃1撃目に 鋳型【最終与ダメ +80%】＋ 天工開物【防御12無視】が転写！",
+      matchup: "得意：第3・第4層ボスの短期粉砕（蹂躙率 9.0%）／ 相性武器：斧（武器強化で天工開物蓄積＆目盛り削り）・竜閃"
+    }
+  },
+  {
+    id: "poison",
+    axis: "毒",
+    navTitle: "② 毒（蝕み・劇症）",
+    navSub: "A:常時蝕み / B:短期暗殺",
+    subtitle: "継続蝕みデバフ要塞 vs 開幕5ターン連続【劇症】暗殺軸",
+    coreFormulas: [
+      "<strong>自然ティックと減衰</strong>：ターン開始時に現在の毒と同量のダメージを与え、その後 <strong>50%</strong> が残る（[[腐れ沼の苔玉]]所持で <strong>75%</strong> 残存）。",
+      "<strong>【劇症】（起爆）の式</strong>：敵の現在毒の <strong>1/3（切り上げ）</strong> を消費し、<code>max(消費量 × 4, 消費量 × 敵最大HP × 0.25%)</code> の防御無視ダメージ（[[劇毒の火薬庫]]で <strong>×5 / 0.32%</strong>）。さらにダメージの <strong>35%</strong> ぶんボス目盛り前進。",
+      "<strong>形態移行時の挙動</strong>：ヴェスカ等の形態交代では毒が 0 に戻る（[[腐蝕の王冠]]所持時は <strong>半分</strong> を次形態へ引き継ぐ）。"
+    ],
+    terminals: [
+      { name: "毒霧（補助）", normal: "敵に毒 +出目 +3（敵にすでに毒があれば +5）", up: "強化＋：+出目 +5（毒があれば +7）" },
+      { name: "腐食の刃（攻撃）", normal: "出目を攻撃に。敵の毒 10 につき攻撃 +3", up: "強化＋：敵の毒 10 につき攻撃 +4" }
+    ],
+    sharedStages: [
+      { label: "Step 1: 高頻度付与", text: "[[緑染みの小刀]](攻撃発動ごと毒+3)、[[蛇血瓶]](4以上の目攻撃で毒+4)、[[毒針の指輪]](初撃+4)で毎ターン10〜18の毒を安定注入。" },
+      { label: "Step 2: 減衰緩和・追撃", text: "[[瘴気溜まりの壺]]が減衰直前に毒+4を差し込み、[[廃庭の霧吹き]]が敵攻撃時にも威力50%（減衰なし）の毒ティックを発生させる。" },
+      { label: "Step 3: 全体増幅・王冠", text: "ティックか劇症のたび[[主を看取る香炉]]が与ダメ+6%（最大+60%）を積み、[[腐蝕の王冠]]が全毒付与量を <strong>1.5倍</strong>＆上限99撤廃。" }
+    ],
+    branchA: {
+      name: "常時蝕み・長期制圧",
+      archetype: "残存75%維持 × 敵攻撃力減衰 × 消費なし毎ターン追撃",
+      nodes: [
+        { step: "① 起点：減衰ストッパー", kind: "normal", text: "[[腐れ沼の苔玉]]【規則】によりターン開始ティック後の残存率が <code>50% → 75%</code> へ上昇。毎ターン15付与すれば理論収束値が 30→60 スタックへ倍増する。" },
+        { step: "② 制圧ループ：高毒キープで完封還流", kind: "loop", loopLabel: "⟳ 高毒で敵攻撃力を削ぐ → 無傷受け切り成立でさらに毒+5還流", text: "毒20〜40を維持することで[[水揚げの麻痺瓶]](敵攻撃 最大−10)＋[[口縫いの毒糸]](攻撃−2・大技−20%)＋[[瘴気の外套]](被ダメ−35%)が常時点灯。完封すると麻痺瓶がさらに毒+5を返す。" },
+        { step: "③ コンボ増幅：常時防御無視＆与ダメ加算", kind: "normal", text: "毒12以上で[[麻痺の吹き矢]]が<strong>敵の防御を完全無視</strong>し、[[腐し刃]]が毒30で攻撃与ダメ+45%、端子〈腐食の刃〉が基礎攻撃を底上げする。" },
+        { step: "④ フィニッシャー：消費ゼロの3重毒ダメージ", kind: "finisher", text: "毒20以上で[[毒溜まりの主]]が開幕毒ティックを <strong>2連発（2回目は減衰なし）</strong> にし、T終了時には[[瘴気の外套]]が<strong>毒を減らさずに【劇症】50%分の追撃</strong>を毎ターン浴びせる。" }
+      ],
+      exampleTitle: "毒48スタック維持時の1ターン自動削り量（攻撃ダメージ別）",
+      exampleText: "敵の毒48でターン開始 → 敵攻撃 → ターン終了までの毒由来ダメージ：",
+      exampleMath: "開幕1回目(毒溜まり): 48 dmg ＋ 開幕2回目(減衰なし): 48 dmg (計96 → 苔玉75%で残36)\n自分ターン付与(+16×王冠1.5 = +24) → 毒 60 に回復\n敵攻撃時(霧吹き50%): 30 dmg (被ダメは麻痺瓶−10＆外套−35%でほぼ完封)\nT終了時(外套・消費なし劇症50%): 消費相当20 × 4 × 50% = 40 dmg → 1ターン自動 166 dmg！",
+      matchup: "得意：高防御エリート・中〜長期戦 ／ 相性武器：盾（完封トリガーと城壁が抜群に噛み合う）・剣"
+    },
+    branchB: {
+      name: "短期暗殺・即時劇症",
+      archetype: "歩行仕込み × 開幕5Tブースト × 1ターン2連【劇症】＆即死",
+      nodes: [
+        { step: "① 起点：戦闘前仕込み＆開幕5T濃毒", kind: "normal", text: "マップ歩行で溜めた[[毒草摘みの杖]](最大16)を開幕注入。さらに[[蓋付きの毒指輪]]が<strong>1〜5ターン目のあらゆる毒付与に +2</strong> を上乗せし、1T目から一気に毒20〜35へ到達させる。" },
+        { step: "② 爆破ループ：命中時＋T終了時の1ターン2連【劇症】", kind: "loop", loopLabel: "⟳ 攻撃命中【劇症】(指輪) → 付与毒で再充填 → T終了時【劇症】(火薬庫)", text: "毒20以上で攻撃が当たると[[蓋付きの毒指輪]]が1発目の自動【劇症】（1〜5Tは<strong>威力+50%</strong>）。同ターンに毒8以上与えて残り毒18以上なら、T終了時に[[劇毒の火薬庫]](倍率×5 / 最大HP0.32%)が2発目の自動【劇症】を叩き込む。" },
+        { step: "③ コンボ増幅：ダウン2倍＆回数累積", kind: "normal", text: "【劇症】ダメージの35%ぶんボス目盛りが前進して素早くダウンを奪い、[[骨溶かしの黒油]]でダウン・よろめき中の【劇症】が <strong>×2.0</strong>、[[遅効の毒刃]]で1回ごとに <strong>+30%（最大+150%）</strong> 増幅。" },
+        { step: "④ フィニッシャー：残毒参照の即死暗殺", kind: "finisher", text: "[[遅効の毒刃]]により、【劇症】ダメージが入った直後に<strong>敵の残りHPが「現在の残毒 × 2（ボスは × 1）」以下なら即座に処刑</strong>して戦闘を終わらせる。" }
+      ],
+      exampleTitle: "開幕3ターン目・ボスダウン中の2連【劇症】暗殺コンボ実例",
+      exampleText: "3ターン目（指輪+50%有効・劇症累計3回目=+90%・黒油ダウン中×2）、敵の毒36から攻撃命中：",
+      exampleMath: "1発目(指輪・消費12→残24): 12 × 火薬庫5 × 指輪1.5 × 毒刃1.9 × 黒油2.0 × ダウン1.5 = 513 dmg!\n攻撃＆小刀等で毒+12再付与 → 毒 36 (付与12≥8 かつ 毒36≥18)\n2発目(火薬庫・消費12→残24): 12 × 5 × 1.5 × 毒刃2.2 × 黒油2.0 × ダウン1.5 = 594 dmg!\nさらにボス残HP ≤ 24 なら【遅効の毒刃】で即死決着！（計 1,100+ dmg を3T目に叩き出す）",
+      matchup: "得意：第3・第4層ボスの瞬殺（蹂躙率 20.8%・全分岐1位！）／ 弱点：ヴェスカ4連戦（6T以降指輪バフ終了＆P4処刑無効）／ 相性武器：短剣（疾手5Tと完全同期・蹂躙23.3%）"
+    }
+  },
+  {
+    id: "charge",
+    axis: "充電",
+    navTitle: "③ 充電（マナ・再起動・OC）",
+    navSub: "A:再起動連打 / B:高圧OC",
+    subtitle: "マナ還流による端子多重【再起動】 vs 大容量【オーバークロック】砲軸",
+    coreFormulas: [
+      "<strong>基本上限 30・【過充電】閾値 10</strong>：充電が 10 以上ある状態が【過充電】。ダイス振り直し・充電コスト付き端子・【再起動】・【オーバークロック】に支払う。",
+      "<strong>【再起動】</strong>：そのターンに発動した攻撃/防御カード 1 枚の効果を、ダイスを追加で挿さずにそのままもう 1 回発動させる（攻撃カードなら攻撃回数が +1 回増加）。",
+      "<strong>【オーバークロック】</strong>：[[雷鳴の太鼓]]所持時、充電 15 以上で 12 消費し、<strong>最初の 1 撃の最終与ダメージ +100% ＆ 敵防御完全無視</strong>。"
+    ],
+    terminals: [
+      { name: "招雷（充電）", normal: "充電 +出目 +3（過充電なら +6）", up: "強化＋：+出目 +5（過充電なら +8）" },
+      { name: "裁きの雷（攻撃・使い捨て）", normal: "全充電を消費して攻撃に加算（今T先に充電を使った回数 × +25% 増幅）", up: "強化＋：挿した出目も攻撃に加算" }
+    ],
+    sharedStages: [
+      { label: "Step 1: 開幕過充電＆供給", text: "[[予備の蓄電池]](開幕+10)で1T目から即【過充電】突入。[[火打ちの針]](攻撃ごと+2)、[[静電気の毛布]](防御ダイス×3)、[[継ぎ足しの蓄電瓶]](充電ダイス×3)で毎ターン補給。" },
+      { label: "Step 2: 消費トリガー変換", text: "充電を5使うたび[[帯電の胸甲]](ブロック+5)と[[蓄電の小手]](全撃の基礎攻撃+3)が同時発火し、8以上消費で[[避雷の杭]]がボス目盛り最大HP5%前進＋ブロック+6。" },
+      { label: "Step 3: 3回周期の誘導弾", text: "[[溜め撃ちの誘導コイル]]が消費行動3回ごとに<strong>「その3回で消費した充電合計 × 2」の防御無視ダメージ＋次撃最終+50%</strong>を飛ばし、A/B両方の火力を支える。" }
+    ],
+    branchA: {
+      name: "再起動連打",
+      archetype: "過充電+2還流 × 複数回【再起動】 × 再起動最終+40%",
+      nodes: [
+        { step: "① 起点：消費量を減らさないマナ還流", kind: "loop", loopLabel: "⟳ 3以上消費するたび直後に充電+2還流（最大3回）→ 消費総量はフル計上！", text: "[[過負荷チューナー]]が過充電（10以上）中の消費行動（3以上）の直後に<strong>充電+2をキャッシュバック</strong>。実質コストを下げながら「消費した充電量」は減らないため、胸甲・小手・誘導コイルがフル稼働する。" },
+        { step: "② 展開：攻防カードの連続【再起動】", kind: "normal", text: "[[二股の導線]]（コスト <code>12 − 充電秘宝数</code>、6個所持で最小 <strong>6</strong>）で主力カードを1回【再起動】し、敵攻撃ターンは[[逆さ避雷針]](充電5で被ダメ−6＆防御カードを自動【再起動】)で2回目の消費を刻む。" },
+        { step: "③ コンボ増幅：2回消費から無料3連目へ", kind: "normal", text: "1ターンに2回消費（リロール＋導線、または導線＋避雷針）を満たした瞬間、[[灼線鞭]]が<strong>最も攻撃が高い攻撃カードを無料で自動【再起動】</strong>し、[[焦げ導線]]が消費量×3（最大45）の固定ダメを添える。" },
+        { step: "④ フィニッシャー：再起動 +40% ＆ 時間遅延", kind: "finisher", text: "[[灼線鞭]]により<strong>すべての【再起動】攻撃に最終与ダメージ +40%</strong> が乗り、累計15消費ごとに[[貸与された時間]]が敵エスカレーション遅延＋次T手札+1枚で一方的に殴り続ける。" }
+      ],
+      exampleTitle: "充電12から1ターン3回消費＆ダブル攻撃【再起動】実例",
+      exampleText: "充電秘宝6個所持、充電12（過充電）から主力攻撃カード（出力25）と防御カードを配線：",
+      exampleMath: "1回目: 二股の導線で攻撃【再起動】(6消費 → チューナー+2還流で残8) [攻撃再起動1発目: 最終+40%]\n2回目: 逆さ避雷針で防御【再起動】(5消費 → 残3) [被ダメ−6 ＆ 防御2回分]\n条件達成(2回消費): 灼線鞭が攻撃カードを無料【再起動】! [攻撃再起動2発目: 最終+40%]\n副産物(計11消費): 蓄電の小手(全撃+6)・胸甲(防+10)・焦げ導線(33 dmg)・避雷の杭(目盛り5%)が一斉発火！",
+      matchup: "得意：攻防両立の安定連撃・エスカレーション遅延 ／ 相性武器：剣（切り返し）・短剣（連刃）"
+    },
+    branchB: {
+      name: "高圧オーバークロック",
+      archetype: "上限解放プール × 12消費OC倍化 × 最大HP割合削り",
+      nodes: [
+        { step: "① 起点：大容量キャパシタ構築", kind: "normal", text: "[[雷鳴の太鼓]](上限+15＝45)や[[雷壷]]【規則】(上限撤廃、30超過分のみ終了時1/4減衰)と端子〈大導電〉〈招雷〉で、常時15〜40の大型充電プールを維持する。" },
+        { step: "② 変換ループ：ダウン奪取→充電+10再装填", kind: "loop", loopLabel: "⟳ 15消費でライデン瓶が次ダウン強化＆ダウン開始時に充電+10自動補給", text: "1ターン15以上消費で[[黒錫のライデン瓶]]が起動し、ボスの次ダウン被ダメ倍率を <code>×1.5 → ×2.0</code> に引き上げつつ、ダウン突入時に充電+10を払い戻して次の大技へ繋ぐ。" },
+        { step: "③ コンボ増幅：オーバークロック × 雷神槍の二重最終乗算", kind: "normal", text: "[[雷鳴の太鼓]]が12消費で<strong>初撃の最終与ダメ+100%＆防御全無視</strong>。同時に8以上消費で[[雷神槍]]が<strong>全攻撃に最終与ダメ +(消費量×6%)</strong> を重ね掛けする。" },
+        { step: "④ フィニッシャー：最大HP12%削り＋裁きの雷", kind: "finisher", text: "T終了時に[[黒錫のライデン瓶]]が<strong>敵最大HPの最大12%防御無視ダメージ</strong>を削り取り、トドメ局面では使い捨て端子〈裁きの雷〉で全充電を1撃へ全放出する。" }
+      ],
+      exampleTitle: "充電20から 雷撃(3)＋オーバークロック(12)＋リロール(3)＝18消費ターン実例",
+      exampleText: "1ターンに計18充電を消費して強化〈雷撃〉を1撃目に叩き込む：",
+      exampleMath: "初撃倍率: オーバークロック(+100%) ＋ 雷神槍(18×6% = +108%) ＋ 誘導コイル(+50%) → 最終与ダメ ×3.58 (防御全無視!)\n固定追撃: 誘導コイル(3回消費合計18×2 = 36 dmg) ＋ ライデン瓶(敵最大HPの 12% 防御無視!)\nさらに次のボスダウン時のダメージ倍率が ×2.0 に予約される！",
+      matchup: "得意：高防御・高HPボスの装甲貫通爆撃 ／ 相性武器：盾（高耐久で溜める）・竜閃（単発1撃への全乗せ）"
+    }
+  },
+  {
+    id: "crit",
+    axis: "会心",
+    navTitle: "④ 会心（練気・集中）",
+    navSub: "A:練気維持 / B:集中一撃",
+    subtitle: "【練気】蓄積による100%超え連撃 vs 練気半消費【集中】スナイパー軸",
+    coreFormulas: [
+      "<strong>【練気】システム</strong>：会心秘宝を1つ以上持つ戦闘で、攻撃が会心するたび <strong>【練気】+1</strong>（戦闘中減らない・【集中】会心時のみ半分消費）。すべての会心攻撃に <code>会心倍率 +(0.06 × 練気)</code> が自動加算される。",
+      "<strong>超過会心率変換</strong>：会心率が 100% を超えた分は無駄にならず、<strong>超過 1% ごとに会心倍率 +0.015</strong>（[[寸鉄]]所持で <strong>+0.03</strong>）へ変換される。",
+      "<strong>【集中】システム（分岐B）</strong>：集中秘宝を <strong>3つ以上</strong> 持ち、<strong>攻撃カードを 1枚だけ</strong> 発動したターンの攻撃は【集中】になる（基礎賭け金 <strong>−20%</strong>［2026-11-26緩和］＋ G/L集中品の低下 − 会心秘宝数による相殺）。会心成功時、【練気】を+1した後に<strong>半分（切り上げ）を消費</strong>して集中会心効果が爆発する。"
+    ],
+    terminals: [
+      { name: "弱点看破（攻撃）", normal: "出目を攻撃に。このターンの会心倍率 +(この戦闘の会心回数 × 0.05)", up: "強化＋：会心回数 × 0.08" },
+      { name: "一閃（補助・奇数限定）", normal: "このターンの攻撃は必ず会心。会心倍率 +(この戦闘の会心回数 × 0.05)", up: "強化＋：会心回数 × 0.08" }
+    ],
+    sharedStages: [
+      { label: "Step 1: 会心率の確保", text: "[[鷹匠の革手袋]](4以上で率+12%/倍率+0.15)、[[狙い目の刻み]](6の目で+26%)、[[測量師の片眼鏡]](歩数×5%乗算)で初手から高会心率を作る。" },
+      { label: "Step 2: 練気連動の倍率＆耐久", text: "[[瑠璃砥石]]が連撃/集中会心ごとに永続で率+4%・倍率+0.04を積み、[[一点読みの片眼]]が<strong>練気に応じて最大+0.89の会心倍率</strong>を供給。" },
+      { label: "Step 3: 対ボス防御＆盾貫通", text: "[[死相の面頬]]が会心ターンの敵直接攻撃を <code>練気 ÷ (練気 + 8)</code>（大技Tは練気2倍換算）カットし、練気3以上/集中会心でヴェスカのシールドも貫通する。" }
+    ],
+    branchA: {
+      name: "練気維持・確定会心連打",
+      archetype: "練気無消費蓄積 × 会心率150%+超過変換 × 攻防一体制圧",
+      nodes: [
+        { step: "① 起点：毎ターン2〜3回の多段会心", kind: "normal", text: "攻撃カードを2〜3枚並べて手数で会心を出し、[[見切りの目印]](2撃目以降+20%)や[[重ね斬りの型]](3撃目以降 率+25%・倍率+0.75)で後続撃を確定会心化する。" },
+        { step: "② 維持ループ：前ターンの会心が次ターンを確定化", kind: "loop", loopLabel: "⟳ 会心連打 → 次T手札+1・会心率+35%〜65%・ブロック供給 → さらに練気が増える", text: "前ターンの会心数に応じて[[余韻の鈴]](1回につき率+10%・防+4)と[[千里眼の水晶]](次T手札+1・率+35%・最終+25%)が起動し、途切れない確定会心ループが成立。" },
+        { step: "③ コンボ増幅：高練気維持による二重スケーリング", kind: "normal", text: "【練気】を一切使わないため中盤以降は練気10〜20に到達。システム基礎(+0.06×練気)に加えて[[白刃の鏡砥]](+0.06×練気)と[[連なる閃き]](最終+40%)が毎撃に乗る。" },
+        { step: "④ フィニッシャー：超過2倍変換＆完全貫通", kind: "finisher", text: "[[寸鉄]]により100%を超えた会心率が <strong>1%あたり倍率+0.03</strong> へ化け、かつ練気3以上の全会心が<strong>敵の防御を完全無視</strong>。[[死相の面頬]]で敵大技すら半減以下にして完封する。" }
+      ],
+      exampleTitle: "練気12・合算会心率160%での3連撃ターン実例",
+      exampleText: "[[千里眼の水晶]]＋[[寸鉄]]＋[[白刃の鏡砥]]＋[[連なる閃き]]が揃った中盤以降：",
+      exampleMath: "会心倍率: 基礎1.5 + 練気12×(基礎0.06+鏡砥0.06=1.44) + 片眼0.89 + 超過60%×寸鉄0.03(1.80) = ×5.63!\nさらに全3撃が【確定会心】×【敵防御完全無視】×【千里眼+25% ＆ 連なる閃き+40% 最終乗算】\n防御面も 死相の面頬(12/20 = 敵攻撃−60%、大技なら24/32 = −75%) ＋ 余韻の鈴＆見立て書でブロック20+！",
+      matchup: "得意：全層オールラウンダー（クリア率 27.3%・蹂躙 11.5%）／ 相性武器：短剣（基礎会心15〜25%＋連刃＋急所）・剣"
+    },
+    branchB: {
+      name: "集中・一撃必殺スナイパー",
+      archetype: "攻撃1枚限定 × 練気半消費ベット × 再発火＆HP割合処刑",
+      nodes: [
+        { step: "① 起点：開幕練気＆狙撃準備", kind: "normal", text: "[[抜き打ちの作法]]で開幕から【練気】+3（1T目とダウン中は集中率+12%）。攻撃カードを<strong>あえて1枚だけ</strong>発動して【集中】モードに入る（基礎賭け金−20%は会心秘宝収集で相殺）。" },
+        { step: "② 変換ループ：練気半消費で永続倍率＆次T会心率を鍛える", kind: "loop", loopLabel: "⟳ 集中会心で練気半分消費 → 永続倍率+0.15×消費＆HP回復＆次T初撃+20%", text: "集中会心が決まるたび[[一閃の極意]]が消費練気×0.15の<strong>戦闘中永続倍率</strong>とHP回復を与え、[[初太刀の黒鞘]]がブロック＋次ターン初撃率+20%を繋ぐ。" },
+        { step: "③ コンボ増幅：1撃への全リソース凝縮", kind: "normal", text: "その1撃に[[抜き打ちの作法]](倍率+1.00)、[[一の矢]](倍率+0.60+消費×0.15、出目5以上で+0.40)、[[渾身の鉄兜]](<strong>最終与ダメ +40%+消費×15%</strong>・防+10)が一点集中する。" },
+        { step: "④ フィニッシャー：照準器の2連射 ＆ 義眼の即死処刑", kind: "finisher", text: "[[必殺の照準器]]が集中会心した一撃を<strong>練気消費なしで即座にもう1回発火</strong>（倍率+0.80+消費×0.30）。さらに[[白濁の義眼]]が防御全無視＋<strong>残HP ≤ (倍率×7% + 消費練気×4%)［ボス半分］で即死処刑</strong>する。" }
+      ],
+      exampleTitle: "練気7から放つ【集中】1撃 → 照準器2撃目 → 義眼処刑の実例",
+      exampleText: "攻撃カード1枚（出力30）に出目6を挿して集中会心！（練気 7+1=8 → 半分の 4 を消費）：",
+      exampleMath: "1撃目(集中会心): 倍率(基礎1.5 + 練気0.48 + 作法1.0 + 一の矢1.6 + 片眼0.57 = ×5.15) × 鉄兜(最終+100% = ×2.0) = 約 309 dmg (防御全無視!)\n2撃目(必殺の照準器・自動再発火!): 倍率 + (0.80 + 4×0.30 = +2.00) されてもう一撃追撃！\n処刑判定(白濁の義眼): ボスでも (5.15×7% + 4×4%) ÷ 2 = 最大HPの 26.0% 以下になった瞬間に即死！",
+      matchup: "得意：単体ボス1ターン蒸発（クリア率 26.0%・蹂躙率 12.3%）／ 相性武器：竜閃（画竜点睛の『攻撃1枚限定』と100%完全一致！）・斧"
+    }
+  },
+  {
+    id: "bleed",
+    axis: "出血",
+    navTitle: "⑤ 出血（裂傷・血晶）",
+    navSub: "A:無減衰多段 / B:消費還流",
+    subtitle: "自然減衰停止の100スタック多段撃 vs 出血消費→60%還流サイクル軸",
+    coreFormulas: [
+      "<strong>基本挙動</strong>：攻撃命中時に付与され、ターン終了時に現在の出血スタック分のダメージを与えたあと割合減衰する（[[止血禁じの軟膏]]で減衰緩和、[[医書の隠し針]]で<strong>自然減衰ゼロ</strong>）。",
+      "<strong>防御貫通＆阻害</strong>：[[鎧縫いの針]]で出血と同値の敵防御を無視（15以上で目盛り20%前進）、[[血の楔]]で敵の回復・シールド・軽減を <code>出血 ÷ (出血 + 30)</code> 阻害＆20以上で最終+40%。"
+    ],
+    terminals: [
+      { name: "鉤爪（攻撃）", normal: "出目を攻撃に。攻撃が通れば出血 +(敵の出血 ÷ 4、最低 +2)", up: "強化＋：最低 +3" },
+      { name: "血抜き（補助・3以下限定）", normal: "敵の出血 5 につき、このターンの与ダメージ +10%", up: "強化＋：条件が 4 以下に緩和" }
+    ],
+    sharedStages: [
+      { label: "Step 1: 序盤の傷口形成", text: "[[血呼びの腕輪]](開幕+3)、[[裂け目の楔]](低目攻撃+3)、[[鉛入りの手斧]](高目攻撃+2)、[[鋸刃の山刀]](瀕死時+5)で素早く出血15〜20へ乗せる。" },
+      { label: "Step 2: 貫通＆デバフ固定", text: "出血20に届くと[[鎧縫いの針]]が防御20無視＋ボス目盛り削り、[[凝血の小瓶]]が敵攻撃−20%（出血30で大技倍率−0.5）で被弾を抑え込む。" },
+      { label: "Step 3: 共通フィニッシュ補助", text: "[[血の楔]]が敵の厄介なシールド・回復ギミックを封殺しつつ、全攻撃に最終与ダメージ+40%を常時提供する。" }
+    ],
+    branchA: {
+      name: "超多段ヒット・無減衰蓄積",
+      archetype: "自然減衰停止 × 付与量2倍雪だるま × 多段【血桜】解放",
+      nodes: [
+        { step: "① 起点：減衰完全停止＆付与2倍化", kind: "loop", loopLabel: "⟳ 出血14到達 → 涸れぬ血晶で全付与2倍 × 隠し針で減衰0 ＆ 端子〈鉤爪〉で指数増殖", text: "[[医書の隠し針]]でターン終了時の自然減衰を <strong>0</strong> に固定し、[[涸れぬ血晶]]で出血14以上の敵への付与量を<strong>すべて2倍</strong>にする。端子〈鉤爪〉(+現在出血÷4×2倍)が加わると数ターンで出血80〜150へ爆発する。" },
+        { step: "② 手数変換：出血スタックを基礎攻撃へ転写", kind: "normal", text: "攻撃カードを3枚以上（または再起動）並べると、[[医書の隠し針]](出血10ごと全撃+2)と[[激情の刃]](3撃目以降に基礎攻撃+最大15)で1撃あたりの基礎打点が跳ね上がる。" },
+        { step: "③ コンボ増幅：2撃目以降の【血桜】最大+120%", kind: "normal", text: "[[血桜]]が2撃目以降の各攻撃で出血をわずか2だけ消費し、<strong>消費前の出血×2%（出血60で上限の最終与ダメージ +120%＝×2.2）</strong>を毎撃に掛ける。" },
+        { step: "④ フィニッシャー：止血帯の3倍界王拳ティック", kind: "finisher", text: "ターン終了時、本来の自然出血ダメージ（減衰なし）に加えて[[逆締めの止血帯]]が3撃命中時に<strong>出血×2の防御無視ダメージ</strong>を追加し、実質1ターンに出血×3倍を削り取る。" }
+      ],
+      exampleTitle: "出血65スタック・3連撃ターンの総削り量実例",
+      exampleText: "[[医書の隠し針]]＋[[涸れぬ血晶]]＋[[血桜]]＋[[逆締めの止血帯]]＋[[血の楔]]で3回攻撃命中：",
+      exampleMath: "基礎攻撃加算: 隠し針(+12) ＋ 3撃目に激情の刃(+15) ／ 防御無視: 鎧縫いの針で敵防御 65 無視\n最終乗算: 1撃目は血の楔(+40%)、2撃目・3撃目は 血の楔(+40%) ＋ 血桜(+120%)!\nT終了時追撃: 通常出血ティック(65) ＋ 逆締めの止血帯(65×2 = 130) = 合計 195 dmg が毎ターン自動炸裂（しかも出血は減らない）！",
+      matchup: "得意：ヴェスカ含む全ボス戦（クリア率 25.9%・V死亡率49.1%と理想値）／ 相性武器：短剣（連刃で3撃条件＆血桜が2回乗る）"
+    },
+    branchB: {
+      name: "血晶回収サイクル・処刑",
+      archetype: "1/3大消費 × 60%次ターン還流 × 減少トリガー多重発火",
+      nodes: [
+        { step: "① 起点：大口消費エンジン", kind: "normal", text: "出血15以上で攻撃が当たると[[紅の搾り具]]が出血の <strong>1/3を消費して「消費量×8」の防御無視ダメージ</strong>を与え、さらにそのダメージの <strong>100%ぶんボス目盛りを前進</strong>させて強引にダウンを奪う。" },
+        { step: "② 還流ループ：消費した血の60%が翌朝戻る", kind: "loop", loopLabel: "⟳ 秘宝で出血消費 → 血車で手札+1 ＆ 戻り血の頭骨で次T開始時に消費量の60%が再付与！", text: "[[戻り血の頭骨]]により、搾り具等で消費した出血の <strong>60%</strong> が次ターン開始時に敵へ戻るため、ゼロから溜め直す必要がなく毎ターン大口消費を連打できる。" },
+        { step: "③ コンボ増幅：1回の「減少」に3つの秘宝が同時反応", kind: "normal", text: "出血が減るたび、[[血車]](消費量×2ダメ＆次T手札+1)、[[血脈の災環]](減った量×3ダメ＆20%HP吸収・最大10)、[[血吸いの護石]](減った量ブロック・最大12)が<strong>全部同時に誘発</strong>する。" },
+        { step: "④ フィニッシャー：消費1あたり×13ダメージ ＆ 鉈処刑", kind: "finisher", text: "搾り具(×8)＋血車(×2)＋災環(×3)で<strong>消費した出血1ポイントあたり計 13 ダメージ＋HP回復＋ブロック＋ドロー</strong>に変換し、最後は[[百人切りの鉈]](最大25%/ボス12.5%)で首を落とす。" }
+      ],
+      exampleTitle: "出血36から【紅の搾り具】が12消費した瞬間の連鎖実例",
+      exampleText: "出血36のボスに1撃当てて[[紅の搾り具]]が1/3（=12）を消費した瞬間：",
+      exampleMath: "即時ダメージ連鎖: 搾り具(12×8=96) ＋ 血車(12×2=24) ＋ 血脈の災環(12×3=36) = 防御無視 156 dmg!\n同時獲得リソース: ボス目盛り +96前進 ＋ HP +7回復(災環) ＋ 次Tブロック +12(護石) ＋ 次T手札 +1枚(血車)\nさらに次T開始時: 戻り血の頭骨で 12×60% = +7 出血が敵に自動返還！",
+      matchup: "得意：殴り合い耐久＆ボスダウンハメ（クリア率 26.1%）／ 相性武器：斧（猛りの目盛り削り＋血令のドレインと相乗）"
+    }
+  },
+  {
+    id: "shield",
+    axis: "シールド",
+    navTitle: "⑥ シールド（見切り・要塞）",
+    navSub: "A:ジャスト反撃 / B:移動要塞",
+    subtitle: "予告値ピタリ【ジャスト防御】反撃 vs 無減衰50+シールド質量粉砕軸",
+    coreFormulas: [
+      "<strong>シールド減衰規則</strong>：ターン開始時に前ターンの残りシールドは <strong>50%</strong> に半減する（[[油染みの盾革]]で無傷次Tは <strong>30%減衰＝70%残存</strong>、[[脈打たぬ鋼の心臓]]で50以上なら<strong>減衰ゼロ</strong>）。",
+      "<strong>【ジャスト防御】判定</strong>：敵が攻撃するターンにHPを1も失わず、かつ <code>敵の攻撃値 ≤ (ブロック + シールド) ≤ 敵の攻撃値 + 許容幅2</code>（[[擦り減った小盾]]で <strong>許容幅4</strong>）に収めると成立。"
+    ],
+    terminals: [
+      { name: "当て金（防御）", normal: "出目をブロックに。シールド +4（前Tに【ジャスト防御】なら +8）", up: "強化＋：シールド +6（前Tジャストなら +10）" },
+      { name: "重装突撃（攻撃）", normal: "出目を攻撃に。今のシールドの 50% を攻撃に足し、その分のシールドを払う", up: "強化＋：今のシールドの 75% を攻撃に足して払う" }
+    ],
+    sharedStages: [
+      { label: "Step 1: 開幕装甲＆獲得倍率", text: "[[聖路の白靴]](歩行蓄積)と[[脈打たぬ鋼の心臓]](勝利ごと成長)で開幕からシールドを展開。HP半減時に[[二拍目の心臓]]が最大HP30%シールド＋以降の獲得量を <strong>1.5倍</strong> 化する。" },
+      { label: "Step 2: 大技対策＆ダウン予約", text: "エリート/ボスの大技・チャージ時に[[英雄の意志]]がシールド+18を張り、ジャスト成立で次ダウン倍率+0.5＆ダウン時シールド+20を予約。" },
+      { label: "Step 3: 喪失を火力へ転換", text: "吸収・消費・減衰のどの経路でもシールドを8失うたび[[敗残兵の部隊章]]が【反骨】(与ダメ+10%・最大+100%)を永続蓄積する。" }
+    ],
+    branchA: {
+      name: "ジャスト防御・見切り反撃",
+      archetype: "許容幅拡大 × 250%カウンター × 永続最終ダメージ成長",
+      nodes: [
+        { step: "① 起点：許容幅0〜+4への緩和", kind: "normal", text: "[[擦り減った小盾]]でジャスト許容幅を倍増（敵予告20なら防御合計 <code>20〜24</code> で成立）させ、ダイスの端数調整で狙って【ジャスト防御】を出せる状態にする。" },
+        { step: "② 反撃ループ：相手の攻撃力をそのまま2.5倍で返す", kind: "loop", loopLabel: "⟳ ジャスト成立 → 反射+反撃 ＆ 防人の軍標で次T手札+1＋永続最終倍率UP", text: "ジャスト成立の瞬間に[[鏡返しの小盾]](防いだ量の<strong>100%反射</strong>)と[[重装兵の隠し刃]](予告攻撃の<strong>150%防御無視反撃</strong>)が同時炸裂し、守っただけなのに大ダメージが入る。" },
+        { step: "③ コンボ増幅：軍標の青天井スケーリング", kind: "normal", text: "[[防人の軍標]]がジャスト1回ごとに<strong>「所持シールド秘宝数 × 9%」の最終与ダメージ（8個所持なら1回ごとに +72%！）</strong>を戦闘終了まで永続累積させる。" },
+        { step: "④ フィニッシャー：静止の振り子 → 次ターン +130% 全力斬り", kind: "finisher", text: "敵の大技ターンに攻撃カード0枚でジャスト完封すると[[静止の振り子]]が起動し、次ターンの全攻撃に<strong>最終与ダメージ +130%</strong>（＋受け太刀の籠手+8＆軍標累積）を乗せて一刀両断する。" }
+      ],
+      exampleTitle: "敵の大技（予告30）を無攻撃ジャスト完封 → 次ターン反撃実例",
+      exampleText: "シールド秘宝8個所持、敵予告30に対しブロック+シールド=32で無攻撃ジャスト防御成立：",
+      exampleMath: "防御ターン即時反撃: 鏡返し(30) ＋ 隠し刃(30×1.5 = 45) = 殴らずに 75 dmg！\nバフ獲得: 防人の軍標(最終 +72% 永続追加＆手札+1) ＋ 静止の振り子(次T最終 +130%) ＋ 英雄の意志(次ダウン×2.0)\n翌ターン主攻撃: 軍標2回分(+144%) ＋ 振り子(+130%) = 【最終与ダメージ +274% (×3.74)】で粉砕！",
+      matchup: "得意：攻撃頻度・威力の高いボス全般 ／ 相性武器：盾（鉄盾〜ドーンブリンガーのジャスト時追加シールドと完全一致）"
+    },
+    branchB: {
+      name: "余剰持ち越し・移動要塞",
+      archetype: "50以上無減衰プール × シールド35%攻撃加算 × 破城斧+130%",
+      nodes: [
+        { step: "① 起点：巨大シールドの構築＆無減衰ロック", kind: "loop", loopLabel: "⟳ 二拍目の心臓(獲得1.5倍)でシールド50突破 → 鋼の心臓で毎ターン減衰ゼロ化！", text: "[[当て布の籠手]]・[[肩当て]](3個防御で+12)・[[油染みの盾革]]でシールドを積み上げ、50を超えた瞬間[[脈打たぬ鋼の心臓]]により<strong>ターン開始時の半減が完全消滅</strong>して要塞が完成する。" },
+        { step: "② 質量変換：現在シールドがそのまま毎撃の基礎攻撃力になる", kind: "normal", text: "攻撃カードを挿したターン、[[盾押しの心得]]が<strong>現在シールドの35%（シールド60なら全撃に基礎攻撃 +21！）</strong>を消費なしで毎撃に加算し、[[力みの小手]]も蓄積分を解放する。" },
+        { step: "③ コンボ増幅：わざと割らせる／減衰させる逆転トリガー", kind: "normal", text: "50未満で大口減衰または敵の大技吸収で12以上失った時は、[[落城の礎石]]が<strong>次T全撃に失った半分を加算＋最終+80%＋ボス目盛り最大10%前進</strong>を叩き出す。" },
+        { step: "④ フィニッシャー：破城斧の連続装甲粉砕", kind: "finisher", text: "シールド20以上の間、[[破城斧]]が攻撃カード1枚につきシールド6を燃料として払い、<strong>すべての攻撃を「最終与ダメージ +130% ＆ 敵防御完全無視」</strong>に変える。" }
+      ],
+      exampleTitle: "シールド60維持・攻撃カード3枚での【盾押し＋破城斧】斉射実例",
+      exampleText: "[[脈打たぬ鋼の心臓]]で減衰停止中のシールド60から、攻撃カード3枚を発動：",
+      exampleMath: "基礎攻撃上乗せ: 盾押しの心得(60 × 35% = 全3撃それぞれに 基礎攻撃 +21！)\n破城斧ブースト: シールド 6×3 = 18 消費(残42) → 全3撃に【最終与ダメージ +130% ＆ 敵防御完全無視】\nさらに18消費により 敗残兵の部隊章【反骨 +2 (与ダメ+20%)】も同時進行！（必要なら〈重装突撃〉で残盾ごと叩きつける）",
+      matchup: "得意：道中無事故突破（第2〜4層死亡率が全軸最低の 7% / 16% / 22%）／ 相性武器：盾（シールドバッシュで全盾を攻撃変換）"
+    }
+  },
+  {
+    id: "deck",
+    axis: "山札",
+    navTitle: "⑦ 山札（廃棄回転・常設構築）",
+    navSub: "A:使い捨て機関 / B:常設＆残す",
+    subtitle: "使い捨て連打・回収の蒸気機関 vs 常設フル展開＆手札熟成軸",
+    coreFormulas: [
+      "<strong>使い捨てカード</strong>：通常は発動するとその戦闘中は山札に戻らない（ラン終了では消えない）。山札が薄くなるためリシャッフル頻度が上がる。",
+      "<strong>常設カード＆「残す（Pick）」</strong>：常設カードは一度引くと戦闘終了まで場に残り続ける。未使用の手札は「残す」で次ターンへ持ち越せる。"
+    ],
+    terminals: [
+      { name: "焼却斬り（攻撃・使い捨て）", normal: "前Tまでに使い捨て使用後のみ発動。出目×2 ＋ 累計使い捨て回数×2 を攻撃に", up: "強化＋：出目×3 ＋ 累計回数×3" },
+      { name: "緊急再装填（補助・5以上・使い捨て）", normal: "このターンに使った他の使い捨て1枚（場の右から）を次T手札に戻す", up: "強化＋：出目を充電にも入れる" },
+      { name: "歯車の軸（補助・常設・容量0）", normal: "出目は挿せない。場にあれば毎T最初に発動した非基本カードの挿した目1つにつき +2", up: "強化＋：挿した目1つにつき +3" }
+    ],
+    sharedStages: [
+      { label: "Step 1: 初動ドロー＆圧縮", text: "[[組み置きの配線束]](1T目+2枚)で初手を広げ、[[無銘の設計図]]がリシャッフルのたび基本カード（攻撃/防御/充電）を1枚ずつ除外して山札を精鋭化する。" },
+      { label: "Step 2: 毎ターン追加ドロー機関", text: "山札12枚以下なら[[整理された工具箱]]が毎T+1枚、非基本3枚発動で[[仕込みの切替器]]が次T+1枚＆ボス目盛り20%前進を供給。" },
+      { label: "Step 3: 偶数リシャッフル倍化", text: "[[永久機関の主軸]]がリシャッフルごとにカードを引きつつ、<strong>切り直し回数が2の倍数になるターンは挿した全カードを2回発動</strong>させる。" }
+    ],
+    branchA: {
+      name: "廃棄・高速回転ループ",
+      archetype: "使い捨て連打 × 4回ごと手札回収 × 累計回数×9%最終乗算",
+      nodes: [
+        { step: "① 起点：使い捨てを発動しながらドロー＆防御確保", kind: "normal", text: "起爆札・貫通弾・応急箱・焼却斬りを使うたび、[[焼き入れの挟み]](3固定ダメ＆全撃+1)、[[切り捨ての半券]](全撃+4/防+5)、[[灰払いの箒]](防+3＆2枚使用で次T+1枚)が脇を固める。" },
+        { step: "② 再生ループ：除外されたはずの使い捨てが戻ってくる", kind: "loop", loopLabel: "⟳ 使い捨て4回使用 → 解体屋の袋が除外済み使い捨てを手札へ回収（最大5回）＋ 緊急再装填！", text: "[[解体屋の袋]]が4回ごとに除外領域から使い捨てカードを手札へ呼び戻し、端子〈緊急再装填〉と合わせて1戦闘で10〜15回以上の使い捨て発動を実現する。" },
+        { step: "③ コンボ増幅：基礎攻撃と最終倍率の二重カウントアップ", kind: "normal", text: "累計使用回数が増えるほど、[[再利用のるつぼ]](回数×2を全撃の基礎攻撃へ加算)と端子〈焼却斬り〉(回数×2〜3加算)で基礎打点が膨れ上がる。" },
+        { step: "④ フィニッシャー：蒸気機関の全体乗算", kind: "finisher", text: "使い捨て3回達成以降、[[廃材組みの蒸気機関]]が<strong>すべての攻撃に「累計使い捨て回数 × 9%」の最終与ダメージ乗算</strong>（12回なら +108%＝×2.08）を常時付与する。" }
+      ],
+      exampleTitle: "累計使い捨て10回到達時の〈焼却斬り＋〉爆発実例",
+      exampleText: "[[再利用のるつぼ]]＋[[廃材組みの蒸気機関]]所持、10回目の使い捨てとして〈焼却斬り＋〉に出目6を配線：",
+      exampleMath: "焼却斬り＋単体出力: 出目6×3(18) ＋ 累計10回×3(30) ＋ るつぼ(10×2=20) ＋ 半券(4) = 基礎 72!\n蒸気機関の最終乗算: 10回 × 9% = 【最終与ダメージ +90% (×1.90)】\nさらに偶数リシャッフルターンなら【永久機関の主軸】でこれが 2回発動！",
+      matchup: "得意：短期〜中期決戦の手数圧倒（ヴェスカ到達率 60.9% で全17腕トップ！）／ 相性武器：剣・盾"
+    },
+    branchB: {
+      name: "常設展開・Pick盤面構築",
+      archetype: "開幕全常設自動展開 × 補助カード多重バフ ×「残す」熟成砲",
+      nodes: [
+        { step: "① 起点：開幕1ターン目に完成盤面を自動構築", kind: "normal", text: "[[常設の作業台]]が戦闘開始時に<strong>山札内のすべての常設カード（歯車の軸・増幅器・共振器など）を一気に場へ展開</strong>し、引く手間をゼロにする。" },
+        { step: "② 熟成ループ：切り札を手札に「残す」ほど倍率が育つ", kind: "loop", loopLabel: "⟳ 強カードを「残す」で温存継続 → 1Tごとに取っておきの銀弾が +25%, +50%, +75%… 熟成！", text: "常設盤面と補助カードで場を回しながら、手札の決戦カードに「残す」を付け続けることで[[取っておきの銀弾]]の最終倍率が上限なしで積み上がる。" },
+        { step: "③ コンボ増幅：常設枚数 × 補助枚数のダブル最終乗算", kind: "normal", text: "場の常設1枚につき[[常設の作業台]]が毎T<strong>（攻+5・防+3・最終+25%）</strong>を常時供給し、さらに補助カードを発動するたび[[継ぎ目のない導線]]が1枚につき<strong>（攻+7・防+3・最終+25%・防御8無視）</strong>を上乗せする。" },
+        { step: "④ フィニッシャー：熟成銀弾の解放", kind: "finisher", text: "ボスのダウンや隙に合わせて3〜4ターン温存したカードを発動すると、[[留め金の栞]](攻+6/防+4)＋作業台＋継ぎ目＋[[取っておきの銀弾]](<strong>+75%〜+100%</strong>)が重なり一撃で沈める。" }
+      ],
+      exampleTitle: "常設3枚＋補助2枚発動＋3ターン温存カード解放ターンの実例",
+      exampleText: "[[常設の作業台]](常設3枚展開中)＋[[継ぎ目のない導線]](補助2枚発動)＋3T残した攻撃カードを発動：",
+      exampleMath: "全撃への基礎攻撃加算: 作業台(5×3=+15) ＋ 継ぎ目(7×2=+14) ＋ 栞(+6) = 全撃 +35！（防御も 16 無視）\n全撃へのブロック加算: 作業台(3×3=+9) ＋ 継ぎ目(3×2=+6) ＋ 備えの鐘(+12) ＋ 栞(+4) = ブロック +31！\n最終与ダメージ乗算: 作業台(+75%) ＋ 継ぎ目(+50%) ＋ 銀弾3T(+75%) = 【最終 +200% (×3.0)】！",
+      matchup: "得意：安定した盤面制圧（クリア率 21.9%・作業台引けた時の蹂躙Lift 3.61x）／ 相性武器：盾（Knight勝率 35.6%）・剣"
+    }
+  },
+  {
+    id: "role",
+    axis: "役",
+    navTitle: "⑧ 役［サブ軸・13品］",
+    navSub: "A:低目継続 / B:確定ゾロ目",
+    subtitle: "出目ペア継続＆二重発動 vs リロール操作＆100%ゾロ目昇格サブ軸",
+    coreFormulas: [
+      "<strong>サブ軸設計（全13品）</strong>：単体で完結させるだけでなく、他7軸のメインギミックに「出目の役」から手札・無料リロール・最終乗算を供給するハイブリッド軸。",
+      "<strong>役の体系（ADR-0015）</strong>：同じ出目2個で<strong>ペア役</strong>（1〈特別〉・2〈封じ〉・3〈追撃〉・4〈攻め〉・5〈守り〉・6〈強打〉等）、3個同じで<strong>ゾロ目</strong>（効果強化）、連番で<strong>〈連なり〉</strong>。"
+    ],
+    terminals: [
+      { name: "賽振り台（充電）", normal: "充電 +出目。次T最初の振り直しの充電コスト −min(6, この戦闘の役成立回数)", up: "強化＋：−min(8, 役成立回数)" },
+      { name: "役落とし（攻撃）", normal: "出目を攻撃に。今T役が成立していれば攻撃 +(この戦闘の役成立回数 × 3)［ゾロ目・連なりは 2倍］", up: "強化＋：役成立回数 × 4［ゾロ目・連なりは 2倍］" }
+    ],
+    sharedStages: [
+      { label: "Step 1: 毎ターンの役カウント蓄積", text: "ペア・ゾロ目・連なりが立つたび戦闘中の「役成立回数」が増加し、[[進軍の角笛]](最大+6、ゾロ目+12)と端子〈賽振り台〉〈役落とし〉が成長する。" },
+      { label: "Step 2: 共通レジェンダリー乗算", text: "[[連勝の銀杯]]が役成立ターンの全攻撃に<strong>「この戦闘の役成立回数 × 8%」の最終与ダメージ</strong>を与え、他軸の主攻撃を別枠から押し上げる。" },
+      { label: "Step 3: 装備ダイスとのシナジー", text: "特殊面構成の装備ダイス（偏り面・4〜5面ダイス等）と組み合わせることで、狙った出目のペア・連なり率を劇的に引き上げられる。" }
+    ],
+    branchA: {
+      name: "低目ロール連打・残響",
+      archetype: "1〜3の役継続 × ペア複合発動 × 役効果の次ターン再発火",
+      nodes: [
+        { step: "① 起点：低目ペアがドローと貫通を生む", kind: "normal", text: "攻撃威力が低くなりがちな1〜3の出目を逆手に取り、[[小口の錠前]](1〜3の役で次T手札+1・防+4)と[[欠け目の見立て]](1・2の役で防御12無視＆目盛り25%前進)でアドバンテージに変える。" },
+        { step: "② 継続ループ：同じ役を維持して無料リロール継続", kind: "loop", loopLabel: "⟳ 同目2T連続成立 → メトロノームが与ダメ+25%・手札+1・次T初回リロール無料を毎ターン供給！", text: "[[揃いのメトロノーム]]が一度繋がると、毎ターン無料リロールと追加手札がもらえるため次のターンもまた同じ目を揃えやすくなる自己維持ループに入る。" },
+        { step: "③ コンボ増幅：1回のペアで2種類の役を同時発動", kind: "normal", text: "[[曇りの合わせ鏡]]により、たとえば3のペア〈追撃〉を作ると1つ下の2のペア〈封じ〉も同時に発動し、攻防両面の役恩恵を1ターンに二重取りできる。" },
+        { step: "④ フィニッシャー：宿命の音叉による残響2連発", kind: "finisher", text: "2ターン連続で役が立つかゾロ目/連なりを出すと[[宿命の音叉]]が共鳴し、<strong>その役の効果自体が次のターン開始時にもう1回自動発動</strong>＋[[連勝の銀杯]]の累積乗算で押し切る。" }
+      ],
+      exampleTitle: "3のペア〈追撃〉2ターン連続成立時のコンボ実例",
+      exampleText: "[[揃いのメトロノーム]]＋[[曇りの合わせ鏡]]＋[[宿命の音叉]]で3のペアを連続成立：",
+      exampleMath: "役効果の多重化: 今Tの〈3:追撃〉＋ 合わせ鏡で〈2:封じ〉同時発動 ＋ 音叉で前Tの〈3:追撃〉も再発動！\nバフ＆リソース: 与ダメ+25%・進軍の角笛(+6)・錠前(防+4)・手札合計 +2枚・次T初回リロール無料！",
+      matchup: "得意：出目の低い序盤ダイスの救済・コンスタントなボス目盛り削り ／ 相性軸：出血A（裂け目の楔の1〜3出目条件と完全一致！）"
+    },
+    branchB: {
+      name: "リロール＆ゾロ目昇格爆発",
+      archetype: "無料振り直し保険 × リロール高打点 × ペア100%ゾロ目化",
+      nodes: [
+        { step: "① 起点：リロールコストと下振れの完全ケア", kind: "loop", loopLabel: "⟳ 万一役が外れても負け越しの賽が『次T無料リロール＋防+6＋手札+1』で即座にリカバリー", text: "[[擦り切れた賽袋]](戦闘初回リロール無料＆リロールT防+5)と[[負け越しの賽]]により、充電を温存しながら毎ターン強気にリロールを回せる。" },
+        { step: "② リロール打点：振り直すだけで攻防が跳ね上がる", kind: "normal", text: "リロールしたターンに役が立つと、[[追撃の弾帯]](各撃の基礎攻撃+8、3の役かゾロ目なら+10)と[[轟きの鉄球]](ブロック+10＆最終+35%/+45%)が即座に乗る。" },
+        { step: "③ 規則破壊：5回目以降「すべてのペアが確定ゾロ目」へ", kind: "finisher", text: "[[万象の賽盆]]により、戦闘中に役が3回成立した後はペアが50%でゾロ目に、<strong>5回成立した後は 100% 確定でゾロ目として扱われる</strong>ようになる。" },
+        { step: "④ フィニッシャー：常時ゾロ目状態の〈役落とし〉砲", kind: "finisher", text: "確定ゾロ目化後は適当に2個同じ目を揃えるだけで毎回ゾロ目効果＋[[轟きの鉄球]](<strong>最終+45%</strong>)＋[[進軍の角笛]](2倍＝全撃+12)＋端子〈役落とし〉(<strong>2倍＝役回数×6〜8加算！</strong>)が確定暴発する。" }
+      ],
+      exampleTitle: "役7回成立後・【万象の賽盆】確定ゾロ目モードでの1ターン実例",
+      exampleText: "リロール1回から普通のペア（例：[4, 4, 2]）を揃えて〈役落とし＋〉を発動：",
+      exampleMath: "万象の賽盆: [4,4,2] の2個そろいが 100% 確定で【4のゾロ目】に昇格！\n基礎攻撃爆発: 役落とし＋(7回×4×ゾロ目2倍 = +56!) ＋ 進軍の角笛(ゾロ目2倍 = +12) ＋ 弾帯(+10) = +78！\n最終与ダメージ: 轟きの鉄球(+45%) ＋ 連勝の銀杯(7回×8% = +56%) = 【最終 +101% (×2.01)】！",
+      matchup: "得意：中〜長期戦の爆発的逆転（万象の賽盆の蹂躙時保有率 47%）／ 相性軸：充電A（呼雷粉・引き直しの撃鉄のリロール連動）"
+    }
+  },
+  {
+    id: "weapons",
+    navTitle: "§9 武器5家系×8軸マトリクス",
+    navSub: "斧・剣・短剣・盾・竜閃",
+    isWeapons: true
+  }
+];
+
+function renderOverview() {
+  return `
+  <section id="overview" class="section-card">
+    <div class="axis-header">
+      <h2 class="axis-title">§0 全体設計：4枠動的軸ロック ＆ ダメージ乗算階層</h2>
+      <span class="axis-badge">システム骨格</span>
+    </div>
+    <div class="rule-grid">
+      <div class="info-box">
+        <h4>ラン内のビルド収束ルール（動的4軸ロック）</h4>
+        <ul class="formula-list">
+          <li>軸付き秘宝を取得すると、その軸がランの <strong>出現枠（最大4軸）</strong> に登録される。4枠が埋まった後は<strong>ロック済み4軸＋汎用・金秘宝のみ</strong>が抽選されるため、1ランで自軸秘宝が <strong>平均 8〜11個</strong> 集まる。</li>
+          <li>各軸（全8軸）の GOLD・LEGENDARY 帯は <strong>分岐A</strong> と <strong>分岐B</strong> の2つのサブアーキタイプに分かれており、同じ軸でも「どのGOLD/Lを軸にするか」で回転ループとフィニッシャーが別物に変化する。</li>
+          <li>不要な提示秘宝は<strong>「見送り」で換金（平均約50G/ラン）</strong>でき、ロック済み軸指定リロールと合わせて「引きの悪さを知識で乗り切る」制御が可能。</li>
+        </ul>
+      </div>
+      <div class="info-box">
+        <h4>ダメージ計算の4階層（異階層どうしは掛け算！）</h4>
+        <ul class="formula-list">
+          <li><strong>① 基礎攻撃加算</strong>：<code>武器攻撃力 ＋ 端子出力(出目×倍率) ＋ 全撃攻撃+N</code>（[[蓄電の小手]]・[[盾押しの心得]]・[[再利用のるつぼ]]・〈猛り〉等）</li>
+          <li><strong>② 与ダメージ%の池（加算枠）</strong>：<code>outgoingDamageMultiplier</code>（[[荒砥]]・[[主を看取る香炉]]・[[腐し刃]]・[[敗残兵の部隊章]]等）</li>
+          <li><strong>③ 会心倍率 ＆ 超過変換</strong>：<code>会心倍率 ＋ 練気×0.06 ＋ 超過率×0.015(寸鉄0.03)</code></li>
+          <li><strong>④ 最終与ダメージ%（別枠乗算・切り札）</strong>：<code>hitFinalDamagePct</code>（[[烈刃]]・[[血桜]]・[[雷神槍]]・[[防人の軍標]]・[[廃材組みの蒸気機関]]等）→ <strong>①×②×③×④を掛けた後、敵防御（貫通減算後）とダウン×1.5〜2.0を通す</strong>。</li>
+        </ul>
+      </div>
+    </div>
+  </section>`;
+}
+
+function renderWeapons() {
+  return `
+  <section id="weapons" class="section-card">
+    <div class="axis-header">
+      <h2 class="axis-title">§9 武器 5 家系（戦闘スタイル）× 8軸シナジー早見表</h2>
+      <span class="axis-badge">T2 → T3 → T4 進化</span>
+    </div>
+    <p style="margin-top:0;color:var(--ink-2);font-size:13px;">武器は特定の1軸に縛られず、「どの配線リズムで戦うか」を決める横串の戦闘スタイルとして全8軸と掛け合わさります。</p>
+    <table class="matrix-table">
+      <thead>
+        <tr>
+          <th style="width:18%">武器家系（代表進化）</th>
+          <th style="width:36%">固有メカニクス（T2 → T4）</th>
+          <th style="width:28%">特に噛み合う軸・分岐（ベストシナジー）</th>
+          <th style="width:18%">苦手な組み合わせ・注意点</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>斧（バーサーカー）</strong><br>${richText("[[猛斧]] → [[血塗りの戦斧]] → [[血帝廻天]]")}</td>
+          <td>${richText("<strong>★更新</strong>：基礎攻撃 <code>5/8/11</code>。<strong>〈猛り〉</strong>1T目から毎T攻撃+1（最大+5/+9/+14）＆ボス目盛り15〜40%前進。<strong>〈鎧砕き〉</strong>命中で敵防御−2/−3、<strong>敵防御0の間は常時最終+20%</strong>。T4で全力攻撃時最終+35%＆被弾HP60%次撃転化。")}</td>
+          <td><strong>臨界B</strong>（武器強化で天工開物+8＆ダウン延長と目盛り削りが合致）<br><strong>出血B</strong>（紅の搾り具の目盛り100%前進＋血令回復で殴り合い無双）</td>
+          <td>長期戦・装甲割りに強く、今回の初速＆防御0常時化バフで序盤雑魚戦の取りこぼしも解消。</td>
+        </tr>
+        <tr>
+          <td><strong>剣（ソードマン）</strong><br>${richText("[[鍛鉄の剣]] → [[銀の長剣]] → [[デュランダル]]")}</td>
+          <td><strong>〈間合〉</strong>攻撃出目+25/40/60%＆敵の固定削り打ち消し。<strong>〈一対一〉</strong>単体戦で最終+10/18%・防御+3/+5。T4<strong>〈切り返し〉〈不滅の刃〉</strong>で「攻撃と防御の両方に挿す」たびブロック60%を攻撃加算＆最終最大+72%。</td>
+          <td><strong>充電A</strong>（二股の導線＋逆さ避雷針で攻防両立を毎ターン維持）<br><strong>毒A・出血A・会心A</strong>（癖がなく全軸の基準値を一段引き上げる万能型）</td>
+          <td>極端な弱点なし。「攻撃1枚だけ＆防御0枚」に偏る瞬間よりも攻防スプリット配線で真価。</td>
+        </tr>
+        <tr>
+          <td><strong>短剣（アサシン）</strong><br>${richText("[[盗賊の短刀]] → [[処刑人の曲刀]] → [[ノクタリア]]")}</td>
+          <td>基礎会心15〜25%・高貫通（防御0）。<strong>〈疾手〉</strong>開幕5ターン攻撃+4/+6/+9＆初手手札+1/+2。T3<strong>〈連刃〉</strong>攻撃2枚以上で防御無視の追撃+1回。T4<strong>〈急所〉〈処刑〉</strong>で瀕死ボス10%処刑。</td>
+          <td><strong>会心A</strong>（勝率42.6%・蹂躙21.2%の最強タッグ！高会心＋連刃＋急所）<br><strong>毒B</strong>（開幕5T暗殺タイムが〈疾手〉5Tと完全同期・蹂躙23.3%！）<br><strong>出血A・臨界A</strong>（連刃の追加ヒットで3撃条件を即達成）</td>
+          <td>基礎防御が <code>[0,0]</code> のため、<strong>山札B・シールドB</strong>のような長期受け回し型とは相性が悪い（被弾負けしやすい）。</td>
+        </tr>
+        <tr>
+          <td><strong>盾（ナイト）</strong><br>${richText("[[鉄盾]] → [[聖騎士の盾]] → [[ドーンブリンガー]]")}</td>
+          <td>最高基礎防御 <code>[3,4]〜[8,9]</code>。<strong>〈城壁〉</strong>余りブロックの60/90/120%をシールド変換（ジャストなら+8/+12/+16）。T3<strong>〈シールドバッシュ〉</strong>防御なし攻撃Tにシールドを攻撃へ変換。T4<strong>〈黎明〉</strong>完封で敵最大HP削り。</td>
+          <td><strong>シールドA / B</strong>（城壁で毎T自動シールド供給＆ジャストボーナス重複）<br><strong>山札A / B</strong>（Knight勝率36〜38%！高基礎防御でカード構築の隙を完全カバー）<br><strong>充電B・毒A</strong>（耐久して大技を溜める軸全般）</td>
+          <td>基礎会心率が <code>5%</code> と最低のため、<strong>会心B（集中）</strong>を序盤から無理に狙うと賭け金負けしやすい。</td>
+        </tr>
+        <tr>
+          <td><strong>独立伝説：竜閃</strong><br>${richText("[[竜閃]]")}</td>
+          <td><strong>会心率 100%</strong>・貫通99。<strong>〈画竜点睛〉</strong>攻撃1枚だけに最大出目を挿すと最終+100%（ダイス最大値なら+200%＆ボス目盛り破壊）。<strong>〈無我無心〉</strong>攻撃1枚だけのとき他カードの出目も攻撃に加算（2枚以上だと武器攻撃0）。</td>
+          <td><strong>会心B〈集中〉</strong>（「攻撃1枚だけ発動」の条件が100%一致し、確定会心で賭け金リスクすら踏み倒す究極ロマン砲）<br><strong>充電B</strong>（オーバークロックの「最初の1撃+100%」と完全一致）</td>
+          <td>攻撃を2枚以上並べる多段系（出血A・会心A・充電A）とは排他。見かけたら1撃特化へ舵を切る象徴武器。</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>`;
+}
+
+function renderBranchCol(br, letter) {
+  const cls = letter === 'A' ? 'br-a' : 'br-b';
+  const tagCls = letter === 'A' ? 'br-tag-a' : 'br-tag-b';
+  const nodesHtml = br.nodes.map((nd, idx) => {
+    const nodeCls = nd.kind === 'loop' ? 'flow-node loop-node'
+                  : nd.kind === 'finisher' ? 'flow-node finisher-node'
+                  : 'flow-node';
+    const rightBadge = nd.kind === 'loop' ? '<span>🔄 コアループ</span>'
+                     : nd.kind === 'finisher' ? '<span>💥 FINISHER</span>' : '';
+    const arrow = idx < br.nodes.length - 1
+      ? `<div class="flow-arrow ${nd.kind === 'loop' ? 'loop-back' : ''}">${nd.loopLabel ? esc(nd.loopLabel) + ' ／ ↓' : '▼'}</div>`
+      : (nd.loopLabel ? `<div class="flow-arrow loop-back">${esc(nd.loopLabel)}</div>` : '');
+    return `
+      <div class="${nodeCls}">
+        <div class="flow-step-hdr"><span>${esc(nd.step)}</span>${rightBadge}</div>
+        <div class="flow-desc">${richText(nd.text)}</div>
+      </div>
+      ${arrow}`;
+  }).join('');
+
+  return `
+    <div class="branch-col ${cls}">
+      <div class="br-head">
+        <div>
+          <span class="${tagCls}">分岐 ${letter}</span>
+          <span class="br-name">〈${esc(br.name)}〉</span>
+        </div>
+        <span class="br-archetype">${esc(br.archetype)}</span>
+      </div>
+      <div class="flow-stack">${nodesHtml}</div>
+      <div class="combo-example">
+        <div class="combo-example-title">⚡ ${esc(br.exampleTitle)}</div>
+        <div>${richText(br.exampleText)}</div>
+        <pre class="combo-math" style="white-space:pre-wrap;margin:6px 0 0;">${esc(br.exampleMath)}</pre>
+      </div>
+      <div class="matchup-note"><strong>運用・相性：</strong>${esc(br.matchup)}</div>
+    </div>`;
+}
+
+function renderAxisCatalog(axisName) {
+  const rarRank = { BRONZE: 0, SILVER: 1, GOLD: 2, LEGENDARY: 3 };
+  const belong = RAW_ITEMS.filter(it => it.category === 'Passive' && it.axis === axisName)
+    .sort((a, b) => (rarRank[a.rarity] ?? 9) - (rarRank[b.rarity] ?? 9) || a.name.localeCompare(b.name, 'ja'));
+  const groups = [
+    { label: `分岐 A 専用秘宝`, list: belong.filter(x => x.branch === 'A') },
+    { label: `分岐 B 専用秘宝`, list: belong.filter(x => x.branch === 'B') },
+    { label: `軸共通エンジン秘宝`, list: belong.filter(x => !x.branch) }
+  ];
+
+  const renderGroup = g => `
+    <div class="cat-subhead">${esc(g.label)}（${g.list.length}品）</div>
+    <div class="relic-grid">
+      ${g.list.map(it => `
+        <div class="relic-card" data-rar="${esc(it.rarity)}">
+          <div class="relic-icon-box">
+            <img src="${iconPath(it)}" alt="" onerror="this.style.display='none'">
+          </div>
+          <div class="relic-body">
+            <div class="relic-title">
+              <span>${esc(it.name)}</span>
+              ${UPDATED_ITEMS.has(it.name) ? '<span class="new-badge">★更新</span>' : ''}
+              <span class="relic-rar">${esc(it.rarity)} · ${it.basePrice || 0}G</span>
+            </div>
+            <div class="relic-desc">${esc(it.description)}</div>
+          </div>
+        </div>
+      `).join('')}
+    </div>`;
+
+  return `
+    <details class="catalog-details">
+      <summary>📦 ${esc(axisName)}軸の所属秘宝 全 ${belong.length} 品を表示（A: ${groups[0].list.length} / B: ${groups[1].list.length} / 共通: ${groups[2].list.length}）</summary>
+      ${groups.map(renderGroup).join('')}
+    </details>`;
+}
+
+function renderAxisSection(sec) {
+  const belong = RAW_ITEMS.filter(it => it.category === 'Passive' && it.axis === sec.axis);
+  const cntA = belong.filter(x => x.branch === 'A').length;
+  const cntB = belong.filter(x => x.branch === 'B').length;
+  const cntS = belong.filter(x => !x.branch).length;
+
+  return `
+  <section id="${sec.id}" class="section-card axis-section">
+    <div class="axis-header">
+      <div>
+        <h2 class="axis-title">${esc(sec.navTitle)} <span class="axis-badge">${esc(sec.subtitle)}</span></h2>
+      </div>
+      <span class="axis-count">全 ${belong.length} 品（分岐A:${cntA} / 分岐B:${cntB} / 共通:${cntS}）</span>
+    </div>
+
+    <div class="rule-grid">
+      <div class="info-box">
+        <h4>基本メカニクス・計算式</h4>
+        <ul class="formula-list">
+          ${sec.coreFormulas.map(f => `<li>${richText(f)}</li>`).join('')}
+        </ul>
+      </div>
+      <div class="info-box">
+        <h4>軸専用 端子カード（ロック連動出現）</h4>
+        ${sec.terminals.map(t => `
+          <div class="term-card">
+            <strong>〈${esc(t.name)}〉</strong>：${esc(t.normal)}
+            <span class="term-up">${esc(t.up)}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <div class="shared-strip">
+      <div class="shared-strip-title">⚙️ 両分岐を支える共通エンジン（B / S / G / L 共通枠 ${cntS} 品）</div>
+      <div class="pipeline-stages">
+        ${sec.sharedStages.map(st => `
+          <div class="pipe-stage">
+            <span class="pipe-stage-label">${esc(st.label)}</span>
+            <div class="pipe-stage-body">${richText(st.text)}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <div class="ab-grid">
+      ${renderBranchCol(sec.branchA, 'A')}
+      ${renderBranchCol(sec.branchB, 'B')}
+    </div>
+
+    ${renderAxisCatalog(sec.axis)}
+  </section>`;
+}
+
+// Navigation & View Mode
+let viewMode = 'all';
+let activeSecId = 'overview';
+
+function renderAll() {
+  const nav = document.getElementById('nav-list');
+  nav.innerHTML = SECTIONS.map(s => `
+    <li>
+      <a href="#${s.id}" class="nav-link ${s.id === activeSecId ? 'active' : ''}" onclick="onNavClick(event, '${s.id}')">
+        <span>${esc(s.navTitle)}</span>
+        <span class="nav-sub">${esc(s.navSub)}</span>
+      </a>
+    </li>
+  `).join('');
+
+  const main = document.getElementById('main-content');
+  const list = viewMode === 'single' ? SECTIONS.filter(s => s.id === activeSecId) : SECTIONS;
+  main.innerHTML = list.map(s => s.isOverview ? renderOverview() : s.isWeapons ? renderWeapons() : renderAxisSection(s)).join('');
+}
+
+function setViewMode(m) {
+  viewMode = m;
+  document.getElementById('mode-all').classList.toggle('active', m === 'all');
+  document.getElementById('mode-single').classList.toggle('active', m === 'single');
+  renderAll();
+}
+
+function onNavClick(e, id) {
+  activeSecId = id;
+  if (viewMode === 'single') {
+    e.preventDefault();
+    renderAll();
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  } else {
+    document.querySelectorAll('.nav-link').forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + id));
+  }
+}
+
+function toggleTheme() {
+  const cur = document.documentElement.dataset.theme;
+  const isDark = cur ? cur === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+  document.documentElement.dataset.theme = isDark ? 'light' : 'dark';
+}
+
+let allOpen = false;
+function toggleAllCatalogs() {
+  allOpen = !allOpen;
+  document.querySelectorAll('details.catalog-details').forEach(d => d.open = allOpen);
+}
+
+// Floating Tooltip for .item-pill
+const tt = document.getElementById('tooltip');
+document.addEventListener('mouseover', e => {
+  const pill = e.target.closest('.item-pill');
+  if (!pill) { tt.style.display = 'none'; return; }
+  const it = ITEM_MAP[pill.dataset.item];
+  if (!it) return;
+  const br = it.branch ? ` ／ 分岐 ${it.branch}` : (it.axis ? ' ／ 軸共通' : '');
+  const imgHtml = `<img src="${iconPath(it)}" onerror="this.style.display='none'">`;
+  tt.innerHTML = `
+    <div class="tt-head">${imgHtml}<span>${esc(it.name)}</span></div>
+    <div class="tt-meta">${esc(it.category)} · ${esc(it.rarity || '')}${it.axis ? ' · ' + esc(it.axis) + esc(br) : ''}</div>
+    <div>${esc(it.description || '')}</div>
+  `;
+  tt.style.display = 'block';
+});
+document.addEventListener('mousemove', e => {
+  if (tt.style.display !== 'block') return;
+  const x = Math.min(window.innerWidth - 360, e.clientX + 14);
+  const y = Math.min(window.innerHeight - 160, e.clientY + 14);
+  tt.style.left = Math.max(8, x) + 'px';
+  tt.style.top = Math.max(8, y) + 'px';
+});
+
+renderAll();
+</script>
+</body>
+</html>

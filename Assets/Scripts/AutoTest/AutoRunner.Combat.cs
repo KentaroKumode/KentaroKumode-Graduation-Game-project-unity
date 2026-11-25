@@ -684,7 +684,7 @@ namespace AutoTest
             if (s.whiteBlade) { mulAdd += ItemSystem.PassiveSkills.Effects.WhiteBladeMirror.MulPerRenki * (s.renki + 1 - spent); mulPlain += ItemSystem.PassiveSkills.Effects.WhiteBladeMirror.MulPerRenki * (s.renki + 1); }
             bool focusNoDef = focus && s.heaven;                                                                   // 〈白濁の義眼〉: 集中会心は防御を全部無視
             bool suntetsuNoDef = s.critDouble && s.renki + 1 >= ItemSystem.PassiveSkills.Effects.Suntetsu.IgnoreRenki;   // 〈寸鉄〉: 練気 3 以上の会心は防御を全部無視
-            float critMulEff = CombatSystem.CritCore.EffectiveMul(s.critMulBase + mulAdd, s.critRed, add, s.critDouble);
+            float critMulEff = CombatSystem.CritCore.EffectiveMul(s.critMulBase + mulAdd, s.critRed, add, s.critDouble, focus);
             float sniperMul = CombatSystem.CritCore.EffectiveMul(s.critMulBase + mulPlain + CombatSystem.CritCore.SniperMulAdd(spent), s.critRed, addPlain, s.critDouble);
             float ironOut = s.ironClub ? System.Math.Min(1f, add) : 0f;
             bool pinpoint = s.pinpointCut, vital = s.vitalIgnore, down = DownTakesMul(s.enemyDown, s.enemyDownWeak);   // よろめき (2026-11-14) は ×1.5 なし (〈骨溶かしの黒油〉は有り)
@@ -697,6 +697,7 @@ namespace AutoTest
                 {
                     if (nonCritMul > 0f) d = (int)(d * (1f + nonCritMul));
                     if (pinpoint) d = d * ItemSystem.PassiveSkills.Effects.PinpointEye.NonCritKeepPct / 100;
+                    if (focus && fz) d = d * CombatSystem.CritCore.FocusMissKeepPct / 100;
                 }
                 float om = crit ? outMul : outMul + ironOut;   // 〈銑鉄棍〉: 会心しなかった撃だけ池へ足す
                 if (om > 0f && System.Math.Abs(om - 1f) > 0.001f) d = Mathf.CeilToInt(d * om);
@@ -715,6 +716,7 @@ namespace AutoTest
                 return d;
             }
             float p = s.critOff ? 0f : force || s.critOn ? 1f : ItemSystem.PassiveSkills.CombatContext.ResolveCritRate(add);
+            if (focus && !force && !s.critOn && p > CombatSystem.CritCore.FocusMaxRate) p = CombatSystem.CritCore.FocusMaxRate;
             float v = p >= 1f ? D(true, critMulEff) : p <= 0f ? D(false, critMulEff) : p * D(true, critMulEff) + (1f - p) * D(false, critMulEff);
             //   【練気】の将来の価値 (answer9): 会心の秘宝を持つ時、 会心 1 回 (= 練気 +1) を与ダメ RenkiFutureDmg 相当に数える
             if (s.critRelics > 0) v += p * RenkiFutureDmg;
@@ -807,7 +809,8 @@ namespace AutoTest
             st.nonCritMul = ctx.nonCritOutgoingMultiplier;
             st.pinpointCut = ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.PinpointEye.NonCritCutKey) > 0f;
             st.outMul = OutgoingPoolNow(ctx, run);
-            st.finalPct = ctx.finalDamagePct + (ctx.painkillerProcced ? GameLoop.Consumables.PainkillerFinalPct : 0);   // 〈痛覚遮断剤〉の発動ターン: 本体は撃ごとに hitFinalDamagePct へ足す
+            st.finalPct = ctx.finalDamagePct + (ctx.painkillerProcced ? GameLoop.Consumables.PainkillerFinalPct : 0)
+                        + ItemSystem.PassiveSkills.Effects.BloodEdict.BurstForecast(ctx);   // 〈痛覚遮断剤〉・〈血令〉の発動ターン
             st.guardEcho = bladeDance;   // 〈防人の軍標〉の「もう 1 回」は 2026-11-25 に撤去
             st.critPen = ctx.critArmorPen;
             st.vitalIgnore = bladeDance || ItemSystem.PassiveSkills.Effects.VitalStrike.IgnoresDefense(ctx);   // 剣舞譜は会心確定なので「会心は防御を無視」と同じ見込み
@@ -1098,11 +1101,16 @@ namespace AutoTest
                 hit2Raw = System.Math.Max(0, enemyAtk - block);   // 2 回目には通った時の上乗せが乗らない (本体: 2 回目の ProcessDamage は OnPreDealDamage を鳴らさない)
             }
             if (ws.takenMul < 1f && !tele.enemyAttackIgnoresGuard) taken = Mathf.RoundToInt(taken * ws.takenMul);
-            //   〈死相の面頬〉(2026-11-23): 会心したターンの敵の攻撃を 練気 ÷ (練気 + 12) 減らす (大技は練気 2 倍)。 このターンに 1 回でも会心する確率で重み付け (本体 ApplyLossDamageModifiers)
+            //   〈死相の面頬〉(2026-11-23): 会心したターンの敵の攻撃を減らす (上限 45% / 大技 55%)
             if (s.mask && taken > 0 && ws.aHits > 0 && !tele.enemyAttackIgnoresGuard)
             {
                 float pAny = 1f - (float)System.Math.Pow(1f - s.critP, ws.aHits);
                 taken = Mathf.RoundToInt(taken * (1f - pAny * ItemSystem.PassiveSkills.Effects.DeathMaskVisor.Cut(s.renki + 1, tele.turnsToHeavy == 0)));
+            }
+            if (ws.aHits == 1 && s.focusCount >= CombatSystem.CritCore.FocusNeedCount && taken > 0 && !tele.enemyAttackIgnoresGuard)
+            {
+                float pFoc = System.Math.Min(CombatSystem.CritCore.FocusMaxRate, s.critP);
+                taken += Mathf.RoundToInt(taken * (1f - pFoc) * CombatSystem.CritCore.FocusMissTakenBonus);
             }
             taken += (int)reflectPenalty;
             // 【ジャスト防御】の見込み (本体 ShieldCore.IsJustGuard・許容幅は既定・HP の減り 0)。 盾〈黎明〉〈城壁〉が読む

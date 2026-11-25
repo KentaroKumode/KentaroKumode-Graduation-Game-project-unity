@@ -264,30 +264,52 @@ namespace ItemSystem.PassiveSkills.Effects
 
     // ── G: 分岐 ──
 
-    /// <summary>過負荷チューナー: 過充電 (充電 10 以上) の間、 充電を消費する行動 (振り直し・再起動・端子・秘宝) の消費量 −2 (最低 1)。
-    /// 減らすのは ChargeCore.CostNow を通す所 (振り直し = CombatManager.RerollCostNow・端子と再起動 = TerminalEnv.chargeCostCut)。</summary>
+    /// <summary>過負荷チューナー (2026-11-26 還流型へ変更): 過充電 (充電 10 以上) の間、 充電を 3 以上消費する行動を行うたび、 直後に充電 +2 を得る (1 ターン最大 3 回)。
+    /// 支払い前の充電は ctx.LastChargeBeforeSpend を読む。 端子の解決の見込み (TerminalCards.Resolve) も同じ条件で還流を反映する。</summary>
     public class OverloadTuner : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "過負荷チューナー";
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.IsOvercharged());
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.overloadChargeCut = true;
+        public const string TurnCountKey = "chg.tuner.n";
+        public static int UsedThisTurn(CombatContext ctx) => ctx == null ? 0 : Chg.TurnN(ctx, TurnCountKey);
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(ChargeCore.TunerMaxPerTurn - UsedThisTurn(ctx));
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnChargeSpend };
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
+        {
+            if (t == PassiveSkillTrigger.OnBattleStart) { ctx.overloadChargeCut = true; return; }
+            int used = UsedThisTurn(ctx);
+            if (used >= ChargeCore.TunerMaxPerTurn) return;
+            if (ctx.LastChargeBeforeSpend < ChargeCore.OverchargeAt || Kw.EventAmount(ctx) < ChargeCore.TunerMinSpend) return;
+            Chg.SetTurnN(ctx, TurnCountKey, used + 1);
+            ctx.AddCharge(ChargeCore.TunerRefund);
+        }
     }
 
-    /// <summary>焦げ導線: 充電を消費するたび、 消費した量 × 3 の防御無視ダメージを敵に与える (1 ターン最大 45)。</summary>
+    /// <summary>焦げ導線 (2026-11-26 再起動連動解放): 充電を消費するたび、 消費した量 × 3 の防御無視ダメージを敵に与える (基本 1 ターン最大 45)。
+    /// このターン【再起動】が発動するたび、 このターンの上限 +20・追加で 12 の防御無視ダメージを与える (充電Bや他軸では上限 45 のまま)。</summary>
     public class ScorchedWire : IPassiveSkillEffect
     {
         public string SkillId => "焦げ導線";
-        public const int Mul = 3, MaxPerTurn = 45;
+        public const int Mul = 3, MaxPerTurn = 45, RebootCapAdd = 20, RebootZap = 12;
+        public const string HeldKey = "chg.scorch.held";
         private const string Key = "chg.scorch";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnChargeSpend };
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnChargeSpend };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
+            if (t == PassiveSkillTrigger.OnBattleStart) { ctx.accumulatedValues[HeldKey] = 1f; return; }
+            int rebootsTurn = (int)ctx.GetAccumulated(ChargeCore.RebootsTurnNumKey) == ctx.currentTurn
+                ? (int)ctx.GetAccumulated(ChargeCore.RebootsTurnKey) : 0;
+            int cap = MaxPerTurn + RebootCapAdd * rebootsTurn;
             int done = Chg.TurnN(ctx, Key);
-            int dmg = System.Math.Min(MaxPerTurn - done, Kw.EventAmount(ctx) * Mul);
+            int dmg = System.Math.Min(cap - done, Kw.EventAmount(ctx) * Mul);
             if (dmg <= 0 || ctx.enemyCurrentHP <= 0) return;
             Chg.SetTurnN(ctx, Key, done + dmg);
             Kw.DamageEnemy(ctx, dmg);
+        }
+
+        public static void OnReboot(CombatContext ctx, int count)
+        {
+            if (ctx == null || count <= 0 || ctx.GetAccumulated(HeldKey) <= 0f || ctx.enemyCurrentHP <= 0) return;
+            Kw.DamageEnemy(ctx, RebootZap * count);
         }
     }
 
@@ -348,19 +370,29 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>溜め撃ちの誘導コイル: この戦闘で充電を消費した回数を数え、 3 回ごとに「今の充電 × 3」の防御無視ダメージと、 次の 1 撃の最終与ダメージ +50% (1 ターン最大 2 回)。</summary>
+    /// <summary>溜め撃ちの誘導コイル (2026-11-26 再起動累計型へ変更): この戦闘で充電を消費した回数を数え、 3 回ごとに「20 + この戦闘の【再起動】累計回数 × 12」(最大 140) の防御無視ダメージと、
+    /// このターンの【再起動】の撃すべてと次の 1 撃の最終与ダメージ +50% (1 ターン最大 2 回)。</summary>
     public class FourthStrikeCore : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "溜め撃ちの誘導コイル";
-        public const int Every = 3, ChargeMul = 3, NextPct = 50, MaxPerTurn = 2;
-        private const string CountKey = "chg.four", PendingKey = "chg.four.next", TurnKey = "chg.four.turn";
+        public const int Every = 3, BaseDmg = 20, PerRebootDmg = 12, MaxDmg = 140, NextPct = 50, MaxPerTurn = 2;
+        public const string CountKey = "chg.four";
+        private const string PendingKey = "chg.four.next", TurnKey = "chg.four.turn";
+        public static int DamageFor(int rebootsBattle) => System.Math.Min(MaxDmg, BaseDmg + PerRebootDmg * System.Math.Max(0, rebootsBattle));
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Rw.Count(ctx, CountKey) % Every);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnChargeSpend, PassiveSkillTrigger.OnPreDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (t == PassiveSkillTrigger.OnPreDealDamage)
             {
-                if (Rw.Count(ctx, PendingKey) <= 0 || !Chg.RealHit(ctx)) return;
+                if (!Chg.RealHit(ctx)) return;
+                if (ctx.isRebootHit)
+                {
+                    int firedTurn = Chg.TurnN(ctx, TurnKey);
+                    if (firedTurn > 0) ctx.hitFinalDamagePct += NextPct * firedTurn;
+                    return;
+                }
+                if (Rw.Count(ctx, PendingKey) <= 0) return;
                 ctx.accumulatedValues[PendingKey] = Rw.Count(ctx, PendingKey) - 1;
                 ctx.hitFinalDamagePct += NextPct;
                 return;
@@ -371,10 +403,11 @@ namespace ItemSystem.PassiveSkills.Effects
             int done = Chg.TurnN(ctx, TurnKey);
             if (done >= MaxPerTurn) return;
             Chg.SetTurnN(ctx, TurnKey, done + 1);
-            int dmg = ctx.GetCharge() * ChargeMul;
+            int reboots = (int)ctx.GetAccumulated(ChargeCore.RebootsBattleKey);
+            int dmg = DamageFor(reboots);
             if (dmg > 0 && ctx.enemyCurrentHP > 0) Kw.DamageEnemy(ctx, dmg);
             Kw.Add(ctx, PendingKey, 1);
-            Rw.Log($"[溜め撃ちの誘導コイル] 充電を使った {c} 回目 → 充電 {ctx.GetCharge()} × 3 = {dmg} (防御無視)・次の 1 撃 +50%");
+            Rw.Log($"[溜め撃ちの誘導コイル] 充電を使った {c} 回目 (再起動累計 {reboots}) → {dmg} (防御無視)・再起動撃と次の 1 撃 +50%");
         }
     }
 

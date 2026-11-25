@@ -344,6 +344,14 @@ namespace CombatSystem
                 if (Debug.unityLogger.logEnabled) Debug.Log($"[CombatManager] 亡者の招待: 被ダメ+{bonusDmg} (合計{totalDmg})");
             }
 
+            // 【集中】失敗の隙 (2026-11-26 パチンコ化): このターン【集中】を外していたら被ダメ +25%
+            if ((int)ctx.GetAccumulated(CritCore.FocusMissVulnTurnKey) == ctx.currentTurn && totalDmg > 0)
+            {
+                int vulnDmg = Mathf.CeilToInt(totalDmg * CritCore.FocusMissTakenBonus);
+                totalDmg += vulnDmg;
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[集中失敗] 隙を晒して被ダメ+{vulnDmg} (合計{totalDmg})");
+            }
+
             // 共助: 1ターン目のメインダメージ半減
             if (ctx.halveFirstEnemyAttack && ctx.currentTurn == 1)
             {

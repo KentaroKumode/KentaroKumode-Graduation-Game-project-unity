@@ -149,7 +149,16 @@
   .card .rarity-bar {
     position: absolute; left: 0; top: 0; bottom: 0; width: 3px; border-radius: 6px 0 0 6px;
   }
-  .card .head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .card .head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .card .head-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .card .icon-box {
+    width: 40px; height: 40px; flex-shrink: 0; border-radius: 5px;
+    background: #2a2218; border: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .card .icon-box img {
+    width: 32px; height: 32px; image-rendering: pixelated; image-rendering: crisp-edges; display: block;
+  }
   .card .name { font-weight: 700; font-size: 15px; color: var(--ink); }
   .card .price { color: var(--ink-3); font-size: 11px; font-variant-numeric: tabular-nums; }
   .card .subline { font-size: 11px; color: var(--ink-3); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
@@ -673,11 +682,15 @@
         stats.push(`<span>面 <b>[${r.diceFaces.join(',')}]</b></span>`);
     if (r.attackPower) stats.push(`<span>攻 <b>${r.attackPower}</b></span>`);
     if (r.critRatePct) stats.push(`<span>会心 <b>${r.critRatePct}%</b></span>`);
+    const iconSrc = `../../Assets/Resources/Icons/Items/${encodeURIComponent(r.name || r.id)}.png`;
     return `
       <div class="card r-${esc(r.rarity)}">
         <div class="rarity-bar"></div>
         <div class="head">
-          <div class="name">${esc(r.name||r.id)}</div>
+          <div class="head-left">
+            <div class="icon-box"><img src="${iconSrc}" alt="" loading="lazy" onerror="this.parentElement.style.display='none'"></div>
+            <div class="name">${esc(r.name||r.id)}</div>
+          </div>
           <div class="price">${r.basePrice ? r.basePrice + 'G' : ''}</div>
         </div>
         <div class="subline">

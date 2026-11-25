@@ -15,25 +15,27 @@ namespace CombatSystem
     /// </summary>
     public static class CritCore
     {
-        /// <summary>超過会心率 1 (= 100%) あたりの会心倍率 (1% につき +0.015・answer9: 旧 +0.01) / 〈寸鉄〉の倍。</summary>
-        public const float ExcessPerRate = 1.5f, SuntetsuExcessMul = 2f;
-        /// <summary>【練気】1 つあたりの、 会心した撃の会心倍率 (answer9 案 A)。</summary>
+        /// <summary>超過会心率 1 (= 100%) あたりの会心倍率 (1% につき +0.015・answer9: 旧 +0.01) / 〈寸鉄〉の倍 (2026-11-26 安定化: 2.0 → 1.5)。</summary>
+        public const float ExcessPerRate = 1.5f, SuntetsuExcessMul = 1.5f;
+        /// <summary>【練気】1 つあたりの、 会心した撃の会心倍率 / 【練気】の上限 (2026-11-26: 無制限 → 10)。</summary>
         public const float RenkiMulPer = 0.06f;
+        public const int RenkiCap = 10;
 
-        /// <summary>超過会心率で足す会心倍率 (<paramref name="critAdd"/> = 合算した会心率・1 = 100%)。</summary>
-        public static float ExcessMul(float critAdd, bool suntetsu)
+        /// <summary>超過会心率で足す会心倍率 (<paramref name="critAdd"/> = 合算した会心率・通常は 1 = 100%、 【集中】は上限 0.80 を超えた分も倍率に変換)。</summary>
+        public static float ExcessMul(float critAdd, bool suntetsu, bool focused = false)
         {
-            if (critAdd <= 1f) return 0f;
-            float m = (critAdd - 1f) * ExcessPerRate * (suntetsu ? SuntetsuExcessMul : 1f);
+            float cap = focused ? FocusMaxRate : 1f;
+            if (critAdd <= cap) return 0f;
+            float m = (critAdd - cap) * ExcessPerRate * (suntetsu ? SuntetsuExcessMul : 1f);
             return CardRules.CritExcessPct > 0 ? m * (100 + CardRules.CritExcessPct) / 100f : m;   // 挑戦カード〈急所読み〉III: 変換 +25%
         }
 
         /// <summary>会心した撃に実際に掛かる会心倍率。 順: 敵の会心耐性 (下限 1.0) → 超過会心率の変換。</summary>
-        public static float EffectiveMul(float critMul, float enemyReduction, float critAdd, bool suntetsu)
+        public static float EffectiveMul(float critMul, float enemyReduction, float critAdd, bool suntetsu, bool focused = false)
         {
             float m = critMul;
             if (enemyReduction > 0f) m = System.Math.Max(1f, m - enemyReduction);
-            m += ExcessMul(critAdd, suntetsu);
+            m += ExcessMul(critAdd, suntetsu, focused);
             return m;
         }
 
@@ -54,9 +56,13 @@ namespace CombatSystem
 
         // ---- 【集中】(2026-11-23) ----
 
-        /// <summary>集中の品の数の入口 / 集中の会心率の下限 / 基礎の賭け金。</summary>
+        /// <summary>集中の品の数の入口 / 集中の会心率の下限・上限 (2026-11-26 パチンコ化: 最大 80%) / 基礎の賭け金・最低賭け金下限 (25%)。</summary>
         public const int FocusNeedCount = 3;
-        public const float FocusMinRate = 0.01f, FocusBaseCost = 0.25f;
+        public const float FocusMinRate = 0.01f, FocusMaxRate = 0.80f, FocusBaseCost = 0.25f, FocusMinWager = 0.25f;
+        /// <summary>【集中】が外れた時のペナルティ (2026-11-26 パチンコ化): その撃の与ダメ 70% (−30%)・そのターンの被ダメージ +25%。</summary>
+        public const int FocusMissKeepPct = 70;
+        public const float FocusMissTakenBonus = 0.25f;
+        public const string FocusMissVulnTurnKey = "crit.focusMissTurn";
         /// <summary>集中の品の賭け金 (レア度ごと: BRONZE 0・SILVER 0・GOLD 18%・LEGENDARY 24%・answer10)。</summary>
         public const float FocusCostB = 0f, FocusCostS = 0f, FocusCostG = 0.18f, FocusCostL = 0.24f;
         /// <summary>集中の品の相殺 (会心の秘宝 1 つにつき賭け金から引く・GOLD 2%・LEGENDARY 3%・answer10)。</summary>
@@ -109,11 +115,11 @@ namespace CombatSystem
         /// <summary>持っている会心の軸の秘宝の数 (items.json の axis・〈昇華〉の品も所持の一覧に入る)。</summary>
         public static int CritRelicCount(GameLoop.RunState run) => ItemSystem.PassiveSkills.AxisRules.Count(run, ItemSystem.PassiveSkills.AxisRules.Crit);
 
-        /// <summary>集中の賭け金 (会心率から引く・小数・answer10): max(0, 基礎 25% ＋ 品の賭け金の合計 − 品の相殺の合計 × 会心の秘宝の数)。 0 で止まる (会心率の加点にはしない)。</summary>
+        /// <summary>集中の賭け金 (会心率から引く・小数・2026-11-26 パチンコ化): 相殺しても最低 25% (<see cref="FocusMinWager"/>) は必ず残る。</summary>
         public static float FocusCost(FocusItems f, int critRelicCount)
         {
             float pool = FocusBaseCost + RawFocusItemCost(f) - RawFocusOffsetPerRelic(f) * critRelicCount;
-            return pool > 0f ? pool : 0f;
+            return pool > FocusMinWager ? pool : FocusMinWager;
         }
 
         /// <summary>集中の撃の会心率。 集中にならない時は −1 (入口: 集中の品 3 つ以上・攻撃の端子 1 枚の撃・照準器のもう 1 回でない・集中の会心率 1% 以上)。
@@ -128,8 +134,8 @@ namespace CombatSystem
         /// <summary>集中会心で使う【練気】(+1 した後の値の半分・切り上げ)。</summary>
         public static int RenkiSpend(int renkiAfterGain) => renkiAfterGain <= 0 ? 0 : (renkiAfterGain + 1) / 2;
 
-        /// <summary>〈必殺の照準器〉: もう 1 回発火した撃の会心倍率の上乗せ = 0.80 ＋ 元の集中会心で使った【練気】× 0.30 (answer9・旧 0.50 / 0.25)。</summary>
-        public const float SniperMulBase = 0.80f, SniperMulPerRenki = 0.30f;
+        /// <summary>〈必殺の照準器〉(2026-11-26 パチンコ強化): もう 1 回発火した撃の会心倍率の上乗せ = 1.20 ＋ 元の集中会心で使った【練気】× 0.40。</summary>
+        public const float SniperMulBase = 1.20f, SniperMulPerRenki = 0.40f;
         public static float SniperMulAdd(int spent) => SniperMulBase + SniperMulPerRenki * spent;
     }
 }

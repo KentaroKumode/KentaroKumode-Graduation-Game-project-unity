@@ -137,12 +137,39 @@ namespace AutoTest
             }
             // 〈無害灯〉: 敵の直接攻撃で失う HP を無効 (1 ターン 1 回・使う臨界と返すダメージは見ない)
             if (sg.lamp) ws.takenMul = 0f;
-            // 〈蓋付きの毒指輪〉の【起爆】(毒の BOT の規則・2026-11-21): 配線の後の毒 (端子の毒を足す) が 24 以上で攻撃の撃があれば、 起爆のダメージを軽減不可の分に足す
-            //   (撃が当たるかは見ない・王冠の 1.5 倍は見ない)。 毒を 24 へ押し上げて殴る挿し方が選ばれる
+            // 〈蓋付きの毒指輪〉の【起爆】(毒の BOT の規則・2026-11-26): 配線の後の毒が 20 以上で攻撃の撃があれば、 起爆のダメージを軽減不可の分に足す
             if (sg.ring && o.attackHits.Count > 0)
             {
-                int pz = env.enemyPoison + o.poison;
-                if (pz >= PoisonCore.RingNeed) ws.extraDmg += PoisonCore.Damage(PoisonCore.Spend(pz), sg.poisonItems, sg.detonates, s.enemyDown, sg.enemyMaxHp);
+                int ringAdd = o.poison > 0 && sg.turn <= PoisonCore.RingAssassinTurns ? PoisonCore.RingBonusPoison : 0;
+                int pz = env.enemyPoison + o.poison + ringAdd;
+                if (pz >= PoisonCore.RingNeed) ws.extraDmg += PoisonCore.Damage(PoisonCore.Spend(pz), sg.poisonItems, sg.detonates, s.enemyDown, sg.enemyMaxHp, 100, sg.turn);
+            }
+            // 〈灼線鞭〉〈焦げ導線〉〈溜め撃ちの誘導コイル〉(2026-11-26 再起動連動強化)
+            if ((sg.chargeItems & ChargeItems.Whip) != 0 && o.attackHits.Count > 0 && o.rebooted.Count > 0)
+            {
+                int rebHits = 0;
+                for (int h = 0; h < o.attackHitDice.Count; h++) if (o.attackHitDice[h] == 0) rebHits++;
+                if (rebHits > 0) sightFlat += rebHits * (ChargeCore.WhipFinalPct(o.rebooted.Count) / 100f) * DeckPerTurnDamage(in s, k) / o.attackHits.Count;
+            }
+            if (sg.scorchedWire && o.rebooted.Count > 0)
+                ws.extraDmg += o.rebooted.Count * ItemSystem.PassiveSkills.Effects.ScorchedWire.RebootZap;
+            if (sg.fourthCoil && o.chargePays.Count > 0)
+            {
+                int trig = Math.Min(ItemSystem.PassiveSkills.Effects.FourthStrikeCore.MaxPerTurn,
+                    (sg.fourthCount + o.chargePays.Count) / ItemSystem.PassiveSkills.Effects.FourthStrikeCore.Every
+                    - sg.fourthCount / ItemSystem.PassiveSkills.Effects.FourthStrikeCore.Every);
+                if (trig > 0)
+                {
+                    ws.extraDmg += trig * ItemSystem.PassiveSkills.Effects.FourthStrikeCore.DamageFor(sg.rebootsBattle + o.rebooted.Count);
+                    if (o.attackHits.Count > 0)
+                    {
+                        int rebHits = 0;
+                        for (int h = 0; h < o.attackHitDice.Count; h++) if (o.attackHitDice[h] == 0) rebHits++;
+                        float perHit = DeckPerTurnDamage(in s, k) / o.attackHits.Count;
+                        sightFlat += (rebHits * trig + Math.Min(trig, o.attackHits.Count - rebHits))
+                            * (ItemSystem.PassiveSkills.Effects.FourthStrikeCore.NextPct / 100f) * perHit;
+                    }
+                }
             }
             // 出血の BOT の規則 (2026-11-21): 撃を順に追い、 撃の前の出血 (配線の時点 + それより前の撃の出血) で〈血の楔〉+40%・〈血桜〉(2 撃目から・出血 2 を使う) の撃の最終与ダメを、
             //   撃の後の出血で〈紅の搾り具〉(15 以上・1/3 を使う × 8・1 ターン 1 回) を足す。 〈涸れぬ血晶〉の倍は本体と同じ BleedCore.CrystalGain。
@@ -287,7 +314,7 @@ namespace AutoTest
                 {
                     if (sg.secondStrike && (hot || sg.burstLastTurn)) sightFlat += ItemSystem.PassiveSkills.Effects.SecondStrike.Atk * o.attackHits.Count;
                     if (sg.fierceBlade && hot)
-                        sightFlat += ItemSystem.PassiveSkills.Effects.FierceBlade.PctPerBurst * (sg.heat.burstsTotal + hf.burstsWired) / 100f
+                        sightFlat += ItemSystem.PassiveSkills.Effects.FierceBlade.PctForBursts(sg.heat.burstsTotal + hf.burstsWired) / 100f
                                    * DeckPerTurnDamage(in s, k);
                 }
             }
@@ -586,7 +613,10 @@ namespace AutoTest
             /// <summary>〈蓋付きの毒指輪〉: このターンまだ起爆していない (持っていなければ false)。 / 毒の品の旗・この戦闘で起爆した回数 (起爆のダメージの式 PoisonCore.Damage が読む)。</summary>
             public bool ring;
             public PoisonItems poisonItems;
-            public int detonates, enemyMaxHp;
+            public ChargeItems chargeItems;
+            public bool scorchedWire, fourthCoil;
+            public int rebootsBattle, fourthCount;
+            public int detonates, enemyMaxHp, turn;
             /// <summary>出血の品の旗 (撃ごとの出血は Resolve の 5f が書く・〈血桜〉〈血の楔〉〈紅の搾り具〉〈涸れぬ血晶〉はここで見積もる) / 〈紅の搾り具〉をこのターンもう使った。</summary>
             public BleedItems bleedItems;
             public bool pressed;
@@ -607,8 +637,14 @@ namespace AutoTest
                 v.burstLastTurn = ctx.currentTurn > 1 && (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.BurstTurnKey) == ctx.currentTurn - 1;
                 v.secondStrike = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.SecondStrike.Id); v.fierceBlade = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.FierceBlade.Id);
                 v.poisonItems = PoisonCore.ItemsOf(run);
+                v.chargeItems = ChargeCore.ItemsOf(run);
+                v.scorchedWire = run.OwnsPassive("焦げ導線");
+                v.fourthCoil = run.OwnsPassive("溜め撃ちの誘導コイル");
+                v.rebootsBattle = (int)ctx.GetAccumulated(ChargeCore.RebootsBattleKey);
+                v.fourthCount = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.FourthStrikeCore.CountKey);
                 v.detonates = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.Psn.DetonateCountKey);
                 v.enemyMaxHp = ctx.enemyMaxHP;      // 起爆の最大 HP の項 (本体と同じ ctx.enemyMaxHP)
+                v.turn = ctx.currentTurn;
                 v.bleedItems = BleedCore.ItemsOf(run);
                 v.pressed = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.CrimsonPress.TurnKey) == ctx.currentTurn;
                 v.ring = (v.poisonItems & PoisonItems.Ring) != 0 && (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.HollowPoisonRing.TurnKey) != ctx.currentTurn;
