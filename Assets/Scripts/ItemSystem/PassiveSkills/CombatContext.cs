@@ -551,7 +551,7 @@ namespace ItemSystem.PassiveSkills
         public float shieldOnWinPct;
 
         // ==== 臨界メーター (Rinkai) 2026-07-16 追加 ====
-        /// <summary>[persistent] 臨界メーター: 攻撃の端子に挿した出目の合計の半分 (HeatCore.EndGain) を毎ターンの終わりに足し、 品・端子の分はその時点で足す (Keywords.Kw.AddHeat)。
+        /// <summary>[persistent] 臨界メーター: 攻撃の端子に挿した出目の合計の半分 (HeatCore.EndGain) を毎ターン配線のとき (攻撃の前・2026-11-25〜) に足し、 品・端子の分はその時点で足す (Keywords.Kw.AddHeat)。
         /// 閾値に届くとその場で爆発する (式は CombatSystem.HeatCore)。</summary>
         public int rinkaiMeter;
         /// <summary>[persistent] 直近ターンにプレイヤーが与えた総ダメージ。

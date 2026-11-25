@@ -237,11 +237,15 @@ namespace CombatSystem
                 ShieldDiag.Note("端子", o.shield);
             }
             if (o.poison > 0) ItemSystem.PassiveSkills.Effects.Rw.Poison(ctx, o.poison);
-            //   臨界: 〈燧石の指輪〉の倍を立ててから、 端子の分 → 品の分 (5g) を 1 つずつ (HeatCore.Forecast と同じ順)
+            //   臨界: 〈燧石の指輪〉の倍を立ててから、 端子の分 → 品の分 (5g) を 1 つずつ → 攻撃に挿した出目の合計の半分 (HeatCore.EndGain・2026-11-25〜 配線のとき = 攻撃の前。 旧: ターンの終わり) (HeatCore.Forecast と同じ順)
             if (o.heatDouble) ctx.accumulatedValues[HeatCore.DoubleTurnKey] = ctx.currentTurn;
             if (o.heat > 0 || o.heatGains.Count > 0) ItemSystem.PassiveSkills.Keywords.Kw.EnableHeat(ctx);
             if (o.heat > 0) ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, o.heat, "端子");
             foreach (int g in o.heatGains) ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, g, "臨界の品(配線)");
+            {   // ここで閾値をまたげば、 そのターンの攻撃すべてに【過熱】が乗る (作者の決定 2026-11-25)
+                int pipHeat = HeatCore.EndGain(o);
+                if (ctx.rinkaiThreshold > 0 && pipHeat > 0) ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, pipHeat, "配線(攻撃に挿した出目の半分)");
+            }
             for (int r = 0; r < o.retreatStage; r++) YachtRoleEffects.AddEscalationDelay(ctx, YachtRoleEffects.TurnsToRetreatOneStage(ctx));
             if (o.escalationDelay > 0)      // 時計の賽 (ADR-0015)
             {

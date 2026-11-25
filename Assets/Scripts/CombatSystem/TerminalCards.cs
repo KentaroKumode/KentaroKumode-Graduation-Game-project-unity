@@ -301,7 +301,7 @@ namespace CombatSystem
         public int attackAdd, blockAdd, chargeAdd;
         public int attackDice, blockDice, chargeDice, supportDice;
         /// <summary>攻撃の種類の端子に挿した出目の合計 (〈号令の剣〉〈歯車の軸〉の出目 +N は入る・〈剛腕〉の倍・端子の倍率・基礎攻撃は入らない・【再起動】〈残響〉で増えない・2026-11-22 neon 収束)。
-        /// ターンの終わりの臨界はこの半分 (<see cref="HeatCore.EndGain"/>)。</summary>
+        /// 配線のとき (攻撃の前) の臨界はこの半分 (<see cref="HeatCore.EndGain"/>)。</summary>
         public int attackPips;
         /// <summary>このターンに発動した防御の種類の端子の数 (【再起動】の分も 1 回・2026-11-22 〈受け流しの扇〉)。</summary>
         public int blockTerminals;

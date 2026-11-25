@@ -1622,15 +1622,7 @@ namespace CombatSystem
             //   1 回目を敵攻撃より前に置くのは、 致死打で `enemyHP > 0` が落ちて
             //   **ヴェスカがそのターンを丸ごと飛ばす**のを防ぐため (踏みとどまった以上は殴り返す)。
             //   よってこの 2 点セットで 1 ターン分を覆う。 ClampToThreshold は冪等。
-            // --- 臨界メーター (Rinkai) 更新 ---
-            //   攻撃の端子に挿した出目の合計の半分を溜める (HeatCore.EndGain・2026-11-22 neon 収束: 旧 攻撃の端子の合計)。 閾値をまたいだらその場で爆発のダメージが入る (Kw.AddHeat → LandBurst・ADR-0016)。
-            //   品が溜める分 (被弾・充電・会心など) は、 それぞれの出来事の時点で Kw.AddHeat を通る。
-            //   **手元の HP を ctx へ書き戻す前 (解決中) に置く** ── 書き戻しの後だと爆発で減らした ctx の HP が上書きされて消える。
-            {
-                int endHeat = CombatSystem.HeatCore.EndGain(term);
-                if (ctx.rinkaiThreshold > 0 && endHeat > 0)
-                    ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, endHeat, "ターンの終わり(攻撃に挿した出目の半分)");
-            }
+            // (臨界の攻撃に挿した出目の半分は 2026-11-25 から配線のとき = 攻撃の前に溜める・CombatManager.Terminals の ApplyTerminalOutcome)
             // 攻撃の後に品が預けた敵へのダメージ (Kw.DamageEnemy) をここで通す。 踏みとどまりの clamp より前。
             {
                 int pendingKw = ItemSystem.PassiveSkills.Keywords.Kw.TakePendingEnemyDamage(ctx);
