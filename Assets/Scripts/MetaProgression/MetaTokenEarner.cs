@@ -42,7 +42,7 @@ namespace MetaProgression
         private static void Award(int amount, string reason)
         {
             var mgr = MetaProgressManager.Instance;
-            if (mgr == null) return;
+            if (mgr == null || GameLoop.RunSpec.NoRewards) return;   // ラン指定の「報酬なし」(チュートリアル) はトークンも出さない
             mgr.AddTokens(amount);
             Debug.Log($"[MetaToken] +{amount} ({reason})  累計={mgr.State.tokens}");
         }

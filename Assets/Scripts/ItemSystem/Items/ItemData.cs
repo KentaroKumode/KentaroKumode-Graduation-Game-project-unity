@@ -146,6 +146,8 @@ namespace ItemSystem
         public string axis;
         /// <summary>軸の中の分岐 ("A" / "B"・共通の品は空・2026-11-23)。 出どころは full-item-rework-ledger の役割の欄 (会心は crit_redesign answer8 の振り分け)。 BOT の分岐の寄せ (AutoRunner.buyBranchFocus) が読む。</summary>
         public string branch;
+        /// <summary>常に働いていて、 働く瞬間の無い品 (2026-11-25・旧 説明文の【規則】)。 戦闘の秘宝の列で光らせない (RelicDisplay の Quiet)。</summary>
+        public bool quietRelic;
     }
 
     /// <summary>

@@ -21,7 +21,7 @@ namespace CombatSystem
     /// 猶予 (<see cref="CrackGraceTurns"/>・既定 1) ターン後のターンの終わりに、 まだ割れていなければ<b>ひとりでに割れる</b> (猶予 1 = 次のターンの終わり)。
     /// その間に通常攻撃が当たれば、 その時点で普通に割れる。 一度入ったひびは、 回復で HP が目盛りの上へ戻っても消えない (2026-11-14・作者の決定・その間の通常攻撃では割れず、 猶予が切れた時に割れる)。
     /// ひとりでに割れた目盛りのダウンは<b>弱い</b>: 敵は攻撃しないが、 受けるダメージ ×<see cref="TakenMul"/> は付かない (口 downCrackWeak)。
-    /// 口 downBreakRule = AnyDamage で旧い判定 (ターンの終わりの HP で割る・ひびなし・全部 満額のダウン)。</para>
+    /// 口 downBreakRule = AnyDamage で旧い判定 (ターンの終わりの HP で割る・ひびなし・全部 ダウン)。</para>
     ///
     /// <para>本体 (<c>CombatManager</c>) と BOT (<c>AutoRunner</c> の効用・先読み) が<b>同じ関数</b>を呼ぶ。 式を 2 か所に書かない。
     /// このファイルは UnityEngine に依存しない (Unity なしの検算 <c>Tools/rules_check</c> がそのままコンパイルする)。
@@ -29,7 +29,7 @@ namespace CombatSystem
     /// </summary>
     public static class BossDown
     {
-        /// <summary>ダウン中に受けるダメージの倍率 (満額のダウンだけ・ひびで割れた弱いダウンには付かない)。</summary>
+        /// <summary>ダウン中に受けるダメージの倍率 (ダウンだけ・ひびで割れたよろめきには付かない)。</summary>
         public const float TakenMul = 1.5f;
         /// <summary>今の戦闘のダウンの倍率 (既定 <see cref="TakenMul"/>・挑戦カード〈受身〉で 1.35 / 1.20)。 戦闘の始めに <see cref="CardRules.Load"/> が入れる。</summary>
         public static float TakenMulCard = TakenMul;
@@ -86,18 +86,28 @@ namespace CombatSystem
         public static bool NextTurnIsDown(float[] notches, int maxHp, int broken, int pendingNow, int hpAfter)
             => notches != null && hpAfter > 0 && pendingNow + (BrokenCount(notches, maxHp, hpAfter, broken) - broken) > 0;
 
-        /// <summary>受けるダメージにダウンの倍率を掛ける (<paramref name="down"/> = このターンはダウン・切り捨て)。</summary>
-        public static int ApplyTaken(int dmg, bool down) => down && dmg > 0 ? (int)(dmg * TakenMulCard) : dmg;
+        /// <summary>受けるダメージにダウンの倍率を掛ける (<paramref name="down"/> = このターンはダウン・切り捨て)。
+        /// 〈英雄の意志〉〈黒錫のライデン瓶〉で強めたダウン (2026-11-25) は倍率 +<see cref="TakenBonusPctNow"/>%。</summary>
+        public static int ApplyTaken(int dmg, bool down)
+            => !down || dmg <= 0 ? dmg : TakenBonusPctNow > 0 ? (int)(dmg * (TakenMulCard + TakenBonusPctNow * 0.01f)) : (int)(dmg * TakenMulCard);
+
+        /// <summary>このダウンの倍率の上乗せ (% ・0 = なし・2026-11-25)。 次のダウンを強める品 (<see cref="BossDownState.bonusPct"/>) が、 そのダウンの間だけ立てる。 CombatManager がターンの頭に入れ、 戦闘の始めと終わりに 0 へ戻す。</summary>
+        public static int TakenBonusPctNow;
+
+        /// <summary>次のダウンの倍率の上乗せの上限 (% ・×1.5 → ×2.5 まで・2026-11-25 neon answer_gauge)。</summary>
+        public const int TakenBonusMaxPct = 100;
+        /// <summary>次のダウンを 1 ターン延ばせる回数 (1 戦闘につき・〈柱折りの発破筒〉・2026-11-25)。</summary>
+        public const int ExtendMaxPerFight = 2;
 
         /// <summary>いまの戦闘のこのターンがダウンか (種類を問わない・CombatManager がターンの頭に立て、 次のターンの頭・戦闘の始めと終わりに戻す)。
         /// 「ダウン中は発動しない」を名乗ったパッシブの止め (<c>PassiveSkillManager.FireEnemyTrigger</c>) が読む。</summary>
         public static bool ActiveNow;
 
-        /// <summary>このターンのダウンが受けるダメージ ×<see cref="TakenMul"/> を持つか (満額のダウン。 ひびで割れた弱いダウンは false・2026-11-14)。
+        /// <summary>このターンのダウンが受けるダメージ ×<see cref="TakenMul"/> を持つか (ダウン。 ひびで割れたよろめきは false・2026-11-14。 〈骨溶かしの黒油〉を持てばよろめきも true・2026-11-25)。
         /// 敵の HP を減らす口 (<c>HpLossDiag.Lose</c>・主攻撃の <c>ApplyWinDamageModifiers</c>・品の直接の削り) が <see cref="ApplyTakenNow"/> で読む。</summary>
         public static bool TakenMulNow;
 
-        /// <summary>このターンが満額のダウンなら ×<see cref="TakenMul"/>。</summary>
+        /// <summary>このターンが ×1.5 を持つダウンなら ×<see cref="TakenMul"/> (と上乗せ)。</summary>
         public static int ApplyTakenNow(int dmg) => ApplyTaken(dmg, TakenMulNow);
 
         // ---- 割れ方の見込み (本体の BossDownState と同じ規則を、 状態を書き換えずに 1 ターン分だけ進める・BOT が読む) ----
@@ -105,7 +115,7 @@ namespace CombatSystem
         /// <summary><see cref="ForecastTurn"/> の答え。</summary>
         public struct Forecast
         {
-            /// <summary>通常攻撃で割れる数 (満額のダウン) / ひびの猶予が切れて割れる数 / ターンの後の割った目盛りの数。</summary>
+            /// <summary>通常攻撃で割れる数 (ダウン) / ひびの猶予が切れて割れる数 / ターンの後の割った目盛りの数。</summary>
             public int fullAdded, crackAdded, brokenAfter;
             /// <summary>次のターンはダウンか / そのダウンは弱いか (被ダメ ×1.5 なし)。</summary>
             public bool nextDown, nextWeak;
@@ -188,9 +198,9 @@ namespace CombatSystem
     /// <summary>目盛りの割れ方 (<see cref="BossDown.ForecastTurn"/>・測定の口 <c>GameHooks.DownBreak</c> / <c>AutoRunner.downBreakRule</c>)。</summary>
     public enum DownBreakRule
     {
-        /// <summary>既定 (2026-11-14〜): 通常攻撃 (主攻撃) が当たった時だけ割れる。 通常攻撃以外で下回った目盛りにはひびが入り、 猶予の後にひとりでに割れる (弱いダウン)。</summary>
+        /// <summary>既定 (2026-11-14〜): 通常攻撃 (主攻撃) が当たった時だけ割れる。 通常攻撃以外で下回った目盛りにはひびが入り、 猶予の後にひとりでに割れる (よろめき)。</summary>
         MainAttackOnly = 0,
-        /// <summary>旧い判定 (2026-11-13〜11-14): ターンの終わりの HP で割る (経路を問わない・ひびなし・全部 満額のダウン)。</summary>
+        /// <summary>旧い判定 (2026-11-13〜11-14): ターンの終わりの HP で割る (経路を問わない・ひびなし・全部 ダウン)。</summary>
         AnyDamage = 1,
     }
 
@@ -203,7 +213,7 @@ namespace CombatSystem
         public int broken;
         /// <summary>まだ来ていないダウンのターンの数。</summary>
         public int pending;
-        /// <summary>まだ来ていないダウンの種類 (割れた順・true = ひびで割れた弱いダウン)。 長さは <see cref="pending"/> と同じ。</summary>
+        /// <summary>まだ来ていないダウンの種類 (割れた順・true = ひびで割れたよろめき)。 長さは <see cref="pending"/> と同じ。</summary>
         public readonly System.Collections.Generic.List<bool> pendingWeak = new System.Collections.Generic.List<bool>();
         /// <summary>目盛りごとの、 ひびが入ったターン (−1 = ひびなし・割った目盛りも −1)。 null = 目盛りなし。</summary>
         public int[] crackTurn;
@@ -254,7 +264,7 @@ namespace CombatSystem
             return d;
         }
 
-        /// <summary>[新しい判定 MainAttackOnly] 主攻撃が <paramref name="mainDmg"/> (1 以上) で当たった直後の HP <paramref name="hp"/> で、 まだ割っていない目盛り以下のものを全部割る (満額のダウン)。
+        /// <summary>[新しい判定 MainAttackOnly] 主攻撃が <paramref name="mainDmg"/> (1 以上) で当たった直後の HP <paramref name="hp"/> で、 まだ割っていない目盛り以下のものを全部割る (ダウン)。
         /// 戻り値 = 割った数。 倒れた (HP ≤ 0)・ダメージ 0 (回避・吸収) なら割らない。 <paramref name="crackedBroken"/> = 割った中で、 ひびが入っていた数 /
         /// <paramref name="crackWaitSum"/> = それらの、 ひびが入ってから割るまでのターン数の合計 (計装)。</summary>
         public int NoteMainHit(int hp, int maxHp, int mainDmg, int turn, out int crackedBroken, out int crackWaitSum)
@@ -290,7 +300,7 @@ namespace CombatSystem
             return d;
         }
 
-        /// <summary>次に割る目盛りを <paramref name="add"/> (HP) だけ上げる (〈雷鯰の棘〉〈避雷の杭〉〈鎧縫いの針〉)。 <paramref name="hpCap"/> より上へは行かない。
+        /// <summary>次に割る目盛りを <paramref name="add"/> (HP) だけ上げる (臨界の爆発・【劇症】・〈雷鯰の棘〉〈避雷の杭〉ほか)。 <paramref name="hpCap"/> より上へは行かない。
         /// 並びは書き換えず作り直す (<c>BossParams</c> の表を共有しているため)。 戻り値 = 上がった後の目盛りの HP (動かなければ −1)。</summary>
         public int RaiseNext(int maxHp, int hpCap, int add)
         {
@@ -308,35 +318,48 @@ namespace CombatSystem
         public int CrackBreakTurn(int grace)
             => grace >= 0 && crackTurn != null && broken < crackTurn.Length && crackTurn[broken] >= 0 ? crackTurn[broken] + grace : -1;
 
-        /// <summary>まだ割っていない一番上の目盛りのひびを今割る (満額のダウンを待ちに積む・〈積雷の黒舎利〉・2026-11-21)。 ひびが無ければ false。</summary>
-        public bool BreakTopCrack()
+        // ---- 次のダウンを強める (2026-11-25・neon answer_gauge の方向 2)。 戦闘を通して持つ (形態の交代では消さない・ResetBuffs は戦闘の始めだけ) ----
+
+        /// <summary>[persistent] 次のダウンの倍率の上乗せ (% ・上限 <see cref="BossDown.TakenBonusMaxPct"/>) / そのダウンの開始時に得るシールド / 充電。</summary>
+        public int bonusPct, shieldOnDown, chargeOnDown;
+        /// <summary>[persistent] 次のダウンを 1 ターン延ばす (〈柱折りの発破筒〉) / この戦闘で延ばした回数。</summary>
+        public bool extendNext;
+        public int extendsUsed;
+        /// <summary>このダウンの倍率の上乗せ (% ・ダウンが続く間だけ)。 / このダウンの間に、 強めを使った (よろめきでないダウンの最初のターンで使う)。</summary>
+        public int bonusNowPct;
+        private bool _buffsTaken;
+
+        /// <summary>戦闘の始め: 次のダウンを強める分を全部 0 へ。</summary>
+        public void ResetBuffs() { bonusPct = 0; shieldOnDown = 0; chargeOnDown = 0; extendNext = false; extendsUsed = 0; bonusNowPct = 0; _buffsTaken = false; }
+
+        /// <summary>次のダウンの倍率 +<paramref name="pct"/>% (上限まで)・開始時のシールド / 充電を足す。</summary>
+        public void BuffNext(int pct, int shield, int charge)
         {
-            if (!TopCracked) return false;
-            Push(1, false);
-            crackTurn[broken] = -1; broken++;
+            bonusPct = Math.Min(BossDown.TakenBonusMaxPct, bonusPct + Math.Max(0, pct));
+            shieldOnDown += Math.Max(0, shield); chargeOnDown += Math.Max(0, charge);
+        }
+
+        /// <summary>次のダウンを 1 ターン延ばす (1 回のダウンにつき 1 ターン・1 戦闘 <see cref="BossDown.ExtendMaxPerFight"/> 回まで)。 仕込めたら true。</summary>
+        public bool ExtendNext()
+        {
+            if (!Enabled || extendNext || extendsUsed >= BossDown.ExtendMaxPerFight) return false;
+            extendNext = true;
             return true;
         }
 
-        /// <summary>まだ割っていない一番上の目盛りを、 HP に関係なく今割る (満額のダウンを待ちに積む・〈英雄の意志〉・2026-11-21)。 割る目盛りが無ければ false。</summary>
-        public bool BreakTopNotch()
+        /// <summary><see cref="BeginTurn"/> の後に呼ぶ: このターンがよろめきでないダウンの最初のターンなら、 溜めた強めを使う
+        /// (倍率の上乗せはダウンが続く間・シールド / 充電は戻り値で渡す・延長はダウンを 1 ターン足す)。 ダウンでないターンは上乗せを消す。 使ったら true。</summary>
+        public bool TakeBuffs(out int shield, out int charge, out bool extended)
         {
-            if (notches == null || broken >= notches.Length) return false;
-            Push(1, false);
-            crackTurn[broken] = -1; broken++;
-            return true;
+            shield = 0; charge = 0; extended = false;
+            if (!downNow) { bonusNowPct = 0; _buffsTaken = false; return false; }
+            if (downWeakNow || _buffsTaken) return false;
+            _buffsTaken = true;
+            bonusNowPct = bonusPct; shield = shieldOnDown; charge = chargeOnDown;
+            bonusPct = 0; shieldOnDown = 0; chargeOnDown = 0;
+            if (extendNext) { extendNext = false; extendsUsed++; pending++; pendingWeak.Insert(0, false); extended = true; }
+            return bonusNowPct > 0 || shield > 0 || charge > 0 || extended;
         }
-
-        /// <summary>まだ割っていない一番上の目盛りにひびを入れる (HP に関係なく・既にひびがあれば何もしない・〈落城の礎石〉・2026-11-21)。 入れたら true。
-        /// ひびは通常のひびと同じく、 猶予が切れたターンの終わりに割れる (BossDownState.NoteTurnEndCracks)。</summary>
-        public bool CrackTopNotch(int turn)
-        {
-            if (crackTurn == null || broken >= crackTurn.Length || crackTurn[broken] >= 0) return false;
-            crackTurn[broken] = turn;
-            return true;
-        }
-
-        /// <summary>まだ割っていない一番上の目盛りにひびが入っているか。</summary>
-        public bool TopCracked => crackTurn != null && broken < crackTurn.Length && crackTurn[broken] >= 0;
 
         /// <summary>次に割る目盛りの HP (−1 = 無し)。</summary>
         public int NextNotchHp(int maxHp) => BossDown.NextNotchHp(notches, maxHp, broken);

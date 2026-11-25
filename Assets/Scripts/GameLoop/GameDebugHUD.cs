@@ -335,11 +335,10 @@ namespace GameLoop
             var sim = mm.Sim;
             if (sim != null)
             {
-                sb.AppendLine($"ターン {sim.Turn} / 魔石 {sim.Stone().Text} / 天候 {sim.Weather.DisplayName()}"
-                            + (sim.FlareOn ? " / 照明中" : ""));
+                sb.AppendLine($"ターン {sim.Turn} / 追跡者 {(sim.FoeAlive ? (sim.FoeMode == FoeMode.Chase ? "追跡" : "巡回") : "なし")} / 天候 {sim.Weather.DisplayName()}");
                 var eta = sim.Eta();
                 if (eta.Valid) sb.AppendLine($"捕捉されている ── 最短 {eta.turns} 手で捕まる（{eta.WhoName}）");
-                sb.AppendLine("[W] 待つ  [R] 偵察  [F] 照明  [L] 囮罠");
+                sb.AppendLine("[Space] 待つ  [F] 測量  [L] 囮罠");
             }
             sb.AppendLine("移動先 (道):");
             for (int i = 0; i < all.Count; i++)

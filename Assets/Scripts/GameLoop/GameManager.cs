@@ -226,7 +226,10 @@ namespace GameLoop
         // ============================================================
 
         /// <summary>新しいランを開始</summary>
-        public void StartNewRun()
+        public void StartNewRun() => StartNewRun(null);
+
+        /// <summary>新しいランを開始。 <paramref name="spec"/> = ラン指定 (<see cref="RunSpec"/>・初期の持ち物・山札・シード・地図などを上書き)。 null なら本編 (今までと同じ)。</summary>
+        public void StartNewRun(RunSpec spec)
         {
             // **戦闘終了イベントの購読をここで確実にする。**
             //   購読は Start() で 1 回だけ張っていたが、 それだと
@@ -242,6 +245,7 @@ namespace GameLoop
                 cmForEvents.OnCombatEnd += HandleCombatEnd;
             }
 
+            RunSpec.Begin(spec);     // 前の指定を外し、 指定のシードがあれば乱数をそのシードで始める (挑戦カード・整備盤を読む前)
             Run = new RunState();
             Run.Initialize(BaseStartingHP);
             BeginChallengeCards();   // 挑戦カードのランか (効果を読む前に決める)
@@ -250,9 +254,12 @@ namespace GameLoop
 
             // 2026-06-28: 職業セット + スターター消耗品 1 個配布
             Run.playerClass = SelectedClass;
-            string starterConsumable = ClassStarter.GetConsumableId(Run.playerClass);
-            Run.TryAddConsumable(starterConsumable);
-            Log($"職業: {Run.playerClass} → スターター消耗品「{starterConsumable}」を配布");
+            if (spec == null || !spec.noStarterItems)
+            {
+                string starterConsumable = ClassStarter.GetConsumableId(Run.playerClass);
+                Run.TryAddConsumable(starterConsumable);
+                Log($"職業: {Run.playerClass} → スターター消耗品「{starterConsumable}」を配布");
+            }
 
             // ラン跨ぎで永続するスキル状態 (Nightfall の蓄積過剰ダメ等) をリセット
             ItemSystem.PassiveSkills.PassiveSkillRegistry.ResetAllRunState();
@@ -272,12 +279,17 @@ namespace GameLoop
 
             // 初期武器: 職業固定 (2026-07-14 ランダム配布から変更 ── 出自選択画面の
             // 「メイン武器」表示と実体を一致させる。正本: ClassStarter.GetWeaponId)
-            string starterWeapon = ClassStarter.GetWeaponId(Run.playerClass);
+            string starterWeapon = spec != null ? spec.weapon : ClassStarter.GetWeaponId(Run.playerClass);
             if (Run.ownedPassiveItems == null)
                 Run.ownedPassiveItems = new System.Collections.Generic.List<string>();
-            ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, starterWeapon);
-            Run.equippedWeaponId = starterWeapon;
-            Log($"初期武器: {starterWeapon}");
+            if (!string.IsNullOrEmpty(starterWeapon))
+            {
+                ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, starterWeapon);
+                Run.equippedWeaponId = starterWeapon;
+                Log($"初期武器: {starterWeapon}");
+            }
+            // ラン指定の開始の山札 (空なら RunState.Initialize が入れた本編の開始の山札のまま)
+            if (spec?.deck != null && spec.deck.Length > 0) Run.terminalDeck = new System.Collections.Generic.List<string>(spec.deck);
 
             // メタ恒久バフを適用（HP/Gold/初期素材を底上げ）
             MetaProgression.MetaBuffApplicator.ApplyToRunStart(Run, BaseStartingHP);
@@ -292,7 +304,7 @@ namespace GameLoop
                 PendingEventPassiveOffers.Clear();
                 PendingEventDiceOffers.Clear();
                 ClearEventTerminalPending();
-                int startPassives = MetaProgression.MetaBuffApplicator.GetStartingPassiveCount();
+                int startPassives = spec != null && spec.noStarterItems ? 0 : MetaProgression.MetaBuffApplicator.GetStartingPassiveCount();   // ラン指定の「初期の持ち物なし」は配らない
                 for (int sp = 0; sp < startPassives; sp++)
                 {
                     // 宝物庫 r10 (極点): **何本目かで提示数が増える** (1 本目 1 択 / 2 本目 2 択 / 3 本目 3 択)。
@@ -331,7 +343,7 @@ namespace GameLoop
 
             // 整備パネル〈戦術の懐刀〉(補助の枠・2026-11-20): ランダムな戦術消耗品を 1 個 (1 品の重みは同じ・乱数は専用のキーなので他の抽選は変わらない)。
             //   (旧: 種火 r3 の開幕の品 2 つは、 種火が枠のモジュールになった時に外した・docs/GAME.md §15-1)
-            if (MetaProgression.MetaBuffApplicator.HasTacticKnife())
+            if (MetaProgression.MetaBuffApplicator.HasTacticKnife() && (spec == null || !spec.noStarterItems))
             {
                 var tactics = Consumables.TacticPool();
                 if (tactics.Count > 0)
@@ -343,7 +355,7 @@ namespace GameLoop
 
             // [測定 2026-11-13] 博士の時計をランの最初から秘宝として持たせる (既定は何もしない・乱数は引かない)。
             //   開幕の秘宝の抽選の後に足す ── 時計は配布の山に入らないので抽選は変わらないが、 所持の並びを「武器 → 開幕の秘宝 → 時計」に保つ
-            if (GameHooks.VescaClockHeldAtStart) VescaClock.Take(Run);
+            if (GameHooks.VescaClockHeldAtStart && spec == null) VescaClock.Take(Run);
 
             LastCombatResult = null;
             CurrentEnemy = null;
@@ -355,12 +367,12 @@ namespace GameLoop
             _familiarFightCount = 0;
 
             // 航行マップの消耗品: 囮罠 (2026-09-28・2026-10-18 に囮と罠を統合)
-            GrantStartingMapTools();
+            GrantStartingMapTools(spec);
 
             SetPhase(GamePhase.RunStart);
             MetaProgression.Achievements.AchievementService.BeginRun(Run);
             OnRunStarted?.Invoke(Run);
-            Log($"=== ラン開始 === HP:{Run.playerMaxHP}");
+            Log($"=== ラン開始 === HP:{Run.playerMaxHP}" + (spec != null ? $" (ラン指定 {spec.id})" : ""));
 
             EnterFloor();
         }
@@ -522,14 +534,13 @@ namespace GameLoop
                     Debug.LogWarning($"[GameManager] G無視: フェーズが Title でない (現在={CurrentPhase})。/clear や autoStartRun=true で既に走っている可能性あり");
             }
 
-            // マップナビゲーション: 数字キーで移動先選択 (航行マップは Space 待つ (W/A/S/D は視点の移動なので使わない) / R 偵察 / F 照明 / L 囮罠)
+            // マップナビゲーション: 数字キーで移動先選択 (航行マップは Space 待つ (W/A/S/D は視点の移動なので使わない) / F 測量 / L 囮罠)
             if (CurrentPhase == GamePhase.MapNavigation)
             {
                 if (FreeMap != null)
                 {
                     if (Input.GetKeyDown(KeyCode.Space)) { WaitTurn(); return; }
-                    if (Input.GetKeyDown(KeyCode.R)) { ReconTurn(); return; }
-                    if (Input.GetKeyDown(KeyCode.F)) { UseFlare(); return; }
+                    if (Input.GetKeyDown(KeyCode.F)) { Survey(); return; }
                     if (Input.GetKeyDown(KeyCode.L)) { Consumables.Use(Run, ItemIds.Lure); return; }
                 }
                 var moves = MapManager.Instance?.GetAvailableMoves();

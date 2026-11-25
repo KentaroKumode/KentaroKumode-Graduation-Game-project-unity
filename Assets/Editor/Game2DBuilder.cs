@@ -8,8 +8,6 @@ public static class Game2DBuilder
 {
     private const string Dir = "Assets/gui2d/";
 
-    private static Sprite S(string n) => AssetDatabase.LoadAssetAtPath<Sprite>(Dir + n + ".png");
-    private static Texture2D T(string n) => AssetDatabase.LoadAssetAtPath<Texture2D>(Dir + n + ".png");
 
     private static RectTransform Node(string name, Transform parent, int x, int y, int w, int h)
     {
@@ -21,15 +19,6 @@ public static class Game2DBuilder
         rt.anchoredPosition = new Vector2(x, -y);
         rt.sizeDelta = new Vector2(w, h);
         return rt;
-    }
-
-    private static Image Pic(string name, Transform parent, string sprite, int x, int y, bool raycast = false)
-    {
-        var sp = S(sprite);
-        var rt = Node(name, parent, x, y, (int)sp.rect.width, (int)sp.rect.height);
-        var im = rt.gameObject.AddComponent<Image>();
-        im.sprite = sp; im.raycastTarget = raycast;
-        return im;
     }
 
     [MenuItem("Tools/Game2D/Build Canvas")]
@@ -126,73 +115,10 @@ public static class Game2DBuilder
         var hudRoot = Node("Hud", gridRt, 0, 0, Game2DLayout.Width, Game2DLayout.Height);
         hudRoot.anchorMin = Vector2.zero; hudRoot.anchorMax = Vector2.one; hudRoot.offsetMin = hudRoot.offsetMax = Vector2.zero;
 
-        // HTML の描画の順: 資源バー → レーダー → 操作パネル → GOLD の入れ物 (入れ物が上・パネルが下)。 HP のバーは HTML に無いので、 実用のため足す。
-        EnsureReadable("gold_pot_layer2", "gold_pot_layer3", "gold_pot_layer4", "gold_pot_layer5", "gold_pot_layer6", "coin_gui",
-                       "button_trap", "button_trap_push", "button_flare", "button_flare_push", "button_recon", "button_recon_push", "button_frame",
-                       "bar_layer1", "bar_layer2", "bar_layer3", "bar_layer4", "counter_strip");
-
-        // --- 資源バー (bar_layer1〜4): 土台・物資/シールドの板・HP ---
-        var resRt = Node("ResBar", hudRoot, 0, 0, Game2DLayout.Width, Game2DLayout.Height);
-        var resBar = resRt.gameObject.AddComponent<Game2DResBar>();
-        resBar.layer1 = T("bar_layer1"); resBar.layer2 = T("bar_layer2"); resBar.layer3 = T("bar_layer3"); resBar.layer4 = T("bar_layer4"); resBar.counterStrip = T("counter_strip");
-        resBar.Build();
-
-        // --- レーダー (2026-10-27 刷新): 資源バー (bar_layer1) の右の液晶 (左上 313,213・51x51) の上へ、 気配の円を描く。 素材の絵は使わない ---
-        var radarRt = Node("Radar", hudRoot, 313, 213, 51, 51);
-        var radarRaw = radarRt.gameObject.AddComponent<RawImage>(); radarRaw.raycastTarget = false;
-        var radar = radarRt.gameObject.AddComponent<Game2DRadar>();
-        radar.image = radarRaw;
-
-
-        var navOnly = Node("NavOnly", hudRoot, 0, 0, Game2DLayout.Width, Game2DLayout.Height);
-        navOnly.anchorMin = Vector2.zero; navOnly.anchorMax = Vector2.one; navOnly.offsetMin = navOnly.offsetMax = Vector2.zero;
+        // 航行の計器 (所持金・HP・物資・測量 / 囮罠 / 待つ・天気・ターン・所持品) は下の NavExtras が液晶の中の暗い帯として描く (2026-11-24・旧い筐体の部品は削除)
 
         var battleSim = cgo.AddComponent<UI.Game2D.Battle.Game2DBattleSim>(); battleSim.fx = battleFx;
         // 戦闘の画面は液晶の中 (Game2DBattleLcd・戦闘の流れが実行時に同じ GameObject に付ける・2026-11-16〜)。 旧い戦闘の HUD (BattleOnly のパネル群) は削除
-
-        // --- 操作パネル (map-prototype.html の BTNP): 枠の上端が、 閉じた GOLD の入れ物の下端 (54) に接する (枠は PNG の 3 行目から) → y = 51。
-        //     下 = 3 つのボタン (押した絵は同じ場所に重ねて出し入れ)、 上 = 枠、 その上に残数ランプ、 いちばん上に影 ---
-        var panelRt = Node("ButtonPanel", navOnly, 0, 51, 89, 124);
-        var names = new[] { "button_trap", "button_flare", "button_recon" };
-        var normals = new RawImage[3]; var pushes = new RawImage[3];
-        for (int k = 0; k < 3; k++) normals[k] = FullRaw(names[k], panelRt, T(names[k]), 89, 124);
-        for (int k = 0; k < 3; k++) { pushes[k] = FullRaw(names[k] + "_push", panelRt, T(names[k] + "_push"), 89, 124); pushes[k].enabled = false; }
-        FullRaw("frame", panelRt, T("button_frame"), 89, 124);
-        var lampX = new[] { 20, 27, 34 };
-        var trapLamps = new Image[3]; var flareLamps = new Image[3];
-        for (int i = 0; i < 3; i++)
-        {
-            trapLamps[i] = Pic("trapLamp" + i, panelRt, "lamp_off", lampX[i], 47);
-            flareLamps[i] = Pic("flareLamp" + i, panelRt, "lamp_off", lampX[i], 75);
-        }
-        var shadeRaw = FullRaw("potShade", panelRt, null, 89, 124); shadeRaw.enabled = false;
-
-        // --- GOLD の入れ物 (map-prototype.html の GOLDPOT) (0,0) 76x96: 描画順 1 → 3 → 5 → 2 → 4 → 粒。 初期は閉じている ---
-        var pot = Node("GoldPot", hudRoot, 0, 0, 76, 96);
-        var l1 = Pic("layer1", pot, "gold_pot_layer1", 0, 0).rectTransform;
-        var clip = Node("layer3Clip", pot, 0, 0, 76, 96); clip.gameObject.AddComponent<RectMask2D>();
-        var l3raw = FullRaw("layer3", clip, T("gold_pot_layer3"), 76, 96);
-        var l5 = Pic("layer5", pot, "gold_pot_layer5", 0, 0).rectTransform;
-        var l2 = Pic("layer2", pot, "gold_pot_layer2", 0, 0).rectTransform;
-        var l4 = Pic("layer4", pot, "gold_pot_layer4", 0, 0).rectTransform;
-        var dispRaw = FullRaw("Display", l4, null, 76, 96);
-        var partRaw = FullRaw("Particles", pot, null, 156, 176); partRaw.enabled = false; dispRaw.enabled = false;   // テクスチャを入れるまで出さない (null の RawImage は白く出る)
-        var goldPot = pot.gameObject.AddComponent<Game2DGoldPot>();
-        goldPot.layer1 = l1; goldPot.layer2 = l2; goldPot.layer4 = l4; goldPot.layer5 = l5; goldPot.layer3Clip = clip; goldPot.layer3 = l3raw;
-        goldPot.display = dispRaw; goldPot.particles = partRaw;
-        goldPot.tex2 = T("gold_pot_layer2"); goldPot.tex3 = T("gold_pot_layer3"); goldPot.tex4 = T("gold_pot_layer4"); goldPot.tex5 = T("gold_pot_layer5");
-        goldPot.marker = T("gold_pot_layer6"); goldPot.coinSprite = T("coin_gui");
-        goldPot.ApplyEditorPose();      // 再生していなくても、 閉じた状態 (HTML の初期) で見えるように
-
-        // 操作パネルの制御 (ボタンの当たり判定・押す・影・残数ランプ)。 戦闘でも GOLD の入れ物は触れるので、 NavOnly の外に置く
-        var ctl = Node("NavPanelCtl", hudRoot, 0, 0, 1, 1);
-        var navPanel = ctl.gameObject.AddComponent<Game2DNavPanel>();
-        navPanel.normal = normals; navPanel.push = pushes; navPanel.trapLamps = trapLamps; navPanel.flareLamps = flareLamps; navPanel.shade = shadeRaw;
-        navPanel.normalTex = new[] { T("button_trap"), T("button_flare"), T("button_recon") };
-        navPanel.pushTex = new[] { T("button_trap_push"), T("button_flare_push"), T("button_recon_push") };
-        navPanel.frameTex = T("button_frame"); navPanel.lampOn = S("lamp"); navPanel.lampOff = S("lamp_off");
-        navPanel.pot = goldPot; navPanel.view = mapView;
-        mapView.panel = navPanel;
 
         // --- 起動 (TOUCH DISPLAY → クリックで点灯)。 文字と覆いは実行時に液晶の中身として出す (液晶の効果が掛かる) ---
         var boot = cgo.AddComponent<Game2DBoot>();
@@ -241,8 +167,7 @@ public static class Game2DBuilder
         // --- 配線 ---
         // Hud は常に生きている Grid に付ける (hudRoot は Hud 自身が出し入れするので、 そこに付けると一度消えたら戻れない)
         var hud = gridRt.gameObject.AddComponent<Game2DHud>();
-        hud.gold = goldPot; hud.radar = radar; hud.resBar = resBar; hud.panel = navPanel;
-        hud.navOnly = navOnly.gameObject; hud.battleSim = battleSim; hud.extras = extras; hud.root = hudRoot.gameObject;
+        hud.battleSim = battleSim; hud.extras = extras; hud.root = hudRoot.gameObject;
 
         // --- 液晶の Quad: 走査線・湾曲・色収差・ブルーム・ノイズ + 点灯の瞬間の残像 (Game2D/LcdScreen)。 ビネットは外枠まで覆う Game2D/LcdFx ---
         if (quadGo != null)
@@ -261,7 +186,7 @@ public static class Game2DBuilder
         var cam = GameObject.Find("Main Camera").GetComponent<Camera>();
         var quad = GameObject.Find("Quad").transform;
         var screen = cgo.AddComponent<Game2DScreen>();
-        screen.screenCamera = cam; screen.lcdQuad = quad; screen.canvas = canvas; screen.gridRoot = presentGrid; mapView.screen = screen; navPanel.screen = screen; modal.screen = screen; extras.screen = screen;
+        screen.screenCamera = cam; screen.lcdQuad = quad; screen.canvas = canvas; screen.gridRoot = presentGrid; mapView.screen = screen; modal.screen = screen; extras.screen = screen;
         screen.Apply();
 
         // 開発用のデバッグ表示 (左上の文字) は、 液晶の作図と重なるので切る (キー操作は GameManager 側)
@@ -302,21 +227,4 @@ public static class Game2DBuilder
         return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
     }
 
-    /// <summary>テクスチャを (0,0) に等倍で置く RawImage (当たり判定は使わず、 部品が画素で判定する)。</summary>
-    private static RawImage FullRaw(string name, Transform parent, Texture2D tex, int w, int h)
-    {
-        var rt = Node(name, parent, 0, 0, w, h);
-        var ri = rt.gameObject.AddComponent<RawImage>(); ri.texture = tex; ri.raycastTarget = false;
-        return ri;
-    }
-
-    /// <summary>当たり判定 (alpha) に使うので、 スプライトの読み出しを許可する。</summary>
-    private static void EnsureReadable(params string[] names)
-    {
-        foreach (var n in names)
-        {
-            var imp = AssetImporter.GetAtPath(Dir + n + ".png") as TextureImporter;
-            if (imp != null && !imp.isReadable) { imp.isReadable = true; imp.SaveAndReimport(); }
-        }
-    }
 }

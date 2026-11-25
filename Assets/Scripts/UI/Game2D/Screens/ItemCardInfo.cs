@@ -9,6 +9,43 @@ namespace UI.Game2D
     /// <b>UnityEngine に依存しない</b> (検算 Tools/inventory_check が items.json の全件からこれを作って、 欄の送りで切り捨てなく読めるかを見る)。
     /// ゲームの状態からの作り方は <see cref="ItemCards"/> (Unity 側)。
     /// </summary>
+    /// <summary>
+    /// 説明文の【】の言葉の説明 (2026-11-25・作者: 定義はキーワードの説明に入れ、 品の説明文は縮める)。 詳細の欄が説明文の後に出す。
+    /// 品 1 つの中だけで使う数 (力み・反骨) は【】を付けずに品の説明文で書く (2026-11-25)。 ほかの品やカードから呼ばれる言葉はここに定義を置く。
+    /// 数値の正本は PoisonCore / CritCore / ShieldCore / HeatCore と docs/GAME.md §7。 数値を変えたらここも直す。
+    /// </summary>
+    public static class KeywordGlossary
+    {
+        public static readonly Dictionary<string, string> Text = new Dictionary<string, string>
+        {
+            { "【劇症】", "【劇症】敵の毒を 3 分の 1 を消費し、「消費量 × 4」と「消費量 × 敵の最大 HP の 0.25%」の大きい方の軽減不可ダメージ。" },
+            { "【練気】", "【練気】会心の秘宝を持つ戦闘で、攻撃が会心するたび +1（戦闘の間は減らない）。会心した攻撃は【練気】1 につき会心倍率 +0.06。" },
+            { "【集中】", "【集中】集中の秘宝を 3 つ以上持ち、攻撃のカードを 1 枚だけ発動したターンの攻撃。会心率が低下するが、会心すれば【練気】の半分を使って集中会心の効果が働く。" },
+            { "【ジャスト防御】", "【ジャスト防御】敵の攻撃を HP を 1 も失わずに受け、ブロックとシールドの合計と攻撃の差が 2 以下のときに発生する。" },
+            { "【過熱】", "【過熱】爆発が起きたターンに獲得。ターン終了時に失われる。" },
+            { "【再起動】", "【再起動】このターンに発動したカード 1 枚を、ダイスなしでもう 1 回発動する。" },
+            { "【オーバークロック】", "【オーバークロック】充電を使い、そのターンの最初の攻撃の最終与ダメージを増加させ、敵の防御をすべて無視する。" },
+        };
+
+        /// <summary>説明文に出てくる順に、 載っている言葉の説明を返す (同じ言葉は 1 度)。</summary>
+        public static List<string> In(string description)
+        {
+            var r = new List<string>();
+            if (string.IsNullOrEmpty(description)) return r;
+            var seen = new HashSet<string>();
+            int i = 0;
+            while ((i = description.IndexOf('【', i)) >= 0)
+            {
+                int j = description.IndexOf('】', i);
+                if (j < 0) break;
+                string k = description.Substring(i, j - i + 1);
+                if (seen.Add(k) && Text.TryGetValue(k, out var t)) r.Add(t);
+                i = j + 1;
+            }
+            return r;
+        }
+    }
+
     public sealed class ItemCardInfo
     {
         /// <summary>種類 (持ち物の画面の区切りの順)。</summary>
@@ -140,6 +177,8 @@ namespace UI.Game2D
             if (mark != null) Add(mark, 4);
             if (block != null) Add("今は使えない: " + block, 4);
             if (!string.IsNullOrEmpty(description)) { Blank(); Add(description, 2); }
+            var kw = KeywordGlossary.In(description);
+            foreach (var k in kw) { Blank(); Add(k, 1); }   // 言葉ごとに空行で区切る (頁は空行で割る・1 塊が頁を超えないように)
             if (!string.IsNullOrEmpty(flavor)) { Blank(); Add(flavor, 3); }
             return l;
         }

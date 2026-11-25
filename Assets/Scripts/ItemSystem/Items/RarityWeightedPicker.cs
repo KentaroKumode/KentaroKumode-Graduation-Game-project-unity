@@ -34,11 +34,28 @@ namespace ItemSystem
         private static float Biased(float w, float bias)
             => bias <= 0f ? w : Mathf.Pow(w, 1f - Mathf.Clamp01(bias));
 
-        /// <param name="legendaryMul">LEGENDARY の重みに掛ける数 (呪物の賽・店とイベントの秘宝だけ・CombatSystem.DiePassives.LegendaryOfferMul)。</param>
-        public static CompleteItemData Pick(List<CompleteItemData> pool, ItemRarity? minRarity = null,
-                                            float rarityBias = 0f, float legendaryMul = 1f)
+        /// <summary><see cref="Pick"/> と同じ引数で、 決まる品が LEGENDARY になる確率 (プールにあるレア度の重みだけで割る・乱数は引かない)。
+        /// 呪物の賽の置き換えの確率 (CombatSystem.DiePassives.MaybeCurse) が読む。</summary>
+        public static float LegendaryChance(List<CompleteItemData> pool, ItemRarity? minRarity = null, float rarityBias = 0f)
         {
-            float W(ItemRarity r, float w) => Biased(w, rarityBias) * (r == ItemRarity.LEGENDARY ? legendaryMul : 1f);
+            if (pool == null) return 0f;
+            var available = new HashSet<ItemRarity>();
+            foreach (var it in pool) if (it != null && (!minRarity.HasValue || it.rarity >= minRarity.Value)) available.Add(it.rarity);
+            float total = 0f, leg = 0f;
+            foreach (var (rarity, weight) in tierWeights)
+            {
+                if (!available.Contains(rarity)) continue;
+                float w = Biased(weight, rarityBias);
+                total += w;
+                if (rarity == ItemRarity.LEGENDARY) leg = w;
+            }
+            return total > 0f ? leg / total : 0f;
+        }
+
+        public static CompleteItemData Pick(List<CompleteItemData> pool, ItemRarity? minRarity = null,
+                                            float rarityBias = 0f)
+        {
+            float W(ItemRarity r, float w) => Biased(w, rarityBias);
             if (pool == null || pool.Count == 0) return null;
 
             // min rarity フィルタ

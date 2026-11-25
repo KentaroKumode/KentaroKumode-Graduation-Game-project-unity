@@ -241,7 +241,7 @@ namespace MapSystem
         }
 
         /// <summary>マスの種別が判明した点を <see cref="MapNode.revealed"/> へ写す (一度見えたら隠さない)。
-        /// 戦闘名は**完全公開** (偵察・照明で見つけた点 = <see cref="FreeMapSim.Scouted"/>) の時だけ開示する (2026-11-05)。
+        /// 戦闘名は**完全公開** (測量・〈前哨の旗〉・イベントで明かした点 = <see cref="FreeMapSim.Scouted"/>) の時だけ開示する (2026-11-05)。
         /// 何もしない時の視界 (1 歩) で見えただけの点は種別だけで、 戦闘名は出さない ── 近いことと調べたことは別。</summary>
         public void SyncFreeKnowledge()
         {

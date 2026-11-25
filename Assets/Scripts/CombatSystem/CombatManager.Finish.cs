@@ -99,7 +99,7 @@ namespace CombatSystem
             EventSystem.TimedEffects.TimedEffectManager.OnCombatEnd(
                 psmCtx, GameLoop.GameManager.Instance?.Run, this);
 
-            // 名前付き固有パッシブ（戦闘終了時系: 巡礼者の杖、希望の灯片）
+            // 名前付き固有パッシブ（戦闘終了時系: 巡礼者の杖、燐晶）
             ItemSystem.PassiveItems.PassiveItemManager.OnCombatEnd(
                 psmCtx, GameLoop.GameManager.Instance?.Run, this);
 
@@ -123,7 +123,7 @@ namespace CombatSystem
             {
                 var runSteps = GameLoop.GameManager.Instance?.Run;
                 if (runSteps != null) runSteps.stepsSinceBattle = 0;
-                // 〈脈なしの鋼心臓〉: 戦闘に勝つたび X +2 (勝ちの判定は GetLastCombatResult と同じ)
+                // 〈脈打たぬ鋼の心臓〉: 戦闘に勝つたび X +2 (勝ちの判定は GetLastCombatResult と同じ)
                 if (playerHP > 0 && enemyHP <= 0) ItemSystem.PassiveSkills.Effects.PulselessHeart.NoteWin(runSteps);
             }
 

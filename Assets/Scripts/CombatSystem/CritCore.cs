@@ -10,7 +10,7 @@ namespace CombatSystem
     /// <para><b>【集中】</b>: 集中の品を <see cref="FocusNeedCount"/> つ以上持ち、 攻撃の端子 1 枚だけのターンの撃で、 集中の会心率
     /// (会心率 − <see cref="FocusCost"/> ＋〈抜き打ちの作法〉の上乗せ) が <see cref="FocusMinRate"/> 以上なら、 その撃は集中の撃になる。
     /// 集中の撃が会心したら【練気】を +1 してから <see cref="RenkiSpend"/> (半分・切り上げ) を使う。 集中会心の品はその使った量で効く。</para>
-    /// <para>旧〈天眼の鍔〉の確定会心 ×1.25 (HeavenSureMul) と、 会心の品が配る確定会心は 2026-11-23 に撤去した。</para>
+    /// <para>旧〈白濁の義眼〉の確定会心 ×1.25 (HeavenSureMul) と、 会心の品が配る確定会心は 2026-11-23 に撤去した。</para>
     /// <para>このファイルは UnityEngine に依存しない。</para>
     /// </summary>
     public static class CritCore

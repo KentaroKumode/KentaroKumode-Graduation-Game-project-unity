@@ -48,7 +48,7 @@ LCD_SCALE = 8                             # 液晶 1 px → 画面 px (2026-09-2
 LCD_OX, LCD_OY = (SW - LW * LCD_SCALE) // 2, (SH - LH * LCD_SCALE) // 2   # = (-64, -16): 端は画面の外へ出る
 LX, LY = LCD_OX / SCREEN, LCD_OY / SCREEN  # GUI 座標での液晶の左上 (HTML の配置用)
 VOID = (13, 14, 15)                       # 液晶の外 (筐体なし)
-ITEMS = ["工廠の材料箱", "無限モーター", "呼雷粉", "逆さ避雷針", "過負荷チューナー", "魂喰らいの血石"]
+ITEMS = ["工廠の材料箱", "無限モーター", "呼雷粉", "逆さ避雷針", "過負荷チューナー", "血吸いの護石"]
 FONT = ImageFont.truetype(FONT_PATH, 12)
 TEXTS = []
 

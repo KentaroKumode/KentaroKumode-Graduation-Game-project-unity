@@ -252,6 +252,10 @@ namespace GameLoop
         /// パッシブの重複取得を禁止する判定に使う（= 一度捨てたものも再取得しない）。</summary>
         public HashSet<string> seenPassiveItemIds = new HashSet<string>();
 
+        /// <summary>呪いの付いた提示の品 (呪物の賽・2026-11-25・CombatSystem.DiePassives.MaybeCurse)。 手に入れると最大 HP −5 で外れる。
+        /// 同じ品が呪い無しで出し直された時・店に並んで買われた時も外れる (呪いは提示ごと)。</summary>
+        public HashSet<string> cursedOfferIds = new HashSet<string>();
+
         /// <summary><b>出現の枠 (動的 4 枠ロック・2026-11-21・docs/full-item-rework-spec.md §1-1)。</b> 8 軸の秘宝を取得した順の軸 (最大 4)。
         /// 4 つ埋まると、 秘宝と軸の端子はこの 4 軸と枠外 (金・軸なし) からだけ出る。 手放しても外れない。 種火を挿していれば、 その軸が最初から 1 つ目。
         /// 書くのは <see cref="ItemSystem.AxisPool.NoteAcquired"/> とランの始めだけ。</summary>
@@ -468,12 +472,12 @@ namespace GameLoop
         public int  oldLetterUsesSpent;        // 古い手紙: 手元の 1 枚を使った回数。 ItemIds.OldLetterUses に達したら手放して 0 に戻す
 
         // === アイテム再編 (2026-10-31) ===
-        /// <summary>前の戦闘が終わってからマップで進んだ歩数。 移動で貯まる品 (継ぎ革の旅靴・聖路の白靴・毒草摘みの杖・測量師の片眼鏡) が
+        /// <summary>前の戦闘が終わってからマップで進んだ歩数。 移動で貯まる品 (火打ち底の旅靴・聖路の白靴・毒草摘みの杖・測量師の片眼鏡) が
         /// 次の戦闘の開始時に読む。 GameManager の点に入る前のフックで +1、 戦闘終了で 0。</summary>
         public int  stepsSinceBattle;
         /// <summary>〈天工開物〉: このランで武器を強化した回数 (持っている間だけ数える)。 爆発の基礎 +8 × 回数 (HeatEffects.TenkouKaibutsu)。</summary>
         public int  heavenlyCraftUpgrades;
-        /// <summary>〈脈なしの鋼心臓〉の X: 戦闘開始時のシールド。 ランの始めに 12、 持っている間に戦闘に勝つたび +2 (2026-11-21)。</summary>
+        /// <summary>〈脈打たぬ鋼の心臓〉の X: 戦闘開始時のシールド。 ランの始めに 12、 持っている間に戦闘に勝つたび +2 (2026-11-21)。</summary>
         public int  pulselessHeartShield = ItemSystem.PassiveSkills.Effects.PulselessHeart.StartShield;
 
         // === マクロ秘宝 (2026-11-20・item-overhaul-spec §9)。 どれも持っている間の出来事だけ数える ===
@@ -485,7 +489,7 @@ namespace GameLoop
         public int  passShopSpent;
         /// <summary>[使っていない・セーブ互換で残す] 旧〈黄金の通行手形〉の残り軒数。 読み書きしない。</summary>
         public int  passShopsUp;
-        /// <summary>〈避雷の天幕〉: 数えている層の深さ (違う層に入ったら数え直す) と、 その層で半分にした回数。</summary>
+        /// <summary>〈防嵐の天幕〉: 数えている層の深さ (違う層に入ったら数え直す) と、 その層で半分にした回数。</summary>
         public int  tentDepth = -1, tentUses;
 
         /// <summary>次戦闘持ち越しバフをすべて消去（戦闘開始時にコピー後 or リセット時）。</summary>
@@ -534,6 +538,7 @@ namespace GameLoop
             permanentDebuffs = new HashSet<string>();
             seenOnceEvents = new HashSet<string>();
             seenPassiveItemIds = new HashSet<string>();
+            cursedOfferIds = new HashSet<string>();
             lockedAxes = new List<string>();
             { string spark = MetaProgression.MetaBuffApplicator.GetSparkAxis(); if (spark != null) lockedAxes.Add(spark); }   // 種火の軸は最初から 1 つ目の枠
             ascendedPassiveIds = new List<string>();

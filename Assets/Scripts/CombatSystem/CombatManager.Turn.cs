@@ -555,6 +555,7 @@ namespace CombatSystem
                     for (int i = 0; i < playerDice.Length; i++) { playerDice[i] += foundry; _slothAt[i] += foundry; }   // 怠惰の足し戻しの目も一緒にずらす
             }
             ForceVescaDice(ctx, playerDice, null);   // [測定 2026-11-11] ヴェスカ連戦の出目の固定 (既定は触らない)
+            ForceRunSpecDice(ctx, playerDice, playerFaceIdx);   // ラン指定の出目の固定 (チュートリアルの「悪い目 → 振り直し」・指定が無ければ触らない)
 
             // 7層ヴェスカ〈天与の指輪〉: 3 以上の出目をすべて 1〜2 へ再抽選する。
             //   全出目 1 は本数ぶんの手が完全に死に、 その前の「行動不可」と重さが変わらなかった。
@@ -620,7 +621,7 @@ namespace CombatSystem
             // パターン系パッシブ (ゾロ目/階段/全相異) + 合計確定
             psm.ProcessPostRoll(playerDice, enemyDice);
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnPostRoll);
-            DecideOmniPair(ctx, playerDice);   // 〈万象のゾロ目〉(2026-11-21): 出目が決まった所で、 2 個そろいをゾロ目として扱うか (配線の前)
+            DecideOmniPair(ctx, playerDice);   // 〈万象の賽盆〉(2026-11-21): 出目が決まった所で、 2 個そろいをゾロ目として扱うか (配線の前)
 
             // --- 2. 予告 (柱3: 完全情報テレグラフ) ---
             // 〈鎮静香〉(§6-5) の遅延を差し引いたターンで段階を引く。 予告にもそのまま出るので、
@@ -746,19 +747,19 @@ namespace CombatSystem
             TerminalOutcome term;
             {
                 var tenv = TerminalEnvNow(ctx, enemyAtkValue);
-                int[] slots = null, targets = null; bool[] keepMarks = null;
+                int[] slots = null, targets = null, plugRank = null; bool[] keepMarks = null;      // plugRank = 撃の順 (挿した順・null = 場の順・2026-11-25)
                 int reboot = ChargeCore.RebootNone; bool overclock = false;      // 充電のコアアクション (人 = 画面 / BOT = 方策・2026-11-21)
                 if (_interactiveTurn)
                 {
                     _pause.Set(TurnPauseKind.Wiring, playerDice, playerFaceIdx, tele);
                     _pause.board = _deck.board; _pause.terminalEnv = tenv; _pause.terminalState = _deck.state;
                     yield return _pause;
-                    slots = _pause.slots; targets = _pause.targets; keepMarks = _pause.keep; reboot = _pause.reboot; overclock = _pause.overclock;
+                    slots = _pause.slots; targets = _pause.targets; keepMarks = _pause.keep; reboot = _pause.reboot; overclock = _pause.overclock; plugRank = _pause.plugRank;
                 }
-                else if (WiringPolicy != null) { var plan = WiringPolicy(playerDice, tele); slots = plan.slots; targets = plan.targets; keepMarks = plan.keep; reboot = plan.reboot ?? ChargeCore.RebootNone; overclock = plan.overclock; }
+                else if (WiringPolicy != null) { var plan = WiringPolicy(playerDice, tele); slots = plan.slots; targets = plan.targets; keepMarks = plan.keep; reboot = plan.reboot ?? ChargeCore.RebootNone; overclock = plan.overclock; plugRank = plan.plugRank; }
                 if (slots == null) slots = TerminalWiring.Auto(_deck.board, playerDice, tenv, _deck.state);
                 // 〈影写し〉〈火葬の剣〉〈有効活用〉の対象: 人 = 画面で選んだ端子 / BOT = 方策 / どちらも無ければ左端の候補
-                term = TerminalCards.Resolve(_deck.board, slots, playerDice, tenv, _deck.state, targets, logAttack: true, reboot: reboot, overclock: overclock);
+                term = TerminalCards.Resolve(_deck.board, slots, playerDice, tenv, _deck.state, targets, logAttack: true, reboot: reboot, overclock: overclock, plugRank: plugRank);
                 _termWanted = (int[])slots.Clone();   // [計装 #106] 直す前の挿し方 (挿したが不発の数え)
                 mutualWiring = term.kindOfDie;
                 _termOutcome = term;
@@ -982,20 +983,24 @@ namespace CombatSystem
             int lbStage = GameLoop.GameManager.Instance?.Run?.limitBreakStage ?? 0;
             int dealtDmg = 0, dealtFixed = 0; bool isCrit = false;
             var hitDealt = new List<int>(); var hitCrit = new List<bool>();
-            var hitFocus = new List<bool>(); var hitSpent = new List<int>(); var hitRenki = new List<int>();   // 撃ごとの集中会心・使った【練気】・会心で +1 した後の【練気】(〈死相の面頬〉〈天眼の鍔〉が読む・2026-11-23)
+            var hitFocus = new List<bool>(); var hitSpent = new List<int>(); var hitRenki = new List<int>();   // 撃ごとの集中会心・使った【練気】・会心で +1 した後の【練気】(〈死相の面頬〉〈白濁の義眼〉が読む・2026-11-23)
             int nHits = Math.Max(1, hitBases.Count);
             ctx.hitCount = hitBases.Count;   // 撃ごとの品が読む (攻撃しないターンは 0 ── 下の 1 回は固定ダメの枠を取り出すだけ)
             //   〈必殺の照準器〉(CritCore・2026-11-23): 攻撃の端子が 1 枚だけのターン、 その撃が集中会心なら同じ撃をもう 1 回発火する (1 ターン 1 回・会心は実際の会心率で振る・
             //   もう一度集中にならない・【練気】を使わない・会心倍率 +(0.50 ＋ 元の撃で使った【練気】× 0.25))
             bool sniper = hitBases.Count == 1 && GameLoop.GameManager.Instance?.Run?.OwnsPassive(GameLoop.ItemIds.CritSniper) == true;
             bool refire = false; int sniperSpent = 0;
-            //   〈防人の軍標〉(2026-11-22): 2 回目以降 (BorderGuardStandard.EchoNeed) のジャスト防御の次のターン、 全部の撃がもう 1 回ずつ発火する (同じ撃をすぐもう 1 回・会心は振り直す)。
+            //   〈無銘の剣舞譜〉(2026-11-25 作者の決定): 毎ターン全部の撃が会心確定・敵の防御を無視・同じ撃がもう 1 回 (同じ撃をすぐもう 1 回・会心は振り直す)。
+            //   (〈防人の軍標〉の「もう 1 回」は 2026-11-25 に撤去。 道はこの品だけが使う)
             //   shortcut: 〈必殺の照準器〉がもう 1 回発火した撃には重ねない (照準器は攻撃の端子 1 枚のターンだけ)
-            bool echoAll = hitBases.Count > 0 && ItemSystem.PassiveSkills.Effects.BorderGuardStandard.EchoNow(ctx), echoing = false;
+            bool bladeDance = hitBases.Count > 0 && ItemSystem.PassiveSkills.Effects.BladeDance.Held(GameLoop.GameManager.Instance?.Run), echoing = false;
+            bool echoAll = bladeDance;
             for (int h = 0; h < nHits; h++)
             {
                 ctx.hitIndex = h; ctx.forceCritThisHit = false; ctx.critSkipRoll = false; ctx.isRefireHit = refire; ctx.hitCritRateMulAdd = 0f; ctx.hitIsFocused = false; ctx.hitFocusSpentRenki = 0; ctx.hitFinalDamagePct = 0; ctx.hitOutgoingPct = 0; ctx.hitIgnoreDefense = h == chainHit; ctx.hitArmorPen = 0;   // 撃ごとの値 (〈抜き打ちの作法〉〈加重の拳套〉・〈連刃〉の追撃は防御を無視)
                 ctx.hitFaceMax = CritCore.HitFaceMax(term, playerDice, h);   // 〈狙い目の刻み〉が読む
+                ctx.hitFinalDamagePct += (int)ctx.GetAccumulated(DiePassives.RewindFinalPctKey);   // 逆巻きの賽: マイナスの段階の得 (このターン・最終与ダメージ)
+                if (bladeDance && h < hitBases.Count) { ctx.forceCritThisHit = true; ctx.hitIgnoreDefense = true; }
                 if (h > 0 || refire || echoing)
                 {
                     // 次の撃の前に固定ダメの枠を空にする ── 空にしないと 1 撃目の固定ダメ (毒・品が預けた分) が次の撃にも返って二重に入る。
@@ -1021,7 +1026,7 @@ namespace CombatSystem
                 hitFocus.Add(c && ctx.hitIsFocused); hitSpent.Add(ctx.hitFocusSpentRenki); hitRenki.Add(c ? ItemSystem.PassiveSkills.Effects.Crit.HitRenki(ctx) : 0);
                 dealtDmg += d; dealtFixed += f; isCrit |= c;
                 if (refire) { refire = false; CritRefireFired++; Debug.Log($"[必殺の照準器] 会心の撃をもう 1 回発火 → {d}"); }
-                else if (echoing) { echoing = false; GuardEchoFired++; Debug.Log($"[防人の軍標] {h + 1} 撃目をもう 1 回発火 → {d}"); }
+                else if (echoing) { echoing = false; GuardEchoFired++; Debug.Log($"[無銘の剣舞譜] {h + 1} 撃目をもう 1 回発火 → {d}"); }
                 else if (sniper && c && h == 0 && ctx.hitIsFocused) { refire = true; sniperSpent = ctx.hitFocusSpentRenki; h--; }
                 else if (echoAll && h < hitBases.Count) { echoing = true; h--; }
             }
@@ -1138,7 +1143,7 @@ namespace CombatSystem
             }
 
             result.enemyHPBeforeAttack = enemyHP;   // [読むための欄・実績〈やりすぎ〉] 主攻撃を当てる直前の敵の HP
-            // ADR-0016: 主攻撃は 1 撃ずつ HP へ入れ、 首落とし (天眼の鍔) とボスの目盛りを割る判定も 1 撃ごと。
+            // ADR-0016: 主攻撃は 1 撃ずつ HP へ入れ、 首落とし (白濁の義眼) とボスの目盛りを割る判定も 1 撃ごと。
             //   合計 (dealtDmg) は役〈追撃〉・ヴェスカの守りで変わっているので配り直す: 減った分は後ろの撃から削り、 増えた分は最後の撃に乗せる。
             int hitLeft = dealtDmg;
             for (int h = 0; h < hitDealt.Count; h++)
@@ -1146,7 +1151,7 @@ namespace CombatSystem
                 int hitDmg = h == hitDealt.Count - 1 ? hitLeft : Math.Min(hitDealt[h], hitLeft);
                 hitLeft -= hitDmg;
                 HpLossDiag.Lose(ref enemyHP, hitDmg, "通常攻撃");
-                // 〈天眼の鍔〉(2026-11-23): 集中会心の一撃のあと、 敵の HP が「(会心倍率 × 5 ＋ 使った【練気】× 3)%」(ボスはその半分・上限なし) 以下なら倒す。 〈百人切りの鉈〉と同じく CanExecuteEnemy で止まる
+                // 〈白濁の義眼〉(2026-11-23): 集中会心の一撃のあと、 敵の HP が「(会心倍率 × 5 ＋ 使った【練気】× 3)%」(ボスはその半分・上限なし) 以下なら倒す。 〈百人切りの鉈〉と同じく CanExecuteEnemy で止まる
                 if (hitCrit[h] && hitFocus[h] && hitDmg > 0 && enemyHP > 0)
                 {
                     int line = ItemSystem.PassiveSkills.Effects.HeavenEyeGuard.KillLine(ctx, hitSpent[h]);
@@ -1155,9 +1160,9 @@ namespace CombatSystem
                         int left = enemyHP;
                         enemyHP = 0;
                         CritExecuteFired++;
-                        HpLossDiag.Add("経路:処刑(天眼の鍔)", left);
-                        EnemyHpLedger.Land("処刑(天眼の鍔)", left, left);
-                        if (Debug.unityLogger.logEnabled) Debug.Log($"[天眼の鍔] 集中会心のあと敵 HP {left} ≤ {line} → 倒す");
+                        HpLossDiag.Add("経路:処刑(白濁の義眼)", left);
+                        EnemyHpLedger.Land("処刑(白濁の義眼)", left, left);
+                        if (Debug.unityLogger.logEnabled) Debug.Log($"[白濁の義眼] 集中会心のあと敵 HP {left} ≤ {line} → 倒す");
                     }
                 }
                 // 〈百人切りの鉈〉(2026-11-21・BleedCore): 撃が当たったあと、 敵の出血が 12 以上で HP が「出血 × 1.2%」(ボスは半分・最大 25%) 以下なら倒す。 CanExecuteEnemy で止まる
@@ -1617,15 +1622,7 @@ namespace CombatSystem
             //   1 回目を敵攻撃より前に置くのは、 致死打で `enemyHP > 0` が落ちて
             //   **ヴェスカがそのターンを丸ごと飛ばす**のを防ぐため (踏みとどまった以上は殴り返す)。
             //   よってこの 2 点セットで 1 ターン分を覆う。 ClampToThreshold は冪等。
-            // --- 臨界メーター (Rinkai) 更新 ---
-            //   攻撃の端子に挿した出目の合計の半分を溜める (HeatCore.EndGain・2026-11-22 neon 収束: 旧 攻撃の端子の合計)。 閾値をまたいだらその場で爆発のダメージが入る (Kw.AddHeat → LandBurst・ADR-0016)。
-            //   品が溜める分 (被弾・充電・会心など) は、 それぞれの出来事の時点で Kw.AddHeat を通る。
-            //   **手元の HP を ctx へ書き戻す前 (解決中) に置く** ── 書き戻しの後だと爆発で減らした ctx の HP が上書きされて消える。
-            {
-                int endHeat = CombatSystem.HeatCore.EndGain(term);
-                if (ctx.rinkaiThreshold > 0 && endHeat > 0)
-                    ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, endHeat, "ターンの終わり(攻撃に挿した出目の半分)");
-            }
+            // (臨界の攻撃に挿した出目の半分は 2026-11-25 から配線のとき = 攻撃の前に溜める・CombatManager.Terminals の ApplyTerminalOutcome)
             // 攻撃の後に品が預けた敵へのダメージ (Kw.DamageEnemy) をここで通す。 踏みとどまりの clamp より前。
             {
                 int pendingKw = ItemSystem.PassiveSkills.Keywords.Kw.TakePendingEnemyDamage(ctx);

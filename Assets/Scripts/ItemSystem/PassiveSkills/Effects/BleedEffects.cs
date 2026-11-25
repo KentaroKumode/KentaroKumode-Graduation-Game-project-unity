@@ -6,13 +6,13 @@ namespace ItemSystem.PassiveSkills.Effects
     // ============================================================
     //  出血の軸 26 品 (2026-11-21・full-item-rework-ledger §④・docs/GAME.md §7-2)。
     //  撃 (攻撃の端子 1 枚 = 1 撃・ADR-0016) を重ねるほど出血が増え、 出血の多い敵を殴るほど 1 撃が重くなる。
-    //  撃ごとに出血を与える 10 品と撃ごとの攻撃 +N の 3 品 (鉛入りの握斧・血日に澄む佩玉・医家の反り刃・返し刃の留め金・欠け刃のナイフ・
-    //  裂け目の楔・鋸刃の山刀・先血の腕輪の最初の撃・血止め知らずの針箱・医書裏の開き針の攻撃・激情の刃・百人切りの鉈) は
+    //  撃ごとに出血を与える 10 品と撃ごとの攻撃 +N の 3 品 (鉛入りの手斧・血に澄む紅玉・医家の反り刃・返し刃の留め金・欠け刃のナイフ・
+    //  裂け目の楔・鋸刃の山刀・血呼びの腕輪の最初の撃・血止め知らずの針箱・医書の隠し針の攻撃・激情の刃・百人切りの鉈) は
     //  CombatSystem.BleedCore.ApplyToTerminals (Resolve の 5f・本体・画面の見込み・BOT が同じ)。 〈百人切りの鉈〉の処刑は本体の撃の輪 (BleedCore.CleaverKillLine)。
     //  出血のダメージは毎ターンの終わり (CombatManager.Turn・出血の量そのまま)・減り方は 1 + 出血 / (10 + 割る数の足し分) (AxisRules.BleedDecay)。
     // ============================================================
 
-    // ── B: 起点 ── (〈鉛入りの握斧〉〈血日に澄む佩玉〉〈医家の反り刃〉〈返し刃の留め金〉〈欠け刃のナイフ〉〈裂け目の楔〉は端子の解決の中だけ・BleedCore の旗)
+    // ── B: 起点 ── (〈鉛入りの手斧〉〈血に澄む紅玉〉〈医家の反り刃〉〈返し刃の留め金〉〈欠け刃のナイフ〉〈裂け目の楔〉は端子の解決の中だけ・BleedCore の旗)
 
     /// <summary>棘付きの籠手: ブロックで敵の攻撃を受けきったターン (ブロック ≥ 敵の攻撃・HP を 1 も失わない)、 敵に出血 +3・次のターンの最初の 1 撃の攻撃 +4。</summary>
     public class ThornGlove : IPassiveSkillEffect, IRelicDisplay
@@ -52,11 +52,11 @@ namespace ItemSystem.PassiveSkills.Effects
 
     // ── S: エンジン・安定 ── (〈鋸刃の山刀〉〈血止め知らずの針箱〉は端子の解決の中だけ)
 
-    /// <summary>魂喰らいの血石: 敵の出血が消費か自然減衰で減るたび、 減った量と同じブロックを得る (1 ターン最大 12)。
+    /// <summary>血吸いの護石: 敵の出血が消費か自然減衰で減るたび、 減った量と同じブロックを得る (1 ターン最大 12)。
     /// 自然減衰 (ターンの頭) の分はそのターンのブロック、 攻撃の中で消費した分 (配線の後) は次のターンのブロックに入る。</summary>
     public class SoulBloodstone : IPassiveSkillEffect, IRelicDisplay
     {
-        public string SkillId => "魂喰らいの血石";
+        public string SkillId => "血吸いの護石";
         public const int MaxPerTurn = 12;
         /// <summary>[ターンごと] このターンに得たブロック (Psn.TurnN) / [persistent] 次のターンに入れるブロック。</summary>
         private const string Key = "bld.soul", PendingKey = "bld.soul.pending";
@@ -88,7 +88,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>先血の腕輪: 戦闘開始時、 敵に出血 +3。 各ターン最初に攻撃が当たったとき、 敵に出血 +1 (BleedCore の旗・5f)。</summary>
+    /// <summary>血呼びの腕輪: 戦闘開始時、 敵に出血 +3。 各ターン最初に攻撃が当たったとき、 敵に出血 +1 (BleedCore の旗・5f)。</summary>
     public class BloodFate : IPassiveSkillEffect
     {
         public string SkillId => GameLoop.ItemIds.BleedFirstBlood;
@@ -124,10 +124,10 @@ namespace ItemSystem.PassiveSkills.Effects
 
     // ── G: 分岐 A〈多段〉/ 分岐 B〈回収〉 ── (〈激情の刃〉〈百人切りの鉈〉は端子の解決と本体の撃の輪だけ)
 
-    /// <summary>逆綴じの止血帯 (分岐 A): ターンの終わり、 このターン 2 撃以上の攻撃をしていたら敵の出血 × 1 の軽減不可ダメージ。 3 撃以上なら × 2 (final5: 0〜1 撃のターンは働かない)。</summary>
+    /// <summary>逆締めの止血帯 (分岐 A): ターンの終わり、 このターン 2 撃以上の攻撃をしていたら敵の出血 × 1 の軽減不可ダメージ。 3 撃以上なら × 2 (final5: 0〜1 撃のターンは働かない)。</summary>
     public class Wringing : IPassiveSkillEffect, IRelicDisplay
     {
-        public string SkillId => "逆綴じの止血帯";
+        public string SkillId => "逆締めの止血帯";
         public const int Mul = 1, MulMulti = 2, MinHits = 2, MultiHits = 3;
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.enemyBleedStacks > 0 && ctx.hitCount >= MinHits);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
@@ -137,11 +137,11 @@ namespace ItemSystem.PassiveSkills.Effects
             if (b <= 0 || ctx.enemyCurrentHP <= 0 || ctx.hitCount < MinHits) return;
             int mul = ctx.hitCount >= MultiHits ? MulMulti : Mul;
             Kw.DamageEnemy(ctx, b * mul);
-            Rw.Log($"[逆綴じの止血帯] 出血 {b} × {mul} = {b * mul} の軽減不可 (撃 {ctx.hitCount})");
+            Rw.Log($"[逆締めの止血帯] 出血 {b} × {mul} = {b * mul} の軽減不可 (撃 {ctx.hitCount})");
         }
     }
 
-    /// <summary>医書裏の開き針【規則】(分岐 A): 敵の出血の自然減衰が無くなる。 敵の出血 10 につき、 撃ごとの攻撃 +2 (配線の時点の出血・BleedCore の旗・5f)。</summary>
+    /// <summary>医書の隠し針【規則】(分岐 A): 敵の出血の自然減衰が無くなる。 敵の出血 10 につき、 撃ごとの攻撃 +2 (配線の時点の出血・BleedCore の旗・5f)。</summary>
     public class AntiClotting : IPassiveSkillEffect
     {
         public string SkillId => GameLoop.ItemIds.BleedOpenNeedle;
@@ -223,7 +223,8 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>紅の搾り具 (分岐 B): 敵の出血が 15 以上の敵に攻撃が当たったとき、 出血の 1/3 (切り上げ) を使い、 使った量 × 8 の軽減不可ダメージ・ボスの次の目盛りにひび (1 ターン 1 回)。</summary>
+    /// <summary>紅の搾り具 (分岐 B): 敵の出血が 15 以上の敵に攻撃が当たったとき、 出血の 1/3 (切り上げ) を使い、 使った量 × 8 の軽減不可ダメージ・ボスの次の目盛りをそのダメージの 100% ぶん上げる
+    /// (1 ターン 1 回・2026-11-25 neon answer_gauge・旧: ひびを入れる)。</summary>
     public class CrimsonPress : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => GameLoop.ItemIds.BleedPress;
@@ -238,7 +239,7 @@ namespace ItemSystem.PassiveSkills.Effects
             int used = Kw.ConsumeBleed(ctx, BleedCore.PressSpend(b));
             if (used <= 0) return;
             Kw.DamageEnemy(ctx, used * BleedCore.PressMul);
-            CombatManager.Instance?.CrackBossNotch(SkillId);
+            CombatManager.Instance?.RaiseBossNextNotch(used * BleedCore.PressMul);
             Rw.Log($"[紅の搾り具] 出血 {b} → {ctx.enemyBleedStacks} (使う {used}) → {used * BleedCore.PressMul} の軽減不可");
         }
     }
@@ -252,11 +253,11 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.bleedDouble = true;
     }
 
-    /// <summary>戻り血の古鎌 (分岐 B): 秘宝が敵の出血を使うたび (<see cref="Kw.ConsumeBleed"/> の出来事 OnBleedConsume)、 使った量の 60% (切り捨て) が
+    /// <summary>戻り血の頭骨 (分岐 B): 秘宝が敵の出血を使うたび (<see cref="Kw.ConsumeBleed"/> の出来事 OnBleedConsume)、 使った量の 60% (切り捨て) が
     /// 次のターンの頭に出血として戻る。 自然に減る分 (OnBleedDecay) は戻らない。 戻す出血は AddEnemyBleed を通す。</summary>
     public class ReturningBloodSickle : IPassiveSkillEffect, IRelicDisplay
     {
-        public string SkillId => "戻り血の古鎌";
+        public string SkillId => "戻り血の頭骨";
         public const int ReturnPct = 60;
         /// <summary>[persistent] 次のターンの頭に戻す量 / このターンに使った分の 60% / その「このターン」の番号。</summary>
         private const string ReadyKey = "bld.sickle.ready", CurKey = "bld.sickle.cur", TurnKey = "bld.sickle.turn";
@@ -278,7 +279,7 @@ namespace ItemSystem.PassiveSkills.Effects
             if (n <= 0) return;
             ctx.accumulatedValues[ReadyKey] = 0;
             ctx.AddEnemyBleed(n);
-            Rw.Log($"[戻り血の古鎌] 使った出血の 60% が戻る: 出血 +{n} → {ctx.enemyBleedStacks}");
+            Rw.Log($"[戻り血の頭骨] 使った出血の 60% が戻る: 出血 +{n} → {ctx.enemyBleedStacks}");
         }
 
         /// <summary>「このターン」の分を「次のターンの頭に戻す」側へ移し、 今のターンの番号にする。</summary>

@@ -347,7 +347,7 @@ namespace UI.Game2D.Battle
                     {
                         Game2DSfx.Play("decide");
                         int n = p.playerDice != null ? p.playerDice.Length : 0;
-                        cm.AnswerWiringSlots(BuildSlots(n), (int[])target.Clone(), (bool[])keepMark.Clone(), rebootSel, overclockOn);   // 残す印は本体が KeepFromMarks で直す (挿した端子には効かない)
+                        cm.AnswerWiringSlots(BuildSlots(n), (int[])target.Clone(), (bool[])keepMark.Clone(), rebootSel, overclockOn, PlugRank(n));   // 残す印は本体が KeepFromMarks で直す (挿した端子には効かない)
                         if (!cm.IsAwaitingDecision) Resolve(cm);
                     }
                     break;
@@ -460,7 +460,7 @@ namespace UI.Game2D.Battle
             if (cm != null) { _hpBefore += cm.PlayerHP - hpBefore; playerHp = cm.PlayerHP; playerMax = Mathf.Max(1, cm.PlayerMaxHP); }
             var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
             if (ctx != null) charge = ctx.GetCharge();
-            // 戦術消耗品 (2026-11-20: 〈入れ替えの符〉〈複製の水銀〉・〈帯革の薬嚢〉) で場の手札が変わったら、 場を取り直す。
+            // 戦術消耗品 (2026-11-20: 〈風替わりの羽根〉〈複製の水銀〉・〈帯革の薬嚢〉) で場の手札が変わったら、 場を取り直す。
             //   挿してあった出目は外す (同じ添字に別の端子が来るため)
             var dk = cm?.TerminalDeck;
             if (dk != null && !SameBoard(dk.board))
@@ -535,16 +535,42 @@ namespace UI.Game2D.Battle
 
         private int[] BuildSlots(int n)
         {
+            SyncPlugSeq();
             var s = new int[n];
             for (int i = 0; i < n; i++) s[i] = i < slot.Length ? slot[i] : -1;
             return s;
         }
 
+        // 撃の順 (2026-11-25・作者の決定): 攻撃の端子の撃は出目を挿した順に当たる。 slot が変わった出目に、 変わった時の通し番号を振る
+        //   (挿し方を変える口が多いので、 前に見た slot と比べて拾う ── 外して挿し直すと最後になる)。
+        private int[] _plugSeq = new int[0], _seenSlot = new int[0];
+        private int _plugClock;
+        private void SyncPlugSeq()
+        {
+            if (_plugSeq.Length != slot.Length)
+            {
+                System.Array.Resize(ref _plugSeq, slot.Length); int old = _seenSlot.Length;
+                System.Array.Resize(ref _seenSlot, slot.Length); for (int i = old; i < slot.Length; i++) { _seenSlot[i] = -1; _plugSeq[i] = -1; }
+            }
+            for (int i = 0; i < slot.Length; i++)
+                if (slot[i] != _seenSlot[i]) { _seenSlot[i] = slot[i]; _plugSeq[i] = slot[i] >= 0 ? ++_plugClock : -1; }
+        }
+        /// <summary>出目ごとの挿した順 (Resolve の plugRank・AnswerWiringSlots へ渡す)。</summary>
+        private int[] PlugRank(int n)
+        {
+            SyncPlugSeq();
+            var r = new int[n];
+            for (int i = 0; i < n; i++) r[i] = i < _plugSeq.Length ? _plugSeq[i] : -1;
+            return r;
+        }
+        /// <summary>札 s の撃の番号 (1 から・見込みで撃にならない札は 0)。 札の上に出す。</summary>
+        public int HitNo(int s) => preview != null ? preview.attackHitSlot.IndexOf(s) + 1 : 0;
+
         private void RecomputePreview()
         {
             if (lastOutcome != null) { preview = lastOutcome; return; }
             if (!TermInputs(out var dice, out var env, out var st)) { preview = null; return; }
-            preview = TerminalCards.Resolve(board, BuildSlots(dice.Length), dice, env, st.Clone(), target, reboot: rebootSel, overclock: overclockOn);
+            preview = TerminalCards.Resolve(board, BuildSlots(dice.Length), dice, env, st.Clone(), target, reboot: rebootSel, overclock: overclockOn, plugRank: PlugRank(dice.Length));
         }
 
         // ── 充電のコアアクション (2026-11-21・ChargeCore・仮置き) ──
@@ -564,7 +590,7 @@ namespace UI.Game2D.Battle
         {
             if (!CanOperate || !HasReboot) return;
             var cands = new List<int>();
-            var o = TermInputs(out var dice, out var env, out var st) ? TerminalCards.Resolve(board, BuildSlots(dice.Length), dice, env, st.Clone(), target) : null;
+            var o = TermInputs(out var dice, out var env, out var st) ? TerminalCards.Resolve(board, BuildSlots(dice.Length), dice, env, st.Clone(), target, plugRank: PlugRank(dice.Length)) : null;
             if (o != null)
                 foreach (int s in o.fired)
                 {
@@ -593,7 +619,7 @@ namespace UI.Game2D.Battle
         public string OverclockLabel => "オーバークロック";
 
         // ── 毒の【起爆】(2026-11-21・PoisonCore・仮置き) ── 起爆は品が自動で起こす (押す札ではない)。 見込み (preview) の毒で、 このターン起爆するかを右の列に出す。
-        //   〈石抜きの毒指輪〉= 配線の後の毒が 24 以上で攻撃の端子あり / 〈劇毒の火薬庫〉= このターンに与えた毒 (端子の分を足す) が 8 以上。
+        //   〈蓋付きの毒指輪〉= 配線の後の毒が 24 以上で攻撃の端子あり / 〈劇毒の火薬庫〉= このターンに与えた毒 (端子の分を足す) が 8 以上。
         private PoisonItems PoisonFlags => CombatManager.Instance?.TerminalDeck?.state.poisonItems ?? PoisonItems.None;
         public bool HasDetonate => (PoisonFlags & (PoisonItems.Ring | PoisonItems.Magazine)) != 0;
         private bool DetonateState(out string label)
@@ -604,12 +630,12 @@ namespace UI.Game2D.Battle
             if ((PoisonFlags & PoisonItems.Ring) != 0)
             {
                 int p = env.enemyPoison + add;
-                label = "起爆 毒" + p + "/" + PoisonCore.RingNeed;
+                label = "劇症 毒" + p + "/" + PoisonCore.RingNeed;
                 return p >= PoisonCore.RingNeed && preview != null && preview.attackHits.Count > 0;
             }
             var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
             int g = (ctx != null ? ItemSystem.PassiveSkills.Effects.Psn.TurnN(ctx, ItemSystem.PassiveSkills.Effects.PoisonMagazine.GivenKey) : 0) + add;
-            label = "起爆 付与" + g + "/" + PoisonCore.MagazineGiven;
+            label = "劇症 付与" + g + "/" + PoisonCore.MagazineGiven;
             return g >= PoisonCore.MagazineGiven;
         }
         /// <summary>このターン起爆する見込み (金で出す)。 / 右の列の文字 (仮)。</summary>
@@ -665,7 +691,7 @@ namespace UI.Game2D.Battle
             var s = ItemSystem.PassiveSkills.Keywords.Kw.HeatState(ctx);
             if (s.threshold <= 0 && (preview == null || (preview.heat <= 0 && preview.heatGains.Count == 0))) return false;
             var f = preview != null ? HeatCore.Forecast(s, preview) : default;
-            int n = f.burstsWired + f.burstsEnd;
+            int n = f.burstsWired;
             label = "臨界 " + s.meter + "/" + (s.threshold > 0 ? s.threshold : HeatCore.StartThreshold(s.items)) + (n > 0 ? " 爆発" + n : "");
             return n > 0;
         }
@@ -702,7 +728,7 @@ namespace UI.Game2D.Battle
         }
 
         // ── 山札の品 (2026-11-21・仮置き) ── 山札の品を持つ戦闘で、 この戦闘で使い捨てを使った回数 (+ この配線で使う数) を右の列に出す (表示だけ)。
-        //   この配線で使い捨てを使うなら金。 〈再利用のるつぼ〉〈灰から組む機関〉〈解体屋の袋〉が読む回数。
+        //   この配線で使い捨てを使うなら金。 〈再利用のるつぼ〉〈廃材組みの蒸気機関〉〈解体屋の袋〉が読む回数。
         private TerminalBattleState DeckSt => CombatManager.Instance?.TerminalDeck?.state;
         public bool HasDeckItems => DeckSt != null && DeckSt.deckItems != DeckItems.None;
         public bool DeckLive => HasDeckItems && preview != null && preview.disposedNow > 0;
@@ -710,7 +736,7 @@ namespace UI.Game2D.Battle
                                    + (preview != null && preview.damageMul != 1f ? " ×" + preview.damageMul.ToString("0.00") : "");
 
         // ── 役の軸の品 (2026-11-21・仮置き) ── 役の品を持つ戦闘で、 この戦闘で役が成立した回数 (+ このターンに立つ役)・続いたターンを右の列に出す (表示だけ)。
-        //   このターンに役が立つなら金。 〈符丁の刻み板〉〈血濡れの符丁〉〈万象のゾロ目〉が回数を、 〈揃いの拍子木〉が続いたターンを読む。
+        //   このターンに役が立つなら金。 〈進軍の角笛〉〈連勝の銀杯〉〈万象の賽盆〉が回数を、 〈揃いのメトロノーム〉が続いたターンを読む。
         public bool HasRoleItems => DeckSt != null && ItemSystem.PassiveSkills.AxisRules.Count(GameLoop.GameManager.Instance?.Run, ItemSystem.PassiveSkills.AxisRules.Role) > 0;
         public bool RoleLive => HasRoleItems && preview != null && preview.roleNow > 0;
         public string RoleLabel => !HasRoleItems ? "" : "役 " + DeckSt.roleCount + (RoleLive ? "+1" : "") + "回" + (DeckSt.roleStreak > 0 ? " 続" + DeckSt.roleStreak : "")
@@ -932,11 +958,11 @@ namespace UI.Game2D.Battle
             bool plugged = false;
             for (int i = 0; i < slot.Length; i++) if (slot[i] == s) plugged = true;
             if (!plugged) return true;
-            // 繋ぎの賽 (ADR-0015): 挿した端子も、 印の付いた左から最初の 1 枚だけ残る (本体の KeepFromMarks と同じ選び方)
-            if (EquippedDie.IdOf(GameManager.Instance?.Run) != DieIds.Link) return false;
+            // 繋ぎの賽 (ADR-0015): 挿した端子も、 印の付いた左から最初の 1 枚だけ残る (本体の KeepFromMarks と同じ選び方)。 使い捨ては残らない (2026-11-25)
+            if (EquippedDie.IdOf(GameManager.Instance?.Run) != DieIds.Link || TerminalCards.Get(board[s])?.disposable == true) return false;
             for (int t = 0; t < s && t < keepMark.Length; t++)
             {
-                if (!keepMark[t]) continue;
+                if (!keepMark[t] || TerminalCards.Get(board[t])?.disposable == true) continue;
                 for (int i = 0; i < slot.Length; i++) if (slot[i] == t) return false;   // もっと左に、 挿して印の付いた端子がある
             }
             return true;

@@ -531,13 +531,13 @@ namespace AutoTest
             /// <summary>[2026-11-21] 〈急所突きの針〉が仕込んである: 攻撃のある最初の 1 撃は必ず会心・敵の防御を無視 (本体 CombatManager.TakeTacticNeedle)。</summary>
             public bool needleFirst;
             /// <summary>[会心の軸 2026-11-21・CritCore] 配線の前に分かる合算の会心率 (100% 超えもそのまま) / 会心倍率 (敵の会心耐性の前) / 敵の会心耐性 /
-            /// 〈寸鉄〉(超過の変換 2 倍) /〈天眼の鍔〉(確定会心 ×1.25) /〈銑鉄棍〉(会心しなかった撃に会心率 1% につき +1%) / 会心が出ない (封印) / 必ず会心 (forceCritical)。</summary>
+            /// 〈寸鉄〉(超過の変換 2 倍) /〈白濁の義眼〉(確定会心 ×1.25) /〈銑鉄棍〉(会心しなかった撃に会心率 1% につき +1%) / 会心が出ない (封印) / 必ず会心 (forceCritical)。</summary>
             public float critAdd, critMulBase, critRed;
             public bool critDouble, ironClub, critOff, critOn;
-            /// <summary>[会心の軸] 配線で決まる品: 〈鷹匠の革手袋〉〈狙い目の刻み〉/ 攻撃の端子 1 枚の撃の〈一の矢〉〈渾身の柄頭〉〈必殺の照準器〉/ 最初の 1 撃が〈抜き打ちの作法〉で確定会心。</summary>
+            /// <summary>[会心の軸] 配線で決まる品: 〈鷹匠の革手袋〉〈狙い目の刻み〉/ 攻撃の端子 1 枚の撃の〈一の矢〉〈渾身の鉄兜〉〈必殺の照準器〉/ 最初の 1 撃が〈抜き打ちの作法〉で確定会心。</summary>
             public bool falconer, aim, firstArrow, pommel, sniper;
             /// <summary>[会心の軸 2026-11-23] 【集中】と【練気】: 今の練気 / 持っている集中の品 / その数 / 会心の品の数 / 〈抜き打ちの作法〉の集中の会心率の上乗せ /
-            /// 集中会心の品 (〈抜き打ちの作法〉〈細目の覗き筒〉〈天眼の鍔〉) / 分岐 A の撃ごとの品 (〈見切りの目印〉〈脈打ちの測り針〉とその持ち越し・〈初太刀の鍔留め〉の次の撃・〈白刃の鏡砥〉) /
+            /// 集中会心の品 (〈抜き打ちの作法〉〈細目の覗き筒〉〈白濁の義眼〉) / 分岐 A の撃ごとの品 (〈見切りの目印〉〈脈打ちの測り針〉とその持ち越し・〈初太刀の黒鞘〉の次の撃・〈白刃の鏡砥〉) /
             /// 〈測量師の片眼鏡〉の会心率の乗算 / 〈死相の面頬〉を持っている。</summary>
             public int renki, focusCount, critRelics;
             public CombatSystem.CritCore.FocusItems focusItems;
@@ -550,7 +550,6 @@ namespace AutoTest
             public float nonCritMul;           // 鈍器: 非会心だけ ×(1+x)
             public bool pinpointCut;           // 〈一点読みの片眼〉の代価: 非会心 × PinpointEye.NonCritKeepPct%
             public float outMul;               // 与ダメ倍率の池 (ctx.outgoing + 整備パネル + 戦意 + 剛胆 + 遺物 + 研磨剤 + 油・膏薬)
-            public int consBurst;              // 消費: 攻撃バースト (倍率の後に足す)
             public int critPen;                // 会心した攻撃だけに足す貫通
             public bool vitalIgnore;           // 短剣〈急所〉: 会心は防御を無視
             public int minDmg;                 // 勝利時の与ダメ最低保証
@@ -649,7 +648,7 @@ namespace AutoTest
             fpct += garyoPct;
             if (hitNo >= 1) fpct += s.lateHitFinalPct;   // 〈加重の拳套〉(answer15: 別枠の最終与ダメ)
             bool noDef = ws.ignoreDefense || (hitNo == 0 && s.needleFirst) || rawOverride >= 0 || (hitNo >= 1 && s.rung.vital2nd);   // 〈急所〉: 2 撃目以降は防御無視
-            int minDmg = s.minDmg, consBurst = s.consBurst, eDef = noDef ? 0 : s.eDefNow, pen = s.myPen + ws.armorPen, critPen = s.critPen;
+            int minDmg = s.minDmg, eDef = noDef ? 0 : s.eDefNow, pen = s.myPen + ws.armorPen, critPen = s.critPen;
             float nonCritMul = s.nonCritMul, berserk = s.berserkMul;
             // 会心 (CritCore・本体の ProcessDamage と同じ式): 撃ごとの会心率と会心倍率。 配線で決まる品はこの撃の目・撃の数で足す
             float add = s.critAdd, mulAdd = ws.critMultAdd;
@@ -658,7 +657,7 @@ namespace AutoTest
             if (s.aim && ws.hitFace != null && hitNo < ws.hitFace.Length) add += CombatSystem.CritCore.AimRate(ws.hitFace[hitNo]);
             add += s.bellRate;
             bool solo = ws.aHits == 1;
-            //   分岐 A の撃ごとの品 (2026-11-23): 〈見切りの目印〉2 撃目以降 / 〈脈打ちの測り針〉前の撃が会心 (2 撃目以降は前の撃の会心率で重み付け) / 〈初太刀の鍔留め〉の次のターンの最初の撃
+            //   分岐 A の撃ごとの品 (2026-11-23): 〈見切りの目印〉2 撃目以降 / 〈脈打ちの測り針〉前の撃が会心 (2 撃目以降は前の撃の会心率で重み付け) / 〈初太刀の黒鞘〉の次のターンの最初の撃
             if (s.readMark && ws.aHits >= 2 && hitNo >= 1) add += ItemSystem.PassiveSkills.Effects.ReadMark.RateFor(s.renki);
             if (s.pulse) { float w = hitNo == 0 ? (s.pulsePrimed ? 1f : 0f) : s.critP; add += w * ItemSystem.PassiveSkills.Effects.PulseNeedle.Rate; mulAdd += w * ItemSystem.PassiveSkills.Effects.PulseNeedle.Mul; }
             if (s.firstStrokePrimed && hitNo == 0) add += ItemSystem.PassiveSkills.Effects.FirstStrokePin.NextRate;
@@ -683,12 +682,12 @@ namespace AutoTest
             if (s.critRelics > 0) { mulAdd += CombatSystem.CritCore.RenkiMulPer * (s.renki + 1); mulPlain += CombatSystem.CritCore.RenkiMulPer * (s.renki + 1); }
             //   〈白刃の鏡砥〉: 会心した撃は今の【練気】(この会心の +1・集中なら使った後) × 0.06
             if (s.whiteBlade) { mulAdd += ItemSystem.PassiveSkills.Effects.WhiteBladeMirror.MulPerRenki * (s.renki + 1 - spent); mulPlain += ItemSystem.PassiveSkills.Effects.WhiteBladeMirror.MulPerRenki * (s.renki + 1); }
-            bool focusNoDef = focus && s.heaven;                                                                   // 〈天眼の鍔〉: 集中会心は防御を全部無視
+            bool focusNoDef = focus && s.heaven;                                                                   // 〈白濁の義眼〉: 集中会心は防御を全部無視
             bool suntetsuNoDef = s.critDouble && s.renki + 1 >= ItemSystem.PassiveSkills.Effects.Suntetsu.IgnoreRenki;   // 〈寸鉄〉: 練気 3 以上の会心は防御を全部無視
             float critMulEff = CombatSystem.CritCore.EffectiveMul(s.critMulBase + mulAdd, s.critRed, add, s.critDouble);
             float sniperMul = CombatSystem.CritCore.EffectiveMul(s.critMulBase + mulPlain + CombatSystem.CritCore.SniperMulAdd(spent), s.critRed, addPlain, s.critDouble);
             float ironOut = s.ironClub ? System.Math.Min(1f, add) : 0f;
-            bool pinpoint = s.pinpointCut, vital = s.vitalIgnore, down = s.enemyDown && !s.enemyDownWeak;   // ひびの弱いダウン (2026-11-14) は ×1.5 なし
+            bool pinpoint = s.pinpointCut, vital = s.vitalIgnore, down = DownTakesMul(s.enemyDown, s.enemyDownWeak);   // よろめき (2026-11-14) は ×1.5 なし (〈骨溶かしの黒油〉は有り)
             float D(bool crit, float cmul, bool fz = true)   // fz = 集中会心の上乗せを入れる (照準器のもう 1 回は false)
             {
                 int d = raw;
@@ -701,10 +700,9 @@ namespace AutoTest
                 }
                 float om = crit ? outMul : outMul + ironOut;   // 〈銑鉄棍〉: 会心しなかった撃だけ池へ足す
                 if (om > 0f && System.Math.Abs(om - 1f) > 0.001f) d = Mathf.CeilToInt(d * om);
-                d += consBurst;
-                if (termMul != 1f && d > 0) d = System.Math.Max(1, Mathf.RoundToInt(d * termMul));   // 〈激昂〉〈共鳴〉: 本体と同じ位置 (攻撃バーストの後・物差しの前)
-                d = CombatSystem.EnemyHpLedger.ProbeMain(d);   // [測定用の物差し 2026-11-10] 本体と同じ位置 (攻撃バーストの後・防御の前)
-                d = ApplyFinalPct(d, fpct + (crit && fz ? critFpct : 0));     // 最終与ダメージ倍率: 本体と同じ位置 (物差しの直後・徒労の前・〈渾身の柄頭〉は集中会心の撃だけ)
+                if (termMul != 1f && d > 0) d = System.Math.Max(1, Mathf.RoundToInt(d * termMul));   // 〈激昂〉〈共鳴〉: 本体と同じ位置 (与ダメ倍率の池の後・物差しの前)
+                d = CombatSystem.EnemyHpLedger.ProbeMain(d);   // [測定用の物差し 2026-11-10] 本体と同じ位置 (与ダメ倍率の池の後・防御の前)
+                d = ApplyFinalPct(d, fpct + (crit && fz ? critFpct : 0));     // 最終与ダメージ倍率: 本体と同じ位置 (物差しの直後・徒労の前・〈渾身の鉄兜〉は集中会心の撃だけ)
                 d = MetaProgression.MetaDebuffApplicator.ApplyOutgoingCut(d);   // 〈徒労〉: 本体と同じ位置 (物差しの直後・防御の前・CombatManager.Damage.cs)
                 d = CombatSystem.BossDown.ApplyTaken(d, down);               // ボスのダウン ×1.5: 本体と同じ位置 (徒労の直後)
                 if (eDef > 0 && d > 0 && !(crit && (vital || suntetsuNoDef || (fz && focusNoDef))))
@@ -743,7 +741,7 @@ namespace AutoTest
             }
             outMul += metaPct * 0.01f;
             if (ctx.polishArmed) outMul += 1.5f;
-            if (ctx.consDmgMultPct > 0) outMul += ctx.consDmgMultPct / 100f;
+            if (ctx.consDmgMultPct > 0) outMul *= 1f + ctx.consDmgMultPct / 100f;   // 〈油・膏薬〉は最終与ダメージ (2026-11-25・池の外で掛ける)
             return outMul;
         }
 
@@ -770,8 +768,9 @@ namespace AutoTest
             st.critRed = ctx.enemyCritMultReduction;
             st.critDouble = ctx.critExcessDouble || (run != null && run.OwnsPassive(ItemIds.CritSuntetsu));
             st.ironClub = ctx.critToDamage || (run != null && run.OwnsPassive(ItemIds.CritIronClub));
-            st.critOff = ctx.critSuppressed;
-            st.critOn = !st.critOff && ctx.forceCritical;
+            bool bladeDance = ItemSystem.PassiveSkills.Effects.BladeDance.Held(run);   // 〈無銘の剣舞譜〉: 全部の撃が会心確定・防御無視・もう 1 回 (本体 CombatManager.Turn の撃の輪)
+            st.critOff = ctx.critSuppressed && !bladeDance;
+            st.critOn = bladeDance || (!st.critOff && ctx.forceCritical);
             st.falconer = run != null && run.OwnsPassive(ItemSystem.PassiveSkills.Effects.FalconerGlove.Id);
             // 【練気】・【集中】(2026-11-23・本体と同じ CritCore の関数)
             st.renki = ItemSystem.PassiveSkills.Effects.Crit.Renki(ctx);
@@ -808,11 +807,10 @@ namespace AutoTest
             st.nonCritMul = ctx.nonCritOutgoingMultiplier;
             st.pinpointCut = ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.PinpointEye.NonCritCutKey) > 0f;
             st.outMul = OutgoingPoolNow(ctx, run);
-            st.finalPct = ctx.finalDamagePct;
-            st.guardEcho = ItemSystem.PassiveSkills.Effects.BorderGuardStandard.EchoNow(ctx);
-            st.consBurst = ctx.consAtkBurst;
+            st.finalPct = ctx.finalDamagePct + (ctx.painkillerProcced ? GameLoop.Consumables.PainkillerFinalPct : 0);   // 〈痛覚遮断剤〉の発動ターン: 本体は撃ごとに hitFinalDamagePct へ足す
+            st.guardEcho = bladeDance;   // 〈防人の軍標〉の「もう 1 回」は 2026-11-25 に撤去
             st.critPen = ctx.critArmorPen;
-            st.vitalIgnore = ItemSystem.PassiveSkills.Effects.VitalStrike.IgnoresDefense(ctx);
+            st.vitalIgnore = bladeDance || ItemSystem.PassiveSkills.Effects.VitalStrike.IgnoresDefense(ctx);   // 剣舞譜は会心確定なので「会心は防御を無視」と同じ見込み
             st.minDmg = ctx.winMinDamage;
             st.berserkMul = ctx.enemyDamageTakenMultiplier;
         }
@@ -1033,7 +1031,7 @@ namespace AutoTest
             if (aCount > 0) dmg = CombatSystem.EnemyHpLedger.ProbeMain(dmg);   // [測定用の物差し 2026-11-10] 旧の式にも同じ位置で (防御の前)
             if (aCount > 0) dmg = ApplyFinalPct(dmg, s.finalPct + rung.FinalPct(s.solo, aCount, bCount, s.execBoost, s.shattered, s.undyingStreak + 1));   // 最終与ダメージ倍率 (武器の撃ごとの +% 込み): 本体と同じ位置 (物差しの直後・徒労の前)
             if (aCount > 0) dmg = MetaProgression.MetaDebuffApplicator.ApplyOutgoingCut(dmg);   // 〈徒労〉: 本体と同じ位置 (物差しの直後・防御の前)
-            if (aCount > 0) dmg = CombatSystem.BossDown.ApplyTaken(dmg, s.enemyDown && !s.enemyDownWeak);   // ボスのダウン ×1.5: 本体と同じ位置 (徒労の直後・ひびの弱いダウンは無し)
+            if (aCount > 0) dmg = CombatSystem.BossDown.ApplyTaken(dmg, DownTakesMul(s.enemyDown, s.enemyDownWeak));   // ボスのダウン ×1.5: 本体と同じ位置 (徒労の直後・よろめきは無し・強めたダウンの上乗せは ApplyTaken が読む)
             // 敵の防御 (このターンの値) で軽減
             if (aCount > 0 && eDefNow > 0)
                 dmg = CombatSystem.DefenseFormula.Apply(dmg, CombatSystem.DefenseFormula.Effective(eDefNow, myPen + ws.armorPen));
@@ -1361,6 +1359,10 @@ namespace AutoTest
         /// <summary>[#107] 同じく〈反撃態勢〉(本体: EnemyPassiveSkillEffects.CounterStance・次のターンの敵の OnPreDealDamage で finalDamage += )。</summary>
         private const string CounterStanceNextTurnKey = ItemSystem.PassiveSkills.Effects.CounterStance.NextTurnKey;
 
+        /// <summary>このダウンが受けるダメージ ×1.5 を持つか (本体の BossDown.TakenMulNow と同じ条件: よろめきは無し・〈骨溶かしの黒油〉はよろめきにも有り・2026-11-25)。</summary>
+        internal static bool DownTakesMul(bool down, bool weak)
+            => down && (!weak || (ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context?.poisonDownDouble ?? false));
+
         /// <summary>[2026-11-14] 目盛りの割れ方の見込み (本体と同じ規則 BossDown.ForecastTurn を、 口 GameHooks.DownBreak / DownCrackGrace / DownCrackWeak で呼ぶ)。
         /// <paramref name="mainDmg"/> = 主攻撃の見込み / <paramref name="totalDmg"/> = このターンの与ダメの見込み (旧い判定はこの後の HP で数える = NextTurnIsDown と同じ)。
         /// 新しい判定では、 主攻撃の後に入る通常攻撃以外の削りを <see cref="OptimalTurnState.downChip"/> (固定ダメの枠の毒など + 出血) と、 与ダメの見込みのうち主攻撃以外の分の大きい方で見る。</summary>
@@ -1454,7 +1456,7 @@ namespace AutoTest
             //   ダウンのターンの次 (このターンがダウン) は plan.next の攻撃 (本体がこのターンの頭に起点を動かした後の値) になる。
             if (st.downNotches != null && GameLoop.GameHooks.DownBreak != CombatSystem.DownBreakRule.AnyDamage)
             {
-                // 新しい判定 (2026-11-14): 主攻撃だけで割れる・通常攻撃以外の削りはひび (猶予の後に弱いダウン)。 本体と同じ規則 (BossDown.ForecastTurn)
+                // 新しい判定 (2026-11-14): 主攻撃だけで割れる・通常攻撃以外の削りはひび (猶予の後によろめき)。 本体と同じ規則 (BossDown.ForecastTurn)
                 var f = DownForecast(in st, st.enemyHp, o.mainDmg, System.Math.Min(o.effDmg, st.enemyHp) - o.enemyHeal, wantCracks: true);
                 bool nd = f.nextDown;
                 int added = f.fullAdded + f.crackAdded;
@@ -1894,8 +1896,8 @@ namespace AutoTest
         /// <summary>全部振り直した後に立つ役が、 役の軸の品で生む得の期待値 (攻撃相当の量・出目の和と同じ単位)。 持っていなければ 0。
         /// 面の出方を全部数える (<see cref="ExpectedBestUtilityAfterReroll"/> と同じ)。 役は本体と同じ関数 (<see cref="CombatSystem.TerminalCards.RoleOf"/>・封じ・格上げ込み)、
         /// 量は TerminalCards の定数 (Resolve の 6d と同じ値)。 役の回数・前のターンの役の目は本体の TerminalBattleState.roleCount / roleLastFace。
-        /// 撃 1 つぶん (撃の数は見ない)。 与ダメージの % は振った目の和に掛けた量。 振り直した後の手なので〈血染めの歯車〉は 3 の役なら乗る。 品の条件の目は本体の TerminalCards の定数 (2026-11-22)。
-        /// shortcut: 次のターンへ持ち越す分 (雷毒の導管・揃いの拍子木の手札・負け越しの賽) と役そのものの効果は数えない。</summary>
+        /// 撃 1 つぶん (撃の数は見ない)。 与ダメージの % は振った目の和に掛けた量。 振り直した後の手なので〈追撃の弾帯〉は 3 の役なら乗る。 品の条件の目は本体の TerminalCards の定数 (2026-11-22)。
+        /// shortcut: 次のターンへ持ち越す分 (小口の錠前・揃いのメトロノームの手札・負け越しの賽) と役そのものの効果は数えない。</summary>
         private static float RoleRerollPips(ItemSystem.PassiveSkills.CombatContext ctx, int[] faces, int k, CombatSystem.MutualTurnTelegraph tele)
         {
             var cm = CombatManager.Instance;

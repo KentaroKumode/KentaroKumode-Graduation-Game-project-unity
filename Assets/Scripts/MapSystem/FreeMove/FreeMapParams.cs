@@ -8,6 +8,7 @@ namespace MapSystem.FreeMove
     /// <see cref="GameLoop.GameRng"/> のキー付き抽選だけを使う (同じシード・同じ操作なら同じ結果)。</para>
     ///
     /// <para>連続時間の自由移動 (刻み・速さ・道の外の移動・照明の継続・使い魔の巡航ミサイル) は 2026-10-18 に廃止した。
+    /// 照明・偵察・魔石・痕跡・警戒・捕捉の距離の段は 2026-11-24 に廃止した (測量と「隣の点に来たら見つかる」へ・GAME.md §24)。
     /// 移動は<b>道でつながった隣の点へ 1 歩</b>。 自分が 1 歩動くと追跡者が 1 度動く。 戦闘・イベントはターンを使わない。</para>
     /// </summary>
     public static class FreeMapParams
@@ -61,34 +62,28 @@ namespace MapSystem.FreeMove
         // ── 索敵 ───────────────────────────────────────────────
         /// <summary>何もしていない時に見える範囲 (道で何歩先まで)。</summary>
         public const int Vision = 1;
-        public const int FlareRange = 3;
-        public const int FlareTurns = 3;
-        public const int FlareSupply = 1;
+        /// <summary>測量 (2026-11-24・旧い照明と偵察を 1 つにまとめた): 今いる点から道でこの歩数までの点の種別と戦闘名を地図に書き込む (その層の間ずっと消えない)。</summary>
+        public const int SurveyRange = 3;
         /// <summary>〈補給線〉(〈兵站〉r10) で 1 回跳ぶ物資。</summary>
         public const int RelaySupply = 1;
-        public const int ReconRange = 2;
-        /// <summary>魔石の反応の段: これ以下の歩数が「かなり近い」「遠い」。 それより外は反応なし。</summary>
-        public const int StoneNear = 2;
-        public const int StoneFar = 4;
+        /// <summary>イベントの出やすさ (EventWeights) と BOT の値付けが「番人が近い」と見なす道の歩数 (2026-11-24・旧い魔石の「遠い」4 歩)。
+        /// 遊ぶ人の規則ではない (地図には出さない)。</summary>
+        public const int FoeNearHops = 4;
 
         // ── 追跡者 ─────────────────────────────────────────────
-        /// <summary>捕捉 (察知) の歩数。 照明中は <see cref="FlareRange"/>。</summary>
-        public const int DetectRange = 2;
-        /// <summary>このターン数だけ捕捉できなければ見失う。</summary>
+        /// <summary>見つける歩数 (2026-11-24・作者の決定「隣の点に来たら見つかる」・性質によらず 1・旧 通常 2 / 照明中 3 / 召喚者 5)。 使い魔も同じ (<see cref="FamiliarSee"/>)。</summary>
+        public const int DetectRange = 1;
+        /// <summary>このターン数だけ隣に来られなければ見失う。 縄張りの外へ出たらすぐ見失う。</summary>
         public const int QuietLose = 3;
-        /// <summary>召喚者 (動かない) の捕捉の歩数 (2026-11-04)。 動けない代わりに遠くから気づく。</summary>
-        public const int SummonerDetectRange = 5;
         /// <summary>追跡の上限 (2026-11-04)。 このターン数だけ追い続けたら諦めて巡回へ戻る。
         /// 同じ速さの追跡者は、 下がり続けるプレイヤーと永遠に距離が保たれてしまうため。</summary>
         public const int ChaseGiveUp = 8;
-        /// <summary>諦めた後、 このターン数のあいだは捕捉しない (すぐ捕捉し直して上限が意味を失わないように)。</summary>
+        /// <summary>諦めた後、 このターン数のあいだは見つけない (すぐ見つけ直して上限が意味を失わないように)。</summary>
         public const int ChaseRest = 4;
-        /// <summary>使い魔がプレイヤーを見つける歩数。</summary>
+        /// <summary>使い魔がプレイヤーを見つける歩数 (本体と同じ隣の点)。</summary>
         public const int FamiliarSee = 1;
         /// <summary>召喚者が使い魔を放つ間隔 (ターン)。</summary>
         public const int SummonEvery = 3;
-        /// <summary>痕跡が残るターン。</summary>
-        public const int TraceLife = 4;
 
         // ── 前線 (天候) ────────────────────────────────────────
         /// <summary>前線が進む間隔 (ターン) と、 1 回に進む距離 (層の広さ 16.4 のうち)。 前線は「現象の届く範囲」で罰は無い。</summary>
@@ -106,11 +101,11 @@ namespace MapSystem.FreeMove
         public const double StormPhase1EndRadius = 0.6, StormPhase2EndRadius = 0.3;
         /// <summary>フェーズ 2 の終わりの輪の中心を、 ボスの点からずらす長さ (フェーズ 2 の終わりの半径に対する割合の幅)。 1 未満なので、 ボスの点は輪の中に残る。</summary>
         public const double StormOffsetMin = 0.3, StormOffsetMax = 0.7;
-        /// <summary>嵐の中の点へ動く (・嵐の中で待つ / 偵察する) たびに払う HP。</summary>
+        /// <summary>嵐の中の点へ動く (・嵐の中で待つ) たびに払う HP。</summary>
         public const int StormHp = 3;
         /// <summary>深さ 1 (画面の第 1 層) だけの嵐の HP (2026-11-20・docs/system-overhaul-spec.md §4-3・1 層の死の半分が嵐の中を歩いて HP が尽きた死だったため 3 → 2)。</summary>
         public const int StormHpDepth1 = 2;
-        /// <summary>深さ <paramref name="depth"/> の、 嵐の中の点へ動く (・嵐の中で待つ / 偵察する) たびに払う HP (雹の上乗せは別)。</summary>
+        /// <summary>深さ <paramref name="depth"/> の、 嵐の中の点へ動く (・嵐の中で待つ) たびに払う HP (雹の上乗せは別)。</summary>
         public static int StormHpAt(int depth) => depth == 1 ? StormHpDepth1 : StormHp;
         /// <summary>落石のような雹の嵐: 嵐の中の点への 1 歩の HP の追加。</summary>
         public const int StormHailHp = 1;
@@ -136,14 +131,14 @@ namespace MapSystem.FreeMove
         public const int InstabilityWin = 1;
         /// <summary>戦闘の中で、 エスカレーションの段が 1 つ上がるごと (ボス戦では溜めない)。</summary>
         public const int InstabilityEscalation = 1;
-        /// <summary>崩れ始めた後 (累計が <see cref="InstabilityPhase1At"/> 以上) の 1 歩・待つ・偵察。 朱の雪の嵐の中への 1 歩は手番の数 (2) だけ。</summary>
+        /// <summary>崩れ始めた後 (累計が <see cref="InstabilityPhase1At"/> 以上) の 1 歩・待つ。 朱の雪の嵐の中への 1 歩は手番の数 (2) だけ。</summary>
         public const int InstabilityWalk = 1;
         /// <summary>フェーズの境目 (累計)。 0〜14 = 静か・15〜 = フェーズ 1 (崩れ始める)・30〜 = 2・45〜 = 3・50〜 = 4。
         /// 2026-11-13 作者の決定で 10/20/30/35 → 15/30/45/50 (2 度目の置き値・輪の中で粘っても 1 層に 12〜19 点しか踏めなかったため)。
         /// 手番の時計 (stormClock = Turns) の段の長さは上の <see cref="StormQuietTurns"/> / <see cref="StormPhase1Turns"/> ほかで、 これとは共有しない。</summary>
         public const int InstabilityPhase1At = 15, InstabilityPhase2At = 30, InstabilityPhase3At = 45, InstabilityPhase4At = 50;
         /// <summary>深さ 6 (画面の第 4 層) の累計の始まり。 2026-11-18 (作者の指示「4 層は嵐の開始を 3 ターン遅らせ」) で 15 (= <see cref="InstabilityPhase1At"/>・入った時から崩れ始めている) → 12。
-        /// 換算: 崩れ始める前は歩く・待つ・偵察で溜まらないので、 静かな間に溜まるのは歩く以外 (取る・激化・イベントのターン・嵐を動かす) だけ。
+        /// 換算: 崩れ始める前は歩く・待つで溜まらないので、 静かな間に溜まるのは歩く以外 (取る・激化・イベントのターン・嵐を動かす) だけ。
         /// 深さ 6 のその増え方は 1 手番あたり 1.04 (案 B の測定・Super・ボスに着いた 6,199 層・層ごとの中央 1.06) → 3 手番 ≈ 3 ポイント。
         /// 崩れ始めた後の動きは前と同じで、 嵐の全体が約 3 手番遅れる (GAME.md §5-12)。 手番の時計 (stormClock = Turns・測定の口) の <see cref="Storm.QuietTurns"/> は変えていない。</summary>
         public const int InstabilityDepth6Start = 12;
@@ -179,7 +174,7 @@ namespace MapSystem.FreeMove
         // ── 囮罠 (囮と罠を 1 つに統合・2026-10-18) ─────────────
         /// <summary>置いた点が残るターン。 過ぎたら効果が切れる。</summary>
         public const int LureLife = 8;
-        /// <summary>追跡者がこの歩数以内に居れば、 置いた瞬間に気を引かれる (警戒して向かう)。</summary>
+        /// <summary>巡回中の追跡者がこの歩数以内に居れば、 置いた瞬間に気を引かれて向かう。</summary>
         public const int LureNotice = 6;
         /// <summary>踏んだ追跡者を足止めするターン。</summary>
         public const int LureHoldTurns = 2;

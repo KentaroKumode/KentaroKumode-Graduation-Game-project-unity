@@ -45,7 +45,7 @@ namespace MetaProgression.Achievements
         /// <summary>解除しない間: 遺物の付与を止めた測定 (<see cref="MetaBuffApplicator.SuppressMetaRewards"/>) と、 BOT がランを動かしている間 (<see cref="GameHooks.BotDriving"/>・2026-11-17)。
         /// 記録 (codex・<c>CodexRecorder</c>) と同じく、 実績は人が遊んだ時だけ解除する。 2026-11-17 まではふつうのバッチでも解除し、 <see cref="OnUnlocked"/> も鳴っていた。
         /// <b>Note* を足す時は必ず <see cref="Ready"/> か Suppressed を通す。</b></summary>
-        private static bool Suppressed => MetaBuffApplicator.SuppressMetaRewards || GameHooks.BotDriving;
+        private static bool Suppressed => MetaBuffApplicator.SuppressMetaRewards || GameHooks.BotDriving || RunSpec.NoRewards;   // ラン指定の「報酬なし」(チュートリアル) も解除しない
 
         private static bool Ready => !Suppressed && run != null && run.active;
 
@@ -441,8 +441,9 @@ namespace MetaProgression.Achievements
             if (depth == Depth(0)) return;
             if (sim != null && sim.StormMode && sim.StormPhase >= StormLastPhase) Unlock(Cat.StormBoss);
             if (state.provision <= 0) Unlock(Cat.ProvisionZeroBoss);
-            // 忍び足: 追跡者のいる層で、 ボスを倒した時に追跡者がまだいて、 一度も見つかっていない (追跡者を倒した = 捕まった = 見つかった)
-            if (sim != null && sim.HasFoe && MapSystem.FreeMove.FloorPlan.HasWanderer(depth) && !run.floorFound) Unlock(Cat.PursuerUnseen);
+            // 忍び足 (2026-11-24 仮・作者の承認待ち): 追跡者のいる層で縄張りの宝を取り、 ボスを倒すまで一度も見つかっていない (追跡者を倒した = 捕まった = 見つかった)。
+            //   縄張りを避ける道は必ずあり (§5-9)、 見つかるのは隣の点に来た時だけなので、 宝を取らずに抜けるだけでは緩すぎる
+            if (sim != null && sim.HasFoe && sim.TreasureTaken && MapSystem.FreeMove.FloorPlan.HasWanderer(depth) && !run.floorFound) Unlock(Cat.PursuerUnseen);
             if (depth >= Depth(2) && run.floorFights == 0) Unlock(Cat.BossOnlyFloor);
         }
 

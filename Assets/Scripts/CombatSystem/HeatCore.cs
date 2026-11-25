@@ -8,7 +8,7 @@ namespace CombatSystem
         None = 0,
         Stone = 1 << 0,        // 過熱石: 攻撃の端子に 2 個以上挿したターン 臨界 +6 (3 個とも攻撃なら +12)
         Breastplate = 1 << 1,  // 燻りの革胸当て: 防御の端子を発動するたび 臨界 +4・ブロック +2
-        Poker = 1 << 2,        // 火守りの火搔き棒: 攻撃以外の端子に挿したダイス 1 個につき 臨界 +6
+        Poker = 1 << 2,        // 火守りの火掻き棒: 攻撃以外の端子に挿したダイス 1 個につき 臨界 +6
         Spanner = 1 << 3,      // 点火スパナ: 撃ごとに 臨界 +4
         Whetstone = 1 << 4,    // 荒砥: 撃ごとに 臨界 +2
         Oven = 1 << 5,         // 恒温の竈: 戦闘開始時 閾値の半分から・爆発の後は 8 から
@@ -21,7 +21,7 @@ namespace CombatSystem
         Ashen = 1 << 12,       // 八日目の灰燼: 臨界 40 以上で起きた爆発 ×1.6
         Flint = 1 << 13,       // 燧石の指輪: 攻撃 3 撃以上 (【再起動】を含む) のターン 臨界の獲得 ×2・爆発のたび次の爆発 +25%
         Kiln = 1 << 14,        // 暴れ窯の火床: 超臨界爆発 ×2.0・超臨界のたび閾値 −4 (最大 −16)
-        Pillar = 1 << 15,      // 柱折りの発破筒: 爆発のひびを即座に正規のダウンへ割る・ダウン中の敵への爆発 ×2.0
+        Pillar = 1 << 15,      // 柱折りの発破筒: 超臨界の爆発で次のダウンを 1 ターン延ばす (1 戦闘 2 回まで)・ダウン中の敵への爆発 ×3.0
     }
 
     /// <summary>
@@ -29,7 +29,7 @@ namespace CombatSystem
     /// BOT の配線の見積もり・画面の見込みは同じ <see cref="Gain"/> / <see cref="TryBurst"/> / <see cref="Forecast"/> を通る。
     ///
     /// <para><b>爆発</b>: 臨界が閾値 (既定 <see cref="Threshold"/>) に届くと、 その場で基礎 <see cref="BurstBase"/> のダメージ
-    /// (敵の防御の <see cref="DefensePenPct"/>% を無視) を出し、 ボスの次の目盛りにひびを入れる。 爆発が起きたターンは【過熱】。
+    /// (敵の防御の <see cref="DefensePenPct"/>% を無視) を出し、 ボスの目盛りをそのダメージの 40% 前進させる (2026-11-25〜)。 爆発が起きたターンは【過熱】。
     /// 超臨界爆発 = 閾値の <see cref="SuperAtPct"/>% 以上の臨界で起きた爆発 (×1.5・〈暴れ窯の火床〉で ×2.0)。</para>
     /// <para>このファイルは UnityEngine に依存しない。</para>
     /// </summary>
@@ -37,17 +37,19 @@ namespace CombatSystem
     {
         // 閾値 30 → 36 (2026-11-22 段 3 の較正 4・臨界の腕が寄せなしの約 2 倍 / ターンの終わりの攻撃の合計が毎ターン溜まる)
         // → 32 (2026-11-22 neon 収束: ターンの終わりの臨界を攻撃の合計から「攻撃に挿した出目の合計の半分」へ下げたのと合わせて)
-        public const int Threshold = 32, ThresholdFloor = 12, BurstBase = 25, DefensePenPct = 50;   // 爆発の基礎 30 → 24 (final6) → 26 (answer9) → 25 (answer12)
+        /// <summary>爆発でボスの次の目盛りを上げる割合 (爆発の入ったダメージの %・2026-11-25 neon answer_gauge・旧: ひびを入れる)。</summary>
+        public const int BurstNotchPct = 40;
+        public const int Threshold = 30, ThresholdFloor = 12, BurstBase = 25, DefensePenPct = 50;   // 爆発の基礎 30 → 24 (final6) → 26 (answer9) → 25 (answer12)
         public const int SuperAtPct = 150, SuperMulPct = 185, KilnSuperMulPct = 260;   // 超臨界 ×1.5 → ×1.65 (answer9) → ×1.85 (answer15)・雷管 +4 → +5・柱折り ×2.5 → ×3.0 (answer15)・暴れ窯 ×2.0 → ×2.5 (2026-11-22 final4) → ×2.0 (final5) → ×2.25 (final6) → ×2.60 (answer12)
         public const int StoneTwo = 8, StoneAll = 16, BreastHeat = 4, BreastBlock = 2, PokerPerDie = 6, SpannerPerHit = 3, WhetPerHit = 2;   // 過熱石 +6/+12 → +8/+16・スパナ +2 → +4・荒砥 +1 → +2 (final4)・スパナ +4 → +3 (final6)
-        public const int OvenRestart = 8, PrimerAdd = 5, CoalAdd = 1, CoalMax = 6, MoldPerExcess = 3, LedgerMax = 5, KettleCut = 4;   // 炭 +2 → +1・釜 −8 → −6 (2026-11-22 段 3 の較正 2)・雷管 +6/48 → +4/32・鋳型 +3 → +2 (neon 収束)・雷管 +4/32 → +6/上限なし (final4) → +3/上限なし (final5) → +5 (answer9)・answer12: 雷管 +4・鋳型 +3・釜 −4
+        public const int OvenRestart = 8, PrimerAdd = 5, CoalAdd = 1, CoalMax = 6, MoldPerExcess = 3, LedgerMax = 5, KettleCut = 5;   // 炭 +2 → +1・釜 −8 → −6 (2026-11-22 段 3 の較正 2)・雷管 +6/48 → +4/32・鋳型 +3 → +2 (neon 収束)・雷管 +4/32 → +6/上限なし (final4) → +3/上限なし (final5) → +5 (answer9)・answer12: 雷管 +4・鋳型 +3・釜 −4・2026-11-25 作者: 閾値 32 → 30・釜 −4 → −5 (閾値 25)
         public const int SparkPctPerBurst = 10,   // 2026-11-22 段 3 の較正 2: 15 → 8 (長い戦闘で伸び続ける) → neon 収束 5 → final4 8 → final5 5 → answer9 7 → answer13 10
                           AshenNeed = 40, AshenMulPct = 175, FlintPctPerBurst = 40, KilnStep = 4, KilnMax = 16, PillarDownMulPct = 300, LedgerChainPct = 30;   // 柱折り ×2.0 → ×2.5 (final6)・answer14: 燧石 25 → 40・帳簿外 同じターンの 2 回目以降 +30% ずつ
         /// <summary>〈燧石の指輪〉: 攻撃の撃 (攻撃の端子の発動・【再起動】の撃も 1 つ) がこの数以上のターン (2026-11-22 neon 収束: 攻撃の端子 2 枚 → 3 撃)。</summary>
         public const int FlintAttackHits = 3;
-        /// <summary>ターンの終わりの臨界 = 攻撃の端子に挿した出目の合計 (<see cref="TerminalOutcome.attackPips"/>) ÷ これ (切り捨て・2026-11-22 neon 収束: 旧 攻撃の端子の合計 attackAdd)。</summary>
+        /// <summary>配線のとき (攻撃の前・2026-11-25〜・旧: ターンの終わり) の臨界 = 攻撃の端子に挿した出目の合計 (<see cref="TerminalOutcome.attackPips"/>) ÷ これ (切り捨て・2026-11-22 neon 収束: 旧 攻撃の端子の合計 attackAdd)。</summary>
         public const int EndGainDiv = 2;
-        /// <summary>ターンの終わりに得る臨界 (本体 CombatManager.Turn・<see cref="Forecast"/> が同じ式)。 基礎攻撃・端子の倍率・品の攻撃 +N は入らない。</summary>
+        /// <summary>配線のとき (攻撃の前) に得る臨界 (本体 CombatManager.Terminals・<see cref="Forecast"/> が同じ式)。 基礎攻撃・端子の倍率・品の攻撃 +N は入らない。</summary>
         public static int EndGain(TerminalOutcome o) => o == null ? 0 : o.attackPips / EndGainDiv;
 
         /// <summary>[persistent・ctx の accumulatedValues] 〈暴れ窯の火床〉で下げた閾値 / [ターンごと] このターンの爆発の回数・〈焚き足しの炭〉を使った回数 / 〈燧石の指輪〉が働くターン。</summary>
@@ -86,7 +88,7 @@ namespace CombatSystem
             return f;
         }
 
-        /// <summary>戦闘の始めの閾値 (〈早沸かし釜〉−6・下限 <see cref="ThresholdFloor"/>)。</summary>
+        /// <summary>戦闘の始めの閾値 (〈早沸かし釜〉−5・下限 <see cref="ThresholdFloor"/>)。</summary>
         public static int StartThreshold(HeatItems f) => System.Math.Max(ThresholdFloor, Threshold - (Has(f, HeatItems.Kettle) ? KettleCut : 0));
 
         /// <summary>臨界を n 得る (〈焚き足しの炭〉+1 → 〈燧石の指輪〉×2 → 遺物 +%)。 戻り値 = 実際に足した量。</summary>
@@ -170,14 +172,14 @@ namespace CombatSystem
             o.heatDouble = Has(f, HeatItems.Flint) && o.attackHits.Count >= FlintAttackHits;      // 撃 = 攻撃の端子の発動 + 【再起動】の撃
         }
 
-        /// <summary>見込みの結果: 配線の時 (攻撃の前・【過熱】になる) の爆発の回数・ターンの終わり (攻撃に挿した出目の合計の半分) の爆発の回数・
+        /// <summary>見込みの結果: 配線の時 (攻撃の前・【過熱】になる) の爆発の回数 (攻撃に挿した出目の合計の半分も含む・2026-11-25〜)・
         /// 爆発のダメージの合計 (敵の防御の後)・終わった後の臨界。</summary>
         public struct Outlook
         {
-            public int burstsWired, burstsEnd, landed, meterAfter;
+            public int burstsWired, landed, meterAfter;
         }
 
-        /// <summary>この配線で起きる爆発の見込み (BOT の配線の評価・画面の右の列)。 本体と同じ順 (端子の臨界 → 品の臨界を 1 つずつ → ターンの終わりに <see cref="EndGain"/>) で
+        /// <summary>この配線で起きる爆発の見込み (BOT の配線の評価・画面の右の列)。 本体と同じ順 (端子の臨界 → 品の臨界を 1 つずつ → <see cref="EndGain"/>・全部 配線のとき = 攻撃の前) で
         /// <see cref="Gain"/> と <see cref="TryBurst"/> を通す。 <paramref name="s"/> は写し (書き換えてよい)。
         /// shortcut: ターンの頭・敵の攻撃の後に品が足す臨界 (〈炉番の外套〉〈早沸かし釜〉) とひびの値打ちは見ない。 要るなら敵の予告から足す。</summary>
         public static Outlook Forecast(State s, TerminalOutcome o)
@@ -188,7 +190,7 @@ namespace CombatSystem
             s.doubled |= o.heatDouble;
             r.burstsWired = Step(ref s, o.heat, ref r.landed);
             foreach (int g in o.heatGains) r.burstsWired += Step(ref s, g, ref r.landed);
-            r.burstsEnd = Step(ref s, EndGain(o), ref r.landed);
+            r.burstsWired += Step(ref s, EndGain(o), ref r.landed);
             r.meterAfter = s.meter;
             return r;
         }

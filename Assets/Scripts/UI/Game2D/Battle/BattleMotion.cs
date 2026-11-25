@@ -113,30 +113,47 @@ namespace UI.Game2D.Battle
         //  武器の演出の絵だけで攻撃する (2026-11-15・作者の決定「武器のモーションは不要、 パーティクルだけでいい」)
         // =====================================================================
 
-        /// <summary>武器の演出の絵 (weapon-家系-normal / crit) の「当たる所」の時刻 (秒・絵の頭から)。 <b>調整はこの表だけ</b>。
+        /// <summary>武器の演出の絵 (weapon-家系-normal / crit・段 4 は weapon-家系-legend-normal / crit) の「当たる所」の時刻 (秒・絵の頭から)。 <b>調整はこの表だけ</b>。
         /// kind: cut = 薄い当たり (命中の音と敵の白い光だけ・ダメージ無し) / それ以外 = ダメージが入る当たり (最後の 1 つにまとめて入れる)。
-        /// 初期値は絵を作ったコード (Tools/pixelfx/src/fx/dicebound/weapons.js の PLAN) から割り出した: 絵の上の時刻 = delay + 元の効果の時刻 ÷ speed。
+        /// 2026-11-24 (smear の作り直し・段 4 の追加): 書き出した絵 (1 秒 24 コマ・コマ i は i/24 秒から出る) をコマ送りで見て、 当たる面が出るコマに合わせた (Captures/fx_smear/ingame/grids/)。
+        /// 太い面は 1 コマだけなので、 当たりはその太い面のコマの頭。 会心の溜め (段 4・斧と盾の v2) は、 溜めの間は当たらない。
         /// <list type="bullet">
-        /// <item>剣・通常: 一太刀 (blade-slash) が振り切る sweep 0.06 ÷ 0.65 = 0.092</item>
-        /// <item>剣・会心: ぐるりと一周 (spin-slash) の輪が閉じる SW 0.17 ÷ 0.65 = 0.262 (薄い) → 交差の二太刀 (cross-slash・delay 0.3) の 1 太刀目 0.3 + 0.06 ÷ 0.65 = 0.392 (薄い)
-        ///   → 2 太刀目 0.3 + (UP 0.14 + 0.06) ÷ 0.65 = 0.608 (本当たり)</item>
-        /// <item>斧: 縦の刃 (chop) が足もとへ届く sweep 0.07 ÷ 0.65 = 0.108 (着地の土煙・地面の割れは delay 0.1 で、 ほぼ同時)</item>
-        /// <item>短剣・通常: 小さな斬撃 6 つ (dagger・t0 = i × 0.055・sweep 0.035) ÷ 0.75 = 0.047 / 0.120 / 0.193 / 0.267 / 0.340 / 0.413 (薄い)
-        ///   → 締めの一太刀 (t0 = 6 × 0.055 + 0.04・sweep 0.055) ÷ 0.75 = 0.567 (本当たり)</item>
-        /// <item>短剣・会心: 真横の大きな斬撃 sweep 0.07 ÷ 0.72 = 0.097 (薄い) → 小さな斬撃 6 つ (T_OFF 0.3 から) ÷ 0.72 = 0.465〜0.847 (薄い) → 締め 1.007 (本当たり)</item>
-        /// <item>盾: 柱 (slam-column) が落ちきる drop 0.14 = 下向きの突き (thrust・OUT 0.07 ÷ 0.5) = 着地の土煙の delay 0.14</item>
+        /// <item>剣: 通常 = 一太刀 1 / 会心 = 輪が閉じて光る 3 (薄い) → 交差の 1 太刀目 6 (薄い) → 2 太刀目 9</item>
+        /// <item>斧: 通常 = 縦の刃 1 / 会心 (v2) = 横の振り 1 (薄い) → 縦の刃が地面に着く閃光 7</item>
+        /// <item>短剣: 通常 = 小さな斬撃 1・2・4・6・8・9 (薄い) → 締め 11 / 会心 (v2) = ×の斬撃 1・3・5・7・9 (薄い) → 真横の締め 11</item>
+        /// <item>盾: 通常 = 光の柱が着く 2 / 会心 (v2) = 紋章で溜めて、 柱が着く閃光 6</item>
+        /// <item>デュランダル: 通常 = 星の溜め → 太い三日月 4 / 会心 = 星 2 つの溜め → 1 太刀目 8 (薄い) → 十字の 2 太刀目 11</item>
+        /// <item>血帝廻天: 通常 = 縦の刃 1 / 会心 = 紅い星の溜め → 刃が地面に着く 6</item>
+        /// <item>ノクタリア: 通常 = 夜の球の中の斬撃 3・5・7・9・11 (薄い) → 球が弾ける 13 / 会心 = 真横の一閃 7 → 斬撃 9〜21 の奇数 (薄い) → 弾ける 23</item>
+        /// <item>ドーンブリンガー: 通常 = 盾の紋章 → 日の出 3 / 会心 = 長い溜め → 日の出 8</item>
         /// </list></summary>
         public static readonly Dictionary<string, (float t, string kind)[]> WeaponSheetHits = new Dictionary<string, (float, string)[]>
         {
-            { "sword-normal", new[] { (0.092f, "chop") } },
-            { "sword-crit", new[] { (0.262f, "cut"), (0.392f, "cut"), (0.608f, "finish") } },
-            { "axe-normal", new[] { (0.108f, "chop") } },
-            { "axe-crit", new[] { (0.108f, "chop") } },
-            { "dagger-normal", new[] { (0.047f, "cut"), (0.120f, "cut"), (0.193f, "cut"), (0.267f, "cut"), (0.340f, "cut"), (0.413f, "cut"), (0.567f, "finish") } },
-            { "dagger-crit", new[] { (0.097f, "cut"), (0.465f, "cut"), (0.542f, "cut"), (0.618f, "cut"), (0.694f, "cut"), (0.771f, "cut"), (0.847f, "cut"), (1.007f, "finish") } },
-            { "shield-normal", new[] { (0.14f, "slam") } },
-            { "shield-crit", new[] { (0.14f, "slam") } },
+            { "sword-normal", F((1, "chop")) },
+            { "sword-crit", F((3, "cut"), (6, "cut"), (9, "finish")) },
+            { "axe-normal", F((1, "chop")) },
+            { "axe-crit", F((1, "cut"), (7, "chop")) },
+            { "dagger-normal", F((1, "cut"), (2, "cut"), (4, "cut"), (6, "cut"), (8, "cut"), (9, "cut"), (11, "finish")) },
+            { "dagger-crit", F((1, "cut"), (3, "cut"), (5, "cut"), (7, "cut"), (9, "cut"), (11, "finish")) },
+            { "shield-normal", F((2, "slam")) },
+            { "shield-crit", F((6, "slam")) },
+            { "sword-legend-normal", F((4, "chop")) },
+            { "sword-legend-crit", F((8, "cut"), (11, "finish")) },
+            { "axe-legend-normal", F((1, "chop")) },
+            { "axe-legend-crit", F((6, "chop")) },
+            { "dagger-legend-normal", F((3, "cut"), (5, "cut"), (7, "cut"), (9, "cut"), (11, "cut"), (13, "finish")) },
+            { "dagger-legend-crit", F((7, "cut"), (9, "cut"), (11, "cut"), (13, "cut"), (15, "cut"), (17, "cut"), (19, "cut"), (21, "cut"), (23, "finish")) },
+            { "shield-legend-normal", F((3, "slam")) },
+            { "shield-legend-crit", F((8, "slam")) },
         };
+
+        /// <summary>当たる所を「コマの番号 (1 秒 24 コマ)」で書くための写し替え。</summary>
+        private static (float, string)[] F(params (int frame, string kind)[] hs)
+        {
+            var r = new (float, string)[hs.Length];
+            for (int i = 0; i < hs.Length; i++) r[i] = (hs[i].frame / 24f, hs[i].kind);
+            return r;
+        }
 
         /// <summary>攻撃の長さに数える絵の末尾: 画素の数が一番多いコマの この割合 を下回った後のコマは待たない (絵は重ねて流れ続ける)。</summary>
         public const float SheetTailFrac = 0.1f;
@@ -146,7 +163,7 @@ namespace UI.Game2D.Battle
         public static Plan SheetPlan(string fam, bool crit, float sheetSeconds)
         {
             if (fam == null || !WeaponSheetHits.TryGetValue(fam + (crit ? "-crit" : "-normal"), out var hs)) return null;
-            var P = new Plan { fam = fam };
+            var P = new Plan { fam = FxLayerPreload.BaseFamily(fam) };      // 音・揺れ・瓦礫は素の家系で出し分ける (段 4 も同じ)
             float last = 0f;
             foreach (var (t, kind) in hs)
             {

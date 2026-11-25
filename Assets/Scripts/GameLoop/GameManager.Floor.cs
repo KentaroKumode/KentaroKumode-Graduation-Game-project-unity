@@ -60,6 +60,7 @@ namespace GameLoop
         {
             if (Run != null && Run.isRunActive)
                 Run.EndRun();
+            RunSpec.End();   // ラン指定のランを終える (シードを入れていたら乱数を前の状態へ戻す)
 
             CurrentEnemy = null;
             LastCombatResult = null;
@@ -123,9 +124,10 @@ namespace GameLoop
             RevealAdjacentEncounters();
 
             // 層タイトル表示（確定文言の正本: docs/GAME.md §5。ビジュアルは未実装、OnShow を UI が購読）
-            var layerIntro = LayerTitles.ForFloor(Run.Depth);
+            //   ラン指定の題があればそれ (空なら出さない)
+            var layerIntro = RunSpec.Current?.layerTitle != null ? new LayerTitles.Entry(RunSpec.Current.layerTitle, "") : LayerTitles.ForFloor(Run.Depth);
             Log($"=== {layerIntro.title} ===　{layerIntro.subtitle}");
-            LayerTitles.Raise(layerIntro);
+            if (!string.IsNullOrEmpty(layerIntro.title)) LayerTitles.Raise(layerIntro);
 
             // 前哨基地は開始ノードのため OnTileActivated イベントが ActivateTile 経由で発火しない。
             // 旅団契約 AI (AutoRunner) 等のリスナーへ明示的に通知する。
@@ -361,6 +363,7 @@ namespace GameLoop
                     && !Run.ownedPassiveItems.Contains(SwordDanceSet.Finale))
                 {
                     ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, SwordDanceSet.Finale);
+                    (ItemSystem.PassiveSkills.PassiveSkillRegistry.Get(SwordDanceSet.Finale) as ItemSystem.PassiveSkills.Effects.BladeDance)?.SeedOnAcquire(Run.currentFloor);   // 製品の 4 枚集約と同じ取得時の剣先 (2026-11-25)
                     Log("[計測] 5層撃破 → 〈無銘の剣舞譜〉を強制付与");
                 }
 

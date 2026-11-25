@@ -409,7 +409,7 @@ namespace AutoTest
         private string CurrentNodeId()
         {
             var mm = MapManager.Instance;
-            // 航行マップの層では囮罠や照明のようにターンを使わない操作がある。 点が同じでも
+            // 航行マップの層では囮罠のようにターンを使わない操作がある。 点が同じでも
             //   ターンが進んでいれば進展なので、 ターンを添えてストール検出に誤判定させない。
             if (mm != null && mm.IsFreeMap) return $"{mm.CurrentNode?.id ?? ""}@{mm.Sim.Turn}";
             return mm?.CurrentNode?.id ?? "";
@@ -653,7 +653,7 @@ namespace AutoTest
             GameLoop.GameHooks.DownCancel = CombatSystem.DownCancelRule.ChargeOrHeavy;   // [測定 2026-11-14] ダウンの取り消しの規則を既定へ
             GameLoop.GameHooks.DownBreak = CombatSystem.DownBreakRule.MainAttackOnly;     // [測定 2026-11-14] 目盛りの割れ方を既定 (通常攻撃だけ) へ
             GameLoop.GameHooks.DownCrackGrace = CombatSystem.BossDown.CrackGraceTurns;    // [測定 2026-11-14] ひびの猶予を既定 (1) へ
-            GameLoop.GameHooks.DownCrackWeak = true;                                     // [測定 2026-11-14] ひびのダウンは弱い (既定) へ
+            GameLoop.GameHooks.DownCrackWeak = true;                                     // [測定 2026-11-14] よろめきは弱い (既定) へ
             GameLoop.GameHooks.HeavyChargeNoAttack = true;                      // [測定 2026-11-14] チャージは攻撃しない (既定) へ
             GameLoop.GameHooks.AshKingHeavyDisabled = false;                    // [測定 2026-11-14] 灰燼の王の大技〈業火〉を既定 (あり) へ
             GameLoop.GameHooks.BlazeTickEachTurn = false;                       // [測定 2026-11-14] 烈炎の毎ターンの削りを既定 (なし) へ

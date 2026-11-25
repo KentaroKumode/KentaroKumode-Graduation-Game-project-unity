@@ -25,7 +25,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>仕込みの配電盤: 基本以外の端子を 3 枚発動したターン、 攻撃が当たるたびボスの次の目盛りがその撃のダメージの 20% だけ上がる
+    /// <summary>仕込みの切替器: 基本以外の端子を 3 枚発動したターン、 攻撃が当たるたびボスの次の目盛りがその撃のダメージの 20% だけ上がる
     /// (目盛りへの削り +20%・〈鎧縫いの針〉と同じ口 CombatManager.RaiseBossNextNotch)。 次のターンの手札 +2 は旗 (<see cref="DeckItems.Switchboard"/>)。</summary>
     public class PrimedSwitchboard : IPassiveSkillEffect, IRelicDisplay
     {

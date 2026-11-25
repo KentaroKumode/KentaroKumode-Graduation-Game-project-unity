@@ -551,7 +551,7 @@ namespace ItemSystem.PassiveSkills
         public float shieldOnWinPct;
 
         // ==== 臨界メーター (Rinkai) 2026-07-16 追加 ====
-        /// <summary>[persistent] 臨界メーター: 攻撃の端子に挿した出目の合計の半分 (HeatCore.EndGain) を毎ターンの終わりに足し、 品・端子の分はその時点で足す (Keywords.Kw.AddHeat)。
+        /// <summary>[persistent] 臨界メーター: 攻撃の端子に挿した出目の合計の半分 (HeatCore.EndGain) を毎ターン配線のとき (攻撃の前・2026-11-25〜) に足し、 品・端子の分はその時点で足す (Keywords.Kw.AddHeat)。
         /// 閾値に届くとその場で爆発する (式は CombatSystem.HeatCore)。</summary>
         public int rinkaiMeter;
         /// <summary>[persistent] 直近ターンにプレイヤーが与えた総ダメージ。
@@ -604,7 +604,7 @@ namespace ItemSystem.PassiveSkills
         public int burstStackBonus;
         /// <summary>[persistent] ターン開始の減衰で残るシールドへの上乗せ (% ポイント)。 〈油染みの盾革〉が +20 (50% → 70%)。 残る割合は最大 80%。</summary>
         public int shieldKeepBonusPct;
-        /// <summary>[persistent] 会心した攻撃だけに足す貫通 (〈刃毀れの見立て〉・CombatManager.Damage の防御の計算)。</summary>
+        /// <summary>[persistent] 会心した攻撃だけに足す貫通 (〈刃こぼれの見立て〉・CombatManager.Damage の防御の計算)。</summary>
         public int critArmorPen;
         /// <summary>[persistent] 充電の上限への上乗せ (〈雷鳴の太鼓〉・端子〈大導電＋〉・<see cref="ChargeCap"/>)。</summary>
         public int chargeCapBonus;
@@ -643,7 +643,7 @@ namespace ItemSystem.PassiveSkills
         public int burstFlatBonus;
         /// <summary>[persistent] 〈重装兵の隠し刃〉: ボスのダウン中のターンは、 ターン開始時にシールドが半減しない (BeginNewTurn)。</summary>
         public bool shieldKeepOnBossDown;
-        /// <summary>[persistent] 〈脈なしの鋼心臓〉: ターン開始時のシールドがこれ以上なら減衰しない (0 = なし・BeginNewTurn)。</summary>
+        /// <summary>[persistent] 〈脈打たぬ鋼の心臓〉: ターン開始時のシールドがこれ以上なら減衰しない (0 = なし・BeginNewTurn)。</summary>
         public int shieldNoDecayAt;
         /// <summary>[persistent] 〈二拍目の心臓〉: この戦闘のシールドの獲得量 +N% (増えた分に掛けて切り捨て・<see cref="consShield"/> の set)。</summary>
         public int shieldGainPct;
@@ -681,7 +681,7 @@ namespace ItemSystem.PassiveSkills
         /// <summary>[persistent]</summary>
         public bool oathBroken;
         /// <summary>[perTurn] (Phase A で判定してから false (Phase B ではない)) 痛覚遮断剤 (狂戦士): 使用ターン 致命ダメで HP 1 踏みとどまり、
-        /// 次ターン開始時 HP=1 ならダイス合計+10/基礎攻撃+10、 攻撃終了時に死亡。
+        /// 次ターン開始時 HP=1 なら攻撃+10・そのターンの攻撃の最終与ダメージ+50% (Consumables.PainkillerFinalPct)、 攻撃終了時に死亡。
         /// armedThisTurn=使用ターン中、 procced=次ターンに踏みとどまり判定済+強化バフ発動中。</summary>
         public bool painkillerArmedThisTurn;
         /// <summary>[decay] (Phase A で立ち、 そのターンの攻撃の後に CombatManager.Turn.cs が倒す)</summary>
@@ -698,7 +698,6 @@ namespace ItemSystem.PassiveSkills
         public string pendingEnemySwapLabel;
 
         // ===== 消費アイテム由来（この1戦闘のみ。ctxは戦闘毎に生成→破棄で自動消去） =====
-        public int consAtkBurst;          // [persistent] (主攻撃で使ったら 0) 次の主攻撃で与ダメ+X（与ダメ倍率の後に足す・適用後0）
         public int consDiceRoll;          // [persistent] 攻撃+X（CombatManager.Turn.cs が攻撃値へ足す）。 書くのは〈痛覚遮断剤〉の発動 (BeginNewTurn Phase A) だけ
         /// <summary>[persistent] この戦闘で払ったリロールの回数（2026-10-17〜）。 費用 = 振り直す個数 × (この値 + 1)。
         /// <b>ターンでは戻らない</b> ── 同じ戦闘で振り直すほど高くつく（続けるとジリ貧）。 ctx は戦闘ごとに作り直すので、
@@ -999,10 +998,9 @@ namespace ItemSystem.PassiveSkills
                 if (playerCurrentHP == 1)
                 {
                     painkillerProcced = true;
-                    // 攻撃+10 (consDiceRoll: 攻撃値へ加算) / 最終与ダメージ+10 (consAtkBurst: 与ダメ倍率の後に加算) を流用
+                    // 攻撃+10 (consDiceRoll: 攻撃値へ加算)。 最終与ダメージ +50% は painkillerProcced の間 CombatManager.Damage が撃ごとに hitFinalDamagePct へ足す (2026-11-25・旧 +10 固定)
                     consDiceRoll += 10;
-                    consAtkBurst += 10;
-                    if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log("[痛覚遮断剤] HP=1 維持確認 → 攻撃+10/最終与ダメージ+10。 攻撃終了時に死亡。");
+                    if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log("[痛覚遮断剤] HP=1 維持確認 → 攻撃+10/最終与ダメージ+50%。 攻撃終了時に死亡。");
                 }
             }
 
@@ -1110,7 +1108,7 @@ namespace ItemSystem.PassiveSkills
             // 失った分を〈半減で失った〉出来事として配る (2026-10-31)。
             // 〈重装兵の隠し刃〉(2026-11-20): このターンがボスのダウンなら半減しない (ダウンはこの後 CombatManager.BeginBossDownTurn が待ちから 1 つ使って立てる)
             bool keepForDown = shieldKeepOnBossDown && (CombatSystem.CombatManager.Instance?.Down?.pending ?? 0) > 0;
-            bool keepForHeart = shieldNoDecayAt > 0 && _consShield >= shieldNoDecayAt;   // 〈脈なしの鋼心臓〉(2026-11-21): シールド 25 以上なら減衰しない
+            bool keepForHeart = shieldNoDecayAt > 0 && _consShield >= shieldNoDecayAt;   // 〈脈打たぬ鋼の心臓〉(2026-11-21): シールド 25 以上なら減衰しない
             if (currentTurn > 1 && _consShield > 0 && !keepForDown && !keepForHeart)
             {
                 // 残る割合 50% + 上乗せ (〈油染みの盾革〉+20・最大 80%)

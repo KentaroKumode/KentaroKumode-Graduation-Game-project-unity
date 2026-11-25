@@ -12,7 +12,8 @@ namespace MetaProgression
     /// </summary>
     public static class MetaBuffApplicator
     {
-        private static MetaProgressState S => MetaProgressManager.Instance?.State;
+        /// <summary>ラン指定の「整備盤なし」(GameLoop.RunSpec.noMetaBuffs・チュートリアル) の間は null ── 下の getter が全部「メタ進行なし」の値を返す。</summary>
+        private static MetaProgressState S => RunSpec.NoMeta ? null : MetaProgressManager.Instance?.State;
 
         /// <summary>整備盤の効いているパネルの数値の合計 (2026-11-23・<see cref="MetaBoard"/>)。 メタ進行が無ければ全部 0。</summary>
         private static BoardStats B => S?.BoardEffects ?? Empty;

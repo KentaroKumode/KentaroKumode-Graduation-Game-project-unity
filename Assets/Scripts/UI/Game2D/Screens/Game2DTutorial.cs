@@ -19,10 +19,10 @@ namespace UI.Game2D
         public const string CombatForm = "戦闘の形式";
         public const string RollDice = "ダイスを振る";
         public const string Telegraph = "敵の予告";
-        public const string Plug = "端子に挿す";
-        public const string Deck = "端子の山札";
-        public const string Kinds = "端子の種類";
-        public const string GrowDeck = "端子を増やす";
+        public const string Plug = "カードに挿す";
+        public const string Deck = "カードの山札";
+        public const string Kinds = "カードの種類";
+        public const string GrowDeck = "カードを増やす";
         public const string Order = "解決の順番";
         public const string Long = "戦闘の長期化";
         public const string Dice = "賽";
@@ -98,7 +98,7 @@ namespace UI.Game2D
         /// 契機の表 (並び = handbook の並び = 同時に頼まれた時に出す順)。 頼む所:
         /// <list type="bullet">
         /// <item>ランと帰還 / 層の歩き方 / 前哨基地 / 賽 / 役 / キーワード / 毒 / 出血 / 充電 / 臨界 / 物資 / 持ち物 ── この部品が状態を見て頼む (<see cref="Watch"/>)</item>
-        /// <item>巡回するもの ── 魔石が初めて反応した時 (<see cref="Game2DRadar.SetStone"/>)</item>
+        /// <item>巡回するもの ── 縄張りの番人が居る層に入った時 (<see cref="Watch"/>・2026-11-24 に円いレーダーの反応から移した)</item>
         /// <item>戦闘の形式 / 層とボス / 端子の山札 / ダイスを振る / 敵の予告 / 端子に挿す / 端子の種類 / 解決の順番 / 戦闘の長期化 / 会心 / 確定会心 / 逃げる ── 戦闘の流れ (<see cref="Game2DBattleSim"/>)</item>
         /// <item>端子を増やす / 装備と強化 (休憩・武器の入れ替え) / ショップ ── 場面の窓 (<see cref="Game2DPhaseScreens"/>)</item>
         /// <item>出自 ── 出自 (職業) の選択画面が出そろった時 (<see cref="UI.ClassSelect.ClassSelectView"/>)</item>
@@ -191,7 +191,6 @@ namespace UI.Game2D
         private RawImage _dimImg; private RectTransform _dimRt; private Texture2D _dimTex;
         private RawImage _img; private RectTransform _rt; private Texture2D _tex;
         private RectInt? _focus; private int _stable; private string _probe; private RectInt? _probeRect; private float _probeT;
-        private Game2DRadar _radar;
         private int _winW = W;
         private Game2DTutorialText.Entry _entry;
         private readonly List<Page> _pages = new List<Page>();
@@ -240,7 +239,8 @@ namespace UI.Game2D
         {
             var gm = GameManager.Instance;
             if (gm == null) { if (_cur != null) Hide(); SyncInput(); return; }
-            if (Application.isBatchMode || GameHooks.BotDriving)
+            // ラン指定で手引きの文を止める間 (チュートリアルのラン・RunSpec.hide): BOT の時と同じく出さず、 見た印も付けない (本編でまた出る)
+            if (Application.isBatchMode || GameHooks.BotDriving || RunSpec.Hides(RunSpec.HideHandbook))
             {
                 _queue.Clear();
                 if (_cur != null) Hide();          // 印は付けない (人が遊ぶ時にまた出る)
@@ -264,7 +264,12 @@ namespace UI.Game2D
                 Request(TutorialTopics.RunAndReturn);
                 if (ClearedThirdLayerEver()) Request(TutorialTopics.Challenge);      // 「挑戦」: 第三層をクリアした記録がある (前の起動のクリアも拾う)
             }
-            else if (ph == GameManager.GamePhase.MapNavigation) Request(TutorialTopics.WalkLayer);
+            else if (ph == GameManager.GamePhase.MapNavigation)
+            {
+                Request(TutorialTopics.WalkLayer);
+                var fm = gm.FreeMap;      // 「巡回するもの」: 縄張りの番人が居る層に入った (縄張りは層に入った時から地図に赤く出ている)
+                if (fm != null && fm.FoeAlive && fm.Territory.Count > 0) Request(TutorialTopics.Patrol);
+            }
             var run = gm.Run;
             int owned = run?.ownedPassiveItems != null ? run.ownedPassiveItems.Count : -1;
             if (owned != _lastOwned)
@@ -305,7 +310,7 @@ namespace UI.Game2D
             // 「挑戦」: このランで第三層のボスを倒した (〈決意〉で先へ進むランは、 エンドの記録が付かないのでここで頼む)。 出すのはタイトルに戻ってから (Scene.Title)
             if (run.Depth > run.normalClearFloor || (run.Depth == run.normalClearFloor && run.bossDefeatedThisFloor))
                 Request(TutorialTopics.Challenge);
-            // 「物資」: 地図の上で物資が減った (歩いた・照明を灯した)
+            // 「物資」: 地図の上で物資が減った (歩いた)
             if (run.provision != _lastProv)
             {
                 if (run.provision < _lastProv && ph == GameManager.GamePhase.MapNavigation) Request(TutorialTopics.Provision);
@@ -377,15 +382,14 @@ namespace UI.Game2D
         //   画面全体を幕で暗くし、 範囲の内側だけ幕を抜いて枠で囲む。 文面の板は範囲に重ならない所へ置く。 部品が無い節は幕だけ (板は中央)。
 
         /// <summary>強調する部品の種類。</summary>
-        private enum Focus { None, NavTop, Radar, Intent, BattleGauge, Ports, Stat, Ctl, Hand }
+        private enum Focus { None, NavTop, Intent, BattleGauge, Ports, Stat, Ctl, Hand }
 
         /// <summary>節 → 強調する部品。 ここに無い節は強調しない (幕だけ)。</summary>
         private static Focus FocusOf(string title)
         {
             switch (title)
             {
-                case TutorialTopics.WalkLayer: return Focus.NavTop;        // 手番・待つ の帯
-                case TutorialTopics.Patrol: return Focus.Radar;            // 魔石
+                case TutorialTopics.WalkLayer: return Focus.NavTop;        // 天気・手番・所持金の帯
                 case TutorialTopics.Telegraph: return Focus.Intent;        // 予告の枠
                 case TutorialTopics.Plug: return Focus.Ports;              // 出目と差し込み口
                 case TutorialTopics.Deck:
@@ -407,7 +411,6 @@ namespace UI.Game2D
             var f = FocusOf(title);
             if (f == Focus.None) return null;
             if (f == Focus.NavTop) return Game2DNavExtras.TopBar;
-            if (f == Focus.Radar) { if (_radar == null) _radar = FindObjectOfType<Game2DRadar>(); return _radar != null ? (RectTransform)_radar.transform : null; }
             return null;      // 戦闘の部品は RectTransform を持たない (液晶の中・FocusRect が Game2DBattleLcd から範囲を取る)
         }
 

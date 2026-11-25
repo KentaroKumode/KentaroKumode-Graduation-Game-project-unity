@@ -5,9 +5,9 @@ using ItemSystem.PassiveSkills.Keywords;
 namespace ItemSystem.PassiveSkills.Effects
 {
     // ============================================================
-    //  軸なし汎用の 36 品 (2026-11-21・full-item-rework-ledger §⑩・docs/GAME.md §7-9)。 枠外 (動的 4 枠ロックの対象外)。
+    //  軸なし汎用の 33 品 (2026-11-24 に航行の 3 品を削除・旧 36・2026-11-21・full-item-rework-ledger §⑩・docs/GAME.md §7-9)。 枠外 (動的 4 枠ロックの対象外)。
     //  効果クラスを持つのは戦闘の中で働く 13 品 (拳套・薬嚢・小瓶・短槍・崩し・楔・砂時計・気圧計・[剣の舞] 5 品)。
-    //  戦闘の外だけで効く品 (探索・追跡者の 13 品・風見鶏・天幕・鑑定書・交換帳・止まらない時計・特殊戦術の 5 品) は持っているかを読む所が効かせる
+    //  戦闘の外だけで効く品 (探索・追跡者の 10 品・風見鶏・天幕・鑑定書・交換帳・止まらない時計・特殊戦術の 5 品) は持っているかを読む所が効かせる
     //  (〈古物商の交換帳〉= GameManager.ExchangeLedgerAxis)。 ここの先頭の Rw は全部の軸のファイルが使う道具。
     // ============================================================
 
@@ -124,7 +124,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>底抜けの小瓶: 戦闘で最初に使った消耗品は消費されず、 その戦闘中にもう 1 回使える (1 戦闘 1 回)。
+    /// <summary>二度点きの燐寸: 戦闘で最初に使った消耗品は消費されず、 その戦闘中にもう 1 回使える (1 戦闘 1 回)。
     /// もう 1 回使わなければ、 戦闘の終わりに消える (<see cref="Consumables.Consume"/>)。 使う時の判定は <see cref="Consumables.Use"/> が <see cref="TryKeep"/> で聞く。</summary>
     public class BottomlessVial : IPassiveSkillEffect, IRelicDisplay
     {
@@ -145,7 +145,7 @@ namespace ItemSystem.PassiveSkills.Effects
             if (st == 0)
             {
                 ctx.accumulatedValues[StateKey] = 1; _keptId = id; _ctx = ctx;
-                Rw.Log($"[底抜けの小瓶] 〈{id}〉は消費しない (この戦闘中にもう 1 回使える)");
+                Rw.Log($"[二度点きの燐寸] 〈{id}〉は消費しない (この戦闘中にもう 1 回使える)");
                 return true;
             }
             if (st == 1 && ReferenceEquals(_ctx, ctx) && id == _keptId) { ctx.accumulatedValues[StateKey] = 2; _keptId = null; _ctx = null; }
@@ -158,13 +158,13 @@ namespace ItemSystem.PassiveSkills.Effects
             if (Rw.Count(ctx, StateKey) == 1 && ReferenceEquals(_ctx, ctx) && _keptId != null)
             {
                 Consumables.Consume(Rw.Run, _keptId);
-                Rw.Log($"[底抜けの小瓶] もう 1 回使わなかった〈{_keptId}〉は戦闘の終わりに消える");
+                Rw.Log($"[二度点きの燐寸] もう 1 回使わなかった〈{_keptId}〉は戦闘の終わりに消える");
             }
             _keptId = null; _ctx = null;
         }
     }
 
-    /// <summary>隙衝きの短槍: 敵がチャージ中 (大技の前で攻撃しない) かダウン中のターン、 攻撃の与ダメージ +40% (与ダメ % の池・撃ごとに乗る)。</summary>
+    /// <summary>隙突きの短槍: 敵がチャージ中 (大技の前で攻撃しない) かダウン中のターン、 攻撃の与ダメージ +40% (与ダメ % の池・撃ごとに乗る)。</summary>
     public class GapSpear : IPassiveSkillEffect
     {
         public string SkillId => ItemIds.TacGapSpear;
@@ -175,7 +175,7 @@ namespace ItemSystem.PassiveSkills.Effects
             var cm = CombatSystem.CombatManager.Instance;
             if (cm == null || !cm.EnemyChargingOrDownNow(ctx.currentTurn)) return;
             ctx.AddOutgoingPct(Pct);
-            Rw.Log("[隙衝きの短槍] 敵がチャージ中かダウン中 → 与ダメージ +40%");
+            Rw.Log("[隙突きの短槍] 敵がチャージ中かダウン中 → 与ダメージ +40%");
         }
     }
 
@@ -197,7 +197,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>大技殺しの楔: ダウンか〈封じ〉で敵の大技を取り消したとき (OnHeavyCanceled)、 敵に最大 HP の 10% の軽減不可ダメージ・次のターンのブロック +15
+    /// <summary>構え崩しの鉄杭: ダウンか〈封じ〉で敵の大技を取り消したとき (OnHeavyCanceled)、 敵に最大 HP の 10% の軽減不可ダメージ・次のターンのブロック +15
     /// (取り消したターンは敵が攻撃しないので次のターン・<see cref="CombatSystem.YachtRoleEffects.BlockNextKey"/>)。</summary>
     public class HeavyBreakerWedge : IPassiveSkillEffect
     {
@@ -209,11 +209,11 @@ namespace ItemSystem.PassiveSkills.Effects
             int dmg = (int)((long)ctx.enemyMaxHP * MaxHpPct / 100);
             Kw.DamageEnemy(ctx, dmg);
             CombatSystem.YachtRoleEffects.AddNextTurn(ctx, CombatSystem.YachtRoleEffects.BlockNextKey, Block);
-            Rw.Log($"[大技殺しの楔] 大技を取り消した → 軽減不可 {dmg}・次のターン ブロック +{Block}");
+            Rw.Log($"[構え崩しの鉄杭] 大技を取り消した → 軽減不可 {dmg}・次のターン ブロック +{Block}");
         }
     }
 
-    /// <summary>逆境の砂時計: エスカレーションの段階が 2 以上の間、 ターン開始時にブロック +4 (このターン)・攻撃の与ダメージ +25% (与ダメ % の池)。
+    /// <summary>背水の錨: エスカレーションの段階が 2 以上の間、 ターン開始時にブロック +4 (このターン)・攻撃の与ダメージ +25% (与ダメ % の池)。
     /// 段階は〈鎮静香〉の遅延と段階の戻しを差し引いた今の段階 (CombatManager.EscalationStageNow・予告に出る段階)。</summary>
     public class AdversityHourglass : IPassiveSkillEffect
     {
@@ -349,12 +349,17 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>無銘の剣舞譜 (特殊・4枚集約の変化先): 戦闘突入ごとに[剣先]スタック+1（最大99・ラン中持続）。
-    /// ダイス合計に剣先スタック分を加算。与ダメージ時に剣先スタック分HP回復、被ダメージ時に剣先スタック分の
-    /// 軽減不可ダメージを相手へ。スタックはランを跨がず IRunResettable でリセット。</summary>
+    /// <summary>無銘の剣舞譜 (特殊・4枚集約の変化先・2026-11-25 作者の決定で壊れ性能へ): 戦闘突入ごと・攻撃の撃が当たるたびに[剣先] +1（上限なし・ラン中持続・取得時に 層 × 15）。
+    /// 攻撃 +剣先 (撃ごとに乗る)。撃が当たるたび剣先分 HP 回復、被ダメージ時に剣先分の軽減不可ダメージを相手へ。
+    /// 全部の撃が会心確定・敵の防御を無視・同じ撃がもう 1 回当たる (本体 CombatManager.Turn の撃の輪が <see cref="Held"/> を読む・〈防人の軍標〉のもう 1 回と同じ道)。
+    /// スタックはランを跨がず IRunResettable でリセット。</summary>
     public class BladeDance : IPassiveSkillEffect, IRelicDisplay, IRunResettable, IRunStatePersistent
     {
-        public string SkillId => "無銘の剣舞譜";
+        public string SkillId => GameLoop.SwordDanceSet.Finale;
+        public const int SeedPerFloor = 15;
+        public static bool Held(GameLoop.RunState run) => run?.OwnsPassive(GameLoop.SwordDanceSet.Finale) == true;
+        /// <summary>いまの剣先 (テスト・画面が読む)。</summary>
+        public int Kensaki => kensaki;
         /// <summary>秘宝の列 (#320) の見え方。</summary>
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(kensaki);
         private int kensaki = 0; // 剣先スタック（ラン中持続）
@@ -366,16 +371,16 @@ namespace ItemSystem.PassiveSkills.Effects
         public bool RestoreRunState(string state)
         {
             if (!int.TryParse(state, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out int v)) return false;
-            kensaki = System.Math.Max(0, System.Math.Min(99, v));
+            kensaki = System.Math.Max(0, v);   // 上限なし (2026-11-25)
             return true;
         }
 
-        /// <summary>4枚集約による BD 取得時の初期スタック付与 (現在層 × 5・2026-11-15 にコードに合わせてコメントを直した)。
-        /// 取得が後半層に偏る構造のため、 集約成功への報酬として「現時点の層数 × 5」 をプリロードする。
+        /// <summary>4枚集約による BD 取得時の初期スタック付与 (現在層 × 15・2026-11-25 に × 5 から上げた)。
+        /// 取得が後半層に偏る構造のため、 集約成功への報酬として「現時点の層数 × 15」 をプリロードする。
         /// 既に kensaki > seed の場合は上書きしない (後から再取得→上書きで減少を防ぐ)。</summary>
         public void SeedOnAcquire(int floor)
         {
-            int seed = System.Math.Min(99, System.Math.Max(0, floor) * 5);
+            int seed = System.Math.Max(0, floor) * SeedPerFloor;
             if (seed > kensaki) kensaki = seed;
             if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[無銘の剣舞譜] 取得時シード: floor={floor} → kensaki={kensaki}");
         }
@@ -392,17 +397,20 @@ namespace ItemSystem.PassiveSkills.Effects
             switch (trigger)
             {
                 case PassiveSkillTrigger.OnBattleStart:
-                    kensaki = System.Math.Min(99, kensaki + 1);
+                    kensaki++;
                     if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[無銘の剣舞譜] 戦闘突入: 剣先スタック → {kensaki}");
                     break;
                 case PassiveSkillTrigger.OnPostRoll:
-                    // 旧: ダイス合計+剣先 / 新: 攻撃+剣先
+                    // 攻撃 +剣先 (mutualAttackBonus = 端子の外の攻撃なので撃ごとに乗る)。 撃の途中で増えた剣先は次のターンから乗る
                     if (kensaki > 0) ctx.AddPlayerAttackOrDiceBonus(kensaki);
                     break;
                 case PassiveSkillTrigger.OnPostDealDamage:
-                    // 与ダメージ時: 剣先スタック分HP回復
-                    if (kensaki > 0 && ctx.finalDamage > 0)
-                        ctx.playerCurrentHP = System.Math.Min(ctx.playerMaxHP, ctx.playerCurrentHP + kensaki);
+                    // 撃が当たるたび: 剣先分 HP 回復、 本物の撃 (もう 1 回の撃も含む) なら剣先 +1
+                    if (ctx.finalDamage > 0)
+                    {
+                        if (kensaki > 0) ctx.playerCurrentHP = System.Math.Min(ctx.playerMaxHP, ctx.playerCurrentHP + kensaki);
+                        if (ctx.IsRealHit) kensaki++;
+                    }
                     break;
                 case PassiveSkillTrigger.OnPostReceiveDamage:
                     // 被ダメージ時: 剣先スタック分の軽減不可ダメージを相手へ

@@ -454,13 +454,13 @@ namespace EventSystem
                 {
                     bool rare = eff.param == EventEffectRoles.RareTerminal;
                     var offer = GameLoop.GameManager.RollEventTerminals(run, Mathf.Max(1, eff.amount), rare);
-                    if (offer.Count == 0) { result.log.Add("差し出せる端子は無かった"); break; }
+                    if (offer.Count == 0) { result.log.Add("差し出せるカードは無かった"); break; }
                     result.NoteGain(MapSystem.FreeMove.EventGainKind.Item);   // 不安定化: 持ち物が増える得 (端子は秘宝でないので +1 の側)
                     var gm = GameLoop.GameManager.Instance;
                     string got = gm != null ? gm.OfferEventTerminals(offer) : null;
                     if (gm == null) { run.terminalDeck.Add(offer[0]); got = offer[0]; }   // 本体の外 (単体の試験): 先頭を加える (秘宝の N 択と同じ)
-                    result.log.Add(got == null ? $"{(rare ? "レアの" : "")}端子を {offer.Count} つから 1 つ選ぶ"
-                                 : got == "" ? "端子は山札に加えなかった" : $"端子を山札に加えた: {got}");
+                    result.log.Add(got == null ? $"{(rare ? "レアの" : "")}カードを {offer.Count} つから 1 つ選ぶ"
+                                 : got == "" ? "カードは山札に加えなかった" : $"カードを山札に加えた: {got}");
                     break;
                 }
 
@@ -470,7 +470,7 @@ namespace EventSystem
                     if (not != null) { result.log.Add(not); break; }
                     var gm = GameLoop.GameManager.Instance;
                     string removed = gm != null ? gm.OfferEventTerminalRemoval() : "";
-                    result.log.Add(removed == null ? "山札から抜く端子を 1 枚選ぶ" : removed == "" ? "山札から端子は抜かなかった" : $"山札から抜いた: {removed}");
+                    result.log.Add(removed == null ? "山札から抜くカードを 1 枚選ぶ" : removed == "" ? "山札からカードは抜かなかった" : $"山札から抜いた: {removed}");
                     break;
                 }
             }
@@ -639,16 +639,18 @@ namespace EventSystem
             }
 
             // 秘宝: 出現の枠と 2 段階の軸均等の抽選 (軸か枠外に絞ってからレア度で引く・full-item-rework-spec §1-2)。 軸の指定がある時は、 その軸が枠に無ければ出さない
+            var basePool = filtered;   // 呪物の賽の置き換えの LEGENDARY は軸で絞る前の並びから
             if (category == ItemCategory.Passive)
             {
                 filtered = ItemSystem.AxisPool.Narrow(run ?? GameLoop.GameManager.Instance?.Run, filtered, "event.axis");
                 if (filtered.Count == 0) return null;
             }
 
-            // 呪物の賽: イベントの秘宝は LEGENDARY の重み ×3 (ADR-0016)
-            float legMul = category == ItemCategory.Passive ? CombatSystem.DiePassives.LegendaryOfferMul(run ?? GameLoop.GameManager.Instance?.Run) : 1f;
-            var picked = ItemSystem.RarityWeightedPicker.Pick(filtered, null, 0f, legMul);
-            return picked?.internalName;
+            var picked = ItemSystem.RarityWeightedPicker.Pick(filtered);
+            if (picked == null || category != ItemCategory.Passive) return picked?.internalName;
+            // 呪物の賽 (2026-11-25): GOLD 以下は LEGENDARY の出やすさの 2 倍で呪いの LEGENDARY に変わる
+            return CombatSystem.DiePassives.MaybeCurse(run ?? GameLoop.GameManager.Instance?.Run, picked.internalName, basePool,
+                ItemSystem.RarityWeightedPicker.LegendaryChance(basePool), "event", alsoExclude);
         }
 
         /// <summary>id から表示名を解決。DBに見つからなければ id をそのまま返す。</summary>

@@ -123,7 +123,7 @@ namespace GameLoop
             if (ok)
             {
                 if (useCap > 0 && lockCtx != null) lockCtx.accumulatedValues[BattleUseKey] = lockCtx.GetAccumulated(BattleUseKey) + 1f;
-                // 〈底抜けの小瓶〉(2026-11-20): 戦闘で最初に使った消耗品は消費しない (その戦闘中にもう 1 回使える・使わなければ戦闘の終わりに消える)
+                // 〈二度点きの燐寸〉(2026-11-20): 戦闘で最初に使った消耗品は消費しない (その戦闘中にもう 1 回使える・使わなければ戦闘の終わりに消える)
                 if (!ItemSystem.PassiveSkills.Effects.BottomlessVial.TryKeep(lockCtx, run, id)) Consume(run, id);
                 MetaProgression.Achievements.AchievementService.NoteConsumableUsed();
                 NoteVescaPhaseUse();
@@ -135,7 +135,7 @@ namespace GameLoop
         }
 
         /// <summary>使った品を所持から 1 つ減らす。 古い手紙は 1 枚で OldLetterUses 回使える (使い切ったときだけ手放す)。
-        /// 〈底抜けの小瓶〉が戦闘の終わりに、 もう 1 回使わなかった品を消すのもここ。</summary>
+        /// 〈二度点きの燐寸〉が戦闘の終わりに、 もう 1 回使わなかった品を消すのもここ。</summary>
         public static void Consume(RunState run, string id)
         {
             if (run?.ownedConsumables == null || string.IsNullOrEmpty(id)) return;
@@ -239,7 +239,7 @@ namespace GameLoop
                 case ItemIds.Talisman3:
                 case ItemIds.Talisman4: return AddShield(run, ctx, ShieldAmount(id));
 
-                // 攻撃強化: 与ダメ +X% (その戦闘中)。 outgoingDamageMultiplier は**加算プール**
+                // 攻撃強化: 最終与ダメージ +X% (その戦闘中・2026-11-25 に与ダメの池から最終へ移した・CombatManager.Damage)。 旧: outgoingDamageMultiplier は**加算プール**
                 //   (実測 ×2.00) なので、 +75% でも最終与ダメは ×1.375 に薄まる。
                 case ItemIds.PowerOil1: return AddTimedDmgMult(run, ctx, 15, -1);
                 case ItemIds.PowerOil2: return AddTimedDmgMult(run, ctx, 30, -1);
@@ -300,8 +300,10 @@ namespace GameLoop
 
         /// <summary>〈鎧割りの酸瓶〉: 敵の防御から引く量 (この戦闘中・下限 0)。</summary>
         public const int AcidDefenseCut = 12;
-        /// <summary>〈目盛り削りの鑿〉: 敵へのダメージ。</summary>
+        /// <summary>〈目盛り削りのノミ〉: 敵へのダメージ。</summary>
         public const int ChiselDamage = 15;
+        /// <summary>〈痛覚遮断剤〉: 発動したターンの攻撃の最終与ダメージ +N% (油・膏薬と同じ最終与ダメージの枠・2026-11-25 作者の決定・旧 +10 固定)。</summary>
+        public const int PainkillerFinalPct = 50;
         /// <summary>〈複製の水銀〉: 手札に足す写しの枚数。</summary>
         public const int MercuryCopies = 2;
 
@@ -334,7 +336,7 @@ namespace GameLoop
                 case ItemIds.TacticSwap: return dk == null || dk.hand.Count == 0 ? "手札が無い" : null;
                 case ItemIds.TacticOil: return dk == null ? "使えない" : dk.state.ignoreCond ? "このターンはもう効いている" : null;
                 case ItemIds.TacticOrb: return dk == null ? "使えない" : dk.state.doubleAll ? "このターンはもう効いている" : null;
-                case ItemIds.TacticMercury: return dk == null || dk.hand.Count == 0 ? "写す端子が無い" : null;
+                case ItemIds.TacticMercury: return dk == null || dk.hand.Count == 0 ? "写すカードが無い" : null;
                 case ItemIds.TacticNeedle: return ctx.GetAccumulated(CombatManager.TacticNeedleKey) > 0f ? "もう仕込んである" : null;
                 case ItemIds.TacticChisel: return cm.EnemyHP <= 0 ? "敵が倒れている" : null;
                 case ItemIds.TacticAcid: case ItemIds.TacticSand: return null;
@@ -348,7 +350,7 @@ namespace GameLoop
             switch (id)
             {
                 case ItemIds.TacticSwap:
-                    if (Debug.unityLogger.logEnabled) Debug.Log($"[入れ替えの符] 手札を捨てて {dk.SwapHand()} 枚引き直した");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[風替わりの羽根] 手札を捨てて {dk.SwapHand()} 枚引き直した");
                     return true;
                 case ItemIds.TacticOil:
                     dk.state.ignoreCond = true;      // 〈無形の構え〉の「条件を無視」と同じ旗 (このターンだけ・BeginTurn が戻す)

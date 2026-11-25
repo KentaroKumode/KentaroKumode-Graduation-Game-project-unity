@@ -206,6 +206,8 @@ namespace ItemSystem
         public string axis = "";
         /// <summary>軸の中の分岐 ("A" / "B"・共通の品は空・2026-11-23・items.json の branch)。 構造は id の綴りから読まない。</summary>
         public string branch = "";
+        /// <summary>常に働いていて、 働く瞬間の無い品 (items.json の quietRelic・2026-11-25)。 戦闘の秘宝の列で光らせない。</summary>
+        public bool quietRelic;
         public List<PassiveEffect> weaponPassives = new List<PassiveEffect>();
         
         [Header("パッシブアイテムデータ")]

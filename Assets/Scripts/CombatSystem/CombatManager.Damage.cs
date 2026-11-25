@@ -120,14 +120,15 @@ namespace CombatSystem
                 if (Debug.unityLogger.logEnabled) Debug.Log("[瞬間研磨剤] 与ダメージ+150%");
             }
 
-            // 消費: 鬼火の油 与ダメ+X%（全戦闘）。 **他の与ダメ% と同じプールへ加算** (2026-09-19)。
-            //   旧: 倍率を掛けた後の totalDmg に さらに ×(1+X%) を掛けており、 与ダメ% を重ねると掛け算で膨らんだ。
+            // 消費: 鬼火の油ほか 最終与ダメージ +X%（全戦闘）。 2026-11-25 作者の決定: 与ダメの池 (加算) から最終与ダメージへ
+            //   (池だと ほかの品の % と足されて薄まり、 BRONZE の +15% が秘宝の最弱より弱かった)。 下の ApplyFinalDamage で掛ける (この 1 撃の上乗せ・撃ごとに 0 へ戻る)。
             if (ctx.consDmgMultPct > 0)
             {
-                if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
-                ctx.outgoingDamageMultiplier += ctx.consDmgMultPct / 100f;
+                ctx.hitFinalDamagePct += ctx.consDmgMultPct;
                 DmgSourceDiag.Note("消費〈油・膏薬〉", DmgSourceDiag.Out, ctx.consDmgMultPct / 100f);
             }
+            // 〈痛覚遮断剤〉が発動したターン: 最終与ダメージ +50% (油・膏薬と同じ枠・2026-11-25・旧 攻撃バースト +10 固定)
+            if (ctx.painkillerProcced) ctx.hitFinalDamagePct += GameLoop.Consumables.PainkillerFinalPct;
 
             // 与ダメ倍率（激情の刃 等のパッシブ由来 + メタ% + 遺物 + 研磨剤 + 鬼火の油）
             //   + この 1 撃だけの池への上乗せ (〈加重の拳套〉・ctx.hitOutgoingPct)
@@ -144,13 +145,6 @@ namespace CombatSystem
                 CombatStats.Stage(22, ctx.outgoingDamageMultiplier <= 0f ? 1f : ctx.outgoingDamageMultiplier);
             }
 
-            // 消費: 攻撃力バースト（この勝利ターンのみ・単発消費）
-            if (ctx.consAtkBurst > 0)
-            {
-                totalDmg += ctx.consAtkBurst;
-                if (Debug.unityLogger.logEnabled) Debug.Log($"[CombatManager] 攻撃バースト +{ctx.consAtkBurst}");
-                ctx.consAtkBurst = 0;
-            }
             if (CombatStats.DiagWinAttack) CombatStats.Stage(6, totalDmg);   // 段 F
 
             // [2026-07-28 撤去] メタバフ「会心ダイス」による会心時の固定ダメ加算。
@@ -210,8 +204,8 @@ namespace CombatSystem
                      && ((ctx.hitIsFocused && ItemSystem.PassiveSkills.Effects.HeavenEyeGuard.Held(ctx))
                          || (ctx.critExcessDouble && ItemSystem.PassiveSkills.Effects.Crit.HitRenki(ctx) >= ItemSystem.PassiveSkills.Effects.Suntetsu.IgnoreRenki)))
             {
-                // 〈天眼の鍔〉の集中会心 / 〈寸鉄〉の【練気】5 以上の会心は敵の防御を完全に無視する (2026-11-23)
-                if (Debug.unityLogger.logEnabled) Debug.Log($"[天眼の鍔/寸鉄] 会心 → 敵の防御{ctx.enemyDefense} を無視");
+                // 〈白濁の義眼〉の集中会心 / 〈寸鉄〉の【練気】5 以上の会心は敵の防御を完全に無視する (2026-11-23)
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[白濁の義眼/寸鉄] 会心 → 敵の防御{ctx.enemyDefense} を無視");
             }
             else if (ctx.hitIgnoreDefense && ctx.enemyDefense > 0 && totalDmg > 0)
             {

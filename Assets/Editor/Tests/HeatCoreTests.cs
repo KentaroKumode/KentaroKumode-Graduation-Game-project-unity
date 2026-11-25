@@ -69,16 +69,15 @@ namespace AutoTest.EditorTests
             Assert.That(o.heatGains, Is.EquivalentTo(new[] { HeatCore.StoneTwo, HeatCore.BreastHeat, HeatCore.SpannerPerHit, HeatCore.SpannerPerHit }));
             Assert.That(o.heatDouble, Is.False);
             Assert.That(o.attackPips, Is.EqualTo(9));                  // 攻撃に挿した 5 + 4
-            Assert.That(HeatCore.EndGain(o), Is.EqualTo(4));           // ターンの終わりは 9 の半分 (切り捨て)
+            Assert.That(HeatCore.EndGain(o), Is.EqualTo(4));           // 配線のとき (攻撃の前) は 9 の半分 (切り捨て)
             // 攻撃 3 枚 (5・4・3): 過熱石 (3 個とも攻撃)・スパナ × 3 撃・燧石の倍
             var board3 = new List<string> { TerminalIds.Attack, TerminalIds.Attack, TerminalIds.Attack };
             var o3 = TerminalCards.Resolve(board3, new[] { 0, 1, 2 }, new[] { 5, 4, 3 }, env, st);
             Assert.That(o3.heatGains, Is.EquivalentTo(new[] { HeatCore.StoneAll, HeatCore.SpannerPerHit, HeatCore.SpannerPerHit, HeatCore.SpannerPerHit }));
             Assert.That(o3.heatDouble, Is.True);
             var f = HeatCore.Forecast(new HeatCore.State { items = st.heatItems, threshold = 40 }, o3);
-            // 過熱石 16 × 2 = 32 → スパナ 3 × 2 で 38 → 44 (閾値 40 に届いて 0 へ・1 回) → +6 = 6 → ターンの終わり 12 / 2 = 6 × 2 = 12 → 18 (final6: スパナ +3)
+            // 過熱石 16 × 2 = 32 → スパナ 3 × 2 で 38 → 44 (閾値 40 に届いて 0 へ・1 回) → +6 = 6 → 攻撃に挿した出目 12 / 2 = 6 × 2 = 12 → 18 (2026-11-25〜 配線のとき・爆発の回数は全部 burstsWired) (final6: スパナ +3)
             Assert.That(f.burstsWired, Is.EqualTo(1));
-            Assert.That(f.burstsEnd, Is.EqualTo(0));
             Assert.That(f.meterAfter, Is.EqualTo(18));
         }
     }

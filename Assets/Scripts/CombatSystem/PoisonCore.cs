@@ -12,10 +12,10 @@
         Thorn = 1 << 3,        // 毒棘の小盾: 防御の端子に挿したターン ブロック +6
         Mantle = 1 << 4,       // 瘴気の外套: 毒 15 以上で受けるダメージ −35%
         Blowpipe = 1 << 5,     // 麻痺の吹き矢: 毒 18 以上で敵の防御を全部無視
-        Ring = 1 << 6,         // 石抜きの毒指輪: 毒 24 以上で攻撃が当たると【起爆】 (2026-11-22 neon 収束: 16 → 24)
+        Ring = 1 << 6,         // 蓋付きの毒指輪: 毒 24 以上で攻撃が当たると【起爆】 (2026-11-22 neon 収束: 16 → 24)
         Magazine = 1 << 7,     // 劇毒の火薬庫: 起爆の倍率 ×5・敵の最大 HP の 0.32% / 毒
         SlowBlade = 1 << 8,    // 遅効の毒刃: 起爆のダメージ +30% × この戦闘の起爆の回数
-        Oil = 1 << 9,          // 骨溶かしの黒油: ダウン中の毒のダメージと起爆 ×2
+        Oil = 1 << 9,          // 骨溶かしの黒油: ダウン中・よろめき中の毒のダメージと起爆 ×2・よろめきにも ×1.5・ダウンさせたとき毒 +8
     }
 
     /// <summary>
@@ -23,8 +23,8 @@
     ///
     /// <para><b>【起爆】</b>: 敵の毒を 1/3 (切り上げ・2026-11-22 neon 収束: 旧 半分) 消費し、 max(消費量 × 倍率 (既定 ×4), floor(消費量 × 敵の最大 HP × 0.25%)) の軽減不可ダメージ (防御も無視)。
     /// 最大 HP の項は 2026-11-22 neon 収束 (HP の大きいボスで起爆が細る分を補う)。
-    /// 起爆したターンの終わりに、 ボスの目盛りのひびを全部、 正規のダウン (受けるダメージ ×1.5 あり) として割る (CombatManager.NoteBossDownTurnEnd)。
-    /// 起爆は品が起こす (〈石抜きの毒指輪〉〈劇毒の火薬庫〉)。 ダメージの式はここだけにあり、 本体 (PoisonEffects の Psn.Detonate) と BOT の見積もり (AutoRunner の ItemSight) が同じ関数を呼ぶ。</para>
+    /// 起爆したとき、 ボスの次の目盛りをその起爆のダメージの <see cref="DetonateNotchPct"/>% ぶん上げる (今の HP の 1 下まで・ひびは割らない・2026-11-25 作者の決定 / neon answer_gauge)。
+    /// 起爆は品が起こす (〈蓋付きの毒指輪〉〈劇毒の火薬庫〉)。 ダメージの式はここだけにあり、 本体 (PoisonEffects の Psn.Detonate) と BOT の見積もり (AutoRunner の ItemSight) が同じ関数を呼ぶ。</para>
     /// <para>このファイルは UnityEngine に依存しない。</para>
     /// </summary>
     public static class PoisonCore
@@ -35,7 +35,7 @@
         public const int DetonateMaxHpBp = 25, MagazineMaxHpBp = 32;
         /// <summary>起爆で消費する毒の割合の分母 (毒 ÷ これ・切り上げ・2026-11-22 neon 収束: 2 → 3)。</summary>
         public const int SpendDiv = 3;
-        /// <summary>〈石抜きの毒指輪〉: 起爆に要る敵の毒 (2026-11-22 neon 収束: 16 → 24。 起爆の後も 16 残り、 〈瘴気の外套〉15・〈口縫いの毒糸〉10・〈麻痺の吹き矢〉12 が切れない)。</summary>
+        /// <summary>〈蓋付きの毒指輪〉: 起爆に要る敵の毒 (2026-11-22 neon 収束: 16 → 24。 起爆の後も 16 残り、 〈瘴気の外套〉15・〈口縫いの毒糸〉10・〈麻痺の吹き矢〉12 が切れない)。</summary>
         public const int RingNeed = 24;
         /// <summary>〈劇毒の火薬庫〉: 1 ターンに与えた毒の合計がこれ以上なら、 ターンの終わりに起爆。</summary>
         public const int MagazineGiven = 8;
@@ -43,6 +43,8 @@
         public const int SlowBladePctPerDetonate = 30;
         /// <summary>〈骨溶かしの黒油〉: ダウン中の毒のダメージ・起爆の倍率。</summary>
         public const int OilDownMul = 2;
+        /// <summary>【起爆】でボスの次の目盛りを上げる割合 (起爆のダメージの %) / 〈骨溶かしの黒油〉: ボスをダウンさせたとき敵に与える毒 (2026-11-25 neon answer_gauge)。</summary>
+        public const int DetonateNotchPct = 35, OilDownPoison = 8;
         /// <summary>〈瘴気の外套〉: 受けるダメージ −35% の毒 / ターンの終わりの消費しない起爆 (威力 50%) の毒。</summary>
         public const int MantleNeed = 15, MantleCutPct = 35, MantleEchoNeed = 25, MantleEchoPct = 50;
         /// <summary>〈毒溜まりの主〉: ターン開始の毒のダメージが 2 回になる毒。</summary>

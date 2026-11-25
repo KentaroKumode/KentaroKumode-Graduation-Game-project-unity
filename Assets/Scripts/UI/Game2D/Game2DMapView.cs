@@ -7,7 +7,7 @@ namespace UI.Game2D
     /// <summary>
     /// 航行の液晶 (地図) の本体 (2026-10-19)。 map-prototype.html の <c>drawLCD</c> / <c>setScreen</c> を、 ターン制の <see cref="FreeMapSim"/> の上に移した。
     ///
-    /// <para>480×270 (GUI の 1 dot) のバッファへ毎フレーム 1 dot ずつ作図し (<c>Plot</c>)、 天候・照明・偵察の演出 (<c>Fx</c>) を重ね、
+    /// <para>480×270 (GUI の 1 dot) のバッファへ毎フレーム 1 dot ずつ作図し (<c>Plot</c>)、 天候・測量の演出 (<c>Fx</c>) を重ね、
     /// 航行を映すカメラの正面に置いた Quad のテクスチャへ流す。 それが液晶の RT に映り、 Quad のシェーダ (残像・湾曲・ノイズ・格子) が掛かる。
     /// 旧来の地図のスプライト (点・道・飾り) は、 この Quad の奥に隠れる。</para>
     ///
@@ -74,7 +74,7 @@ namespace UI.Game2D
             if (sim == null)
             {
                 ShakeDots = Vector2.zero; ApplyShake();
-                _flareActive = false; _reconActive = false; _meInit = false; _hover = -1; _camManual = false; _dragOn = false;
+                _reconActive = false; _meInit = false; _hover = -1; _camManual = false; _dragOn = false;
                 return;
             }
             if (_cam == null)
@@ -96,8 +96,7 @@ namespace UI.Game2D
             Plot(sim);
             WeatherFx(sim, dt);
             ReconFx();
-            FlareFx(sim, dt);
-            DrawSelf();                       // 自分は最前面 (天候・照明・偵察の演出より手前)
+            DrawSelf();                       // 自分は最前面 (天候・測量の演出より手前)
             Upload();
             ApplyShake();
         }

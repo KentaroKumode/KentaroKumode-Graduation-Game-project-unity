@@ -28,11 +28,11 @@ namespace AutoTest.EditorTests
             Assert.That(o.attackAdd - b.attackAdd, Is.EqualTo(each * 2));
             Assert.That(o.blockAdd - b.blockAdd, Is.EqualTo(TerminalCards.PrideBlock));
             Assert.That(o.damageMul, Is.EqualTo(b.damageMul * (1f + TerminalCards.AshPer * 3)).Within(1e-4));
-            // 〈灰から組む機関〉は累計 3 回から (2 回なら倍率なし・final5: 旧 2 回)
+            // 〈廃材組みの蒸気機関〉は累計 3 回から (2 回なら倍率なし・final5: 旧 2 回)
             Assert.That(Run(DeckItems.Ash, 1).damageMul, Is.EqualTo(b.damageMul).Within(1e-4));
         }
 
-        /// <summary>〈折り目のついた札〉(answer13): 残した端子の発動が続いたターン数 × 25%・上限なし (3 ターン目 ×1.75)。</summary>
+        /// <summary>〈取っておきの銀弾〉(answer13): 残した端子の発動が続いたターン数 × 25%・上限なし (3 ターン目 ×1.75)。</summary>
         [Test]
         public void Folded_StreakTimes25Uncapped()
         {

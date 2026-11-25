@@ -73,6 +73,10 @@ namespace MetaProgression
         /// 図鑑の敵 (<see cref="codexEnemies"/>) は「戦ったことがある」なので代わりに使えない。</summary>
         public bool ashKingBeaten;
 
+        /// <summary>チュートリアルのラン「街に着く前」(docs/GAME.md §23-35) を終えたか (2026-11-24)。 立っていない間は、 タイトルの PLAY がチュートリアルのラン指定
+        /// (GameLoop.RunSpec.FirstRunTutorial) を始める。 ボスを倒した時に立てる (GameLoop.RunSpec.MarkTutorialDone)。 2 回目以降に見る入口は無い (作者の決定)。</summary>
+        public bool tutorialDone;
+
         /// <summary>〈さびれた観測所〉で博士に会った回数。 **ランを跨いで数える。**
         /// 0 = 初対面 / 1 以上 = 再訪の文面に切り替わる。
         ///

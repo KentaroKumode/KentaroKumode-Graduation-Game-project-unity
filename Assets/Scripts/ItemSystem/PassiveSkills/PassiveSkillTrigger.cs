@@ -109,7 +109,7 @@ namespace ItemSystem.PassiveSkills
         // ── 端子の山札の出来事 (2026-11-20・段 1-e・item-overhaul-spec §2-2)。 どれも Kw.Raise で配る (量 0 以下は鳴らない)。
         //   配る所は CombatManager.Terminals.cs の RaiseTerminalEvents (配線の解決 ApplyTerminalOutcome の直後・OnWired の前) と RaiseDeckShuffles。
         //   端子の出力を変える効果はこの出来事で書かない (Resolve の中で効かせる・BOT と自動で一致する)。 ここで書くのは端子の解決の外の効果だけ。
-        /// <summary>使い捨ての端子を使った (発動した・この戦闘から外れる・量 = 1)。 1 枚につき 1 回。 戻る使い捨て (〈灰から組む機関〉〈緊急再装填〉) も使えば鳴る。</summary>
+        /// <summary>使い捨ての端子を使った (発動した・この戦闘から外れる・量 = 1)。 1 枚につき 1 回。 戻る使い捨て (〈廃材組みの蒸気機関〉〈緊急再装填〉) も使えば鳴る。</summary>
         OnTerminalDispose,
         /// <summary>端子の捨て札を切り直して山にした (量 = 切り直した枚数)。 ターンの頭に引く時のほか、 判断の間に引く消耗品・品で切り直した時も (OnWired の前にまとめて配る)。</summary>
         OnDeckShuffle,
@@ -119,10 +119,10 @@ namespace ItemSystem.PassiveSkills
         OnSupportTerminalUse,
         // ── 役とボスの出来事 (2026-11-21・段 1-f・item-overhaul-spec §2-2)。 どれも Kw.Raise で配る。
         /// <summary>役が立った直後 (CombatManager.ResolveRoles・配線の解決の後・OnWired の前・量 = 強さ: 2 個そろい 1 / ゾロ目 2 / 連なり 2)。
-        /// 立った役は <see cref="CombatContext.firedRolesThisTurn"/> の最後。 〈鏡合わせの盤〉の重ねた効果・〈宿命の刻み目〉のもう 1 回では鳴らない (役が立ったのではない)。
+        /// 立った役は <see cref="CombatContext.firedRolesThisTurn"/> の最後。 〈曇りの合わせ鏡〉の重ねた効果・〈宿命の音叉〉のもう 1 回では鳴らない (役が立ったのではない)。
         /// ここで足す攻撃 +N (ctx.mutualAttackBonus) は撃ごとに乗る。</summary>
         OnRoleFired,
-        /// <summary>ボスの目盛りを割ってダウンが決まった (量 = 割った目盛りの数)。 通常攻撃で割った (主攻撃・〈目盛り削りの鑿〉) か、 ひびの猶予が切れて割れたかは
+        /// <summary>ボスの目盛りを割ってダウンが決まった (量 = 割った目盛りの数)。 通常攻撃で割った (主攻撃・〈目盛り削りのノミ〉) か、 ひびの猶予が切れて割れたかは
         /// <see cref="Keywords.Kw.BossDownCrackKey"/> (1 = ひび) で分ける。 通常攻撃の割れは撃の輪の中、 ひびの割れはターンの終わりに鳴る。</summary>
         OnBossDown,
         /// <summary>敵の大技を取り消した (量 = 1): ダウンがチャージか大技のターンに重なった (ターンの頭・CombatManager.BeginBossDownTurnCore) か、

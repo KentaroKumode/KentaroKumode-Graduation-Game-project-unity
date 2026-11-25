@@ -28,9 +28,9 @@ namespace UI.Game2D.Battle
 
         /// <summary>セーブを止め、 ランが無ければ (タイトル・ゲームオーバーなら) 新しいランを始めて、 指定した敵との戦闘の画面に入る。
         /// ランがあれば作り直さない (戦闘中なら打ち切って始め直す = <see cref="Restart"/> と同じ)。
-        /// enemyId = 敵の id (<c>boss_layer6</c> など・ふつうの敵も可)。 family = 武器の家系 sword / axe / dagger / shield (段 2 の品を持たせる)・"none" か null = 素手。
+        /// enemyId = 敵の id (<c>boss_layer6</c> など・ふつうの敵も可)。 family = 武器の家系 sword / axe / dagger / shield (tier の段の品を持たせる・既定は段 2・段 4 で名のある 4 本)・"none" か null = 素手。
         /// hp = 最大 HP と今の HP (0 以下ならランの値のまま)。 例: <c>UI.Game2D.Battle.QaBattle.Start("boss_layer6", "axe")</c></summary>
-        public static bool Start(string enemyId, string family = "sword", int hp = DefaultHp)
+        public static bool Start(string enemyId, string family = "sword", int hp = DefaultHp, int tier = 2)
         {
             SaveGuard.Suppressed = true;
             if (!Application.isPlaying) { Debug.LogWarning("[QaBattle] Play モードで呼ぶ"); return false; }
@@ -39,12 +39,12 @@ namespace UI.Game2D.Battle
             MarkAllTutorialsSeen();
             if (gm.Run == null || gm.CurrentPhase == GameManager.GamePhase.Title || gm.CurrentPhase == GameManager.GamePhase.GameOver)
                 gm.StartNewRun();
-            return Restart(enemyId, family, hp);
+            return Restart(enemyId, family, hp, tier);
         }
 
         /// <summary>ランを作り直さずに、 敵と武器の家系を替えて戦闘を始め直す (戦闘中なら、 決着の処理を通さずに打ち切ってから)。 ランが無ければ false (先に <see cref="Start"/>)。
         /// 例: <c>UI.Game2D.Battle.QaBattle.Restart("boss_layer7_p4", "dagger")</c></summary>
-        public static bool Restart(string enemyId, string family = "sword", int hp = DefaultHp)
+        public static bool Restart(string enemyId, string family = "sword", int hp = DefaultHp, int tier = 2)
         {
             SaveGuard.Suppressed = true;
             var gm = GameManager.Instance; var run = gm?.Run;
@@ -54,8 +54,8 @@ namespace UI.Game2D.Battle
             if (string.IsNullOrEmpty(family) || family == "none") run.equippedWeaponId = null;
             else
             {
-                var w = ItemSystem.ItemDatabase.Instance?.GetWeapon(family, 2);
-                if (w == null) { Debug.LogWarning($"[QaBattle] 家系 '{family}' の武器が無い"); return false; }
+                var w = ItemSystem.ItemDatabase.Instance?.GetWeapon(family, tier);
+                if (w == null) { Debug.LogWarning($"[QaBattle] 家系 '{family}' 段 {tier} の武器が無い"); return false; }
                 if (run.ownedPassiveItems == null || !run.ownedPassiveItems.Contains(w.id)) ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(run, w.id);
                 run.equippedWeaponId = w.id;
             }

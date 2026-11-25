@@ -8,7 +8,7 @@ namespace UI.Game2D
     /// 地図の作図 (map-prototype.html の <c>PLOT</c> と <c>drawLCD</c> の中身)。
     /// 地: 暗い色に、 中央ほど明るい点 (ディザ)。 陸 (山) は網点の面 + 明るい輪郭。 航路は影つきの細線。 点は 9×9 の絵。
     /// 自分は中心 1 dot ＋ 十字の腕。 追跡者・使い魔は赤、 囮罠は + の印。 液晶の端に読み出し (EXIT / SCALE / OWN / T+) と天候の名前。
-    /// 色は層ごとの地の色 (<see cref="Pals"/>) と共通のインクだけで、 半透明は照明・魔石の範囲の淡い塗りだけ。
+    /// 色は層ごとの地の色 (<see cref="Pals"/>) と共通のインクだけで、 半透明は淡い塗り (ボスの点の赤い霞) だけ。
     /// </summary>
     public partial class Game2DMapView
     {
@@ -66,7 +66,7 @@ namespace UI.Game2D
         {
             var lay = sim.Layout; var t = lay.types[i];
             bool isStart = i == lay.start, isGoal = i == lay.goal;
-            // 嵐の層 (2026-11-13) の終点は、 照明・隣・嵐のフェーズ 3 で種別が分かるまで、 ほかの未確認の点と同じ「?」で描く
+            // 嵐の層 (2026-11-13) の終点は、 測量・隣・嵐のフェーズ 3 で種別が分かるまで、 ほかの未確認の点と同じ「?」で描く
             bool known = sim.Known[i] || isStart || (isGoal && !lay.storm);
             col = NodeInk;
             if (!known) return IcoUnknown;                                   // 種別が分からない点 = 疑問符 (色は到達済みと同じ)
@@ -167,21 +167,6 @@ namespace UI.Game2D
 
             bool blink = Mathf.FloorToInt(_now / 0.4f) % 2 == 0;
 
-            // 範囲: 照明の広がり (淡い塗り + 破線の輪)
-            if (sim.FlareOn)
-            {
-                float fr = FreeMapParams.FlareRange * _hopUnit * _ls;
-                Disc(_me.x, _me.y, fr, _lc.hi, 0.10f);
-                Ellipse(_me, fr, fr, 0, _lc.mid, new[] { 2, 1 });
-            }
-
-            // 気配 = 察知距離の円の波 (外へだけ振れるギザギザの 1 本線)。 段 = 察知距離 (2 / 3 / 4 以上)
-            {
-                int hops = sim.DetectHops;
-                int L = Mathf.Clamp(hops - 2, 0, 2);
-                DetectNoise(hops * _hopUnit * _ls, L, L >= 2 ? _lc.red : L >= 1 ? _lc.warn : _lc.mid);
-            }
-
             // 行き先の見込み (カーソルを乗せた点)
             if (_hover >= 0 && _hover != sim.Me && _hover < lay.Count && !sim.IsSunk(_hover))
             {
@@ -242,7 +227,7 @@ namespace UI.Game2D
             {
                 var q = Sp(lay.pos[sim.FoeNode]);
                 Glyph(IcoFoe, q.x, q.y, _lc.red);
-                string st = sim.FoeFreezeTurns > 0 ? "停止" : sim.FoeMode == FoeMode.Chase ? "追跡" : sim.FoeMode == FoeMode.Alert ? "警戒" : "巡回";
+                string st = sim.FoeFreezeTurns > 0 ? "停止" : sim.FoeMode == FoeMode.Chase ? "追跡" : "巡回";
                 Text(st, q.x, q.y - 6 * Pxs, _lc.red);
             }
             // 使い魔
@@ -252,7 +237,7 @@ namespace UI.Game2D
                 Rect(Mathf.FloorToInt(q.x) - (Pxs - 1), Mathf.FloorToInt(q.y) - (Pxs - 1), 2 * Pxs - 1, 2 * Pxs - 1, _lc.red);
             }
 
-            // 戦闘名 (2026-11-05): 種別が見えていて (視界・照明・偵察で発見済み) 戦闘名も開示済みの点は、
+            // 戦闘名 (2026-11-05): 種別が見えていて (視界・測量で発見済み) 戦闘名も開示済みの点は、
             //   カーソルを乗せると戦闘名を出す。 敵の名前は出さない ── 何が待っているかの「当たり」だけを渡す。
             //   名前は 2 体戦のプリセット → 単体戦・ボスの対応表 (EncounterPresets.SoloTitles) の順。 どちらにも無ければ出さない
             //   (FloorManager.EncounterTitle は敵の表示名へ落ちるが、 ここでは敵の名前を出さないので使わない)。
@@ -285,7 +270,7 @@ namespace UI.Game2D
             return GameLoop.EncounterPresets.SoloTitle(node.encounterEnemyA);
         }
 
-        /// <summary>自分: 青い十字 (中心 1 dot ＋ 腕)。 ノード (生成り) と見分けがつくよう青にし、 天候・照明・偵察の演出よりも<b>手前</b> (一番上) に描く。</summary>
+        /// <summary>自分: 青い十字 (中心 1 dot ＋ 腕)。 ノード (生成り) と見分けがつくよう青にし、 天候・測量の演出よりも<b>手前</b> (一番上) に描く。</summary>
         private static readonly Color32 SelfBlue = new Color32(84, 170, 255, 255), SelfBlueHi = new Color32(150, 208, 255, 255);
 
         private void DrawSelf()
@@ -300,23 +285,7 @@ namespace UI.Game2D
             Rect(cxp, cyp - 4 * u, 1, 2 * u, SelfBlue); Rect(cxp, cyp + 2 * u + 1, 1, 2 * u, SelfBlue);
         }
 
-        /// <summary>察知距離の円: 円周を 3 dot おきに区切り、 各点の高さを乱数で決めて直線でつなぐ。 その場で震える (段ごとに 4 / 10 / 20 回/秒)。</summary>
-        private void DetectNoise(float R, int level, Color32 col)
-        {
-            int[] fps = { 4, 10, 20 }; float[] amps = { 1.5f, 4f, 8f };
-            int frame = Mathf.FloorToInt(_now * fps[level]);
-            float amp = amps[level]; int n = Mathf.Max(48, Mathf.RoundToInt(Mathf.PI * 2 * R / 3));
-            bool has = false; Vector2 prev = default;
-            for (int i = 0; i <= n; i++)
-            {
-                float a = (float)i / n * Mathf.PI * 2, s = Rnd01(i % n, frame);
-                float h = amp * (s > 0.92f ? 1.6f + s : s * s);
-                var q = new Vector2(_me.x + Mathf.Cos(a) * (R + h), _me.y + Mathf.Sin(a) * (R + h));
-                if (has) Line(prev, q, col);
-                prev = q; has = true;
-            }
-        }
-
+        /// <summary>(i, frame) で決まる 0..1 の値 (嵐の輪のうごめき・Game2DMapView.Storm が使う)。</summary>
         private static float Rnd01(int i, int frame)
         {
             unchecked
@@ -327,11 +296,14 @@ namespace UI.Game2D
             }
         }
 
-        // ── 読み出し (左下: EXIT の方角・縮尺・自艦の格子位置・経過ターン / 上: 天候) ──
+        // ── 読み出し (下の帯の右: 出口の方角・縮尺・自艦の格子位置 / 上の帯の下: 出現の枠・宝の知らせ) ──
+        //   経過ターン・天候・嵐の時計は航行の計器の上の帯 (Game2DNavExtras) が出すので、 ここでは描かない (2026-11-24・二重に出していた)
         private static readonly string[] Compass = { "北", "北北東", "北東", "東北東", "東", "東南東", "南東", "南南東", "南", "南南西", "南西", "西南西", "西", "西北西", "北西", "北北西" };
 
-        /// <summary>縄張りの宝の知らせの左上 (dot)。 上の帯 (高さ 30・Game2DNavExtras.TopR) の下 4 dot。</summary>
-        private const int TreasureNoteX = 96, TreasureNoteTop = 34;
+        /// <summary>縄張りの宝の知らせの左上 (dot)。 上の帯 (y 9〜36・Game2DNavExtras.TopR) の下 4 dot・左の列 (所持品・x 16〜55) の右。</summary>
+        private const int TreasureNoteX = 64, TreasureNoteTop = 41;
+        /// <summary>出口の方角・縮尺・現在の格子位置の左端 (dot)。 航行の計器の下の帯 (HP・物資・x 15〜198) の右。</summary>
+        private const int ReadoutX = 212;
 
         private void Readout(FreeMapSim sim)
         {
@@ -342,7 +314,7 @@ namespace UI.Game2D
             float b = (Mathf.Atan2((float)(ex.x - me.x), -(float)(ex.y - me.y)) + Mathf.PI * 2) % (Mathf.PI * 2);
             int sec = Mathf.RoundToInt(b / (Mathf.PI * 2 / 16)) % 16;
             float ang = sec * Mathf.PI * 2 / 16 - Mathf.PI / 2;
-            float cx0 = 96 + 118, cy0 = H - 17, Rr = 9;
+            float cx0 = ReadoutX + 118, cy0 = H - 17, Rr = 9;
             for (int k = 0; k < 16; k++) { float ak = k * Mathf.PI * 2 / 16 - Mathf.PI / 2; Put(Mathf.RoundToInt(cx0 + Mathf.Cos(ak) * Rr), Mathf.RoundToInt(cy0 + Mathf.Sin(ak) * Rr), _lc.dim); }
             Rect((int)cx0, (int)(cy0 - Rr - 1), 1, 2, _lc.hi);                                     // 北の目印
             if (!exitHidden)
@@ -350,23 +322,12 @@ namespace UI.Game2D
                 Rect(Mathf.RoundToInt(cx0 + Mathf.Cos(ang) * Rr) - 1, Mathf.RoundToInt(cy0 + Mathf.Sin(ang) * Rr) - 1, 3, 3, _lc.hot);
                 for (int r = 1; r < Rr - 1; r++) Put(Mathf.RoundToInt(cx0 + Mathf.Cos(ang) * r), Mathf.RoundToInt(cy0 + Mathf.Sin(ang) * r), _lc.dim);   // 針
             }
-            Text("出口 " + (exitHidden ? "？" : Compass[sec]), 96, H - 35, _lc.mid, Align.Left);
-            Text("縮尺 " + _zoom + "倍", 96, H - 22, _lc.dim, Align.Left);
+            Text("出口 " + (exitHidden ? "？" : Compass[sec]), ReadoutX, H - 35, _lc.mid, Align.Left);
+            Text("縮尺 " + _zoom + "倍", ReadoutX, H - 22, _lc.dim, Align.Left);
             char col = (char)('A' + Mathf.Clamp(Mathf.FloorToInt((float)me.x / 2f), 0, 25));
             int row = Mathf.FloorToInt((float)me.y / 2f) + 1;
-            Text("現在 " + col + row, 96, H - 9, _lc.dim, Align.Left);
-            Text("ターン " + Mathf.Min(999, sim.Turn).ToString("000"), 96 + 8 * 4 * Pxs, H - 9, _lc.dim, Align.Left);      // 「ターン」とは書かない (2026-11-11)
+            Text("現在 " + col + row, ReadoutX, H - 9, _lc.dim, Align.Left);
 
-            if (sim.StormMode)
-            {
-                // 嵐 (2026-11-13): 静かな時間は「嵐まで N」、 嵐の間は「嵐 フェーズ k・次まで N」と種類の名前
-                Text(StormLabel(sim), W - 8 - 89, 8, sim.StormPhase == 0 ? _lc.mid : _lc.warn, Align.Right);
-            }
-            else
-            {
-                bool calm = !(sim.Weather != WeatherKind.None && !double.IsNegativeInfinity(sim.Front));
-                Text("天気 " + (calm ? "凪" : sim.Weather.DisplayName()), W - 8 - 89, 8, calm ? _lc.dim : _lc.hi, Align.Right);
-            }
             // 出現の枠 (動的 4 枠ロック・2026-11-21・full-item-rework-spec §1-5): 右上の上の帯の真下に「出現 [毒][充電][？][？]」。 4 つ埋まったら明るい色と「ロック」
             var runL = GameLoop.GameManager.Instance?.Run;
             if (runL != null)
@@ -378,7 +339,7 @@ namespace UI.Game2D
                 Text(slots, W - 8 - 89, TreasureNoteTop + sh / 2f, lk ? _lc.hot : _lc.mid, Align.Right);
             }
             // 縄張りの宝を取った後 (2026-11-12・仮置き): 何を得たかを左上に出す (航行のまま渡すので、 専用の画面は挟まない)
-            //   液晶の上端 (y 0〜29) は x 96〜387 が上の帯 (Game2DNavExtras の TopR / StatusR) に覆われるので、 その真下に、
+            //   液晶の上端 (y 9〜36) は上の帯 (Game2DNavExtras の TopR) に覆われるので、 その真下に、
             //   地図の点や道と重なっても読めるよう地の色の下敷きを敷いて出す (y = 8 だと上の帯の裏で見えなかった)。
             if (sim.TreasureTaken)
             {

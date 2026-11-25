@@ -103,12 +103,13 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>英雄の意志: エリート戦・ボス戦で敵が大技の予告かチャージを出しているターン、 ターン開始時にシールド +18。
-    /// そのターンに【ジャスト防御】が成立したら、 ボスの目盛りを直接 1 段割る (満額のダウン・CombatManager.BreakBossNotch)。</summary>
+    /// そのターンに【ジャスト防御】が成立したら、 次のダウンの受けるダメージの倍率 +0.5 (上限 +1.0)・そのダウンの開始時にシールド +20
+    /// (CombatManager.BuffNextBossDown・2026-11-25 neon answer_gauge・旧: 目盛りを HP に関係なく 1 段割る)。</summary>
     public class HeroWill : IPassiveSkillEffect, IRelicDisplay
     {
         public const string Id = "英雄の意志";
         public string SkillId => Id;
-        public const int Shield = 18;
+        public const int Shield = 18, DownBonusPct = 50, DownShield = 20;
         private const string Key = "shd.heroTurn";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(Rw.StrongFoe() && (CombatManager.Instance?.EnemyHeavyOrChargeNow(ctx.currentTurn) ?? false));
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart, PassiveSkillTrigger.OnJustGuard };
@@ -116,8 +117,8 @@ namespace ItemSystem.PassiveSkills.Effects
         {
             if (t == PassiveSkillTrigger.OnJustGuard)
             {
-                if (Shd.Count(ctx, Key) == ctx.currentTurn && (CombatManager.Instance?.BreakBossNotch(SkillId) ?? false))
-                    Rw.Log("[英雄の意志] 大技をジャスト防御 → ボスの目盛りを 1 段割った");
+                if (Shd.Count(ctx, Key) == ctx.currentTurn && Rw.OncePerTurn(ctx, Key + ".jg"))
+                    CombatManager.Instance?.BuffNextBossDown(SkillId, DownBonusPct, DownShield, 0);
                 return;
             }
             if (!Rw.StrongFoe() || !(CombatManager.Instance?.EnemyHeavyOrChargeNow(ctx.currentTurn) ?? false)) return;
@@ -264,10 +265,10 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>静寂の構え: 攻撃の端子に 1 つも挿さずに敵の攻撃を完封した (攻撃を受けて HP を 1 も失わなかった) 次のターン、 全撃の最終与ダメージ +60% (【ジャスト防御】だったなら +130%・answer14: 旧 +100%)。</summary>
+    /// <summary>静止の振り子: 攻撃の端子に 1 つも挿さずに敵の攻撃を完封した (攻撃を受けて HP を 1 も失わなかった) 次のターン、 全撃の最終与ダメージ +60% (【ジャスト防御】だったなら +130%・answer14: 旧 +100%)。</summary>
     public class SilentStance : IPassiveSkillEffect, IRelicDisplay
     {
-        public const string Id = "静寂の構え";
+        public const string Id = "静止の振り子";
         public string SkillId => Id;
         public const int Pct = 60, JustPct = 130;   // answer14: ジャスト防御 +100% → +130%
         private const string TurnKey = "shd.still", PctKey = "shd.stillPct";
@@ -330,11 +331,11 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>脈なしの鋼心臓: 戦闘開始時、 シールド +X (X = <see cref="GameLoop.RunState.pulselessHeartShield"/>・ランの始めに 4・持っている間に戦闘に勝つたび +1)。
+    /// <summary>脈打たぬ鋼の心臓: 戦闘開始時、 シールド +X (X = <see cref="GameLoop.RunState.pulselessHeartShield"/>・ランの始めに 4・持っている間に戦闘に勝つたび +1)。
     /// 現在のシールドが 50 以上の間、 ターン開始時にシールドが減衰しない (ctx.shieldNoDecayAt・2026-11-22 旧: 6 / 35)。 勝ちを数えるのは CombatManager.FinishCombat (<see cref="NoteWin"/>)。</summary>
     public class PulselessHeart : IPassiveSkillEffect, IRelicDisplay
     {
-        public const string Id = "脈なしの鋼心臓";
+        public const string Id = "脈打たぬ鋼の心臓";
         public const int StartShield = 4, PerWin = 1, NoDecayAt = 50;
         public string SkillId => Id;
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Rw.Run?.pulselessHeartShield ?? StartShield);
@@ -352,13 +353,13 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>落城の礎石: 吸収またはターン開始の減衰で 1 ターンにシールドを 12 以上 (2026-11-22 neon 収束: 旧 20) 失ったとき、 次のターンの全撃の基礎攻撃 +「そのターンに失ったシールドの半分」(攻撃 +N・撃ごと)・
-    /// 全撃の最終与ダメージ +60%。 シールドが吸収か減衰で減るたび、 ボスの次の目盛りにひびを入れる (ひびが既にあれば何もしない・CombatManager.CrackBossNotch)。
+    /// 全撃の最終与ダメージ +80%。 失ったシールド 1 につき、 ボスの次の目盛りを最大 HP の 0.5% ぶん上げる (1 ターン最大 10%・2026-11-25 neon answer_gauge・旧: 減るたびひびを入れる)。
     /// 2026-11-22 (neon 最終仕上げ §2-2) 旧: 減るたび 減った量 × 2 の軽減不可ダメージ。</summary>
     public class FallenCastleCornerstone : IPassiveSkillEffect, IRelicDisplay
     {
         public const string Id = "落城の礎石";
         public string SkillId => Id;
-        public const int Need = 12, FinalPct = 80;   // 2026-11-22 neon 収束: 失うシールド 20 → 12・final6: +60% → +80%
+        public const int Need = 12, FinalPct = 80, NotchPermillePerShield = 5, NotchPermilleMax = 100;   // 2026-11-22 neon 収束: 失うシールド 20 → 12・final6: +60% → +80%
         /// <summary>このターンに失ったシールド (Psn.TurnN) / 上乗せが働くターン / その攻撃 +N。</summary>
         private const string LostKey = "shd.castle.lost", TurnKey = "shd.castle.turn", AtkKey = "shd.castle.atk";
         public static bool Primed(CombatContext ctx) => ctx != null && ctx.currentTurn > 0 && Shd.Count(ctx, TurnKey) == ctx.currentTurn;
@@ -388,35 +389,34 @@ namespace ItemSystem.PassiveSkills.Effects
                 {
                     int lost = Kw.EventAmount(ctx);
                     if (lost <= 0) return;
+                    int had = Psn.TurnN(ctx, LostKey);
                     Psn.AddTurnN(ctx, LostKey, lost);
-                    CombatManager.Instance?.CrackBossNotch(Id);
+                    // 1 ターンの合計で最大 HP の 10% まで: 今までの分と足した後の分の差だけ上げる
+                    int pm = System.Math.Min(NotchPermilleMax, (had + lost) * NotchPermillePerShield) - System.Math.Min(NotchPermilleMax, had * NotchPermillePerShield);
+                    if (pm > 0) CombatManager.Instance?.RaiseBossNextNotch((int)((long)ctx.enemyMaxHP * pm / 1000));
                     return;
                 }
             }
         }
     }
 
-    /// <summary>防人の軍標【規則】: 【ジャスト防御】を成立させるたび、 この戦闘の最終与ダメージ倍率 +45% (累積・ctx.finalDamagePct) と、 次のターンの手札 +1 枚 (Rw.DrawNext)。
-    /// この戦闘で 2 回目以降 (2026-11-22 neon 収束: 旧 3 回目以降) のジャスト防御を成立させた次のターン、 全部の撃がもう 1 回ずつ発火する (2 回当たる・本体の撃の輪 CombatManager.Turn が <see cref="EchoNow"/> を読む・2026-11-22)。</summary>
+    /// <summary>防人の軍標: 【ジャスト防御】を成立させるたび、 この戦闘の最終与ダメージ倍率 +(持っているシールドの秘宝の数 × 9)% (この品も数える・ctx.AxisDepth・累積・ctx.finalDamagePct) と、
+    /// 次のターンの手札 +1 枚 (Rw.DrawNext)。 2026-11-25 作者の決定: 「2 回目以降のジャスト防御の次のターン 全攻撃がもう 1 回」を撤去 (シールドの品なしでつまみ食いできた)・+45% 固定 → 秘宝の数に比例 (5 つで +45%)。</summary>
     public class BorderGuardStandard : IPassiveSkillEffect, IRelicDisplay
     {
         public const string Id = "防人の軍標";
         public string SkillId => Id;
-        public const int PctPerGuard = 45, Draw = 1, EchoNeed = 2;
-        /// <summary>[persistent] 撃がもう 1 回ずつ発火するターン。</summary>
-        public const string EchoKey = "shd.standard.echo";
+        public const int PctPerShieldItem = 9, Draw = 1;
+        /// <summary>ジャスト防御 1 回の上乗せ (%)。 本体と BOT の見積もりが同じ式を読む。</summary>
+        public static int PctPerGuard(CombatContext ctx) => ctx != null ? PctPerShieldItem * ctx.AxisDepth(AxisRules.Shield) : 0;
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Pct(ctx.finalDamagePct / 100f);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnJustGuard };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            ctx.finalDamagePct += PctPerGuard;
+            int pct = PctPerGuard(ctx);
+            ctx.finalDamagePct += pct;
             Rw.DrawNext(Draw);
-            bool echo = Shd.Count(ctx, Shd.JustGuardCountKey) >= EchoNeed;
-            if (echo) ctx.accumulatedValues[EchoKey] = ctx.currentTurn + 1;
-            Rw.Log($"[防人の軍標] ジャスト防御 → 最終与ダメージ倍率 +{PctPerGuard}% (この戦闘 +{ctx.finalDamagePct}%)・次のターンの手札 +{Draw}{(echo ? "・次のターン 全撃がもう 1 回発火" : "")}");
+            Rw.Log($"[防人の軍標] ジャスト防御 → 最終与ダメージ倍率 +{pct}% (この戦闘 +{ctx.finalDamagePct}%)・次のターンの手札 +{Draw}");
         }
-
-        /// <summary>このターン、 全部の撃がもう 1 回ずつ発火する (本体の撃の輪と BOT の見積もりが読む)。</summary>
-        public static bool EchoNow(CombatContext ctx) => ctx != null && ctx.currentTurn > 0 && Shd.Count(ctx, EchoKey) == ctx.currentTurn;
     }
 }

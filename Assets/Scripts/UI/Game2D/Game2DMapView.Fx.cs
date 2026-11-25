@@ -6,17 +6,13 @@ using UnityEngine;
 namespace UI.Game2D
 {
     /// <summary>
-    /// 航行の画面演出 (2026-10-19)。 正本は docs/design/map-prototype.html の <c>FLAREFX</c> (照明弾) / <c>RECONFX</c> (偵察) /
+    /// 航行の画面演出 (2026-10-19)。 正本は docs/design/map-prototype.html の <c>RECONFX</c> (2026-11-24 から測量の掃引・照明弾 FLAREFX は照明ごと削除) /
     /// <c>WXFX</c> (天候 7 種)。 値は HTML の cfg をそのまま持ってくる。 液晶のバッファへ 1 dot ずつ、 地図の上に描く。
     /// 色は液晶のインク (共通) と層の地の色の混色だけで、 半透明は使わない (濃さはディザの密度と大きさで表す)。 乱数は種つき xorshift32。 実時間で動く。
     /// </summary>
     public partial class Game2DMapView
     {
         // ── HTML の cfg ──
-        private const float RiseMs = 320, RiseH = 72, FadeMs = 700, Drift = 26, Sway = 4, GlowR = 44, GlowA = 0.55f,
-                            IgnMs = 130, IgnScale = 1.5f, SmokeMs = 1300, RayLong = 16, RayShort = 8;
-        private const int Embers = 16;
-        private const float MsPerTurn = 4000f;            // 照明の燃焼の時計 1 ターン = 実時間 (演出の目安)
         private const float WedgeA = 1.05f, ReconFlashMs = 380, ReconMinR = 3, ReconDensity = 11, ReconSweepMs = 1400;
         private const int ReconTicks = 12;
         private const float FogInner = 70, FogOuter = 260, FogMax = 0.30f, FogDrift = 5,
@@ -34,13 +30,6 @@ namespace UI.Game2D
         //  合図
         // =====================================================================
 
-        private bool _flareActive;
-        private float _riseT, _burnClock, _flareRt, _flareRtLast, _subTurn;
-        private int _flareLeftSeen = -1;
-        private Vector2 _flareAnchor;          // 打ち上げた点 (配置の座標)
-        private readonly List<Ember> _embers = new List<Ember>();
-        private struct Ember { public float at, vx, life, dx; }
-
         private bool _reconActive;
         private float _reconT0, _reconDoneAt = -1e9f;
         private Vector2 _reconAnchor;
@@ -50,99 +39,16 @@ namespace UI.Game2D
             var sim = GameManager.Instance != null ? GameManager.Instance.FreeMap : null;
             if (sim == null) return;
             var p = sim.Layout.pos[sim.Me]; var anchor = new Vector2((float)p.x, (float)p.y);
-            if (fx == GameManager.NavFx.Flare)
-            {
-                _flareActive = true; _riseT = 0; _burnClock = 0; _flareRt = 0; _flareRtLast = Time.unscaledTime;
-                _flareLeftSeen = sim.FlareTurnsLeft; _subTurn = 0; _flareAnchor = anchor;
-                _embers.Clear();
-                for (int i = 0; i < Embers; i++) _embers.Add(new Ember { at = 0.05f + Rnd() * 0.95f, vx = (Rnd() - 0.5f) * 16, life = 0.5f + Rnd() * 0.5f, dx = (Rnd() - 0.5f) * 8 });
-            }
-            else if (fx == GameManager.NavFx.Recon) { _reconActive = true; _reconT0 = Time.unscaledTime; _reconAnchor = anchor; }      // 囮罠・待つ (2026-11-15 に足した合図) は絵を出さない
+            if (fx == GameManager.NavFx.Survey) { _reconActive = true; _reconT0 = Time.unscaledTime; _reconAnchor = anchor; }      // 囮罠・待つ (2026-11-15 に足した合図) は絵を出さない
         }
 
         // =====================================================================
-        //  照明弾 (FLAREFX)
-        // =====================================================================
-
-        private static float Eo(float u) => 1 - (1 - u) * (1 - u);
-        private static float Flick(float t) => 0.82f + 0.18f * Mathf.Sin(t * 0.045f + 3 * Mathf.Sin(t * 0.017f)) + 0.06f * Mathf.Sin(t * 0.13f);
-
-        private readonly Dictionary<int, Color32[]> _glow = new Dictionary<int, Color32[]>();
-
-        private Color32[] GlowSprite(int r, float a)
-        {
-            int key = r * 64 + Mathf.RoundToInt(a * 20);
-            if (_glow.TryGetValue(key, out var c)) return c;
-            int n = 2 * r + 1; c = new Color32[n * n];
-            for (int y = 0; y < n; y++)
-                for (int x = 0; x < n; x++)
-                {
-                    float rr = Mathf.Sqrt((x - r) * (x - r) + (y - r) * (y - r)) / r;
-                    if (rr >= 1) continue;
-                    float lv = (1 - rr) * (1 - rr) * a;
-                    if (lv * 16 > Bayer[(y & 3) * 4 + (x & 3)] + 0.5f) c[y * n + x] = rr < 0.4f ? InkHi : InkMid;
-                }
-            _glow[key] = c;
-            return c;
-        }
-
-        private void FlareFx(FreeMapSim sim, float dt)
-        {
-            if (!_flareActive) return;
-            if (!sim.FlareOn) { _flareActive = false; return; }
-            float dtMs = Mathf.Min(0.1f, _now - _flareRtLast) * 1000f; _flareRtLast = _now;
-            _flareRt += dtMs;
-            if (_riseT < RiseMs) _riseT += dtMs; else _burnClock += dtMs;
-
-            // 燃焼の経過 (ms 換算) = ターンぶんの階段 + ターンの中での実時間のゆっくりした進み
-            if (sim.FlareTurnsLeft != _flareLeftSeen) { _flareLeftSeen = sim.FlareTurnsLeft; _subTurn = 0; }
-            _subTurn = Mathf.Min(0.9f, _subTurn + dtMs / MsPerTurn);
-            float totalTurns = FreeMapParams.FlareTurns;
-            float total = totalTurns * MsPerTurn, bt = ((totalTurns - sim.FlareTurnsLeft) + _subTurn) * MsPerTurn;
-
-            var o0 = Sp(_flareAnchor.x, _flareAnchor.y);
-            float topY = o0.y - RiseH;
-            float head = Mathf.Min(_riseT, RiseMs), since = _riseT >= RiseMs ? bt : 0;
-            for (int i = 1; i <= 7; i++)                                                    // 昇った筋に残る煙
-            {
-                if (since + (1 - i / 7f) * RiseMs > SmokeMs) continue;
-                PxC(o0.x + (i % 2 == 1 ? 1 : -1), o0.y - RiseH * Eo((i / 7f) * head / RiseMs), 1, InkMid);
-            }
-            if (_riseT < RiseMs)                                                            // ① 打ち上げ
-            {
-                float u = _riseT / RiseMs;
-                for (int i = 4; i >= 0; i--)
-                    PxC(o0.x, o0.y - RiseH * Eo(Mathf.Max(0, u - i * 0.04f)), i == 0 ? 2 : 1, i == 0 ? InkHot : i < 3 ? InkHi : InkMid);
-                return;
-            }
-            float fadeAt = total - FadeMs, fade = bt > fadeAt ? 1 - (bt - fadeAt) / FadeMs : 1, env = fade * fade;
-            float ax = o0.x + Mathf.Sin(_flareRt / 380f) * Sway, ay = topY + Drift * (bt / total) + (1 - fade) * 12;
-            float f = Flick(_flareRt) * env;
-            bool ign = _burnClock < IgnMs;
-            int R = Mathf.Max(4, Mathf.RoundToInt(GlowR * (0.9f + 0.1f * f) * (0.4f + 0.6f * env) * (ign ? IgnScale : 1f) / 2f) * 2);
-            float a = Mathf.Round(GlowA * (ign ? 1.4f : 1f) * f * 20f) / 20f;
-            var g = GlowSprite(R, a); int gn = 2 * R + 1; int gx = Mathf.RoundToInt(ax) - R, gy = Mathf.RoundToInt(ay) - R;
-            for (int y = 0; y < gn; y++) for (int x = 0; x < gn; x++) { var c = g[y * gn + x]; if (c.a != 0) Put(gx + x, gy + y, c); }       // 光の暈
-            float k = 0.7f + 0.5f * f; int ix = Mathf.RoundToInt(ax), iy = Mathf.RoundToInt(ay);
-            for (int m = 2; m < RayLong * k * env; m++) { var c = m < 5 ? InkHot : InkHi; Put(ix, iy - m, c); Put(ix, iy + m, c); Put(ix - m, iy, c); Put(ix + m, iy, c); }
-            for (int m = 2; m < RayShort * k * env; m++) { var c = m < 4 ? InkHot : InkHi; Put(ix - m, iy - m, c); Put(ix + m, iy - m, c); Put(ix - m, iy + m, c); Put(ix + m, iy + m, c); }
-            PxC(ax, ay, ign ? 7 : 5, InkHi); PxC(ax, ay, ign ? 5 : 3, InkHot);              // 核
-            foreach (var e in _embers)                                                      // 火の粉
-            {
-                float et = (bt - e.at * total) / 1000f;
-                if (et < 0 || et > e.life) continue;
-                float u = et / e.life;
-                PxC(ax + e.dx + e.vx * et, ay + 14 * et + 40 * et * et, u < 0.4f ? 2 : 1, u < 0.25f ? InkHot : u < 0.65f ? InkHi : InkMid);
-            }
-        }
-
-        // =====================================================================
-        //  偵察 (RECONFX)
+        //  測量 (旧 偵察の RECONFX・2026-11-24): 測量で書き込んだ範囲 (道の歩数を距離の目安に) を 1 周なぞる
         // =====================================================================
 
         private void ReconFx()
         {
-            float rr = FreeMapParams.ReconRange * _hopUnit * _ls;
+            float rr = FreeMapParams.SurveyRange * _hopUnit * _ls;
             var center = Sp(_reconAnchor.x, _reconAnchor.y);
             if (!_reconActive)
             {
@@ -159,7 +65,7 @@ namespace UI.Game2D
             if (progress >= 1f) { _reconActive = false; _reconDoneAt = _now; return; }
             int R = Mathf.RoundToInt(rr), cx0 = Mathf.RoundToInt(center.x), cy0 = Mathf.RoundToInt(center.y);
             float th = -Mathf.PI / 2 + progress * Mathf.PI * 2;                              // 12 時から時計回りに 1 周
-            Ellipse(center, rr, rr, 0, _lc.hi, new[] { 1, 1 });                              // 偵察の範囲の輪 (1 dot おき)
+            Ellipse(center, rr, rr, 0, _lc.hi, new[] { 1, 1 });                              // 測量の範囲の輪 (1 dot おき)
             for (int k = 0; k < ReconTicks; k++)                                              // 縁の目盛り
             {
                 float ang = (float)k / ReconTicks * Mathf.PI * 2 - Mathf.PI / 2;

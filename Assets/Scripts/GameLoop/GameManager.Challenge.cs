@@ -33,7 +33,7 @@ namespace GameLoop
         {
             PendingChallengeTiers.Clear(); _challengeOffer = null; _entryHealPending = false;
             var st = MetaProgressManager.Instance?.State;
-            int d = st != null ? Mathf.Clamp(st.challengeDifficulty, 0, ChallengeCards.MaxDifficulty) : 0;
+            int d = st != null && !RunSpec.NoMeta ? Mathf.Clamp(st.challengeDifficulty, 0, ChallengeCards.MaxDifficulty) : 0;   // ラン指定の「整備盤・挑戦なし」は難易度 0
             Run.challengeDifficulty = d;
             Run.InvalidateCardChallenge();
             if (d > 0) Log($"挑戦: 難易度 {d} ({ChallengeCards.ScheduleText(d)})");

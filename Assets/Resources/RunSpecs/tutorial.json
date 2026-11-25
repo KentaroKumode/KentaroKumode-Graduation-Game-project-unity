@@ -1,0 +1,36 @@
+{
+  "id": "tutorial",
+  "seed": "20261124",
+  "weapon": "鍛鉄の剣",
+  "deck": ["攻撃", "攻撃", "防御", "防御", "充電"],
+  "noStarterItems": true,
+  "noMetaBuffs": true,
+  "noRewards": true,
+  "lures": 0,
+  "layerTitle": "街に着く前",
+  "map": ["battle:tut_wolf_snow", "walk", "boss:boss_layer_tut"],
+  "hide": ["escalation", "handbook", "flee"],
+  "onDeath": "retryBattle",
+  "setsTutorialDone": true,
+  "battles": [
+    { "enemy": "tut_wolf_snow", "charge": 3 }
+  ],
+  "dice": [
+    { "enemy": "tut_wolf_snow", "turn": 2, "faces": [1, 2, 1] }
+  ],
+  "hints": [
+    { "enemy": "tut_wolf_snow", "turn": 1, "parts": ["dice", "attack", "go"] },
+    { "enemy": "tut_wolf_snow", "turn": 2, "parts": ["orb", "reroll"] },
+    { "enemy": "tut_wolf_snow", "turn": 3, "parts": ["intent", "block"] },
+    { "enemy": "boss_layer_tut", "when": "charge", "parts": ["intent"] },
+    { "enemy": "boss_layer_tut", "when": "heavy", "parts": ["intent", "block"] }
+  ],
+  "slides": [
+    { "art": "tut_coach" },
+    { "art": "tut_win1", "frame": "tut_window_frame", "mid": 150 },
+    { "art": "tut_win2", "frame": "tut_window_frame", "mid": 150 },
+    { "art": "tut_win3", "frame": "tut_window_frame", "mid": 150 },
+    { "art": "tut_win4", "frame": "tut_window_frame", "mid": 100, "yoff": -50, "arrive": true },
+    { "art": "day", "adapt": true }
+  ]
+}

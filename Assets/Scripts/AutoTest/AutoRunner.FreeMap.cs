@@ -10,7 +10,7 @@ namespace AutoTest
     /// 航行マップ (ターン制・2026-10-18・docs/GAME.md §5) の BOT の航行。 <b>技量で方策が変わる</b> (§21):
     /// <list type="bullet">
     /// <item><b>Naive</b>: 行き先だけを決めて最短の道を歩く。 追跡者を避けない。</item>
-    /// <item><b>Optimal / Super / Exact / Ultra</b>: 同じ行き先に加えて、 <b>見えている / 魔石に出ている追跡者を避ける</b>
+    /// <item><b>Optimal / Super / Exact / Ultra</b>: 同じ行き先に加えて、 <b>見えている追跡者を避ける</b>
     ///       ── 次の 1 歩を、 追跡者に近づかない隣へ振る・捕捉されたら囮罠を使う。</item>
     /// </list>
     /// どの方策も乱数を使わない。 追跡者の性質 (<see cref="FoeProfile"/>) は読まない (プレイヤーには明かされない)。
@@ -28,7 +28,7 @@ namespace AutoTest
     /// <item>縄張りを横切らない (2026-11-12・回避ありの方策だけ): 縄張りを出ない追跡者の層では、 払える遠回り
     ///       (<see cref="navTerritoryDetour"/> 歩まで・行った先から出口か店まで歩ける) なら縄張りの点を踏まない道を選ぶ (<see cref="TerritoryAwareStep"/>)。</item>
     /// </list>
-    /// <para>照明・偵察・待つは使わない。 乱数は使わない (GameRng を消費しない)。</para>
+    /// <para>測量・待つは使わない。 乱数は使わない (GameRng を消費しない)。</para>
     /// </summary>
     public partial class AutoRunner
     {
@@ -61,19 +61,17 @@ namespace AutoTest
         private int _foeSeenAt = -1, _foeSeenStill, _foeSeenTurn = -1;
         private bool _foeSeenMove;
 
-        /// <summary>偵察と照明を使うか (2026-11-05)。 戦闘名は偵察・照明で見つけた点 (完全公開) にしか出ないので、
-        /// 使わないと危険な戦闘を避ける情報が無い。 **既定は false (使わない)** ── 2026-11-05 に同じ 5,000 シードで比べると
+        /// <summary>測量で先を調べるか (2026-11-05 に偵察と照明で入れた口・2026-11-24 に測量 1 本へ)。 戦闘名は測量で書き込んだ点 (完全公開) にしか出ないので、
+        /// 使わないと危険な戦闘を避ける情報が無い。 **既定は false (使わない)** ── 2026-11-05 に (旧い照明と偵察で) 同じ 5,000 シードで比べると
         /// 使う方がクリア 19.4% → 17.9% (z=−2.42) と悪化した (照明 5 回 = 物資 250 と、 偵察 6 回分のターンを払うのに、
-        /// 戦闘名を活かす判断が TileDanger の足切りしか無い)。 使う場面を絞ってから戻す。</summary>
+        /// 戦闘名を活かす判断が TileDanger の足切りしか無い)。 使う場面を絞ってから戻す。 測量 (1 手番・物資 0・その層の間消えない) では未測定。</summary>
         [System.NonSerialized] public bool freeNavScout = false;
-        /// <summary>この層で偵察した点 (同じ点では 1 回まで)。</summary>
-        private readonly HashSet<int> _freeMapReconAt = new HashSet<int>();
-        /// <summary>偵察: 2 歩以内に、 まだ調べていない未使用の点がこの数以上あれば使う。</summary>
-        private const int ReconMinUnscouted = 2;
-        /// <summary>照明: 3 歩以内に、 まだ調べていない未使用の点がこの数以上あれば使う。</summary>
-        private const int FlareMinUnscouted = 4;
-        /// <summary>[計装] 偵察・照明を使った回数 (バッチ累計)。</summary>
-        public static long FreeNavRecons, FreeNavFlares;
+        /// <summary>この層で測量した点 (同じ点では 1 回まで ── 書き込みは消えないので、 同じ点で 2 度目は何も増えない)。</summary>
+        private readonly HashSet<int> _freeMapSurveyAt = new HashSet<int>();
+        /// <summary>測量: 測量の範囲に、 まだ調べていない未使用の点がこの数以上あれば使う (旧 照明の 4 をそのまま)。</summary>
+        private const int SurveyMinUnscouted = 4;
+        /// <summary>[計装] 測量を使った回数 (バッチ累計)。</summary>
+        public static long FreeNavSurveys;
 
         /// <summary>新しい点へ着かないまま、 この行動数が過ぎたら迂回を考える。</summary>
         private const int FreeMapStallActions = 10;
@@ -125,8 +123,8 @@ namespace AutoTest
         /// <summary>[計装] 〈補給線〉(〈兵站〉r10) で跳んだ回数 (バッチ累計)。</summary>
         public static long FreeMapRelays;
 
-        /// <summary>[計装] 店を探すために照明を使った回数 (バッチ累計)。</summary>
-        public static long FreeMapShopFlares;
+        /// <summary>[計装] 店を探すために測量を使った回数 (バッチ累計)。</summary>
+        public static long FreeMapShopSurveys;
 
         /// <summary>補給できる店 (種別が見えていて・まだ入っていない・物資 1 を買える金がある) の添字。 <paramref name="hops"/> で最も近いもの。 無ければ -1。
         /// <para>2026-11-09: 物資の上限 5 に合わせて、 寄り道の計画を「今の物資で出口まで」から「出口か、 まだ入っていない店まで」へ。
@@ -398,7 +396,7 @@ namespace AutoTest
                 _freeMapLayout = map.layout; _freeMapActions = 0; _freeMapTrail.Clear();
                 _freeMapVisited.Clear(); _freeMapSinceProgress = 0; _freeMapDetourTarget = -1;
                 _foeSeenAt = -1; _foeSeenStill = 0; _foeSeenMove = false; _foeSeenTurn = -1;
-                _freeMapReconAt.Clear();
+                _freeMapSurveyAt.Clear();
                 SnapState(0, run.playerHP);
             }
             if (_freeMapVisited.Add(sim.Me)) _freeMapSinceProgress = 0; else _freeMapSinceProgress++;
@@ -469,9 +467,9 @@ namespace AutoTest
                 if (best >= 0 && gm.RelayStep(map.NodeIdAt(best))) { FreeMapRelays++; return false; }
             }
 
-            // ── 調べる (2026-11-05): 照明 → 偵察の順。 どちらも行き先を決める前に使い、 開示された戦闘名は Rank (TileDanger) が読む ──
-            //   照明: 物資 50 (1 歩分)・ターンは使わない・3 ターンのあいだ 3 歩先まで。 追跡者の察知も 3 歩に伸びるので、 近くに居る時は使わない。
-            //   偵察: 1 ターン (追跡者が動き天候の前線も進む)・2 歩先まで。 追われている時は使わない。 同じ点では 1 回まで。
+            // ── 調べる (2026-11-05・2026-11-24 に測量 1 本へ): 行き先を決める前に使い、 開示された戦闘名は Rank (TileDanger) が読む ──
+            //   測量: 1 ターン (物資は使わない・2026-11-25〜)・3 歩先までを書き込み、 その層の間消えない。 同じ点では 1 回まで。
+            bool surveyAffordable = !_freeMapSurveyAt.Contains(at);
             if (freeNavScout && _freeMapActions <= MaxFreeMapActionsPerFloor)
             {
                 int Unscouted(int range)
@@ -486,29 +484,17 @@ namespace AutoTest
                     return c;
                 }
                 bool chased = sim.FoeAlive && sim.FoeMode == FoeMode.Chase;
-                bool foeNear = sim.FoeAlive && (sim.FoeVisible || sim.Stone().level >= 2);
-                int exitCost = exitHopsAt == int.MaxValue ? 0 : exitHopsAt * FreeMapParams.MoveSupply;
-                if (!sim.FlareOn && !chased && !foeNear
-                    && NavSupply(run, sim) >= exitCost + FreeMapExitMargin + FreeMapParams.FlareSupply
-                    && Unscouted(FreeMapParams.FlareRange) >= FlareMinUnscouted
-                    && gm.UseFlare())
+                if (!chased && surveyAffordable && Unscouted(FreeMapParams.SurveyRange) >= SurveyMinUnscouted && gm.Survey())
                 {
-                    FreeNavFlares++;
+                    _freeMapSurveyAt.Add(at);
+                    FreeNavSurveys++;
                     return false;   // ターンは使わない。 見えた上で同じ判断をもう一度する
-                }
-                if (!sim.FlareOn && !chased && !_freeMapReconAt.Contains(at)
-                    && Unscouted(FreeMapParams.ReconRange) >= ReconMinUnscouted
-                    && gm.ReconTurn())
-                {
-                    _freeMapReconAt.Add(at);
-                    FreeNavRecons++;
-                    return false;
                 }
             }
 
             // ── 行き先 ──
             //   2026-11-09: 物資が出口まで足りなくても、 まだ入っていない店まで届くなら先に店へ寄って買い足す。
-            //   店が見つかっていなければ、 照明で周りを照らして探す (物資 1・ターンは使わない)。
+            //   店が見つかっていなければ、 測量で周りを書き込んで探す (1 ターン・同じ点では 1 回まで)。
             int target = -1;
             //   店は何度でも入れる (2026-11-09) ので、 往復で詰まらないように:
             //   ・補給に行くのは満タンでない時だけ・今いる点は除く
@@ -522,17 +508,17 @@ namespace AutoTest
             int refuel = full ? NearestRefuel(mm, sim, hopsFromMe, run, at, toGoalArr, toGoalArr[at])
                               : NearestRefuel(mm, sim, hopsFromMe, run, at);
             bool refuelOk = refuel >= 0 && NavSupply(run, sim) >= hopsFromMe[refuel] * FreeMapParams.MoveSupply;
-            if (refuel < 0 && !sim.FlareOn && !(sim.FoeAlive && sim.FoeMode == FoeMode.Chase)
-                && run.coins >= FreeMapParams.ProvisionPrice && run.provision > FreeMapParams.FlareSupply
+            if (refuel < 0 && !_freeMapSurveyAt.Contains(at) && !(sim.FoeAlive && sim.FoeMode == FoeMode.Chase)
+                && run.coins >= FreeMapParams.ProvisionPrice
                 && _freeMapActions <= MaxFreeMapActionsPerFloor)
             {
                 int unknown = 0;
                 foreach (var n in map.GetAllNodes())
                 {
                     int i = n.index;
-                    if (i >= 0 && i < L.Count && !n.revealed && !sim.IsSunk(i) && hopsFromMe[i] != int.MaxValue && hopsFromMe[i] <= FreeMapParams.FlareRange) unknown++;
+                    if (i >= 0 && i < L.Count && !n.revealed && !sim.IsSunk(i) && hopsFromMe[i] != int.MaxValue && hopsFromMe[i] <= FreeMapParams.SurveyRange) unknown++;
                 }
-                if (unknown >= 2 && gm.UseFlare()) { FreeMapShopFlares++; FreeNavFlares++; return false; }
+                if (unknown >= 2 && gm.Survey()) { _freeMapSurveyAt.Add(at); FreeMapShopSurveys++; FreeNavSurveys++; return false; }
             }
             bool toExit = _freeMapActions > MaxFreeMapActionsPerFloor
                           || exitHopsAt == int.MaxValue
@@ -618,18 +604,19 @@ namespace AutoTest
                 }
             }
 
-            // S4: 次に向かう点の戦闘名が分からず、 近ければ偵察してから決める (同じ点では 1 回まで・追われている時はしない)
+            // S4: 次に向かう点の戦闘名が分からず、 近ければ測量してから決める (同じ点では 1 回まで・追われている時はしない)
+            //   2026-11-24 に測量を物資 1・ターン 0 にした版では、 物資を吸われて Super 19.4% → 11.7% (同じ 2000 シード)。 2026-11-25 に 1 ターン・物資 0 へ戻した
             if (v3.superNav && !toExit && target >= 0 && _freeMapActions <= MaxFreeMapActionsPerFloor
-                && hopsFromMe[target] <= FreeMapParams.ReconRange
-                && !(sim.FoeAlive && sim.FoeMode == FoeMode.Chase) && !_freeMapReconAt.Contains(at))
+                && hopsFromMe[target] <= FreeMapParams.SurveyRange && surveyAffordable
+                && !(sim.FoeAlive && sim.FoeMode == FoeMode.Chase))
             {
                 var tn = map.GetNode(map.NodeIdAt(target));
                 bool unknownFight = tn != null && !tn.encounterRevealed && (!tn.revealed
                     || tn.EffectiveType == TileType.Battle || tn.EffectiveType == TileType.EliteBattle);
-                if (unknownFight && gm.ReconTurn())
+                if (unknownFight && gm.Survey())
                 {
-                    _freeMapReconAt.Add(at);
-                    FreeNavRecons++;
+                    _freeMapSurveyAt.Add(at);
+                    FreeNavSurveys++;
                     return false;
                 }
             }
@@ -781,48 +768,23 @@ namespace AutoTest
             return h == int.MaxValue ? 0f : System.Math.Max(0, r - h);
         }
 
-        /// <summary>[測定 2026-11-12・#35] 推定した追跡者の位置から各点への歩数。 分からない (魔石に反応なし) なら null。
-        /// 見えていればその位置。 見えていなければ魔石の段と方角から推す: 方角が ±45° に収まる点のうち、
-        /// 自分からの歩数が段の目安 (遠い = <see cref="FreeMapParams.StoneFar"/>・かなり近い/察知 = <see cref="FreeMapParams.StoneNear"/>) に近い点。
-        /// 見えていない位置そのものは読まない (魔石と同じ情報だけ)。</summary>
+        /// <summary>[測定 2026-11-12・#35] 追跡者の位置から各点への歩数。 見えている (素の視界・測量で書き込んだ範囲) 時だけ。 見えていなければ null。
+        /// 見えていない位置そのものは読まない (人と同じ情報だけ・2026-11-24 に魔石の段と方角からの推定は魔石ごと廃止)。</summary>
         private int[] FearFoeHops(FreeMapSim sim, int at)
-        {
-            if (!sim.FoeAlive) return null;
-            int foe = -1;
-            if (sim.FoeVisible) foe = sim.FoeNode;
-            else
-            {
-                var st = sim.Stone();
-                if (st.level <= 0) return null;
-                int want = st.level == 1 ? FreeMapParams.StoneFar : FreeMapParams.StoneNear;
-                var d = sim.HopsFrom(at);
-                int bestScore = int.MaxValue;
-                for (int i = 0; i < d.Length; i++)
-                {
-                    if (i == at || d[i] == int.MaxValue) continue;
-                    int bd = System.Math.Abs(sim.Bearing(at, i) - st.bearing); if (bd > 4) bd = 8 - bd;
-                    if (bd > 1) continue;
-                    int score = System.Math.Abs(d[i] - want) * 2 + bd;
-                    if (score < bestScore) { bestScore = score; foe = i; }   // 同点は添字の小さい方
-                }
-            }
-            return foe < 0 ? null : sim.HopsFrom(foe);
-        }
+            => sim.FoeAlive && sim.FoeVisible ? sim.HopsFrom(sim.FoeNode) : null;
 
-        /// <summary>見えている追跡者 / 魔石に出ている方角を避けて、 次の 1 歩を選び直す。
+        /// <summary>見えている追跡者を避けて、 次の 1 歩を選び直す。
         /// 既定の一歩 <paramref name="preferred"/> が安全ならそのまま。 危ないなら、 行き先までの歩数が増えすぎない範囲で
-        /// 追跡者から遠い隣へ。 追跡者の位置が分からない時は、 魔石の方角に向かう隣を避ける。</summary>
+        /// 追跡者から遠い隣へ。 追跡者が見えていない時は避けない (2026-11-24 に魔石の方角を避ける枝は魔石ごと廃止)。</summary>
         private int AvoidFoeStep(FreeMapSim sim, int at, int target, int preferred)
         {
             if (!sim.FoeAlive) return preferred;
             // 縄張りを出ない追跡者 (2026-11-12): 縄張りの外の点は追跡者も使い魔も来ないので、 そのまま踏む
             if (sim.Leashed && !sim.InTerritory(preferred)) return preferred;
-            var stone = sim.Stone();
-            bool foeKnown = sim.FoeVisible;
-            if (!foeKnown && stone.level < 2) return preferred;   // 遠い / 反応なしなら避けない
+            if (!sim.FoeVisible) return preferred;   // 見えていなければ避けない
 
             // 動かない追跡者: 近づいても捕まらない。 その点を踏まないことだけを避ける
-            if (foeKnown && FoeLooksStatic())
+            if (FoeLooksStatic())
                 return preferred != sim.FoeNode ? preferred : FirstSafeNeighbor(sim, at, target, sim.FoeNode, preferred);
 
             var toTarget = sim.HopsFrom(target);
@@ -839,18 +801,11 @@ namespace AutoTest
                 if (chased && c != preferred && !(toTarget[c] < baseline)) continue;
                 double danger;
                 if (sim.Leashed && !sim.InTerritory(c)) danger = 0.0;   // 縄張りの外は来ない
-                else if (foeKnown)
+                else
                 {
                     var dFoe = sim.HopsFrom(sim.FoeNode);
                     int step = dFoe[c] == int.MaxValue ? 99 : dFoe[c];
                     danger = step <= FoeAvoidHops ? (FoeAvoidHops + 1 - step) * 4.0 : 0.0;
-                }
-                else
-                {
-                    // 魔石の方角 (45° 刻み) との差が小さいほど、 追跡者に近づく隣
-                    int b = sim.Bearing(at, c);
-                    int diff = System.Math.Abs(b - stone.bearing); if (diff > 4) diff = 8 - diff;
-                    danger = diff <= 1 ? (2 - diff) * 3.0 : 0.0;
                 }
                 double progress = toTarget[c] == int.MaxValue ? -50 : baseline - toTarget[c];   // 近づけば +1
                 double score = progress * 2.0 - danger + (c == preferred ? 0.01 : 0.0);

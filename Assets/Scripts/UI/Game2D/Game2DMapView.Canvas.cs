@@ -6,9 +6,9 @@ namespace UI.Game2D
     /// 航行の液晶の 1 画面 (480×270 の dot)。 正本は docs/design/map-prototype.html の「液晶の表示」(<c>LC</c> / <c>INK</c> / <c>PALETTES</c> /
     /// <c>F35</c> / <c>ICON9</c> と <c>ltext / glyph / lline / lellipse / lfill / lcirc / bracket</c>)。
     ///
-    /// <para>このファイルは<b>描くための道具</b>だけ (色・字・絵・線・円・塗り)。 地図の作図は <c>Plot</c>、 天候・照明・偵察は <c>Fx</c>、
+    /// <para>このファイルは<b>描くための道具</b>だけ (色・字・絵・線・円・塗り)。 地図の作図は <c>Plot</c>、 天候・測量は <c>Fx</c>、
     /// 操作は <c>Input</c> の部分クラスにある。 すべて 1 dot 単位で打つ (線の描画機能・アンチエイリアスは使わない)。
-    /// 半透明を使うのは HTML と同じ「照明の範囲」「魔石の範囲」の淡い塗りだけ。</para>
+    /// 半透明を使うのは淡い塗り (<c>Disc</c>・ボスの点の赤い霞) だけ (HTML の「照明の範囲」「魔石の範囲」は 2026-11-24 に廃止)。</para>
     /// </summary>
     public partial class Game2DMapView
     {
@@ -49,7 +49,7 @@ namespace UI.Game2D
 
         private Lc _lc = Pals[1];
 
-        // 天候・照明・偵察の演出が使うインク (どの層でも共通)
+        // 天候・測量の演出が使うインク (どの層でも共通)
         private static readonly Color32 InkDim = Hex("#6f7480"), InkMid = Hex("#a59f8a"), InkHi = Hex("#e2dcc6"), InkHot = Hex("#f2ecd8"), InkRed = Hex("#c8553f");
 
         private static readonly int[] Bayer = { 0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5 };
@@ -119,7 +119,7 @@ namespace UI.Game2D
             _buf[(H - 1 - y) * W + x] = c;
         }
 
-        /// <summary>下の色と混ぜて置く (照明・魔石の範囲の淡い塗り用)。</summary>
+        /// <summary>下の色と混ぜて置く (淡い塗り用・ボスの点の赤い霞)。</summary>
         private void PutA(int x, int y, Color32 c, float a)
         {
             if (x < 0 || y < 0 || x >= W || y >= H) return;

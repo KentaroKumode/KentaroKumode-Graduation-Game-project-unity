@@ -37,6 +37,14 @@ namespace MapSystem
         /// <summary>指定フロアのマップを生成</summary>
         public static FloorMap Generate(int floor)
         {
+            // ラン指定の一本道 (チュートリアル・GameLoop.RunSpec.map): 指定の形に、 指定の敵を点へ焼き付けて流す。 嵐・山岳・追跡者は無い
+            var spec = GameLoop.RunSpec.Current;
+            if (spec != null && spec.HasMap)
+            {
+                var m = FromLayout(spec.BuildLayout(floor));
+                spec.ApplyEncounters(m);
+                return m;
+            }
             if (!FloorPlan.IsFreeMap(floor)) return GenerateBossOnly(floor);
             // 深さ 6 の固定のイベントの点 (〈真理〉を持って入った層 = イベントなしの測定だけ・乱数を引かない・他の層では読まれない)。 正本は ConvictionSystem.KeepsFixedEventPoint
             //   嵐 (2026-11-13): 測定の口 GameHooks.StormEnabled が立っていれば、 嵐のある深さで始点を選び直す (FreeMove.Storm.Apply・乱数は専用のキー)
@@ -67,7 +75,7 @@ namespace MapSystem
                     freeMap = true,
                     band = L.storm ? L.BandOf(i) : -1,   // 嵐の層は始点からの距離で決めた帯 (2026-11-13)
                     // 種別が最初から分かっている点: 始点・終点 (ボス / 門)・深さ 6 の固定のイベントの点 (イベントなしの測定の層だけ)。
-                    //   他は視界 (距離 1)・照明・偵察で見えるまで伏せる。 嵐の層 (2026-11-13) の終点は伏せる (照明・隣・嵐のフェーズ 3 で見える)。
+                    //   他は視界 (距離 1)・測量で見えるまで伏せる。 嵐の層 (2026-11-13) の終点は伏せる (測量・隣・嵐のフェーズ 3 で見える)。
                     revealed = i == L.start || (i == L.goal && !L.storm) || i == L.fixedEvent,
                 };
                 ApplyEliteUpgrade(L.floor, node);

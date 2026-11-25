@@ -238,7 +238,7 @@ base: origin/main 6ea741d
 | F-K-01 | GameRng | `hash(塩, キー, 連番)`・キー別カウンタ | `GameLoop/GameRng.cs` | 文字列キー 30 種（直書きのもの）[^rng] | ロ | 仕（§4-5） | 固 |
 | F-K-02 | シードの入力と表示 | `TryParseSeed`・`FormatSeed`・`SetMasterSeed` | `GameRng.cs` | ― | 両 | コ | 固 |
 | F-K-03 | 戦闘の通し番号 | `_combatSeq` はランごとに戻す | `CombatManager._combatSeq`・`GameManager.StartNewRun` | ― | ロ | 仕（§23-20） | 固 |
-| F-K-04 | GameRng を使わない乱数 | 遺物の抽選（`System.Random`）・画面の演出 | `RelicRoller.cs:25-28`・`Game2DRelicPanel.cs:17`・`Game2DBattleFx.cs`・`Game2DRadar.cs` | 4 ファイル | ロ | 食（G-30） | 仮 |
+| F-K-04 | GameRng を使わない乱数 | 遺物の抽選（`System.Random`）・画面の演出 | `RelicRoller.cs:25-28`・`Game2DRelicPanel.cs:17`・`Game2DBattleFx.cs`（`Game2DRadar.cs` は 2026-11-24 に削除） | 3 ファイル | ロ | 食（G-30） | 仮 |
 | F-K-05 | BOT と人の一致 | 同じ操作列なら同じ結果・〈猫の手〉は専用キー | `GameManager.MoveStep` ほか・`challenge.cat` | ― | ロ | 仕（§5-8・§23-25） | 動 |
 
 ## L. 表示・文字・音・演出

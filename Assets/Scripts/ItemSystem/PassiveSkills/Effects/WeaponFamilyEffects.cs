@@ -421,11 +421,11 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>黎明: 敵の攻撃を HP の減り 0 で受け切ったターン、 軽減前のダメージ 10 につき敵の最大 HP の 5% を削る。
-    /// 【ジャスト防御】が成立したターンは 8% にして、 ボスの次の目盛りにひびを入れる。 2 体戦は 2 体目にも同じ量 (CombatManager が <see cref="DealtKey"/> を読む)。
+    /// 【ジャスト防御】が成立したターンは 8% にして、 ボスの次の目盛りを削ったダメージの 50% ぶん上げる (2026-11-25 neon answer_gauge・旧: ひびを入れる)。 2 体戦は 2 体目にも同じ量 (CombatManager が <see cref="DealtKey"/> を読む)。
     /// 削りは敵の HP を直接減らす (〈天与の才〉の踏みとどまりは通す)。</summary>
     public class Daybreak : IPassiveSkillEffect
     {
-        public const int PerUnit = 10, PctPerUnit = 5, JustPctPerUnit = 8;
+        public const int PerUnit = 10, PctPerUnit = 5, JustPctPerUnit = 8, JustNotchPct = 50;
         /// <summary>このターンに 1 体目へ入れた削り。 2 体戦で 2 体目へ同じ量を写すために CombatManager が読む (読んだら消す)。</summary>
         public const string DealtKey = "daybreakDealt";
         public string SkillId => "黎明";
@@ -443,7 +443,7 @@ namespace ItemSystem.PassiveSkills.Effects
             int after = DivineTalent.ClampToThreshold(ctx, System.Math.Max(0, before - dmg), ctx.enemyMaxHP);
             ctx.enemyCurrentHP = after;
             if (before > after) ctx.accumulatedValues[DealtKey] = before - after;
-            if (just) CombatManager.Instance?.CrackBossNotch(SkillId);
+            if (just && before > after) CombatManager.Instance?.RaiseBossNextNotch((before - after) * JustNotchPct / 100);
             Rw.Log($"[黎明] 無傷で受け切った{(just ? " (ジャスト防御)" : "")}: 軽減前 {pre} → {units}×{(just ? JustPctPerUnit : PctPerUnit)}% = {dmg} (敵HP {before} → {after})");
         }
     }
@@ -453,11 +453,11 @@ namespace ItemSystem.PassiveSkills.Effects
     // ============================================================
 
     /// <summary>画竜点睛: 攻撃の端子を 1 枚だけ発動し、 そこにこのターン振った目の最大 (タイ含む) を挿したとき、 その 1 撃の最終与ダメージ ×2.0 (+100%)。
-    /// その目が装備ダイスの最大の目なら ×3.0 (+200%) で、 ボスの次の目盛りをその場で割る (満額のダウン・1 ターン 1 回)。 攻撃の端子を 2 枚以上発動したターンは不発 (〈無我無心〉)。
+    /// その目が装備ダイスの最大の目なら ×3.0 (+200%) で、 ボスの次の目盛りをその攻撃のダメージの 50% ぶん上げる (1 ターン 1 回・2026-11-25 neon answer_gauge・旧: その場で割る)。 攻撃の端子を 2 枚以上発動したターンは不発 (〈無我無心〉)。
     /// 式は <see cref="CombatRules.GaryoPct"/> (2026-11-22・旧: 装備ダイスの最大の目だけ)。</summary>
     public class GaryoTensei : IPassiveSkillEffect
     {
-        public const int FinalPct = 200, RollMaxPct = 100;   // final5: 150 / 60 → 200 / 100 (会心倍率 2.0 → 1.6 の巻き添えを戻す)
+        public const int FinalPct = 200, RollMaxPct = 100, NotchPct = 50;   // final5: 150 / 60 → 200 / 100 (会心倍率 2.0 → 1.6 の巻き添えを戻す)
         public const string TurnKey = "ryusen.garyoTurn", BrokeKey = "ryusen.garyoBroke";
         public string SkillId => "画竜点睛";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage, PassiveSkillTrigger.OnPostDealDamage };
@@ -469,13 +469,14 @@ namespace ItemSystem.PassiveSkills.Effects
                 int pct = CombatRules.GaryoPct(ctx.hitFaceMax, RolledMax(ctx), MaxFace(ctx));
                 if (pct <= 0) return;
                 ctx.hitFinalDamagePct += pct;   // 確定会心は 2026-11-23 に撤去 (〈竜閃〉は武器の会心率 100%)
-                if (pct >= FinalPct) ctx.accumulatedValues[TurnKey] = ctx.currentTurn;      // 目盛りを割るのは装備ダイスの最大の目の時だけ
+                if (pct >= FinalPct) ctx.accumulatedValues[TurnKey] = ctx.currentTurn;      // 目盛りを上げるのは装備ダイスの最大の目の時だけ
                 CombatManager.WeaponGaryoFired++;
                 Rw.Log($"[画竜点睛] 目 {ctx.hitFaceMax} (振った最大 {RolledMax(ctx)}・ダイスの最大 {MaxFace(ctx)}) → 最終与ダメージ +{pct}%");
                 return;
             }
             if ((int)ctx.GetAccumulated(TurnKey) != ctx.currentTurn || !Psn.Hit(ctx) || !Rw.OncePerTurn(ctx, BrokeKey)) return;
-            CombatManager.Instance?.BreakBossNotch(SkillId);
+            int add = ctx.finalDamage * NotchPct / 100;
+            if (add > 0) CombatManager.Instance?.RaiseBossNextNotch(add);
         }
 
         /// <summary>このターン振った目の最大 (振っていなければ 0)。</summary>

@@ -10,13 +10,9 @@ namespace MapSystem.FreeMove
     {
         /// <summary>何もしていない時に見える範囲 (道で何歩先まで)。 〈夜目の指輪〉で 2。</summary>
         public int vision = FreeMapParams.Vision;
-        /// <summary>魔石の「遠い」の歩数に足す分。 〈魔石の欠片〉で +1 (4 → 5)。</summary>
-        public int stoneFarBonus;
-        /// <summary>痕跡が残るターンの倍率。 〈忍びの外套〉で 0.5 (4 → 2)。</summary>
-        public double traceLifeMul = 1.0;
         /// <summary>使い魔がプレイヤーを見つける歩数。 〈鏡の護符〉で 0 (重なった時だけ)。</summary>
         public int familiarSee = FreeMapParams.FamiliarSee;
-        /// <summary>層ごとの〈煙玉〉の回数 (捕捉された瞬間に自動で発動し、 追跡者を警戒へ落とす)。</summary>
+        /// <summary>層ごとの〈煙玉〉の回数 (見つかる瞬間に自動で発動し、 見つからなかったことにする)。</summary>
         public int smokeCharges;
         /// <summary>層ごとの〈前哨の旗〉の回数 (今いる点に偵察拠点を置く)。</summary>
         public int beaconCharges;
@@ -26,13 +22,13 @@ namespace MapSystem.FreeMove
         public bool goalwardHalf;
         /// <summary>削る砂の前線の追加の物資 (+1) を受けない (〈油布の靴〉)。</summary>
         public bool ignoreSand;
-        /// <summary>雹の中の 1 歩で払う HP を減らす分 (〈油布の靴〉で 1・2026-11-20)。 嵐の層の雹の嵐 (嵐の HP + 雹の上乗せ) と、 嵐の無い層の雹の点の 1 歩に効く (最低 0)。 待つ・偵察には効かない。</summary>
+        /// <summary>雹の中の 1 歩で払う HP を減らす分 (〈油布の靴〉で 1・2026-11-20)。 嵐の層の雹の嵐 (嵐の HP + 雹の上乗せ) と、 嵐の無い層の雹の点の 1 歩に効く (最低 0)。 待つには効かない。</summary>
         public int hailHpCut;
         /// <summary>前哨の旗の拠点から常に公開する歩数。</summary>
         public int beaconRange = BeaconRangeDefault;
 
         public const int BeaconRangeDefault = 3;
-        /// <summary>〈煙玉〉が効いた後、 追跡者が捕捉し直さないターン (減らしてから判定するので、 実際の猶予は 1 少ない)。</summary>
+        /// <summary>〈煙玉〉が効いた後、 追跡者が見つけ直さないターン (減らしてから判定するので、 実際の猶予は 1 少ない)。</summary>
         public const int SmokeRestTurns = 3;
 
         public static readonly FreeMapPerks None = new FreeMapPerks();

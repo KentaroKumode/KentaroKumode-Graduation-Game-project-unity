@@ -13,19 +13,19 @@ namespace CombatSystem
         /// <summary>〈鎧割りの酸瓶〉をこの戦闘で使った数 (ctx.accumulatedValues)。 ヴェスカの形態の交代 (防御を入れ直す) の後にも同じだけ引く。</summary>
         public const string TacticAcidKey = "tactic.acid";
 
-        /// <summary>〈目盛り削りの鑿〉: 敵に <paramref name="dmg"/> のダメージ。 敵の HP を減らす口 (<see cref="HpLossDiag.Lose"/>) を通すので、 最終与ダメージ倍率・怠惰・ダウンの ×1.5 は
-        /// 主攻撃以外と同じに掛かる (敵の防御は掛からない)。 目盛りは<b>通常攻撃として</b>割る (<see cref="NoteBossDownMainHit"/>・ひびの入った目盛りも満額のダウン)。
+        /// <summary>〈目盛り削りのノミ〉: 敵に <paramref name="dmg"/> のダメージ。 敵の HP を減らす口 (<see cref="HpLossDiag.Lose"/>) を通すので、 最終与ダメージ倍率・怠惰・ダウンの ×1.5 は
+        /// 主攻撃以外と同じに掛かる (敵の防御は掛からない)。 目盛りは<b>通常攻撃として</b>割る (<see cref="NoteBossDownMainHit"/>・ひびの入った目盛りもダウン)。
         /// 戻り値 = 使えたか (敵が倒れていれば使えない)。</summary>
         public bool TacticChisel(CombatContext ctx, int dmg)
         {
             if (!isCombatActive || ctx == null || enemyHP <= 0 || dmg <= 0) return false;
             int before = enemyHP;
-            HpLossDiag.Lose(ref enemyHP, dmg, "目盛り削りの鑿");
+            HpLossDiag.Lose(ref enemyHP, dmg, "目盛り削りのノミ");
             int dealt = before - enemyHP;
             ctx.enemyCurrentHP = enemyHP;
             EnemyHpLedger.CtxOverwritten();   // [計装]
             NoteBossDownMainHit(dealt, ctx.currentTurn);
-            if (Debug.unityLogger.logEnabled) Debug.Log($"[目盛り削りの鑿] 敵に {dealt} (通常攻撃として目盛りを見る) → 敵HP {enemyHP}");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[目盛り削りのノミ] 敵に {dealt} (通常攻撃として目盛りを見る) → 敵HP {enemyHP}");
             return true;
         }
 

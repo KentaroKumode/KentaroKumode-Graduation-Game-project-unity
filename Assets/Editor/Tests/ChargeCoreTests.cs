@@ -29,6 +29,20 @@ namespace AutoTest.EditorTests
         }
 
         [Test]
+        public void HitOrder_FollowsPlugRank_RebootStaysLast()
+        {
+            var board = new List<string> { TerminalIds.Attack, TerminalIds.Attack };
+            var env = new TerminalEnv { charge = 10, chargeCap = 30, hp = 50, maxHp = 50 };
+            var o = TerminalCards.Resolve(board, new[] { 0, 1 }, new[] { 5, 3 }, env, new TerminalBattleState());
+            Assert.That(o.attackHitSlot, Is.EqualTo(new List<int> { 0, 1 }));      // 挿した順が無ければ場の順
+            o = TerminalCards.Resolve(board, new[] { 0, 1 }, new[] { 5, 3 }, env, new TerminalBattleState(), plugRank: new[] { 1, 0 });
+            Assert.That(o.attackHitSlot, Is.EqualTo(new List<int> { 1, 0 }));      // 右の札へ先に挿した = 1 撃目
+            Assert.That(o.attackHits, Is.EqualTo(new List<int> { 3, 5 }));
+            o = TerminalCards.Resolve(board, new[] { 0, 1 }, new[] { 5, 3 }, env, new TerminalBattleState { chargeItems = ChargeItems.Fork }, reboot: 0, plugRank: new[] { 1, 0 });
+            Assert.That(o.attackHitSlot, Is.EqualTo(new List<int> { 1, 0, 0 }));   // 【再起動】の撃は後ろ
+        }
+
+        [Test]
         public void Reboot_NeedsChargeAndItem()
         {
             Assert.That(Run(ChargeItems.Fork, ChargeCore.RebootCost - 1, reboot: 0).rebootSlot, Is.EqualTo(-1));

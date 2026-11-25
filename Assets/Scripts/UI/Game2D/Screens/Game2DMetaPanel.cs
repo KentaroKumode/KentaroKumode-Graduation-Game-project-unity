@@ -34,11 +34,11 @@ namespace UI.Game2D
             MetaModule.SparkCrit    => "会心が最初から出現の 4 枠の 1 つ目・会心倍率 +" + N(MetaPanel.CritMulBonus),
             MetaModule.SparkDeck    => "山札が最初から出現の 4 枠の 1 つ目・戦闘の 1 ターン目の手札 +" + MetaPanel.DeckOpeningDraw + " 枚",
             MetaModule.SparkRole    => "役が最初から出現の 4 枠の 1 つ目・各戦闘の最初の振り直しが無料",
-            MetaModule.AttackTune   => "攻撃の端子に挿した出目 1 個につき +" + MetaPanel.TerminalTunePerDie,
-            MetaModule.BlockTune    => "防御の端子に挿した出目 1 個につき +" + MetaPanel.TerminalTunePerDie,
+            MetaModule.AttackTune   => "攻撃のカードに挿した出目 1 個につき +" + MetaPanel.TerminalTunePerDie,
+            MetaModule.BlockTune    => "防御のカードに挿した出目 1 個につき +" + MetaPanel.TerminalTunePerDie,
             MetaModule.AxisTicket   => "店の軸指定の振り直しの追加 −" + MetaPanel.AxisTicketDiscount + "G",
             MetaModule.TacticKnife  => "ランの始めに戦術の消耗品を 1 つ持つ (どれかはランダム)",
-            MetaModule.Compression  => "店で端子を山札から抜くのが、 ランで最初の 1 回だけ無料",
+            MetaModule.Compression  => "店でカードを山札から抜くのが、 ランで最初の 1 回だけ無料",
             _ => m.ToString(),
         };
 

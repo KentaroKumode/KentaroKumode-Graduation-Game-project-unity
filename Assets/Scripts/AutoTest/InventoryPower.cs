@@ -200,7 +200,7 @@ namespace AutoTest
                 case GameLoop.DieIds.Link: case GameLoop.DieIds.Appraiser: case GameLoop.DieIds.Gamble: return 1f;
                 case GameLoop.DieIds.Clock: case GameLoop.DieIds.Rewind: return 1.5f;
                 case GameLoop.DieIds.Gravestone: return 2f;
-                default: return 0f;   // 角の取れた賽・軽石・呪物 (LEGENDARY の重みと最大 HP は差し引き 0 と見る)
+                default: return 0f;   // 角の取れた賽・軽石・呪物 (呪いの LEGENDARY と最大 HP −5 は差し引き 0 と見る)
             }
         }
 

@@ -208,6 +208,20 @@ namespace UI.Game2D
             }
         }
 
+        /// <summary>品の提示の行 (報酬・品を選ぶ・開幕の秘宝)。 呪物の賽の呪いの付いた品 (2026-11-25) は名前を赤にし、 右に「呪い」、 説明の頭に代価を出す。</summary>
+        private static ModalItem OfferRow(string id)
+        {
+            var data = ItemDatabase.Instance?.GetItem(id);
+            var it = new ModalItem { name = ItemDatabase.DisplayNameOf(data, id), desc = data?.description };
+            if (CombatSystem.DiePassives.IsCursedOffer(GameManager.Instance?.Run, id))
+            {
+                it.value = CombatSystem.DiePassives.CurseMark;
+                it.tone = Game2DKit.Red;
+                it.desc = CombatSystem.DiePassives.CurseNote + (string.IsNullOrEmpty(it.desc) ? "" : "\n" + it.desc);
+            }
+            return it;
+        }
+
         // ── 開幕の秘宝 (開幕パッシブ) の選択 (〈宝物庫〉r10: 何本目かで 2〜3 択) ──
 
         private ScreenDef StartingPick(GameManager gm)
@@ -215,11 +229,7 @@ namespace UI.Game2D
             var cands = gm.PendingStartingPassiveChoices[0];
             var d = New("開幕の秘宝", "残り " + gm.PendingStartingPassiveChoices.Count, 420);
             d.body = "このランに持っていく秘宝を 1 つ選ぶ。";
-            foreach (var id in cands)
-            {
-                var data = ItemDatabase.Instance?.GetItem(id);
-                d.Items.Add(new ModalItem { name = ItemDatabase.DisplayNameOf(data, id), desc = data?.description });
-            }
+            foreach (var id in cands) d.Items.Add(OfferRow(id));
             d.buttons.Add(B("選ぶ", "pick", true));
             d.buttons.Add(SkipButton(cands));
             d.onAction = (a, sel) => { if (a == "pick" || a == "skip") { gm.ResolveStartingPassive(a == "skip" ? -1 : Mathf.Clamp(sel, 0, cands.Count - 1)); Game2DSfx.Play("ui_confirm"); } Refresh(); };
@@ -233,11 +243,7 @@ namespace UI.Game2D
             var cands = gm.PendingEventPassiveOffers[0];
             var d = New("品を選ぶ", gm.PendingEventPassiveOffers.Count > 1 ? "残り " + gm.PendingEventPassiveOffers.Count : null, 420);
             d.body = cands.Count > 1 ? "差し出された品から 1 つ選ぶ。 見送ればゴールドになる。" : "受け取るか、 見送ってゴールドにする。";
-            foreach (var id in cands)
-            {
-                var data = ItemDatabase.Instance?.GetItem(id);
-                d.Items.Add(new ModalItem { name = data != null && !string.IsNullOrEmpty(data.displayName) ? data.displayName : id, desc = data?.description });
-            }
+            foreach (var id in cands) d.Items.Add(OfferRow(id));
             d.buttons.Add(B(cands.Count > 1 ? "選ぶ" : "受け取る", "pick", true));
             d.buttons.Add(SkipButton(cands));
             d.onAction = (a, sel) => { if (a == "pick" || a == "skip") { gm.ResolveEventPassiveOffer(a == "skip" ? -1 : Mathf.Clamp(sel, 0, cands.Count - 1)); Game2DSfx.Play("ui_confirm"); } Refresh(); };
@@ -317,12 +323,12 @@ namespace UI.Game2D
             // 端子の山札 (ADR-0014): 回復の代わりに 1 枚抜く (無料)。 山札が手札の枚数を下回る抜き方はできない
             bool canTerm = gm.CanRemoveTerminal; int deckN = run.terminalDeck != null ? run.terminalDeck.Count : 0;
             d.Items.Add(new ModalItem { name = "山札から抜く", value = canTerm ? "山札 " + deckN + " 枚" : "抜けない", disabled = !canTerm,
-                desc = canTerm ? "回復の代わりに、 山札から端子を 1 枚抜く (この先ずっと)。 抜く端子を次に選ぶ。" : "山札が下限の枚数 (" + CombatSystem.TerminalCards.MinDeckSize + ") を下回る抜き方はできない。" });
+                desc = canTerm ? "回復の代わりに、 山札からカードを 1 枚抜く (この先ずっと)。 抜くカードを次に選ぶ。" : "山札が下限の枚数 (" + CombatSystem.TerminalCards.MinDeckSize + ") を下回る抜き方はできない。" });
             // 端子を強化する (2026-11-20): 素材を払って、 山札の端子 1 枚を強化した端子 (＋) に差し替える。 値段は強化するたびに上がる
             int upCost = GameManager.TerminalUpgradeCost(run); bool anyUp = GameManager.HasUpgradableTerminal(run), canUp = anyUp && run.weaponMaterials >= upCost;
-            d.Items.Add(new ModalItem { name = "端子を強化する", value = "素材 " + upCost, disabled = !canUp,
-                desc = !anyUp ? "山札に強化できる端子が無い。"
-                     : canUp ? "素材 " + upCost + " を使って、 山札の端子を 1 枚強化する (この先ずっと・強化するたびに素材が 2 増える)。 強化する端子を次に選ぶ。"
+            d.Items.Add(new ModalItem { name = "カードを強化する", value = "素材 " + upCost, disabled = !canUp,
+                desc = !anyUp ? "山札に強化できるカードが無い。"
+                     : canUp ? "素材 " + upCost + " を使って、 山札のカードを 1 枚強化する (この先ずっと・強化するたびに素材が 2 増える)。 強化するカードを次に選ぶ。"
                              : "素材が足りない (" + upCost + " 要る)。" });
             d.buttons.Add(B("決める", "do", true));
             d.onAction = (a, sel) =>
@@ -391,7 +397,7 @@ namespace UI.Game2D
             var run = gm.Run; var sm = ShopManager.Instance; var inv = sm != null ? sm.Current : null;
             int price = sm != null ? sm.AxisRerollPrice : 0;
             var d = New("ショップ ― 軸で振り直す", "所持金 " + run.coins + "G", 460);
-            d.body = "出現の枠 " + ItemSystem.AxisPool.SlotsLabel(run) + " の軸か金を選ぶ。 売れていない秘宝の前の " + ShopManager.AxisRerollGuaranteed + " 枠はその軸の品になり、 残りの枠と端子も出やすくなる。"; d.bodyLines = 2;
+            d.body = "出現の枠 " + ItemSystem.AxisPool.SlotsLabel(run) + " の軸か金を選ぶ。 売れていない秘宝の前の " + ShopManager.AxisRerollGuaranteed + " 枠はその軸の品になり、 残りの枠とカードも出やすくなる。"; d.bodyLines = 2;
             var axList = new List<string>(run.lockedAxes) { ItemSystem.PassiveSkills.AxisRules.Gold };
             var axes = axList.ToArray();
             foreach (var ax in axes)
@@ -400,7 +406,7 @@ namespace UI.Game2D
                 d.Items.Add(new ModalItem
                 {
                     name = ax, value = (string.IsNullOrEmpty(word) ? "秘宝 " : word + " ") + ItemSystem.PassiveSkills.AxisRules.Count(run, ax),
-                    desc = ax + "の秘宝" + (ax == ItemSystem.PassiveSkills.AxisRules.Gold ? "" : "と端子") + "が出やすくなる (秘宝の " + ShopManager.AxisRerollGuaranteed + " 枠は確定)。 値段は振り直し " + (inv != null ? inv.CurrentRerollPrice : 0) + "G + " + ShopManager.AxisRerollSurchargeFor(run) + "G。",
+                    desc = ax + "の秘宝" + (ax == ItemSystem.PassiveSkills.AxisRules.Gold ? "" : "とカード") + "が出やすくなる (秘宝の " + ShopManager.AxisRerollGuaranteed + " 枠は確定)。 値段は振り直し " + (inv != null ? inv.CurrentRerollPrice : 0) + "G + " + ShopManager.AxisRerollSurchargeFor(run) + "G。",
                     disabled = inv == null || price > run.coins,
                 });
             }
@@ -430,7 +436,7 @@ namespace UI.Game2D
         private ScreenDef ShopTerminals(GameManager gm)
         {
             var run = gm.Run; int deckN = run.terminalDeck != null ? run.terminalDeck.Count : 0;
-            var d = New("ショップ ― 端子", "所持金 " + run.coins + "G  山札 " + deckN + " 枚", 460);
+            var d = New("ショップ ― カード", "所持金 " + run.coins + "G  山札 " + deckN + " 枚", 460);
             var shelf = gm.TerminalShop;
             foreach (var s in shelf)
             {
@@ -447,7 +453,7 @@ namespace UI.Game2D
             d.Items.Add(new ModalItem
             {
                 name = "山札から 1 枚抜く", value = canRemove ? price + "G" : "抜けない",
-                desc = canRemove ? "山札から端子を 1 枚抜く (この先ずっと)。 抜くたびに値段が上がる。 抜く端子を次に選ぶ。"
+                desc = canRemove ? "山札からカードを 1 枚抜く (この先ずっと)。 抜くたびに値段が上がる。 抜くカードを次に選ぶ。"
                                  : "山札が下限の枚数 (" + CombatSystem.TerminalCards.MinDeckSize + ") を下回る抜き方はできない。",
                 disabled = !canRemove || price > run.coins,
             });
@@ -455,7 +461,7 @@ namespace UI.Game2D
             d.buttons.Add(B("山札を見る", "deck"));
             d.buttons.Add(B("棚へ", "back"));
             d.buttons.Add(B("出る", "leave"));
-            d.footer = "端子を選んで「決める」で山札に加える";
+            d.footer = "カードを選んで「決める」で山札に加える";
             d.onAction = (a, sel) =>
             {
                 switch (a)
@@ -519,7 +525,7 @@ namespace UI.Game2D
             if (inv != null && !_shopSupply) d.buttons.Add(B("振り直す " + sm.RerollPrice + "G", "reroll"));
             if (inv != null && !_shopSupply) d.buttons.Add(B("軸で振り直す " + sm.AxisRerollPrice + "G", "axis"));
             d.buttons.Add(B(_shopSupply ? "棚へ" : "補給 (物資)", "supply"));
-            d.buttons.Add(B("端子", "term"));
+            d.buttons.Add(B("カード", "term"));
             d.buttons.Add(B("売る", "sellmode"));
             if (robOk) d.buttons.Add(B(_robArmed ? "本当に強盗" : "強盗", "rob"));
             d.buttons.Add(B("出る", "leave"));
@@ -591,7 +597,7 @@ namespace UI.Game2D
             Game2DTutorial.Request(TutorialTopics.GrowDeck);      // 手引き「端子を増やす」: 初めて戦闘に勝って端子の報酬が出た (issue #86)
             var run = gm.Run; var offer = run.pendingTerminalOffer;
             bool fromEvent = gm.TerminalOfferFromEvent;      // イベントの「端子をNつから選ぶ」(2026-11-21): 題を変え、 戦闘の不安定化の行は出さない
-            var d = New(fromEvent ? "端子を選ぶ" : "端子の報酬", "山札 " + (run.terminalDeck != null ? run.terminalDeck.Count : 0) + " 枚", 460);
+            var d = New(fromEvent ? "カードを選ぶ" : "カードの報酬", "山札 " + (run.terminalDeck != null ? run.terminalDeck.Count : 0) + " 枚", 460);
             d.body = "1 枚を山札に加える。 加えなくてもよい。"; d.bodyLines = 1;
             foreach (var id in offer)
             {
@@ -658,18 +664,18 @@ namespace UI.Game2D
             bool pick = _termPick == TermPick.Shop || _termPick == TermPick.Rest || evRemove || upPick;
             if (upPick)
             {
-                d.title = "強化する端子を選ぶ ― 素材 " + GameManager.TerminalUpgradeCost(run);
+                d.title = "強化するカードを選ぶ ― 素材 " + GameManager.TerminalUpgradeCost(run);
                 d.buttons.Add(B("強化する", "upgrade", true));
             }
             else if (pick)
             {
-                d.title = _termPick == TermPick.Shop ? "抜く端子を選ぶ ― " + gm.TerminalRemovePrice + "G" : evRemove ? "抜く端子を選ぶ" : "抜く端子を選ぶ ― 休憩";
+                d.title = _termPick == TermPick.Shop ? "抜くカードを選ぶ ― " + gm.TerminalRemovePrice + "G" : evRemove ? "抜くカードを選ぶ" : "抜くカードを選ぶ ― 休憩";
                 d.buttons.Add(B("抜く", "remove", true));
             }
             if (pages > 1) d.buttons.Add(B("次の頁 " + (_termDeckPage + 1) + "/" + pages, "page"));
             d.buttons.Add(B(evRemove ? "抜かない" : "戻る", "back", !pick));
-            d.footer = upPick ? "強化した端子は名前に「＋」が付く。 同じ名前が 2 枚あれば 1 枚だけ強化する"
-                     : pick ? "抜いた端子は、 このランの山札から消える" : "名前の色は種類 (赤 = 攻撃・青 = 防御・金 = 充電・緑 = 補助)";
+            d.footer = upPick ? "強化したカードは名前に「＋」が付く。 同じ名前が 2 枚あれば 1 枚だけ強化する"
+                     : pick ? "抜いたカードは、 このランの山札から消える" : "名前の色は種類 (赤 = 攻撃・青 = 防御・金 = 充電・緑 = 補助)";
             d.onAction = (a, sel) =>
             {
                 if (a == "page") _termDeckPage = (_termDeckPage + 1) % pages;
@@ -678,14 +684,14 @@ namespace UI.Game2D
                 {
                     int at = deck.IndexOf(names[first + sel]);
                     if (gm.RestUpgradeTerminal(at)) { Game2DSfx.Play("ui_confirm"); _termPick = TermPick.None; }
-                    else modal.ShowError("強化できない (素材が足りない・強化できない端子)");
+                    else modal.ShowError("強化できない (素材が足りない・強化できないカード)");
                 }
                 else if (a == "remove" && pick && sel >= 0 && sel < cnt)
                 {
                     int at = deck.IndexOf(names[first + sel]);
                     bool ok = _termPick == TermPick.Shop ? gm.ShopRemoveTerminal(at) : evRemove ? gm.ResolveEventTerminalRemoval(at) : gm.RestRemoveTerminal(at);
                     if (ok) { Game2DSfx.Play("ui_confirm"); _termPick = TermPick.None; }
-                    else modal.ShowError("抜けない (所持金が足りない・山札が手札の枚数を下回る・最後の攻撃の端子)");
+                    else modal.ShowError("抜けない (所持金が足りない・山札が手札の枚数を下回る・最後の攻撃のカード)");
                 }
                 Refresh();
             };
@@ -935,11 +941,7 @@ namespace UI.Game2D
                 bool relicPair = ItemSystem.AxisPool.SkipGoldFor(offer) > 0;
                 string pickLine = offer.Count >= 3 ? "3 つから 1 つを受け取る。" : offer.Count == 2 ? "どちらか 1 つを受け取る。" : "受け取るか選ぶ。";
                 d.body = relicPair ? pickLine + " 見送ればゴールドになる。" : pickLine;
-                foreach (var id in offer)
-                {
-                    var data = ItemDatabase.Instance?.GetItem(id);
-                    d.Items.Add(new ModalItem { name = data != null ? data.displayName : id, desc = data?.description });
-                }
+                foreach (var id in offer) d.Items.Add(OfferRow(id));
                 AddInstabilityLine(gm, d, d.Items.Count);   // 不安定化: 択から選ぶ報酬の窓にも (2026-11-13)
                 d.buttons.Add(B("受け取る", "pick", true));
                 if (relicPair) d.buttons.Add(SkipButton(offer));

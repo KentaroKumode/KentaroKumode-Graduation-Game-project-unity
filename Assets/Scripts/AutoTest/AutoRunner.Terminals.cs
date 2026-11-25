@@ -137,7 +137,7 @@ namespace AutoTest
             }
             // 〈無害灯〉: 敵の直接攻撃で失う HP を無効 (1 ターン 1 回・使う臨界と返すダメージは見ない)
             if (sg.lamp) ws.takenMul = 0f;
-            // 〈石抜きの毒指輪〉の【起爆】(毒の BOT の規則・2026-11-21): 配線の後の毒 (端子の毒を足す) が 24 以上で攻撃の撃があれば、 起爆のダメージを軽減不可の分に足す
+            // 〈蓋付きの毒指輪〉の【起爆】(毒の BOT の規則・2026-11-21): 配線の後の毒 (端子の毒を足す) が 24 以上で攻撃の撃があれば、 起爆のダメージを軽減不可の分に足す
             //   (撃が当たるかは見ない・王冠の 1.5 倍は見ない)。 毒を 24 へ押し上げて殴る挿し方が選ばれる
             if (sg.ring && o.attackHits.Count > 0)
             {
@@ -260,25 +260,22 @@ namespace AutoTest
                     flat -= DeckRunLeaveHpCost * hpUnit;
             }
             // 【ジャスト防御】を狙う配線 (シールドの BOT の規則・2026-11-21): 本体と同じ判定 (CombatManager.JustGuardForecast) で成立するなら、 成立で働く品の得を足す。
-            //   shortcut: 先のターンの得は控えめな定数 (〈防人の軍標〉= 残りターンの半分に +35%・〈受け太刀の籠手〉+8 と〈静寂の構え〉の上乗せは次の攻撃の 7 割・〈英雄の意志〉のダウンは 1 ターンの与ダメの半分)
+            //   shortcut: 先のターンの得は控えめな定数 (〈防人の軍標〉= 残りターンの半分に + シールドの秘宝の数 × 9%・〈受け太刀の籠手〉+8 と〈静止の振り子〉の上乗せは次の攻撃の 7 割・〈英雄の意志〉のダウンは 1 ターンの与ダメの半分)
             if (sg.jgCtx != null && CombatManager.Instance != null && CombatManager.Instance.JustGuardForecast(sg.jgCtx, o, in env, out int jgE, out _))
             {
                 float per = DeckPerTurnDamage(in s, k);
                 if (sg.jgMirror) ws.extraDmg += jgE * (ItemSystem.PassiveSkills.Effects.MirrorBuckler.JustPct - ItemSystem.PassiveSkills.Effects.MirrorBuckler.Pct) / 100;
                 if (sg.jgBlade) ws.extraDmg += jgE * ItemSystem.PassiveSkills.Effects.KnightsTrump.ReturnPct / 100;
-                if (sg.jgStandard) sightFlat += ItemSystem.PassiveSkills.Effects.BorderGuardStandard.PctPerGuard / 100f * per * Math.Max(0, turns - 1) * 0.5f + DeckDrawDmg;
-                //   〈防人の軍標〉EchoNeed (2) 回目以降: 次のターンの撃がもう 1 回ずつ = 次の攻撃 1 回分 (2026-11-22)
-                if (sg.jgStandard && turns > 1 && ItemSystem.PassiveSkills.Effects.Shd.Count(sg.jgCtx, ItemSystem.PassiveSkills.Effects.Shd.JustGuardCountKey) + 1 >= ItemSystem.PassiveSkills.Effects.BorderGuardStandard.EchoNeed)
-                    sightFlat += per * DeckFutureAttackShare;
+                if (sg.jgStandard) sightFlat += ItemSystem.PassiveSkills.Effects.BorderGuardStandard.PctPerGuard(sg.jgCtx) / 100f * per * Math.Max(0, turns - 1) * 0.5f + DeckDrawDmg;
                 if (sg.jgCatch) sightFlat += ItemSystem.PassiveSkills.Effects.CatchBracer.Atk * DeckFutureAttackShare;
                 if (sg.jgSilent && o.attackDice == 0)
                     sightFlat += (ItemSystem.PassiveSkills.Effects.SilentStance.JustPct - ItemSystem.PassiveSkills.Effects.SilentStance.Pct) / 100f * per * DeckFutureAttackShare;
                 if (sg.jgHero && env.heavyTurn) sightFlat += 0.5f * per;
             }
-            // 臨界の BOT の規則 (2026-11-21): 本体と同じ HeatCore.Forecast (端子の臨界 → 5g の品の臨界 → ターンの終わりの攻撃に挿した出目の合計の半分 HeatCore.EndGain) で、
+            // 臨界の BOT の規則 (2026-11-21): 本体と同じ HeatCore.Forecast (端子の臨界 → 5g の品の臨界 → 攻撃に挿した出目の合計の半分 HeatCore.EndGain・全部 配線のとき = 攻撃の前・2026-11-25〜) で、
             //   この配線で起きる爆発のダメージ (敵の防御の後) を軽減不可の分に足す。 溜まりの増減は 臨界 1 = 爆発の基礎 ÷ 閾値 × DeckGaugeShare (爆発で 0 に戻る分は負で相殺)。
             //   配線の時に爆発する (= 攻撃の前に【過熱】) か既に【過熱】なら、 〈二度目の打金〉の撃ごとの攻撃 +6・〈烈刃〉の撃の最終与ダメ % を足す。
-            //   shortcut: 1 撃の与ダメは 1 ターンの見込み ÷ 撃の数・ボスの目盛りのひびと〈恒熱の炉壁〉のブロックは見ない
+            //   shortcut: 1 撃の与ダメは 1 ターンの見込み ÷ 撃の数・ボスの目盛りのひびと〈余熱の炉壁〉のブロックは見ない
             if (sg.heat.threshold > 0 || o.heat > 0 || o.heatGains.Count > 0)
             {
                 var hf = HeatCore.Forecast(sg.heat, o);
@@ -586,14 +583,14 @@ namespace AutoTest
             /// <summary>臨界の盤面の写し (Kw.HeatState・HeatCore.Forecast に渡す) / 【過熱】/ 前のターンに爆発した / 〈二度目の打金〉〈烈刃〉を持つ。</summary>
             public HeatCore.State heat;
             public bool overheated, burstLastTurn, secondStrike, fierceBlade;
-            /// <summary>〈石抜きの毒指輪〉: このターンまだ起爆していない (持っていなければ false)。 / 毒の品の旗・この戦闘で起爆した回数 (起爆のダメージの式 PoisonCore.Damage が読む)。</summary>
+            /// <summary>〈蓋付きの毒指輪〉: このターンまだ起爆していない (持っていなければ false)。 / 毒の品の旗・この戦闘で起爆した回数 (起爆のダメージの式 PoisonCore.Damage が読む)。</summary>
             public bool ring;
             public PoisonItems poisonItems;
             public int detonates, enemyMaxHp;
             /// <summary>出血の品の旗 (撃ごとの出血は Resolve の 5f が書く・〈血桜〉〈血の楔〉〈紅の搾り具〉〈涸れぬ血晶〉はここで見積もる) / 〈紅の搾り具〉をこのターンもう使った。</summary>
             public BleedItems bleedItems;
             public bool pressed;
-            /// <summary>【ジャスト防御】で働く品 (〈鏡返しの小盾〉〈重装兵の隠し刃〉〈防人の軍標〉〈受け太刀の籠手〉〈静寂の構え〉〈英雄の意志〉は強敵の時だけ)。
+            /// <summary>【ジャスト防御】で働く品 (〈鏡返しの小盾〉〈重装兵の隠し刃〉〈防人の軍標〉〈受け太刀の籠手〉〈静止の振り子〉〈英雄の意志〉は強敵の時だけ)。
             /// どれかを持っている時だけ <see cref="jgCtx"/> を入れる (挿し方ごとの見込みはこれが null なら飛ばす)。</summary>
             public bool jgMirror, jgBlade, jgStandard, jgCatch, jgSilent, jgHero;
             public ItemSystem.PassiveSkills.CombatContext jgCtx;
@@ -987,7 +984,7 @@ namespace AutoTest
             bool added = false;
             for (int i = 0; i < n; i++)
             {
-                // 待った後の HP (新しい判定では通常攻撃以外の削り downChip も引く ── 目盛りの下ならひびが入り、 次のターンに通常攻撃で割れる・猶予が切れれば弱いダウン)
+                // 待った後の HP (新しい判定では通常攻撃以外の削り downChip も引く ── 目盛りの下ならひびが入り、 次のターンに通常攻撃で割れる・猶予が切れればよろめき)
                 int ha = hp - Math.Min(GameLoop.GameHooks.DownBreak == DownBreakRule.AnyDamage ? outs[i].effDmg : Math.Max(outs[i].effDmg, outs[i].mainDmg + st.downChip), hp);
                 if (oldRule ? !DownKeepRules.HoldEligible(true, tele.turnsToHeavy, downAnyway, any, breaks[i], ha, notch, perTurn)
                             : !DownKeepRules.HoldEligibleChargeOrHeavy(true, toHeavyNext, downAnyway, any, breaks[i], ha, notch, perTurn)) continue;
@@ -1160,7 +1157,27 @@ namespace AutoTest
             if (slots == null) return default;      // null なら本体が既定 (TerminalWiring.Auto) で挿す
             var plan = WiringPlan.OfSlots(slots, targets, keep);
             plan.reboot = BotReboot; plan.overclock = true;      // 充電のコアアクション: 見積もり (下の Resolve) と同じ規則で本体も解く
+            plan.plugRank = BotPlugRank(slots, targets, rolls, tele);
             return plan;
+        }
+
+        /// <summary>撃の順 (2026-11-25) の BOT の規則: 攻撃の端子のうち撃の大きい端子から先に挿す (最初の 1 撃に乗る物 ── オーバークロック・〈抜き打ちの作法〉など ── を大きい撃へ)。
+        /// 撃の大きさは本体と同じ Resolve (場の順) で見る。 shortcut: 全部の順 (k!) を効用で比べない ── 効用 (DeckSums) は撃の順をほぼ見ないので差が出ない。 撃ごとの効用を持ったら順も列挙する。</summary>
+        private static int[] BotPlugRank(int[] slots, int[] targets, int[] rolls, MutualTurnTelegraph tele)
+        {
+            var cm = CombatManager.Instance; var deck = cm?.TerminalDeck;
+            if (deck == null || slots == null) return null;
+            var env = cm.TerminalEnvNow(ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context, tele.enemyAttackValue);
+            var o = TerminalCards.Resolve(deck.board, slots, rolls, env, deck.state.Clone(), targets, reboot: BotReboot, overclock: true);
+            int c = o.attackHits.Count; if (c < 2) return null;
+            var order = new List<int>(c);      // 撃の添字を、 大きい順 (同じなら場の順) に
+            for (int h = 0; h < c; h++) if (o.attackHitSlot.IndexOf(o.attackHitSlot[h]) == h) order.Add(h);      // 【再起動】の撃 (同じ端子の 2 つ目) は数えない
+            order.Sort((a, b) => o.attackHits[a] != o.attackHits[b] ? o.attackHits[b].CompareTo(o.attackHits[a]) : a.CompareTo(b));
+            var rank = new int[rolls.Length];
+            for (int i = 0; i < rank.Length; i++) rank[i] = -1;
+            for (int r = 0; r < order.Count; r++)
+                for (int i = 0; i < rank.Length; i++) if (o.slotOfDie[i] == o.attackHitSlot[order[r]]) rank[i] = r;
+            return rank;
         }
 
         /// <summary>充電のコアアクション (2026-11-21) の BOT の規則: 再起動は払える時はいつも、 対象はおまかせ (<see cref="ChargeCore.AutoValue"/> の最大)・
@@ -1292,7 +1309,7 @@ namespace AutoTest
             // 次のターンの端子の盤面 (充電は DeckSums と同じ順: 払う → 満たす → 足す・上限で止まる)
             var env = ev.env;
             env.hp = ns.myHp; env.shield = ns.myShield; env.enemyAttack = ns.enemyAtk;
-            env.pairAsTriple = false;      // 〈万象のゾロ目〉の格上げは今のターンの出目で決めた物 (次のターンは引いた出目で決まる・見込みは格上げなし)
+            env.pairAsTriple = false;      // 〈万象の賽盆〉の格上げは今のターンの出目で決めた物 (次のターンは引いた出目で決まる・見込みは格上げなし)
             int cap = (env.chargeCap > 0 ? env.chargeCap : 9999) + o.chargeCapAdd;      // 〈大導電＋〉は満たす前に上限を足す
             int ch = Math.Max(0, env.charge - o.chargeSpend);
             if (o.chargeFill) ch = Math.Max(ch, cap);

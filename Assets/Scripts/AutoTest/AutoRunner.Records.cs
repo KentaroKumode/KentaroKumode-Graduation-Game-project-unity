@@ -197,9 +197,9 @@ namespace AutoTest
             /// <summary>[計装 2026-11-19] このランの連鎖の深さの最大 / 同じ品が連鎖で 2 度以上働いた回数 / 不具合の網に掛かった回数。</summary>
             public int chainMaxDepth, chainRepeats, chainGuardHits;
             /// <summary>[計装 2026-11-21] このランの【再起動】/【オーバークロック】/【起爆】/【ジャスト防御】の回数 (CombatManager.RebootFired / OverclockFired / DetonateFired / JustGuardFired)。
-            /// 秘宝が出血を使った回数 / 〈百人切りの鉈〉の処刑の回数 (BleedSpendFired / BleedExecuteFired)。 臨界の爆発 / 〈柱折りの発破筒〉の正規のダウン (BurstFired / BurstBreakFired)。
-            /// 超過会心率が倍率になった会心 / 〈天眼の鍔〉の処刑 / 〈必殺の照準器〉のもう 1 回 (CritOverflowFired / CritExecuteFired / CritRefireFired)。
-            /// 使い捨ての端子を使った回数 / 山札の切り直し (DeckDisposeFired / DeckShuffleFired)。 役の成立 / 〈万象のゾロ目〉の格上げ (RoleFormedFired / RoleOmniFired)。
+            /// 秘宝が出血を使った回数 / 〈百人切りの鉈〉の処刑の回数 (BleedSpendFired / BleedExecuteFired)。 臨界の爆発 / 〈柱折りの発破筒〉でダウンを延ばした回数 (BurstFired / BurstBreakFired)。
+            /// 超過会心率が倍率になった会心 / 〈白濁の義眼〉の処刑 / 〈必殺の照準器〉のもう 1 回 (CritOverflowFired / CritExecuteFired / CritRefireFired)。
+            /// 使い捨ての端子を使った回数 / 山札の切り直し (DeckDisposeFired / DeckShuffleFired)。 役の成立 / 〈万象の賽盆〉の格上げ (RoleFormedFired / RoleOmniFired)。
             /// 見送り換金の回数 / 額 (AxisPool.RunSkips / RunSkipGold・額は〈銭皿〉込み・金の出入りは goldKeys の「見送り(…)」と totalCoinsSpent)。
             /// 武器の〈連刃〉の追撃 /〈処刑〉/〈画竜点睛〉/〈シールドバッシュ〉(CombatManager.WeaponChainFired ほか)。
             /// [2026-11-22] 戦闘報酬の択を取った / 見送った回数 (rewardPicks / rewardSkips)・主軸 (所持が単独 1 位の軸) を引いた回数 (AxisPool.RunMainAxisPicks・2026-11-22 neon 収束で主軸共鳴の重みは撤去 = 今は供給の集中の計装)。</summary>

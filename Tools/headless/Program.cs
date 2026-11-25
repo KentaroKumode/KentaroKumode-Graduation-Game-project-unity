@@ -17,6 +17,15 @@ namespace DiceBoundHeadless
             Console.OutputEncoding = new System.Text.UTF8Encoding(false);
             string logFile = Arg(args, "-logFile");
             if (args.Contains("--selftest")) return SelfTest.Run();
+            // ITT の合流 (エディタの ItemLearningParallelRunner.FinishItt と同じ再計算): --itt-recompute <合流した grant_runs.csv> <学習フォルダ> [版 (super など)]
+            int ir = Array.IndexOf(args, "--itt-recompute");
+            if (ir >= 0 && ir + 2 < args.Length)
+            {
+                AutoTest.GrantItt.Variant = ir + 3 < args.Length ? args[ir + 3] : "";
+                bool ok = AutoTest.GrantItt.Recompute(args[ir + 1], args[ir + 2]) && AutoTest.GrantItt.RecomputeSurvival(args[ir + 1], args[ir + 2]);
+                Console.WriteLine((ok ? "OK " : "NG ") + AutoTest.GrantItt.SurvivalSummary);
+                return ok ? 0 : 1;
+            }
             if (string.IsNullOrEmpty(Arg(args, AutoTest.ParallelSweep.RankMarginWorkerBootstrap.JobArgument)))
             {
                 Console.Error.WriteLine("usage: DiceBoundHeadless -logFile <log> " + AutoTest.ParallelSweep.RankMarginWorkerBootstrap.JobArgument + " <job.json>  |  --selftest");

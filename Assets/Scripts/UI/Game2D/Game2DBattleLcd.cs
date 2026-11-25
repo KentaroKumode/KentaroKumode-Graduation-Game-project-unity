@@ -30,7 +30,7 @@ namespace UI.Game2D
     /// 食われる分 = 予告の攻撃値 (ブロックの前・防御の後) + 〈業火〉の烈炎、 覆った分 = 見込みのブロック + シールド (旧画面の資源バーの「守り」と同じ値) を出す。
     /// 本当の見込みは本体に関数を足してから差し替える。</para>
     ///
-    /// <para>戦闘中は筐体の下の HP 帯とレーダーを常に隠す (<see cref="Game2DHud"/>)。 道具・〈有効活用〉・持ち物の窓は <see cref="BattleWindows"/>。
+    /// <para>戦闘中は航行の計器 (下の帯の HP・物資など) を引っ込める (<see cref="Game2DHud"/>)。 道具・〈有効活用〉・持ち物の窓は <see cref="BattleWindows"/>。
     /// BOT がランを動かしている間は戦闘の流れ (<see cref="Game2DBattleSim"/>) が動かないので、 この画面も出ない。</para>
     /// </summary>
     public class Game2DBattleLcd : MonoBehaviour
@@ -153,7 +153,7 @@ namespace UI.Game2D
             }
             _hoverCard = HandUp ? CardAt(d, -1) : -1;
             _hoverRelic = ExtrasUp ? RelicAt(d) : -1;
-            _hoverZone = In(d, HeadRect()) ? Zone.Head : In(d, OrbRect()) || In(d, RerollRect()) ? Zone.Orb : In(d, HpRect()) ? Zone.Hp : In(d, DeckRect()) ? Zone.Deck : Zone.None;
+            _hoverZone = In(d, HeadRect()) ? Zone.Head : ShowCharge && (In(d, OrbRect()) || In(d, RerollRect())) ? Zone.Orb : In(d, HpRect()) ? Zone.Hp : In(d, DeckRect()) ? Zone.Deck : Zone.None;
             if (Input.GetMouseButtonDown(0))
             {
                 int die = HandUp ? DieAt(d) : -1;
@@ -165,7 +165,7 @@ namespace UI.Game2D
                 }
                 if (_hoverCard >= 0) { if (sim.CanOperate) { _pressCard = _hoverCard; _pressDot = d; _moved = false; } return; }
                 if (ExtrasUp && In(d, InvRect())) { OpenInventory(); return; }
-                if (ExtrasUp && sim.CanOperate && (In(d, OrbRect()) || In(d, RerollRect()))) { if (sim.CanRerollNow) sim.Reroll(); else Game2DSfx.Play("ui_click"); return; }
+                if (ExtrasUp && sim.CanOperate && ShowCharge && (In(d, OrbRect()) || In(d, RerollRect()))) { if (sim.CanRerollNow) sim.Reroll(); else Game2DSfx.Play("ui_click"); return; }
                 if (ExtrasUp && sim.CanOperate)
                 {
                     if (In(d, SideRect(0))) { sim.AutoWire(); return; }
@@ -289,7 +289,7 @@ namespace UI.Game2D
 
         private static readonly string[] SideLabels = { "おまかせ", "道具", "逃げる" };
         /// <summary>k = 0〜2: おまかせ・道具・逃げる / −1: 【再起動】(〈二股の導線〉) / −2: 【オーバークロック】(〈雷鳴の太鼓〉)・仮置き (2026-11-21)。
-        /// −3: 【起爆】の見込み (〈石抜きの毒指輪〉〈劇毒の火薬庫〉・押す札ではない・2026-11-21)。 −4: 【ジャスト防御】の見込み (防御/予告+許容幅・押す札ではない・2026-11-21)。
+        /// −3: 【起爆】の見込み (〈蓋付きの毒指輪〉〈劇毒の火薬庫〉・押す札ではない・2026-11-21)。 −4: 【ジャスト防御】の見込み (防御/予告+許容幅・押す札ではない・2026-11-21)。
         /// −5: 出血の見込み (今の出血 + この配線の撃ごとの出血・押す札ではない・2026-11-21)。 −6: 臨界の爆発の見込み (今の臨界/閾値 + この配線の爆発の回数・押す札ではない・2026-11-21)。</summary>
         private string SideLabel(int k) => k == -1 ? _sim.RebootLabel : k == -2 ? _sim.OverclockLabel : k == -3 ? _sim.DetonateLabel : k == -4 ? _sim.JustGuardLabel : k == -5 ? _sim.BleedLabel : k == -6 ? _sim.HeatLabel : k == -7 ? _sim.CritLabel : k == -8 ? _sim.DeckLabel : k == -9 ? _sim.RoleLabel : k == 2 && _fleeArmed ? "本当に?" : SideLabels[k];
         private RectInt SideRect(int k)
@@ -412,14 +412,14 @@ namespace UI.Game2D
             else
             {
                 // ダウン・チャージ・攻撃しない天与 (予告の印が無いターン): 字で
-                string t = s.down ? (s.downWeak ? "ダウン(ひび) 攻撃なし" : "ダウン 攻撃なし")
+                string t = s.down ? (s.downWeak ? "よろめき 攻撃なし" : "ダウン 攻撃なし")
                          : s.charging ? (s.tenyo > 0 ? "チャージ " + TenyoHeavy.NameOf((TenyoHeavy.Gift)s.tenyo) : "チャージ 攻撃なし")
                          : s.heavyIn == 0 && s.tenyo > 0 && s.eatk == 0 ? TenyoHeavy.NameOf((TenyoHeavy.Gift)s.tenyo) + " 攻撃なし" : null;
                 if (t == null) { xr = cx + 4; }
                 else { int w = Game2DJpFont.Width(t); Txt(t, cx - w / 2, yI, Heavy); xr = cx - w / 2 + w + 3; }
             }
-            // 激化の段 (数字は出さない・小さな四角を 5 つ・点いている数が段)
-            for (int i = 0; i < BattleLcdLayout.PipMax; i++)
+            // 激化の段 (数字は出さない・小さな四角を 5 つ・点いている数が段)。 ラン指定で隠せる (チュートリアル・RunSpec.hide)
+            for (int i = 0; !RunSpec.Hides(RunSpec.HideEscalation) && i < BattleLcdLayout.PipMax; i++)
             {
                 int px = xr + i * BattleLcdLayout.PipStep, py = yI + 4;
                 Rect(px - 1, py - 1, BattleLcdLayout.PipSize + 2, BattleLcdLayout.PipSize + 2, Edge);
@@ -427,13 +427,13 @@ namespace UI.Game2D
             }
             // 前触れ (次のターン)・ダウン中の倍率・ひび・目盛りまで・不安定 (旧画面の予告の枠の下の行)
             var parts = new List<string>(3); bool hot = false;
-            if (s.downPending > 0) { parts.Add(s.downNextWeak ? "次 ダウン(ひび)" : "次 ダウン"); hot = true; }
+            if (s.downPending > 0) { parts.Add(s.downNextWeak ? "次 よろめき" : "次 ダウン"); hot = true; }
             else if (s.guardIn == 1 && s.heavyIn == 1) { parts.Add("次 構え・大技"); hot = true; }
             else if (s.heavyIn == 1) { parts.Add("次 大技"); hot = true; }
             else if (s.guardIn == 1) parts.Add("次 構え");
-            if (s.down && !s.downWeak) { parts.Add("被ダメ×" + BossDown.TakenMulCard.ToString("0.0#")); hot = true; }
-            else if (s.crackBreakTurn >= 0) { parts.Add(s.crackBreakTurn <= s.turn ? "ひび このターンで割れる" : "ひび あと" + (s.crackBreakTurn - s.turn + 1) + "ターン"); hot = true; }
-            else if (s.downNotchHp >= 0 && s.downCracks != null && s.downBroken < s.downCracks.Length && s.downCracks[s.downBroken] >= 0) { parts.Add("ひび 通常攻撃で割れる"); hot = true; }
+            if (s.down && (!s.downWeak || BossDown.TakenMulNow)) { parts.Add("被ダメ×" + (BossDown.TakenMulCard + BossDown.TakenBonusPctNow * 0.01f).ToString("0.0#")); hot = true; }
+            else if (s.crackBreakTurn >= 0) { parts.Add(s.crackBreakTurn <= s.turn ? "亀裂 このターンで割れる" : "亀裂 あと" + (s.crackBreakTurn - s.turn + 1) + "ターン"); hot = true; }
+            else if (s.downNotchHp >= 0 && s.downCracks != null && s.downBroken < s.downCracks.Length && s.downCracks[s.downBroken] >= 0) { parts.Add("亀裂 通常攻撃で割れる"); hot = true; }
             if (parts.Count > 0)
             {
                 string t = Game2DJpFont.Clip(string.Join("  ", parts), 220);
@@ -496,6 +496,7 @@ namespace UI.Game2D
             if (_handOff < BattleLcdLayout.HandHide && s.board.Count > 0) for (int k = 0; k < s.board.Count; k++) DrawCard(k);
             if (_spHand.tgt < 0.5f) DrawFloor();      // 床の出目は札と一緒には動かさない (振り始めから見せる)
             DrawDragGhost();
+            DrawHint();
             DrawTip();
         }
 
@@ -537,7 +538,8 @@ namespace UI.Game2D
                            + (_hs.toilCutPct > 0 ? (_hs.consOutgoingPct > 0 ? " " : "") + EventSystem.TimedEffects.BattleBoonRule.ToilName + "−" + _hs.toilCutPct + "%" : "");
                 Txt(Game2DJpFont.Clip(add, 78), BattleLcdLayout.LeftX + ox, BattleLcdLayout.ModY, Gold2);
             }
-            // 充電の玉: 中の数 = 今の充電・扇 = 充電 30 で満ちる (旧画面のランプ 10 個 × 3)
+            // 充電の玉: 中の数 = 今の充電・扇 = 充電 30 で満ちる (旧画面のランプ 10 個 × 3)。 出番の無い時 (山札に充電の端子が無く充電も 0) は玉も振り直すも出さない
+            if (!ShowCharge) return;
             int cx = BattleLcdLayout.OrbX + ox, cy = BattleLcdLayout.OrbY, r = BattleLcdLayout.OrbR;
             float frac = Mathf.Clamp01(s.charge / 30f);
             for (int j = -r - 1; j <= r + 1; j++)
@@ -601,6 +603,81 @@ namespace UI.Game2D
         }
 
         private bool AnyPlugged() { foreach (var v in _sim.slot) if (v >= 0) return true; return false; }
+
+        /// <summary>充電の玉と「振り直す」を出すか (2026-11-24・docs/GAME.md §23-35): 今の充電が 1 以上か、 ランの山札に充電の種類の端子がある時だけ。 出番の無いゲージは見せない。</summary>
+        private bool ShowCharge
+        {
+            get
+            {
+                if (_sim.charge > 0) return true;
+                var deck = GameManager.Instance?.Run?.terminalDeck;
+                if (deck == null) return true;      // ランが無い戦闘 (単体の確認) は今までどおり出す
+                foreach (var id in deck) if (TerminalCards.Get(id)?.kind == TerminalKind.Charge) return true;
+                return false;
+            }
+        }
+
+        // ── ラン指定の光る枠 (2026-11-24・チュートリアル・RunSpec.hints) ──
+        //   今の敵・ターン (またはチャージ / 大技のターン) に合う行の部品を、 並びの順に 1 つずつ光らせる。 済んだ部品は飛ばす:
+        //   出目 = どれかを挿した / 攻撃・防御・充電 = その種類の札に挿した / 振り直す = このターンに振り直した / 予告・充電の玉 = 1 秒見せた / 決める = 済まない (最後に置く)。
+        //   光るのは判断の間だけ。 点滅は 8 コマ/秒の拍で 5 コマ点いて 3 コマ消える。 字は出さない。
+        private string _hintKey; private float _hintAt;
+        private const float HintLookSec = 1f;
+
+        private void DrawHint()
+        {
+            var s = _sim; var foe = CombatManager.Instance?.CurrentEnemy;
+            if (!s.CanOperate || !HandUp || foe == null) return;
+            var parts = RunSpec.HintParts(foe.id, s.turn, s.charging, s.heavyIn == 0);
+            if (parts == null) return;
+            string key = foe.id + "/" + s.turn;
+            if (key != _hintKey) { _hintKey = key; _hintAt = Time.unscaledTime; }
+            float seen = Time.unscaledTime - _hintAt, look = 0f;
+            foreach (var p in parts)
+            {
+                bool done;
+                switch (p)
+                {
+                    case RunSpec.PartIntent: case RunSpec.PartOrb: look += HintLookSec; done = seen >= look; break;
+                    case RunSpec.PartDice: done = AnyPlugged(); break;
+                    case RunSpec.PartAttack: done = KindPlugged(TerminalKind.Attack); break;
+                    case RunSpec.PartBlock: done = KindPlugged(TerminalKind.Block); break;
+                    case RunSpec.PartCharge: done = KindPlugged(TerminalKind.Charge); break;
+                    case RunSpec.PartReroll: done = (ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context?.rerollsThisTurn ?? 0) > 0; break;
+                    default: done = false; break;
+                }
+                if (done) continue;
+                if ((int)(Time.unscaledTime * 8f) % 8 < 5)
+                    foreach (var r in HintRects(p)) { Frame1(r.x - 3, r.y - 3, r.width + 6, r.height + 6, Edge); Frame1(r.x - 2, r.y - 2, r.width + 4, r.height + 4, Amber); }
+                return;
+            }
+        }
+
+        /// <summary>種類 k の札に出目を挿しているか。</summary>
+        private bool KindPlugged(TerminalKind k)
+        {
+            foreach (var c in _sim.slot) if (c >= 0 && c < _sim.board.Count && TerminalCards.Get(_sim.board[c])?.kind == k) return true;
+            return false;
+        }
+
+        /// <summary>光らせる部品の範囲 (札は、 その種類の札を全部)。</summary>
+        private IEnumerable<RectInt> HintRects(string part)
+        {
+            TerminalKind k;
+            switch (part)
+            {
+                case RunSpec.PartDice: { var r = FocusRect(Part.Ports, false); if (r.HasValue) yield return r.Value; yield break; }
+                case RunSpec.PartIntent: yield return HeadRect(); yield break;
+                case RunSpec.PartOrb: yield return OrbRect(); yield break;
+                case RunSpec.PartReroll: yield return RerollRect(); yield break;
+                case RunSpec.PartGo: if (GoVisible) yield return GoRect(); yield break;
+                case RunSpec.PartAttack: k = TerminalKind.Attack; break;
+                case RunSpec.PartBlock: k = TerminalKind.Block; break;
+                case RunSpec.PartCharge: k = TerminalKind.Charge; break;
+                default: yield break;
+            }
+            for (int c = 0; c < _sim.board.Count; c++) if (TerminalCards.Get(_sim.board[c])?.kind == k) yield return CardRect(c);
+        }
 
         /// <summary>右上: 山と捨て札 (と外した札) の枚数。 左上: [持ち物] (仮)。</summary>
         private void DrawInvAndDeck()
@@ -698,6 +775,9 @@ namespace UI.Game2D
                 else if (q == 0 && !string.IsNullOrEmpty(d.condLabel)) Txt(d.condLabel, sr.x + 2, sr.y + 4, dim ? Half(kc) : kc, false);
             }
             if (stopped) Rect(r.x + 2, r.y + BattleLcdLayout.ArtY + BattleLcdLayout.ArtH / 2, r.width - 4, 1, StopMark);      // 止まっている = 横切る 1 本の線
+            //   撃の番号 (仮・2026-11-25): 攻撃の端子は挿した順に当たる。 絵の窓の左上に小さな札で 1 2 3 (液晶の字に ①②③ が無いので数字)
+            int hitNo = d.kind == TerminalKind.Attack && plugged ? sim.HitNo(s) : 0;
+            if (hitNo > 0) { int bx = r.x + BattleLcdLayout.ArtX + 1, by = r.y + BattleLcdLayout.ArtY + 1, bw = Game2DJpFont.Width(hitNo.ToString()) + 3; Box(bx, by, bw, Game2DJpFont.Cell + 2, Edge, Gold2); TxtC(hitNo.ToString(), bx + bw / 2, by + 1, Gold2, false); }
             // 札の上の印 (仮の字): 停止 / 対象・候補 / 不発 / 残す / 残り (2 個挿せる札)
             bool kept = sim.CanOperate && sim.IsKept(s);
             string label = stopped ? "停止" : cand ? (chosen ? "対象" : "候補") : plugged && !fires ? "不発" : kept ? "残す" : cap >= 2 && sim.Remaining(s) > 0 && plugged ? "残" + sim.Remaining(s) : null;

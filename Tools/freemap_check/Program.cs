@@ -27,6 +27,90 @@ static partial class T
         return s;
     }
 
+    /// <summary>「隣の点に来たら見つかる」(2026-11-24・作者の決定) の検算。 性質 4 種 × 縄張りを出ない / 旧い作り × 適当な歩き方で、
+    /// ① 見つかった (Detected) 手の終わりには、 追跡者は隣に居るか捕まえている (2 歩以上離れて見つかることは無い)
+    /// ② 隣へ寄せて待つと、 見つかるか捕まる (〈煙玉〉なし)
+    /// ③ 縄張りを出ない追跡者は、 手番が進んだ時にプレイヤーが縄張りの外なら追跡していない (外へ出たらすぐ見失う)
+    /// ④ 見えている (FoeVisible) のは、 素の視界の内か測量で書き込んだ点に居る時だけ
+    /// ⑤ 追跡者の状態は巡回か追跡だけ (警戒は廃止)・使い魔は本体と同じく隣で見つける (〈鏡の護符〉は重なった時だけ)</summary>
+    static void FoundReport()
+    {
+        var profiles = new[] { FoeProfile.Summoner, FoeProfile.Houndmaster, FoeProfile.Sprinter, FoeProfile.Brute };
+        int detects = 0, farDetect = 0, chaseOutside = 0, visBad = 0, modeBad = 0, ops = 0, adjTried = 0, adjMissed = 0, lost = 0;
+        string first = null;
+        foreach (var pr in profiles)
+            foreach (bool leash in new[] { true, false })
+                for (int salt = 1; salt <= 120; salt++)
+                {
+                    var s = Make(salt, pr, WeatherKind.None, new Wallet { Provision = 50, Hp = 999 }, leashed: leash, treasure: leash);
+                    if (!s.FoeAlive) continue;
+                    for (int k = 0; k < 120 && !s.Dead; k++)
+                    {
+                        if (s.InFight)
+                        {
+                            if (s.Contact == FreeMapSim.ContactKind.Body) s.ResolveBodyFled(); else s.ResolveFamiliarFight(true);
+                            continue;
+                        }
+                        int h = (salt * 7919 + k * 104729) & 0x7fffffff;
+                        var nb = s.Neighbors(s.Me);
+                        FreeMapEvent ev;
+                        int goal = k < 50 ? s.Home : s.Layout.goal;
+                        if (h % 9 == 0) ev = s.Survey();
+                        else if (h % 9 == 1) ev = s.Wait();
+                        else if (h % 9 == 2 && nb.Count > 0) ev = s.MoveTo(nb[(h / 9) % nb.Count]);
+                        else { int nx = s.StepToward(s.Me, goal); ev = nx == s.Me ? s.Wait() : s.MoveTo(nx); }
+                        ops++;
+                        int dist = s.FoeAlive ? s.HopsFrom(s.Me)[s.FoeNode] : int.MaxValue;
+                        if ((ev & FreeMapEvent.Detected) != 0) { detects++; if (!s.InFight && dist > FreeMapParams.DetectRange) { farDetect++; first ??= $"{pr.id} salt {salt} k {k} dist {dist}"; } }
+                        if ((ev & FreeMapEvent.FoeLost) != 0) lost++;
+                        if (leash && (ev & FreeMapEvent.TurnPassed) != 0 && !s.InFight && s.FoeAlive && !s.InTerritory(s.Me) && s.FoeMode == FoeMode.Chase) chaseOutside++;
+                        if (s.FoeMode != FoeMode.Patrol && s.FoeMode != FoeMode.Chase) modeBad++;
+                        if (s.FoeAlive)
+                        {
+                            bool want = dist <= s.VisionRange || s.Scouted[s.FoeNode] || s.InBeacon(s.FoeNode);
+                            if (s.FoeVisible != want) visBad++;
+                        }
+                    }
+                    // ② 隣へ寄せて待つ (召喚者は動かないので、 自分が中心の隣へ歩く)
+                    var t = Make(salt, pr, WeatherKind.None, new Wallet { Provision = 50, Hp = 999 }, leashed: leash, treasure: leash);
+                    if (!t.FoeAlive) continue;
+                    if (pr.foeSteps > 0) t.PullFoe(99);
+                    else
+                    {
+                        var dHome = t.HopsFrom(t.FoeNode);
+                        for (int g = 0; g < 40 && dHome[t.Me] > 1 && !t.InFight; g++) { int nx = t.StepToward(t.Me, t.FoeNode); if (nx == t.Me || nx == t.FoeNode) break; t.GrantFreeMoves(1); t.MoveTo(nx); }
+                    }
+                    if (t.InFight || t.HopsFrom(t.Me)[t.FoeNode] != 1 || (leash && !t.InTerritory(t.Me))) continue;
+                    adjTried++;
+                    var e2 = t.Wait();
+                    if ((e2 & (FreeMapEvent.Detected | FreeMapEvent.Caught)) == 0) { adjMissed++; first ??= $"adj {pr.id} salt {salt}"; }
+                }
+        Check(farDetect == 0 && chaseOutside == 0 && visBad == 0 && modeBad == 0 && adjTried > 0 && adjMissed == 0 && detects > 0 && lost > 0,
+              $"見つかる: 隣の点でだけ見つかる・隣で待てば見つかる・縄張りの外へ出たらすぐ見失う・見えるのは視界と測量の範囲だけ・状態は巡回か追跡 ({ops} 手・見つかった {detects}・見失った {lost} / 2 歩以上で見つかった {farDetect} / 隣で見つからない {adjMissed}/{adjTried} / 外で追跡中 {chaseOutside} / 見え方の違い {visBad} / 状態 {modeBad} {first})");
+
+        // 使い魔: 猟犬は隣で見つける (2 歩以上では向きを変えない)・〈鏡の護符〉(見つける距離 0) は重なった時だけ
+        {
+            int tried = 0, bad = 0;
+            for (int salt = 1; salt <= 120; salt++)
+            {
+                foreach (int see in new[] { FreeMapParams.FamiliarSee, 0 })
+                {
+                    var s = Make(salt, FoeProfile.Houndmaster, WeatherKind.None, new Wallet { Provision = 50, Hp = 999 });
+                    s.SetPerks(new FreeMapPerks { familiarSee = see });
+                    for (int k = 0; k < 60 && !s.Dead; k++)
+                    {
+                        if (s.InFight) { if (s.Contact == FreeMapSim.ContactKind.Body) s.ResolveBodyFled(); else s.ResolveFamiliarFight(true); continue; }
+                        int nx = s.StepToward(s.Me, k < 30 ? s.Home : s.Layout.goal);
+                        var ev = nx == s.Me ? s.Wait() : s.MoveTo(nx);
+                        tried++;
+                        if ((ev & FreeMapEvent.FamiliarContact) != 0 && s.Familiars.Count > 0 && s.Familiars.TrueForAll(f => f.pos != s.Me)) bad++;   // 接触は重なった時だけ
+                    }
+                }
+            }
+            Check(tried > 0 && bad == 0, $"使い魔: 接触は同じ点に重なった時だけ・〈鏡の護符〉の見つける距離 0 でも動く ({tried} 手・違い {bad})");
+        }
+    }
+
     /// <summary>縄張りを通らずに from から to へ向かう次の 1 歩 (通れなければ from)。</summary>
     static int StepAvoidingTerritory(FreeMapSim s, int from, int to)
     {
@@ -148,7 +232,7 @@ static partial class T
                 if (s.InFight) break;
             }
             var ev = s.PlaceLure();
-            bool alerted = (ev & FreeMapEvent.FoeAlerted) != 0 && s.FoeMode == FoeMode.Alert;
+            bool alerted = (ev & FreeMapEvent.FoeAlerted) != 0 && s.FoeMode == FoeMode.Patrol;   // 2026-11-24: 囮罠へ向かうのは巡回の中の寄り道 (警戒は廃止)
             Check(alerted, $"囮罠で気を引かれる (mode={s.FoeMode})");
             bool triggered = false;
             for (int i = 0; i < 15 && !s.InFight; i++)
@@ -158,17 +242,38 @@ static partial class T
             }
             Check(triggered || s.InFight, $"追跡者が囮罠を踏んで足止めされる (foeFreeze={s.FoeFreezeTurns}, caught={s.InFight})");
         }
-        // --- 照明・偵察 ---
+        // --- 測量 (2026-11-24・旧い照明と偵察を 1 つに) ---
+        //   1 手番・物資 0 (2026-11-25〜)・3 歩先までの種別と戦闘名を書き込み (Scouted)・その層の間消えない
         {
-            var s = Make(3, FoeProfile.Brute, WeatherKind.None);
-            int turn = s.Turn; int knownBefore = s.Known.Count(k => k);
-            s.UseFlare();
-            Check(s.Turn == turn && s.FlareOn && s.Known.Count(k => k) > knownBefore, "照明は手番を使わず視界を広げる");
-            s.Wait(); s.Wait(); s.Wait();
-            Check(!s.FlareOn, "照明は3手番で切れる");
-            var s2 = Make(3, FoeProfile.Brute, WeatherKind.None);
-            int t2 = s2.Turn; s2.Recon();
-            Check(s2.Turn == t2 + 1, "偵察は1手番");
+            int bad = 0, layers = 0; string first = null;
+            for (int salt = 1; salt <= 200; salt++)
+            {
+                var w = new Wallet { Provision = 5 };
+                var s = Make(salt, FoeProfile.Brute, WeatherKind.None, w, leashed: true);
+                for (int g = 0; g < salt % 5 && !s.InFight; g++) { s.GrantFreeMoves(1); s.MoveTo(s.Neighbors(s.Me)[0]); }
+                if (s.InFight) continue;
+                layers++;
+                int turn = s.Turn, p0 = w.Provision;
+                var d = s.HopsFrom(s.Me);
+                var ev = s.Survey();
+                if (s.InFight) continue;   // 手番が進んで追跡者に捕まった層は書き込みの検査から外す
+                bool ok = s.Turn == turn + 1 && w.Provision == p0 && (ev & FreeMapEvent.TurnPassed) != 0;
+                for (int i = 0; i < d.Length; i++)
+                    if (d[i] <= FreeMapParams.SurveyRange && !s.IsSunk(i) && !(s.Known[i] && s.Scouted[i])) ok = false;     // 3 歩以内は全部書き込む
+                    else if (d[i] > FreeMapParams.SurveyRange && d[i] != int.MaxValue && s.Scouted[i]) ok = false;           // 外は書き込まない (始めは何も書き込まれていない)
+                var scouted = (bool[])s.Scouted.Clone();
+                for (int k = 0; k < 20 && !s.InFight && !s.Dead; k++) { var nb = s.Neighbors(s.Me); if (k % 3 == 0) s.Wait(); else s.MoveTo(nb[k % nb.Count]); }
+                for (int i = 0; i < scouted.Length; i++) if (scouted[i] && !s.Scouted[i]) ok = false;                        // 消えない
+                var save = s.CaptureState();
+                var r = Make(salt, FoeProfile.Brute, WeatherKind.None, null, leashed: true); r.LoadState(save, null);
+                for (int i = 0; i < scouted.Length; i++) if (scouted[i] && !r.Scouted[i]) ok = false;                        // 中断セーブを跨いでも消えない
+                if (!ok) { bad++; first ??= "salt " + salt; }
+            }
+            var w0 = new Wallet { Provision = 0, Hp = 30 };
+            var z = Make(3, FoeProfile.Brute, WeatherKind.None, w0);
+            z.Survey();
+            Check(layers > 0 && bad == 0 && w0.Hp == 30,
+                  $"測量: 1 手番・物資も HP も使わず・{FreeMapParams.SurveyRange} 歩先までの種別と戦闘名を書き込み・その層の間 (中断セーブを跨いでも) 消えない ({layers} 層・違い {bad} {first})");
         }
         // --- 天候: 道が崩れる / 点が沈む ---
         foreach (var wx in new[] { WeatherKind.Crumble, WeatherKind.Sink })
@@ -229,20 +334,18 @@ static partial class T
         {
             var w = new Wallet { Provision = 5 };
             var s = Make(5, FoeProfile.Brute, WeatherKind.None, w);
-            s.UseFlare();
-            int p0 = w.Provision, t0 = s.Turn, foe0 = s.FoeNode, flare0 = s.FlareTurnsLeft;
+            int p0 = w.Provision, t0 = s.Turn, foe0 = s.FoeNode;
             s.GrantFreeMoves(2);
             Check(s.FreeMovesLeft == 2 && s.Me == s.Layout.start, "近道: 受けただけでは動かない (残り 2)");
             int a = s.Neighbors(s.Me)[0];
             var ev1 = s.MoveTo(a);
-            Check(w.Provision == p0 && s.Turn == t0 && s.FoeNode == foe0 && s.FlareTurnsLeft == flare0 && s.FreeMovesLeft == 1
+            Check(w.Provision == p0 && s.Turn == t0 && s.FoeNode == foe0 && s.FreeMovesLeft == 1
                   && (ev1 & FreeMapEvent.TurnPassed) == 0 && (ev1 & FreeMapEvent.Arrived) != 0,
-                  $"近道: ただの 1 歩は物資もターンも減らず、追跡者も照明も動かない (物資 {p0}->{w.Provision}, ターン {t0}->{s.Turn}, 残り {s.FreeMovesLeft})");
-            Check(s.HasTrace(a), "近道: ただの 1 歩も痕跡は残す");
+                  $"近道: ただの 1 歩は物資もターンも減らず、追跡者も動かない (物資 {p0}->{w.Provision}, ターン {t0}->{s.Turn}, 残り {s.FreeMovesLeft})");
             s.Wait();
             Check(s.FreeMovesLeft == 1 && s.Turn == t0 + 1, "近道: 待つでは減らない");
-            s.Recon();
-            Check(s.FreeMovesLeft == 1 && s.Turn == t0 + 2, "近道: 偵察でも減らない");
+            s.Survey();
+            Check(s.FreeMovesLeft == 1 && s.Turn == t0 + 2, "近道: 測量でも減らない (測量は待つと同じく 1 手番)");
             int t1 = s.Turn, p1 = w.Provision;
             s.MoveTo(s.Neighbors(s.Me)[0]);
             Check(s.FreeMovesLeft == 0 && s.Turn == t1 && w.Provision == p1, "近道: 2 回目もただで、残りは 0");
@@ -289,12 +392,7 @@ static partial class T
             Check(adj && (ev2 & FreeMapEvent.Caught) != 0 && s2.Contact == FreeMapSim.ContactKind.Body && s2.Turn == t3 && s2.PendingArrival == s2.Me,
                   $"近道: 追跡者の点へ踏み込むと、ターンを進めずに捕まる (隣={adj}, ターン {t3}->{s2.Turn})");
         }
-        // --- 魔石 ---
-        {
-            var s = Make(5, FoeProfile.Brute, WeatherKind.None);
-            var st = s.Stone();
-            Check(st.level >= 0 && st.level <= 3, $"魔石 level={st.level} {st.Text}");
-        }
+        FoundReport();
         // --- 縄張り (2026-11-12): 追跡者 (本体・使い魔) は縄張りの外へ出ない ---
         {
             var profiles = new[] { FoeProfile.Summoner, FoeProfile.Houndmaster, FoeProfile.Sprinter, FoeProfile.Brute };
@@ -401,7 +499,7 @@ static partial class T
                 }
                 if (s.FoeMode == FoeMode.Patrol) backToPatrol++;
             }
-            Check(tested > 0 && detected == 0 && leftT == 0 && lureTrig == 0 && (pr.foeSteps == 0 || backToPatrol == tested),   // 動かない召喚者は警戒のまま (旧い作りと同じ)
+            Check(tested > 0 && detected == 0 && leftT == 0 && lureTrig == 0 && backToPatrol == tested,   // 2026-11-24: 囮罠に気を引かれても巡回のまま (警戒は廃止・動かない召喚者も)
                 $"縄張りの外 ({pr.id}): 捕捉されない・外の囮罠は踏まない・囮罠が切れたら巡回へ戻る (試 {tested} / 捕捉 {detected} / 外へ {leftT} / 踏む {lureTrig} / 気を引かれた {alerted} / 巡回へ {backToPatrol})");
         }
         // --- 縄張りの宝 ---
@@ -537,19 +635,19 @@ static partial class T
                     var L = FreeMapGenerator.Generate(floor);
                     var s = new FreeMapSim(L, new Wallet(), true, pr, WeatherKind.None);
                     s.ConfigureTerritory(true, true); layers++;
-                    s.UseFlare();   // 照明で捕捉の歩数を伸ばしても (3 歩・召喚者は 5 歩)、 縄張りの外なら気づかれない
+                    s.Survey();   // 測量で番人の居場所が見えても、 縄張りの外なら気づかれない (旧: 照明で捕捉の歩数を伸ばしても)
                     for (int g = 0; g < 80 && s.Me != L.goal; g++)
                     {
                         int nx = s.StepAvoidingTerritory(s.Me, L.goal, out _, out int terr);
                         if (nx == s.Me || terr > 0) break;
-                        if (g % 6 == 2) s.UseFlare();
+                        if (g % 6 == 2) s.Survey();
                         var ev = s.MoveTo(nx);
                         if (s.InTerritory(s.Me)) stepped++;
                         if ((ev & (FreeMapEvent.Detected | FreeMapEvent.Caught | FreeMapEvent.FamiliarContact | FreeMapEvent.SmokeUsed)) != 0 || s.FoeMode == FoeMode.Chase) { noticed++; break; }
                     }
                     if (s.Me == L.goal) reached++;
                 }
-            Check(reached == layers && noticed == 0 && stepped == 0, $"避ける道を歩く ({pr.id}・照明つき): 全層で縄張りを踏まずに終点へ・気づかれない ({reached}/{layers} 到達 / 気づかれた {noticed} / 踏んだ {stepped})");
+            Check(reached == layers && noticed == 0 && stepped == 0, $"避ける道を歩く ({pr.id}・測量つき): 全層で縄張りを踏まずに終点へ・気づかれない ({reached}/{layers} 到達 / 気づかれた {noticed} / 踏んだ {stepped})");
         }
         BypassReport();
         AshBaseReport();

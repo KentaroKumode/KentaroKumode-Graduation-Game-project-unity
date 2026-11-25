@@ -165,11 +165,28 @@ namespace CombatSystem
         /// <summary>目を上書きした (天与の指輪・避雷針) ダイスは、 引く前の目が無いので 0 に戻す。</summary>
         private void ClearSlothCut(int i) { if (i >= 0 && i < _slothCut.Length) _slothCut[i] = 0; }
 
-        /// <summary>役の判定に使う目 = 今の目 + 怠惰で引いた量 (引いていなければ <paramref name="dice"/> そのもの)。 ResolveRoles・〈万象のゾロ目〉・端子の解決 (TerminalEnv.roleDiceCut)・BOT・画面が同じ判定を通す。</summary>
+        /// <summary>役の判定に使う目 = 今の目 + 怠惰で引いた量 (引いていなければ <paramref name="dice"/> そのもの)。 ResolveRoles・〈万象の賽盆〉・端子の解決 (TerminalEnv.roleDiceCut)・BOT・画面が同じ判定を通す。</summary>
         public int[] RoleDice(int[] dice) => TerminalCards.RoleDiceOf(dice, _slothCut, _slothAt);
 
         /// <summary>[テスト用] 怠惰で引いた量の今の値。</summary>
         internal int[] SlothCutNow => _slothCut;
+
+        /// <summary>ラン指定 (GameLoop.RunSpec.dice) が今の敵・ターンの最初の出目を決めていれば、 その目にする (止まった面も同じ目の面へ合わせる・振り直した目は触らない)。
+        /// 指定が無ければ何もしない。 怠惰の引き算の記録も「引いていない」に戻す。</summary>
+        private void ForceRunSpecDice(ItemSystem.PassiveSkills.CombatContext ctx, int[] playerDice, int[] playerFaceIdx)
+        {
+            var forced = GameLoop.RunSpec.ForcedDice(currentEnemy?.id, ctx?.currentTurn ?? 0);
+            if (forced == null || playerDice == null) return;
+            var faces = ctx.equippedDiceFaces;
+            for (int i = 0; i < playerDice.Length && i < forced.Length; i++)
+            {
+                playerDice[i] = forced[i];
+                ClearSlothCut(i);
+                if (i < _slothAt.Length) _slothAt[i] = forced[i];
+                int fi = faces != null ? Array.IndexOf(faces, forced[i]) : -1;
+                if (fi >= 0 && playerFaceIdx != null && i < playerFaceIdx.Length) playerFaceIdx[i] = fi;
+            }
+        }
 
         /// <summary>[測定 2026-11-11] ヴェスカ連戦の間、 出目を <see cref="GameLoop.GameHooks.VescaDiceForce"/> に固定する (0 なら何もしない)。
         /// rerolled が null なら全部、 そうでなければ振り直したダイスだけ。</summary>
@@ -197,7 +214,7 @@ namespace CombatSystem
         /// <summary>この戦闘で振り直しを 1 回でもした (無料も・ctx.accumulatedValues・〈擦り切れた賽袋〉の「戦闘の最初の振り直し」)。</summary>
         private const string RerolledKey = "role.rerolled";
 
-        /// <summary>このターン、 次の振り直しに使える無料の回数 (2026-11-21): 前のターンから持ち越した無料 (〈特別・対〉〈鏡合わせの盤〉〈揃いの拍子木〉・
+        /// <summary>このターン、 次の振り直しに使える無料の回数 (2026-11-21): 前のターンから持ち越した無料 (〈特別・対〉〈曇りの合わせ鏡〉〈揃いのメトロノーム〉・
         /// currentBuffs の <see cref="YachtRoleEffects.FreeRerollKey"/>) と、 〈擦り切れた賽袋〉(この戦闘でまだ振り直していなければ 1)。
         /// 本体の支払い (<see cref="RerollPhase"/>)・画面の費用・BOT の振り直しの方策が同じ関数を読む。</summary>
         public static int FreeRerollsLeft(CombatContext ctx)
@@ -438,7 +455,7 @@ namespace CombatSystem
             bool mirror = AxisRules.Owns(roleRun, GameLoop.ItemIds.RoleMirror),
                  fate = AxisRules.Owns(roleRun, GameLoop.ItemIds.RoleFate);
             var tier = GameLoop.DiceFaceParts.Tier.T3;   // Tier は使わない (ADR-0015)。 実績の呼び手のために渡すだけ
-            // 〈宿命の刻み目〉: 前のターンに立ったゾロ目・連なり、 または 2 ターン続けて立った役の効果が、 このターンにももう 1 回働く
+            // 〈宿命の音叉〉: 前のターンに立ったゾロ目・連なり、 または 2 ターン続けて立った役の効果が、 このターンにももう 1 回働く
             //   (役が立ったのではないので数えない・出来事も鳴らさない・2026-11-22 neon 収束〜・その前はゾロ目だけ)。
             if (fate)
             {
@@ -447,7 +464,7 @@ namespace CombatSystem
                 if (prev >= 0)
                 {
                     YachtRoleEffects.Apply((RoleKind)prev, tier, ctx, ref outcome);
-                    if (Debug.unityLogger.logEnabled) Debug.Log($"[宿命の刻み目] 前のターンの役〈{YachtRoles.NameOf((RoleKind)prev)}〉の効果がもう 1 回働く");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[宿命の音叉] 前のターンの役〈{YachtRoles.NameOf((RoleKind)prev)}〉の効果がもう 1 回働く");
                 }
             }
 
@@ -458,11 +475,11 @@ namespace CombatSystem
                 YachtRoleEffects.FormedCount[(int)k]++;
                 // T4-C〈凶運〉: このランで封印されている役は成立しても効かない。
                 if ((ctx.sealedRoleMask & (1 << (int)k)) != 0) continue;
-                // 〈万象のゾロ目〉: このターン 2 個そろいをゾロ目として扱う (振り直しの後に DecideOmniPair が決めた・端子の解決も同じ TerminalCards.UpgradePair)
+                // 〈万象の賽盆〉: このターン 2 個そろいをゾロ目として扱う (振り直しの後に DecideOmniPair が決めた・端子の解決も同じ TerminalCards.UpgradePair)
                 k = TerminalCards.UpgradePair(k, OmniPairNow(ctx), ctx.sealedRoleMask);
 
-                YachtRoleEffects.Apply(k, tier, ctx, ref outcome);   // 〈万象のゾロ目〉の「ゾロ目の効果が 2 回働く」は answer13 で削除 (格上げだけ)
-                // 〈鏡合わせの盤〉: 2 個そろいなら、 1 つ小さい目の 2 個そろいの効果も働く (1 の 2 個そろいなら、 次のターンの無料の振り直し +1)
+                YachtRoleEffects.Apply(k, tier, ctx, ref outcome);   // 〈万象の賽盆〉の「ゾロ目の効果が 2 回働く」は answer13 で削除 (格上げだけ)
+                // 〈曇りの合わせ鏡〉: 2 個そろいなら、 1 つ小さい目の 2 個そろいの効果も働く (1 の 2 個そろいなら、 次のターンの無料の振り直し +1)
                 if (mirror && !YachtRoles.IsBig(k)) MirrorPair(k, ctx, tier, ref outcome);
                 if (fate && (YachtRoles.IsBig(k) || fateStreak)) ctx.accumulatedValues[FateRoleKey] = (int)k + 1;
                 ctx.firedRolesThisTurn.Add(k);
@@ -475,7 +492,7 @@ namespace CombatSystem
                 // 役が立った (2026-11-21・段 1-f): 量 = 強さ (2 個そろい 1 / ゾロ目・連なり 2)。 OnWired の前なので、 品の攻撃 +N は撃ごとに乗る
                 ItemSystem.PassiveSkills.Keywords.Kw.Raise(ctx, PassiveSkillTrigger.OnRoleFired, YachtRoles.Strength(k));
             }
-            // 役の回数と同じ目の役が続いたターン (役の軸の品が読む・TerminalBattleState)。 〈宿命の刻み目〉〈鏡合わせの盤〉の重ねた効果は数えない
+            // 役の回数と同じ目の役が続いたターン (役の軸の品が読む・TerminalBattleState)。 〈宿命の音叉〉〈曇りの合わせ鏡〉の重ねた効果は数えない
             if (_deck != null)
             {
                 int formed = ctx.firedRolesThisTurn.Count;
@@ -496,25 +513,25 @@ namespace CombatSystem
             return outcome;
         }
 
-        /// <summary>〈宿命の刻み目〉(2026-11-21): 前のターンに立った役 ((int)RoleKind + 1・0 = なし・ctx.accumulatedValues)。</summary>
+        /// <summary>〈宿命の音叉〉(2026-11-21): 前のターンに立った役 ((int)RoleKind + 1・0 = なし・ctx.accumulatedValues)。</summary>
         private const string FateRoleKey = "role.fate";
-        /// <summary>[persistent・戦闘で 0 から] 〈宿命の刻み目〉: 役が立った直近のターンの番号 (「2 ターン続けて立った役」・2026-11-22 neon 収束)。</summary>
+        /// <summary>[persistent・戦闘で 0 から] 〈宿命の音叉〉: 役が立った直近のターンの番号 (「2 ターン続けて立った役」・2026-11-22 neon 収束)。</summary>
         private const string FateLastTurnKey = "role.fateLast";
-        /// <summary>〈万象のゾロ目〉(2026-11-21): 2 個そろいをゾロ目として扱うと決めたターンの番号 (ctx.accumulatedValues) / 乱数のキー (専用) /
+        /// <summary>〈万象の賽盆〉(2026-11-21): 2 個そろいをゾロ目として扱うと決めたターンの番号 (ctx.accumulatedValues) / 乱数のキー (専用) /
         /// この戦闘の役の回数がこれ以上なら確率 <see cref="OmniPctMid"/>・<see cref="OmniNeedFull"/> 以上なら 100%。</summary>
         private const string OmniTurnKey = "role.omniTurn";
         public const string OmniRngKey = "role.omni";
         public const int OmniNeedMid = 3, OmniNeedFull = 5;   // final6: 3 / 5 → 4 / 7 → answer9: 2 / 4 → answer14: 3 / 5
         public const float OmniPctMid = 0.5f;
 
-        /// <summary>〈万象のゾロ目〉: この戦闘の役の回数 <paramref name="roles"/> での、 2 個そろいをゾロ目として扱う確率。</summary>
+        /// <summary>〈万象の賽盆〉: この戦闘の役の回数 <paramref name="roles"/> での、 2 個そろいをゾロ目として扱う確率。</summary>
         public static float OmniPairChance(int roles) => roles >= OmniNeedFull ? 1f : roles >= OmniNeedMid ? OmniPctMid : 0f;
 
-        /// <summary>〈万象のゾロ目〉: このターン 2 個そろいをゾロ目として扱う (<see cref="DecideOmniPair"/> が決めた)。 端子の盤面 (TerminalEnv.pairAsTriple) と ResolveRoles が読む。</summary>
+        /// <summary>〈万象の賽盆〉: このターン 2 個そろいをゾロ目として扱う (<see cref="DecideOmniPair"/> が決めた)。 端子の盤面 (TerminalEnv.pairAsTriple) と ResolveRoles が読む。</summary>
         public static bool OmniPairNow(CombatContext ctx)
             => ctx != null && ctx.currentTurn > 0 && (int)ctx.GetAccumulated(OmniTurnKey) == ctx.currentTurn;
 
-        /// <summary>〈万象のゾロ目〉(2026-11-21): 出目が決まった所 (振り直しと出目を書き換える効果の後・配線の前) で、 立つ役が 2 個そろいなら、
+        /// <summary>〈万象の賽盆〉(2026-11-21): 出目が決まった所 (振り直しと出目を書き換える効果の後・配線の前) で、 立つ役が 2 個そろいなら、
         /// この戦闘で役が 3 回以上成立した後は確率 50%・5 回以上なら 100% (answer14・answer9: 2 / 4・final6: 4 / 7) でこのターンそれをゾロ目として扱う。 配線の前に決めるので、 配線の判断 (人・BOT) はその結果を見て挿せる。
         /// 100% の時は乱数を引かない。</summary>
         private void DecideOmniPair(CombatContext ctx, int[] dice)
@@ -526,10 +543,10 @@ namespace CombatSystem
             if (p <= 0f || (p < 1f && !GameLoop.GameRng.Chance(p, OmniRngKey))) return;
             RoleOmniFired++;      // [計装]
             ctx.accumulatedValues[OmniTurnKey] = ctx.currentTurn;
-            if (Debug.unityLogger.logEnabled) Debug.Log($"[万象のゾロ目] 〈{YachtRoles.NameOf(k.Value)}〉をゾロ目として扱う ({p * 100f:0}%)");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[万象の賽盆] 〈{YachtRoles.NameOf(k.Value)}〉をゾロ目として扱う ({p * 100f:0}%)");
         }
 
-        /// <summary>〈鏡合わせの盤〉(2026-11-21): 2 個そろい <paramref name="k"/> の、 1 つ小さい目の 2 個そろいの効果を働かせる (役が立ったのではない ── 数えない)。
+        /// <summary>〈曇りの合わせ鏡〉(2026-11-21): 2 個そろい <paramref name="k"/> の、 1 つ小さい目の 2 個そろいの効果を働かせる (役が立ったのではない ── 数えない)。
         /// 1 の 2 個そろいなら、 次のターンの無料の振り直し +1・次のターンのブロック +<see cref="MirrorOneBlock"/>。 1 つ小さい目の役が〈凶運〉で封じられていれば働かない。</summary>
         public const int MirrorOneBlock = 6;
         private static void MirrorPair(RoleKind k, CombatContext ctx, GameLoop.DiceFaceParts.Tier tier, ref RoleOutcome outcome)
@@ -539,13 +556,13 @@ namespace CombatSystem
             {
                 YachtRoleEffects.AddNextTurn(ctx, YachtRoleEffects.FreeRerollKey, 1);
                 YachtRoleEffects.AddNextTurn(ctx, YachtRoleEffects.BlockNextKey, MirrorOneBlock);
-                if (Debug.unityLogger.logEnabled) Debug.Log($"[鏡合わせの盤] 特別・対 → 次のターンの無料の振り直し +1・ブロック +{MirrorOneBlock}");
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[曇りの合わせ鏡] 特別・対 → 次のターンの無料の振り直し +1・ブロック +{MirrorOneBlock}");
                 return;
             }
             var m = YachtRoles.Of(face - 1, false);
             if ((ctx.sealedRoleMask & (1 << (int)m)) != 0) return;
             YachtRoleEffects.Apply(m, tier, ctx, ref outcome);
-            if (Debug.unityLogger.logEnabled) Debug.Log($"[鏡合わせの盤] 〈{YachtRoles.NameOf(k)}〉に重ねて〈{YachtRoles.NameOf(m)}〉の効果");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[曇りの合わせ鏡] 〈{YachtRoles.NameOf(k)}〉に重ねて〈{YachtRoles.NameOf(m)}〉の効果");
         }
 
         // 端子の状態のうち、 戦闘の情報 (accumulatedValues) を通して渡すキー。 **フィールドを増やさない**
@@ -670,7 +687,7 @@ namespace CombatSystem
             return Math.Max(1, ctx.currentTurn - delay);
         }
 
-        /// <summary>今のエスカレーションの段階 (〈鎮静香〉の遅延・段階の戻しを差し引いた、 予告に出る段階・〈逆境の砂時計〉が読む・2026-11-21)。</summary>
+        /// <summary>今のエスカレーションの段階 (〈鎮静香〉の遅延・段階の戻しを差し引いた、 予告に出る段階・〈背水の錨〉が読む・2026-11-21)。</summary>
         public int EscalationStageNow(CombatContext ctx) => Escalation.EffectiveStage(EscalationTurn(ctx));
 
         private void SyncHPFromContext(CombatContext ctx)

@@ -15,7 +15,7 @@ namespace GameLoop
     /// 通常の戦闘 (使い魔・イベントの戦闘) に勝つ → <see cref="InstabilitySource.Battle"/>・
     /// イベントで持ち物が増える (ゴールド・消耗品・素材・物資・品・フラグ・Instability.CountsAsEventGain) → <see cref="InstabilitySource.EventGain"/> (秘宝を得た時は数えない)・
     /// 戦闘のエスカレーションの段が上がる → <see cref="InstabilitySource.Escalation"/> (ボス戦は除く)・
-    /// イベントの「ターン+N」→ <see cref="InstabilitySource.EventTurns"/>。 歩く・待つ・偵察・嵐を動かす は <see cref="FreeMapSim"/> の中で溜まる。</para>
+    /// イベントの「ターン+N」→ <see cref="InstabilitySource.EventTurns"/>。 歩く・待つ・嵐を動かす は <see cref="FreeMapSim"/> の中で溜まる。</para>
     ///
     /// <para>溜まらない: 店で買う・交換マス・強盗・偽の商人・逃げた戦闘・負けて救済された戦闘・ボス戦・端子の報酬・休憩・照明・〈補給線〉・近道の 1 歩。</para>
     /// </summary>
@@ -133,10 +133,10 @@ namespace GameLoop
 
         /// <summary>〈嵐読みの風見鶏〉の量 (仮)。</summary>
         public const int VaneGold = 8, VaneCalm = 3;
-        /// <summary>〈避雷の天幕〉: 層ごとに半分にする回数 (仮)。</summary>
+        /// <summary>〈防嵐の天幕〉: 層ごとに半分にする回数 (仮)。</summary>
         public const int TentActions = 3;
 
-        /// <summary>〈避雷の天幕〉: 層に入ってから最初の <see cref="TentActions"/> 回の「取る」(宝・秘宝・戦闘の勝ち・イベントの得) で溜まる量を半分 (切り捨て) にする、 引く分。
+        /// <summary>〈防嵐の天幕〉: 層に入ってから最初の <see cref="TentActions"/> 回の「取る」(宝・秘宝・戦闘の勝ち・イベントの得) で溜まる量を半分 (切り捨て) にする、 引く分。
         /// 歩く・イベントのターン・嵐を動かす・エスカレーションは行動ではないので数えない。 不安定化の時計が動いている時だけ呼ばれる。</summary>
         private int TentCut(InstabilitySource src, int n)
         {

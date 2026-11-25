@@ -286,7 +286,7 @@ namespace GameLoop
                     RunFreeMapOp(s =>
                     {
                         s.GrantFreeMoves(e.amount);
-                        Log($"イベント: 時限バフ「近道」+{e.amount}（残り {s.FreeMovesLeft} 回・移動の物資とターンを使わない・待つ・偵察には効かない・層を出ると消える）");
+                        Log($"イベント: 時限バフ「近道」+{e.amount}（残り {s.FreeMovesLeft} 回・移動の物資とターンを使わない・待つには効かない・層を出ると消える）");
                         return MapSystem.FreeMove.FreeMapEvent.None;
                     });
                     break;

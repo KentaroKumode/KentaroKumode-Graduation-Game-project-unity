@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using GameLoop;
+using ItemSystem;
 
 namespace CombatSystem
 {
@@ -13,8 +15,8 @@ namespace CombatSystem
     ///
     /// <para><b>ほかの所にある賽</b>: 目利き = 振り直し (CombatManager.RerollPhase・残す目)・逆巻き = エスカレーションの段階 (ApplyRewind・Escalation.StageOffset)・
     /// 繋ぎ = 残す印 (TerminalDeckState.KeepFromMarks)・時計 = 常設の〈時計〉の端子 (TerminalIds.Clock)・
-    /// 連なり = 役〈連なり〉(YachtRoles / YachtRoleEffects)。 呪物 = 店とイベントの秘宝の LEGENDARY の重み (<see cref="LegendaryOfferMul"/>) と
-    /// 秘宝を手に入れた時の最大 HP (<see cref="OnPassiveAcquired"/>)。 効果の数値はすべて仮の値 (items.json の説明文と同じ)。</para>
+    /// 連なり = 役〈連なり〉(YachtRoles / YachtRoleEffects)。 呪物 = 店以外の秘宝の提示を呪いの LEGENDARY に置き換える (<see cref="MaybeCurse"/>) と
+    /// 呪いの秘宝を手に入れた時の最大 HP (<see cref="OnPassiveAcquired"/>)。 効果の数値はすべて仮の値 (items.json の説明文と同じ)。</para>
     ///
     /// <para><b>出目は書き換えない</b> (ADR-0015 の 2)。 ここは出目が決まって端子に挿された後の上乗せだけ。</para>
     /// </summary>
@@ -39,25 +41,51 @@ namespace CombatSystem
         /// <summary>古銭: そのターンの役〈癒し〉(⑧の役) の回復量 +N (YachtRoleEffects の〈癒し〉が読む・1 回働くごと)。</summary>
         public const int OldCoinHeal = 1;
         public const int OldCoinFace = 8;
-        /// <summary>呪物の賽 (ADR-0016・2026-11-20): 店とイベントで秘宝を選ぶ時の LEGENDARY の重みに掛ける数 (他のレア度の重みはそのまま)。</summary>
-        public const float CursedLegendaryMul = 3f;
-        /// <summary>呪物の賽: LEGENDARY の秘宝を手に入れるたびに減る最大 HP (このランの間・1 より下にはならない・2026-11-20: 旧 秘宝なら何でも −3)。</summary>
-        public const int CursedMaxHpPerLegendary = 5;
+        /// <summary>呪物の賽 (2026-11-25 作者の決定・旧 2026-11-20 の LEGENDARY の重み ×3 と「LEGENDARY を手に入れるたび −5」は撤去):
+        /// 店以外で決まった秘宝が GOLD 以下なら、 確率「その場所の LEGENDARY の出やすさ × これ」で呪いの LEGENDARY に変わる。</summary>
+        public const float CursedChanceMul = 2f;
+        /// <summary>呪物の賽: 呪いの秘宝を手に入れた時に減る最大 HP (このランの間・1 より下にはならない)。 ふつうに出た LEGENDARY は減らない。</summary>
+        public const int CursedMaxHp = 5;
+        /// <summary>提示の行に出す呪いの印と、 その説明 (報酬・品を選ぶ・開幕の秘宝の窓)。</summary>
+        public const string CurseMark = "呪い";
+        public static readonly string CurseNote = "呪い: 手に入れると最大 HP −" + CursedMaxHp + "（このランの間）。";
 
         /// <summary>役〈癒し〉の回復量に足す分 (古銭の賽なら <see cref="OldCoinHeal"/>・それ以外 0)。</summary>
         public static int RoleHealBonus(RunState run) => EquippedDie.IdOf(run) == DieIds.OldCoin ? OldCoinHeal : 0;
 
-        /// <summary>店とイベントで秘宝を選ぶ時の LEGENDARY の重みの倍率 (呪物の賽なら <see cref="CursedLegendaryMul"/>・それ以外 1)。 戦闘の報酬には掛けない。</summary>
-        public static float LegendaryOfferMul(RunState run) => EquippedDie.IdOf(run) == DieIds.Cursed ? CursedLegendaryMul : 1f;
+        /// <summary>その品が今、 呪いの付いた提示か (提示の窓・BOT の値踏みが読む)。</summary>
+        public static bool IsCursedOffer(RunState run, string itemId)
+            => run?.cursedOfferIds != null && !string.IsNullOrEmpty(itemId) && run.cursedOfferIds.Contains(itemId);
 
-        /// <summary>秘宝 (category Passive) を手に入れた (PassiveAddHelper.AddPassiveItem)。 呪物の賽で、 LEGENDARY なら最大 HP −<see cref="CursedMaxHpPerLegendary"/>。</summary>
+        /// <summary>呪物の賽の置き換え (2026-11-25)。 店以外で秘宝の提示が 1 つ決まった後に呼ぶ。 <paramref name="itemId"/> = ふつうに決まった品。
+        /// 呪物の賽を装備していて、 決まった秘宝が GOLD 以下なら、 確率 <see cref="CursedChanceMul"/> × <paramref name="legendaryChance"/> で
+        /// <paramref name="pool"/> の LEGENDARY の秘宝 (<paramref name="alsoExclude"/> と同じ提示の品を除く) に替え、 呪いの印を付けて返す。
+        /// 乱数は専用のキー (<paramref name="key"/>.curse / .curse.pick) だけ ── 呪物の賽でない時は引かない (ほかの抽選の列は動かない)。</summary>
+        public static string MaybeCurse(RunState run, string itemId, List<CompleteItemData> pool, float legendaryChance, string key, ICollection<string> alsoExclude = null)
+        {
+            if (run == null || string.IsNullOrEmpty(itemId)) return itemId;
+            if (run.cursedOfferIds == null) run.cursedOfferIds = new HashSet<string>();
+            run.cursedOfferIds.Remove(itemId);   // 前の提示で呪いが付いて見送られた品が、 今度はふつうに出た
+            if (EquippedDie.IdOf(run) != DieIds.Cursed || pool == null) return itemId;
+            var d = ItemDatabase.Instance?.GetItem(itemId);
+            if (d == null || !d.IsPassive || d.rarity > ItemRarity.GOLD) return itemId;
+            if (GameRng.Value(key + ".curse") >= CursedChanceMul * legendaryChance) return itemId;
+            var legs = pool.FindAll(it => it != null && it.IsPassive && it.rarity == ItemRarity.LEGENDARY && it.internalName != itemId
+                                          && (alsoExclude == null || !alsoExclude.Contains(it.internalName)));
+            if (legs.Count == 0) return itemId;
+            string got = legs[GameRng.RangeAuto(key + ".curse.pick", 0, legs.Count)].internalName;
+            run.cursedOfferIds.Add(got);
+            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[賽] 呪物の賽: {itemId} → 呪いの {got}");
+            return got;
+        }
+
+        /// <summary>秘宝 (category Passive) を手に入れた (PassiveAddHelper.AddPassiveItem)。 呪いの付いた提示 (<see cref="IsCursedOffer"/>) なら最大 HP −<see cref="CursedMaxHp"/>。</summary>
         public static void OnPassiveAcquired(RunState run, string itemId)
         {
-            if (run == null || EquippedDie.IdOf(run) != DieIds.Cursed) return;
-            if (ItemSystem.ItemDatabase.Instance?.GetItem(itemId)?.rarity != ItemSystem.ItemRarity.LEGENDARY) return;
-            run.playerMaxHP = System.Math.Max(1, run.playerMaxHP - CursedMaxHpPerLegendary);
+            if (run?.cursedOfferIds == null || !run.cursedOfferIds.Remove(itemId)) return;
+            run.playerMaxHP = System.Math.Max(1, run.playerMaxHP - CursedMaxHp);
             if (run.playerHP > run.playerMaxHP) run.playerHP = run.playerMaxHP;
-            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[賽] 呪物の賽: LEGENDARY の秘宝を手に入れた → 最大 HP {run.playerMaxHP}");
+            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[賽] 呪物の賽: 呪いの秘宝 {itemId} を手に入れた → 最大 HP {run.playerMaxHP}");
         }
 
         /// <summary>端子の結果へ賽のパッシブを足す。 <paramref name="v"/> は端子に入る目 (〈号令の剣〉の +1 の後)。</summary>
@@ -169,7 +197,7 @@ namespace CombatSystem
         public const int RewindNeed = 3;
 
         /// <summary>逆巻きの賽 (作者 2026-11-18): 攻撃に目を 3 つ挿したターン、 エスカレーションの段階を 1 つ下げる (2 → 1・0 → −1)。
-        /// エスカレーションはふつうに進む (ターンの閾値で 1 つ上がる)。 段階がマイナスの間は、 自分の与ダメに同じ段の倍率を足す (−1 で +30%)。
+        /// エスカレーションはふつうに進む (ターンの閾値で 1 つ上がる)。 段階がマイナスの間は、 そのターンの攻撃の最終与ダメージに同じ段の倍率を足す (−1 で +30%・2026-11-25 に与ダメの池から移した)。
         /// 敵の攻撃に効くのは次のターンから (このターンの予告はもう決まっている)。 配線の結果が決まった直後・主攻撃より前に呼ぶ。</summary>
         public static void ApplyRewind(ItemSystem.PassiveSkills.CombatContext ctx, TerminalOutcome term, int escTurn)
         {
@@ -180,8 +208,12 @@ namespace CombatSystem
                 if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[賽] 逆巻きの賽: 段階を 1 つ下げた → {Escalation.EffectiveStage(escTurn)}");
             }
             int s = Escalation.EffectiveStage(escTurn);
-            if (s < 0) ctx.outgoingDamageMultiplier += Escalation.NegativeStageBuff(-s);
+            // マイナスの段階の得は最終与ダメージ (2026-11-25 作者: 与ダメの池から移す)。 毎ターン上書きするので、 このターンだけ効く (撃ごとに CombatManager が hitFinalDamagePct へ足す)
+            ctx.accumulatedValues[RewindFinalPctKey] = s < 0 ? (float)System.Math.Round(Escalation.NegativeStageBuff(-s) * 100f) : 0f;
         }
+
+        /// <summary>逆巻きの賽: このターンの最終与ダメージ +% (ctx.accumulatedValues・<see cref="ApplyRewind"/> が毎ターン書く)。</summary>
+        public const string RewindFinalPctKey = "die.rewind.finalPct";
 
         /// <summary>賭場の賽: 振り直しが無料 (費用 0)・代わりに振り直すたびに HP −N。</summary>
         public const int GambleHpCost = 1;

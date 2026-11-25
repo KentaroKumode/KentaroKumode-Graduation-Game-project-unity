@@ -31,20 +31,20 @@ namespace CombatSystem
         public static long DetonateFired;
         /// <summary>[計装] 【ジャスト防御】が成立した回数 (ランの始めに BOT が 0 へ戻す・ランの記録の justGuardFired)。</summary>
         public static long JustGuardFired;
-        /// <summary>[計装] 〈防人の軍標〉で撃がもう 1 回発火した回数 (2026-11-22・ランの記録の guardEchoFired)。</summary>
+        /// <summary>[計装] 撃がもう 1 回発火した回数 (ランの記録の guardEchoFired・2026-11-25〜〈無銘の剣舞譜〉だけ・旧〈防人の軍標〉)。</summary>
         public static long GuardEchoFired;
         /// <summary>[計装] 秘宝が敵の出血を使った回数 (Kw.ConsumeBleed・〈血桜〉〈紅の搾り具〉) / 〈百人切りの鉈〉で処刑した回数 (ランの始めに BOT が 0 へ戻す・ランの記録の bleedSpendFired / bleedExecuteFired)。</summary>
         public static long BleedSpendFired, BleedExecuteFired;
-        /// <summary>[計装] 臨界の爆発の回数 / 〈柱折りの発破筒〉が爆発のひびを正規のダウンへ割った回数 (ランの始めに BOT が 0 へ戻す・ランの記録の burstFired / burstBreakFired)。</summary>
+        /// <summary>[計装] 臨界の爆発の回数 / 〈柱折りの発破筒〉でダウンを 1 ターン延ばした回数 (2026-11-25〜・旧: 爆発のひびを割った回数) (ランの始めに BOT が 0 へ戻す・ランの記録の burstFired / burstBreakFired)。</summary>
         public static long BurstFired, BurstBreakFired;
-        /// <summary>[計装] 超過会心率 (100% 超え) が会心倍率になった会心の回数 / 〈天眼の鍔〉で処刑した回数 / 〈必殺の照準器〉がもう 1 回発火した回数
+        /// <summary>[計装] 超過会心率 (100% 超え) が会心倍率になった会心の回数 / 〈白濁の義眼〉で処刑した回数 / 〈必殺の照準器〉がもう 1 回発火した回数
         /// (ランの始めに BOT が 0 へ戻す・ランの記録の critOverflowFired / critExecuteFired / critRefireFired)。</summary>
         public static long CritOverflowFired, CritExecuteFired, CritRefireFired;
         /// <summary>[計装 2026-11-23] 【集中】の撃の回数 / 集中会心の回数 / 集中会心で使った【練気】の合計 (ランの始めに BOT が 0 へ戻す・ランの記録の focusAttempted / focusCritted / renkiSpentTotal)。</summary>
         public static long FocusAttempted, FocusCritted, RenkiSpentTotal;
         /// <summary>[計装] 使い捨ての端子を使った回数 / 山札を切り直した回数 (ランの始めに BOT が 0 へ戻す・ランの記録の deckDisposeFired / deckShuffleFired)。</summary>
         public static long DeckDisposeFired, DeckShuffleFired;
-        /// <summary>[計装] 役が成立した回数 / 〈万象のゾロ目〉が 2 個そろいをゾロ目として扱った回数 (ランの始めに BOT が 0 へ戻す・ランの記録の roleFormedFired / roleOmniFired)。</summary>
+        /// <summary>[計装] 役が成立した回数 / 〈万象の賽盆〉が 2 個そろいをゾロ目として扱った回数 (ランの始めに BOT が 0 へ戻す・ランの記録の roleFormedFired / roleOmniFired)。</summary>
         public static long RoleFormedFired, RoleOmniFired;
         /// <summary>[計装] 武器: 〈連刃〉の追撃 / 〈処刑〉で倒した / 〈画竜点睛〉が働いた撃 / 〈シールドバッシュ〉でシールドを攻撃にした
         /// (ランの始めに BOT が 0 へ戻す・ランの記録の weaponChainFired / weaponExecuteFired / weaponGaryoFired / weaponBashFired)。</summary>
@@ -78,7 +78,7 @@ namespace CombatSystem
             _deck.state.shieldItems = ShieldCore.ItemsOf(run);           // シールドの品 (端子の解決の 5e・ジャスト防御の許容幅・2026-11-21)
             _deck.state.bleedItems = BleedCore.ItemsOf(run);             // 出血の品 (端子の解決の 5f・撃ごとの出血・2026-11-21)
             _deck.state.heatItems = HeatCore.ItemsOf(run);               // 臨界の品 (爆発の式・端子の解決の 5g・2026-11-21)
-            if (AxisRules.Owns(run, GameLoop.ItemIds.DeckSparePlug)) _deck.state.extraDrawNext += TerminalCards.SparePlugDraw;      // 〈予備の差込口〉: 1 ターン目に多く引く
+            if (AxisRules.Owns(run, GameLoop.ItemIds.DeckSparePlug)) _deck.state.extraDrawNext += TerminalCards.SparePlugDraw;      // 〈組み置きの配線束〉: 1 ターン目に多く引く
             _deck.state.extraDrawNext += MetaProgression.MetaBuffApplicator.GetSparkDeckOpeningDraw();      // 種火・山札 (2026-11-21): 1 ターン目の手札 +1
             _deck.state.extraDrawNext += CardRules.OpeningDraw;      // 挑戦カード〈手捌き〉: 1 ターン目の手札 +N
             if (AxisRules.Owns(run, GameLoop.ItemIds.DeckToolbox) && runDeck.Count <= TerminalCards.ToolboxMaxDeck)
@@ -161,7 +161,7 @@ namespace CombatSystem
             e.noAttack = GameLoop.Consumables.RapierContreOn(ctx);   // 〈シュヴァリエのレイピア〉のコントラタック中は攻撃の端子に挿せない
             e.sealedRoleMask = ctx.sealedRoleMask;                    // 立つ役 (TerminalCards.RoleOf) は ResolveRoles と同じ判定 (2026-11-21)
             e.roleDiceCut = (int[])_slothCut.Clone(); e.roleDiceAt = (int[])_slothAt.Clone();   // クェシナの怠惰: 立つ役は引く前の目で決める (RoleDice と同じ)
-            e.pairAsTriple = OmniPairNow(ctx);                        // 〈万象のゾロ目〉: このターン 2 個そろいをゾロ目として扱う (振り直しの後に決める)
+            e.pairAsTriple = OmniPairNow(ctx);                        // 〈万象の賽盆〉: このターン 2 個そろいをゾロ目として扱う (振り直しの後に決める)
             return e;
         }
 
@@ -237,11 +237,15 @@ namespace CombatSystem
                 ShieldDiag.Note("端子", o.shield);
             }
             if (o.poison > 0) ItemSystem.PassiveSkills.Effects.Rw.Poison(ctx, o.poison);
-            //   臨界: 〈燧石の指輪〉の倍を立ててから、 端子の分 → 品の分 (5g) を 1 つずつ (HeatCore.Forecast と同じ順)
+            //   臨界: 〈燧石の指輪〉の倍を立ててから、 端子の分 → 品の分 (5g) を 1 つずつ → 攻撃に挿した出目の合計の半分 (HeatCore.EndGain・2026-11-25〜 配線のとき = 攻撃の前。 旧: ターンの終わり) (HeatCore.Forecast と同じ順)
             if (o.heatDouble) ctx.accumulatedValues[HeatCore.DoubleTurnKey] = ctx.currentTurn;
             if (o.heat > 0 || o.heatGains.Count > 0) ItemSystem.PassiveSkills.Keywords.Kw.EnableHeat(ctx);
             if (o.heat > 0) ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, o.heat, "端子");
             foreach (int g in o.heatGains) ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, g, "臨界の品(配線)");
+            {   // ここで閾値をまたげば、 そのターンの攻撃すべてに【過熱】が乗る (作者の決定 2026-11-25)
+                int pipHeat = HeatCore.EndGain(o);
+                if (ctx.rinkaiThreshold > 0 && pipHeat > 0) ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, pipHeat, "配線(攻撃に挿した出目の半分)");
+            }
             for (int r = 0; r < o.retreatStage; r++) YachtRoleEffects.AddEscalationDelay(ctx, YachtRoleEffects.TurnsToRetreatOneStage(ctx));
             if (o.escalationDelay > 0)      // 時計の賽 (ADR-0015)
             {

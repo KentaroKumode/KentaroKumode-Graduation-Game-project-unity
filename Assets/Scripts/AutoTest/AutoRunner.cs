@@ -299,7 +299,7 @@ namespace AutoTest
         public CombatSystem.DownBreakRule downBreakRule = CombatSystem.DownBreakRule.MainAttackOnly;
         /// <summary>[測定 2026-11-14] ひびの猶予 (ターン数・既定 1 = ひびが入ったターンの次のターンの終わりに割れる)。 0 = すぐ割れる・負 (−1) = ひびでは割れない。 本体の GameHooks.DownCrackGrace へ流す。</summary>
         public int downCrackGrace = CombatSystem.BossDown.CrackGraceTurns;
-        /// <summary>[測定 2026-11-14] true (既定) = ひびで割れた目盛りのダウンは弱い (受けるダメージ ×1.5 なし)。 false = ひびのダウンも ×1.5。 本体の GameHooks.DownCrackWeak へ流す。</summary>
+        /// <summary>[測定 2026-11-14] true (既定) = ひびで割れた目盛りのダウンは弱い (受けるダメージ ×1.5 なし)。 false = よろめきも ×1.5。 本体の GameHooks.DownCrackWeak へ流す。</summary>
         public bool downCrackWeak = true;
         /// <summary>[測定 2026-11-14] true (既定) = 大技のチャージのターン (大技の 1 ターン前) は敵が攻撃しない (作者の決定)。 false = 旧い作り (チャージも小技の倍率で攻撃)。
         /// 本体の GameHooks.HeavyChargeNoAttack へ流す (BOT の見込みは本体の Escalation.EnemyAttackValue を通るので自然に読む)。</summary>
@@ -349,7 +349,7 @@ namespace AutoTest
         public int navFearRange = 4;
         /// <summary>[測定 2026-11-11] ヴェスカ連戦の出目を固定する値 (0 = 触らない)。 本体の GameHooks.VescaDiceForce へ流す。</summary>
         public int vescaDiceForce = 0;
-        /// <summary>[測定用の物差し 2026-11-10] 敵の HP に入る毒・出血・爆発・〈逆綴じの止血帯〉の量に掛ける倍率 (<see cref="CombatSystem.EnemyHpLedger.ProbePassiveMult"/>)。
+        /// <summary>[測定用の物差し 2026-11-10] 敵の HP に入る毒・出血・爆発・〈逆締めの止血帯〉の量に掛ける倍率 (<see cref="CombatSystem.EnemyHpLedger.ProbePassiveMult"/>)。
         /// 既定 1。 ラン開始時に本体へ入れ、 ラン終了時に 1 へ戻す。 製品では使わない。</summary>
         public float probePassiveMult = 1f;
         /// <summary>[計装] 本体へ入れる値 (ラン開始後は実際に入れた値・開始前は入れる予定の値)。</summary>
@@ -914,7 +914,7 @@ namespace AutoTest
                  + $"{(handCarry == CombatSystem.HandCarryMode.Pick ? " 残す方策 " + EffectiveHandKeepPolicy + " (handKeepPolicy=" + handKeepPolicy + ")" : "")} "
                  + $"/ ボスのダウン {(bossDown ? "あり" : "なし (旧い作り)")} "
                  + $"/ ダウンの大技の取り消し {(downCancelRule == CombatSystem.DownCancelRule.Always ? "どのダウンでも周期を頭に戻す (旧い規則)" : "チャージか大技のターンに重なった時だけ")} (downCancelRule={downCancelRule}) "
-                 + $"/ 目盛りの割れ方 {(downBreakRule == CombatSystem.DownBreakRule.AnyDamage ? "ターンの終わりの HP で割る (旧い判定・ひびなし)" : "通常攻撃だけ・それ以外で下回るとひび → " + (downCrackGrace < 0 ? "ひびでは割れない" : downCrackGrace == 0 ? "そのターンの終わりに割れる" : downCrackGrace + " ターン後のターンの終わりに割れる") + (downCrackWeak ? "・ひびのダウンは被ダメ ×1.5 なし" : "・ひびのダウンも被ダメ ×1.5"))} (downBreakRule={downBreakRule}・downCrackGrace={downCrackGrace}・downCrackWeak={downCrackWeak}) "
+                 + $"/ 目盛りの割れ方 {(downBreakRule == CombatSystem.DownBreakRule.AnyDamage ? "ターンの終わりの HP で割る (旧い判定・ひびなし)" : "通常攻撃だけ・それ以外で下回るとひび → " + (downCrackGrace < 0 ? "ひびでは割れない" : downCrackGrace == 0 ? "そのターンの終わりに割れる" : downCrackGrace + " ターン後のターンの終わりに割れる") + (downCrackWeak ? "・よろめきは被ダメ ×1.5 なし" : "・よろめきも被ダメ ×1.5"))} (downBreakRule={downBreakRule}・downCrackGrace={downCrackGrace}・downCrackWeak={downCrackWeak}) "
                  + $"/ 大技のチャージ {(heavyChargeNoAttack ? "攻撃しない" : "小技の倍率で攻撃する (旧い作り)")} (heavyChargeNoAttack={heavyChargeNoAttack}) "
                  + $"/ 大技の倍率と周期 {HeavySpecEffectiveText()} (enemyHeavySpec='{enemyHeavySpec}') "
                  + $"/ 灰燼の王 {(ashKingHeavy ? "大技〈業火〉(攻撃 ×大技 + 烈炎 × 業火の倍率・チャージは攻撃しない)" : "旧い形 (予兆のターンに攻撃 +N)")} (ashKingHeavy={ashKingHeavy}) "
@@ -1918,7 +1918,7 @@ namespace AutoTest
                 LearnedPriorityProvider.Reload(TierLearningRoot, writeMarkdown: false);
             }
             bool isSuperSkill = wiringSkill == WiringSkill.Super;
-            // Super = Optimal + 無段階の序列 + 激しい防御 + 消耗品の読み + 偵察と戦闘名の回避 (2026-11-06・同じシードで +4.86σ)。
+            // Super = Optimal + 無段階の序列 + 激しい防御 + 消耗品の読み + 測量と戦闘名の回避 (2026-11-06・同じシードで +4.86σ)。
             //   **戦闘の先読みは含まない** (配線とリロールは山札の方策・先読みは deckLookahead だけ・2026-11-12 に確認)。
             if (isSuperSkill) { v3.superDefense = true; v3.superConsumables = true; v3.superNav = true; v3.macroPlan = true; v3.phase3Ranked = true; UseLearnedDanger = true; AvoidLoseRate = v3.avoidLoseRate; }
             // [2026-11-10] 軸に寄せる方策を本体の差し込み口 (開幕の品・挑戦カード) へも渡す。 空なら無効。

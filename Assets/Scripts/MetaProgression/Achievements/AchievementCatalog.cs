@@ -86,7 +86,7 @@ namespace MetaProgression.Achievements
                 case C.CombatSkill: return "戦闘の腕前";
                 case C.Keyword: return "キーワード";
                 case C.DiceRole: return "出目と役";
-                case C.Terminal: return "端子";
+                case C.Terminal: return "カード";
                 case C.ClassWeapon: return "職業と武器";
                 case C.Navigation: return "航行";
                 case C.ShopEconomy: return "店と経済";
@@ -167,7 +167,7 @@ namespace MetaProgression.Achievements
             D(DeckMin, C.Terminal, 3, "身軽", $"山札を、これ以上抜けない枚数（{CombatSystem.TerminalCards.MinDeckSize}枚）まで減らして、戦闘に勝つ"),
             D(Deck30, C.Terminal, 2, "紙の城", $"山札を{DeckBigGoal}枚以上にする"),
             // 出目 4 個の時 (時限バフ〈使命感〉など) だけ成り立つ。 作者は承知でこのまま (2026-11-17)
-            D(Terminal5Types, C.Terminal, 4, "総動員", "1ターンに、攻撃・防御・充電・補助の端子をすべて挿す"),
+            D(Terminal5Types, C.Terminal, 4, "総動員", "1ターンに、攻撃・防御・充電・補助のカードをすべて挿す"),
 
             // ── 職業と武器 ──
             D(ClassSword, C.ClassWeapon, 2, "抜き身", "剣士で、3層のボスを倒す"),
@@ -179,7 +179,7 @@ namespace MetaProgression.Achievements
 
             // ── 航行 ──
             D(PursuerWin, C.Navigation, 2, "狩る側", "追跡者を倒す"),
-            D(PursuerUnseen, C.Navigation, 3, "忍び足", "追跡者のいる層を、一度も見つからずにボスまで抜ける"),
+            D(PursuerUnseen, C.Navigation, 3, "忍び足", "縄張りの宝を取り、一度も見つからずにボスまで抜ける"),      // 2026-11-24 仮 (縄張りは必ず避けられる + 隣で見つかるだけでは緩いので宝を条件に・作者の承認待ち)
             D(FamiliarWin, C.Navigation, 1, "猟犬払い", "使い魔を倒す"),
             D(LureHit, C.Navigation, 2, "罠師", "囮罠で、追跡者を足止めする"),
             D(StormBoss, C.Navigation, 4, "嵐の目", "嵐が最後の段まで進んだ層で、ボスを倒す"),

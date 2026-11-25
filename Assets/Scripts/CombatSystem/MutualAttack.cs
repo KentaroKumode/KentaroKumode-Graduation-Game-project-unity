@@ -34,6 +34,8 @@ namespace CombatSystem
         public int? reboot;
         /// <summary>〈雷鳴の太鼓〉【オーバークロック】を使う (条件を満たさなければ本体が使わない)。</summary>
         public bool overclock;
+        /// <summary>撃の順 (2026-11-25): 出目ごとの挿した順 (小さいほど先・添字 = ダイス番号)。 攻撃の端子の撃はこの順に当たる。 null = 場の順。</summary>
+        public int[] plugRank;
 
         public static WiringPlan Of(DiceTerminal[] main) => new WiringPlan { main = main };
         public static WiringPlan OfSlots(int[] slots, int[] targets = null, bool[] keep = null) => new WiringPlan { slots = slots, targets = targets, keep = keep };
