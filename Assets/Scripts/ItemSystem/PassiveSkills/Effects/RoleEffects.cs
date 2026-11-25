@@ -44,7 +44,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>揃いの拍子木: 同じ目の役が 2 ターン以上続けて立ったターン (2026-11-22〜・途切れるか目が変わるまで毎ターン・連なりは数えない)、 次のターンの手札 +1 枚・次のターンの最初の振り直しが無料
+    /// <summary>揃いのメトロノーム: 同じ目の役が 2 ターン以上続けて立ったターン (2026-11-22〜・途切れるか目が変わるまで毎ターン・連なりは数えない)、 次のターンの手札 +1 枚・次のターンの最初の振り直しが無料
     /// (無料の振り直し +1・〈特別・対〉と同じ口)。 各撃の与ダメージ +35% は旗 (<see cref="RoleItems.Clapper"/>)。</summary>
     public class MatchedClappers : IPassiveSkillEffect
     {
@@ -57,7 +57,7 @@ namespace ItemSystem.PassiveSkills.Effects
             if (face == 0 || face != (CombatManager.Instance?.TerminalDeck?.state.roleLastFace ?? 0)) return;   // 前のターンにも同じ目の役 (このターンの分はまだ入っていない)
             Rw.DrawNext(1);
             YachtRoleEffects.AddNextTurn(ctx, YachtRoleEffects.FreeRerollKey, 1);
-            Rw.Log($"[揃いの拍子木] {face} の役が続いた → 次のターン 手札 +1・最初の振り直しが無料");
+            Rw.Log($"[揃いのメトロノーム] {face} の役が続いた → 次のターン 手札 +1・最初の振り直しが無料");
         }
     }
 
@@ -78,7 +78,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>小目の骨牌: 1・2・3 の役 (〈特別〉〈封じ〉〈追撃〉) が立ったターン (2026-11-22 neon 収束〜・その前は 2 だけ)、 次のターンの手札 +1 枚 (1 ターン 1 回: 役は 1 ターンに高々 1 つ)・次のターンのブロック +4。</summary>
+    /// <summary>小口の錠前: 1・2・3 の役 (〈特別〉〈封じ〉〈追撃〉) が立ったターン (2026-11-22 neon 収束〜・その前は 2 だけ)、 次のターンの手札 +1 枚 (1 ターン 1 回: 役は 1 ターンに高々 1 つ)・次のターンのブロック +4。</summary>
     public class LowFaceConduit : IPassiveSkillEffect
     {
         public string SkillId => ItemIds.RoleConduit;
@@ -90,7 +90,7 @@ namespace ItemSystem.PassiveSkills.Effects
             if (k == null || !TerminalCards.FaceIn(TerminalCards.ConduitFaces, TerminalCards.FaceOfRole(k.Value))) return;
             Rw.DrawNext(1);
             RoleFx.BlockNext(ctx, Block);
-            Rw.Log($"[小目の骨牌] 〈{YachtRoles.NameOf(k.Value)}〉 → 次のターン 手札 +1・ブロック +{Block}");
+            Rw.Log($"[小口の錠前] 〈{YachtRoles.NameOf(k.Value)}〉 → 次のターン 手札 +1・ブロック +{Block}");
         }
     }
 }

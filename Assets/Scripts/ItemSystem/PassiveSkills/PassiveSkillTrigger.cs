@@ -119,7 +119,7 @@ namespace ItemSystem.PassiveSkills
         OnSupportTerminalUse,
         // ── 役とボスの出来事 (2026-11-21・段 1-f・item-overhaul-spec §2-2)。 どれも Kw.Raise で配る。
         /// <summary>役が立った直後 (CombatManager.ResolveRoles・配線の解決の後・OnWired の前・量 = 強さ: 2 個そろい 1 / ゾロ目 2 / 連なり 2)。
-        /// 立った役は <see cref="CombatContext.firedRolesThisTurn"/> の最後。 〈曇りの合わせ鏡〉の重ねた効果・〈宿命の骨賽〉のもう 1 回では鳴らない (役が立ったのではない)。
+        /// 立った役は <see cref="CombatContext.firedRolesThisTurn"/> の最後。 〈曇りの合わせ鏡〉の重ねた効果・〈宿命の音叉〉のもう 1 回では鳴らない (役が立ったのではない)。
         /// ここで足す攻撃 +N (ctx.mutualAttackBonus) は撃ごとに乗る。</summary>
         OnRoleFired,
         /// <summary>ボスの目盛りを割ってダウンが決まった (量 = 割った目盛りの数)。 通常攻撃で割った (主攻撃・〈目盛り削りのノミ〉) か、 ひびの猶予が切れて割れたかは

@@ -44,7 +44,7 @@ namespace AutoTest.EditorTests
             Assert.That(Run(RoleItems.Chipped, p1).armorPen - Run(RoleItems.None, p1).armorPen, Is.EqualTo(TerminalCards.ChippedPen));
             Assert.That(Run(RoleItems.Chipped, p2).armorPen - Run(RoleItems.None, p2).armorPen, Is.EqualTo(TerminalCards.ChippedPen));
             Assert.That(Run(RoleItems.Chipped, p3).armorPen, Is.EqualTo(Run(RoleItems.None, p3).armorPen));
-            // 小目の骨牌の目 (RoleEffects.cs): 1・2・3
+            // 小口の錠前の目 (RoleEffects.cs): 1・2・3
             Assert.That(TerminalCards.FaceIn(TerminalCards.ConduitFaces, 3) && !TerminalCards.FaceIn(TerminalCards.ConduitFaces, 4) && !TerminalCards.FaceIn(TerminalCards.ConduitFaces, 0), Is.True);
             // 役が無ければ何もしない
             Assert.That(Atk(RoleItems.WoodTag | RoleItems.NotchBoard, new[] { 1, 3, 5 }, 3), Is.EqualTo(0));
@@ -75,7 +75,7 @@ namespace AutoTest.EditorTests
             var t = Run(RoleItems.Thunder, triple);
             Assert.That(t.damageMul, Is.EqualTo(b.damageMul * (1f + TerminalCards.ThunderFinalPct)).Within(1e-4));
             Assert.That(t.blockAdd - b.blockAdd, Is.EqualTo(TerminalCards.ThunderBlock));
-            // 連勝の符丁 (answer9): どの役でも (ゾロ目・連なりも)・回数 (1 + 1) × BloodmarkPer
+            // 連勝の銀杯 (answer9): どの役でも (ゾロ目・連なりも)・回数 (1 + 1) × BloodmarkPer
             int[] pair = { 2, 2, 5 };
             Assert.That(Run(RoleItems.Bloodmark, pair, roleCount: 1).damageMul, Is.EqualTo(Run(RoleItems.None, pair).damageMul * (1f + 2 * TerminalCards.BloodmarkPer)).Within(1e-4));
             Assert.That(Run(RoleItems.Bloodmark, triple, roleCount: 1).damageMul, Is.EqualTo(b.damageMul * (1f + 2 * TerminalCards.BloodmarkPer)).Within(1e-4));

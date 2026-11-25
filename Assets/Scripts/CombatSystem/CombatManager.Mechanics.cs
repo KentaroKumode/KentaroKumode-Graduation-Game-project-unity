@@ -214,7 +214,7 @@ namespace CombatSystem
         /// <summary>この戦闘で振り直しを 1 回でもした (無料も・ctx.accumulatedValues・〈擦り切れた賽袋〉の「戦闘の最初の振り直し」)。</summary>
         private const string RerolledKey = "role.rerolled";
 
-        /// <summary>このターン、 次の振り直しに使える無料の回数 (2026-11-21): 前のターンから持ち越した無料 (〈特別・対〉〈曇りの合わせ鏡〉〈揃いの拍子木〉・
+        /// <summary>このターン、 次の振り直しに使える無料の回数 (2026-11-21): 前のターンから持ち越した無料 (〈特別・対〉〈曇りの合わせ鏡〉〈揃いのメトロノーム〉・
         /// currentBuffs の <see cref="YachtRoleEffects.FreeRerollKey"/>) と、 〈擦り切れた賽袋〉(この戦闘でまだ振り直していなければ 1)。
         /// 本体の支払い (<see cref="RerollPhase"/>)・画面の費用・BOT の振り直しの方策が同じ関数を読む。</summary>
         public static int FreeRerollsLeft(CombatContext ctx)
@@ -455,7 +455,7 @@ namespace CombatSystem
             bool mirror = AxisRules.Owns(roleRun, GameLoop.ItemIds.RoleMirror),
                  fate = AxisRules.Owns(roleRun, GameLoop.ItemIds.RoleFate);
             var tier = GameLoop.DiceFaceParts.Tier.T3;   // Tier は使わない (ADR-0015)。 実績の呼び手のために渡すだけ
-            // 〈宿命の骨賽〉: 前のターンに立ったゾロ目・連なり、 または 2 ターン続けて立った役の効果が、 このターンにももう 1 回働く
+            // 〈宿命の音叉〉: 前のターンに立ったゾロ目・連なり、 または 2 ターン続けて立った役の効果が、 このターンにももう 1 回働く
             //   (役が立ったのではないので数えない・出来事も鳴らさない・2026-11-22 neon 収束〜・その前はゾロ目だけ)。
             if (fate)
             {
@@ -464,7 +464,7 @@ namespace CombatSystem
                 if (prev >= 0)
                 {
                     YachtRoleEffects.Apply((RoleKind)prev, tier, ctx, ref outcome);
-                    if (Debug.unityLogger.logEnabled) Debug.Log($"[宿命の骨賽] 前のターンの役〈{YachtRoles.NameOf((RoleKind)prev)}〉の効果がもう 1 回働く");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[宿命の音叉] 前のターンの役〈{YachtRoles.NameOf((RoleKind)prev)}〉の効果がもう 1 回働く");
                 }
             }
 
@@ -492,7 +492,7 @@ namespace CombatSystem
                 // 役が立った (2026-11-21・段 1-f): 量 = 強さ (2 個そろい 1 / ゾロ目・連なり 2)。 OnWired の前なので、 品の攻撃 +N は撃ごとに乗る
                 ItemSystem.PassiveSkills.Keywords.Kw.Raise(ctx, PassiveSkillTrigger.OnRoleFired, YachtRoles.Strength(k));
             }
-            // 役の回数と同じ目の役が続いたターン (役の軸の品が読む・TerminalBattleState)。 〈宿命の骨賽〉〈曇りの合わせ鏡〉の重ねた効果は数えない
+            // 役の回数と同じ目の役が続いたターン (役の軸の品が読む・TerminalBattleState)。 〈宿命の音叉〉〈曇りの合わせ鏡〉の重ねた効果は数えない
             if (_deck != null)
             {
                 int formed = ctx.firedRolesThisTurn.Count;
@@ -513,9 +513,9 @@ namespace CombatSystem
             return outcome;
         }
 
-        /// <summary>〈宿命の骨賽〉(2026-11-21): 前のターンに立った役 ((int)RoleKind + 1・0 = なし・ctx.accumulatedValues)。</summary>
+        /// <summary>〈宿命の音叉〉(2026-11-21): 前のターンに立った役 ((int)RoleKind + 1・0 = なし・ctx.accumulatedValues)。</summary>
         private const string FateRoleKey = "role.fate";
-        /// <summary>[persistent・戦闘で 0 から] 〈宿命の骨賽〉: 役が立った直近のターンの番号 (「2 ターン続けて立った役」・2026-11-22 neon 収束)。</summary>
+        /// <summary>[persistent・戦闘で 0 から] 〈宿命の音叉〉: 役が立った直近のターンの番号 (「2 ターン続けて立った役」・2026-11-22 neon 収束)。</summary>
         private const string FateLastTurnKey = "role.fateLast";
         /// <summary>〈万象の賽盆〉(2026-11-21): 2 個そろいをゾロ目として扱うと決めたターンの番号 (ctx.accumulatedValues) / 乱数のキー (専用) /
         /// この戦闘の役の回数がこれ以上なら確率 <see cref="OmniPctMid"/>・<see cref="OmniNeedFull"/> 以上なら 100%。</summary>

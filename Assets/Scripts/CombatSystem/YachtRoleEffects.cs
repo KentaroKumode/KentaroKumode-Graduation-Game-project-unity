@@ -57,7 +57,7 @@ namespace CombatSystem
         public const string EnemyStunKey = "roleEnemyStun";
         /// <summary>〈封じ〉2 個そろい: 次ターンの敵の攻撃を N% 減らす (値 = N)。</summary>
         public const string EnemyAtkCutKey = "roleEnemyAtkCut";
-        /// <summary>役の軸の品 (〈負け越しの賽〉〈小目の骨牌〉〈曇りの合わせ鏡〉): 次のターンのブロック +N (値 = N・BeginNewTurn が品のブロック +N へ入れる)。</summary>
+        /// <summary>役の軸の品 (〈負け越しの賽〉〈小口の錠前〉〈曇りの合わせ鏡〉): 次のターンのブロック +N (値 = N・BeginNewTurn が品のブロック +N へ入れる)。</summary>
         public const string BlockNextKey = "roleBlockNext";
 
         // ── 数値 (ADR-0015・作者 2026-11-18。 小さい目ほど役が強く、 大きい目ほど数字が強い。 仮の値) ──
@@ -104,7 +104,7 @@ namespace CombatSystem
                 case 1:   // 特別: 無料の振り直し 2 回 + 小さな〈極〉(面数 × 5%) / 〈極〉
                     if (!triple)
                     {
-                        AddNextTurn(ctx, FreeRerollKey, FreeRerollPair);   // 足し合わせる (〈曇りの合わせ鏡〉〈揃いの拍子木〉の +1 と重なる・2026-11-21)
+                        AddNextTurn(ctx, FreeRerollKey, FreeRerollPair);   // 足し合わせる (〈曇りの合わせ鏡〉〈揃いのメトロノーム〉の +1 と重なる・2026-11-21)
                         FireYacht(ctx, ref outcome, YachtPairPctPerFaceNormal, YachtPairPctPerFaceNormal * 0.5f);
                     }
                     else FireYacht(ctx, ref outcome, YachtPctPerFaceNormal, YachtPctPerFaceBoss);
@@ -117,7 +117,7 @@ namespace CombatSystem
                     break;
 
                 case 3:   // 追撃: 与えたダメージの 50% を追加 / 150% を追加確定ダメージ
-                    //   同じターンに 2 回働けば足し合わせる (〈万象の賽盆〉〈曇りの合わせ鏡〉〈宿命の骨賽〉・2026-11-21)。 ゾロ目が 1 回でも働けば確定ダメージ
+                    //   同じターンに 2 回働けば足し合わせる (〈万象の賽盆〉〈曇りの合わせ鏡〉〈宿命の音叉〉・2026-11-21)。 ゾロ目が 1 回でも働けば確定ダメージ
                     outcome.extraDamageRatio += triple ? PursuitTriple : PursuitPair;
                     outcome.extraDamageTrue |= triple;
                     break;

@@ -69,9 +69,9 @@ namespace CombatSystem
         NotchBoard = 1 << 1,   // 符丁の刻み板
         Chipped = 1 << 2,      // 欠け目の見立て (防御の無視の分・目盛りの削りは RoleEffects.cs)
         Gear = 1 << 3,         // 追い目の賽筒
-        Clapper = 1 << 4,      // 揃いの拍子木 (与ダメージの分・手札と無料の振り直しは RoleEffects.cs)
+        Clapper = 1 << 4,      // 揃いのメトロノーム (与ダメージの分・手札と無料の振り直しは RoleEffects.cs)
         Thunder = 1 << 5,      // 轟きの大賽
-        Bloodmark = 1 << 6,    // 連勝の符丁
+        Bloodmark = 1 << 6,    // 連勝の銀杯
         Pouch = 1 << 7,        // 擦り切れた賽袋 (振り直したターンのブロックの分・無料の振り直しは CombatManager.FreeRerollsLeft)
     }
 
@@ -212,7 +212,7 @@ namespace CombatSystem
         public HeatItems heatItems;
         /// <summary>この戦闘で役が成立した回数 / 直前のターンまで同じ目の役が続いて成立したターンの数 / 直前のターンに立った役の目 (<see cref="TerminalCards.FaceOfRole"/>・0 = なしか連なり)
         /// (CombatManager.ResolveRoles がターンの役の後に書く・2026-11-21・同じ目にしたのは 2026-11-22)。
-        /// 〈符丁の刻み板〉〈連勝の符丁〉〈揃いの拍子木〉〈万象の賽盆〉が読む。 Resolve の中では、 このターンの役はまだ入っていない。</summary>
+        /// 〈符丁の刻み板〉〈連勝の銀杯〉〈揃いのメトロノーム〉〈万象の賽盆〉が読む。 Resolve の中では、 このターンの役はまだ入っていない。</summary>
         public int roleCount, roleStreak, roleLastFace;
         /// <summary>この戦闘の何ターン目か (<see cref="BeginTurn"/> が 1 つ進める・戦闘の始めは 0)。 挑戦カード〈初太刀〉の「1 ターン目」が読む (2026-11-22)。</summary>
         public int turn;
@@ -495,15 +495,15 @@ namespace CombatSystem
         public const int WoodTagAttack = 1, WoodTagBlock = 2, NotchBoardPer = 1, NotchBoardMax = 6, ChippedPen = 12, GearAttack = 8, GearAttackHigh = 10, ThunderBlock = 10, ThunderRerollBlock = 10, PouchBlock = 5;   // answer12: 歯車 +5 → +7・雷鳴の振り直しの役 ブロック +8・賽袋 振り直しブロック +5
           // answer9: 歯車 3 の役 +6 → どの役も +5 (3 の役かゾロ目は +10)・雷鳴 ブロック +4 → +10
         /// <summary>役の軸の品が働く役の目 (2026-11-22・どの役でも → 目を指定)。 *Faces = 目の集合 (ビット 1 &lt;&lt; 目・<see cref="FaceIn"/>)。
-        /// 2026-11-22 neon 収束で広げた: 木札 5 → 4・5 / 刻み板 4 → 3・4 / 見立て 1 → 1・2 / 導管 2 → 1・2・3。 〈小目の骨牌〉は RoleEffects.cs。</summary>
+        /// 2026-11-22 neon 収束で広げた: 木札 5 → 4・5 / 刻み板 4 → 3・4 / 見立て 1 → 1・2 / 導管 2 → 1・2・3。 〈小口の錠前〉は RoleEffects.cs。</summary>
         public const int WoodTagFaces = 1 << 4 | 1 << 5, NotchBoardFaces = 1 << 3 | 1 << 4, ChippedFaces = 1 << 1 | 1 << 2, GearFace = 3, ConduitFaces = 1 << 1 | 1 << 2 | 1 << 3;
         /// <summary>目 <paramref name="face"/> (1〜6・連なりは 0 でどの集合にも入らない) が集合 <paramref name="faces"/> に入るか。</summary>
         public static bool FaceIn(int faces, int face) => face > 0 && ((faces >> face) & 1) != 0;
-        /// <summary>〈揃いの拍子木〉与ダメージ % の池 / 〈轟きの大賽〉最終与ダメージ / 〈連勝の符丁〉2 個そろいの役のターン 役の回数 1 回あたりの最終与ダメージ・上限
+        /// <summary>〈揃いのメトロノーム〉与ダメージ % の池 / 〈轟きの大賽〉最終与ダメージ / 〈連勝の銀杯〉2 個そろいの役のターン 役の回数 1 回あたりの最終与ダメージ・上限
         /// (2026-11-22 neon 収束: 3・4 の役 × 5% → すべての役 × 8% → final4: 2 個そろいだけ (ゾロ目・連なりでは働かない) × 10%・上限 50% → final5: × 7%・上限なし)。</summary>
         public const float ClapperPct = 0.25f, ThunderFinalPct = 0.45f, ThunderRerollPct = 0.35f, BloodmarkPer = 0.08f;   // answer14: 拍子木 12% → 25%・雷鳴 振り直しの他の役 30% → 35%   // answer12: 雷鳴 振り直したターンの他の役 +30%・符丁 7% → 8%
           // answer9: 雷鳴 +20% → +45%
-        /// <summary>〈連勝の符丁〉が働く役 = 2 個そろい (ゾロ目・連なりでは働かない・2026-11-22 final4)。 本体と BOT が同じ判定。</summary>
+        /// <summary>〈連勝の銀杯〉が働く役 = 2 個そろい (ゾロ目・連なりでは働かない・2026-11-22 final4)。 本体と BOT が同じ判定。</summary>
         public static bool BloodmarkFires(RoleKind k) => true;   // answer9: どの役でも (旧 2 個そろいだけ)
         /// <summary>〈賽振り台〉次のターンの最初の振り直しの費用から引く上限 (min(上限, 役の回数)) / 〈役落とし〉役が成立したターン 攻撃 + 役の回数 × N。
         /// 役の回数 = この戦闘で役が成立した回数 (このターンの役を含む・役の軸の品と同じ数え方・台帳 §⑧)。 *Up = 強化した端子。</summary>
@@ -1297,10 +1297,10 @@ namespace CombatSystem
             if ((f & RoleItems.NotchBoard) != 0 && FaceIn(NotchBoardFaces, face))                                            // 〈符丁の刻み板〉3〈追撃〉・4〈攻め〉 (回数はどの役も)
                 each += Math.Min(NotchBoardMax, NotchBoardPer * count) * (big ? 2 : 1);
             if ((f & RoleItems.Chipped) != 0 && FaceIn(ChippedFaces, face)) o.armorPen += ChippedPen;                       // 〈欠け目の見立て〉1〈特別〉・2〈封じ〉
-            if ((f & RoleItems.Clapper) != 0 && face != 0 && face == st.roleLastFace) o.outgoingPctAdd += ClapperPct;         // 〈揃いの拍子木〉同じ目が続いた
+            if ((f & RoleItems.Clapper) != 0 && face != 0 && face == st.roleLastFace) o.outgoingPctAdd += ClapperPct;         // 〈揃いのメトロノーム〉同じ目が続いた
             if ((f & RoleItems.Thunder) != 0 && big) { o.damageMul *= 1f + ThunderFinalPct; o.blockAdd += ThunderBlock; }    // 〈轟きの大賽〉
             else if ((f & RoleItems.Thunder) != 0 && env.diceRerolled) { o.damageMul *= 1f + ThunderRerollPct; o.blockAdd += ThunderRerollBlock; }   // 〈轟きの大賽〉振り直したターンの他の役 (answer12)
-            if ((f & RoleItems.Bloodmark) != 0 && BloodmarkFires(k))                                                         // 〈連勝の符丁〉どの役でも (回数はどの役も・answer9)
+            if ((f & RoleItems.Bloodmark) != 0 && BloodmarkFires(k))                                                         // 〈連勝の銀杯〉どの役でも (回数はどの役も・answer9)
                 o.damageMul *= 1f + BloodmarkPer * count;
             if (each > 0 && o.attackHits.Count > 0)
             {

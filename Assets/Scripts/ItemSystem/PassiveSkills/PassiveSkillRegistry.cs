@@ -209,8 +209,8 @@ namespace ItemSystem.PassiveSkills
         }
 
         /// <summary>役の軸 13 品のうち効果クラスを持つ 4 品 (2026-11-21・RoleEffects.cs)。 端子の解決の中の分 (潮目の木札・符丁の刻み板・欠け目の見立ての防御の無視・
-        /// 追い目の賽筒・揃いの拍子木の与ダメージ・轟きの大賽・連勝の符丁) は CombatSystem.TerminalCards の RoleItems の旗、
-        /// 擦り切れた賽袋・曇りの合わせ鏡・宿命の骨賽・万象の賽盆は CombatManager の役の適用 (FreeRerollsLeft / ResolveRoles / DecideOmniPair)。</summary>
+        /// 追い目の賽筒・揃いのメトロノームの与ダメージ・轟きの大賽・連勝の銀杯) は CombatSystem.TerminalCards の RoleItems の旗、
+        /// 擦り切れた賽袋・曇りの合わせ鏡・宿命の音叉・万象の賽盆は CombatManager の役の適用 (FreeRerollsLeft / ResolveRoles / DecideOmniPair)。</summary>
         private static void RegisterRole()
         {
             Register(new ChippedEyeReading()); Register(new MatchedClappers()); Register(new LosingStreakDie()); Register(new LowFaceConduit());

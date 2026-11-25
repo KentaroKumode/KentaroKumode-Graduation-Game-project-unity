@@ -70,7 +70,7 @@ OnTurnEnd の 4 か所。これ以外の位置で敵パッシブが ctx の HP �
   （本体の支払い・画面の費用の表示 `TurnPause.rerollCost`・BOT の `AutoRunner.MutualRerollPolicy` が同じ値を読む）。
 - 〈特別・対〉の無料分（`YachtRoleEffects.FreeRerollKey`）は費用 0 で、回目に数えない。〈無力感〉の +1 も足さない。
 - 整備パネルの種火・役（2026-11-21）: 各戦闘の最初の振り直し 1 回（`MetaPanel.RoleFreeRerolls`）も同じ無料分に足す（`CombatManager.FreeRerollsLeft`）。〈特別・対〉の分と重なった時は〈特別・対〉の分（ターンの終わりで消える）から先に使い、種火の分はその戦闘の間残る（`ctx.accumulatedValues[SparkRoleFreeUsedKey]`）。
-- 無料の回数は `CombatManager.FreeRerollsLeft` の 1 か所（2026-11-21・段 1-f）= currentBuffs `roleFreeReroll`（〈特別・対〉+2・〈曇りの合わせ鏡〉の 1 の 2 個そろい +1・〈揃いの拍子木〉+1 ── 次のターンへ足し合わせる `YachtRoleEffects.AddNextTurn`）
+- 無料の回数は `CombatManager.FreeRerollsLeft` の 1 か所（2026-11-21・段 1-f）= currentBuffs `roleFreeReroll`（〈特別・対〉+2・〈曇りの合わせ鏡〉の 1 の 2 個そろい +1・〈揃いのメトロノーム〉+1 ── 次のターンへ足し合わせる `YachtRoleEffects.AddNextTurn`）
   + 〈擦り切れた賽袋〉（この戦闘でまだ 1 回も振り直していなければ 1・`role.rerolled`）+ 種火・役の残り。 使う順は 賽袋 → currentBuffs → 種火（`NoteRerollPaid`・currentBuffs から減らす）。
 - 〈賽振り台〉（端子・2026-11-21）: 挿した次のターンの最初の振り直し（`rerollsThisTurn = 0`）の費用 −min(6, この戦闘で役が成立した回数〔このターンの役を含む・`roleCount`〕)（強化 8・下限 0・複数挿せば足す）。
   `TerminalOutcome.rerollDiscountNext` → nextTurnBuffs `roleRerollDiscount` → `RerollCostNow(ctx, 個数, 回目)` が引く（本体・画面・BOT の同じ関数・〈過負荷チューナー〉の −1 の後）。
@@ -651,7 +651,7 @@ s = `SwordDanceSet.SoloScale`（2026-11-20）: 持っている[剣の舞]（昇�
 | OnDeckShuffle | 端子の捨て札を切り直したとき (ターンの頭に引く所 = `DrawTerminalHand` の直後 / 判断の間に消耗品・品で引いた分は `RaiseTerminalEvents` の頭) | 切り直した枚数 |
 | OnKeptTerminalUse | 残す印で前のターンから残した端子を発動したとき (`RaiseTerminalEvents`・名前で数える) | 挿した出目の合計 (最低 1) |
 | OnSupportTerminalUse | 補助の端子 (基本の〈時計〉を除く) を発動したとき (`RaiseTerminalEvents`・〈残響〉で 2 回働いても 1 回) | 挿した出目の合計 (最低 1) |
-| OnRoleFired | 役が立ったとき (2026-11-21・`CombatManager.ResolveRoles`・配線の解決の後・OnWired の前・〈曇りの合わせ鏡〉の重ねた効果・〈宿命の骨賽〉のもう 1 回では鳴らない) | 強さ (2 個そろい 1 / ゾロ目・連なり 2) |
+| OnRoleFired | 役が立ったとき (2026-11-21・`CombatManager.ResolveRoles`・配線の解決の後・OnWired の前・〈曇りの合わせ鏡〉の重ねた効果・〈宿命の音叉〉のもう 1 回では鳴らない) | 強さ (2 個そろい 1 / ゾロ目・連なり 2) |
 | OnBossDown | ボスの目盛りを割ってダウンが決まったとき (2026-11-21)。 通常攻撃 = `NoteBossDownMainHit` (撃の輪の中・〈目盛り削りのノミ〉も)・旧い判定 AnyDamage のターンの終わり / ひび = `NoteBossDownTurnEnd`。 `Kw.BossDownCrackKey` (1 = ひび) で分ける | 割った目盛りの数 |
 | OnHeavyCanceled | 大技を取り消したとき (2026-11-21): ダウンがチャージか大技のターンに重なった (`BeginBossDownTurnCore`・ターンの頭) / 大技のターンに〈封じ・揃〉か端子の行動不能で敵が行動しなかった (敵の攻撃の解決) | 1 |
 | OnChargeGain / OnOvercharge | CombatContext.AddCharge | 増えた分 / 上限で捨てた分 (〈雷壷〉は上限が無く、 ターン終了時に上限超過の 1/4 を失う・2026-11-21 Phase 4 較正: 旧 1/2) |
@@ -809,18 +809,18 @@ sup = 発動した補助の端子 (基本を除く)・perm = 場の常設 (基�
 
 分岐 A〈低目ロール連打〉/ 分岐 B〈リロール＆格上げ爆発〉。 軸の数 (賽目) を読む品は無い。 C = この戦闘で役が成立した回数 (`TerminalBattleState.roleCount`・Resolve の中ではこのターンの役を足した C + 1)・
 F = 役の目 (`TerminalCards.FaceOfRole`・2 個そろいとゾロ目の目・連なりは 0)・L = 直前のターンに立った役の目 (`roleLastFace`・0 = なしか連なり)・
-S = 直前のターンまで同じ目の役が続いたターン数 (`roleStreak`・表示だけ)。 どれも `CombatManager.ResolveRoles` がターンの役の後に書く (〈宿命の骨賽〉のもう 1 回・〈曇りの合わせ鏡〉の重ねた効果は数えない)。
+S = 直前のターンまで同じ目の役が続いたターン数 (`roleStreak`・表示だけ)。 どれも `CombatManager.ResolveRoles` がターンの役の後に書く (〈宿命の音叉〉のもう 1 回・〈曇りの合わせ鏡〉の重ねた効果は数えない)。
 big = ゾロ目か連なり。 品が働く目 (2026-11-22〜・前はどの役でも / 1・2・3 の目を含む役) は `TerminalCards.*Face` の定数。
 
 | 計算の位置 | 式 |
 |---|---|
 | 6d 撃ごとの攻撃 +N (`ApplyRoleItems`) | 〈潮目の木札〉F ∈ {4, 5} なら +1 / 〈追い目の賽筒〉振り直したターン (`env.diceRerolled`) のどの役でも +8 (answer15: 旧 +7) (F = 3 かゾロ目なら +10・answer12: 旧 +5・answer9: 旧 F = 3 だけ +6) / 〈符丁の刻み板〉F ∈ {3, 4} なら +min(6, 1 × (C + 1)) × (ゾロ目 ? 2 : 1) (C はどの役も数える) |
 | 6d ブロック | 〈潮目の木札〉F ∈ {4, 5} なら +2 / 〈轟きの大賽〉big なら +10 (answer9: 旧 +4)・big でない役で振り直したターン (`env.diceRerolled`) なら +10 (answer14: 旧 +8) / 〈擦り切れた賽袋〉振り直したターンは役が無くても +5 (`RoleItems.Pouch`・answer12) |
-| 6d 掛け算 | 〈轟きの大賽〉big なら `damageMul ×= 1.45` (answer9: 旧 1.2)・big でない役で振り直したターンなら ×1.35 (answer14: 旧 ×1.30・answer12) / 〈連勝の符丁〉どの役でも (ゾロ目・連なりも・`TerminalCards.BloodmarkFires`・answer9: 旧 2 個そろいだけ) `damageMul ×= 1 + 0.08 × (C + 1)` (answer12: 旧 0.07・上限なし・final5: final4 min(0.5, 0.10 × (C + 1))・旧 すべての役・0.08) / 〈揃いの拍子木〉F ≠ 0 かつ F = L なら `outgoingPctAdd += 0.25` (answer14: 旧 0.12) |
+| 6d 掛け算 | 〈轟きの大賽〉big なら `damageMul ×= 1.45` (answer9: 旧 1.2)・big でない役で振り直したターンなら ×1.35 (answer14: 旧 ×1.30・answer12) / 〈連勝の銀杯〉どの役でも (ゾロ目・連なりも・`TerminalCards.BloodmarkFires`・answer9: 旧 2 個そろいだけ) `damageMul ×= 1 + 0.08 × (C + 1)` (answer12: 旧 0.07・上限なし・final5: final4 min(0.5, 0.10 × (C + 1))・旧 すべての役・0.08) / 〈揃いのメトロノーム〉F ≠ 0 かつ F = L なら `outgoingPctAdd += 0.25` (answer14: 旧 0.12) |
 | 6d その他 | 〈欠け目の見立て〉F ∈ {1, 2} なら `armorPen += 12` (6d の目の集合は `TerminalCards.*Faces`・2026-11-22 neon 収束で広げた) |
-| 出来事 (`RoleEffects.cs`) | 〈欠け目の見立て〉1・2 の役のターン、 当たった撃のダメージ × 25% だけ `RaiseBossNextNotch` / 〈揃いの拍子木〉OnRoleFired で F ≠ 0 かつ F = L なら次のターン 手札 +1・無料の振り直し +1 / 〈小目の骨牌〉OnRoleFired で F ∈ {1, 2, 3} なら次のターン 手札 +1・ブロック +4 / 〈負け越しの賽〉OnTurnEnd で役なしなら次のターン 無料の振り直し +1・ブロック +6・このターン振り直していれば (rerollsThisTurn > 0) 手札 +1 (answer13) |
-| 次のターンのブロック | nextTurnBuffs `roleBlockNext` (`YachtRoleEffects.BlockNextKey`) → BeginNewTurn の Phase B で `itemBlockBonus` の初期値 (〈負け越しの賽〉〈小目の骨牌〉〈曇りの合わせ鏡〉) |
-| 役の適用 (`ResolveRoles` / `DecideOmniPair`) | 〈擦り切れた賽袋〉戦闘の最初の振り直しが無料 / 〈曇りの合わせ鏡〉〈宿命の骨賽〉〈万象の賽盆〉は §9.2 の役の段 |
+| 出来事 (`RoleEffects.cs`) | 〈欠け目の見立て〉1・2 の役のターン、 当たった撃のダメージ × 25% だけ `RaiseBossNextNotch` / 〈揃いのメトロノーム〉OnRoleFired で F ≠ 0 かつ F = L なら次のターン 手札 +1・無料の振り直し +1 / 〈小口の錠前〉OnRoleFired で F ∈ {1, 2, 3} なら次のターン 手札 +1・ブロック +4 / 〈負け越しの賽〉OnTurnEnd で役なしなら次のターン 無料の振り直し +1・ブロック +6・このターン振り直していれば (rerollsThisTurn > 0) 手札 +1 (answer13) |
+| 次のターンのブロック | nextTurnBuffs `roleBlockNext` (`YachtRoleEffects.BlockNextKey`) → BeginNewTurn の Phase B で `itemBlockBonus` の初期値 (〈負け越しの賽〉〈小口の錠前〉〈曇りの合わせ鏡〉) |
+| 役の適用 (`ResolveRoles` / `DecideOmniPair`) | 〈擦り切れた賽袋〉戦闘の最初の振り直しが無料 / 〈曇りの合わせ鏡〉〈宿命の音叉〉〈万象の賽盆〉は §9.2 の役の段 |
 | BOT | 6d は Resolve と同じ関数なので配線の見積もりに自動で入る。 振り直すかの線 (`RoleRerollPips`) は TerminalCards の定数で 6d を面の出方ごとに数え、 掛け算は振った目の和に掛けた量。 次のターンへ持ち越す分は見ない。 乱数は引かない |
 | 計装 | `CombatManager.RoleFormedFired` (役の成立) / `RoleOmniFired` (万象の格上げ) → ランの記録 `roleFormedFired` / `roleOmniFired` |
 
@@ -1129,7 +1129,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
          賽目の【規則】と締め (2026-11-21・段 1-f・所持は AxisRules.Owns):
            〈万象の賽盆〉: 格上げだけ (上の振り直しの段)。 「ゾロ目の効果を 2 回 Apply」は answer13 で削除
            〈曇りの合わせ鏡〉: 2 個そろい (目 f) なら Pair(f − 1) の効果も Apply (役は立っていない ── firedRolesThisTurn・OnRoleFired・計装に数えない)。 f = 1 なら次のターンの無料の振り直し +1・次のターンのブロック +6
-           〈宿命の骨賽〉: 立った役がゾロ目・連なり (格上げも)、 または前のターンにも役が立った (role.fateLast・2026-11-22 neon 収束: 旧 ゾロ目だけ) なら ctx.accumulatedValues["role.fate"] に控え、 次のターンの ResolveRoles の頭でその効果を 1 回 Apply (数えない・鏡は掛けない)
+           〈宿命の音叉〉: 立った役がゾロ目・連なり (格上げも)、 または前のターンにも役が立った (role.fateLast・2026-11-22 neon 収束: 旧 ゾロ目だけ) なら ctx.accumulatedValues["role.fate"] に控え、 次のターンの ResolveRoles の頭でその効果を 1 回 Apply (数えない・鏡は掛けない)
          役を適用した直後に出来事 OnRoleFired (量 = YachtRoles.Strength・2 個そろい 1 / ゾロ目・連なり 2)。 OnWired の前 = 品の攻撃 +N (mutualAttackBonus) と貫通は撃ごとに乗る。
 
 攻撃しないターン (攻撃端子 0 本 / 逃げる・2026-11-04 修正)
