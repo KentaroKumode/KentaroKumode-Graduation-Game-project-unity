@@ -412,7 +412,7 @@ namespace UI.Game2D
             else
             {
                 // ダウン・チャージ・攻撃しない天与 (予告の印が無いターン): 字で
-                string t = s.down ? (s.downWeak ? "ダウン(ひび) 攻撃なし" : "ダウン 攻撃なし")
+                string t = s.down ? (s.downWeak ? "よろめき 攻撃なし" : "ダウン 攻撃なし")
                          : s.charging ? (s.tenyo > 0 ? "チャージ " + TenyoHeavy.NameOf((TenyoHeavy.Gift)s.tenyo) : "チャージ 攻撃なし")
                          : s.heavyIn == 0 && s.tenyo > 0 && s.eatk == 0 ? TenyoHeavy.NameOf((TenyoHeavy.Gift)s.tenyo) + " 攻撃なし" : null;
                 if (t == null) { xr = cx + 4; }
@@ -427,11 +427,11 @@ namespace UI.Game2D
             }
             // 前触れ (次のターン)・ダウン中の倍率・ひび・目盛りまで・不安定 (旧画面の予告の枠の下の行)
             var parts = new List<string>(3); bool hot = false;
-            if (s.downPending > 0) { parts.Add(s.downNextWeak ? "次 ダウン(ひび)" : "次 ダウン"); hot = true; }
+            if (s.downPending > 0) { parts.Add(s.downNextWeak ? "次 よろめき" : "次 ダウン"); hot = true; }
             else if (s.guardIn == 1 && s.heavyIn == 1) { parts.Add("次 構え・大技"); hot = true; }
             else if (s.heavyIn == 1) { parts.Add("次 大技"); hot = true; }
             else if (s.guardIn == 1) parts.Add("次 構え");
-            if (s.down && !s.downWeak) { parts.Add("被ダメ×" + BossDown.TakenMulCard.ToString("0.0#")); hot = true; }
+            if (s.down && (!s.downWeak || BossDown.TakenMulNow)) { parts.Add("被ダメ×" + (BossDown.TakenMulCard + BossDown.TakenBonusPctNow * 0.01f).ToString("0.0#")); hot = true; }
             else if (s.crackBreakTurn >= 0) { parts.Add(s.crackBreakTurn <= s.turn ? "ひび このターンで割れる" : "ひび あと" + (s.crackBreakTurn - s.turn + 1) + "ターン"); hot = true; }
             else if (s.downNotchHp >= 0 && s.downCracks != null && s.downBroken < s.downCracks.Length && s.downCracks[s.downBroken] >= 0) { parts.Add("ひび 通常攻撃で割れる"); hot = true; }
             if (parts.Count > 0)
