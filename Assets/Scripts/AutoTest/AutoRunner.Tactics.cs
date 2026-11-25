@@ -9,13 +9,13 @@ namespace AutoTest
     /// <summary>
     /// AutoRunner: 戦術消耗品 (2026-11-20・item-overhaul-spec §7-1 / §12-6) の使い方。 配線の判断の頭 (<see cref="DeckWiringPlanPolicy"/>・護符と同じ口) で呼ぶ。
     ///
-    /// <para><b>比べて使う 4 つ</b> (入れ替えの符・無銘の潤滑油・急所突きの針・倍化の共鳴玉): 使った場合の盤面を本体と同じ旗
+    /// <para><b>比べて使う 4 つ</b> (風替わりの羽根・無銘の潤滑油・急所突きの針・倍化の共鳴玉): 使った場合の盤面を本体と同じ旗
     /// (TerminalBattleState の ignoreCond / doubleAll・針の印・手札の引き直し) で組み、 今ターンの最良の効用 (<see cref="BestDeckUtilityOver"/>・
     /// 配線と同じ列挙と HP の帳簿) を使わない場合と比べる。 差が「取っておく値」(<see cref="TacticKeepValue"/>) より大きい物のうち、 差が一番大きい 1 つだけ使う (1 ターン 1 つ)。</para>
     /// <para><b>規則の 4 つ</b>: 鎧割りの酸瓶 (戦闘の頭・エリートかボス・敵の防御 6 以上)・反転の砂 (ボス戦・エスカレーションの段 2 以上)・
     /// 複製の水銀 (ボス戦の頭・手札で素の点が一番高い端子)・目盛り削りのノミ (ボス戦・鑿の削りだけで目盛りが割れ、 そのダウンが大技のチャージか大技のターンに重なり、
     /// 今ターンの最良の挿し方では割れない時)。</para>
-    /// <para>乱数: 入れ替えの符の引き直しの見込みは専用の乱数 (盤面から決まる種) で引く。 GameRng は引かない。</para>
+    /// <para>乱数: 風替わりの羽根の引き直しの見込みは専用の乱数 (盤面から決まる種) で引く。 GameRng は引かない。</para>
     /// </summary>
     public partial class AutoRunner
     {
@@ -26,7 +26,7 @@ namespace AutoTest
         private const int TacticAcidMinDefense = 6;
         /// <summary>反転の砂を使うエスカレーションの段の下限 (§12-6)。</summary>
         private const int TacticSandMinStage = 2;
-        /// <summary>入れ替えの符の引き直しの標本の数。</summary>
+        /// <summary>風替わりの羽根の引き直しの標本の数。</summary>
         private const int TacticSwapSamples = 8;
 
         /// <summary>[計装] 戦術消耗品を使った数 (品ごと・バッチ累計)。</summary>
@@ -125,7 +125,7 @@ namespace AutoTest
             if (pick != null) UseTactic(run, pick);
         }
 
-        /// <summary>入れ替えの符を使った後の最良の効用の期待値 (手札を捨て札へ送り、 同じ枚数を引き直す・本体 <see cref="TerminalDeckState.SwapHand"/> と同じ順・写しで引く)。
+        /// <summary>風替わりの羽根を使った後の最良の効用の期待値 (手札を捨て札へ送り、 同じ枚数を引き直す・本体 <see cref="TerminalDeckState.SwapHand"/> と同じ順・写しで引く)。
         /// shortcut: 切り直しの時の山札の規則 (BeforeShuffle の引く枚数の上乗せ・采配の品) は見ない。 采配の品で差が出るなら SampleNextBoard と同じく BeforeShuffle を写しに掛ける。</summary>
         private float SwapExpectedUtility(in DeckEval ev, int[] dice, MutualTurnTelegraph tele)
         {

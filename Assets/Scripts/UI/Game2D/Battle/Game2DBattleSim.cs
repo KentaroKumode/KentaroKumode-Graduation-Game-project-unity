@@ -460,7 +460,7 @@ namespace UI.Game2D.Battle
             if (cm != null) { _hpBefore += cm.PlayerHP - hpBefore; playerHp = cm.PlayerHP; playerMax = Mathf.Max(1, cm.PlayerMaxHP); }
             var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
             if (ctx != null) charge = ctx.GetCharge();
-            // 戦術消耗品 (2026-11-20: 〈入れ替えの符〉〈複製の水銀〉・〈帯革の薬嚢〉) で場の手札が変わったら、 場を取り直す。
+            // 戦術消耗品 (2026-11-20: 〈風替わりの羽根〉〈複製の水銀〉・〈帯革の薬嚢〉) で場の手札が変わったら、 場を取り直す。
             //   挿してあった出目は外す (同じ添字に別の端子が来るため)
             var dk = cm?.TerminalDeck;
             if (dk != null && !SameBoard(dk.board))
@@ -736,7 +736,7 @@ namespace UI.Game2D.Battle
                                    + (preview != null && preview.damageMul != 1f ? " ×" + preview.damageMul.ToString("0.00") : "");
 
         // ── 役の軸の品 (2026-11-21・仮置き) ── 役の品を持つ戦闘で、 この戦闘で役が成立した回数 (+ このターンに立つ役)・続いたターンを右の列に出す (表示だけ)。
-        //   このターンに役が立つなら金。 〈符丁の刻み板〉〈連勝の銀杯〉〈万象の賽盆〉が回数を、 〈揃いのメトロノーム〉が続いたターンを読む。
+        //   このターンに役が立つなら金。 〈進軍の角笛〉〈連勝の銀杯〉〈万象の賽盆〉が回数を、 〈揃いのメトロノーム〉が続いたターンを読む。
         public bool HasRoleItems => DeckSt != null && ItemSystem.PassiveSkills.AxisRules.Count(GameLoop.GameManager.Instance?.Run, ItemSystem.PassiveSkills.AxisRules.Role) > 0;
         public bool RoleLive => HasRoleItems && preview != null && preview.roleNow > 0;
         public string RoleLabel => !HasRoleItems ? "" : "役 " + DeckSt.roleCount + (RoleLive ? "+1" : "") + "回" + (DeckSt.roleStreak > 0 ? " 続" + DeckSt.roleStreak : "")

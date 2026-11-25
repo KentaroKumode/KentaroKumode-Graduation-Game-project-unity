@@ -30,7 +30,7 @@ namespace AutoTest.EditorTests
             Assert.That(Run(RoleItems.WoodTag, p5).blockAdd - Run(RoleItems.None, p5).blockAdd, Is.EqualTo(TerminalCards.WoodTagBlock));
             Assert.That(Atk(RoleItems.WoodTag, p3), Is.EqualTo(0));
             Assert.That(Atk(RoleItems.WoodTag, p6), Is.EqualTo(0));
-            // 符丁の刻み板: 3・4 の役・回数 (3 + 1)・上限
+            // 進軍の角笛: 3・4 の役・回数 (3 + 1)・上限
             Assert.That(Atk(RoleItems.NotchBoard, p4, 3), Is.EqualTo(TerminalCards.NotchBoardPer * 4 * 2));
             Assert.That(Atk(RoleItems.NotchBoard, p3, 3), Is.EqualTo(TerminalCards.NotchBoardPer * 4 * 2));
             Assert.That(Atk(RoleItems.NotchBoard, p4, 20), Is.EqualTo(TerminalCards.NotchBoardMax * 2));

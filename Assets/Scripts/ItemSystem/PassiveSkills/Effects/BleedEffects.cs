@@ -253,11 +253,11 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.bleedDouble = true;
     }
 
-    /// <summary>戻り血の古鎌 (分岐 B): 秘宝が敵の出血を使うたび (<see cref="Kw.ConsumeBleed"/> の出来事 OnBleedConsume)、 使った量の 60% (切り捨て) が
+    /// <summary>戻り血の頭骨 (分岐 B): 秘宝が敵の出血を使うたび (<see cref="Kw.ConsumeBleed"/> の出来事 OnBleedConsume)、 使った量の 60% (切り捨て) が
     /// 次のターンの頭に出血として戻る。 自然に減る分 (OnBleedDecay) は戻らない。 戻す出血は AddEnemyBleed を通す。</summary>
     public class ReturningBloodSickle : IPassiveSkillEffect, IRelicDisplay
     {
-        public string SkillId => "戻り血の古鎌";
+        public string SkillId => "戻り血の頭骨";
         public const int ReturnPct = 60;
         /// <summary>[persistent] 次のターンの頭に戻す量 / このターンに使った分の 60% / その「このターン」の番号。</summary>
         private const string ReadyKey = "bld.sickle.ready", CurKey = "bld.sickle.cur", TurnKey = "bld.sickle.turn";
@@ -279,7 +279,7 @@ namespace ItemSystem.PassiveSkills.Effects
             if (n <= 0) return;
             ctx.accumulatedValues[ReadyKey] = 0;
             ctx.AddEnemyBleed(n);
-            Rw.Log($"[戻り血の古鎌] 使った出血の 60% が戻る: 出血 +{n} → {ctx.enemyBleedStacks}");
+            Rw.Log($"[戻り血の頭骨] 使った出血の 60% が戻る: 出血 +{n} → {ctx.enemyBleedStacks}");
         }
 
         /// <summary>「このターン」の分を「次のターンの頭に戻す」側へ移し、 今のターンの番号にする。</summary>

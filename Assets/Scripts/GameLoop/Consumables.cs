@@ -350,7 +350,7 @@ namespace GameLoop
             switch (id)
             {
                 case ItemIds.TacticSwap:
-                    if (Debug.unityLogger.logEnabled) Debug.Log($"[入れ替えの符] 手札を捨てて {dk.SwapHand()} 枚引き直した");
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[風替わりの羽根] 手札を捨てて {dk.SwapHand()} 枚引き直した");
                     return true;
                 case ItemIds.TacticOil:
                     dk.state.ignoreCond = true;      // 〈無形の構え〉の「条件を無視」と同じ旗 (このターンだけ・BeginTurn が戻す)

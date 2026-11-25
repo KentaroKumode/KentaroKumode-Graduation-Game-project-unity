@@ -185,7 +185,7 @@ namespace GameLoop
         //   items.json の consFamily = ConsTacticFamily・tier 1 (出来事 OnConsumableUse の量)。 効果の正本は Consumables.ApplyTactic。
         //   店の消費の 3 枠目に 1 種 (ShopManager・乱数キー "shop.consTactic")。 戦闘中だけ使える。
         public const string ConsTacticFamily = "tactic";
-        public const string TacticSwap = "入れ替えの符", TacticOil = "無銘の潤滑油", TacticAcid = "鎧割りの酸瓶", TacticNeedle = "急所突きの針",
+        public const string TacticSwap = "風替わりの羽根", TacticOil = "無銘の潤滑油", TacticAcid = "鎧割りの酸瓶", TacticNeedle = "急所突きの針",
             TacticChisel = "目盛り削りのノミ", TacticSand = "反転の砂", TacticOrb = "倍化の共鳴玉", TacticMercury = "複製の水銀";
 
         // === 消耗品の連動品 (帯革・小瓶 = GeneralEffects.cs / 見本箱 = GoldEffects.cs) ===
@@ -201,8 +201,8 @@ namespace GameLoop
         // === 山札の軸の 19 品 (full-item-rework-ledger §⑦) ===
         //   端子の解決・山札を変える分 = CombatSystem.TerminalCards の DeckItems の旗 (TerminalCards.DeckItemsOf)。 組み置きの配線束・整理された工具箱 = CombatManager.BeginTerminalDeck。
         //   出来事で書く分 (焼き入れの挟み の敵へのダメージ・仕込みの切替器 の目盛りの削り) = DeckEffects.cs。
-        public const string DeckTongs = "焼き入れの挟み", DeckSparePlug = "組み置きの配線束", DeckClasp = "留め金の栞", DeckAuxGear = "補助歯車", DeckIdleWeight = "空回りの錘";
-        public const string DeckBroom = "灰払いの箒", DeckRewind = "早回しのゼンマイ", DeckSwitchboard = "仕込みの切替器", DeckMold = "打ち抜きの金型", DeckToolbox = "整理された工具箱";
+        public const string DeckTongs = "焼き入れの挟み", DeckSparePlug = "組み置きの配線束", DeckClasp = "留め金の栞", DeckAuxGear = "備えの鐘", DeckIdleWeight = "空回りの錘";
+        public const string DeckBroom = "灰払いの箒", DeckRewind = "早回しのゼンマイ", DeckSwitchboard = "仕込みの切替器", DeckMold = "型合わせの古鍵", DeckToolbox = "整理された工具箱";
         public const string DeckCrucible = "再利用のるつぼ", DeckBlueprint = "無銘の設計図", DeckSeamless = "継ぎ目のない導線", DeckFolded = "取っておきの銀弾";
         public const string DeckPride = "切り捨ての半券";
         public const string DeckBag = "解体屋の袋", DeckWorkbench = "常設の作業台", DeckAsh = "廃材組みの蒸気機関", DeckEngine = "永久機関の主軸";
@@ -210,7 +210,7 @@ namespace GameLoop
         // === 役の軸の 13 品 (2026-11-21・full-item-rework-ledger §⑧) ===
         //   出来事で書く品 (欠け目の見立て・揃いのメトロノーム・負け越しの賽・小口の錠前) = RoleEffects.cs。 端子の解決の中の分 = CombatSystem.TerminalCards の RoleItems の旗。
         //   擦り切れた賽袋 = CombatManager.FreeRerollsLeft。 曇りの合わせ鏡・宿命の音叉・万象の賽盆 = CombatManager.ResolveRoles / DecideOmniPair。
-        public const string RoleBag = "擦り切れた賽袋", RoleWoodTag = "潮目の木札", RoleNotchBoard = "符丁の刻み板", RoleChipped = "欠け目の見立て";
+        public const string RoleBag = "擦り切れた賽袋", RoleWoodTag = "潮目の木札", RoleNotchBoard = "進軍の角笛", RoleChipped = "欠け目の見立て";
         public const string RoleClapper = "揃いのメトロノーム", RoleMirror = "曇りの合わせ鏡", RoleFate = "宿命の音叉", RoleOmni = "万象の賽盆";
         public const string RoleLosing = "負け越しの賽", RoleConduit = "小口の錠前", RoleGear = "追い目の賽筒", RoleThunder = "轟きの大賽", RoleBloodmark = "連勝の銀杯";
 
