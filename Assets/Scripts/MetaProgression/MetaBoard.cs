@@ -53,6 +53,8 @@ namespace MetaProgression
     public class BoardPanelDef
     {
         public string id = "", name = "", shape = "1", source = "shop", achievement = "", module = "";
+        /// <summary>系統 (survive / defense / attack / economy / wiring / explore / spark・2026-11-23)。 棚と盤のアイコンと盤の地色はここから引く (id から推測しない)。</summary>
+        public string family = "";
         public int cost;
         public BoardStats stats = new BoardStats();
 

@@ -120,6 +120,9 @@ namespace AutoTest.EditorTests
             {
                 Assert.That(d.CellCount, Is.InRange(1, 4), d.id);
                 if (!string.IsNullOrEmpty(d.module)) Assert.That(d.Module, Is.Not.Null, d.id);
+                Assert.That(new[] { "survive", "defense", "attack", "economy", "wiring", "explore", "spark" }, Does.Contain(d.family), d.id + " の family");
+                Assert.That(d.family == "spark", Is.EqualTo(d.shape == "O"), d.id + " は 2×2 ⇔ 種火");
+                Assert.That(UnityEngine.Resources.Load<UnityEngine.Texture2D>("Game2DMetaBoard/icons/" + (d.family == "spark" ? d.id : d.family)), Is.Not.Null, d.id + " の系統の印");
                 if (d.FromAchievement) { ach++; Assert.That(MetaProgression.Achievements.AchievementCatalog.Get(d.achievement), Is.Not.Null, d.id + " の実績 " + d.achievement); }
                 else Assert.That(d.cost, Is.GreaterThan(0), d.id);
             }

@@ -17,13 +17,11 @@ namespace UI.Game2D
         {
             string key = name + (trim ? "#t" : "");
             if (_cache.TryGetValue(key, out var s)) return s;
-            var ta = Resources.Load<TextAsset>("Game2DMetaBoard/" + name + ".png");
-            if (ta != null)
+            var t = Resources.Load<Texture2D>("Game2DMetaBoard/" + name); // 読み取り可は ItemIconImporter が付ける
+            if (t != null)
             {
-                var t = new Texture2D(2, 2, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point };
-                if (t.LoadImage(ta.bytes)) s = KitSrc.From(t);
-                Object.Destroy(t);
-                if (s != null && trim) s = Trim(s);
+                s = KitSrc.From(t);
+                if (trim) s = Trim(s);
             }
             _cache[key] = s;
             return s;
@@ -180,16 +178,18 @@ namespace UI.Game2D
 
         // ── 描く ──
 
+        /// <summary>盤の地色 = 系統 (meta_board_panels.json の family・アイコンと同じ表から引く・neon answer25)。 既存の面の絵を色替えして使う。</summary>
         private static KitSrc FaceOf(BoardPanelDef d)
         {
-            switch (d.shape)
+            switch (d.family)
             {
-                case "1": return MetaBoardArt.Get("face_gray");
-                case "I2": return MetaBoardArt.Get("face_blue");
-                case "I3": case "L3": return MetaBoardArt.Recolor("face_green", new Color32(0x7c, 0xb0, 0x6a, 255));
-                case "T": return MetaBoardArt.Get("face_amber");
-                case "S": case "Z": return MetaBoardArt.Get("face_purple");
-                case "O": return MetaBoardArt.Tinted("face_spark", SparkColor(d.Module));
+                case "survive": return MetaBoardArt.Recolor("face_gray", new Color32(0xc0, 0x5a, 0x48, 255));     // 暖赤
+                case "defense": return MetaBoardArt.Recolor("face_green", new Color32(0x7c, 0xb0, 0x6a, 255));    // 緑
+                case "attack": return MetaBoardArt.Get("face_blue");                                                // 青
+                case "economy": return MetaBoardArt.Get("face_amber");                                              // 金
+                case "wiring": return MetaBoardArt.Recolor("face_gray", new Color32(0x58, 0xb8, 0xc4, 255));      // 水色
+                case "explore": return MetaBoardArt.Get("face_purple");                                             // 紫
+                case "spark": return MetaBoardArt.Tinted("face_spark", SparkColor(d.Module));                       // 種火 = 軸の色の縁
                 default: return MetaBoardArt.Get("face_gray");
             }
         }
@@ -251,6 +251,17 @@ namespace UI.Game2D
                 else c = face.px[(face.h / 2) * face.w + face.w - 1 - d];
                 if (c.a < 128) c = face.px[(face.h / 2) * face.w + face.w / 2];
                 int px = CellX + x, py = CellY + y;
+                if (!edge.HasValue && face != null)
+                {   // 外周だけ: 1 dot の暗い溝 + 1 dot の明暗の縁 (上・左が明るく、 下・右が暗い)・外側の凸角 1 dot は欠く (同じ色が隣り合っても境目が溶けない・neon answer25 §3)
+                    var inner = Inner(face);
+                    if (d == 0) { if ((dt == 0 || db == 0) && (dl == 0 || dr == 0)) continue; c = Darken(inner, 0.3f); }
+                    else if (d == 1) c = dt == 1 || dl == 1 ? Brighten(inner, 1.45f) : Darken(inner, 0.55f);
+                    else if (d == 2 && cells.Length == 4 && alpha >= 1f)
+                    {   // 4 マスのコアだけ、 凸角の内側に明るいビス点
+                        int sx = dl == 2 ? -1 : dr == 2 ? 1 : 0, sy = dt == 2 ? -1 : db == 2 ? 1 : 0;
+                        if (sx != 0 && sy != 0 && !(x + 3 * sx >= 0 && y + 3 * sy >= 0 && x + 3 * sx < S && y + 3 * sy < S && m[(y + 3 * sy) * S + x + 3 * sx])) c = Game2DKit.Ivory;
+                    }
+                }
                 if (edge.HasValue && d < 2) Blend(p, px, py, edge.Value, edgeA);
                 else if (alpha >= 1f) p.Set(px, py, new Color32(c.r, c.g, c.b, 255));
                 else Blend(p, px, py, c, alpha);
@@ -432,10 +443,14 @@ namespace UI.Game2D
             "1" => "1 マス", "I2" => "2 マス", "I3" => "3 マス (I)", "L3" => "3 マス (L)", "T" => "4 マス (T)", "O" => "4 マス (2×2)", "S" => "4 マス (S)", "Z" => "4 マス (Z)", _ => shape,
         };
 
-        /// <summary>パネルの 1 bit アイコン (16×16・Resources/Game2DMetaBoard/icons/&lt;id&gt;) を col で打つ。 outline = 面の上で読めるよう暗い縁を 1 dot 付ける。</summary>
+        /// <summary>系統の 1 bit の印 (16×16・Resources/Game2DMetaBoard/icons/&lt;family&gt;、 種火は軸ごとに icons/&lt;id&gt;) を col で打つ。 outline = 面の上で読めるよう暗い縁を 1 dot 付ける。
+        /// 種火には 16×16 のすぐ外に 1 dot の角括弧 (防御の盾と種火のシールドの見分け・neon answer25)。</summary>
         private static void Icon(KitPix p, BoardPanelDef d, int x, int y, Color32 col, bool outline)
         {
-            var s = MetaBoardArt.Get("icons/" + d.id, false); if (s == null) return;
+            var s = MetaBoardArt.Get("icons/" + (d.family == "spark" ? d.id : d.family), false); if (s == null) return;
+            if (d.family == "spark")
+                for (int i = 0; i < 3; i++) foreach (var (cx, cy, sx, sy) in new[] { (x - 1, y - 1, 1, 1), (x + 16, y - 1, -1, 1), (x - 1, y + 16, 1, -1), (x + 16, y + 16, -1, -1) })
+                    { p.Set(cx + sx * i, cy, col); p.Set(cx, cy + sy * i, col); }
             bool On(int ix, int iy) => ix >= 0 && iy >= 0 && ix < s.w && iy < s.h && s.px[iy * s.w + ix].a >= 128;
             if (outline)
                 for (int iy = -1; iy <= s.h; iy++) for (int ix = -1; ix <= s.w; ix++)

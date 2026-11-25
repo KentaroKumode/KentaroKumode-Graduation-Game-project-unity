@@ -21,6 +21,8 @@ namespace AutoTest.EditorTools
         private const string TargetDir = "Assets/Resources/Icons/Items/";
         /// <summary>レアリティの枠 (18x18・2026-11-08)。 アイコンと同じ設定にする。</summary>
         private const string FrameDir = "Assets/Resources/Icons/Frames/";
+        /// <summary>整備盤の部品とアイコン (2026-11-23〜 .png.bytes から普通の png へ・プレビューが見えるように)。</summary>
+        private const string MetaBoardDir = "Assets/Resources/Game2DMetaBoard/";
 
         /// <summary>ピクセル規約 (PPU=32)。 <b>スケール倍率で見た目を作らない</b>ため、
         /// 解像度と PPU の対応をここで固定する。</summary>
@@ -28,10 +30,11 @@ namespace AutoTest.EditorTools
 
         private void OnPreprocessTexture()
         {
-            if (assetPath == null || !(assetPath.StartsWith(TargetDir) || assetPath.StartsWith(FrameDir))) return;
+            if (assetPath == null || !(assetPath.StartsWith(TargetDir) || assetPath.StartsWith(FrameDir) || assetPath.StartsWith(MetaBoardDir))) return;
             if (!assetPath.EndsWith(".png", System.StringComparison.OrdinalIgnoreCase)) return;
 
             var ti = (TextureImporter)assetImporter;
+            ti.isReadable          = assetPath.StartsWith(MetaBoardDir); // 整備盤は画素を読んで液晶に打つ (MetaBoardArt.Get)
             ti.textureType         = TextureImporterType.Sprite;
             ti.spriteImportMode    = SpriteImportMode.Single;
             ti.spritePixelsPerUnit = PixelsPerUnit;
@@ -45,7 +48,7 @@ namespace AutoTest.EditorTools
             //   容量のために色を潰す理由が無い。
             var settings = ti.GetDefaultPlatformTextureSettings();
             settings.textureCompression = TextureImporterCompression.Uncompressed;
-            settings.maxTextureSize = 128;
+            settings.maxTextureSize = assetPath.StartsWith(MetaBoardDir) ? 512 : 128; // 盤の部品は 140 dot 幅がある (縮めない)
             ti.SetPlatformTextureSettings(settings);
         }
     }
