@@ -334,7 +334,7 @@ namespace GameLoop
                 case ItemIds.TacticSwap: return dk == null || dk.hand.Count == 0 ? "手札が無い" : null;
                 case ItemIds.TacticOil: return dk == null ? "使えない" : dk.state.ignoreCond ? "このターンはもう効いている" : null;
                 case ItemIds.TacticOrb: return dk == null ? "使えない" : dk.state.doubleAll ? "このターンはもう効いている" : null;
-                case ItemIds.TacticMercury: return dk == null || dk.hand.Count == 0 ? "写す端子が無い" : null;
+                case ItemIds.TacticMercury: return dk == null || dk.hand.Count == 0 ? "写すカードが無い" : null;
                 case ItemIds.TacticNeedle: return ctx.GetAccumulated(CombatManager.TacticNeedleKey) > 0f ? "もう仕込んである" : null;
                 case ItemIds.TacticChisel: return cm.EnemyHP <= 0 ? "敵が倒れている" : null;
                 case ItemIds.TacticAcid: case ItemIds.TacticSand: return null;

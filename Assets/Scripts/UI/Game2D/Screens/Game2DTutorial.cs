@@ -19,10 +19,10 @@ namespace UI.Game2D
         public const string CombatForm = "戦闘の形式";
         public const string RollDice = "ダイスを振る";
         public const string Telegraph = "敵の予告";
-        public const string Plug = "端子に挿す";
-        public const string Deck = "端子の山札";
-        public const string Kinds = "端子の種類";
-        public const string GrowDeck = "端子を増やす";
+        public const string Plug = "カードに挿す";
+        public const string Deck = "カードの山札";
+        public const string Kinds = "カードの種類";
+        public const string GrowDeck = "カードを増やす";
         public const string Order = "解決の順番";
         public const string Long = "戦闘の長期化";
         public const string Dice = "賽";

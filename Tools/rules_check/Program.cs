@@ -330,7 +330,7 @@ static class T
             GameLoop.GameHooks.HandCarry = HandCarryMode.Pick; GameLoop.GameRng.Reset();
             var bd = TerminalCards.Get(TerminalIds.BurnOut);
             Check(bd != null && bd.kind == TerminalKind.Attack && bd.disposable && !bd.rare && TerminalCards.BurnOutMul == 2
-                  && bd.description == "出目 ×2 を攻撃に。挿さずに空けた手札の端子を 1 枚、この戦闘から外す。",
+                  && bd.description == "出目 ×2 を攻撃に。挿さずに空けた手札のカードを 1 枚、この戦闘から外す。",
                   "〈火葬の剣〉: 攻撃の種類・使い捨て・コモン・説明文");
             var env = new TerminalEnv();
             // 挿すと出目 ×2 が攻撃に入り、 選んだ空けた端子が外れる

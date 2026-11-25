@@ -540,8 +540,8 @@ namespace CombatSystem
             [TerminalIds.Detector] = "出目 ×" + DetectorMul + " +" + DetectorBonusUp + " を攻撃に。",
             [TerminalIds.DischargeTube] = "充電 " + DischargeCostUp + " を払い、出目 ×" + DischargeMul + " を攻撃に。",
             [TerminalIds.Deathwish] = "出目の半分 (切り上げ) の HP を払い、出目 ×" + DeathwishMul + " を攻撃に。HP が足りなければ発動しない。このターンに敵を倒すと、払った HP が戻る。",
-            [TerminalIds.Relay] = "出目を攻撃に。このターンに発動した基本以外の端子 1 つにつき攻撃 +" + RelayPerFiredUp + "。",
-            [TerminalIds.Grinder] = "出目を攻撃に。全部の出目 +1 (この端子に挿した出目も)。",
+            [TerminalIds.Relay] = "出目を攻撃に。このターンに発動した基本以外のカード 1 つにつき攻撃 +" + RelayPerFiredUp + "。",
+            [TerminalIds.Grinder] = "出目を攻撃に。全部の出目 +1 (このカードに挿した出目も)。",
             [TerminalIds.Oscillator] = "出目を攻撃に。前にこれを挿した目と同じなら攻撃 +" + OscPerStreakUp + " × 連続回数。",
             [TerminalIds.Twin] = "出目を攻撃に。出目 2 個まで挿せる。2 個挿したら攻撃 +" + TwinPairBonusUp + "。",
             [TerminalIds.Fuse] = "ブロック +" + FuseBlockUp + "。",
@@ -554,17 +554,17 @@ namespace CombatSystem
             [TerminalIds.Heal] = (HealMul == 1 ? "HP +出目。" : "HP +出目 ×" + HealMul + "。") + "シールド +" + HealShieldUp + "。",
             [TerminalIds.Capacitor] = "出目を溜める。" + CapacitorNeedUp + " で次の攻撃 +" + CapacitorAttack + "。",
             [TerminalIds.Arrester] = "出目を溜める。" + ArresterNeedUp + " でそのターンの被ダメージ半分。",
-            [TerminalIds.Transformer] = "攻撃の端子を挿した出目を 2 倍。この端子に挿した出目も攻撃に足す。",
-            [TerminalIds.Switchboard] = "次のターン、端子を " + SwitchboardDrawUp + " 枚多く引く。",
+            [TerminalIds.Transformer] = "攻撃のカードを挿した出目を 2 倍。このカードに挿した出目も攻撃に足す。",
+            [TerminalIds.Switchboard] = "次のターン、カードを " + SwitchboardDrawUp + " 枚多く引く。",
             [TerminalIds.VacuumTube] = "このターンの会心倍率 +" + VacuumCritMultUp.ToString("0.0") + "。",
             [TerminalIds.Coolant] = "出目を溜める。" + CoolantNeedUp + " ごとにエスカレーションの段階を 1 つ戻す。",
             [TerminalIds.Counter] = "出目を攻撃に。基本以外の発動が累計 " + CounterEveryUp + " 回になるごとに、この戦闘中の与ダメージ +" + (int)(CounterPct * 100) + "%。",
-            [TerminalIds.Preheater] = "出目 +" + UpPipBlock2 + " をブロックに。次のターン、端子の条件を無視する。",
+            [TerminalIds.Preheater] = "出目 +" + UpPipBlock2 + " をブロックに。次のターン、カードの条件を無視する。",
             [TerminalIds.TwinShot] = "同じ目 2 個で、出目の合計 ×" + TwinShotMulUp + " を攻撃に。",
             [TerminalIds.Harvester] = "出目を攻撃に。このターンに敵を倒すと最大 HP +" + HarvesterMaxHpUp + " (恒久)。",
-            [TerminalIds.Whet] = "出目を攻撃に。敵の HP が半分以下なら攻撃 +" + WhetLowHpAttackUp + "。このターンに敵を倒すと、この端子の攻撃が恒久に +" + WhetGain + "。",
+            [TerminalIds.Whet] = "出目を攻撃に。敵の HP が半分以下なら攻撃 +" + WhetLowHpAttackUp + "。このターンに敵を倒すと、このカードの攻撃が恒久に +" + WhetGain + "。",
             [TerminalIds.LootBox] = "出目を攻撃に。このターンに敵を倒すとゴールド +" + LootGoldUp + "。",
-            [TerminalIds.Stripper] = "出目を攻撃に。このターンに敵を倒すと、戦闘後の端子の選択肢が " + StripperChoicesUp + " つ増える。",
+            [TerminalIds.Stripper] = "出目を攻撃に。このターンに敵を倒すと、戦闘後のカードの選択肢が " + StripperChoicesUp + " つ増える。",
             [TerminalIds.Retainer] = "出目 +" + UpPipBlock2 + " をブロックに。捨て札から 1 枚、次のターンの手札に戻す。",
             [TerminalIds.StopSignal] = "敵は次のターン行動しない。出目をブロックに。",
             [TerminalIds.Fork] = "出目を攻撃に、出目 +" + UpPip + " をブロックに入れる。",
@@ -586,14 +586,14 @@ namespace CombatSystem
             [TerminalIds.FirstAid] = "この戦闘で HP を失った後だけ発動。HP +出目" + (FirstAidMul == 1 ? "" : " ×" + FirstAidMul) + " +" + FirstAidBonusUp + "。最大 HP を超えた分はシールドになる。",
             [TerminalIds.FullCharge] = "この戦闘中、充電の上限 +" + FullChargeCapUp + "。充電を上限まで満たす。",
             [TerminalIds.CoolShot] = "エスカレーションの段階を 1 つ戻す。出目をブロックに。",
-            [TerminalIds.Copier] = "挿さずに空けた手札の端子を 1 枚、この戦闘中だけ複製して、次のターンの手札に加える。出目を充電に。空けた端子が無ければ発動しない。",
-            [TerminalIds.BurnOut] = "出目 ×" + BurnOutMulUp + " を攻撃に。挿さずに空けた手札の端子を 1 枚、この戦闘から外す。空けた端子が無ければ発動しない。",
+            [TerminalIds.Copier] = "挿さずに空けた手札のカードを 1 枚、この戦闘中だけ複製して、次のターンの手札に加える。出目を充電に。空けたカードが無ければ発動しない。",
+            [TerminalIds.BurnOut] = "出目 ×" + BurnOutMulUp + " を攻撃に。挿さずに空けた手札のカードを 1 枚、この戦闘から外す。空けたカードが無ければ発動しない。",
             // 采配と共通の端子 (2026-11-20)。 使い捨ては回数・枚数を増やさない (段 1-b の方針・terminal_upgrades_draft.md)
             [TerminalIds.BurnSlash] = "この戦闘で使い捨てを使った後だけ発動 (前のターンまで)。出目 ×" + BurnSlashMulUp + " を攻撃に。これまでにこの戦闘で使い捨てを使った回数 ×" + BurnSlashPerUp + " を攻撃に足す。",
             [TerminalIds.Reload] = "このターンに使った他の使い捨てを 1 枚 (場の右から)、次のターンの手札に戻す。出目を充電に。",
-            [TerminalIds.OneCut] = "出目 ×" + OneCutMulUp + " を攻撃に。この撃は敵の防御を無視。挿した攻撃の端子がこれ 1 枚だけのターンにだけ発動する。",
-            [TerminalIds.Gear] = "出目は挿せない。場にあれば、毎ターン最初に発動した基本以外の端子 (場の左から) の挿した目 1 つにつき +" + GearPipUp + "。一度引くとこの戦闘中ずっと場に残る。",
-            [TerminalIds.Bell] = "この戦闘の残りの間、山札を切り直すたび、次のターンに端子を 1 枚多く引く。出目を充電に。",
+            [TerminalIds.OneCut] = "出目 ×" + OneCutMulUp + " を攻撃に。この撃は敵の防御を無視。挿した攻撃のカードがこれ 1 枚だけのターンにだけ発動する。",
+            [TerminalIds.Gear] = "出目は挿せない。場にあれば、毎ターン最初に発動した基本以外のカード (場の左から) の挿した目 1 つにつき +" + GearPipUp + "。一度引くとこの戦闘中ずっと場に残る。",
+            [TerminalIds.Bell] = "この戦闘の残りの間、山札を切り直すたび、次のターンにカードを 1 枚多く引く。出目を充電に。",
             [TerminalIds.Mikiri] = "出目をブロックに。敵が大技を予告したターンなら 2 倍。",
             // 役の軸の端子 (2026-11-21)
             [TerminalIds.DiceTable] = "充電 +出目。次のターンの最初の振り直しの充電の費用 −min(" + DiceTableCapUp + ", この戦闘で役が成立した回数)。",
@@ -685,7 +685,7 @@ namespace CombatSystem
             const TerminalKind A = TerminalKind.Attack, B = TerminalKind.Block, C = TerminalKind.Charge, S = TerminalKind.Support;
             string ax = ItemSystem.PassiveSkills.AxisRules.Crit, ab = ItemSystem.PassiveSkills.AxisRules.Bleed, ap = ItemSystem.PassiveSkills.AxisRules.Poison,
                    ah = ItemSystem.PassiveSkills.AxisRules.Heat, ac = ItemSystem.PassiveSkills.AxisRules.Charge, asx = ItemSystem.PassiveSkills.AxisRules.Shield;
-            var perm = D(TerminalIds.Mains, A, "出目を攻撃に。この戦闘で使うたび、以後のこの端子の攻撃 +" + MainsPerUse + "。一度引くとこの戦闘中ずっと場に残る。"); perm.permanent = true;
+            var perm = D(TerminalIds.Mains, A, "出目を攻撃に。この戦闘で使うたび、以後のこのカードの攻撃 +" + MainsPerUse + "。一度引くとこの戦闘中ずっと場に残る。"); perm.permanent = true;
             return new List<TerminalDef>
             {
                 // ── 基本 ──
@@ -693,13 +693,13 @@ namespace CombatSystem
                 Basic(D(TerminalIds.Block,  B, "出目をブロックに。")),
                 Basic(D(TerminalIds.Charge, C, "出目を充電に。")),
                 // ── 賽の端子 (ADR-0015)。 基本扱い (報酬・店・付与に出ない)・常設 ──
-                ClockDef(D(TerminalIds.Clock, S, "時計の賽の端子。出目の数だけ、エスカレーションの次の段階を先へ送る。一度に 1 つ。")),
+                ClockDef(D(TerminalIds.Clock, S, "時計の賽のカード。出目の数だけ、エスカレーションの次の段階を先へ送る。一度に 1 つ。")),
                 // ── コモン ──
                 D(TerminalIds.Igniter, A, "攻撃 +" + IgniterAttack + "。", TerminalCond.AtMost3),
                 D(TerminalIds.Detector, A, "出目 ×" + DetectorMul + " を攻撃に。", TerminalCond.Odd),
                 Cost(D(TerminalIds.DischargeTube, A, "充電 " + DischargeCost + " を払い、出目 ×" + DischargeMul + " を攻撃に。"), DischargeCost),
                 D(TerminalIds.Deathwish, A, "出目の半分 (切り上げ) の HP を払い、出目 ×" + DeathwishMul + " を攻撃に。HP が足りなければ発動しない。"),
-                D(TerminalIds.Relay, A, "出目を攻撃に。このターンに発動した基本以外の端子 1 つにつき攻撃 +" + RelayPerFired + "。"),
+                D(TerminalIds.Relay, A, "出目を攻撃に。このターンに発動した基本以外のカード 1 つにつき攻撃 +" + RelayPerFired + "。"),
                 D(TerminalIds.Grinder, A, "出目を攻撃に。他の出目すべて +1。"),
                 D(TerminalIds.Oscillator, A, "出目を攻撃に。前にこれを挿した目と同じなら攻撃 +" + OscPerStreak + " × 連続回数。"),
                 Cap(D(TerminalIds.Twin, A, "出目を攻撃に。出目 2 個まで挿せる。"), 2),
@@ -713,24 +713,24 @@ namespace CombatSystem
                 D(TerminalIds.Heal, S, (HealMul == 1 ? "HP +出目。" : "HP +出目 ×" + HealMul + "。"), TerminalCond.AtMost3),
                 D(TerminalIds.Capacitor, S, "出目を溜める。" + CapacitorNeed + " で次の攻撃 +" + CapacitorAttack + "。"),
                 D(TerminalIds.Arrester, S, "出目を溜める。" + ArresterNeed + " でそのターンの被ダメージ半分。"),
-                D(TerminalIds.Transformer, S, "攻撃の端子を挿した出目を 2 倍。"),
-                D(TerminalIds.Switchboard, S, "次のターン、端子を " + SwitchboardDraw + " 枚多く引く。"),
+                D(TerminalIds.Transformer, S, "攻撃のカードを挿した出目を 2 倍。"),
+                D(TerminalIds.Switchboard, S, "次のターン、カードを " + SwitchboardDraw + " 枚多く引く。"),
                 // ── レア ──
                 Rare(D(TerminalIds.Amplifier, S, "出目 1 につき与ダメージ +" + (int)(AmplifierPerPip * 100) + "% (別枠)。", TerminalCond.AtLeast5)),
                 Rare(D(TerminalIds.VacuumTube, S, "このターンの会心倍率 +" + VacuumCritMult.ToString("0.0") + "。", TerminalCond.AtLeast6)),
                 Rare(D(TerminalIds.Resonator, S, "このターンの与ダメージ ×" + ResonatorMul.ToString("0.0") + " (別枠)。", TerminalCond.SameElsewhere)),
-                Rare(D(TerminalIds.Foundry, S, "出目を溜める。" + FoundryNeed + " ごとにこの戦闘中の全部の出目 +1 (1 ターンに " + FoundryMaxPerTurn + " 回まで・余りは持ち越す。このターンは、まだ効果の出ていない端子の出目から)。")),
+                Rare(D(TerminalIds.Foundry, S, "出目を溜める。" + FoundryNeed + " ごとにこの戦闘中の全部の出目 +1 (1 ターンに " + FoundryMaxPerTurn + " 回まで・余りは持ち越す。このターンは、まだ効果の出ていないカードの出目から)。")),
                 Rare(D(TerminalIds.Coolant, S, "出目を溜める。" + CoolantNeed + " ごとにエスカレーションの段階を 1 つ戻す。")),
                 Rare(D(TerminalIds.Counter, A, "出目を攻撃に。基本以外の発動が累計 " + CounterEvery + " 回になるごとに、この戦闘中の与ダメージ +" + (int)(CounterPct * 100) + "%。")),
-                Rare(D(TerminalIds.Preheater, B, "出目をブロックに。次のターン、端子の条件を無視する。")),
+                Rare(D(TerminalIds.Preheater, B, "出目をブロックに。次のターン、カードの条件を無視する。")),
                 Rare(perm),
                 Rare(Cap(D(TerminalIds.TwinShot, A, "同じ目 2 個で、出目の合計 ×" + TwinShotMul + " を攻撃に。", TerminalCond.PairSame), 2)),
                 Rare(D(TerminalIds.Harvester, A, "出目を攻撃に。このターンに敵を倒すと最大 HP +" + HarvesterMaxHp + " (恒久)。")),
-                Rare(D(TerminalIds.Whet, A, "出目を攻撃に。このターンに敵を倒すと、この端子の攻撃が恒久に +" + WhetGain + "。")),
+                Rare(D(TerminalIds.Whet, A, "出目を攻撃に。このターンに敵を倒すと、このカードの攻撃が恒久に +" + WhetGain + "。")),
                 Rare(D(TerminalIds.LootBox, A, "出目を攻撃に。このターンに敵を倒すとゴールド +" + LootGold + "。")),
                 // 〈剥ぎ取り〉: 2026-11-13 に補助から攻撃へ (ユーザーの決定)。 補助のままでは挿しても攻撃にならず、 レアの 3 択でほかに負け続けた (GAME.md §24)
-                Rare(D(TerminalIds.Stripper, A, "出目を攻撃に。このターンに敵を倒すと、戦闘後の端子の選択肢が " + StripperChoices + " つ増える。")),
-                Rare(D(TerminalIds.Doubler, S, "このターン、他の端子の効果を 2 回発動させる。", TerminalCond.AtLeast6)),
+                Rare(D(TerminalIds.Stripper, A, "出目を攻撃に。このターンに敵を倒すと、戦闘後のカードの選択肢が " + StripperChoices + " つ増える。")),
+                Rare(D(TerminalIds.Doubler, S, "このターン、他のカードの効果を 2 回発動させる。", TerminalCond.AtLeast6)),
                 // 〈有効活用〉: 手札の持ち越し (2026-11-13・HandCarry) で「空けた端子を 1 枚残す」は役目を失ったので、
                 //   「捨て札から選んだ 1 枚を、 次のターンの手札に戻す」に作り替えた (ユーザーの決定)。 出目をブロックに入れるのは残す
                 //   (ADR-0014 の値付けの規則 2: 準備役は挿した出目を素の端子と同じに入れたうえで効果を足す)。
@@ -760,18 +760,18 @@ namespace CombatSystem
                 Sit(RunOnce(D(TerminalIds.FirstAid, S, "この戦闘で HP を失った後だけ発動。HP +出目" + (FirstAidMul == 1 ? "" : " ×" + FirstAidMul) + "。", TerminalCond.AtMost3)), "被弾後"),
                 Once(D(TerminalIds.FullCharge, C, "充電を上限まで満たす。")),
                 Once(D(TerminalIds.CoolShot, S, "エスカレーションの段階を 1 つ戻す。")),
-                Once(D(TerminalIds.Copier, S, "挿さずに空けた手札の端子を 1 枚、この戦闘中だけ複製して、次のターンの手札に加える。空けた端子が無ければ発動しない。")),
+                Once(D(TerminalIds.Copier, S, "挿さずに空けた手札のカードを 1 枚、この戦闘中だけ複製して、次のターンの手札に加える。空けたカードが無ければ発動しない。")),
                 // 〈火葬の剣〉: 2026-11-14 に作り直し (作者の決定)。 旧: 補助で「空けた端子を 1 枚この戦闘から外す」だけ (測定で発動 1.7%・GAME.md §24)。
                 //   外す端子が無いターン (候補 0) は挿しても不発 (Resolve の 4.)・使い捨ても消費しない
-                Once(D(TerminalIds.BurnOut, A, "出目 ×" + BurnOutMul + " を攻撃に。挿さずに空けた手札の端子を 1 枚、この戦闘から外す。空けた端子が無ければ発動しない。")),
+                Once(D(TerminalIds.BurnOut, A, "出目 ×" + BurnOutMul + " を攻撃に。挿さずに空けた手札のカードを 1 枚、この戦闘から外す。空けたカードが無ければ発動しない。")),
                 // ── 采配と共通の端子 (2026-11-20・段 1-e・item-overhaul-spec §8 / §12-4) ──
                 Sit(Once(D(TerminalIds.BurnSlash, A, "この戦闘で使い捨てを使った後だけ発動 (前のターンまで)。出目 ×" + BurnSlashMul + " を攻撃に。これまでにこの戦闘で使い捨てを使った回数 ×" + BurnSlashPer + " を攻撃に足す。", TerminalCond.None, ItemSystem.PassiveSkills.AxisRules.Deck)), "使い捨て後"),
                 //   〈緊急再装填〉: 自分は戻せない (他の〈緊急再装填〉は戻せる・作者 2026-11-20「戻し合っても意味がない」)。 戻す 1 枚は場の右から (Resolve の 5b)
                 Once(D(TerminalIds.Reload, S, "このターンに使った他の使い捨てを 1 枚 (場の右から)、次のターンの手札に戻す。", TerminalCond.AtLeast5)),
-                Once(D(TerminalIds.OneCut, A, "出目 ×" + OneCutMul + " を攻撃に。この撃は敵の防御を無視。挿した攻撃の端子がこれ 1 枚だけのターンにだけ発動する。")),
+                Once(D(TerminalIds.OneCut, A, "出目 ×" + OneCutMul + " を攻撃に。この撃は敵の防御を無視。挿した攻撃のカードがこれ 1 枚だけのターンにだけ発動する。")),
                 //   〈歯車の軸〉: 挿せない常設 (capacity 0)。 場にあれば効く (Resolve の 5.)。 2 枚あれば 2 枚分
-                Cap(Perm(D(TerminalIds.Gear, S, "出目は挿せない。場にあれば、毎ターン最初に発動した基本以外の端子 (場の左から) の挿した目 1 つにつき +" + GearPip + "。一度引くとこの戦闘中ずっと場に残る。")), 0),
-                Rare(Once(D(TerminalIds.Bell, S, "この戦闘の残りの間、山札を切り直すたび、次のターンに端子を 1 枚多く引く。"))),
+                Cap(Perm(D(TerminalIds.Gear, S, "出目は挿せない。場にあれば、毎ターン最初に発動した基本以外のカード (場の左から) の挿した目 1 つにつき +" + GearPip + "。一度引くとこの戦闘中ずっと場に残る。")), 0),
+                Rare(Once(D(TerminalIds.Bell, S, "この戦闘の残りの間、山札を切り直すたび、次のターンにカードを 1 枚多く引く。"))),
                 D(TerminalIds.Mikiri, B, "出目をブロックに。敵が大技を予告したターンなら 2 倍。", TerminalCond.AtMost3),
                 D(TerminalIds.Crush, A, "出目を攻撃に。この撃でボスの目盛りを割ったら、敵に最大 HP の " + CrushPct + "% の軽減不可ダメージ。", TerminalCond.AtLeast5),
                 // ── 役の軸の端子 (2026-11-21・段 1-f・item-overhaul-spec §8-1 / §12-4) ──

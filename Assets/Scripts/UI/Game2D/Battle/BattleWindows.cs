@@ -32,7 +32,7 @@ namespace UI.Game2D.Battle
             {
                 if (sim.ShowingResult) return null;
                 var disc = sim.Discard;
-                if (disc == null || disc.Count == 0) return "捨て札が空 (戻す端子が無い)";
+                if (disc == null || disc.Count == 0) return "捨て札が空 (戻すカードが無い)";
                 if (!sim.IsRecaller(f)) return "出目に挿すと、 捨て札から戻す 1 枚を選べる";
                 int r = sim.RecallOf(f);
                 return r >= 0 ? "戻す: 〈" + disc[r] + "〉 (押して選び直す)" : null;
@@ -50,11 +50,11 @@ namespace UI.Game2D.Battle
             {
                 if (!sim.IsPicker(f))
                     return CombatSystem.TerminalCards.BaseOf(id) == CombatSystem.TerminalIds.BurnOut      // 〈火葬の剣〉(2026-11-14): 外す端子が無ければ挿しても不発
-                        ? "出目に挿すと、 挿していない手札の端子を外す対象に選べる (外す端子が無いと発動しない)"
-                        : "出目に挿すと、 挿していない手札の端子を対象に選べる";
+                        ? "出目に挿すと、 挿していない手札のカードを外す対象に選べる (外すカードが無いと発動しない)"
+                        : "出目に挿すと、 挿していない手札のカードを対象に選べる";
                 t = sim.TargetOf(f);
             }
-            return t >= 0 && t < sim.board.Count ? "対象: 〈" + sim.board[t] + "〉" : "対象: なし (空けた端子が無い)";
+            return t >= 0 && t < sim.board.Count ? "対象: 〈" + sim.board[t] + "〉" : "対象: なし (空けたカードが無い)";
         }
 
         private Game2DModal _modal;
@@ -135,8 +135,8 @@ namespace UI.Game2D.Battle
         private ScreenDef MercuryDef()
         {
             var dk = CombatSystem.CombatManager.Instance?.TerminalDeck;
-            var d = new ScreenDef { id = "battle_mercury", jp = true, title = "〈" + ItemIds.TacticMercury + "〉: 写す端子", w = 460, cols = 2,
-                sub = "手札の端子を 1 枚選ぶ (写しを " + Consumables.MercuryCopies + " 枚、 この戦闘の間だけ手札に加える)" };
+            var d = new ScreenDef { id = "battle_mercury", jp = true, title = "〈" + ItemIds.TacticMercury + "〉: 写すカード", w = 460, cols = 2,
+                sub = "手札のカードを 1 枚選ぶ (写しを " + Consumables.MercuryCopies + " 枚、 この戦闘の間だけ手札に加える)" };
             var slots = new List<int>();
             if (dk != null)
                 for (int s = dk.permanent.Count; s < dk.board.Count; s++)
