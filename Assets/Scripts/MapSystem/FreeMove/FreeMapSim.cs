@@ -274,7 +274,7 @@ namespace MapSystem.FreeMove
         /// (歩く・イベントのターン・嵐を動かす は n が量)。 累計は 0 未満にしない。 段が変わったら <see cref="FreeMapEvent.StormAdvanced"/>
         /// (フェーズ 3 に入ったらボスの点の種別が見える)。 実際に動いた量を <paramref name="delta"/> に返す。
         /// 不安定化の時計でない (嵐の無い層・手番の時計) なら何もしない (delta = 0)。 戦闘の途中でも呼べる (段は地図へ戻った時に効く)。
-        /// <paramref name="cut"/> = 表の量から引く分 (〈避雷の天幕〉の半分・GameManager.AddInstability が決める)。</summary>
+        /// <paramref name="cut"/> = 表の量から引く分 (〈防嵐の天幕〉の半分・GameManager.AddInstability が決める)。</summary>
         public FreeMapEvent AddInstability(InstabilitySource src, int n, out int delta, int cut = 0)
         {
             delta = 0;

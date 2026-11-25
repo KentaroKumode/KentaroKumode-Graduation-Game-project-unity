@@ -93,7 +93,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public static bool FocusCrit(CombatContext ctx) => ctx.IsRealHit && ctx.hitIsFocused && ctx.isCritical;
 
         /// <summary>BOT の配線の見積もり: 配線の前に分かる、 このターンの全部の撃に乗る会心率・会心倍率・会心率の乗算 (所持品の条件は品と同じ判定・量は品の定数)。
-        /// 撃ごとに決まる分 (〈余韻の鈴〉〈鷹匠の革手袋〉〈狙い目の刻み〉〈見切りの目印〉〈脈打ちの測り針〉〈初太刀の鍔留め〉・集中会心の品) は BOT が撃ごとに見る。</summary>
+        /// 撃ごとに決まる分 (〈余韻の鈴〉〈鷹匠の革手袋〉〈狙い目の刻み〉〈見切りの目印〉〈脈打ちの測り針〉〈初太刀の黒鞘〉・集中会心の品) は BOT が撃ごとに見る。</summary>
         public static void ForecastTurn(CombatContext ctx, RunState run, out float rate, out float mul, out float rateMul)
         {
             rate = 0f; mul = 0f; rateMul = 0f;
@@ -492,7 +492,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>初太刀の鍔留め (仮名・2026-11-23 新)【集中】(賭け金 0): 集中会心のとき、 このターンのブロック +(8 ＋ 使った【練気】× 3)・次のターンの最初の 1 撃の会心率 +20% (answer9: 旧 6 / 2 / +15%)。</summary>
+    /// <summary>初太刀の黒鞘 (仮名・2026-11-23 新)【集中】(賭け金 0): 集中会心のとき、 このターンのブロック +(8 ＋ 使った【練気】× 3)・次のターンの最初の 1 撃の会心率 +20% (answer9: 旧 6 / 2 / +15%)。</summary>
     public class FirstStrokePin : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => ItemIds.CritFirstStroke;
@@ -527,7 +527,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>刃毀れの見立て【集中】(賭け金 0・answer10): 集中会心の撃は敵の防御を 12 無視し、 その撃のダメージの (35 ＋ 使った【練気】× 10)% だけ、 ボスの次の目盛りを上げる (RaiseBossNextNotch)
+    /// <summary>刃こぼれの見立て【集中】(賭け金 0・answer10): 集中会心の撃は敵の防御を 12 無視し、 その撃のダメージの (35 ＋ 使った【練気】× 10)% だけ、 ボスの次の目盛りを上げる (RaiseBossNextNotch)
     /// (answer9: 旧 25 / 8・防御の無視なし)。</summary>
     public class NickAppraisal : IPassiveSkillEffect
     {
@@ -543,7 +543,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>渾身の柄頭【集中】(賭け金 0・answer10): 集中会心の撃の最終与ダメージ +(40 ＋ 使った【練気】× 15)%・このターンのブロック +10 (answer9: 旧 25 / 12・+6)。</summary>
+    /// <summary>渾身の鉄兜【集中】(賭け金 0・answer10): 集中会心の撃の最終与ダメージ +(40 ＋ 使った【練気】× 15)%・このターンのブロック +10 (answer9: 旧 25 / 12・+6)。</summary>
     public class HeftyPommel : IPassiveSkillEffect
     {
         public string SkillId => ItemIds.CritPommel;
@@ -598,7 +598,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>天眼の鍔【集中】(賭け金 24%・会心の秘宝 1 つにつき 3% 相殺・answer10): 集中会心の撃は敵の防御を完全に無視し (CombatManager.ApplyWinDamageModifiers)、 撃のあと敵の HP が
+    /// <summary>白濁の義眼【集中】(賭け金 24%・会心の秘宝 1 つにつき 3% 相殺・answer10): 集中会心の撃は敵の防御を完全に無視し (CombatManager.ApplyWinDamageModifiers)、 撃のあと敵の HP が
     /// 「(会心倍率 × 7 ＋ 使った【練気】× 4)%」(ボスはその半分・上限なし・answer9: 旧 × 5 / × 3) 以下なら倒す (CombatManager の撃の輪・<see cref="KillLine"/>)。
     /// 2026-11-23: 旧 確定会心 ×1.25・会心の撃のあと 会心倍率 × 6% (最大 30%)。</summary>
     public class HeavenEyeGuard : IPassiveSkillEffect

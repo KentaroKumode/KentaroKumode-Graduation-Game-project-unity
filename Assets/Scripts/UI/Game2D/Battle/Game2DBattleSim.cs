@@ -619,7 +619,7 @@ namespace UI.Game2D.Battle
         public string OverclockLabel => "オーバークロック";
 
         // ── 毒の【起爆】(2026-11-21・PoisonCore・仮置き) ── 起爆は品が自動で起こす (押す札ではない)。 見込み (preview) の毒で、 このターン起爆するかを右の列に出す。
-        //   〈石抜きの毒指輪〉= 配線の後の毒が 24 以上で攻撃の端子あり / 〈劇毒の火薬庫〉= このターンに与えた毒 (端子の分を足す) が 8 以上。
+        //   〈蓋付きの毒指輪〉= 配線の後の毒が 24 以上で攻撃の端子あり / 〈劇毒の火薬庫〉= このターンに与えた毒 (端子の分を足す) が 8 以上。
         private PoisonItems PoisonFlags => CombatManager.Instance?.TerminalDeck?.state.poisonItems ?? PoisonItems.None;
         public bool HasDetonate => (PoisonFlags & (PoisonItems.Ring | PoisonItems.Magazine)) != 0;
         private bool DetonateState(out string label)
@@ -728,7 +728,7 @@ namespace UI.Game2D.Battle
         }
 
         // ── 山札の品 (2026-11-21・仮置き) ── 山札の品を持つ戦闘で、 この戦闘で使い捨てを使った回数 (+ この配線で使う数) を右の列に出す (表示だけ)。
-        //   この配線で使い捨てを使うなら金。 〈再利用のるつぼ〉〈灰から組む機関〉〈解体屋の袋〉が読む回数。
+        //   この配線で使い捨てを使うなら金。 〈再利用のるつぼ〉〈廃材組みの蒸気機関〉〈解体屋の袋〉が読む回数。
         private TerminalBattleState DeckSt => CombatManager.Instance?.TerminalDeck?.state;
         public bool HasDeckItems => DeckSt != null && DeckSt.deckItems != DeckItems.None;
         public bool DeckLive => HasDeckItems && preview != null && preview.disposedNow > 0;
@@ -736,7 +736,7 @@ namespace UI.Game2D.Battle
                                    + (preview != null && preview.damageMul != 1f ? " ×" + preview.damageMul.ToString("0.00") : "");
 
         // ── 役の軸の品 (2026-11-21・仮置き) ── 役の品を持つ戦闘で、 この戦闘で役が成立した回数 (+ このターンに立つ役)・続いたターンを右の列に出す (表示だけ)。
-        //   このターンに役が立つなら金。 〈符丁の刻み板〉〈血濡れの符丁〉〈万象のゾロ目〉が回数を、 〈揃いの拍子木〉が続いたターンを読む。
+        //   このターンに役が立つなら金。 〈符丁の刻み板〉〈連勝の符丁〉〈万象の賽盆〉が回数を、 〈揃いの拍子木〉が続いたターンを読む。
         public bool HasRoleItems => DeckSt != null && ItemSystem.PassiveSkills.AxisRules.Count(GameLoop.GameManager.Instance?.Run, ItemSystem.PassiveSkills.AxisRules.Role) > 0;
         public bool RoleLive => HasRoleItems && preview != null && preview.roleNow > 0;
         public string RoleLabel => !HasRoleItems ? "" : "役 " + DeckSt.roleCount + (RoleLive ? "+1" : "") + "回" + (DeckSt.roleStreak > 0 ? " 続" + DeckSt.roleStreak : "")

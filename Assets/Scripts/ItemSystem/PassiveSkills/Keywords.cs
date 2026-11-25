@@ -33,7 +33,7 @@ namespace ItemSystem.PassiveSkills.Keywords
         //  臨界 (式の正本は CombatSystem.HeatCore・2026-11-21・full-item-rework-ledger §⑤)
         // ============================================================
 
-        /// <summary>[persistent・戦闘開始で 0] この戦闘で爆発した回数の累計 (端子〈爆炎斬り〉・〈火花読みの眼鏡〉〈烈刃〉〈希望の灯片〉が読む)。</summary>
+        /// <summary>[persistent・戦闘開始で 0] この戦闘で爆発した回数の累計 (端子〈爆炎斬り〉・〈火花読みの眼鏡〉〈烈刃〉〈燐晶〉が読む)。</summary>
         public const string BurstTotalKey = "kw.burstTotal";
         /// <summary>いま決まった爆発で閾値を超えて溢れていた臨界 (〈溢れ取りの鋳型〉が読む・〈帳簿外の爆薬〉なら 0)。</summary>
         public const string BurstExcessKey = "kw.burstExcess";
@@ -188,7 +188,7 @@ namespace ItemSystem.PassiveSkills.Keywords
         //  会心
         // ============================================================
 
-        /// <summary>直近の会心した主攻撃に実際に掛かった会心倍率 (敵の会心耐性・超過会心率・〈天眼の鍔〉の ×1.25 込み・PassiveSkillManager.ProcessDamage が書く)。 〈天眼の鍔〉が読む。</summary>
+        /// <summary>直近の会心した主攻撃に実際に掛かった会心倍率 (敵の会心耐性・超過会心率・〈白濁の義眼〉の ×1.25 込み・PassiveSkillManager.ProcessDamage が書く)。 〈白濁の義眼〉が読む。</summary>
         public const string LastCritMulKey = "kw.lastCritMul";
 
         // ============================================================
@@ -218,7 +218,7 @@ namespace ItemSystem.PassiveSkills.Keywords
 
         /// <summary>最終与ダメージ倍率 (2026-11-20・GAME.md §23-32)。 すべての倍率の後・敵の軽減パッシブと防御の前に掛ける (切り捨て)。
         /// 掛ける口は大罪:怠惰 (<see cref="MetaProgression.MetaDebuffApplicator.ApplyOutgoingCut"/>) と同じ所: 主攻撃 = CombatManager.Damage.cs・
-        /// 主攻撃以外 = HpLossDiag.Lose・<see cref="DamageEnemy"/> の直接の口・〈逆綴じの止血帯〉。 BOT の見積もり (AutoRunner.Combat.cs) も同じ位置。</summary>
+        /// 主攻撃以外 = HpLossDiag.Lose・<see cref="DamageEnemy"/> の直接の口・〈逆締めの止血帯〉。 BOT の見積もり (AutoRunner.Combat.cs) も同じ位置。</summary>
         public static int ApplyFinalDamage(CombatContext ctx, int dmg, int extraPct = 0)
         {
             int pct = ctx != null ? ctx.finalDamagePct + extraPct : 0;   // extraPct = 主攻撃のこの 1 撃だけの上乗せ (ctx.hitFinalDamagePct・〈加重の拳套〉)

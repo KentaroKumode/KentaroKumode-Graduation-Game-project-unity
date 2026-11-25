@@ -209,8 +209,8 @@ namespace CombatSystem
                      && ((ctx.hitIsFocused && ItemSystem.PassiveSkills.Effects.HeavenEyeGuard.Held(ctx))
                          || (ctx.critExcessDouble && ItemSystem.PassiveSkills.Effects.Crit.HitRenki(ctx) >= ItemSystem.PassiveSkills.Effects.Suntetsu.IgnoreRenki)))
             {
-                // 〈天眼の鍔〉の集中会心 / 〈寸鉄〉の【練気】5 以上の会心は敵の防御を完全に無視する (2026-11-23)
-                if (Debug.unityLogger.logEnabled) Debug.Log($"[天眼の鍔/寸鉄] 会心 → 敵の防御{ctx.enemyDefense} を無視");
+                // 〈白濁の義眼〉の集中会心 / 〈寸鉄〉の【練気】5 以上の会心は敵の防御を完全に無視する (2026-11-23)
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[白濁の義眼/寸鉄] 会心 → 敵の防御{ctx.enemyDefense} を無視");
             }
             else if (ctx.hitIgnoreDefense && ctx.enemyDefense > 0 && totalDmg > 0)
             {

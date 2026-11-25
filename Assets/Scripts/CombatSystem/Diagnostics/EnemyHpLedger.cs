@@ -59,7 +59,7 @@ namespace CombatSystem
         /// 敵の攻撃には掛からない。</summary>
         public static float ProbeMainMult = 1f;
         /// <summary>測定用の物差し・既定 1・製品では使わない。 敵の HP に入る 毒の tick (ターン頭・〈廃庭の霧吹き〉)・出血の tick (出血・出血端子)・
-        /// 臨界の爆発 1 回の量 (爆発の会心の上乗せを含む)・〈逆綴じの止血帯〉の量に掛ける。 スタックの溜まり方・減衰・出来事 (OnPoisonTick 等) に渡す量は変えない。
+        /// 臨界の爆発 1 回の量 (爆発の会心の上乗せを含む)・〈逆締めの止血帯〉の量に掛ける。 スタックの溜まり方・減衰・出来事 (OnPoisonTick 等) に渡す量は変えない。
         /// 〈黎明〉・反射・その他の固定ダメ・敵の自傷・プレイヤーが受ける毒/出血には掛けない。</summary>
         public static float ProbePassiveMult = 1f;
         /// <summary><see cref="ProbeMainMult"/> を掛けた量 (既定 1 なら素通し)。</summary>

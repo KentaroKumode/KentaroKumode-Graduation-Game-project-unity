@@ -289,7 +289,7 @@ namespace UI.Game2D
 
         private static readonly string[] SideLabels = { "おまかせ", "道具", "逃げる" };
         /// <summary>k = 0〜2: おまかせ・道具・逃げる / −1: 【再起動】(〈二股の導線〉) / −2: 【オーバークロック】(〈雷鳴の太鼓〉)・仮置き (2026-11-21)。
-        /// −3: 【起爆】の見込み (〈石抜きの毒指輪〉〈劇毒の火薬庫〉・押す札ではない・2026-11-21)。 −4: 【ジャスト防御】の見込み (防御/予告+許容幅・押す札ではない・2026-11-21)。
+        /// −3: 【起爆】の見込み (〈蓋付きの毒指輪〉〈劇毒の火薬庫〉・押す札ではない・2026-11-21)。 −4: 【ジャスト防御】の見込み (防御/予告+許容幅・押す札ではない・2026-11-21)。
         /// −5: 出血の見込み (今の出血 + この配線の撃ごとの出血・押す札ではない・2026-11-21)。 −6: 臨界の爆発の見込み (今の臨界/閾値 + この配線の爆発の回数・押す札ではない・2026-11-21)。</summary>
         private string SideLabel(int k) => k == -1 ? _sim.RebootLabel : k == -2 ? _sim.OverclockLabel : k == -3 ? _sim.DetonateLabel : k == -4 ? _sim.JustGuardLabel : k == -5 ? _sim.BleedLabel : k == -6 ? _sim.HeatLabel : k == -7 ? _sim.CritLabel : k == -8 ? _sim.DeckLabel : k == -9 ? _sim.RoleLabel : k == 2 && _fleeArmed ? "本当に?" : SideLabels[k];
         private RectInt SideRect(int k)

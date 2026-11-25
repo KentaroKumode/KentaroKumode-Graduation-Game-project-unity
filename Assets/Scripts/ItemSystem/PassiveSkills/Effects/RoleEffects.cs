@@ -30,7 +30,7 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>欠け目の見立て: 1 の役〈特別〉か 2 の役〈封じ〉が立ったターン (2026-11-22 neon 収束〜・その前は 1 だけ・さらに前は 1・2・3 の目を含む役)、 攻撃が当たるたびボスの次の目盛りがその撃のダメージの 25% だけ上がる
-    /// (目盛りへの削り +25%・〈刃毀れの見立て〉と同じ口 CombatManager.RaiseBossNextNotch)。 防御 12 の無視は旗 (<see cref="RoleItems.Chipped"/>)。</summary>
+    /// (目盛りへの削り +25%・〈刃こぼれの見立て〉と同じ口 CombatManager.RaiseBossNextNotch)。 防御 12 の無視は旗 (<see cref="RoleItems.Chipped"/>)。</summary>
     public class ChippedEyeReading : IPassiveSkillEffect
     {
         public string SkillId => ItemIds.RoleChipped;
@@ -78,7 +78,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>雷毒の導管: 1・2・3 の役 (〈特別〉〈封じ〉〈追撃〉) が立ったターン (2026-11-22 neon 収束〜・その前は 2 だけ)、 次のターンの手札 +1 枚 (1 ターン 1 回: 役は 1 ターンに高々 1 つ)・次のターンのブロック +4。</summary>
+    /// <summary>小目の骨牌: 1・2・3 の役 (〈特別〉〈封じ〉〈追撃〉) が立ったターン (2026-11-22 neon 収束〜・その前は 2 だけ)、 次のターンの手札 +1 枚 (1 ターン 1 回: 役は 1 ターンに高々 1 つ)・次のターンのブロック +4。</summary>
     public class LowFaceConduit : IPassiveSkillEffect
     {
         public string SkillId => ItemIds.RoleConduit;
@@ -90,7 +90,7 @@ namespace ItemSystem.PassiveSkills.Effects
             if (k == null || !TerminalCards.FaceIn(TerminalCards.ConduitFaces, TerminalCards.FaceOfRole(k.Value))) return;
             Rw.DrawNext(1);
             RoleFx.BlockNext(ctx, Block);
-            Rw.Log($"[雷毒の導管] 〈{YachtRoles.NameOf(k.Value)}〉 → 次のターン 手札 +1・ブロック +{Block}");
+            Rw.Log($"[小目の骨牌] 〈{YachtRoles.NameOf(k.Value)}〉 → 次のターン 手札 +1・ブロック +{Block}");
         }
     }
 }

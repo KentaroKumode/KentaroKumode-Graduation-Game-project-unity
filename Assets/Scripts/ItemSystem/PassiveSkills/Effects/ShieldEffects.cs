@@ -265,10 +265,10 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>静寂の構え: 攻撃の端子に 1 つも挿さずに敵の攻撃を完封した (攻撃を受けて HP を 1 も失わなかった) 次のターン、 全撃の最終与ダメージ +60% (【ジャスト防御】だったなら +130%・answer14: 旧 +100%)。</summary>
+    /// <summary>静止の振り子: 攻撃の端子に 1 つも挿さずに敵の攻撃を完封した (攻撃を受けて HP を 1 も失わなかった) 次のターン、 全撃の最終与ダメージ +60% (【ジャスト防御】だったなら +130%・answer14: 旧 +100%)。</summary>
     public class SilentStance : IPassiveSkillEffect, IRelicDisplay
     {
-        public const string Id = "静寂の構え";
+        public const string Id = "静止の振り子";
         public string SkillId => Id;
         public const int Pct = 60, JustPct = 130;   // answer14: ジャスト防御 +100% → +130%
         private const string TurnKey = "shd.still", PctKey = "shd.stillPct";
@@ -331,11 +331,11 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>脈なしの鋼心臓: 戦闘開始時、 シールド +X (X = <see cref="GameLoop.RunState.pulselessHeartShield"/>・ランの始めに 4・持っている間に戦闘に勝つたび +1)。
+    /// <summary>脈打たぬ鋼の心臓: 戦闘開始時、 シールド +X (X = <see cref="GameLoop.RunState.pulselessHeartShield"/>・ランの始めに 4・持っている間に戦闘に勝つたび +1)。
     /// 現在のシールドが 50 以上の間、 ターン開始時にシールドが減衰しない (ctx.shieldNoDecayAt・2026-11-22 旧: 6 / 35)。 勝ちを数えるのは CombatManager.FinishCombat (<see cref="NoteWin"/>)。</summary>
     public class PulselessHeart : IPassiveSkillEffect, IRelicDisplay
     {
-        public const string Id = "脈なしの鋼心臓";
+        public const string Id = "脈打たぬ鋼の心臓";
         public const int StartShield = 4, PerWin = 1, NoDecayAt = 50;
         public string SkillId => Id;
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Rw.Run?.pulselessHeartShield ?? StartShield);

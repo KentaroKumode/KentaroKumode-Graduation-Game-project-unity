@@ -87,7 +87,7 @@ namespace CombatSystem
             => notches != null && hpAfter > 0 && pendingNow + (BrokenCount(notches, maxHp, hpAfter, broken) - broken) > 0;
 
         /// <summary>受けるダメージにダウンの倍率を掛ける (<paramref name="down"/> = このターンはダウン・切り捨て)。
-        /// 〈英雄の意志〉〈積雷の黒舎利〉で強めたダウン (2026-11-25) は倍率 +<see cref="TakenBonusPctNow"/>%。</summary>
+        /// 〈英雄の意志〉〈黒錫のライデン瓶〉で強めたダウン (2026-11-25) は倍率 +<see cref="TakenBonusPctNow"/>%。</summary>
         public static int ApplyTaken(int dmg, bool down)
             => !down || dmg <= 0 ? dmg : TakenBonusPctNow > 0 ? (int)(dmg * (TakenMulCard + TakenBonusPctNow * 0.01f)) : (int)(dmg * TakenMulCard);
 

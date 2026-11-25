@@ -117,10 +117,10 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>予備のバッテリー: 戦闘開始時、 充電 +10。</summary>
+    /// <summary>予備の蓄電池: 戦闘開始時、 充電 +10。</summary>
     public class SpareBattery : IPassiveSkillEffect
     {
-        public string SkillId => "予備のバッテリー";
+        public string SkillId => "予備の蓄電池";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.AddCharge(10);
     }
@@ -348,10 +348,10 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>四つ打ちの鉄芯: この戦闘で充電を消費した回数を数え、 3 回ごとに「今の充電 × 3」の防御無視ダメージと、 次の 1 撃の最終与ダメージ +50% (1 ターン最大 2 回)。</summary>
+    /// <summary>溜め撃ちの誘導コイル: この戦闘で充電を消費した回数を数え、 3 回ごとに「今の充電 × 3」の防御無視ダメージと、 次の 1 撃の最終与ダメージ +50% (1 ターン最大 2 回)。</summary>
     public class FourthStrikeCore : IPassiveSkillEffect, IRelicDisplay
     {
-        public string SkillId => "四つ打ちの鉄芯";
+        public string SkillId => "溜め撃ちの誘導コイル";
         public const int Every = 3, ChargeMul = 3, NextPct = 50, MaxPerTurn = 2;
         private const string CountKey = "chg.four", PendingKey = "chg.four.next", TurnKey = "chg.four.turn";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Rw.Count(ctx, CountKey) % Every);
@@ -374,15 +374,15 @@ namespace ItemSystem.PassiveSkills.Effects
             int dmg = ctx.GetCharge() * ChargeMul;
             if (dmg > 0 && ctx.enemyCurrentHP > 0) Kw.DamageEnemy(ctx, dmg);
             Kw.Add(ctx, PendingKey, 1);
-            Rw.Log($"[四つ打ちの鉄芯] 充電を使った {c} 回目 → 充電 {ctx.GetCharge()} × 3 = {dmg} (防御無視)・次の 1 撃 +50%");
+            Rw.Log($"[溜め撃ちの誘導コイル] 充電を使った {c} 回目 → 充電 {ctx.GetCharge()} × 3 = {dmg} (防御無視)・次の 1 撃 +50%");
         }
     }
 
-    /// <summary>積雷の黒舎利: 1 ターンに充電を 15 以上消費して終了したとき、 消費した量 × 1% (最大 12%) の敵の最大 HP の防御無視ダメージと、
+    /// <summary>黒錫のライデン瓶: 1 ターンに充電を 15 以上消費して終了したとき、 消費した量 × 1% (最大 12%) の敵の最大 HP の防御無視ダメージと、
     /// 次のダウンの受けるダメージの倍率 +0.5 (上限 +1.0)・そのダウンの開始時に充電 +10 (CombatManager.BuffNextBossDown・2026-11-25 neon answer_gauge・旧: ひびを直接割る)。 1 ターン 1 回 (ターン終了時に 1 回だけ見る)。</summary>
     public class ThunderReliquary : IPassiveSkillEffect
     {
-        public string SkillId => "積雷の黒舎利";
+        public string SkillId => "黒錫のライデン瓶";
         public const int Need = 15, MaxPct = 12, DownBonusPct = 50, DownCharge = 10;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
@@ -393,7 +393,7 @@ namespace ItemSystem.PassiveSkills.Effects
             int dmg = (int)((long)pct * ctx.enemyMaxHP / 100);
             if (dmg > 0) Kw.DamageEnemy(ctx, dmg);
             CombatManager.Instance?.BuffNextBossDown(SkillId, DownBonusPct, 0, DownCharge);
-            Rw.Log($"[積雷の黒舎利] このターン充電 {spent} → 最大 HP の {pct}% = {dmg} (防御無視)");
+            Rw.Log($"[黒錫のライデン瓶] このターン充電 {spent} → 最大 HP の {pct}% = {dmg} (防御無視)");
         }
     }
 }

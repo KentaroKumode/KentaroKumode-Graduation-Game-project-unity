@@ -621,7 +621,7 @@ namespace CombatSystem
             // パターン系パッシブ (ゾロ目/階段/全相異) + 合計確定
             psm.ProcessPostRoll(playerDice, enemyDice);
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnPostRoll);
-            DecideOmniPair(ctx, playerDice);   // 〈万象のゾロ目〉(2026-11-21): 出目が決まった所で、 2 個そろいをゾロ目として扱うか (配線の前)
+            DecideOmniPair(ctx, playerDice);   // 〈万象の賽盆〉(2026-11-21): 出目が決まった所で、 2 個そろいをゾロ目として扱うか (配線の前)
 
             // --- 2. 予告 (柱3: 完全情報テレグラフ) ---
             // 〈鎮静香〉(§6-5) の遅延を差し引いたターンで段階を引く。 予告にもそのまま出るので、
@@ -983,7 +983,7 @@ namespace CombatSystem
             int lbStage = GameLoop.GameManager.Instance?.Run?.limitBreakStage ?? 0;
             int dealtDmg = 0, dealtFixed = 0; bool isCrit = false;
             var hitDealt = new List<int>(); var hitCrit = new List<bool>();
-            var hitFocus = new List<bool>(); var hitSpent = new List<int>(); var hitRenki = new List<int>();   // 撃ごとの集中会心・使った【練気】・会心で +1 した後の【練気】(〈死相の面頬〉〈天眼の鍔〉が読む・2026-11-23)
+            var hitFocus = new List<bool>(); var hitSpent = new List<int>(); var hitRenki = new List<int>();   // 撃ごとの集中会心・使った【練気】・会心で +1 した後の【練気】(〈死相の面頬〉〈白濁の義眼〉が読む・2026-11-23)
             int nHits = Math.Max(1, hitBases.Count);
             ctx.hitCount = hitBases.Count;   // 撃ごとの品が読む (攻撃しないターンは 0 ── 下の 1 回は固定ダメの枠を取り出すだけ)
             //   〈必殺の照準器〉(CritCore・2026-11-23): 攻撃の端子が 1 枚だけのターン、 その撃が集中会心なら同じ撃をもう 1 回発火する (1 ターン 1 回・会心は実際の会心率で振る・
@@ -1143,7 +1143,7 @@ namespace CombatSystem
             }
 
             result.enemyHPBeforeAttack = enemyHP;   // [読むための欄・実績〈やりすぎ〉] 主攻撃を当てる直前の敵の HP
-            // ADR-0016: 主攻撃は 1 撃ずつ HP へ入れ、 首落とし (天眼の鍔) とボスの目盛りを割る判定も 1 撃ごと。
+            // ADR-0016: 主攻撃は 1 撃ずつ HP へ入れ、 首落とし (白濁の義眼) とボスの目盛りを割る判定も 1 撃ごと。
             //   合計 (dealtDmg) は役〈追撃〉・ヴェスカの守りで変わっているので配り直す: 減った分は後ろの撃から削り、 増えた分は最後の撃に乗せる。
             int hitLeft = dealtDmg;
             for (int h = 0; h < hitDealt.Count; h++)
@@ -1151,7 +1151,7 @@ namespace CombatSystem
                 int hitDmg = h == hitDealt.Count - 1 ? hitLeft : Math.Min(hitDealt[h], hitLeft);
                 hitLeft -= hitDmg;
                 HpLossDiag.Lose(ref enemyHP, hitDmg, "通常攻撃");
-                // 〈天眼の鍔〉(2026-11-23): 集中会心の一撃のあと、 敵の HP が「(会心倍率 × 5 ＋ 使った【練気】× 3)%」(ボスはその半分・上限なし) 以下なら倒す。 〈百人切りの鉈〉と同じく CanExecuteEnemy で止まる
+                // 〈白濁の義眼〉(2026-11-23): 集中会心の一撃のあと、 敵の HP が「(会心倍率 × 5 ＋ 使った【練気】× 3)%」(ボスはその半分・上限なし) 以下なら倒す。 〈百人切りの鉈〉と同じく CanExecuteEnemy で止まる
                 if (hitCrit[h] && hitFocus[h] && hitDmg > 0 && enemyHP > 0)
                 {
                     int line = ItemSystem.PassiveSkills.Effects.HeavenEyeGuard.KillLine(ctx, hitSpent[h]);
@@ -1160,9 +1160,9 @@ namespace CombatSystem
                         int left = enemyHP;
                         enemyHP = 0;
                         CritExecuteFired++;
-                        HpLossDiag.Add("経路:処刑(天眼の鍔)", left);
-                        EnemyHpLedger.Land("処刑(天眼の鍔)", left, left);
-                        if (Debug.unityLogger.logEnabled) Debug.Log($"[天眼の鍔] 集中会心のあと敵 HP {left} ≤ {line} → 倒す");
+                        HpLossDiag.Add("経路:処刑(白濁の義眼)", left);
+                        EnemyHpLedger.Land("処刑(白濁の義眼)", left, left);
+                        if (Debug.unityLogger.logEnabled) Debug.Log($"[白濁の義眼] 集中会心のあと敵 HP {left} ≤ {line} → 倒す");
                     }
                 }
                 // 〈百人切りの鉈〉(2026-11-21・BleedCore): 撃が当たったあと、 敵の出血が 12 以上で HP が「出血 × 1.2%」(ボスは半分・最大 25%) 以下なら倒す。 CanExecuteEnemy で止まる

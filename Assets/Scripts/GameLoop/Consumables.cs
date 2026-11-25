@@ -123,7 +123,7 @@ namespace GameLoop
             if (ok)
             {
                 if (useCap > 0 && lockCtx != null) lockCtx.accumulatedValues[BattleUseKey] = lockCtx.GetAccumulated(BattleUseKey) + 1f;
-                // 〈底抜けの小瓶〉(2026-11-20): 戦闘で最初に使った消耗品は消費しない (その戦闘中にもう 1 回使える・使わなければ戦闘の終わりに消える)
+                // 〈二度点きの燐寸〉(2026-11-20): 戦闘で最初に使った消耗品は消費しない (その戦闘中にもう 1 回使える・使わなければ戦闘の終わりに消える)
                 if (!ItemSystem.PassiveSkills.Effects.BottomlessVial.TryKeep(lockCtx, run, id)) Consume(run, id);
                 MetaProgression.Achievements.AchievementService.NoteConsumableUsed();
                 NoteVescaPhaseUse();
@@ -135,7 +135,7 @@ namespace GameLoop
         }
 
         /// <summary>使った品を所持から 1 つ減らす。 古い手紙は 1 枚で OldLetterUses 回使える (使い切ったときだけ手放す)。
-        /// 〈底抜けの小瓶〉が戦闘の終わりに、 もう 1 回使わなかった品を消すのもここ。</summary>
+        /// 〈二度点きの燐寸〉が戦闘の終わりに、 もう 1 回使わなかった品を消すのもここ。</summary>
         public static void Consume(RunState run, string id)
         {
             if (run?.ownedConsumables == null || string.IsNullOrEmpty(id)) return;
@@ -300,7 +300,7 @@ namespace GameLoop
 
         /// <summary>〈鎧割りの酸瓶〉: 敵の防御から引く量 (この戦闘中・下限 0)。</summary>
         public const int AcidDefenseCut = 12;
-        /// <summary>〈目盛り削りの鑿〉: 敵へのダメージ。</summary>
+        /// <summary>〈目盛り削りのノミ〉: 敵へのダメージ。</summary>
         public const int ChiselDamage = 15;
         /// <summary>〈複製の水銀〉: 手札に足す写しの枚数。</summary>
         public const int MercuryCopies = 2;

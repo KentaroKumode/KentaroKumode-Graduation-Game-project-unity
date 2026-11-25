@@ -124,7 +124,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>底抜けの小瓶: 戦闘で最初に使った消耗品は消費されず、 その戦闘中にもう 1 回使える (1 戦闘 1 回)。
+    /// <summary>二度点きの燐寸: 戦闘で最初に使った消耗品は消費されず、 その戦闘中にもう 1 回使える (1 戦闘 1 回)。
     /// もう 1 回使わなければ、 戦闘の終わりに消える (<see cref="Consumables.Consume"/>)。 使う時の判定は <see cref="Consumables.Use"/> が <see cref="TryKeep"/> で聞く。</summary>
     public class BottomlessVial : IPassiveSkillEffect, IRelicDisplay
     {
@@ -145,7 +145,7 @@ namespace ItemSystem.PassiveSkills.Effects
             if (st == 0)
             {
                 ctx.accumulatedValues[StateKey] = 1; _keptId = id; _ctx = ctx;
-                Rw.Log($"[底抜けの小瓶] 〈{id}〉は消費しない (この戦闘中にもう 1 回使える)");
+                Rw.Log($"[二度点きの燐寸] 〈{id}〉は消費しない (この戦闘中にもう 1 回使える)");
                 return true;
             }
             if (st == 1 && ReferenceEquals(_ctx, ctx) && id == _keptId) { ctx.accumulatedValues[StateKey] = 2; _keptId = null; _ctx = null; }
@@ -158,13 +158,13 @@ namespace ItemSystem.PassiveSkills.Effects
             if (Rw.Count(ctx, StateKey) == 1 && ReferenceEquals(_ctx, ctx) && _keptId != null)
             {
                 Consumables.Consume(Rw.Run, _keptId);
-                Rw.Log($"[底抜けの小瓶] もう 1 回使わなかった〈{_keptId}〉は戦闘の終わりに消える");
+                Rw.Log($"[二度点きの燐寸] もう 1 回使わなかった〈{_keptId}〉は戦闘の終わりに消える");
             }
             _keptId = null; _ctx = null;
         }
     }
 
-    /// <summary>隙衝きの短槍: 敵がチャージ中 (大技の前で攻撃しない) かダウン中のターン、 攻撃の与ダメージ +40% (与ダメ % の池・撃ごとに乗る)。</summary>
+    /// <summary>隙突きの短槍: 敵がチャージ中 (大技の前で攻撃しない) かダウン中のターン、 攻撃の与ダメージ +40% (与ダメ % の池・撃ごとに乗る)。</summary>
     public class GapSpear : IPassiveSkillEffect
     {
         public string SkillId => ItemIds.TacGapSpear;
@@ -175,7 +175,7 @@ namespace ItemSystem.PassiveSkills.Effects
             var cm = CombatSystem.CombatManager.Instance;
             if (cm == null || !cm.EnemyChargingOrDownNow(ctx.currentTurn)) return;
             ctx.AddOutgoingPct(Pct);
-            Rw.Log("[隙衝きの短槍] 敵がチャージ中かダウン中 → 与ダメージ +40%");
+            Rw.Log("[隙突きの短槍] 敵がチャージ中かダウン中 → 与ダメージ +40%");
         }
     }
 
@@ -197,7 +197,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>大技殺しの楔: ダウンか〈封じ〉で敵の大技を取り消したとき (OnHeavyCanceled)、 敵に最大 HP の 10% の軽減不可ダメージ・次のターンのブロック +15
+    /// <summary>構え崩しの鉄杭: ダウンか〈封じ〉で敵の大技を取り消したとき (OnHeavyCanceled)、 敵に最大 HP の 10% の軽減不可ダメージ・次のターンのブロック +15
     /// (取り消したターンは敵が攻撃しないので次のターン・<see cref="CombatSystem.YachtRoleEffects.BlockNextKey"/>)。</summary>
     public class HeavyBreakerWedge : IPassiveSkillEffect
     {
@@ -209,11 +209,11 @@ namespace ItemSystem.PassiveSkills.Effects
             int dmg = (int)((long)ctx.enemyMaxHP * MaxHpPct / 100);
             Kw.DamageEnemy(ctx, dmg);
             CombatSystem.YachtRoleEffects.AddNextTurn(ctx, CombatSystem.YachtRoleEffects.BlockNextKey, Block);
-            Rw.Log($"[大技殺しの楔] 大技を取り消した → 軽減不可 {dmg}・次のターン ブロック +{Block}");
+            Rw.Log($"[構え崩しの鉄杭] 大技を取り消した → 軽減不可 {dmg}・次のターン ブロック +{Block}");
         }
     }
 
-    /// <summary>逆境の砂時計: エスカレーションの段階が 2 以上の間、 ターン開始時にブロック +4 (このターン)・攻撃の与ダメージ +25% (与ダメ % の池)。
+    /// <summary>背水の錨: エスカレーションの段階が 2 以上の間、 ターン開始時にブロック +4 (このターン)・攻撃の与ダメージ +25% (与ダメ % の池)。
     /// 段階は〈鎮静香〉の遅延と段階の戻しを差し引いた今の段階 (CombatManager.EscalationStageNow・予告に出る段階)。</summary>
     public class AdversityHourglass : IPassiveSkillEffect
     {

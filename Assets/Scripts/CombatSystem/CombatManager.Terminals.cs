@@ -37,14 +37,14 @@ namespace CombatSystem
         public static long BleedSpendFired, BleedExecuteFired;
         /// <summary>[計装] 臨界の爆発の回数 / 〈柱折りの発破筒〉でダウンを 1 ターン延ばした回数 (2026-11-25〜・旧: 爆発のひびを割った回数) (ランの始めに BOT が 0 へ戻す・ランの記録の burstFired / burstBreakFired)。</summary>
         public static long BurstFired, BurstBreakFired;
-        /// <summary>[計装] 超過会心率 (100% 超え) が会心倍率になった会心の回数 / 〈天眼の鍔〉で処刑した回数 / 〈必殺の照準器〉がもう 1 回発火した回数
+        /// <summary>[計装] 超過会心率 (100% 超え) が会心倍率になった会心の回数 / 〈白濁の義眼〉で処刑した回数 / 〈必殺の照準器〉がもう 1 回発火した回数
         /// (ランの始めに BOT が 0 へ戻す・ランの記録の critOverflowFired / critExecuteFired / critRefireFired)。</summary>
         public static long CritOverflowFired, CritExecuteFired, CritRefireFired;
         /// <summary>[計装 2026-11-23] 【集中】の撃の回数 / 集中会心の回数 / 集中会心で使った【練気】の合計 (ランの始めに BOT が 0 へ戻す・ランの記録の focusAttempted / focusCritted / renkiSpentTotal)。</summary>
         public static long FocusAttempted, FocusCritted, RenkiSpentTotal;
         /// <summary>[計装] 使い捨ての端子を使った回数 / 山札を切り直した回数 (ランの始めに BOT が 0 へ戻す・ランの記録の deckDisposeFired / deckShuffleFired)。</summary>
         public static long DeckDisposeFired, DeckShuffleFired;
-        /// <summary>[計装] 役が成立した回数 / 〈万象のゾロ目〉が 2 個そろいをゾロ目として扱った回数 (ランの始めに BOT が 0 へ戻す・ランの記録の roleFormedFired / roleOmniFired)。</summary>
+        /// <summary>[計装] 役が成立した回数 / 〈万象の賽盆〉が 2 個そろいをゾロ目として扱った回数 (ランの始めに BOT が 0 へ戻す・ランの記録の roleFormedFired / roleOmniFired)。</summary>
         public static long RoleFormedFired, RoleOmniFired;
         /// <summary>[計装] 武器: 〈連刃〉の追撃 / 〈処刑〉で倒した / 〈画竜点睛〉が働いた撃 / 〈シールドバッシュ〉でシールドを攻撃にした
         /// (ランの始めに BOT が 0 へ戻す・ランの記録の weaponChainFired / weaponExecuteFired / weaponGaryoFired / weaponBashFired)。</summary>
@@ -78,7 +78,7 @@ namespace CombatSystem
             _deck.state.shieldItems = ShieldCore.ItemsOf(run);           // シールドの品 (端子の解決の 5e・ジャスト防御の許容幅・2026-11-21)
             _deck.state.bleedItems = BleedCore.ItemsOf(run);             // 出血の品 (端子の解決の 5f・撃ごとの出血・2026-11-21)
             _deck.state.heatItems = HeatCore.ItemsOf(run);               // 臨界の品 (爆発の式・端子の解決の 5g・2026-11-21)
-            if (AxisRules.Owns(run, GameLoop.ItemIds.DeckSparePlug)) _deck.state.extraDrawNext += TerminalCards.SparePlugDraw;      // 〈予備の差込口〉: 1 ターン目に多く引く
+            if (AxisRules.Owns(run, GameLoop.ItemIds.DeckSparePlug)) _deck.state.extraDrawNext += TerminalCards.SparePlugDraw;      // 〈組み置きの配線束〉: 1 ターン目に多く引く
             _deck.state.extraDrawNext += MetaProgression.MetaBuffApplicator.GetSparkDeckOpeningDraw();      // 種火・山札 (2026-11-21): 1 ターン目の手札 +1
             _deck.state.extraDrawNext += CardRules.OpeningDraw;      // 挑戦カード〈手捌き〉: 1 ターン目の手札 +N
             if (AxisRules.Owns(run, GameLoop.ItemIds.DeckToolbox) && runDeck.Count <= TerminalCards.ToolboxMaxDeck)
@@ -161,7 +161,7 @@ namespace CombatSystem
             e.noAttack = GameLoop.Consumables.RapierContreOn(ctx);   // 〈シュヴァリエのレイピア〉のコントラタック中は攻撃の端子に挿せない
             e.sealedRoleMask = ctx.sealedRoleMask;                    // 立つ役 (TerminalCards.RoleOf) は ResolveRoles と同じ判定 (2026-11-21)
             e.roleDiceCut = (int[])_slothCut.Clone(); e.roleDiceAt = (int[])_slothAt.Clone();   // クェシナの怠惰: 立つ役は引く前の目で決める (RoleDice と同じ)
-            e.pairAsTriple = OmniPairNow(ctx);                        // 〈万象のゾロ目〉: このターン 2 個そろいをゾロ目として扱う (振り直しの後に決める)
+            e.pairAsTriple = OmniPairNow(ctx);                        // 〈万象の賽盆〉: このターン 2 個そろいをゾロ目として扱う (振り直しの後に決める)
             return e;
         }
 

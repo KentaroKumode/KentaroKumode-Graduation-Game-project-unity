@@ -83,7 +83,7 @@ namespace CombatSystem
         /// <summary>このターン敵がダウン中か (〈抜き打ちの作法〉が撃の中で読む)。</summary>
         public bool EnemyDownNow => currentEnemy != null && enemyHP > 0 && _down.downNow;
 
-        /// <summary>このターン敵がチャージ中 (大技の前で攻撃しない・天与の盾と指輪も) かダウン中か (〈隙衝きの短槍〉が配線の後に読む・2026-11-21)。
+        /// <summary>このターン敵がチャージ中 (大技の前で攻撃しない・天与の盾と指輪も) かダウン中か (〈隙突きの短槍〉が配線の後に読む・2026-11-21)。
         /// 予告の「チャージ」の印 (<see cref="FillDownTelegraph"/>)・敵の攻撃の解決の「攻撃しない」の枝と同じ判定。</summary>
         public bool EnemyChargingOrDownNow(int turn)
         {
@@ -104,7 +104,7 @@ namespace CombatSystem
             if (to >= 0) Debug.Log($"[{CombatContext.CurrentSkillId}] 次の目盛り {before} → {to} (+{add}・HP {hpNow})");
         }
 
-        /// <summary>次のダウン (よろめきは数えない) の受けるダメージの倍率 +<paramref name="pct"/>% (上限 +100%)・そのダウンの開始時にシールド / 充電 (〈英雄の意志〉〈積雷の黒舎利〉・2026-11-25)。 目盛りの無い敵では何もしない。</summary>
+        /// <summary>次のダウン (よろめきは数えない) の受けるダメージの倍率 +<paramref name="pct"/>% (上限 +100%)・そのダウンの開始時にシールド / 充電 (〈英雄の意志〉〈黒錫のライデン瓶〉・2026-11-25)。 目盛りの無い敵では何もしない。</summary>
         public void BuffNextBossDown(string label, int pct, int shield, int charge)
         {
             if (!_down.Enabled || currentEnemy == null || enemyHP <= 0) return;
@@ -147,7 +147,7 @@ namespace CombatSystem
             if (DownCancelsCycleAt(currentEnemy, ctx.currentTurn, Escalation.HeavyHpRatio))
                 Escalation.HeavyCycleOffset = ctx.currentTurn;
             _down.heavyCanceledNow = hadHeavy && (always || canceled);
-            if (canceled) RaiseBossEvent(ctx, PassiveSkillTrigger.OnHeavyCanceled, 1, false);   // 大技を取り消した (2026-11-21・〈大技殺しの楔〉)
+            if (canceled) RaiseBossEvent(ctx, PassiveSkillTrigger.OnHeavyCanceled, 1, false);   // 大技を取り消した (2026-11-21・〈構え崩しの鉄杭〉)
             if (canceled) MetaProgression.Achievements.AchievementService.NoteBossDownCanceledHeavy();   // 実績〈出鼻をくじく〉   // 画面の「大技は取り消し」(旧い規則はどのダウンでも大技が先へ延びる)
             BossDown.ActiveNow = true;
             BossDown.TakenMulNow = !_down.downWeakNow || ctx.poisonDownDouble;   // ひびで割れたよろめき (2026-11-14) は受けるダメージ ×1.5 なし (〈骨溶かしの黒油〉はよろめきにも ×1.5・2026-11-25)

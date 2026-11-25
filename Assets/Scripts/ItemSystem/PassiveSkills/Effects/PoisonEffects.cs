@@ -134,10 +134,10 @@ namespace ItemSystem.PassiveSkills.Effects
 
     // ── S: エンジン・安定 ── (〈蛇血瓶〉は端子の解決の中だけ)
 
-    /// <summary>主より長い香炉: 毒のダメージか【起爆】が入るたび、 この戦闘中の与ダメージ +6% (最大 +60%)。</summary>
+    /// <summary>主を看取る香炉: 毒のダメージか【起爆】が入るたび、 この戦闘中の与ダメージ +6% (最大 +60%)。</summary>
     public class LongCenser : IPassiveSkillEffect, IRelicDisplay
     {
-        public string SkillId => "主より長い香炉";
+        public string SkillId => "主を看取る香炉";
         public const float PctPer = 0.06f, MaxPct = 0.60f;
         /// <summary>[persistent・戦闘開始で 0] 積もった回数 (率 = 回数 × 6%・float の足し算を重ねない)。</summary>
         private const string Key = "psn.censer";
@@ -221,10 +221,10 @@ namespace ItemSystem.PassiveSkills.Effects
 
     // ── G: 分岐 A〈蝕み〉/ 分岐 B〈起爆〉 ──
 
-    /// <summary>石抜きの毒指輪 (分岐 B): 敵の毒が 24 以上 (<see cref="PoisonCore.RingNeed"/>) で攻撃が当たったとき、 自動で【起爆】(1 ターン 1 回)。</summary>
+    /// <summary>蓋付きの毒指輪 (分岐 B): 敵の毒が 24 以上 (<see cref="PoisonCore.RingNeed"/>) で攻撃が当たったとき、 自動で【起爆】(1 ターン 1 回)。</summary>
     public class HollowPoisonRing : IPassiveSkillEffect, IRelicDisplay
     {
-        public string SkillId => "石抜きの毒指輪";
+        public string SkillId => "蓋付きの毒指輪";
         /// <summary>[persistent] 起爆したターン (Rw.OncePerTurn・BOT の見積もりも読む)。</summary>
         public const string TurnKey = "psn.ring";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.EnemyPoison >= PoisonCore.RingNeed);
@@ -236,10 +236,10 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>岸上げの麻痺瓶 (分岐 A): 敵の毒 4 につき敵の攻撃 −1 (2026-11-22・旧 5 につき・最大 −10・予告の前)。 敵の攻撃を受けきったターン (HP を失わなかった)、 敵に毒 +5。</summary>
+    /// <summary>水揚げの麻痺瓶 (分岐 A): 敵の毒 4 につき敵の攻撃 −1 (2026-11-22・旧 5 につき・最大 −10・予告の前)。 敵の攻撃を受けきったターン (HP を失わなかった)、 敵に毒 +5。</summary>
     public class Paralysis : IPassiveSkillEffect, IRelicDisplay
     {
-        public string SkillId => "岸上げの麻痺瓶";
+        public string SkillId => "水揚げの麻痺瓶";
         public const int Every = 4, MaxCut = 10, Poison = 5;
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(System.Math.Min(MaxCut, ctx.EnemyPoison / Every));
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnTurnEnd };

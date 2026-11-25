@@ -604,7 +604,7 @@ namespace ItemSystem.PassiveSkills
         public int burstStackBonus;
         /// <summary>[persistent] ターン開始の減衰で残るシールドへの上乗せ (% ポイント)。 〈油染みの盾革〉が +20 (50% → 70%)。 残る割合は最大 80%。</summary>
         public int shieldKeepBonusPct;
-        /// <summary>[persistent] 会心した攻撃だけに足す貫通 (〈刃毀れの見立て〉・CombatManager.Damage の防御の計算)。</summary>
+        /// <summary>[persistent] 会心した攻撃だけに足す貫通 (〈刃こぼれの見立て〉・CombatManager.Damage の防御の計算)。</summary>
         public int critArmorPen;
         /// <summary>[persistent] 充電の上限への上乗せ (〈雷鳴の太鼓〉・端子〈大導電＋〉・<see cref="ChargeCap"/>)。</summary>
         public int chargeCapBonus;
@@ -643,7 +643,7 @@ namespace ItemSystem.PassiveSkills
         public int burstFlatBonus;
         /// <summary>[persistent] 〈重装兵の隠し刃〉: ボスのダウン中のターンは、 ターン開始時にシールドが半減しない (BeginNewTurn)。</summary>
         public bool shieldKeepOnBossDown;
-        /// <summary>[persistent] 〈脈なしの鋼心臓〉: ターン開始時のシールドがこれ以上なら減衰しない (0 = なし・BeginNewTurn)。</summary>
+        /// <summary>[persistent] 〈脈打たぬ鋼の心臓〉: ターン開始時のシールドがこれ以上なら減衰しない (0 = なし・BeginNewTurn)。</summary>
         public int shieldNoDecayAt;
         /// <summary>[persistent] 〈二拍目の心臓〉: この戦闘のシールドの獲得量 +N% (増えた分に掛けて切り捨て・<see cref="consShield"/> の set)。</summary>
         public int shieldGainPct;
@@ -1110,7 +1110,7 @@ namespace ItemSystem.PassiveSkills
             // 失った分を〈半減で失った〉出来事として配る (2026-10-31)。
             // 〈重装兵の隠し刃〉(2026-11-20): このターンがボスのダウンなら半減しない (ダウンはこの後 CombatManager.BeginBossDownTurn が待ちから 1 つ使って立てる)
             bool keepForDown = shieldKeepOnBossDown && (CombatSystem.CombatManager.Instance?.Down?.pending ?? 0) > 0;
-            bool keepForHeart = shieldNoDecayAt > 0 && _consShield >= shieldNoDecayAt;   // 〈脈なしの鋼心臓〉(2026-11-21): シールド 25 以上なら減衰しない
+            bool keepForHeart = shieldNoDecayAt > 0 && _consShield >= shieldNoDecayAt;   // 〈脈打たぬ鋼の心臓〉(2026-11-21): シールド 25 以上なら減衰しない
             if (currentTurn > 1 && _consShield > 0 && !keepForDown && !keepForHeart)
             {
                 // 残る割合 50% + 上乗せ (〈油染みの盾革〉+20・最大 80%)

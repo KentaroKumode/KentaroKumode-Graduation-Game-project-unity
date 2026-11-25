@@ -5,7 +5,7 @@ using NUnit.Framework;
 
 namespace AutoTest.EditorTests
 {
-    /// <summary>役の軸の品 (Resolve の 6d・〈万象のゾロ目〉の確率) の契約 (full-item-rework-ledger §⑧)。</summary>
+    /// <summary>役の軸の品 (Resolve の 6d・〈万象の賽盆〉の確率) の契約 (full-item-rework-ledger §⑧)。</summary>
     [TestFixture]
     public sealed class RoleCoreTests
     {
@@ -24,7 +24,7 @@ namespace AutoTest.EditorTests
             int[] p1 = { 1, 1, 5 }, p2 = { 2, 2, 5 }, p3 = { 3, 3, 5 }, p4 = { 4, 4, 1 }, p5 = { 5, 5, 2 }, p6 = { 6, 6, 2 };
             int Atk(RoleItems f, int[] d, int c = 0, bool rr = false) => Run(f, d, c, rerolled: rr).attackAdd - Run(RoleItems.None, d).attackAdd;
             Assert.That(Run(RoleItems.None, p2).roleNow, Is.EqualTo(1));
-            // 見切りの木札: 4・5 の役
+            // 潮目の木札: 4・5 の役
             Assert.That(Atk(RoleItems.WoodTag, p5), Is.EqualTo(TerminalCards.WoodTagAttack * 2));
             Assert.That(Atk(RoleItems.WoodTag, p4), Is.EqualTo(TerminalCards.WoodTagAttack * 2));
             Assert.That(Run(RoleItems.WoodTag, p5).blockAdd - Run(RoleItems.None, p5).blockAdd, Is.EqualTo(TerminalCards.WoodTagBlock));
@@ -35,8 +35,8 @@ namespace AutoTest.EditorTests
             Assert.That(Atk(RoleItems.NotchBoard, p3, 3), Is.EqualTo(TerminalCards.NotchBoardPer * 4 * 2));
             Assert.That(Atk(RoleItems.NotchBoard, p4, 20), Is.EqualTo(TerminalCards.NotchBoardMax * 2));
             Assert.That(Atk(RoleItems.NotchBoard, p5, 3), Is.EqualTo(0));
-            // 血染めの歯車: 振り直し + 3 の役
-            // 血染めの歯車 (answer9): 振り直したターンのどの役も +5・3 の役かゾロ目は +10
+            // 追い目の賽筒: 振り直し + 3 の役
+            // 追い目の賽筒 (answer9): 振り直したターンのどの役も +5・3 の役かゾロ目は +10
             Assert.That(Atk(RoleItems.Gear, p3, rr: true), Is.EqualTo(TerminalCards.GearAttackHigh * 2));
             Assert.That(Atk(RoleItems.Gear, p3), Is.EqualTo(0));
             Assert.That(Atk(RoleItems.Gear, p5, rr: true), Is.EqualTo(TerminalCards.GearAttack * 2));
@@ -44,7 +44,7 @@ namespace AutoTest.EditorTests
             Assert.That(Run(RoleItems.Chipped, p1).armorPen - Run(RoleItems.None, p1).armorPen, Is.EqualTo(TerminalCards.ChippedPen));
             Assert.That(Run(RoleItems.Chipped, p2).armorPen - Run(RoleItems.None, p2).armorPen, Is.EqualTo(TerminalCards.ChippedPen));
             Assert.That(Run(RoleItems.Chipped, p3).armorPen, Is.EqualTo(Run(RoleItems.None, p3).armorPen));
-            // 雷毒の導管の目 (RoleEffects.cs): 1・2・3
+            // 小目の骨牌の目 (RoleEffects.cs): 1・2・3
             Assert.That(TerminalCards.FaceIn(TerminalCards.ConduitFaces, 3) && !TerminalCards.FaceIn(TerminalCards.ConduitFaces, 4) && !TerminalCards.FaceIn(TerminalCards.ConduitFaces, 0), Is.True);
             // 役が無ければ何もしない
             Assert.That(Atk(RoleItems.WoodTag | RoleItems.NotchBoard, new[] { 1, 3, 5 }, 3), Is.EqualTo(0));
@@ -53,7 +53,7 @@ namespace AutoTest.EditorTests
         [Test]
         public void RerollTurnItems_Answer12()
         {
-            // 〈雷鳴のゾロ目〉振り直したターンは 2 個そろいでも最終 +30%・ブロック +8 (振り直していなければ乗らない)
+            // 〈轟きの大賽〉振り直したターンは 2 個そろいでも最終 +30%・ブロック +8 (振り直していなければ乗らない)
             var pair = new[] { 2, 2, 5 };
             var b = Run(RoleItems.None, pair, rerolled: true);
             var th = Run(RoleItems.Thunder, pair, rerolled: true);
@@ -75,7 +75,7 @@ namespace AutoTest.EditorTests
             var t = Run(RoleItems.Thunder, triple);
             Assert.That(t.damageMul, Is.EqualTo(b.damageMul * (1f + TerminalCards.ThunderFinalPct)).Within(1e-4));
             Assert.That(t.blockAdd - b.blockAdd, Is.EqualTo(TerminalCards.ThunderBlock));
-            // 血濡れの符丁 (answer9): どの役でも (ゾロ目・連なりも)・回数 (1 + 1) × BloodmarkPer
+            // 連勝の符丁 (answer9): どの役でも (ゾロ目・連なりも)・回数 (1 + 1) × BloodmarkPer
             int[] pair = { 2, 2, 5 };
             Assert.That(Run(RoleItems.Bloodmark, pair, roleCount: 1).damageMul, Is.EqualTo(Run(RoleItems.None, pair).damageMul * (1f + 2 * TerminalCards.BloodmarkPer)).Within(1e-4));
             Assert.That(Run(RoleItems.Bloodmark, triple, roleCount: 1).damageMul, Is.EqualTo(b.damageMul * (1f + 2 * TerminalCards.BloodmarkPer)).Within(1e-4));

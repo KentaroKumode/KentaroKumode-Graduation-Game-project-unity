@@ -172,7 +172,7 @@ namespace ItemSystem.PassiveSkills
             Register(new FallenCastleCornerstone()); Register(new BorderGuardStandard());
         }
 
-        /// <summary>出血の軸 26 品のうち効果クラスを持つ 16 品 (2026-11-21・BleedEffects.cs)。 残りの 10 品 (鉛入りの握斧・血日に澄む佩玉・医家の反り刃・返し刃の留め金・
+        /// <summary>出血の軸 26 品のうち効果クラスを持つ 16 品 (2026-11-21・BleedEffects.cs)。 残りの 10 品 (鉛入りの手斧・血に澄む紅玉・医家の反り刃・返し刃の留め金・
         /// 欠け刃のナイフ・裂け目の楔・鋸刃の山刀・血止め知らずの針箱・激情の刃・百人切りの鉈) は BleedCore の旗。 〈鎧縫いの針〉は stats の内側。</summary>
         private static void RegisterBleed()
         {
@@ -182,7 +182,7 @@ namespace ItemSystem.PassiveSkills
             Register(new CrimsonPress()); Register(new EndlessSpringCrystal()); Register(new ReturningBloodSickle()); Register(new BloodWedge());
         }
 
-        /// <summary>臨界の軸 26 品のうち効果クラスを持つ 15 品 (2026-11-21・HeatEffects.cs)。 残りの 11 品 (過熱石・燻りの革胸当て・火守りの火搔き棒・恒温の竈・二度詰めの雷管・
+        /// <summary>臨界の軸 26 品のうち効果クラスを持つ 15 品 (2026-11-21・HeatEffects.cs)。 残りの 11 品 (過熱石・燻りの革胸当て・火守りの火掻き棒・恒温の竈・二度詰めの雷管・
         /// 焚き足しの炭・帳簿外の爆薬・火花読みの眼鏡・燧石の指輪・暴れ窯の火床・柱折りの発破筒) は HeatCore の旗 (荒砥・点火スパナ・溢れ取りの鋳型・早沸かし釜・八日目の灰燼は旗とクラスの両方)。</summary>
         private static void RegisterHeat()
         {
@@ -201,16 +201,16 @@ namespace ItemSystem.PassiveSkills
             Register(new PulseNeedle()); Register(new ReadMark()); Register(new WhiteBladeMirror()); Register(new FirstStrokePin()); Register(new NarrowSpyglass()); Register(new OneFlashMastery());
         }
 
-        /// <summary>山札の軸 19 品のうち効果クラスを持つ 2 品 (2026-11-21・DeckEffects.cs)。 残りの 17 品と〈焼き入れの挟み〉の撃の分・〈仕込みの配電盤〉の手札の分は
-        /// CombatSystem.TerminalCards の DeckItems の旗 (〈予備の差込口〉〈整理された工具箱〉は CombatManager.BeginTerminalDeck)。</summary>
+        /// <summary>山札の軸 19 品のうち効果クラスを持つ 2 品 (2026-11-21・DeckEffects.cs)。 残りの 17 品と〈焼き入れの挟み〉の撃の分・〈仕込みの切替器〉の手札の分は
+        /// CombatSystem.TerminalCards の DeckItems の旗 (〈組み置きの配線束〉〈整理された工具箱〉は CombatManager.BeginTerminalDeck)。</summary>
         private static void RegisterDeck()
         {
             Register(new TemperTongs()); Register(new PrimedSwitchboard());
         }
 
-        /// <summary>役の軸 13 品のうち効果クラスを持つ 4 品 (2026-11-21・RoleEffects.cs)。 端子の解決の中の分 (見切りの木札・符丁の刻み板・欠け目の見立ての防御の無視・
-        /// 血染めの歯車・揃いの拍子木の与ダメージ・雷鳴のゾロ目・血濡れの符丁) は CombatSystem.TerminalCards の RoleItems の旗、
-        /// 擦り切れた賽袋・鏡合わせの盤・宿命の刻み目・万象のゾロ目は CombatManager の役の適用 (FreeRerollsLeft / ResolveRoles / DecideOmniPair)。</summary>
+        /// <summary>役の軸 13 品のうち効果クラスを持つ 4 品 (2026-11-21・RoleEffects.cs)。 端子の解決の中の分 (潮目の木札・符丁の刻み板・欠け目の見立ての防御の無視・
+        /// 追い目の賽筒・揃いの拍子木の与ダメージ・轟きの大賽・連勝の符丁) は CombatSystem.TerminalCards の RoleItems の旗、
+        /// 擦り切れた賽袋・曇りの合わせ鏡・宿命の骨賽・万象の賽盆は CombatManager の役の適用 (FreeRerollsLeft / ResolveRoles / DecideOmniPair)。</summary>
         private static void RegisterRole()
         {
             Register(new ChippedEyeReading()); Register(new MatchedClappers()); Register(new LosingStreakDie()); Register(new LowFaceConduit());

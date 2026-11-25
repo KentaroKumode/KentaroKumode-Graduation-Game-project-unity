@@ -133,10 +133,10 @@ namespace GameLoop
 
         /// <summary>〈嵐読みの風見鶏〉の量 (仮)。</summary>
         public const int VaneGold = 8, VaneCalm = 3;
-        /// <summary>〈避雷の天幕〉: 層ごとに半分にする回数 (仮)。</summary>
+        /// <summary>〈防嵐の天幕〉: 層ごとに半分にする回数 (仮)。</summary>
         public const int TentActions = 3;
 
-        /// <summary>〈避雷の天幕〉: 層に入ってから最初の <see cref="TentActions"/> 回の「取る」(宝・秘宝・戦闘の勝ち・イベントの得) で溜まる量を半分 (切り捨て) にする、 引く分。
+        /// <summary>〈防嵐の天幕〉: 層に入ってから最初の <see cref="TentActions"/> 回の「取る」(宝・秘宝・戦闘の勝ち・イベントの得) で溜まる量を半分 (切り捨て) にする、 引く分。
         /// 歩く・イベントのターン・嵐を動かす・エスカレーションは行動ではないので数えない。 不安定化の時計が動いている時だけ呼ばれる。</summary>
         private int TentCut(InstabilitySource src, int n)
         {

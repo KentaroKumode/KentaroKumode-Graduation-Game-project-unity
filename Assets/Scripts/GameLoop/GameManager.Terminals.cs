@@ -19,7 +19,7 @@ namespace GameLoop
             if (boss && Run.currentFloor > TerminalBossRewardLastFloor) return;
             // 0 層の試練の木箱 (2026-11-20・docs/system-overhaul-spec.md §4-4) は 3 択 (エリートと同じ数)
             bool farm = Run.Depth == MapSystem.FreeMove.FloorPlan.FarmFloor;
-            // 〈二股の鑑定書〉: どの戦闘の報酬も 1 枚多い (通常 2 → 3・エリートと 0 層 3 → 4・ボス 3 → 4)
+            // 〈戦利の目録〉: どの戦闘の報酬も 1 枚多い (通常 2 → 3・エリートと 0 層 3 → 4・ボス 3 → 4)
             int n = (boss ? TerminalChoicesBoss : elite || farm ? TerminalChoicesElite : TerminalChoicesNormal) + Run.terminalExtraChoices
                   + (Run.OwnsPassive(ItemIds.MacroAppraisal) ? 1 : 0);
             Run.terminalExtraChoices = 0;

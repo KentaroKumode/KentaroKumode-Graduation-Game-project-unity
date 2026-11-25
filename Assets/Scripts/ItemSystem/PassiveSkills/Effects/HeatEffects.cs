@@ -7,12 +7,12 @@ namespace ItemSystem.PassiveSkills.Effects
     //  臨界の軸 26 品 (2026-11-21・full-item-rework-ledger §⑤・docs/GAME.md §7-4)。
     //  使い捨て・連続配線・リスク行動で臨界を溜め、 閾値 (既定 30) で即時の爆発 (基礎 30・敵の防御 50% 無視・ボスの次の目盛りにひび)。
     //  爆発が起きたターンは【過熱】(Kw.Overheated)。 分岐 A〈高速連鎖〉/ 分岐 B〈高圧超臨界〉。
-    //  爆発の式と、 爆発の式・配線で決まる臨界に効く 16 品 (過熱石・燻りの革胸当て・火守りの火搔き棒・点火スパナと荒砥の撃ごとの臨界・恒温の竈・
+    //  爆発の式と、 爆発の式・配線で決まる臨界に効く 16 品 (過熱石・燻りの革胸当て・火守りの火掻き棒・点火スパナと荒砥の撃ごとの臨界・恒温の竈・
     //  二度詰めの雷管・焚き足しの炭・溢れ取りの鋳型の爆発の分・帳簿外の爆薬・早沸かし釜の閾値・火花読みの眼鏡・八日目の灰燼の ×1.6・燧石の指輪・
     //  暴れ窯の火床・柱折りの発破筒) は CombatSystem.HeatCore の旗 (本体・画面の見込み・BOT が同じ式)。 ここは出来事で働く 15 品。
     // ============================================================
 
-    // ── B: 起点 ── (〈過熱石〉〈燻りの革胸当て〉〈火守りの火搔き棒〉は端子の解決の 5g だけ・HeatCore の旗)
+    // ── B: 起点 ── (〈過熱石〉〈燻りの革胸当て〉〈火守りの火掻き棒〉は端子の解決の 5g だけ・HeatCore の旗)
 
     /// <summary>工廠の材料箱: 爆発するたび、 この戦闘中の自分の防御 +2 (最大 +10)。</summary>
     public class ArsenalCrate : IPassiveSkillEffect, IRelicDisplay
@@ -56,10 +56,10 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>継ぎ革の旅靴: マップを 1 歩進むごとに臨界 +2 を蓄積 (最大 20)。 次の戦闘の開始時、 蓄積分の臨界を得て 0 に戻す (歩数は戦闘で 0 に戻る)。</summary>
+    /// <summary>火打ち底の旅靴: マップを 1 歩進むごとに臨界 +2 を蓄積 (最大 20)。 次の戦闘の開始時、 蓄積分の臨界を得て 0 に戻す (歩数は戦闘で 0 に戻る)。</summary>
     public class PatchedBoots : IPassiveSkillEffect, IRelicDisplay
     {
-        public string SkillId => "継ぎ革の旅靴";
+        public string SkillId => "火打ち底の旅靴";
         public const int PerStep = 2, Max = 20;
         public static int Stored => System.Math.Min(Max, Rw.Steps * PerStep);
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Stored);
@@ -98,10 +98,10 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>恒熱の炉壁: 爆発するたび、 その爆発のダメージ (敵の防御の後) の 12% (上限なし・final6: 旧 25%・最大 14) をそのターンのブロックとして得る (配線より後の爆発の分は CombatManager.Turn が敵の攻撃の前に足す)。</summary>
+    /// <summary>余熱の炉壁: 爆発するたび、 その爆発のダメージ (敵の防御の後) の 12% (上限なし・final6: 旧 25%・最大 14) をそのターンのブロックとして得る (配線より後の爆発の分は CombatManager.Turn が敵の攻撃の前に足す)。</summary>
     public class HeatWall : IPassiveSkillEffect
     {
-        public string SkillId => "恒熱の炉壁";
+        public string SkillId => "余熱の炉壁";
         public const int Pct = 12;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRinkaiBurst };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
@@ -171,10 +171,10 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>希望の灯片: 爆発を 2 回以上起こして戦闘に勝ったとき、 最大 HP +2 (永続)。 【過熱】のターンの終わり、 HP +2 (answer13: +3・+3 → +2・+2)。</summary>
+    /// <summary>燐晶: 爆発を 2 回以上起こして戦闘に勝ったとき、 最大 HP +2 (永続)。 【過熱】のターンの終わり、 HP +2 (answer13: +3・+3 → +2・+2)。</summary>
     public class HopeShard : IPassiveSkillEffect
     {
-        public string SkillId => "希望の灯片";
+        public string SkillId => "燐晶";
         public const int NeedBursts = 2, MaxHp = 2, Heal = 2;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd, PassiveSkillTrigger.OnBattleEnd };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
@@ -184,7 +184,7 @@ namespace ItemSystem.PassiveSkills.Effects
             if (run == null || !Rw.Won(ctx) || Rw.Count(ctx, Kw.BurstTotalKey) < NeedBursts) return;
             run.playerMaxHP += MaxHp;
             run.playerHP = System.Math.Min(run.playerMaxHP, run.playerHP + MaxHp);
-            Rw.Log($"[希望の灯片] 爆発 {Rw.Count(ctx, Kw.BurstTotalKey)} 回で勝利 → 最大HP +{MaxHp} ({run.playerMaxHP})");
+            Rw.Log($"[燐晶] 爆発 {Rw.Count(ctx, Kw.BurstTotalKey)} 回で勝利 → 最大HP +{MaxHp} ({run.playerMaxHP})");
         }
     }
 
