@@ -260,16 +260,13 @@ namespace AutoTest
                     flat -= DeckRunLeaveHpCost * hpUnit;
             }
             // 【ジャスト防御】を狙う配線 (シールドの BOT の規則・2026-11-21): 本体と同じ判定 (CombatManager.JustGuardForecast) で成立するなら、 成立で働く品の得を足す。
-            //   shortcut: 先のターンの得は控えめな定数 (〈防人の軍標〉= 残りターンの半分に +35%・〈受け太刀の籠手〉+8 と〈静寂の構え〉の上乗せは次の攻撃の 7 割・〈英雄の意志〉のダウンは 1 ターンの与ダメの半分)
+            //   shortcut: 先のターンの得は控えめな定数 (〈防人の軍標〉= 残りターンの半分に + シールドの秘宝の数 × 9%・〈受け太刀の籠手〉+8 と〈静寂の構え〉の上乗せは次の攻撃の 7 割・〈英雄の意志〉のダウンは 1 ターンの与ダメの半分)
             if (sg.jgCtx != null && CombatManager.Instance != null && CombatManager.Instance.JustGuardForecast(sg.jgCtx, o, in env, out int jgE, out _))
             {
                 float per = DeckPerTurnDamage(in s, k);
                 if (sg.jgMirror) ws.extraDmg += jgE * (ItemSystem.PassiveSkills.Effects.MirrorBuckler.JustPct - ItemSystem.PassiveSkills.Effects.MirrorBuckler.Pct) / 100;
                 if (sg.jgBlade) ws.extraDmg += jgE * ItemSystem.PassiveSkills.Effects.KnightsTrump.ReturnPct / 100;
-                if (sg.jgStandard) sightFlat += ItemSystem.PassiveSkills.Effects.BorderGuardStandard.PctPerGuard / 100f * per * Math.Max(0, turns - 1) * 0.5f + DeckDrawDmg;
-                //   〈防人の軍標〉EchoNeed (2) 回目以降: 次のターンの撃がもう 1 回ずつ = 次の攻撃 1 回分 (2026-11-22)
-                if (sg.jgStandard && turns > 1 && ItemSystem.PassiveSkills.Effects.Shd.Count(sg.jgCtx, ItemSystem.PassiveSkills.Effects.Shd.JustGuardCountKey) + 1 >= ItemSystem.PassiveSkills.Effects.BorderGuardStandard.EchoNeed)
-                    sightFlat += per * DeckFutureAttackShare;
+                if (sg.jgStandard) sightFlat += ItemSystem.PassiveSkills.Effects.BorderGuardStandard.PctPerGuard(sg.jgCtx) / 100f * per * Math.Max(0, turns - 1) * 0.5f + DeckDrawDmg;
                 if (sg.jgCatch) sightFlat += ItemSystem.PassiveSkills.Effects.CatchBracer.Atk * DeckFutureAttackShare;
                 if (sg.jgSilent && o.attackDice == 0)
                     sightFlat += (ItemSystem.PassiveSkills.Effects.SilentStance.JustPct - ItemSystem.PassiveSkills.Effects.SilentStance.Pct) / 100f * per * DeckFutureAttackShare;

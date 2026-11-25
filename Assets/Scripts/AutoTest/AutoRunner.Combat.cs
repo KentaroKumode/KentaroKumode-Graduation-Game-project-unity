@@ -810,7 +810,7 @@ namespace AutoTest
             st.pinpointCut = ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.PinpointEye.NonCritCutKey) > 0f;
             st.outMul = OutgoingPoolNow(ctx, run);
             st.finalPct = ctx.finalDamagePct;
-            st.guardEcho = bladeDance || ItemSystem.PassiveSkills.Effects.BorderGuardStandard.EchoNow(ctx);
+            st.guardEcho = bladeDance;   // 〈防人の軍標〉の「もう 1 回」は 2026-11-25 に撤去
             st.consBurst = ctx.consAtkBurst;
             st.critPen = ctx.critArmorPen;
             st.vitalIgnore = bladeDance || ItemSystem.PassiveSkills.Effects.VitalStrike.IgnoresDefense(ctx);   // 剣舞譜は会心確定なので「会心は防御を無視」と同じ見込み

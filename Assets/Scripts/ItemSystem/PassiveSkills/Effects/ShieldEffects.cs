@@ -400,27 +400,23 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>防人の軍標【規則】: 【ジャスト防御】を成立させるたび、 この戦闘の最終与ダメージ倍率 +45% (累積・ctx.finalDamagePct) と、 次のターンの手札 +1 枚 (Rw.DrawNext)。
-    /// この戦闘で 2 回目以降 (2026-11-22 neon 収束: 旧 3 回目以降) のジャスト防御を成立させた次のターン、 全部の撃がもう 1 回ずつ発火する (2 回当たる・本体の撃の輪 CombatManager.Turn が <see cref="EchoNow"/> を読む・2026-11-22)。</summary>
+    /// <summary>防人の軍標: 【ジャスト防御】を成立させるたび、 この戦闘の最終与ダメージ倍率 +(持っているシールドの秘宝の数 × 9)% (この品も数える・ctx.AxisDepth・累積・ctx.finalDamagePct) と、
+    /// 次のターンの手札 +1 枚 (Rw.DrawNext)。 2026-11-25 作者の決定: 「2 回目以降のジャスト防御の次のターン 全攻撃がもう 1 回」を撤去 (シールドの品なしでつまみ食いできた)・+45% 固定 → 秘宝の数に比例 (5 つで +45%)。</summary>
     public class BorderGuardStandard : IPassiveSkillEffect, IRelicDisplay
     {
         public const string Id = "防人の軍標";
         public string SkillId => Id;
-        public const int PctPerGuard = 45, Draw = 1, EchoNeed = 2;
-        /// <summary>[persistent] 撃がもう 1 回ずつ発火するターン。</summary>
-        public const string EchoKey = "shd.standard.echo";
+        public const int PctPerShieldItem = 9, Draw = 1;
+        /// <summary>ジャスト防御 1 回の上乗せ (%)。 本体と BOT の見積もりが同じ式を読む。</summary>
+        public static int PctPerGuard(CombatContext ctx) => ctx != null ? PctPerShieldItem * ctx.AxisDepth(AxisRules.Shield) : 0;
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Pct(ctx.finalDamagePct / 100f);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnJustGuard };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            ctx.finalDamagePct += PctPerGuard;
+            int pct = PctPerGuard(ctx);
+            ctx.finalDamagePct += pct;
             Rw.DrawNext(Draw);
-            bool echo = Shd.Count(ctx, Shd.JustGuardCountKey) >= EchoNeed;
-            if (echo) ctx.accumulatedValues[EchoKey] = ctx.currentTurn + 1;
-            Rw.Log($"[防人の軍標] ジャスト防御 → 最終与ダメージ倍率 +{PctPerGuard}% (この戦闘 +{ctx.finalDamagePct}%)・次のターンの手札 +{Draw}{(echo ? "・次のターン 全撃がもう 1 回発火" : "")}");
+            Rw.Log($"[防人の軍標] ジャスト防御 → 最終与ダメージ倍率 +{pct}% (この戦闘 +{ctx.finalDamagePct}%)・次のターンの手札 +{Draw}");
         }
-
-        /// <summary>このターン、 全部の撃がもう 1 回ずつ発火する (本体の撃の輪と BOT の見積もりが読む)。</summary>
-        public static bool EchoNow(CombatContext ctx) => ctx != null && ctx.currentTurn > 0 && Shd.Count(ctx, EchoKey) == ctx.currentTurn;
     }
 }
