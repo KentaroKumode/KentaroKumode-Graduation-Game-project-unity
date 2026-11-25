@@ -197,7 +197,7 @@ namespace CombatSystem
         public const int RewindNeed = 3;
 
         /// <summary>逆巻きの賽 (作者 2026-11-18): 攻撃に目を 3 つ挿したターン、 エスカレーションの段階を 1 つ下げる (2 → 1・0 → −1)。
-        /// エスカレーションはふつうに進む (ターンの閾値で 1 つ上がる)。 段階がマイナスの間は、 自分の与ダメに同じ段の倍率を足す (−1 で +30%)。
+        /// エスカレーションはふつうに進む (ターンの閾値で 1 つ上がる)。 段階がマイナスの間は、 そのターンの攻撃の最終与ダメージに同じ段の倍率を足す (−1 で +30%・2026-11-25 に与ダメの池から移した)。
         /// 敵の攻撃に効くのは次のターンから (このターンの予告はもう決まっている)。 配線の結果が決まった直後・主攻撃より前に呼ぶ。</summary>
         public static void ApplyRewind(ItemSystem.PassiveSkills.CombatContext ctx, TerminalOutcome term, int escTurn)
         {
@@ -208,8 +208,12 @@ namespace CombatSystem
                 if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[賽] 逆巻きの賽: 段階を 1 つ下げた → {Escalation.EffectiveStage(escTurn)}");
             }
             int s = Escalation.EffectiveStage(escTurn);
-            if (s < 0) ctx.outgoingDamageMultiplier += Escalation.NegativeStageBuff(-s);
+            // マイナスの段階の得は最終与ダメージ (2026-11-25 作者: 与ダメの池から移す)。 毎ターン上書きするので、 このターンだけ効く (撃ごとに CombatManager が hitFinalDamagePct へ足す)
+            ctx.accumulatedValues[RewindFinalPctKey] = s < 0 ? (float)System.Math.Round(Escalation.NegativeStageBuff(-s) * 100f) : 0f;
         }
+
+        /// <summary>逆巻きの賽: このターンの最終与ダメージ +% (ctx.accumulatedValues・<see cref="ApplyRewind"/> が毎ターン書く)。</summary>
+        public const string RewindFinalPctKey = "die.rewind.finalPct";
 
         /// <summary>賭場の賽: 振り直しが無料 (費用 0)・代わりに振り直すたびに HP −N。</summary>
         public const int GambleHpCost = 1;

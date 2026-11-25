@@ -999,6 +999,7 @@ namespace CombatSystem
             {
                 ctx.hitIndex = h; ctx.forceCritThisHit = false; ctx.critSkipRoll = false; ctx.isRefireHit = refire; ctx.hitCritRateMulAdd = 0f; ctx.hitIsFocused = false; ctx.hitFocusSpentRenki = 0; ctx.hitFinalDamagePct = 0; ctx.hitOutgoingPct = 0; ctx.hitIgnoreDefense = h == chainHit; ctx.hitArmorPen = 0;   // 撃ごとの値 (〈抜き打ちの作法〉〈加重の拳套〉・〈連刃〉の追撃は防御を無視)
                 ctx.hitFaceMax = CritCore.HitFaceMax(term, playerDice, h);   // 〈狙い目の刻み〉が読む
+                ctx.hitFinalDamagePct += (int)ctx.GetAccumulated(DiePassives.RewindFinalPctKey);   // 逆巻きの賽: マイナスの段階の得 (このターン・最終与ダメージ)
                 if (bladeDance && h < hitBases.Count) { ctx.forceCritThisHit = true; ctx.hitIgnoreDefense = true; }
                 if (h > 0 || refire || echoing)
                 {
