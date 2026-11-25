@@ -5,7 +5,7 @@ namespace ItemSystem.PassiveSkills.Effects
 {
     // ============================================================
     //  毒の軸 25 品 (2026-11-21・full-item-rework-ledger §②・docs/GAME.md §7-1)。
-    //  毒 = 蝕み (敵の攻撃・防御を削る) と【起爆】(毒を半分消費して消費量 × 4 の軽減不可ダメージ・そのターンのひびを正規のダウンに割る)。
+    //  毒 = 蝕み (敵の攻撃・防御を削る) と【起爆】(毒を 1/3 消費して消費量 × 4 の軽減不可ダメージ・ボスの次の目盛りをそのダメージの 35% ぶん上げる)。
     //  起爆の式は CombatSystem.PoisonCore (BOT の見積もりと同じ)。 端子の解決の中で効く 6 品の分 (緑染みの小刀・蛇血瓶・毒見役の小匙・
     //  毒棘の小盾のブロック・瘴気の外套の被ダメ・麻痺の吹き矢の防御無視) は PoisonCore.ApplyToTerminals (Resolve の 5d)。
     //  毒のダメージは毎ターン開始時 (StatusRegistry の poison)・ダメージを出した後に残る割合 50% (〈腐れ沼の苔玉〉で 75%)。
@@ -14,13 +14,13 @@ namespace ItemSystem.PassiveSkills.Effects
     /// <summary>毒の品の小さな道具と【起爆】の本体の口。</summary>
     public static class Psn
     {
-        /// <summary>[persistent・戦闘で 0 から] この戦闘で起爆した回数 / 最後に起爆したターン / 毒のダメージが最後に入ったターン (〈骨溶かしの黒油〉を持つ時だけ書く)。</summary>
-        public const string DetonateCountKey = "psn.detonates", DetonatedTurnKey = "psn.detonatedTurn", PoisonDamageTurnKey = "psn.poisonDmgTurn";
+        /// <summary>[persistent・戦闘で 0 から] この戦闘で起爆した回数 / 最後に起爆したターン。</summary>
+        public const string DetonateCountKey = "psn.detonates", DetonatedTurnKey = "psn.detonatedTurn";
 
         public static int Count(CombatContext ctx, string key) => (int)ctx.GetAccumulated(key);
 
         /// <summary>【起爆】: 敵の毒を 1/3 (切り上げ) 消費し、 max(消費量 × 倍率, 消費量 × 敵の最大 HP × 0.25%) の軽減不可ダメージ (<see cref="PoisonCore.Damage"/>)。
-        /// 起爆したターンの終わりに、 ボスの目盛りのひびが正規のダウンとして割れる (<see cref="ShattersCracksNow"/>)。 戻り値 = ダメージ。</summary>
+        /// ボスの次の目盛りを、 そのダメージの 35% ぶん上げる (<see cref="PoisonCore.DetonateNotchPct"/>・ひびは割らない・2026-11-25)。 戻り値 = ダメージ。</summary>
         public static int Detonate(CombatContext ctx, string label)
         {
             int p = ctx.EnemyPoison;
@@ -33,18 +33,10 @@ namespace ItemSystem.PassiveSkills.Effects
             ctx.accumulatedValues[DetonatedTurnKey] = ctx.currentTurn;
             CombatManager.DetonateFired++;
             Kw.DamageEnemy(ctx, dmg);
+            CombatManager.Instance?.RaiseBossNextNotch(dmg * PoisonCore.DetonateNotchPct / 100);
             Rw.Log($"[{label}] 【起爆】 毒 {p} → {p - spent} (消費 {spent}) → {dmg} の軽減不可ダメージ (この戦闘 {before + 1} 回目)");
             Kw.Raise(ctx, PassiveSkillTrigger.OnPoisonDetonate, dmg);
             return dmg;
-        }
-
-        /// <summary>このターンの終わりに、 ボスの目盛りのひびを全部 正規のダウンとして割るか (CombatManager.NoteBossDownTurnEnd が読む):
-        /// 起爆した / 〈骨溶かしの黒油〉を持ち、 毒のダメージが入った。</summary>
-        public static bool ShattersCracksNow(CombatContext ctx)
-        {
-            if (ctx == null || ctx.currentTurn <= 0) return false;
-            if (Count(ctx, DetonatedTurnKey) == ctx.currentTurn) return true;
-            return ctx.poisonDownDouble && Count(ctx, PoisonDamageTurnKey) == ctx.currentTurn;
         }
 
         /// <summary>このターン (key に今のターンを控え、 違うターンなら 0 から) の数。</summary>
@@ -324,7 +316,7 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>瘴気の外套: 敵の毒が 15 以上の間、 受けるダメージ −35% (敵の直接攻撃・固定ダメージを除く・PoisonCore の旗)。
-    /// ターンの終わり、 敵の毒が 25 以上なら、 毒を消費せずに【起爆】の 50% のダメージ (起爆の回数・ひびの割れには数えない)。</summary>
+    /// ターンの終わり、 敵の毒が 25 以上なら、 毒を消費せずに【起爆】の 50% のダメージ (起爆の回数には数えない・ボスの目盛りは上げない)。</summary>
     public class MiasmaMantle : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "瘴気の外套";
@@ -357,17 +349,19 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.poisonCrown = true;
     }
 
-    /// <summary>骨溶かしの黒油: 毒のダメージか【起爆】が入ったターンの終わりに、 ボスの目盛りのひびは正規のダウンとして割れる (<see cref="Psn.ShattersCracksNow"/>)。
-    /// ダウン中の敵への毒のダメージと起爆のダメージ ×2 (ctx.poisonDownDouble・PoisonCore.Damage)。</summary>
+    /// <summary>骨溶かしの黒油 (2026-11-25 neon answer_gauge・旧: 毒のダメージか起爆のターンにひびを全部割る): よろめき中の敵にもダウンと同じ受けるダメージ ×1.5 が掛かり
+    /// (CombatManager の BossDown.TakenMulNow が ctx.poisonDownDouble を読む)、 ダウン中・よろめき中の敵への毒のダメージと起爆のダメージ ×2 (ctx.poisonDownDouble・PoisonCore.Damage)。
+    /// ボスを通常攻撃でダウンさせたとき (OnBossDown のひびの印 0)、 敵の毒 +8。</summary>
     public class BoneMeltOil : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "骨溶かしの黒油";
-        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(Psn.ShattersCracksNow(ctx));
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnPoisonTick };
+        public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(BossDown.ActiveNow);
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnBossDown };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (t == PassiveSkillTrigger.OnBattleStart) { ctx.poisonDownDouble = true; return; }
-            if (Kw.EventAmount(ctx) >= 1) ctx.accumulatedValues[Psn.PoisonDamageTurnKey] = ctx.currentTurn;
+            if (ctx.GetAccumulated(Kw.BossDownCrackKey) > 0) return;   // よろめき (ひびで割れた) では毒を足さない
+            Rw.Poison(ctx, PoisonCore.OilDownPoison);
         }
     }
 }

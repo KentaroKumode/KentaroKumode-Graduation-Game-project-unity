@@ -51,17 +51,34 @@ namespace AutoTest.EditorTests
         }
 
         [Test]
-        public void BossNotch_BreakAndCrackTop()
+        public void BossNotch_RaiseAndNextDownBuffs()
         {
             var d = new BossDownState();
             d.Reset(new[] { 0.5f, 0.25f });
-            Assert.That(d.CrackTopNotch(3), Is.True);
-            Assert.That(d.CrackTopNotch(4), Is.False);       // 既にひびがある
-            Assert.That(d.TopCracked, Is.True);
-            Assert.That(d.BreakTopNotch(), Is.True);          // HP に関係なく割る (満額のダウン)
-            Assert.That(d.broken, Is.EqualTo(1));
-            Assert.That(d.pending, Is.EqualTo(1));
-            Assert.That(d.TopCracked, Is.False);
+            d.ResetBuffs();
+            // 目盛りを上げても今の HP の 1 下まで (上げるだけでは割れない・2026-11-25)
+            Assert.That(d.RaiseNext(100, 59, 30), Is.EqualTo(59));
+            Assert.That(d.broken, Is.EqualTo(0));
+            // 次のダウンを強める: 上限 +100%・よろめきでは使わない・ダウンの最初のターンに使う
+            d.BuffNext(50, 20, 0); d.BuffNext(50, 0, 10); d.BuffNext(50, 0, 0);
+            Assert.That(d.bonusPct, Is.EqualTo(BossDown.TakenBonusMaxPct));
+            Assert.That(d.ExtendNext(), Is.True);
+            Assert.That(d.ExtendNext(), Is.False);              // 1 回のダウンにつき 1 ターン
+            d.pending = 1; d.pendingWeak.Add(true);             // よろめき
+            d.BeginTurn();
+            Assert.That(d.TakeBuffs(out _, out _, out _), Is.False);
+            Assert.That(d.NoteMainHit(40, 100, 10, 2, out _, out _), Is.EqualTo(1));   // 通常攻撃で割った = ダウン
+            d.BeginTurn();
+            Assert.That(d.TakeBuffs(out int sh, out int ch, out bool ext), Is.True);
+            Assert.That(sh, Is.EqualTo(20)); Assert.That(ch, Is.EqualTo(10)); Assert.That(ext, Is.True);
+            Assert.That(d.bonusNowPct, Is.EqualTo(100));
+            Assert.That(d.pending, Is.EqualTo(1));             // 延長で次のターンもダウン
+            d.BeginTurn();
+            Assert.That(d.TakeBuffs(out _, out _, out _), Is.False);   // 同じダウンの続きでは使わない
+            Assert.That(d.bonusNowPct, Is.EqualTo(100));
+            d.BeginTurn();
+            d.TakeBuffs(out _, out _, out _);
+            Assert.That(d.bonusNowPct, Is.EqualTo(0));         // ダウンが明けたら上乗せは消える
         }
     }
 }

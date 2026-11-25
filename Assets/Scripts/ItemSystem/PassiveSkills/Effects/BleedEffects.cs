@@ -223,7 +223,8 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>紅の搾り具 (分岐 B): 敵の出血が 15 以上の敵に攻撃が当たったとき、 出血の 1/3 (切り上げ) を使い、 使った量 × 8 の軽減不可ダメージ・ボスの次の目盛りにひび (1 ターン 1 回)。</summary>
+    /// <summary>紅の搾り具 (分岐 B): 敵の出血が 15 以上の敵に攻撃が当たったとき、 出血の 1/3 (切り上げ) を使い、 使った量 × 8 の軽減不可ダメージ・ボスの次の目盛りをそのダメージの 100% ぶん上げる
+    /// (1 ターン 1 回・2026-11-25 neon answer_gauge・旧: ひびを入れる)。</summary>
     public class CrimsonPress : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => GameLoop.ItemIds.BleedPress;
@@ -238,7 +239,7 @@ namespace ItemSystem.PassiveSkills.Effects
             int used = Kw.ConsumeBleed(ctx, BleedCore.PressSpend(b));
             if (used <= 0) return;
             Kw.DamageEnemy(ctx, used * BleedCore.PressMul);
-            CombatManager.Instance?.CrackBossNotch(SkillId);
+            CombatManager.Instance?.RaiseBossNextNotch(used * BleedCore.PressMul);
             Rw.Log($"[紅の搾り具] 出血 {b} → {ctx.enemyBleedStacks} (使う {used}) → {used * BleedCore.PressMul} の軽減不可");
         }
     }

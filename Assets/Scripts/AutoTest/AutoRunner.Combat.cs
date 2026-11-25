@@ -688,7 +688,7 @@ namespace AutoTest
             float critMulEff = CombatSystem.CritCore.EffectiveMul(s.critMulBase + mulAdd, s.critRed, add, s.critDouble);
             float sniperMul = CombatSystem.CritCore.EffectiveMul(s.critMulBase + mulPlain + CombatSystem.CritCore.SniperMulAdd(spent), s.critRed, addPlain, s.critDouble);
             float ironOut = s.ironClub ? System.Math.Min(1f, add) : 0f;
-            bool pinpoint = s.pinpointCut, vital = s.vitalIgnore, down = s.enemyDown && !s.enemyDownWeak;   // ひびの弱いダウン (2026-11-14) は ×1.5 なし
+            bool pinpoint = s.pinpointCut, vital = s.vitalIgnore, down = DownTakesMul(s.enemyDown, s.enemyDownWeak);   // よろめき (2026-11-14) は ×1.5 なし (〈骨溶かしの黒油〉は有り)
             float D(bool crit, float cmul, bool fz = true)   // fz = 集中会心の上乗せを入れる (照準器のもう 1 回は false)
             {
                 int d = raw;
@@ -1034,7 +1034,7 @@ namespace AutoTest
             if (aCount > 0) dmg = CombatSystem.EnemyHpLedger.ProbeMain(dmg);   // [測定用の物差し 2026-11-10] 旧の式にも同じ位置で (防御の前)
             if (aCount > 0) dmg = ApplyFinalPct(dmg, s.finalPct + rung.FinalPct(s.solo, aCount, bCount, s.execBoost, s.shattered, s.undyingStreak + 1));   // 最終与ダメージ倍率 (武器の撃ごとの +% 込み): 本体と同じ位置 (物差しの直後・徒労の前)
             if (aCount > 0) dmg = MetaProgression.MetaDebuffApplicator.ApplyOutgoingCut(dmg);   // 〈徒労〉: 本体と同じ位置 (物差しの直後・防御の前)
-            if (aCount > 0) dmg = CombatSystem.BossDown.ApplyTaken(dmg, s.enemyDown && !s.enemyDownWeak);   // ボスのダウン ×1.5: 本体と同じ位置 (徒労の直後・ひびの弱いダウンは無し)
+            if (aCount > 0) dmg = CombatSystem.BossDown.ApplyTaken(dmg, DownTakesMul(s.enemyDown, s.enemyDownWeak));   // ボスのダウン ×1.5: 本体と同じ位置 (徒労の直後・よろめきは無し・強めたダウンの上乗せは ApplyTaken が読む)
             // 敵の防御 (このターンの値) で軽減
             if (aCount > 0 && eDefNow > 0)
                 dmg = CombatSystem.DefenseFormula.Apply(dmg, CombatSystem.DefenseFormula.Effective(eDefNow, myPen + ws.armorPen));
@@ -1362,6 +1362,10 @@ namespace AutoTest
         /// <summary>[#107] 同じく〈反撃態勢〉(本体: EnemyPassiveSkillEffects.CounterStance・次のターンの敵の OnPreDealDamage で finalDamage += )。</summary>
         private const string CounterStanceNextTurnKey = ItemSystem.PassiveSkills.Effects.CounterStance.NextTurnKey;
 
+        /// <summary>このダウンが受けるダメージ ×1.5 を持つか (本体の BossDown.TakenMulNow と同じ条件: よろめきは無し・〈骨溶かしの黒油〉はよろめきにも有り・2026-11-25)。</summary>
+        internal static bool DownTakesMul(bool down, bool weak)
+            => down && (!weak || (ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context?.poisonDownDouble ?? false));
+
         /// <summary>[2026-11-14] 目盛りの割れ方の見込み (本体と同じ規則 BossDown.ForecastTurn を、 口 GameHooks.DownBreak / DownCrackGrace / DownCrackWeak で呼ぶ)。
         /// <paramref name="mainDmg"/> = 主攻撃の見込み / <paramref name="totalDmg"/> = このターンの与ダメの見込み (旧い判定はこの後の HP で数える = NextTurnIsDown と同じ)。
         /// 新しい判定では、 主攻撃の後に入る通常攻撃以外の削りを <see cref="OptimalTurnState.downChip"/> (固定ダメの枠の毒など + 出血) と、 与ダメの見込みのうち主攻撃以外の分の大きい方で見る。</summary>
@@ -1455,7 +1459,7 @@ namespace AutoTest
             //   ダウンのターンの次 (このターンがダウン) は plan.next の攻撃 (本体がこのターンの頭に起点を動かした後の値) になる。
             if (st.downNotches != null && GameLoop.GameHooks.DownBreak != CombatSystem.DownBreakRule.AnyDamage)
             {
-                // 新しい判定 (2026-11-14): 主攻撃だけで割れる・通常攻撃以外の削りはひび (猶予の後に弱いダウン)。 本体と同じ規則 (BossDown.ForecastTurn)
+                // 新しい判定 (2026-11-14): 主攻撃だけで割れる・通常攻撃以外の削りはひび (猶予の後によろめき)。 本体と同じ規則 (BossDown.ForecastTurn)
                 var f = DownForecast(in st, st.enemyHp, o.mainDmg, System.Math.Min(o.effDmg, st.enemyHp) - o.enemyHeal, wantCracks: true);
                 bool nd = f.nextDown;
                 int added = f.fullAdded + f.crackAdded;

@@ -14,7 +14,7 @@ namespace CombatSystem
         public const string TacticAcidKey = "tactic.acid";
 
         /// <summary>〈目盛り削りの鑿〉: 敵に <paramref name="dmg"/> のダメージ。 敵の HP を減らす口 (<see cref="HpLossDiag.Lose"/>) を通すので、 最終与ダメージ倍率・怠惰・ダウンの ×1.5 は
-        /// 主攻撃以外と同じに掛かる (敵の防御は掛からない)。 目盛りは<b>通常攻撃として</b>割る (<see cref="NoteBossDownMainHit"/>・ひびの入った目盛りも満額のダウン)。
+        /// 主攻撃以外と同じに掛かる (敵の防御は掛からない)。 目盛りは<b>通常攻撃として</b>割る (<see cref="NoteBossDownMainHit"/>・ひびの入った目盛りもダウン)。
         /// 戻り値 = 使えたか (敵が倒れていれば使えない)。</summary>
         public bool TacticChisel(CombatContext ctx, int dmg)
         {

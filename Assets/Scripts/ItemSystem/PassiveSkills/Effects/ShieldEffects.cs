@@ -103,12 +103,13 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>英雄の意志: エリート戦・ボス戦で敵が大技の予告かチャージを出しているターン、 ターン開始時にシールド +18。
-    /// そのターンに【ジャスト防御】が成立したら、 ボスの目盛りを直接 1 段割る (満額のダウン・CombatManager.BreakBossNotch)。</summary>
+    /// そのターンに【ジャスト防御】が成立したら、 次のダウンの受けるダメージの倍率 +0.5 (上限 +1.0)・そのダウンの開始時にシールド +20
+    /// (CombatManager.BuffNextBossDown・2026-11-25 neon answer_gauge・旧: 目盛りを HP に関係なく 1 段割る)。</summary>
     public class HeroWill : IPassiveSkillEffect, IRelicDisplay
     {
         public const string Id = "英雄の意志";
         public string SkillId => Id;
-        public const int Shield = 18;
+        public const int Shield = 18, DownBonusPct = 50, DownShield = 20;
         private const string Key = "shd.heroTurn";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(Rw.StrongFoe() && (CombatManager.Instance?.EnemyHeavyOrChargeNow(ctx.currentTurn) ?? false));
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart, PassiveSkillTrigger.OnJustGuard };
@@ -116,8 +117,8 @@ namespace ItemSystem.PassiveSkills.Effects
         {
             if (t == PassiveSkillTrigger.OnJustGuard)
             {
-                if (Shd.Count(ctx, Key) == ctx.currentTurn && (CombatManager.Instance?.BreakBossNotch(SkillId) ?? false))
-                    Rw.Log("[英雄の意志] 大技をジャスト防御 → ボスの目盛りを 1 段割った");
+                if (Shd.Count(ctx, Key) == ctx.currentTurn && Rw.OncePerTurn(ctx, Key + ".jg"))
+                    CombatManager.Instance?.BuffNextBossDown(SkillId, DownBonusPct, DownShield, 0);
                 return;
             }
             if (!Rw.StrongFoe() || !(CombatManager.Instance?.EnemyHeavyOrChargeNow(ctx.currentTurn) ?? false)) return;
@@ -352,13 +353,13 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>落城の礎石: 吸収またはターン開始の減衰で 1 ターンにシールドを 12 以上 (2026-11-22 neon 収束: 旧 20) 失ったとき、 次のターンの全撃の基礎攻撃 +「そのターンに失ったシールドの半分」(攻撃 +N・撃ごと)・
-    /// 全撃の最終与ダメージ +60%。 シールドが吸収か減衰で減るたび、 ボスの次の目盛りにひびを入れる (ひびが既にあれば何もしない・CombatManager.CrackBossNotch)。
+    /// 全撃の最終与ダメージ +80%。 失ったシールド 1 につき、 ボスの次の目盛りを最大 HP の 0.5% ぶん上げる (1 ターン最大 10%・2026-11-25 neon answer_gauge・旧: 減るたびひびを入れる)。
     /// 2026-11-22 (neon 最終仕上げ §2-2) 旧: 減るたび 減った量 × 2 の軽減不可ダメージ。</summary>
     public class FallenCastleCornerstone : IPassiveSkillEffect, IRelicDisplay
     {
         public const string Id = "落城の礎石";
         public string SkillId => Id;
-        public const int Need = 12, FinalPct = 80;   // 2026-11-22 neon 収束: 失うシールド 20 → 12・final6: +60% → +80%
+        public const int Need = 12, FinalPct = 80, NotchPermillePerShield = 5, NotchPermilleMax = 100;   // 2026-11-22 neon 収束: 失うシールド 20 → 12・final6: +60% → +80%
         /// <summary>このターンに失ったシールド (Psn.TurnN) / 上乗せが働くターン / その攻撃 +N。</summary>
         private const string LostKey = "shd.castle.lost", TurnKey = "shd.castle.turn", AtkKey = "shd.castle.atk";
         public static bool Primed(CombatContext ctx) => ctx != null && ctx.currentTurn > 0 && Shd.Count(ctx, TurnKey) == ctx.currentTurn;
@@ -388,8 +389,11 @@ namespace ItemSystem.PassiveSkills.Effects
                 {
                     int lost = Kw.EventAmount(ctx);
                     if (lost <= 0) return;
+                    int had = Psn.TurnN(ctx, LostKey);
                     Psn.AddTurnN(ctx, LostKey, lost);
-                    CombatManager.Instance?.CrackBossNotch(Id);
+                    // 1 ターンの合計で最大 HP の 10% まで: 今までの分と足した後の分の差だけ上げる
+                    int pm = System.Math.Min(NotchPermilleMax, (had + lost) * NotchPermillePerShield) - System.Math.Min(NotchPermilleMax, had * NotchPermillePerShield);
+                    if (pm > 0) CombatManager.Instance?.RaiseBossNextNotch((int)((long)ctx.enemyMaxHP * pm / 1000));
                     return;
                 }
             }

@@ -987,7 +987,7 @@ namespace AutoTest
             bool added = false;
             for (int i = 0; i < n; i++)
             {
-                // 待った後の HP (新しい判定では通常攻撃以外の削り downChip も引く ── 目盛りの下ならひびが入り、 次のターンに通常攻撃で割れる・猶予が切れれば弱いダウン)
+                // 待った後の HP (新しい判定では通常攻撃以外の削り downChip も引く ── 目盛りの下ならひびが入り、 次のターンに通常攻撃で割れる・猶予が切れればよろめき)
                 int ha = hp - Math.Min(GameLoop.GameHooks.DownBreak == DownBreakRule.AnyDamage ? outs[i].effDmg : Math.Max(outs[i].effDmg, outs[i].mainDmg + st.downChip), hp);
                 if (oldRule ? !DownKeepRules.HoldEligible(true, tele.turnsToHeavy, downAnyway, any, breaks[i], ha, notch, perTurn)
                             : !DownKeepRules.HoldEligibleChargeOrHeavy(true, toHeavyNext, downAnyway, any, breaks[i], ha, notch, perTurn)) continue;

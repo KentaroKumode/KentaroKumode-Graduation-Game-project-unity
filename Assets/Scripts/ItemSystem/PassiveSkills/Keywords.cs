@@ -86,7 +86,7 @@ namespace ItemSystem.PassiveSkills.Keywords
         private static int _heatOuter;
 
         /// <summary>臨界を n 溜める (<see cref="CombatSystem.HeatCore.Gain"/>)。 閾値に届いたら爆発し、 その場でダメージを出し (ADR-0016・CombatManager.LandBurst)、
-        /// ボスの次の目盛りにひびを入れ (〈柱折りの発破筒〉は即座に正規のダウン)、 出来事を配る。 src = 出どころの名前 (計装にだけ使う)。</summary>
+        /// ボスの次の目盛りを爆発のダメージの 40% ぶん上げ (ひびは入れない・2026-11-25)、 〈柱折りの発破筒〉は超臨界で次のダウンを 1 ターン延ばし、 出来事を配る。 src = 出どころの名前 (計装にだけ使う)。</summary>
         public static void AddHeat(CombatContext ctx, int n, string src = null)
         {
             if (ctx == null || n <= 0 || ctx.rinkaiThreshold <= 0) return;
@@ -128,9 +128,10 @@ namespace ItemSystem.PassiveSkills.Keywords
                 if (cm != null)
                 {
                     cm.LandBurst(ctx, b.landed);
-                    // 爆発はボスの次の目盛りにひびを入れる (標準)。 〈柱折りの発破筒〉はそのひびを即座に正規のダウンへ割る
-                    cm.CrackBossNotch("臨界の爆発");
-                    if (CombatSystem.HeatCore.Has(s.items, CombatSystem.HeatItems.Pillar) && cm.BreakBossCrack("柱折りの発破筒")) CombatSystem.CombatManager.BurstBreakFired++;
+                    // 爆発はボスの次の目盛りを、 その爆発のダメージの 40% ぶん上げる (今の HP の 1 下まで・ひびは入れない・2026-11-25 作者の決定 / neon answer_gauge)
+                    cm.RaiseBossNextNotch(b.landed * CombatSystem.HeatCore.BurstNotchPct / 100);
+                    // 〈柱折りの発破筒〉: 超臨界の爆発で、 次のダウンを 1 ターン延ばす (1 戦闘 2 回まで)
+                    if (b.super && CombatSystem.HeatCore.Has(s.items, CombatSystem.HeatItems.Pillar)) cm.ExtendNextBossDown("柱折りの発破筒");
                 }
                 Raise(ctx, PassiveSkillTrigger.OnRinkaiBurst, b.threshold);
                 if (b.super) Raise(ctx, PassiveSkillTrigger.OnSuperBurst, b.landed);

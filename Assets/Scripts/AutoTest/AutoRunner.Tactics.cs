@@ -175,7 +175,7 @@ namespace AutoTest
             var ev = PrepareDeckEval(rolls, tele);
             var st = ev.st;
             if (st.downNotches == null || DownForecast(in st, st.enemyHp, 0, 0).nextDown) return false;
-            int chisel = BossDown.ApplyTaken(Consumables.ChiselDamage, st.enemyDown && !st.enemyDownWeak);
+            int chisel = BossDown.ApplyTaken(Consumables.ChiselDamage, DownTakesMul(st.enemyDown, st.enemyDownWeak));
             if (chisel >= st.enemyHp) return true;      // 鑿で倒せる
             if (DownForecast(in st, st.enemyHp, chisel, chisel).fullAdded <= 0) return false;
             var w = ChooseDeckWiring(rolls, tele, out _, out _);

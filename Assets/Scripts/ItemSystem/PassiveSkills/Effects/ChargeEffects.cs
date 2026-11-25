@@ -248,16 +248,16 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>避雷の杭: 1 ターンに充電を 8 以上消費したとき、 ボスの次の目盛りへ 5 ダメージ相当の亀裂 (目盛りを 5 上げる)・ブロック +6 (1 ターン 1 回)。</summary>
+    /// <summary>避雷の杭: 1 ターンに充電を 8 以上消費したとき、 ボスの次の目盛りを最大 HP の 5% ぶん上げ (2026-11-25 neon answer_gauge・旧: +5)、 ブロック +6 (1 ターン 1 回)。</summary>
     public class LightningStake : IPassiveSkillEffect
     {
         public string SkillId => "避雷の杭";
-        public const int Need = 8, Notch = 5, Block = 6;
+        public const int Need = 8, NotchMaxHpPct = 5, Block = 6;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnChargeSpend };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (Chg.SpentTurn(ctx) < Need || !Rw.OncePerTurn(ctx, "chg.stake")) return;
-            CombatManager.Instance?.RaiseBossNextNotch(Notch);
+            CombatManager.Instance?.RaiseBossNextNotch((int)((long)ctx.enemyMaxHP * NotchMaxHpPct / 100));
             Chg.Block(ctx, Block, SkillId);
         }
     }
@@ -379,11 +379,11 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>積雷の黒舎利: 1 ターンに充電を 15 以上消費して終了したとき、 消費した量 × 1% (最大 12%) の敵の最大 HP の防御無視ダメージと、
-    /// ボスの目盛りのひびを直接割る (満額のダウン・ひびが無ければ割らない・CombatManager.BreakBossCrack)。 1 ターン 1 回 (ターン終了時に 1 回だけ見る)。</summary>
+    /// 次のダウンの受けるダメージの倍率 +0.5 (上限 +1.0)・そのダウンの開始時に充電 +10 (CombatManager.BuffNextBossDown・2026-11-25 neon answer_gauge・旧: ひびを直接割る)。 1 ターン 1 回 (ターン終了時に 1 回だけ見る)。</summary>
     public class ThunderReliquary : IPassiveSkillEffect
     {
         public string SkillId => "積雷の黒舎利";
-        public const int Need = 15, MaxPct = 12;
+        public const int Need = 15, MaxPct = 12, DownBonusPct = 50, DownCharge = 10;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -392,8 +392,8 @@ namespace ItemSystem.PassiveSkills.Effects
             int pct = System.Math.Min(MaxPct, spent);
             int dmg = (int)((long)pct * ctx.enemyMaxHP / 100);
             if (dmg > 0) Kw.DamageEnemy(ctx, dmg);
-            bool broke = CombatManager.Instance != null && CombatManager.Instance.BreakBossCrack(SkillId);
-            Rw.Log($"[積雷の黒舎利] このターン充電 {spent} → 最大 HP の {pct}% = {dmg} (防御無視){(broke ? "・ひびを割った" : "")}");
+            CombatManager.Instance?.BuffNextBossDown(SkillId, DownBonusPct, 0, DownCharge);
+            Rw.Log($"[積雷の黒舎利] このターン充電 {spent} → 最大 HP の {pct}% = {dmg} (防御無視)");
         }
     }
 }

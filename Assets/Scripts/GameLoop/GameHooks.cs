@@ -156,7 +156,7 @@ namespace GameLoop
         /// <summary>[測定 2026-11-14] ひびの猶予 (ターン数・既定 <see cref="CombatSystem.BossDown.CrackGraceTurns"/> = 1)。 0 = ひびが入ったターンの終わりにすぐ割れる・負 = ひびでは割れない。
         /// AutoRunner.downCrackGrace が毎ランの始めに入れ、 ラン終了で既定へ戻す。</summary>
         public static int DownCrackGrace = CombatSystem.BossDown.CrackGraceTurns;
-        /// <summary>[測定 2026-11-14] true (既定) = ひびで割れた目盛りのダウンは弱い (受けるダメージ ×1.5 なし)。 false = ひびのダウンも ×1.5。
+        /// <summary>[測定 2026-11-14] true (既定) = ひびで割れた目盛りのダウンは弱い (受けるダメージ ×1.5 なし)。 false = よろめきも ×1.5。
         /// AutoRunner.downCrackWeak が毎ランの始めに入れ、 ラン終了で true へ戻す。</summary>
         public static bool DownCrackWeak = true;
         /// <summary>[測定 2026-11-14] true (既定) = 大技のチャージのターン (大技の 1 ターン前) は敵が攻撃しない (<see cref="CombatSystem.Escalation.IsChargeNoAttack"/>・作者の決定)。
