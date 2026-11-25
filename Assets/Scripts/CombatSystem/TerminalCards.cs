@@ -1772,7 +1772,8 @@ namespace CombatSystem
                 if (!marks[s]) continue;
                 if (o != null && o.fired.Contains(s))
                 {
-                    if (link && !linkUsed) { linkUsed = true; l.Add(board[s]); }
+                    //   使い捨ては発動したターンに戦闘から外れるので残せない (印を数えず、 繋ぎの 1 枚も使わない・2026-11-25 作者)
+                    if (link && !linkUsed && Get(board[s])?.disposable != true) { linkUsed = true; l.Add(board[s]); }
                     continue;
                 }
                 if (o?.stopped != null && s < o.stopped.Length && o.stopped[s]) continue;

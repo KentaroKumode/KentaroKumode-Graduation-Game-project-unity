@@ -958,11 +958,11 @@ namespace UI.Game2D.Battle
             bool plugged = false;
             for (int i = 0; i < slot.Length; i++) if (slot[i] == s) plugged = true;
             if (!plugged) return true;
-            // 繋ぎの賽 (ADR-0015): 挿した端子も、 印の付いた左から最初の 1 枚だけ残る (本体の KeepFromMarks と同じ選び方)
-            if (EquippedDie.IdOf(GameManager.Instance?.Run) != DieIds.Link) return false;
+            // 繋ぎの賽 (ADR-0015): 挿した端子も、 印の付いた左から最初の 1 枚だけ残る (本体の KeepFromMarks と同じ選び方)。 使い捨ては残らない (2026-11-25)
+            if (EquippedDie.IdOf(GameManager.Instance?.Run) != DieIds.Link || TerminalCards.Get(board[s])?.disposable == true) return false;
             for (int t = 0; t < s && t < keepMark.Length; t++)
             {
-                if (!keepMark[t]) continue;
+                if (!keepMark[t] || TerminalCards.Get(board[t])?.disposable == true) continue;
                 for (int i = 0; i < slot.Length; i++) if (slot[i] == t) return false;   // もっと左に、 挿して印の付いた端子がある
             }
             return true;
