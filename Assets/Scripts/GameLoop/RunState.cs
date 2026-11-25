@@ -252,6 +252,10 @@ namespace GameLoop
         /// パッシブの重複取得を禁止する判定に使う（= 一度捨てたものも再取得しない）。</summary>
         public HashSet<string> seenPassiveItemIds = new HashSet<string>();
 
+        /// <summary>呪いの付いた提示の品 (呪物の賽・2026-11-25・CombatSystem.DiePassives.MaybeCurse)。 手に入れると最大 HP −5 で外れる。
+        /// 同じ品が呪い無しで出し直された時・店に並んで買われた時も外れる (呪いは提示ごと)。</summary>
+        public HashSet<string> cursedOfferIds = new HashSet<string>();
+
         /// <summary><b>出現の枠 (動的 4 枠ロック・2026-11-21・docs/full-item-rework-spec.md §1-1)。</b> 8 軸の秘宝を取得した順の軸 (最大 4)。
         /// 4 つ埋まると、 秘宝と軸の端子はこの 4 軸と枠外 (金・軸なし) からだけ出る。 手放しても外れない。 種火を挿していれば、 その軸が最初から 1 つ目。
         /// 書くのは <see cref="ItemSystem.AxisPool.NoteAcquired"/> とランの始めだけ。</summary>
@@ -534,6 +538,7 @@ namespace GameLoop
             permanentDebuffs = new HashSet<string>();
             seenOnceEvents = new HashSet<string>();
             seenPassiveItemIds = new HashSet<string>();
+            cursedOfferIds = new HashSet<string>();
             lockedAxes = new List<string>();
             { string spark = MetaProgression.MetaBuffApplicator.GetSparkAxis(); if (spark != null) lockedAxes.Add(spark); }   // 種火の軸は最初から 1 つ目の枠
             ascendedPassiveIds = new List<string>();

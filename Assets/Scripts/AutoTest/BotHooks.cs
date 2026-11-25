@@ -163,6 +163,11 @@ namespace AutoTest
             return d != null && d.IsPassive && ItemSystem.AxisPool.IsRanked(d.axis) && !InFocus(d.axis) && !run.lockedAxes.Contains(d.axis);
         }
 
+        /// <summary>呪物の賽の呪いの付いた提示 (手に入れると最大 HP −5・2026-11-25) の買いの点の差し引き。 Tier 1 段ぶん (仮の値・測定はまだ)。</summary>
+        public const float CursePenaltyTiers = 1f;
+        public static float CursePenalty(string id)
+            => CombatSystem.DiePassives.IsCursedOffer(GameManager.Instance?.Run, id) ? CursePenaltyTiers * LearnedPriorityProvider.StepPerTier : 0f;
+
         /// <summary>提示から、 欲しい品 (<see cref="WantsPassive"/>) の中で買いの点が一番の品を選ぶ。 欲しい品が無ければ −1 (見送り換金)。</summary>
         public static int ChooseOrSkip(IReadOnlyList<string> offers)
         {
@@ -171,7 +176,7 @@ namespace AutoTest
             for (int i = 0; i < offers.Count; i++)
             {
                 if (!WantsPassive(run, offers[i])) continue;
-                float sc = LearnedPriorityProvider.BuyScore(offers[i]);
+                float sc = LearnedPriorityProvider.BuyScore(offers[i]) - CursePenalty(offers[i]);
                 if (IsFocusItem(offers[i])) sc += AxisFocusBonus * (1 + BranchAdj(offers[i])) * LearnedPriorityProvider.StepPerTier;
                 if (sc > bestScore) { bestScore = sc; best = i; }
             }
@@ -184,7 +189,7 @@ namespace AutoTest
             for (int i = 0; i < offers.Count; i++)
             {
                 if (IsBanned(offers[i])) continue;
-                float sc = LearnedPriorityProvider.BuyScore(offers[i]);
+                float sc = LearnedPriorityProvider.BuyScore(offers[i]) - CursePenalty(offers[i]);
                 if (IsFocusItem(offers[i])) sc += AxisFocusBonus * (1 + BranchAdj(offers[i])) * LearnedPriorityProvider.StepPerTier;   // [2026-11-10] 軸に寄せる方策
                 if (sc > bestScore) { bestScore = sc; best = i; }
             }

@@ -639,16 +639,18 @@ namespace EventSystem
             }
 
             // 秘宝: 出現の枠と 2 段階の軸均等の抽選 (軸か枠外に絞ってからレア度で引く・full-item-rework-spec §1-2)。 軸の指定がある時は、 その軸が枠に無ければ出さない
+            var basePool = filtered;   // 呪物の賽の置き換えの LEGENDARY は軸で絞る前の並びから
             if (category == ItemCategory.Passive)
             {
                 filtered = ItemSystem.AxisPool.Narrow(run ?? GameLoop.GameManager.Instance?.Run, filtered, "event.axis");
                 if (filtered.Count == 0) return null;
             }
 
-            // 呪物の賽: イベントの秘宝は LEGENDARY の重み ×3 (ADR-0016)
-            float legMul = category == ItemCategory.Passive ? CombatSystem.DiePassives.LegendaryOfferMul(run ?? GameLoop.GameManager.Instance?.Run) : 1f;
-            var picked = ItemSystem.RarityWeightedPicker.Pick(filtered, null, 0f, legMul);
-            return picked?.internalName;
+            var picked = ItemSystem.RarityWeightedPicker.Pick(filtered);
+            if (picked == null || category != ItemCategory.Passive) return picked?.internalName;
+            // 呪物の賽 (2026-11-25): GOLD 以下は LEGENDARY の出やすさの 2 倍で呪いの LEGENDARY に変わる
+            return CombatSystem.DiePassives.MaybeCurse(run ?? GameLoop.GameManager.Instance?.Run, picked.internalName, basePool,
+                ItemSystem.RarityWeightedPicker.LegendaryChance(basePool), "event", alsoExclude);
         }
 
         /// <summary>id から表示名を解決。DBに見つからなければ id をそのまま返す。</summary>

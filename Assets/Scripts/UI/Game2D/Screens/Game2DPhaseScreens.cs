@@ -208,6 +208,20 @@ namespace UI.Game2D
             }
         }
 
+        /// <summary>品の提示の行 (報酬・品を選ぶ・開幕の秘宝)。 呪物の賽の呪いの付いた品 (2026-11-25) は名前を赤にし、 右に「呪い」、 説明の頭に代価を出す。</summary>
+        private static ModalItem OfferRow(string id)
+        {
+            var data = ItemDatabase.Instance?.GetItem(id);
+            var it = new ModalItem { name = ItemDatabase.DisplayNameOf(data, id), desc = data?.description };
+            if (CombatSystem.DiePassives.IsCursedOffer(GameManager.Instance?.Run, id))
+            {
+                it.value = CombatSystem.DiePassives.CurseMark;
+                it.tone = Game2DKit.Red;
+                it.desc = CombatSystem.DiePassives.CurseNote + (string.IsNullOrEmpty(it.desc) ? "" : "\n" + it.desc);
+            }
+            return it;
+        }
+
         // ── 開幕の秘宝 (開幕パッシブ) の選択 (〈宝物庫〉r10: 何本目かで 2〜3 択) ──
 
         private ScreenDef StartingPick(GameManager gm)
@@ -215,11 +229,7 @@ namespace UI.Game2D
             var cands = gm.PendingStartingPassiveChoices[0];
             var d = New("開幕の秘宝", "残り " + gm.PendingStartingPassiveChoices.Count, 420);
             d.body = "このランに持っていく秘宝を 1 つ選ぶ。";
-            foreach (var id in cands)
-            {
-                var data = ItemDatabase.Instance?.GetItem(id);
-                d.Items.Add(new ModalItem { name = ItemDatabase.DisplayNameOf(data, id), desc = data?.description });
-            }
+            foreach (var id in cands) d.Items.Add(OfferRow(id));
             d.buttons.Add(B("選ぶ", "pick", true));
             d.buttons.Add(SkipButton(cands));
             d.onAction = (a, sel) => { if (a == "pick" || a == "skip") { gm.ResolveStartingPassive(a == "skip" ? -1 : Mathf.Clamp(sel, 0, cands.Count - 1)); Game2DSfx.Play("ui_confirm"); } Refresh(); };
@@ -233,11 +243,7 @@ namespace UI.Game2D
             var cands = gm.PendingEventPassiveOffers[0];
             var d = New("品を選ぶ", gm.PendingEventPassiveOffers.Count > 1 ? "残り " + gm.PendingEventPassiveOffers.Count : null, 420);
             d.body = cands.Count > 1 ? "差し出された品から 1 つ選ぶ。 見送ればゴールドになる。" : "受け取るか、 見送ってゴールドにする。";
-            foreach (var id in cands)
-            {
-                var data = ItemDatabase.Instance?.GetItem(id);
-                d.Items.Add(new ModalItem { name = data != null && !string.IsNullOrEmpty(data.displayName) ? data.displayName : id, desc = data?.description });
-            }
+            foreach (var id in cands) d.Items.Add(OfferRow(id));
             d.buttons.Add(B(cands.Count > 1 ? "選ぶ" : "受け取る", "pick", true));
             d.buttons.Add(SkipButton(cands));
             d.onAction = (a, sel) => { if (a == "pick" || a == "skip") { gm.ResolveEventPassiveOffer(a == "skip" ? -1 : Mathf.Clamp(sel, 0, cands.Count - 1)); Game2DSfx.Play("ui_confirm"); } Refresh(); };
@@ -935,11 +941,7 @@ namespace UI.Game2D
                 bool relicPair = ItemSystem.AxisPool.SkipGoldFor(offer) > 0;
                 string pickLine = offer.Count >= 3 ? "3 つから 1 つを受け取る。" : offer.Count == 2 ? "どちらか 1 つを受け取る。" : "受け取るか選ぶ。";
                 d.body = relicPair ? pickLine + " 見送ればゴールドになる。" : pickLine;
-                foreach (var id in offer)
-                {
-                    var data = ItemDatabase.Instance?.GetItem(id);
-                    d.Items.Add(new ModalItem { name = data != null ? data.displayName : id, desc = data?.description });
-                }
+                foreach (var id in offer) d.Items.Add(OfferRow(id));
                 AddInstabilityLine(gm, d, d.Items.Count);   // 不安定化: 択から選ぶ報酬の窓にも (2026-11-13)
                 d.buttons.Add(B("受け取る", "pick", true));
                 if (relicPair) d.buttons.Add(SkipButton(offer));

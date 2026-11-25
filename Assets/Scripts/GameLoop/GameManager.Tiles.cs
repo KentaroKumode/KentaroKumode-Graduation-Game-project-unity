@@ -253,12 +253,13 @@ namespace GameLoop
         /// 重複排除の上でレア度重み抽選。未所持が枯渇したら重複許可で再抽選（上位からを許可）。</summary>
         private string PickHigherTierPassive(ItemRarity givenRarity)
         {
-            var pool = HigherTierPassivePool(givenRarity);
-            if (pool == null) return null;
-            pool = ItemSystem.AxisPool.Narrow(Run, pool, "exchange.axis");   // 出現の枠と軸均等の抽選
+            var basePool = HigherTierPassivePool(givenRarity);
+            if (basePool == null) return null;
+            var pool = ItemSystem.AxisPool.Narrow(Run, basePool, "exchange.axis");   // 出現の枠と軸均等の抽選
             if (pool.Count == 0) return null;
             // 〈サーベル・ワルツ〉: [剣の舞] を持っていれば、 LEGENDARY の枠がまれに [剣の舞] に差し替わる (店と同じ・2026-11-20)
-            return SwordDanceSet.MaybeSwapToDance(Run, ItemSystem.RarityWeightedPicker.Pick(pool), pool, "exchange.dance")?.internalName;
+            string id = SwordDanceSet.MaybeSwapToDance(Run, ItemSystem.RarityWeightedPicker.Pick(pool), pool, "exchange.dance")?.internalName;
+            return CombatSystem.DiePassives.MaybeCurse(Run, id, basePool, ItemSystem.RarityWeightedPicker.LegendaryChance(basePool), "exchange");   // 呪物の賽
         }
 
         /// <summary>交換マスの択: 上のレア度の秘宝を重ねずに <paramref name="n"/> 個 (引き方は <see cref="PickHigherTierPassive"/> と同じ)。
@@ -268,14 +269,17 @@ namespace GameLoop
             var res = new List<string>();
             var pool = HigherTierPassivePool(givenRarity);
             if (pool == null) return res;
+            var basePool = pool;
+            float legChance = ItemSystem.RarityWeightedPicker.LegendaryChance(basePool);   // 呪物の賽の置き換えの確率の元 (差し出す品のレア度で変わる)
             while (res.Count < n && pool.Count > 0)
             {
                 var narrowed = ItemSystem.AxisPool.Narrow(Run, pool, "exchange.axis", biasAxis, forceFocus: biasAxis != null);   // 出現の枠と軸均等の抽選 (択ごとに軸を引く)
                 if (narrowed.Count == 0) break;
                 var got = SwordDanceSet.MaybeSwapToDance(Run, ItemSystem.RarityWeightedPicker.Pick(narrowed), narrowed, "exchange.dance");
                 if (got == null) break;
-                res.Add(got.internalName);
-                pool = pool.FindAll(it => it.internalName != got.internalName);
+                string id = CombatSystem.DiePassives.MaybeCurse(Run, got.internalName, basePool, legChance, "exchange", res);   // 呪物の賽
+                res.Add(id);
+                pool = pool.FindAll(it => it.internalName != got.internalName && it.internalName != id);
             }
             return res;
         }

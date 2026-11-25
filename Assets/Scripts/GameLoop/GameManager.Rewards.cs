@@ -457,9 +457,11 @@ namespace GameLoop
             }
             if (pool.Count == 0) return null;
 
+            var basePool = pool;
             pool = AxisPool.Narrow(Run, pool, "start.axis");   // 出現の枠と軸均等の抽選 (full-item-rework-spec §1-2)
             float bias = MetaProgression.MetaBuffApplicator.GetStartingPassiveRarityBias();
-            return ItemSystem.RarityWeightedPicker.Pick(pool, null, bias)?.internalName;
+            string id = ItemSystem.RarityWeightedPicker.Pick(pool, null, bias)?.internalName;
+            return CombatSystem.DiePassives.MaybeCurse(Run, id, basePool, ItemSystem.RarityWeightedPicker.LegendaryChance(basePool, null, bias), "start", alsoExclude);   // 呪物の賽
         }
 
         private string PickPassiveItemForBossExtra(bool wantRare)
@@ -481,6 +483,7 @@ namespace GameLoop
             }
             if (pool.Count == 0) return null;
 
+            var basePool = pool;
             if (wantRare) { var hi = pool.FindAll(it => it.rarity >= ItemRarity.GOLD); if (hi.Count > 0) pool = hi; }   // 軸で絞る前にレア度を決める (絞った軸に GOLD 以上が無いと素の抽選へ落ちるため)
             pool = AxisPool.Narrow(Run, pool, "bonus.axis");   // 出現の枠と軸均等の抽選
             ItemRarity? minRarity = wantRare ? ItemRarity.GOLD : (ItemRarity?)null;
@@ -490,7 +493,9 @@ namespace GameLoop
                 // フォールバック: レア該当無しなら全プールから
                 picked = ItemSystem.RarityWeightedPicker.Pick(pool);
             }
-            return picked?.internalName;
+            // 呪物の賽: 出やすさは引いた時の縛り (wantRare = GOLD 以上) で数える
+            return CombatSystem.DiePassives.MaybeCurse(Run, picked?.internalName, basePool,
+                ItemSystem.RarityWeightedPicker.LegendaryChance(basePool, minRarity), "bonus");
         }
 
         /// <summary>報酬確認→マップに戻る or フロアクリア</summary>
@@ -613,13 +618,16 @@ namespace GameLoop
             bool wantPassive = GameLoop.GameRng.Value("treasure.kind") < CombatRewards.TreasurePassiveRate;
             var kindPool = pool.FindAll(it => (it.category == ItemCategory.Passive) == wantPassive);
             if (kindPool.Count > 0) pool = kindPool;
+            var basePool = pool;   // 呪物の賽の置き換えの LEGENDARY は軸で絞る前の並びから
             if (wantPassive && kindPool.Count > 0) pool = AxisPool.Narrow(Run, pool, "treasure.axis");   // 出現の枠と軸均等の抽選
 
             // 鑑定の眼鏡: 次の宝箱の最低レア保証（消費）。ショップで既消費なら -1。
             CompleteItemData picked;
+            ItemRarity? lootMin = null;
             if (Run != null && Run.nextLootMinRarity >= 0)
             {
                 var minR = (ItemRarity)Run.nextLootMinRarity;
+                lootMin = minR;
                 Run.nextLootMinRarity = -1;
                 picked = ItemSystem.RarityWeightedPicker.Pick(pool, minR)
                          ?? ItemSystem.RarityWeightedPicker.Pick(pool);
@@ -630,7 +638,8 @@ namespace GameLoop
             }
             // 〈サーベル・ワルツ〉: [剣の舞] を持っていれば、 LEGENDARY の枠がまれに [剣の舞] に差し替わる (店と同じ・2026-11-20)
             picked = SwordDanceSet.MaybeSwapToDance(Run, picked, pool, "treasure.dance");
-            return picked?.internalName;
+            return CombatSystem.DiePassives.MaybeCurse(Run, picked?.internalName, basePool,
+                ItemSystem.RarityWeightedPicker.LegendaryChance(basePool, lootMin), "treasure");   // 呪物の賽 (秘宝だけ・消耗品はそのまま)
         }
 
         /// <summary>報酬の候補の数 (2026-11-22・旧 2)。</summary>
@@ -667,6 +676,7 @@ namespace GameLoop
                 Run.nextLootMinRarity = -1;
                 if (!minR.HasValue || loot > minR.Value) minR = loot;
             }
+            float legChance = ItemSystem.RarityWeightedPicker.LegendaryChance(pool, minR);   // 呪物の賽の置き換えの確率の元 (主候補を引く時の縛りで数える)
             CompleteItemData first = (minR.HasValue ? ItemSystem.RarityWeightedPicker.Pick(pool, minR) : null)
                                      ?? ItemSystem.RarityWeightedPicker.Pick(pool, minRarity);
             // 秘宝: 同じレア度の中で軸を均す (秘宝と消耗品の割合・レア度の出方はそのまま・出現の枠の外の軸は出さない)
@@ -686,6 +696,9 @@ namespace GameLoop
                 offer.Add(p.internalName);
                 same.Remove(p);
             }
+            // 呪物の賽 (2026-11-25): 候補 1 つずつ、 GOLD 以下なら呪いの LEGENDARY に変わり得る (同じ提示の品とは重ねない)
+            for (int i = 0; i < offer.Count; i++)
+                offer[i] = CombatSystem.DiePassives.MaybeCurse(Run, offer[i], pool, legChance, key, offer);
             return offer;
         }
 

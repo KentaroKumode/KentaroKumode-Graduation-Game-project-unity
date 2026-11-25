@@ -644,14 +644,6 @@ namespace ItemSystem.Shop
             // Tier重みで抽選 (武器は専用重みで T4 を超レア化)
             var weights = kind == ShopSlotKind.Weapon ? weaponTierWeights
                         : kind == ShopSlotKind.Passive ? PassiveTierWeights(GameLoop.GameManager.Instance?.Run?.Depth ?? 0) : tierWeights;
-            // 呪物の賽 (ADR-0016): 秘宝の枠は LEGENDARY の重み ×3 (他のレア度の重みはそのまま)
-            float legMul = kind == ShopSlotKind.Passive ? CombatSystem.DiePassives.LegendaryOfferMul(GameLoop.GameManager.Instance?.Run) : 1f;
-            if (legMul != 1f)
-            {
-                weights = ((ItemRarity, float)[])weights.Clone();
-                for (int i = 0; i < weights.Length; i++)
-                    if (weights[i].rarity == ItemRarity.LEGENDARY) weights[i].weight *= legMul;
-            }
             ItemRarity targetRarity = RollTier(pool, weights);
             // 〈黄金の通行手形〉: 棚の最初の 2 枠は引いたレア度の 1 段上 (LEGENDARY は据え置き・その段の品が棚に出せなければ引いた段のまま)。 乱数は引き足さない
             if (kind == ShopSlotKind.Passive && _passUpSlotsLeft > 0)
@@ -794,6 +786,7 @@ namespace ItemSystem.Shop
                 case ShopSlotKind.Passive:
                 case ShopSlotKind.Weapon:
                     // 武器は 1 本だけ (2026-11-11): 店で買う武器は入れ替えを承知して買ったもの (画面は「買う」の 2 度押しで確かめる)
+                    run.cursedOfferIds?.Remove(slot.itemId);   // 呪物の賽: 店で買う品に呪いは付かない (ほかの場所で呪い付きで見送った品でも)
                     GameLoop.Loadout.Gain(run, slot.itemId, confirmed: slot.kind == ShopSlotKind.Weapon && GameLoop.Loadout.HumanPlaying);
                     break;
                 case ShopSlotKind.Dice:
