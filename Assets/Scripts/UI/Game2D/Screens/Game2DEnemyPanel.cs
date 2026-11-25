@@ -126,7 +126,7 @@ namespace UI.Game2D
                         ns.Add(Mathf.RoundToInt(s.downNotches[i] * 100f) + "%" + (i < s.downBroken ? " (割った)"
                                : s.downCracks != null && i < s.downCracks.Length && s.downCracks[i] >= 0 ? " (亀裂)" : ""));
                     sb.Append("ダウンの目盛り: ").Append(string.Join("・", ns)).Append('\n');
-                    sb.Append("目盛りを割れるのは通常攻撃だけ。 通常攻撃以外で下回ると亀裂が入り、 しばらくするとひとりでに割れてよろめく (攻撃しないが、 受けるダメージは増えない)。 目盛りを上げる効果は、 今の HP より上には上げない。").Append('\n');
+                    sb.Append("目盛りを割れるのは通常攻撃だけ。 通常攻撃以外で下回ると亀裂が入り、 しばらくするとひとりでに割れてよろめく (攻撃しないが、 受けるダメージは増えない)。 目盛り前進の効果でも、 目盛りは今の HP より上には来ない。").Append('\n');
                 }
             }
             int poison = ctx != null ? ctx.EnemyPoison : 0, bleed = ctx != null ? ctx.enemyBleedStacks : 0;
