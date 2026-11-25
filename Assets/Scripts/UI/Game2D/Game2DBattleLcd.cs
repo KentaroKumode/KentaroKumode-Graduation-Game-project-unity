@@ -432,8 +432,8 @@ namespace UI.Game2D
             else if (s.heavyIn == 1) { parts.Add("次 大技"); hot = true; }
             else if (s.guardIn == 1) parts.Add("次 構え");
             if (s.down && (!s.downWeak || BossDown.TakenMulNow)) { parts.Add("被ダメ×" + (BossDown.TakenMulCard + BossDown.TakenBonusPctNow * 0.01f).ToString("0.0#")); hot = true; }
-            else if (s.crackBreakTurn >= 0) { parts.Add(s.crackBreakTurn <= s.turn ? "ひび このターンで割れる" : "ひび あと" + (s.crackBreakTurn - s.turn + 1) + "ターン"); hot = true; }
-            else if (s.downNotchHp >= 0 && s.downCracks != null && s.downBroken < s.downCracks.Length && s.downCracks[s.downBroken] >= 0) { parts.Add("ひび 通常攻撃で割れる"); hot = true; }
+            else if (s.crackBreakTurn >= 0) { parts.Add(s.crackBreakTurn <= s.turn ? "亀裂 このターンで割れる" : "亀裂 あと" + (s.crackBreakTurn - s.turn + 1) + "ターン"); hot = true; }
+            else if (s.downNotchHp >= 0 && s.downCracks != null && s.downBroken < s.downCracks.Length && s.downCracks[s.downBroken] >= 0) { parts.Add("亀裂 通常攻撃で割れる"); hot = true; }
             if (parts.Count > 0)
             {
                 string t = Game2DJpFont.Clip(string.Join("  ", parts), 220);

@@ -116,7 +116,7 @@ namespace UI.Game2D
                                      + (e.heavyPeriod > 0 && cm.Down.heavyCanceledNow ? "・大技は取り消し" : "") + ")");
                 if (s.downPending > 0) plan.Add("ダウンはあと " + s.downPending + " ターン続く" + (s.downNextWeak ? " (次はよろめき)" : ""));
                 // ひび (2026-11-14): 通常攻撃以外で下回った目盛り。 通常攻撃が当たれば割れる・猶予が切れるとひとりでに割れる (受けるダメージ ×1.5 は付かない)
-                if (s.crackBreakTurn >= 0) plan.Add(s.crackBreakTurn <= s.turn ? "ひびの目盛りはこのターンの終わりにひとりでに割れる" : "ひびの目盛りは " + (s.crackBreakTurn - s.turn + 1) + " ターン後の終わりにひとりでに割れる");
+                if (s.crackBreakTurn >= 0) plan.Add(s.crackBreakTurn <= s.turn ? "亀裂の入った目盛りはこのターンの終わりにひとりでに割れる" : "亀裂の入った目盛りは " + (s.crackBreakTurn - s.turn + 1) + " ターン後の終わりにひとりでに割れる");
                 if (s.downNotchHp >= 0) plan.Add("次の目盛りまで " + System.Math.Max(0, cm.EnemyHP - s.downNotchHp));
                 if (plan.Count > 0) sb.Append(string.Join("・", plan)).Append('\n');
                 if (s.downNotches != null)
@@ -124,9 +124,9 @@ namespace UI.Game2D
                     var ns = new System.Collections.Generic.List<string>();
                     for (int i = 0; i < s.downNotches.Length; i++)
                         ns.Add(Mathf.RoundToInt(s.downNotches[i] * 100f) + "%" + (i < s.downBroken ? " (割った)"
-                               : s.downCracks != null && i < s.downCracks.Length && s.downCracks[i] >= 0 ? " (ひび)" : ""));
+                               : s.downCracks != null && i < s.downCracks.Length && s.downCracks[i] >= 0 ? " (亀裂)" : ""));
                     sb.Append("ダウンの目盛り: ").Append(string.Join("・", ns)).Append('\n');
-                    sb.Append("目盛りを割れるのは通常攻撃だけ。 通常攻撃以外で下回るとひびが入り、 しばらくするとひとりでに割れてよろめく (攻撃しないが、 受けるダメージは増えない)。 目盛りを上げる効果は、 今の HP より上には上げない。").Append('\n');
+                    sb.Append("目盛りを割れるのは通常攻撃だけ。 通常攻撃以外で下回ると亀裂が入り、 しばらくするとひとりでに割れてよろめく (攻撃しないが、 受けるダメージは増えない)。 目盛りを上げる効果は、 今の HP より上には上げない。").Append('\n');
                 }
             }
             int poison = ctx != null ? ctx.EnemyPoison : 0, bleed = ctx != null ? ctx.enemyBleedStacks : 0;
