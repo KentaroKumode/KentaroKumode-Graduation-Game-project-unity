@@ -64,8 +64,6 @@ namespace MapSystem.FreeMove
         public const int Vision = 1;
         /// <summary>測量 (2026-11-24・旧い照明と偵察を 1 つにまとめた): 今いる点から道でこの歩数までの点の種別と戦闘名を地図に書き込む (その層の間ずっと消えない)。</summary>
         public const int SurveyRange = 3;
-        /// <summary>測量 1 回の物資 (手番は使わない・不安定化も溜まらない)。</summary>
-        public const int SurveySupply = 1;
         /// <summary>〈補給線〉(〈兵站〉r10) で 1 回跳ぶ物資。</summary>
         public const int RelaySupply = 1;
         /// <summary>イベントの出やすさ (EventWeights) と BOT の値付けが「番人が近い」と見なす道の歩数 (2026-11-24・旧い魔石の「遠い」4 歩)。

@@ -243,7 +243,7 @@ static partial class T
             Check(triggered || s.InFight, $"追跡者が囮罠を踏んで足止めされる (foeFreeze={s.FoeFreezeTurns}, caught={s.InFight})");
         }
         // --- 測量 (2026-11-24・旧い照明と偵察を 1 つに) ---
-        //   物資 1・手番 0・3 歩先までの種別と戦闘名を書き込み (Scouted)・その層の間消えない・追跡者は動かない
+        //   1 手番・物資 0 (2026-11-25〜)・3 歩先までの種別と戦闘名を書き込み (Scouted)・その層の間消えない
         {
             int bad = 0, layers = 0; string first = null;
             for (int salt = 1; salt <= 200; salt++)
@@ -253,11 +253,11 @@ static partial class T
                 for (int g = 0; g < salt % 5 && !s.InFight; g++) { s.GrantFreeMoves(1); s.MoveTo(s.Neighbors(s.Me)[0]); }
                 if (s.InFight) continue;
                 layers++;
-                int turn = s.Turn, p0 = w.Provision, foe0 = s.FoeNode, ins0 = s.Instability;
+                int turn = s.Turn, p0 = w.Provision;
                 var d = s.HopsFrom(s.Me);
                 var ev = s.Survey();
-                bool ok = s.Turn == turn && w.Provision == p0 - FreeMapParams.SurveySupply && s.FoeNode == foe0 && s.Instability == ins0
-                          && (ev & FreeMapEvent.TurnPassed) == 0;
+                if (s.InFight) continue;   // 手番が進んで追跡者に捕まった層は書き込みの検査から外す
+                bool ok = s.Turn == turn + 1 && w.Provision == p0 && (ev & FreeMapEvent.TurnPassed) != 0;
                 for (int i = 0; i < d.Length; i++)
                     if (d[i] <= FreeMapParams.SurveyRange && !s.IsSunk(i) && !(s.Known[i] && s.Scouted[i])) ok = false;     // 3 歩以内は全部書き込む
                     else if (d[i] > FreeMapParams.SurveyRange && d[i] != int.MaxValue && s.Scouted[i]) ok = false;           // 外は書き込まない (始めは何も書き込まれていない)
@@ -272,8 +272,8 @@ static partial class T
             var w0 = new Wallet { Provision = 0, Hp = 30 };
             var z = Make(3, FoeProfile.Brute, WeatherKind.None, w0);
             z.Survey();
-            Check(layers > 0 && bad == 0 && w0.Hp == 30 - FreeMapParams.SurveySupply * FreeMapParams.HpPerSupply,
-                  $"測量: 物資 {FreeMapParams.SurveySupply}・手番も不安定化も使わず・追跡者は動かず・{FreeMapParams.SurveyRange} 歩先までの種別と戦闘名を書き込み・その層の間 (中断セーブを跨いでも) 消えない・物資が無ければ HP で払う ({layers} 層・違い {bad} {first})");
+            Check(layers > 0 && bad == 0 && w0.Hp == 30,
+                  $"測量: 1 手番・物資も HP も使わず・{FreeMapParams.SurveyRange} 歩先までの種別と戦闘名を書き込み・その層の間 (中断セーブを跨いでも) 消えない ({layers} 層・違い {bad} {first})");
         }
         // --- 天候: 道が崩れる / 点が沈む ---
         foreach (var wx in new[] { WeatherKind.Crumble, WeatherKind.Sink })
@@ -345,7 +345,7 @@ static partial class T
             s.Wait();
             Check(s.FreeMovesLeft == 1 && s.Turn == t0 + 1, "近道: 待つでは減らない");
             s.Survey();
-            Check(s.FreeMovesLeft == 1 && s.Turn == t0 + 1, "近道: 測量でも減らない (測量は手番も使わない)");
+            Check(s.FreeMovesLeft == 1 && s.Turn == t0 + 2, "近道: 測量でも減らない (測量は待つと同じく 1 手番)");
             int t1 = s.Turn, p1 = w.Provision;
             s.MoveTo(s.Neighbors(s.Me)[0]);
             Check(s.FreeMovesLeft == 0 && s.Turn == t1 && w.Provision == p1, "近道: 2 回目もただで、残りは 0");

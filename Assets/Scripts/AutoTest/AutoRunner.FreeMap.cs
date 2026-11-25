@@ -64,7 +64,7 @@ namespace AutoTest
         /// <summary>測量で先を調べるか (2026-11-05 に偵察と照明で入れた口・2026-11-24 に測量 1 本へ)。 戦闘名は測量で書き込んだ点 (完全公開) にしか出ないので、
         /// 使わないと危険な戦闘を避ける情報が無い。 **既定は false (使わない)** ── 2026-11-05 に (旧い照明と偵察で) 同じ 5,000 シードで比べると
         /// 使う方がクリア 19.4% → 17.9% (z=−2.42) と悪化した (照明 5 回 = 物資 250 と、 偵察 6 回分のターンを払うのに、
-        /// 戦闘名を活かす判断が TileDanger の足切りしか無い)。 使う場面を絞ってから戻す。 測量 (物資 1・手番 0・その層の間消えない) では未測定。</summary>
+        /// 戦闘名を活かす判断が TileDanger の足切りしか無い)。 使う場面を絞ってから戻す。 測量 (1 手番・物資 0・その層の間消えない) では未測定。</summary>
         [System.NonSerialized] public bool freeNavScout = false;
         /// <summary>この層で測量した点 (同じ点では 1 回まで ── 書き込みは消えないので、 同じ点で 2 度目は何も増えない)。</summary>
         private readonly HashSet<int> _freeMapSurveyAt = new HashSet<int>();
@@ -468,9 +468,8 @@ namespace AutoTest
             }
 
             // ── 調べる (2026-11-05・2026-11-24 に測量 1 本へ): 行き先を決める前に使い、 開示された戦闘名は Rank (TileDanger) が読む ──
-            //   測量: 物資 1 (1 歩分)・ターンは使わない・不安定化も溜まらない・3 歩先までを書き込み、 その層の間消えない。 同じ点では 1 回まで。
-            int exitCost = exitHopsAt == int.MaxValue ? 0 : exitHopsAt * FreeMapParams.MoveSupply;
-            bool surveyAffordable = !_freeMapSurveyAt.Contains(at) && NavSupply(run, sim) >= exitCost + FreeMapExitMargin + FreeMapParams.SurveySupply;
+            //   測量: 1 ターン (物資は使わない・2026-11-25〜)・3 歩先までを書き込み、 その層の間消えない。 同じ点では 1 回まで。
+            bool surveyAffordable = !_freeMapSurveyAt.Contains(at);
             if (freeNavScout && _freeMapActions <= MaxFreeMapActionsPerFloor)
             {
                 int Unscouted(int range)
@@ -495,7 +494,7 @@ namespace AutoTest
 
             // ── 行き先 ──
             //   2026-11-09: 物資が出口まで足りなくても、 まだ入っていない店まで届くなら先に店へ寄って買い足す。
-            //   店が見つかっていなければ、 測量で周りを書き込んで探す (物資 1・ターンは使わない・同じ点では 1 回まで)。
+            //   店が見つかっていなければ、 測量で周りを書き込んで探す (1 ターン・同じ点では 1 回まで)。
             int target = -1;
             //   店は何度でも入れる (2026-11-09) ので、 往復で詰まらないように:
             //   ・補給に行くのは満タンでない時だけ・今いる点は除く
@@ -510,7 +509,7 @@ namespace AutoTest
                               : NearestRefuel(mm, sim, hopsFromMe, run, at);
             bool refuelOk = refuel >= 0 && NavSupply(run, sim) >= hopsFromMe[refuel] * FreeMapParams.MoveSupply;
             if (refuel < 0 && !_freeMapSurveyAt.Contains(at) && !(sim.FoeAlive && sim.FoeMode == FoeMode.Chase)
-                && run.coins >= FreeMapParams.ProvisionPrice && run.provision > FreeMapParams.SurveySupply
+                && run.coins >= FreeMapParams.ProvisionPrice
                 && _freeMapActions <= MaxFreeMapActionsPerFloor)
             {
                 int unknown = 0;
@@ -605,8 +604,8 @@ namespace AutoTest
                 }
             }
 
-            // S4: 次に向かう点の戦闘名が分からず、 近ければ測量してから決める (同じ点では 1 回まで・追われている時はしない・出口までの物資を残す)
-            //   旧い偵察 (1 ターン・物資 0) を 2026-11-24 に測量 (物資 1・ターン 0) へ置き換えた ── 払う物が手番から物資に変わったので、 物資の取り置きを足した
+            // S4: 次に向かう点の戦闘名が分からず、 近ければ測量してから決める (同じ点では 1 回まで・追われている時はしない)
+            //   2026-11-24 に測量を物資 1・ターン 0 にした版では、 物資を吸われて Super 19.4% → 11.7% (同じ 2000 シード)。 2026-11-25 に 1 ターン・物資 0 へ戻した
             if (v3.superNav && !toExit && target >= 0 && _freeMapActions <= MaxFreeMapActionsPerFloor
                 && hopsFromMe[target] <= FreeMapParams.SurveyRange && surveyAffordable
                 && !(sim.FoeAlive && sim.FoeMode == FoeMode.Chase))

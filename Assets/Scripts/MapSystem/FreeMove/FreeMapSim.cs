@@ -82,8 +82,8 @@ namespace MapSystem.FreeMove
     /// <summary>
     /// 航行マップの動く中身 (ターン制・2026-10-18)。 参照実装は docs/design/map-grid-prototype.html。
     ///
-    /// <para><b>移動は道でつながった隣の点へ 1 歩</b>。 自分が 1 歩動く (または待つ) ごとに 1 ターンが進み、
-    /// 追跡者が 1 度動く。 戦闘・イベント・測量・囮罠はターンを使わない。 物資は距離によらず 1 歩ごとに一定。
+    /// <para><b>移動は道でつながった隣の点へ 1 歩</b>。 自分が 1 歩動く (または待つ・測量する) ごとに 1 ターンが進み、
+    /// 追跡者が 1 度動く。 戦闘・イベント・囮罠はターンを使わない。 物資は距離によらず 1 歩ごとに一定。
     /// イベントの「近道+N」の残り (<see cref="FreeMovesLeft"/>) がある間の 1 歩だけは、 物資もターンも使わない。</para>
     ///
     /// <para>乱数は前線の天候 (道が崩れる・点が沈む) の選択だけで、
@@ -867,17 +867,18 @@ namespace MapSystem.FreeMove
             return true;
         }
 
-        /// <summary>測量 (2026-11-24・旧い照明と偵察を 1 つにまとめた・作者の決定): 物資 <see cref="FreeMapParams.SurveySupply"/> を払い、
+        /// <summary>測量 (2026-11-24・旧い照明と偵察を 1 つにまとめた・作者の決定): <b>1 手番</b> (物資は使わない・2026-11-25 に物資 1・手番 0 から変更)。
         /// 今いる点から道で <see cref="FreeMapParams.SurveyRange"/> 歩先までの点の種別と戦闘名を地図に書き込む (<see cref="Scouted"/>・その層の間ずっと消えない)。
-        /// <b>手番は使わない・不安定化も溜まらない・追跡者に見つかりやすくもならない</b>。 物資が足りない分は HP で払う (1 歩と同じ)。</summary>
+        /// 手番の払いは待つのと同じ (嵐の中なら待つのと同じ HP・崩れ始めた後は歩く分の不安定化・追跡者も動く)。 追跡者に見つかりやすくはならない。</summary>
         public FreeMapEvent Survey()
         {
             if (Dead || InFight) return FreeMapEvent.None;
-            var ev = Pay(FreeMapParams.SurveySupply) ? FreeMapEvent.Died : FreeMapEvent.None;
-            if ((ev & FreeMapEvent.Died) != 0) { Dead = true; return ev; }
+            int walk = InstabilityForWait;
+            if (PayStormWait()) return FreeMapEvent.Died;
+            var ev = walk > 0 ? AddInstability(InstabilitySource.Walk, walk) : FreeMapEvent.None;
             Reveal(Me, FreeMapParams.SurveyRange, true);
             Version++;
-            return ev;
+            return ev | PassTurns(1);
         }
 
         /// <summary>通常の戦闘から逃げた: 直前の点へ戻る (ターンは使わない)。</summary>

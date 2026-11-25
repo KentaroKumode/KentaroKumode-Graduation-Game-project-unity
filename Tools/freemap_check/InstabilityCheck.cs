@@ -251,7 +251,7 @@ static partial class T
             Check(ph && bad == 0, $"不安定化: 境目 0〜{P1 - 1} 静か / {P1} フェーズ 1 (全部を含む輪・地図の中心) / {P2} フェーズ 2 (60%) / {P3} フェーズ 3 (30%・中心はボスをずらした点) / {P4} フェーズ 4 (ボスの点のほか全部)・段の途中は線形・ボスの点はいつも外 ({layers} 層・違反 {bad}{(first != null ? " 最初 " + first : "")})");
         }
 
-        // ── 5. 崩れ始める前は歩いても溜まらない / 後は 1 歩・待つで溜まる (測量は 0) (雪の嵐の中へは +2・近道と〈補給線〉は 0) / 深さ 6 は崩れ始める境目から / 深さ 0・7 は溜まらない ──
+        // ── 5. 崩れ始める前は歩いても溜まらない / 後は 1 歩・待つで溜まる (測量は待つと同じ) (雪の嵐の中へは +2・近道と〈補給線〉は 0) / 深さ 6 は崩れ始める境目から / 深さ 0・7 は溜まらない ──
         {
             bool quiet = true, after = true, snow = true, free = true, d6 = true, d07 = true, ext = true; int layers = 0;
             foreach (int floor in new[] { 1, 3, 5 })
@@ -279,7 +279,7 @@ static partial class T
                     after &= s.Instability == p0 + wantStep; p0 += wantStep - 1;
                     s.Wait(); if (s.InFight) continue; after &= s.Instability == p0 + 2;
                     s.Wait(); if (s.InFight) continue; after &= s.Instability == p0 + 3;
-                    { int ps = s.Instability; s.Survey(); after &= s.Instability == ps; }                    // 測量は 0 (2026-11-24)
+                    { int ps = s.Instability, wantWait = s.InstabilityForWait; s.Survey(); if (s.InFight) continue; after &= s.Instability == ps + wantWait; }   // 測量は待つと同じ (2026-11-25)
                     s.GrantFreeMoves(1); int p1 = s.Instability;
                     s.MoveTo(s.Neighbors(s.Me).First(v => v != s.Layout.goal)); if (s.InFight) continue;
                     free &= s.Instability == p1;                                                               // 近道の 1 歩は 0
@@ -327,7 +327,7 @@ static partial class T
                 d07 &= !s.StormMode && !s.InstabilityMode && s.Instability == 0 && s.StormPhase == 0;
             }
             Check(quiet && after && snow && free && d6 && d07 && ext,
-                $"不安定化: 崩れ始める前は歩く・待つ・測量で溜まらない ({layers} 層)・後は 1 歩・待つで +1・測量は 0 (雪の嵐の中へは +2)・近道と〈補給線〉と休憩の手番は 0・イベントのターン+3 は +3・深さ 6 は {FreeMapParams.InstabilityDepth6Start} から・深さ 0/7 は溜まらない ({quiet}/{after}/{snow}/{free}/{ext}/{d6}/{d07})");
+                $"不安定化: 崩れ始める前は歩く・待つ・測量で溜まらない ({layers} 層)・後は 1 歩・待つ・測量で +1 (雪の嵐の中へは +2)・近道と〈補給線〉と休憩の手番は 0・イベントのターン+3 は +3・深さ 6 は {FreeMapParams.InstabilityDepth6Start} から・深さ 0/7 は溜まらない ({quiet}/{after}/{snow}/{free}/{ext}/{d6}/{d07})");
         }
 
         // ── 6. 遠ざける / 近づける・段の知らせ・フェーズ 3 でボスが見える ──

@@ -286,7 +286,6 @@ namespace UI.Game2D
             if (run == null || !CanAct(gm, sim)) return false;
             switch (i)
             {
-                case 0: return run.provision >= FreeMapParams.SurveySupply;
                 case 1: return CountLures(run) > 0;
                 default: return true;
             }
@@ -296,7 +295,7 @@ namespace UI.Game2D
         {
             switch (i)
             {
-                case 0: return "測量 物資" + FreeMapParams.SurveySupply + "で" + FreeMapParams.SurveyRange + "歩先までを地図に書き込む (F)";
+                case 0: return "測量 1ターンで" + FreeMapParams.SurveyRange + "歩先までを地図に書き込む (F)";
                 case 1: return "囮罠 今いる点に置く 残り" + CountLures(run) + "個 (L)";
                 default: return "待つ その場で1ターン (Space)";
             }

@@ -310,7 +310,7 @@ namespace UI.Game2D
             // 「挑戦」: このランで第三層のボスを倒した (〈決意〉で先へ進むランは、 エンドの記録が付かないのでここで頼む)。 出すのはタイトルに戻ってから (Scene.Title)
             if (run.Depth > run.normalClearFloor || (run.Depth == run.normalClearFloor && run.bossDefeatedThisFloor))
                 Request(TutorialTopics.Challenge);
-            // 「物資」: 地図の上で物資が減った (歩いた・測量した)
+            // 「物資」: 地図の上で物資が減った (歩いた)
             if (run.provision != _lastProv)
             {
                 if (run.provision < _lastProv && ph == GameManager.GamePhase.MapNavigation) Request(TutorialTopics.Provision);

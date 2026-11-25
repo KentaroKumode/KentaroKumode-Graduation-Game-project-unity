@@ -10,9 +10,9 @@ namespace GameLoop
     /// (<see cref="MapManager.Sim"/>) で、 ここはゲームの規則 (到着した点の起動・追跡者との戦闘・
     /// 逃げる・囮罠・休憩) へ橋渡しする。
     ///
-    /// <para><b>時間を進める口は「1 歩動く」「待つ」「休憩で多めに回復」だけ。</b> どれも
+    /// <para><b>時間を進める口は「1 歩動く」「待つ」「測量」「休憩で多めに回復」だけ。</b> どれも
     /// <see cref="FreeMapSim"/> の操作 1 回が 1 ターンぶん (雪の前線の内側は 2 ターン) で、
-    /// 戦闘・イベント・測量・囮罠はターンを使わない。 イベントの「近道+N」の残りがある間の 1 歩は 0 ターン (<see cref="FreeMapSim.FreeMovesLeft"/>)。
+    /// 戦闘・イベント・囮罠はターンを使わない。 イベントの「近道+N」の残りがある間の 1 歩は 0 ターン (<see cref="FreeMapSim.FreeMovesLeft"/>)。
     /// 人も BOT も同じ口を同期的に叩く。</para>
     /// </summary>
     public partial class GameManager
@@ -96,13 +96,13 @@ namespace GameLoop
             return true;
         }
 
-        /// <summary>測量 (2026-11-24・旧い偵察と照明を 1 つに): 物資 <see cref="FreeMapParams.SurveySupply"/>・ターンを使わない・
+        /// <summary>測量 (2026-11-24・旧い偵察と照明を 1 つに): 1 ターン (物資は使わない・2026-11-25〜)・
         /// 今いる点から道で <see cref="FreeMapParams.SurveyRange"/> 歩先までの点の種別と戦闘名を地図に書き込む (その層の間ずっと消えない)。</summary>
         public bool Survey()
         {
             var sim = FreeMapForAction();
             if (sim == null) return false;
-            Log($"測量（物資 −{FreeMapParams.SurveySupply}・ターンは使わない・{FreeMapParams.SurveyRange}歩先まで書き込む）");
+            Log($"測量（1ターン・{FreeMapParams.SurveyRange}歩先まで書き込む）");
             RunFreeMapOp(s => s.Survey());
             OnNavFx?.Invoke(NavFx.Survey);
             return true;
