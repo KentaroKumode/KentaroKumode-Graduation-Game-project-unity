@@ -681,7 +681,7 @@ namespace ItemSystem.PassiveSkills
         /// <summary>[persistent]</summary>
         public bool oathBroken;
         /// <summary>[perTurn] (Phase A で判定してから false (Phase B ではない)) 痛覚遮断剤 (狂戦士): 使用ターン 致命ダメで HP 1 踏みとどまり、
-        /// 次ターン開始時 HP=1 ならダイス合計+10/基礎攻撃+10、 攻撃終了時に死亡。
+        /// 次ターン開始時 HP=1 なら攻撃+10・そのターンの攻撃の最終与ダメージ+50% (Consumables.PainkillerFinalPct)、 攻撃終了時に死亡。
         /// armedThisTurn=使用ターン中、 procced=次ターンに踏みとどまり判定済+強化バフ発動中。</summary>
         public bool painkillerArmedThisTurn;
         /// <summary>[decay] (Phase A で立ち、 そのターンの攻撃の後に CombatManager.Turn.cs が倒す)</summary>
@@ -698,7 +698,6 @@ namespace ItemSystem.PassiveSkills
         public string pendingEnemySwapLabel;
 
         // ===== 消費アイテム由来（この1戦闘のみ。ctxは戦闘毎に生成→破棄で自動消去） =====
-        public int consAtkBurst;          // [persistent] (主攻撃で使ったら 0) 次の主攻撃で与ダメ+X（与ダメ倍率の後に足す・適用後0）
         public int consDiceRoll;          // [persistent] 攻撃+X（CombatManager.Turn.cs が攻撃値へ足す）。 書くのは〈痛覚遮断剤〉の発動 (BeginNewTurn Phase A) だけ
         /// <summary>[persistent] この戦闘で払ったリロールの回数（2026-10-17〜）。 費用 = 振り直す個数 × (この値 + 1)。
         /// <b>ターンでは戻らない</b> ── 同じ戦闘で振り直すほど高くつく（続けるとジリ貧）。 ctx は戦闘ごとに作り直すので、
@@ -999,10 +998,9 @@ namespace ItemSystem.PassiveSkills
                 if (playerCurrentHP == 1)
                 {
                     painkillerProcced = true;
-                    // 攻撃+10 (consDiceRoll: 攻撃値へ加算) / 最終与ダメージ+10 (consAtkBurst: 与ダメ倍率の後に加算) を流用
+                    // 攻撃+10 (consDiceRoll: 攻撃値へ加算)。 最終与ダメージ +50% は painkillerProcced の間 CombatManager.Damage が撃ごとに hitFinalDamagePct へ足す (2026-11-25・旧 +10 固定)
                     consDiceRoll += 10;
-                    consAtkBurst += 10;
-                    if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log("[痛覚遮断剤] HP=1 維持確認 → 攻撃+10/最終与ダメージ+10。 攻撃終了時に死亡。");
+                    if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log("[痛覚遮断剤] HP=1 維持確認 → 攻撃+10/最終与ダメージ+50%。 攻撃終了時に死亡。");
                 }
             }
 

@@ -550,7 +550,6 @@ namespace AutoTest
             public float nonCritMul;           // 鈍器: 非会心だけ ×(1+x)
             public bool pinpointCut;           // 〈一点読みの片眼〉の代価: 非会心 × PinpointEye.NonCritKeepPct%
             public float outMul;               // 与ダメ倍率の池 (ctx.outgoing + 整備パネル + 戦意 + 剛胆 + 遺物 + 研磨剤 + 油・膏薬)
-            public int consBurst;              // 消費: 攻撃バースト (倍率の後に足す)
             public int critPen;                // 会心した攻撃だけに足す貫通
             public bool vitalIgnore;           // 短剣〈急所〉: 会心は防御を無視
             public int minDmg;                 // 勝利時の与ダメ最低保証
@@ -649,7 +648,7 @@ namespace AutoTest
             fpct += garyoPct;
             if (hitNo >= 1) fpct += s.lateHitFinalPct;   // 〈加重の拳套〉(answer15: 別枠の最終与ダメ)
             bool noDef = ws.ignoreDefense || (hitNo == 0 && s.needleFirst) || rawOverride >= 0 || (hitNo >= 1 && s.rung.vital2nd);   // 〈急所〉: 2 撃目以降は防御無視
-            int minDmg = s.minDmg, consBurst = s.consBurst, eDef = noDef ? 0 : s.eDefNow, pen = s.myPen + ws.armorPen, critPen = s.critPen;
+            int minDmg = s.minDmg, eDef = noDef ? 0 : s.eDefNow, pen = s.myPen + ws.armorPen, critPen = s.critPen;
             float nonCritMul = s.nonCritMul, berserk = s.berserkMul;
             // 会心 (CritCore・本体の ProcessDamage と同じ式): 撃ごとの会心率と会心倍率。 配線で決まる品はこの撃の目・撃の数で足す
             float add = s.critAdd, mulAdd = ws.critMultAdd;
@@ -701,9 +700,8 @@ namespace AutoTest
                 }
                 float om = crit ? outMul : outMul + ironOut;   // 〈銑鉄棍〉: 会心しなかった撃だけ池へ足す
                 if (om > 0f && System.Math.Abs(om - 1f) > 0.001f) d = Mathf.CeilToInt(d * om);
-                d += consBurst;
-                if (termMul != 1f && d > 0) d = System.Math.Max(1, Mathf.RoundToInt(d * termMul));   // 〈激昂〉〈共鳴〉: 本体と同じ位置 (攻撃バーストの後・物差しの前)
-                d = CombatSystem.EnemyHpLedger.ProbeMain(d);   // [測定用の物差し 2026-11-10] 本体と同じ位置 (攻撃バーストの後・防御の前)
+                if (termMul != 1f && d > 0) d = System.Math.Max(1, Mathf.RoundToInt(d * termMul));   // 〈激昂〉〈共鳴〉: 本体と同じ位置 (与ダメ倍率の池の後・物差しの前)
+                d = CombatSystem.EnemyHpLedger.ProbeMain(d);   // [測定用の物差し 2026-11-10] 本体と同じ位置 (与ダメ倍率の池の後・防御の前)
                 d = ApplyFinalPct(d, fpct + (crit && fz ? critFpct : 0));     // 最終与ダメージ倍率: 本体と同じ位置 (物差しの直後・徒労の前・〈渾身の鉄兜〉は集中会心の撃だけ)
                 d = MetaProgression.MetaDebuffApplicator.ApplyOutgoingCut(d);   // 〈徒労〉: 本体と同じ位置 (物差しの直後・防御の前・CombatManager.Damage.cs)
                 d = CombatSystem.BossDown.ApplyTaken(d, down);               // ボスのダウン ×1.5: 本体と同じ位置 (徒労の直後)
@@ -809,9 +807,8 @@ namespace AutoTest
             st.nonCritMul = ctx.nonCritOutgoingMultiplier;
             st.pinpointCut = ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.PinpointEye.NonCritCutKey) > 0f;
             st.outMul = OutgoingPoolNow(ctx, run);
-            st.finalPct = ctx.finalDamagePct;
+            st.finalPct = ctx.finalDamagePct + (ctx.painkillerProcced ? GameLoop.Consumables.PainkillerFinalPct : 0);   // 〈痛覚遮断剤〉の発動ターン: 本体は撃ごとに hitFinalDamagePct へ足す
             st.guardEcho = bladeDance;   // 〈防人の軍標〉の「もう 1 回」は 2026-11-25 に撤去
-            st.consBurst = ctx.consAtkBurst;
             st.critPen = ctx.critArmorPen;
             st.vitalIgnore = bladeDance || ItemSystem.PassiveSkills.Effects.VitalStrike.IgnoresDefense(ctx);   // 剣舞譜は会心確定なので「会心は防御を無視」と同じ見込み
             st.minDmg = ctx.winMinDamage;

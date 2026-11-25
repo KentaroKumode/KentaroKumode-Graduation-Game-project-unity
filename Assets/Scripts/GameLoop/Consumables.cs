@@ -302,6 +302,8 @@ namespace GameLoop
         public const int AcidDefenseCut = 12;
         /// <summary>〈目盛り削りのノミ〉: 敵へのダメージ。</summary>
         public const int ChiselDamage = 15;
+        /// <summary>〈痛覚遮断剤〉: 発動したターンの攻撃の最終与ダメージ +N% (油・膏薬と同じ最終与ダメージの枠・2026-11-25 作者の決定・旧 +10 固定)。</summary>
+        public const int PainkillerFinalPct = 50;
         /// <summary>〈複製の水銀〉: 手札に足す写しの枚数。</summary>
         public const int MercuryCopies = 2;
 

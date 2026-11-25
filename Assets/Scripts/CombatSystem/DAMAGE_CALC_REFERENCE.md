@@ -160,11 +160,10 @@ outgoingDamageMultiplier += メタ% + 遺物% + 研磨剤1.5 + consDmgMultPct/10
 × (outgoingDamageMultiplier + hitOutgoingPct/100)   ← パッシブ(OnPreDealDamage で加算済み)/メタ/遺物/研磨剤/鬼火の油 を 1 回だけ掛ける
                                      hitOutgoingPct = この 1 撃だけ池に足す % (撃ごとに 0 に戻す・池そのものは書き換えない・2026-11-21 §3-Q。 〈加重の拳套〉は answer15 で hitFinalDamagePct へ移り、 今は書く品が無い)
                                      ※鬼火の油は 2026-09-19 まで倍率適用後に ×(1+X%) を別掛けしていた
-+ consAtkBurst                     ← 消費:攻撃バースト(単発)
 + メタ会心ボーナス(会心時)
 − メタデバフ向かい風(最低1)
 × (100 + finalDamagePct + hitFinalDamagePct)/100      ← 最終与ダメージ倍率【2026-11-20・GAME.md §23-32】(Kw.ApplyFinalDamage・切り捨て・既定 0 = 素通し)。 〈防人の軍標〉が【ジャスト防御】のたび +(シールドの秘宝の数 × 9) (この戦闘・累積・2026-11-25・旧 +45 固定)。
-                                     hitFinalDamagePct = 主攻撃のこの 1 撃だけの上乗せ (〈血桜〉〈血の楔〉・撃ごとに 0 に戻す・主攻撃以外の口には無い)。 【オーバークロック】(TerminalOutcome.overclock) は撃 0 に +100 (answer15・ChargeCore.OverclockFinalPct)・その撃だけ playerArmorPen += IgnoreAll (撃の後に戻す)。 〈雷神槍〉〈溜め撃ちの誘導コイル〉は OnPreDealDamage で本物の撃に足す。 〈破城斧〉は撃ごとに +80 と `hitIgnoreDefense` (その撃だけ敵の防御を飛ばす・撃ごとに false へ戻す・2026-11-21)。
+                                     hitFinalDamagePct = 主攻撃のこの 1 撃だけの上乗せ (〈血桜〉〈血の楔〉・油・膏薬 (consDmgMultPct)・〈痛覚遮断剤〉の発動ターン +50・撃ごとに 0 に戻す・主攻撃以外の口には無い)。 【オーバークロック】(TerminalOutcome.overclock) は撃 0 に +100 (answer15・ChargeCore.OverclockFinalPct)・その撃だけ playerArmorPen += IgnoreAll (撃の後に戻す)。 〈雷神槍〉〈溜め撃ちの誘導コイル〉は OnPreDealDamage で本物の撃に足す。 〈破城斧〉は撃ごとに +80 と `hitIgnoreDefense` (その撃だけ敵の防御を飛ばす・撃ごとに false へ戻す・2026-11-21)。
                                      怠惰の直前 = すべての倍率 (会心・与ダメ% の池・端子の別枠・物差し) の後・敵の軽減パッシブと防御の前。 与ダメ% の池には足さない。
                                      掛ける口は怠惰と同じ 4 つ (主攻撃 = ApplyWinDamageModifiers / HpLossDiag.Lose (channel ≠ "通常攻撃") / 〈逆締めの止血帯〉/ Kw.DamageEnemy の直接)。 BOT の見積もりも同じ位置 (AutoRunner.ApplyFinalPct)
 × (100 − N)/100                   ← 〈徒労〉の戦闘のデバフ【2026-11-14・GameHooks.ToilDamageDownPct・既定 50 (BattleBoonRule.DefaultToilDamageDownPct・作者の決定)・測定の口 toilDamageDownPct で 0 にすれば切れる】: 〈徒労〉を持っている間 −N% (既定 −50%)
@@ -237,7 +236,7 @@ fixedDamageToPlayer ≥ 999 → playerHP = 0（死の宣告）
 |---|---|---|
 | 瞬間研磨剤 | 剣士 | 次の 1 撃だけ `outgoingDamageMultiplier += 1.5`（与ダメージ+150%）。`ApplyWinDamageModifiers` 内・適用後 disarm。**2026-07-27 リワーク**（旧 playerDiceTotal 加算は相互攻撃モデルで無効だった） |
 | 不抜の聖紋 | 騎士 | 上記 ③-B チェーン参照。HP80% 維持中のみ被ダメ −40%、一度割れたら戦闘中永久無効 |
-| 痛覚遮断剤 | 狂戦士 | 使用ターン致命ダメを HP=1 に clamp（2 経路）。次ターン開始時 (`CombatContext.BeginNewTurn` Phase A) HP=1 なら consDiceRoll+10 / consAtkBurst+10、そのターン終了時に死亡確定 (`ExecuteTurn` 終端) |
+| 痛覚遮断剤 | 狂戦士 | 使用ターン致命ダメを HP=1 に clamp（2 経路）。次ターン開始時 (`CombatContext.BeginNewTurn` Phase A) HP=1 なら consDiceRoll+10 (攻撃+10)・そのターンの撃ごとに hitFinalDamagePct += 50 (`Consumables.PainkillerFinalPct`・最終与ダメージ +50%・油・膏薬と同じ枠・2026-11-25 に旧 consAtkBurst +10 固定から変更)、そのターン終了時に死亡確定 (`ExecuteTurn` 終端) |
 | 仕込み刃 | 暗殺者 | 使ったターンの被ダメを 0 化＋**その 5 倍**を enemyHP へ直接減算（軽減不能・2026-09-22 に 1→5 倍）。このターン限りで、被弾しなくても失効 |
 
 #### 戦術消耗品・消耗品の連動品のダメージ関連効果（2026-11-20・item-overhaul-spec §7）
@@ -338,7 +337,7 @@ ShieldBash の空振り（盾 0）が 34.2% → 66.1%、1 機会あたりの攻�
 | `receivedDamageBonus` | 被ダメ増(亡者の招待+30%) | — |
 | `halveFirstEnemyAttack`/`playerDamageNegateCharges` | 共助/獣の絆 | フラグ消費 (〈獣の恩義〉`nullifyFirstEnemyRoll` は 2026-11-22 に削除・GAME.md §24) |
 | `truceThisTurn` | 停戦協定ターン(他効果抑止) | 毎T |
-| `consShield`/`consDmgMultPct`/`consAtkBurst`/`consDiceRoll` | 消費アイテム由来 (`consAtkBurst`/`consDiceRoll` を書くのは〈痛覚遮断剤〉だけ) | 各種 |
+| `consShield`/`consDmgMultPct`/`consDiceRoll` | 消費アイテム由来 (`consDiceRoll` を書くのは〈痛覚遮断剤〉だけ・`consAtkBurst` は 2026-11-25 に削除) | 各種 |
 | buff `damageBonus`/`critRatePct`(小数)/`enemyDiceDebuff` | currentBuffs/nextTurnBuffs経由 | nextTurn→current移行 |
 | `accumulatedValues["extraDice"]` | そのターンのダイス数増減(NightLord/精鋭/0d0等) | — |
 | `accumulatedValues["extraPursuitDice"]` | 追撃ダイス追加(多頭) | — |

@@ -127,6 +127,8 @@ namespace CombatSystem
                 ctx.hitFinalDamagePct += ctx.consDmgMultPct;
                 DmgSourceDiag.Note("消費〈油・膏薬〉", DmgSourceDiag.Out, ctx.consDmgMultPct / 100f);
             }
+            // 〈痛覚遮断剤〉が発動したターン: 最終与ダメージ +50% (油・膏薬と同じ枠・2026-11-25・旧 攻撃バースト +10 固定)
+            if (ctx.painkillerProcced) ctx.hitFinalDamagePct += GameLoop.Consumables.PainkillerFinalPct;
 
             // 与ダメ倍率（激情の刃 等のパッシブ由来 + メタ% + 遺物 + 研磨剤 + 鬼火の油）
             //   + この 1 撃だけの池への上乗せ (〈加重の拳套〉・ctx.hitOutgoingPct)
@@ -143,13 +145,6 @@ namespace CombatSystem
                 CombatStats.Stage(22, ctx.outgoingDamageMultiplier <= 0f ? 1f : ctx.outgoingDamageMultiplier);
             }
 
-            // 消費: 攻撃力バースト（この勝利ターンのみ・単発消費）
-            if (ctx.consAtkBurst > 0)
-            {
-                totalDmg += ctx.consAtkBurst;
-                if (Debug.unityLogger.logEnabled) Debug.Log($"[CombatManager] 攻撃バースト +{ctx.consAtkBurst}");
-                ctx.consAtkBurst = 0;
-            }
             if (CombatStats.DiagWinAttack) CombatStats.Stage(6, totalDmg);   // 段 F
 
             // [2026-07-28 撤去] メタバフ「会心ダイス」による会心時の固定ダメ加算。
