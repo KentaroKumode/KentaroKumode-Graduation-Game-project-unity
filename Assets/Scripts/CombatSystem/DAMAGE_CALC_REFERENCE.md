@@ -814,9 +814,9 @@ big = ゾロ目か連なり。 品が働く目 (2026-11-22〜・前はどの役�
 
 | 計算の位置 | 式 |
 |---|---|
-| 6d 撃ごとの攻撃 +N (`ApplyRoleItems`) | 〈潮目の木札〉F ∈ {4, 5} なら +1 / 〈追い目の賽筒〉振り直したターン (`env.diceRerolled`) のどの役でも +8 (answer15: 旧 +7) (F = 3 かゾロ目なら +10・answer12: 旧 +5・answer9: 旧 F = 3 だけ +6) / 〈進軍の角笛〉F ∈ {3, 4} なら +min(6, 1 × (C + 1)) × (ゾロ目 ? 2 : 1) (C はどの役も数える) |
-| 6d ブロック | 〈潮目の木札〉F ∈ {4, 5} なら +2 / 〈轟きの大賽〉big なら +10 (answer9: 旧 +4)・big でない役で振り直したターン (`env.diceRerolled`) なら +10 (answer14: 旧 +8) / 〈擦り切れた賽袋〉振り直したターンは役が無くても +5 (`RoleItems.Pouch`・answer12) |
-| 6d 掛け算 | 〈轟きの大賽〉big なら `damageMul ×= 1.45` (answer9: 旧 1.2)・big でない役で振り直したターンなら ×1.35 (answer14: 旧 ×1.30・answer12) / 〈連勝の銀杯〉どの役でも (ゾロ目・連なりも・`TerminalCards.BloodmarkFires`・answer9: 旧 2 個そろいだけ) `damageMul ×= 1 + 0.08 × (C + 1)` (answer12: 旧 0.07・上限なし・final5: final4 min(0.5, 0.10 × (C + 1))・旧 すべての役・0.08) / 〈揃いのメトロノーム〉F ≠ 0 かつ F = L なら `outgoingPctAdd += 0.25` (answer14: 旧 0.12) |
+| 6d 撃ごとの攻撃 +N (`ApplyRoleItems`) | 〈潮目の木札〉F ∈ {4, 5} なら +1 / 〈追撃の弾帯〉振り直したターン (`env.diceRerolled`) のどの役でも +8 (answer15: 旧 +7) (F = 3 かゾロ目なら +10・answer12: 旧 +5・answer9: 旧 F = 3 だけ +6) / 〈進軍の角笛〉F ∈ {3, 4} なら +min(6, 1 × (C + 1)) × (ゾロ目 ? 2 : 1) (C はどの役も数える) |
+| 6d ブロック | 〈潮目の木札〉F ∈ {4, 5} なら +2 / 〈轟きの鉄球〉big なら +10 (answer9: 旧 +4)・big でない役で振り直したターン (`env.diceRerolled`) なら +10 (answer14: 旧 +8) / 〈擦り切れた賽袋〉振り直したターンは役が無くても +5 (`RoleItems.Pouch`・answer12) |
+| 6d 掛け算 | 〈轟きの鉄球〉big なら `damageMul ×= 1.45` (answer9: 旧 1.2)・big でない役で振り直したターンなら ×1.35 (answer14: 旧 ×1.30・answer12) / 〈連勝の銀杯〉どの役でも (ゾロ目・連なりも・`TerminalCards.BloodmarkFires`・answer9: 旧 2 個そろいだけ) `damageMul ×= 1 + 0.08 × (C + 1)` (answer12: 旧 0.07・上限なし・final5: final4 min(0.5, 0.10 × (C + 1))・旧 すべての役・0.08) / 〈揃いのメトロノーム〉F ≠ 0 かつ F = L なら `outgoingPctAdd += 0.25` (answer14: 旧 0.12) |
 | 6d その他 | 〈欠け目の見立て〉F ∈ {1, 2} なら `armorPen += 12` (6d の目の集合は `TerminalCards.*Faces`・2026-11-22 neon 収束で広げた) |
 | 出来事 (`RoleEffects.cs`) | 〈欠け目の見立て〉1・2 の役のターン、 当たった撃のダメージ × 25% だけ `RaiseBossNextNotch` / 〈揃いのメトロノーム〉OnRoleFired で F ≠ 0 かつ F = L なら次のターン 手札 +1・無料の振り直し +1 / 〈小口の錠前〉OnRoleFired で F ∈ {1, 2, 3} なら次のターン 手札 +1・ブロック +4 / 〈負け越しの賽〉OnTurnEnd で役なしなら次のターン 無料の振り直し +1・ブロック +6・このターン振り直していれば (rerollsThisTurn > 0) 手札 +1 (answer13) |
 | 次のターンのブロック | nextTurnBuffs `roleBlockNext` (`YachtRoleEffects.BlockNextKey`) → BeginNewTurn の Phase B で `itemBlockBonus` の初期値 (〈負け越しの賽〉〈小口の錠前〉〈曇りの合わせ鏡〉) |

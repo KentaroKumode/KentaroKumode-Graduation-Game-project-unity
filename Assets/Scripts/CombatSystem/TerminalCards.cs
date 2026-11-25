@@ -68,9 +68,9 @@ namespace CombatSystem
         WoodTag = 1 << 0,      // 潮目の木札
         NotchBoard = 1 << 1,   // 進軍の角笛
         Chipped = 1 << 2,      // 欠け目の見立て (防御の無視の分・目盛りの削りは RoleEffects.cs)
-        Gear = 1 << 3,         // 追い目の賽筒
+        Gear = 1 << 3,         // 追撃の弾帯
         Clapper = 1 << 4,      // 揃いのメトロノーム (与ダメージの分・手札と無料の振り直しは RoleEffects.cs)
-        Thunder = 1 << 5,      // 轟きの大賽
+        Thunder = 1 << 5,      // 轟きの鉄球
         Bloodmark = 1 << 6,    // 連勝の銀杯
         Pouch = 1 << 7,        // 擦り切れた賽袋 (振り直したターンのブロックの分・無料の振り直しは CombatManager.FreeRerollsLeft)
     }
@@ -491,7 +491,7 @@ namespace CombatSystem
         public const float FoldedPerStreak = 0.25f, WorkbenchFinalPct = 0.25f, AshPer = 0.09f, SeamlessFinalPct = 0.25f;   // answer14: 作業台 13% → 25%・継ぎ目 補助 1 枚につき最終 +25%
         // ===== 賽目 (役の軸) の品の数値 (2026-11-21・段 1-f・item-overhaul-spec §5・未測定) =====
         /// <summary>〈潮目の木札〉4・5 の役のターン 各撃の攻撃 +N・ブロック +N / 〈進軍の角笛〉3・4 の役のターン 各撃の攻撃 + min(上限, 役の回数 × N) (ゾロ目なら 2 倍) /
-        /// 〈欠け目の見立て〉1・2 の役のターン 防御の無視 / 〈追い目の賽筒〉振り直し＋3 の役のターン 各撃 +N / 〈轟きの大賽〉ブロック (full-item-rework-ledger §⑧・未測定)。</summary>
+        /// 〈欠け目の見立て〉1・2 の役のターン 防御の無視 / 〈追撃の弾帯〉振り直し＋3 の役のターン 各撃 +N / 〈轟きの鉄球〉ブロック (full-item-rework-ledger §⑧・未測定)。</summary>
         public const int WoodTagAttack = 1, WoodTagBlock = 2, NotchBoardPer = 1, NotchBoardMax = 6, ChippedPen = 12, GearAttack = 8, GearAttackHigh = 10, ThunderBlock = 10, ThunderRerollBlock = 10, PouchBlock = 5;   // answer12: 歯車 +5 → +7・雷鳴の振り直しの役 ブロック +8・賽袋 振り直しブロック +5
           // answer9: 歯車 3 の役 +6 → どの役も +5 (3 の役かゾロ目は +10)・雷鳴 ブロック +4 → +10
         /// <summary>役の軸の品が働く役の目 (2026-11-22・どの役でも → 目を指定)。 *Faces = 目の集合 (ビット 1 &lt;&lt; 目・<see cref="FaceIn"/>)。
@@ -499,7 +499,7 @@ namespace CombatSystem
         public const int WoodTagFaces = 1 << 4 | 1 << 5, NotchBoardFaces = 1 << 3 | 1 << 4, ChippedFaces = 1 << 1 | 1 << 2, GearFace = 3, ConduitFaces = 1 << 1 | 1 << 2 | 1 << 3;
         /// <summary>目 <paramref name="face"/> (1〜6・連なりは 0 でどの集合にも入らない) が集合 <paramref name="faces"/> に入るか。</summary>
         public static bool FaceIn(int faces, int face) => face > 0 && ((faces >> face) & 1) != 0;
-        /// <summary>〈揃いのメトロノーム〉与ダメージ % の池 / 〈轟きの大賽〉最終与ダメージ / 〈連勝の銀杯〉2 個そろいの役のターン 役の回数 1 回あたりの最終与ダメージ・上限
+        /// <summary>〈揃いのメトロノーム〉与ダメージ % の池 / 〈轟きの鉄球〉最終与ダメージ / 〈連勝の銀杯〉2 個そろいの役のターン 役の回数 1 回あたりの最終与ダメージ・上限
         /// (2026-11-22 neon 収束: 3・4 の役 × 5% → すべての役 × 8% → final4: 2 個そろいだけ (ゾロ目・連なりでは働かない) × 10%・上限 50% → final5: × 7%・上限なし)。</summary>
         public const float ClapperPct = 0.25f, ThunderFinalPct = 0.45f, ThunderRerollPct = 0.35f, BloodmarkPer = 0.08f;   // answer14: 拍子木 12% → 25%・雷鳴 振り直しの他の役 30% → 35%   // answer12: 雷鳴 振り直したターンの他の役 +30%・符丁 7% → 8%
           // answer9: 雷鳴 +20% → +45%
@@ -1293,13 +1293,13 @@ namespace CombatSystem
             bool big = YachtRoles.IsBig(k);
             int count = st.roleCount + 1, each = 0, face = FaceOfRole(k);   // 品の条件は目の役 (2026-11-22・連なりはどの目でもない)
             if ((f & RoleItems.WoodTag) != 0 && FaceIn(WoodTagFaces, face)) { each += WoodTagAttack; o.blockAdd += WoodTagBlock; }    // 〈潮目の木札〉4〈攻め〉・5〈守り〉
-            if ((f & RoleItems.Gear) != 0 && env.diceRerolled) each += face == GearFace || (big && k != RoleKind.Straight) ? GearAttackHigh : GearAttack;   // 〈追い目の賽筒〉振り直したターンのどの役も (3 の役かゾロ目は倍・answer9)
+            if ((f & RoleItems.Gear) != 0 && env.diceRerolled) each += face == GearFace || (big && k != RoleKind.Straight) ? GearAttackHigh : GearAttack;   // 〈追撃の弾帯〉振り直したターンのどの役も (3 の役かゾロ目は倍・answer9)
             if ((f & RoleItems.NotchBoard) != 0 && FaceIn(NotchBoardFaces, face))                                            // 〈進軍の角笛〉3〈追撃〉・4〈攻め〉 (回数はどの役も)
                 each += Math.Min(NotchBoardMax, NotchBoardPer * count) * (big ? 2 : 1);
             if ((f & RoleItems.Chipped) != 0 && FaceIn(ChippedFaces, face)) o.armorPen += ChippedPen;                       // 〈欠け目の見立て〉1〈特別〉・2〈封じ〉
             if ((f & RoleItems.Clapper) != 0 && face != 0 && face == st.roleLastFace) o.outgoingPctAdd += ClapperPct;         // 〈揃いのメトロノーム〉同じ目が続いた
-            if ((f & RoleItems.Thunder) != 0 && big) { o.damageMul *= 1f + ThunderFinalPct; o.blockAdd += ThunderBlock; }    // 〈轟きの大賽〉
-            else if ((f & RoleItems.Thunder) != 0 && env.diceRerolled) { o.damageMul *= 1f + ThunderRerollPct; o.blockAdd += ThunderRerollBlock; }   // 〈轟きの大賽〉振り直したターンの他の役 (answer12)
+            if ((f & RoleItems.Thunder) != 0 && big) { o.damageMul *= 1f + ThunderFinalPct; o.blockAdd += ThunderBlock; }    // 〈轟きの鉄球〉
+            else if ((f & RoleItems.Thunder) != 0 && env.diceRerolled) { o.damageMul *= 1f + ThunderRerollPct; o.blockAdd += ThunderRerollBlock; }   // 〈轟きの鉄球〉振り直したターンの他の役 (answer12)
             if ((f & RoleItems.Bloodmark) != 0 && BloodmarkFires(k))                                                         // 〈連勝の銀杯〉どの役でも (回数はどの役も・answer9)
                 o.damageMul *= 1f + BloodmarkPer * count;
             if (each > 0 && o.attackHits.Count > 0)

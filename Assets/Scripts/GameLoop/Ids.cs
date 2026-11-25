@@ -212,7 +212,7 @@ namespace GameLoop
         //   擦り切れた賽袋 = CombatManager.FreeRerollsLeft。 曇りの合わせ鏡・宿命の音叉・万象の賽盆 = CombatManager.ResolveRoles / DecideOmniPair。
         public const string RoleBag = "擦り切れた賽袋", RoleWoodTag = "潮目の木札", RoleNotchBoard = "進軍の角笛", RoleChipped = "欠け目の見立て";
         public const string RoleClapper = "揃いのメトロノーム", RoleMirror = "曇りの合わせ鏡", RoleFate = "宿命の音叉", RoleOmni = "万象の賽盆";
-        public const string RoleLosing = "負け越しの賽", RoleConduit = "小口の錠前", RoleGear = "追い目の賽筒", RoleThunder = "轟きの大賽", RoleBloodmark = "連勝の銀杯";
+        public const string RoleLosing = "負け越しの賽", RoleConduit = "小口の錠前", RoleGear = "追撃の弾帯", RoleThunder = "轟きの鉄球", RoleBloodmark = "連勝の銀杯";
 
         // === 充電の軸の品で、 端子の解決の中で効く 4 品 (2026-11-21・full-item-rework-ledger §①) = CombatSystem.ChargeCore の ChargeItems の旗 ===
         public const string ChargeFork = "二股の導線", ChargeRod = "逆さ避雷針", ChargeWhip = "灼線鞭", ChargeDrum = "雷鳴の太鼓";

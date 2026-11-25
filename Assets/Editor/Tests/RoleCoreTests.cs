@@ -35,8 +35,8 @@ namespace AutoTest.EditorTests
             Assert.That(Atk(RoleItems.NotchBoard, p3, 3), Is.EqualTo(TerminalCards.NotchBoardPer * 4 * 2));
             Assert.That(Atk(RoleItems.NotchBoard, p4, 20), Is.EqualTo(TerminalCards.NotchBoardMax * 2));
             Assert.That(Atk(RoleItems.NotchBoard, p5, 3), Is.EqualTo(0));
-            // 追い目の賽筒: 振り直し + 3 の役
-            // 追い目の賽筒 (answer9): 振り直したターンのどの役も +5・3 の役かゾロ目は +10
+            // 追撃の弾帯: 振り直し + 3 の役
+            // 追撃の弾帯 (answer9): 振り直したターンのどの役も +5・3 の役かゾロ目は +10
             Assert.That(Atk(RoleItems.Gear, p3, rr: true), Is.EqualTo(TerminalCards.GearAttackHigh * 2));
             Assert.That(Atk(RoleItems.Gear, p3), Is.EqualTo(0));
             Assert.That(Atk(RoleItems.Gear, p5, rr: true), Is.EqualTo(TerminalCards.GearAttack * 2));
@@ -53,7 +53,7 @@ namespace AutoTest.EditorTests
         [Test]
         public void RerollTurnItems_Answer12()
         {
-            // 〈轟きの大賽〉振り直したターンは 2 個そろいでも最終 +30%・ブロック +8 (振り直していなければ乗らない)
+            // 〈轟きの鉄球〉振り直したターンは 2 個そろいでも最終 +30%・ブロック +8 (振り直していなければ乗らない)
             var pair = new[] { 2, 2, 5 };
             var b = Run(RoleItems.None, pair, rerolled: true);
             var th = Run(RoleItems.Thunder, pair, rerolled: true);

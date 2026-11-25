@@ -1896,7 +1896,7 @@ namespace AutoTest
         /// <summary>全部振り直した後に立つ役が、 役の軸の品で生む得の期待値 (攻撃相当の量・出目の和と同じ単位)。 持っていなければ 0。
         /// 面の出方を全部数える (<see cref="ExpectedBestUtilityAfterReroll"/> と同じ)。 役は本体と同じ関数 (<see cref="CombatSystem.TerminalCards.RoleOf"/>・封じ・格上げ込み)、
         /// 量は TerminalCards の定数 (Resolve の 6d と同じ値)。 役の回数・前のターンの役の目は本体の TerminalBattleState.roleCount / roleLastFace。
-        /// 撃 1 つぶん (撃の数は見ない)。 与ダメージの % は振った目の和に掛けた量。 振り直した後の手なので〈追い目の賽筒〉は 3 の役なら乗る。 品の条件の目は本体の TerminalCards の定数 (2026-11-22)。
+        /// 撃 1 つぶん (撃の数は見ない)。 与ダメージの % は振った目の和に掛けた量。 振り直した後の手なので〈追撃の弾帯〉は 3 の役なら乗る。 品の条件の目は本体の TerminalCards の定数 (2026-11-22)。
         /// shortcut: 次のターンへ持ち越す分 (小口の錠前・揃いのメトロノームの手札・負け越しの賽) と役そのものの効果は数えない。</summary>
         private static float RoleRerollPips(ItemSystem.PassiveSkills.CombatContext ctx, int[] faces, int k, CombatSystem.MutualTurnTelegraph tele)
         {
