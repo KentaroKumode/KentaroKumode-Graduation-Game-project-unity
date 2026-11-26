@@ -316,12 +316,15 @@ namespace ItemSystem.PassiveSkills
             CombatSystem.EnemyHpLedger.NoteEnemyTriggerDelta(context.enemyCurrentHP - ledgerHpBefore);
         }
 
+        private bool _perspectiveSwapped;
+
         /// <summary>
         /// プレイヤー/敵の視点を入れ替える
         /// </summary>
         private void SwapPerspective()
         {
             if (context == null) return;
+            _perspectiveSwapped = !_perspectiveSwapped;
 
             // HP入れ替え
             int tmpHP = context.playerCurrentHP;
@@ -374,6 +377,7 @@ namespace ItemSystem.PassiveSkills
         {
             FireTrigger(PassiveSkillTrigger.OnBattleEnd);
             ClearEnemySkills();
+            _perspectiveSwapped = false;
             context = null;
             Debug.Log("[PassiveSkillManager] Combat ended.");
         }
@@ -447,6 +451,8 @@ namespace ItemSystem.PassiveSkills
             _kwDepth++;
             if (_kwDepth > ChainMaxDepth) { ChainMaxDepth = _kwDepth; ChainDeepestPath = string.Join(" → ", _kwPath) + " → " + trigger + "(" + amount + ")"; }
             float prevAmount = context.GetAccumulated(Keywords.Kw.AmountKey);
+            bool wasSwapped = _perspectiveSwapped;
+            if (wasSwapped) SwapPerspective();
             try
             {
                 // 実行中にリストが増減しても壊れないよう写しを回す
@@ -475,6 +481,7 @@ namespace ItemSystem.PassiveSkills
             }
             finally
             {
+                if (wasSwapped) SwapPerspective();
                 context.accumulatedValues[Keywords.Kw.AmountKey] = prevAmount;
                 _kwDepth--;
             }

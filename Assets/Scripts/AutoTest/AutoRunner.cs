@@ -244,8 +244,8 @@ namespace AutoTest
         /// <b>既定 3</b> (2026-11-18・作者の承認): 控えの 5 腕の同じシードの比較で、 第 4 層の死亡率 34.6 → 31.1% (z −7.8)・クリア 19.5 → 20.0% と、 いちばん効いた控え方だった
         /// (Captures/experience_storm_d/work/cmp_arms.md)。 1 にすると 2026-11-18 までと同じ。 BOT の値付けのつまみ (ゲームの数値ではない)。 乱数は引かない。</summary>
         public float navD6HpWeightMul = 3f;
-        /// <summary>[実験 2026-11-27] Super の航行スノーボール評価関数 (0 = 既定OFF / >0 = 序盤のアイテム・戦闘・エリート・強化のスノーボール価値を重み付け)。</summary>
-        public float navSnowball = 0f;
+        /// <summary>[2026-11-27 採用] Super の航行スノーボール評価関数 (既定 0.5・20k paired 検証で +0.88 pp / 灰燼 -2.18 pp / ヴェスカ -1.39 pp)。</summary>
+        public float navSnowball = 0.5f;
         /// <summary>[測定の口・2026-11-18] 最初に持つ賽を指定する (ADR-0015 の賽 20 種の確かめ)。 空 = 製品と同じ (角の取れた賽)。
         /// ゲームの数値ではない・乱数は引かない。 v3_queue の腕で <c>forceStartDie=逆巻きの賽</c> のように渡す。</summary>
         public string forceStartDie = "";

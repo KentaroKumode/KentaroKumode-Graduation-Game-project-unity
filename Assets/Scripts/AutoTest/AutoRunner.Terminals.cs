@@ -175,15 +175,27 @@ namespace AutoTest
             }
             // 〈無害灯〉: 敵の直接攻撃で失う HP を無効 (1 ターン 1 回・使う臨界と返すダメージは見ない)
             if (sg.lamp) ws.takenMul = 0f;
-            // 〈蓋付きの毒指輪〉の【起爆】(毒の BOT の規則・2026-11-27): 毒秘宝6以上＆配線の後の毒が 26 以上で攻撃の撃があれば、 起爆のダメージを軽減不可の分に足す
-            if (sg.ring && o.attackHits.Count > 0)
+            // 〈蓋付きの毒指輪〉＆〈劇毒の火薬庫〉の【起爆】(毒の BOT の規則・2026-11-27):
+            //   指輪 = 1〜5 ターン目に毒 26 以上で攻撃の撃があれば自動起爆。
+            //   火薬庫 = 1 ターンに与えた毒 8 以上＆敵の毒 18 以上で即座に自動起爆。
+            if (sg.ring || sg.magazine)
             {
                 int pRel = ItemSystem.PassiveSkills.AxisRules.Count(GameManager.Instance?.Run, ItemSystem.PassiveSkills.AxisRules.Poison);
-                if (pRel >= PoisonCore.RingMinPoisonRelics)
+                int ringAdd = o.poison > 0 && (sg.poisonItems & PoisonItems.Ring) != 0 && sg.turn <= PoisonCore.RingAssassinTurns ? PoisonCore.RingBonusPoison : 0;
+                int addedP = o.poison + ringAdd;
+                int pz = env.enemyPoison + addedP;
+                int detN = sg.detonates;
+                if (sg.magazine && sg.magGiven + addedP >= PoisonCore.MagazineGiven && pz >= PoisonCore.MagazineMinPoison)
                 {
-                    int ringAdd = o.poison > 0 && sg.turn <= PoisonCore.RingAssassinTurns ? PoisonCore.RingBonusPoison : 0;
-                    int pz = env.enemyPoison + o.poison + ringAdd;
-                    if (pz >= PoisonCore.RingNeed) ws.extraDmg += PoisonCore.Damage(PoisonCore.Spend(pz), sg.poisonItems, sg.detonates, s.enemyDown, sg.enemyMaxHp, 100, sg.turn, pRel);
+                    int sp = PoisonCore.Spend(pz);
+                    ws.extraDmg += PoisonCore.Damage(sp, sg.poisonItems, detN, s.enemyDown, sg.enemyMaxHp, 100, sg.turn, pRel);
+                    pz -= sp;
+                    detN++;
+                }
+                if (sg.ring && o.attackHits.Count > 0 && pz >= PoisonCore.RingNeed)
+                {
+                    int sp = PoisonCore.Spend(pz);
+                    ws.extraDmg += PoisonCore.Damage(sp, sg.poisonItems, detN, s.enemyDown, sg.enemyMaxHp, 100, sg.turn, pRel);
                 }
             }
             // 〈灼線鞭〉〈焦げ導線〉〈溜め撃ちの誘導コイル〉(2026-11-26 再起動連動強化)
@@ -653,8 +665,9 @@ namespace AutoTest
             /// <summary>臨界の盤面の写し (Kw.HeatState・HeatCore.Forecast に渡す) / 【過熱】/ 前のターンに爆発した / 〈二度目の打金〉〈烈刃〉を持つ。</summary>
             public HeatCore.State heat;
             public bool overheated, burstLastTurn, secondStrike, fierceBlade;
-            /// <summary>〈蓋付きの毒指輪〉: このターンまだ起爆していない (持っていなければ false)。 / 毒の品の旗・この戦闘で起爆した回数 (起爆のダメージの式 PoisonCore.Damage が読む)。</summary>
-            public bool ring;
+            /// <summary>〈蓋付きの毒指輪〉〈劇毒の火薬庫〉: このターンまだ起爆していない (持っていなければ false)。 / 毒の品の旗・この戦闘で起爆した回数。</summary>
+            public bool ring, magazine;
+            public int magGiven;
             public PoisonItems poisonItems;
             public ChargeItems chargeItems;
             public bool scorchedWire, fourthCoil;
@@ -692,7 +705,9 @@ namespace AutoTest
                 v.turn = ctx.currentTurn;
                 v.bleedItems = BleedCore.ItemsOf(run);
                 v.pressed = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.CrimsonPress.TurnKey) == ctx.currentTurn;
-                v.ring = (v.poisonItems & PoisonItems.Ring) != 0 && (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.HollowPoisonRing.TurnKey) != ctx.currentTurn;
+                v.ring = (v.poisonItems & PoisonItems.Ring) != 0 && ctx.currentTurn <= PoisonCore.RingAssassinTurns && (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.HollowPoisonRing.TurnKey) != ctx.currentTurn;
+                v.magazine = (v.poisonItems & PoisonItems.Magazine) != 0 && (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.PoisonMagazine.TurnKey) != ctx.currentTurn;
+                v.magGiven = ItemSystem.PassiveSkills.Effects.Psn.TurnN(ctx, ItemSystem.PassiveSkills.Effects.PoisonMagazine.GivenKey);
                 v.jgMirror = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.MirrorBuckler.Id); v.jgBlade = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.KnightsTrump.Id);
                 v.jgStandard = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.BorderGuardStandard.Id); v.jgCatch = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.CatchBracer.Id);
                 v.jgSilent = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.SilentStance.Id); v.jgHero = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.HeroWill.Id) && ItemSystem.PassiveSkills.Effects.Rw.StrongFoe();

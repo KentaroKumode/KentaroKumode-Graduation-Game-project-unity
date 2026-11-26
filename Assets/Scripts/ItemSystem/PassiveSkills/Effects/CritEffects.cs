@@ -565,12 +565,12 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>渾身の鉄兜【集中】(賭け金 0・2026-11-27 パチンコ防御＆外し保険): 集中会心の撃の最終与ダメージ +(75 ＋ 使った【練気】× 25)%、 さらにシールド +(10 ＋ 使った【練気】× 3)。
+    /// <summary>渾身の鉄兜【集中】(賭け金 0・2026-11-27 パチンコ防御＆外し保険): 集中会心の撃の最終与ダメージ +(75 ＋ 使った【練気】× 25)%、 さらにシールド +(4 ＋ 使った【練気】× 1)。
     /// 集中が外れたときも、 そのターンのブロック +8 (保険)。</summary>
     public class HeftyPommel : IPassiveSkillEffect
     {
         public string SkillId => ItemIds.CritPommel;
-        public const int FinalPct = 75, FinalPctPerRenki = 25, CritShield = 10, CritShieldPerRenki = 3, MissBlock = 8;
+        public const int FinalPct = 75, FinalPctPerRenki = 25, CritShield = 4, CritShieldPerRenki = 1, MissBlock = 8;
         public static int FinalPctFor(int spent) => FinalPct + FinalPctPerRenki * spent;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalDamage, PassiveSkillTrigger.OnPostDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)

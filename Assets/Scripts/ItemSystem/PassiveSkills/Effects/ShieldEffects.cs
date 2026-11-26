@@ -237,10 +237,9 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (t == PassiveSkillTrigger.OnBattleStart) { ctx.shieldKeepOnBossDown = true; return; }
-            float mul = 1f + System.Math.Max(0, ctx.finalDamagePct) / 100f;
-            int e = (int)(Kw.EventAmount(ctx) * ReturnPct / 100f * mul);
+            int e = Kw.EventAmount(ctx) * ReturnPct / 100;
             Kw.DamageEnemy(ctx, e);
-            Rw.Log($"[重装兵の隠し刃] ジャスト防御 → 予告の {ReturnPct}% × {mul:F2} = {e} を返す");
+            Rw.Log($"[重装兵の隠し刃] ジャスト防御 → 予告の {ReturnPct}% = {e} を返す");
         }
     }
 

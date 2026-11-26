@@ -124,8 +124,11 @@ namespace AutoTest
             //   上限は状態に依らない: 戦闘 = 報酬 − 素の被ダメ (嵐は損を増やすだけ・死の項 ≧ 0)・休む = 0.3 回復・店 = 持ち得る金の全部を品へ・歩数 / 嵐の歩く損 / 恐れ ≧ 0。
             //   それに出口の代償 ≧ 0 (exit0 を足し戻す) と持ち越しの最大を足しても今の best を超えないなら、 その枝の下では best も最初の点も変わらない。
             //   上限の前提 (重み ≧ 0・学習の損と敗北率 ≧ 0 など) が崩れる設定では切らない。
+            float snowB = EffectiveWiringSkill == WiringSkill.Super ? navSnowball : 0f;
             float wHpB = MacroHpPer10[layer] * 10f * (layer == D6Layer ? navD6HpWeightMul : 1f);
-            float wItemB = MacroItem[layer], wGoldB = wItemB / MacroPrice[layer] * MacroGoldDiscount;
+            if (snowB > 0f && layer <= 2) wHpB *= Mathf.Clamp(1f - 0.30f * snowB, 0.45f, 1f);
+            float wItemB = MacroItem[layer] * (snowB > 0f ? 1f + 0.18f * Mathf.Max(0, 4 - layer) * snowB : 1f);
+            float wGoldB = wItemB / MacroPrice[layer] * MacroGoldDiscount;
             float vaneB = run.OwnsPassive(ItemIds.MacroVane) ? Mathf.Max(0f, GameManager.VaneGold) * wGoldB : 0f;
             bool canPrune = wHpB >= 0f && wGoldB >= 0f && navStormPointPrice == 0f && navFearMacro >= 0f && (storm == null || storm.BoundsNonNeg);
             var ub = new float[cands.Count];
@@ -146,12 +149,13 @@ namespace AutoTest
                     //   嵐は敗北率を下げない (倍率 ≧ 1・足す量は損の平均 ≧ 1e-6 の時だけ比が 1 以上) ので、 その前提が立つ点だけ数える
                     double lose = candLook[i].lose;
                     float deathMin = lose <= 1.0 && (storm == null || candLook[i].mean >= 1e-6) ? (float)lose * MacroDeathCost * deathMulB : 0f;
-                    ub[i] = ((elite ? 20f : 10f) * wGoldB + (elite ? CombatRewards.EliteDropRate * wItemB : 0f) - wHpB * (float)candLook[i].mean - deathMin) * w + vaneB * w - MacroStepCost;
+                    float snowAddB = snowB > 0f ? (elite ? 0.25f : 0.18f) * wItemB * snowB : 0f;
+                    ub[i] = ((elite ? 20f : 10f) * wGoldB + (elite ? CombatRewards.EliteDropRate * wItemB : 0f) + snowAddB - wHpB * (float)candLook[i].mean - deathMin) * w + vaneB * w - MacroStepCost;
                     continue;
                 }
                 switch (n.EffectiveType)
                 {
-                    case TileType.Rest: ub[i] = wHpB * 0.3f + 0.02f; break;
+                    case TileType.Rest: ub[i] = (MacroHpPer10[layer] * 10f * (layer == D6Layer ? navD6HpWeightMul : 1f)) * 0.3f + 0.02f + (snowB > 0f ? 0.25f * wItemB * snowB : 0f); break;
                     case TileType.Shop: isShop[i] = true; break;
                     case TileType.Treasure: ub[i] = wItemB * (CombatRewards.TreasurePassiveRate + 0.5f * (1f - CombatRewards.TreasurePassiveRate)); break;
                     case TileType.Exchange: ub[i] = 0.05f; break;
@@ -434,7 +438,7 @@ namespace AutoTest
             if (n == null) return 0f;
             float wHp = MacroHpPer10[layer] * 10f * (layer == D6Layer ? navD6HpWeightMul : 1f);   // [測定 2026-11-18] 第 4 層の HP の重みの口 (既定 1)
             float wItem = MacroItem[layer];
-            float snow = navSnowball;
+            float snow = EffectiveWiringSkill == WiringSkill.Super ? navSnowball : 0f;
             float snowMul = 1f;
             if (snow > 0f)
             {
