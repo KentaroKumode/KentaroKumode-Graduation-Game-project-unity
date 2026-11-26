@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 using GameLoop;
@@ -75,6 +75,33 @@ namespace AutoTest
         private static int DeckEstTurns(in OptimalTurnState s, int k)
             => Mathf.Clamp(Mathf.CeilToInt(s.enemyHp / DeckPerTurnDamage(in s, k)), 1, DeckTurnsCap);
 
+        /// <summary>[2026-11-26] この挿し方で品が足す混乱の見込み (撃ごとの品 × 攻撃の撃の数・1 ターン 1 回の品)。 条件は本体の品と同じ物を読む。
+        /// shortcut: 【起爆】(+3)・臨界の爆発 (+2) は撃の中で起きるかが決まるので数えない。 起爆・爆発の軸で溢れが目立ったら足す。</summary>
+        private static int ItemGaugeEstimate(in OptimalTurnState s, TerminalOutcome o, in WiredSums ws, ItemSystem.PassiveSkills.CombatContext ctx)
+        {
+            var ids = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.ActivePlayerSkillIds;
+            if (ids == null || ctx == null || o == null) return 0;
+            int hits = o.attackHits.Count, perHit = 0, once = 0;
+            if (hits <= 0) return 0;
+            for (int lv = 0; lv < ItemSystem.PassiveSkills.Effects.Fervor.Ids.Length; lv++)
+                if (Has(ids, ItemSystem.PassiveSkills.Effects.Fervor.Ids[lv])) perHit += ItemSystem.PassiveSkills.Effects.Fervor.NotchPct[lv];
+            if (o.blockDice == 0 && ctx.consShield > 0)
+                foreach (var id in ItemSystem.PassiveSkills.Effects.ShieldBash.Ids) if (Has(ids, id)) { perHit += ItemSystem.PassiveSkills.Effects.ShieldBash.NotchPct; break; }
+            if (ctx.IsOvercharged() && Has(ids, ItemSystem.PassiveSkills.Effects.CatfishSpine.Id)) perHit += ItemSystem.PassiveSkills.Effects.CatfishSpine.Gauge;
+            if (ctx.enemyBleedStacks >= ItemSystem.PassiveSkills.Effects.ArmorStitchNeedle.Need && Has(ids, ItemSystem.PassiveSkills.Effects.ArmorStitchNeedle.Id)) perHit += ItemSystem.PassiveSkills.Effects.ArmorStitchNeedle.Gauge;
+            if (o.firedNonBasic >= TerminalCards.SwitchboardNeed && Has(ids, GameLoop.ItemIds.DeckSwitchboard)) perHit += ItemSystem.PassiveSkills.Effects.PrimedSwitchboard.Gauge;
+            if (Has(ids, GameLoop.ItemIds.RoleChipped) && ItemSystem.PassiveSkills.Effects.RoleFx.FaceRoleThisTurn(ctx, TerminalCards.ChippedFaces)) perHit += ItemSystem.PassiveSkills.Effects.ChippedEyeReading.Gauge;
+            if (hits == 1 && s.focusCount >= CritCore.FocusNeedCount && Has(ids, GameLoop.ItemIds.CritNick)) once += ItemSystem.PassiveSkills.Effects.NickAppraisal.Gauge;
+            if (hits == 1 && Has(ids, ItemSystem.PassiveSkills.Effects.GaryoTensei.Id)
+                && CombatRules.GaryoPct(ws.atkFaceMax, ws.rolledMax, s.dieMaxFace) >= ItemSystem.PassiveSkills.Effects.GaryoTensei.FinalPct) once += ItemSystem.PassiveSkills.Effects.GaryoTensei.NotchPct;
+            if (ctx.enemyBleedStacks >= BleedCore.PressNeed && Has(ids, GameLoop.ItemIds.BleedPress)) once += BleedCore.PressGauge;
+            if ((int)ctx.GetAccumulated(ItemSystem.PassiveSkills.CombatContext.ChargeSpentThisTurnKey) + o.chargeSpend >= ItemSystem.PassiveSkills.Effects.LightningStake.Need
+                && Has(ids, ItemSystem.PassiveSkills.Effects.LightningStake.Id)) once += ItemSystem.PassiveSkills.Effects.LightningStake.Gauge;
+            return perHit * hits + once;
+        }
+
+        private static bool Has(IReadOnlyList<string> ids, string id) { for (int i = 0; i < ids.Count; i++) if (ids[i] == id) return true; return false; }
+
         /// <summary>端子の結果を、 効用の入力 (端子ごとの合計と個数 + 追加の効果 + 先の得) へ詰め直す。 盤面は読まない。</summary>
         private WiredSums DeckSums(in OptimalTurnState s, int[] rolls, List<string> board, TerminalOutcome o,
                                    TerminalBattleState before, TerminalBattleState after, in TerminalEnv env, float counterPerFire)
@@ -90,6 +117,12 @@ namespace AutoTest
                 if (o.kindOfDie[i] == DiceTerminal.Attack && rolls[i] > ws.atkFaceMax) ws.atkFaceMax = rolls[i];   // 〈鷹匠の革手袋〉(本体は MutualKeys.AttackDiceMax)
                 if (o.kindOfDie[i] != DiceTerminal.Attack && o.kindOfDie[i] != DiceTerminal.None) ws.otherDice += rolls[i];   // 竜閃〈無我無心〉
                 if (rolls[i] > ws.rolledMax) ws.rolledMax = rolls[i];                                                          // 竜閃〈画竜点睛〉
+            }
+            // [2026-11-26] 混乱ゲージ: 攻撃に挿した面の数字 + 品の混乱 +N (説明文に出ている・配線の時点で条件が分かる分)
+            if (s.downGaugeMax > 0)
+            {
+                var gctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
+                ws.gaugePips = CombatManager.GaugePips(o, CombatManager.NativeDice(gctx, rolls)) + ItemGaugeEstimate(in s, o, in ws, gctx);
             }
             //   武器の配線の後のブロック (2026-11-22): 竜閃〈無我無心〉攻撃の端子 1 枚なら防御の出目 1 個 +3 / 短剣〈連刃〉追撃するターン +4。
             //   shortcut: 本体は品のブロック (遺物 % の後) に足すが、 ここは端子のブロックに足す (遺物・大罪の % がずれる)
@@ -457,6 +490,7 @@ namespace AutoTest
             }
             if (mayMistake) NoteDeckPolicyDiag(in ev, k, board, deck, cands, us, touts, best, bestPre);   // [計装 #106] 実際の配線の判断だけ
             if (mayMistake) NoteDownBreakDiag(in ev, tele, k, outs, best);                                // [診断 2026-11-14] 目盛りの割り時 (方策に関係なく数える)
+            if (mayMistake) NoteInstantDownDiag(in ev, tele, k, outs, us, best);                          // [診断 2026-11-26] Instant の大ダウンの取り逃し
             return cands[best];
         }
 
@@ -624,6 +658,8 @@ namespace AutoTest
             /// どれかを持っている時だけ <see cref="jgCtx"/> を入れる (挿し方ごとの見込みはこれが null なら飛ばす)。</summary>
             public bool jgMirror, jgBlade, jgStandard, jgCatch, jgSilent, jgHero;
             public ItemSystem.PassiveSkills.CombatContext jgCtx;
+            public ItemSystem.PassiveSkills.CombatContext critCtx;
+            public RunState critRun;
 
             public static ItemSight Of(RunState run, ItemSystem.PassiveSkills.CombatContext ctx)
             {
@@ -652,6 +688,7 @@ namespace AutoTest
                 v.jgStandard = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.BorderGuardStandard.Id); v.jgCatch = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.CatchBracer.Id);
                 v.jgSilent = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.SilentStance.Id); v.jgHero = run.OwnsPassive(ItemSystem.PassiveSkills.Effects.HeroWill.Id) && ItemSystem.PassiveSkills.Effects.Rw.StrongFoe();
                 if (v.jgMirror || v.jgBlade || v.jgStandard || v.jgCatch || v.jgSilent || v.jgHero) v.jgCtx = ctx;
+                if (CritCore.CritRelicCount(run) > 0) { v.critCtx = ctx; v.critRun = run; }
                 return v;
             }
         }
@@ -767,7 +804,7 @@ namespace AutoTest
         private TerminalKind? RecallPreferFor(MutualTurnTelegraph tele)
         {
             if (EffectiveHandKeepPolicy != HandKeepPolicy.Planned || !TerminalCards.HandCarry) return null;
-            if (tele.downPending > 0) return TerminalKind.Attack;
+            if (tele.downPending > 0 && tele.downNextKind != (int)DownKind.Resisted) return TerminalKind.Attack;   // 溜めで無効になるダウンは来ない (2026-11-26)
             if (!tele.enemyDown && tele.turnsToHeavy == 1) return TerminalKind.Block;
             return null;
         }
@@ -883,8 +920,14 @@ namespace AutoTest
 
             int k = rolls.Length;
             // 2. 次のターンの当て (本体と同じ関数で、 選んだ挿し方の後に次のターンがダウンか)
-            bool downNext = st.downNotches != null
-                && DownForecast(in st, st.enemyHp, outc.mainDmg, Math.Max(0, outc.effDmg)).nextDown;
+            // 割った瞬間に効く規則 (2026-11-26): 次のターンが大ダウンなのは、 この挿し方で大技を止めて割る時か、 待っている大ダウンがある時だけ
+            bool downNext = st.downGaugeMax > 0   // [2026-11-26] 混乱ゲージ: 大技のターンにこの挿し方で満たす時だけ
+                ? !st.enemyDown && st.downInstant && st.downBreakKindNow == (int)DownKind.Big && st.downGauge + outc.gaugePips >= st.downGaugeMax
+                : st.downNotches != null
+                && (st.downInstant
+                    ? (st.downPendingNow > 0 && !st.downPendingHeadWeak)
+                      || (!st.enemyDown && st.downBreakKindNow == (int)DownKind.Big && DownForecast(in st, st.enemyHp, outc.mainDmg, Math.Max(0, outc.effDmg)).fullAdded > 0)
+                    : DownForecast(in st, st.enemyHp, outc.mainDmg, Math.Max(0, outc.effDmg)).nextDown);
             bool heavyNext = !downNext && !tele.enemyDown && tele.turnsToHeavy == 1;
             int permAtk = 0, permBlk = 0;
             for (int s = 0; s < perm && s < board.Count; s++)
@@ -976,6 +1019,8 @@ namespace AutoTest
             var st = ev.st;
             // 規則は本体と同じ口 (GameHooks.DownCancel)。 旧い規則 (Always) は 2e76c46 の式のまま (条件も同じ)
             bool oldRule = GameLoop.GameHooks.DownCancel == DownCancelRule.Always;
+            // 割る時を選ぶ規則 (Timed・2026-11-26): 待つ得は配線の効用そのもの (チャージの前に割ると負・チャージで割ると山場を消す) に入ったので、 ここでは足さない
+            if (BossDown.IsTimedFamily(GameLoop.GameHooks.DownCancel)) return false;
             if (st.downNotches == null || st.enemyDown || (oldRule && tele.turnsToHeavy != 2)) return false;
             var cm = CombatManager.Instance; var enemy = cm?.CurrentEnemy;
             var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
@@ -1100,6 +1145,85 @@ namespace AutoTest
                  + $" / 待つ手が無い理由: 次が大技か大技なし {a[8]}・何もしなくても次はダウン {a[9]}・目盛りの手前で止まって次に割れる手が無い {a[10]}"
                  + $" / 見込みの答え合わせ: 割ると見込んだ手 → 次のターンにダウン {a[12]}/{a[11]} ({P(a[12], a[11])})"
                  + $"・割らないと見込んだ手 → それでもダウン {a[14]}/{a[13]} ({P(a[14], a[13])}・毒・出血・削り・会心のぶれ)";
+        }
+
+        // =====================================================================
+        //  [診断 2026-11-26] Instant: 大技のターンに割れたか / 大技の手前で割って捨てたのを手加減で残せたか (判断は変えない・乱数を引かない)
+        //  割るかの見込みは BOT の見積もり (会心のぶれ・毒などは入らない)。 大技の周期を持つボスで、 ダウン中でない判断だけ数える。
+        // =====================================================================
+        /// <summary>[0] 大技のターン (今割れば大ダウン) の判断 / [1] そのうち割る手があった / [2] 割る手を選んだ / [3] 撃破する手を選んだ / [4] 大技のターンに目盛りが残っていない (割り切り済み) /
+        /// [5] 大技の 1〜2 ターン前の判断 (目盛りあり) / [6] そのうち割る手を選んだ (チャージで無効 or よろめき) / [7] そのうち割らない手もあった /
+        /// [8] そのうち割らずに、 大技のターンまでに届く位置 (目盛りまで toH × 1 ターンの与ダメ以内) に残す手もあった /
+        /// [9] 抑える量の合計 (選んだ主攻撃 − 目盛りまで + 1) / [10..13] 抑える量の分布 ≤5 / ≤15 / ≤30 / >30 / [14] 割らない最良の手との効用の差の合計 ×100 (HP 相当)。 ランをまたいで累計。</summary>
+        private static readonly long[] _instDownDiag = new long[15];
+        public static void ResetInstantDownDiag() => System.Array.Clear(_instDownDiag, 0, _instDownDiag.Length);
+        /// <summary>生の数 (ワーカーの inst_down_diag.txt に出す・腕をまたいで足す用)。</summary>
+        public static string InstantDownDiagRaw() => "inst_down_diag=" + string.Join(",", _instDownDiag);
+
+        private void NoteInstantDownDiag(in DeckEval ev, MutualTurnTelegraph tele, int k, OptimalTurnOutcome[] outs, float[] us, int best)
+        {
+            if (GameLoop.GameHooks.DownCancel != DownCancelRule.Instant) return;
+            var st = ev.st;
+            var enemy = CombatManager.Instance?.CurrentEnemy;
+            bool gm = st.downGaugeMax > 0;   // [2026-11-26] 混乱ゲージ (目盛りの代わり・「割る」= 満たす・抑える量 = 溢れた量)
+            if ((st.downNotches == null && !gm) || st.enemyDown || enemy == null || enemy.heavyPeriod <= 0) return;
+            int toH = tele.turnsToHeavy;
+            if (toH < 0 || toH > 2) return;
+            int hp = st.enemyHp, n = outs.Length;
+            int notch = gm ? 0 : BossDown.NextNotchHp(st.downNotches, st.downMaxHp, st.downBroken);
+            if (toH == 0)
+            {
+                if (tele.downBreakNowKind != (int)DownKind.Big && notch >= 0) return;   // 大技のターンでも今割って大ダウンにならない敵
+                _instDownDiag[0]++;
+                if (notch < 0) { _instDownDiag[4]++; return; }
+                if (outs[best].killsNow) { _instDownDiag[3]++; return; }
+            }
+            else
+            {
+                if (notch < 0) return;
+                _instDownDiag[5]++;
+            }
+            var breaks = new bool[n]; bool any = false;
+            for (int i = 0; i < n; i++)
+            {
+                breaks[i] = !outs[i].killsNow && (gm ? st.downGauge + outs[i].gaugePips >= st.downGaugeMax
+                                                     : DownForecast(in st, hp, outs[i].mainDmg, Math.Min(outs[i].effDmg, hp)).fullAdded > 0);
+                any |= breaks[i];
+            }
+            if (toH == 0)
+            {
+                if (any) _instDownDiag[1]++;
+                if (breaks[best]) _instDownDiag[2]++;
+                return;
+            }
+            if (!breaks[best] || outs[best].killsNow) return;
+            _instDownDiag[6]++;
+            float perTurn = gm ? st.downGaugePerTurn : DeckPerTurnDamage(in st, k);
+            bool hold = false, holdReach = false; float holdU = float.NegativeInfinity;
+            for (int i = 0; i < n; i++)
+            {
+                if (breaks[i] || outs[i].killsNow) continue;
+                hold = true; holdU = Math.Max(holdU, us[i]);
+                int gapAfter = gm ? st.downGaugeMax - (st.downGauge + outs[i].gaugePips) : hp - Math.Min(outs[i].effDmg, hp) - notch;
+                if (gapAfter > 0 && gapAfter <= toH * perTurn) holdReach = true;
+            }
+            if (hold) { _instDownDiag[7]++; _instDownDiag[14] += (long)Math.Round(Math.Max(0f, Math.Min(us[best] - holdU, 1e4f)) * 100f); }
+            if (holdReach) _instDownDiag[8]++;
+            int over = Math.Max(1, gm ? st.downGauge + outs[best].gaugePips - st.downGaugeMax + 1 : outs[best].mainDmg - (hp - notch) + 1);
+            _instDownDiag[9] += over;
+            _instDownDiag[over <= 5 ? 10 : over <= 15 ? 11 : over <= 30 ? 12 : 13]++;
+        }
+
+        /// <summary>[診断 2026-11-26] サマリーに出す行 (判断が無ければ空)。</summary>
+        public static string InstantDownDiagLine()
+        {
+            var a = _instDownDiag;
+            if (a[0] == 0 && a[5] == 0) return "";
+            string P(long x, long of) => of > 0 ? $"{100.0 * x / of:0.0}%" : "-";
+            return $"[大ダウンの取り逃し] 大技のターン {a[0]} 回: 割る手があった {a[1]} ({P(a[1], a[0])})・割った {a[2]} ({P(a[2], a[0])})・撃破 {a[3]}・目盛りが残っていない {a[4]} ({P(a[4], a[0])})"
+                 + $" / 大技の 1〜2 ターン前 {a[5]} 回: 割った {a[6]} ({P(a[6], a[5])})・うち割らない手もあった {a[7]} ({P(a[7], a[6])})・うち大技までに届く位置に残せた {a[8]} ({P(a[8], a[6])})"
+                 + $" / 抑える量 平均 {(a[6] > 0 ? (double)a[9] / a[6] : 0):0.0} (≤5 {a[10]}・≤15 {a[11]}・≤30 {a[12]}・>30 {a[13]})"
+                 + $" / 割らない最良の手との効用の差 平均 {(a[7] > 0 ? a[14] / 100.0 / a[7] : 0):0.00} (HP 相当)";
         }
 
         /// <summary>[#141 計装] サマリーに出す行 (判断が無ければ空)。</summary>

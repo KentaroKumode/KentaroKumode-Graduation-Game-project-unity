@@ -46,6 +46,10 @@ namespace AutoTest
         public bool hpLedger = true;
         /// <summary>hpLedger の「先のターンの被ダメの見込み」に掛ける割合 (1 = 先も全部攻撃して全部受ける前提)。 既定 0.2 (2026-11-10)。</summary>
         public float ledgerFutureShare = 0.2f;
+        /// <summary>LedgerLoss の残りターン数を CeilToInt + 上限 12 の階段ではなく連続値で計算する。 <b>2026-11-26 に既定を ON へ畳んだ</b> (作者の決定)。
+        /// 階段だと与ダメが少し増えても残りターン数が同じ段に留まり、 先の被ダメの見込みが変わらない (次のターンの火力差が 0 点に潰れ、 2 ターン先読みも効かなかった)。
+        /// 連続化で熟練者の実力が +3.41 pp (今の数値)〜+4.28 pp (HP 2 倍) 上がった。 false で畳む前の階段 (〈吸血〉の敵は今も階段のまま)。</summary>
+        public bool ledgerContinuous = true;
 
         /// <summary>E8: 2 ターン先読み。 各配線 w の値 = 今ターンの効用 U_now(w) + 次ターンの最良効用の期待値 E[max U_next]。
         /// 次ターンの盤面は w でこのターンを解いた後 (敵 HP・自 HP・シールド・不滅の刃の連続数・堅守の準備・敵の防御・ターン+1・次ターンの敵攻撃) で、

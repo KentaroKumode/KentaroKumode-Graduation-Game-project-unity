@@ -15,13 +15,13 @@ namespace CombatSystem
     /// </summary>
     public static class CritCore
     {
-        /// <summary>超過会心率 1 (= 100%) あたりの会心倍率 (1% につき +0.015・answer9: 旧 +0.01) / 〈寸鉄〉の倍 (2026-11-26 安定化: 2.0 → 1.5)。</summary>
-        public const float ExcessPerRate = 1.5f, SuntetsuExcessMul = 1.5f;
-        /// <summary>【練気】1 つあたりの、 会心した撃の会心倍率 / 【練気】の上限 (2026-11-26: 無制限 → 10)。</summary>
+        /// <summary>超過会心率 1 (= 100%) あたりの会心倍率 (1% につき +0.015・全ビルド共通フラット)。</summary>
+        public const float ExcessPerRate = 1.5f, SuntetsuExcessMul = 1f;
+        /// <summary>【練気】1 つあたりの、 会心した撃の会心倍率 (全ビルド共通 +0.06) と基本上限 (12・〈寸鉄〉で +6)。</summary>
         public const float RenkiMulPer = 0.06f;
-        public const int RenkiCap = 10;
+        public const int RenkiCap = 12;
 
-        /// <summary>超過会心率で足す会心倍率 (<paramref name="critAdd"/> = 合算した会心率・通常は 1 = 100%、 【集中】は上限 0.80 を超えた分も倍率に変換)。</summary>
+        /// <summary>超過会心率で足す会心倍率 (<paramref name="critAdd"/> = 合算した会心率・通常は 1 = 100%、 【集中】は上限 0.80 を超えた分もすべて同じレートで変換)。</summary>
         public static float ExcessMul(float critAdd, bool suntetsu, bool focused = false)
         {
             float cap = focused ? FocusMaxRate : 1f;

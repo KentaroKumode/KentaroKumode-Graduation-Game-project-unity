@@ -1,4 +1,4 @@
-using CombatSystem;
+﻿using CombatSystem;
 using GameLoop;
 using ItemSystem.PassiveSkills.Keywords;
 
@@ -25,18 +25,20 @@ namespace ItemSystem.PassiveSkills.Effects
 
         public static int Count(CombatContext ctx, string key) => (int)ctx.GetAccumulated(key);
 
-        /// <summary>今の【練気】(上限 <see cref="CritCore.RenkiCap"/>)。</summary>
-        public static int Renki(CombatContext ctx) => ctx == null ? 0 : System.Math.Min(CritCore.RenkiCap, Count(ctx, RenkiKey));
+        /// <summary>今の【練気】の上限 (基本 12・〈寸鉄〉所持で 18)。</summary>
+        public static int CapNow() => CritCore.RenkiCap + (Rw.Run != null && Rw.Run.OwnsPassive(ItemIds.CritSuntetsu) ? Suntetsu.CapAdd : 0);
+        /// <summary>今の【練気】。</summary>
+        public static int Renki(CombatContext ctx) => ctx == null ? 0 : System.Math.Min(CapNow(), Count(ctx, RenkiKey));
         public static void AddRenki(CombatContext ctx, int n)
         {
-            if (ctx != null && n != 0) ctx.accumulatedValues[RenkiKey] = System.Math.Min(CritCore.RenkiCap, System.Math.Max(0, Renki(ctx) + n));
+            if (ctx != null && n != 0) ctx.accumulatedValues[RenkiKey] = System.Math.Min(CapNow(), System.Math.Max(0, Renki(ctx) + n));
         }
 
-        /// <summary>プレイヤーの撃が会心した時の【練気】(PassiveSkillManager.ProcessDamage が OnCriticalDamage の前に呼ぶ)。 +1 (上限 10) して、 集中の撃なら半分 (切り上げ) を使う。 戻り値 = 使った量。</summary>
+        /// <summary>プレイヤーの撃が会心した時の【練気】(PassiveSkillManager.ProcessDamage が OnCriticalDamage の前に呼ぶ)。 +1 して、 集中の撃なら半分 (切り上げ) を使う。 戻り値 = 使った量。</summary>
         public static int GainOnCrit(CombatContext ctx)
         {
             if (ctx == null || CritCore.CritRelicCount(Rw.Run) <= 0) return 0;   // 会心の軸の秘宝を持たない戦闘では溜まらない (answer9)
-            int after = System.Math.Min(CritCore.RenkiCap, Renki(ctx) + 1);
+            int after = System.Math.Min(CapNow(), Renki(ctx) + 1);
             ctx.accumulatedValues[RenkiKey] = after;
             ctx.accumulatedValues[HitRenkiKey] = after;
             if (Count(ctx, RenkiTurnKey) != ctx.currentTurn) { ctx.accumulatedValues[RenkiTurnKey] = ctx.currentTurn; ctx.accumulatedValues[RenkiTurnMaxKey] = after; }
@@ -168,16 +170,16 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>測量師の片眼鏡 (2026-11-26 開幕倍率調整): 前の戦闘からマップを 1 歩進むごとに蓄積する (歩数は戦闘で 0 に戻る)。 この戦闘の間ずっと、 1 歩につき会心率 ×(1 + 0.05)・会心倍率 +0.015 (最大 +0.30)。</summary>
+    /// <summary>測量師の片眼鏡 (2026-11-26 会心率純化): 前の戦闘からマップを 1 歩進むごとに蓄積する (歩数は戦闘で 0 に戻る)。 この戦闘の間ずっと、 1 歩につき会心率 ×(1 + 0.05) (倍率加算なし)。</summary>
     public class SurveyorMonocle : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => ItemIds.CritSurveyor;
-        public const float RateMulPerStep = 0.05f, MulPerStep = 0.015f, MaxMul = 0.30f;
+        public const float RateMulPerStep = 0.05f, MulPerStep = 0f, MaxMul = 0f;
         /// <summary>[persistent] 戦闘の始めの歩数。</summary>
         private const string Key = "crit.surveyor.steps";
         public static int Steps(CombatContext ctx) => Rw.Count(ctx, Key);
         public static float RateMulNow(CombatContext ctx) => RateMulPerStep * Steps(ctx);
-        public static float MulNow(CombatContext ctx) => System.Math.Min(MaxMul, MulPerStep * Steps(ctx));
+        public static float MulNow(CombatContext ctx) => 0f;
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Steps(ctx));
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnCriticalCheck };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
@@ -185,7 +187,6 @@ namespace ItemSystem.PassiveSkills.Effects
             if (t == PassiveSkillTrigger.OnBattleStart) { ctx.accumulatedValues[Key] = System.Math.Max(0, Rw.Steps); return; }
             if (!ctx.IsRealHit) return;
             ctx.hitCritRateMulAdd += RateMulNow(ctx);   // 撃ごとに戻る (CombatManager の撃の輪)
-            ctx.criticalMultiplier += MulNow(ctx);
         }
     }
 
@@ -197,11 +198,11 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.critToDamage = true;
     }
 
-    /// <summary>脈打ちの測り針 (仮名・2026-11-23 新): 直前の撃が会心だったとき、 次の 1 撃の会心率 +20%・会心倍率 +0.25 (ターンをまたいで持ち越す・会心しなかった撃で消える・answer9: 旧 +15%)。</summary>
+    /// <summary>脈打ちの測り針 (2026-11-26 会心率寄りに調整): 直前の撃が会心だったとき、 次の 1 撃の会心率 +22%・会心倍率 +0.12 (ターンをまたいで持ち越す・会心しなかった撃で消える)。</summary>
     public class PulseNeedle : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => ItemIds.CritPulse;
-        public const float Rate = 0.20f, Mul = 0.25f;
+        public const float Rate = 0.22f, Mul = 0.12f;
         /// <summary>[persistent] 直前の本物の撃が会心だった (1 / 0)。</summary>
         public const string Key = "crit.pulse";
         public static bool Primed(CombatContext ctx) => ctx != null && ctx.GetAccumulated(Key) > 0f;
@@ -242,8 +243,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>一点読みの片眼【規則】: 会心率 +22%・会心倍率 +(0.25 + 今の【練気】× 0.08) (最大 +0.89・2026-11-26 練気連動へ変更)。 代わりに会心しなかった撃の与ダメージ −45%。
-    /// 代価は PassiveSkillManager の会心判定の後で掛ける (<see cref="ApplyCost"/> が <see cref="NonCritCutKey"/> を立てる)。</summary>
+    /// <summary>一点読みの片眼【規則】: 会心率 +22%・会心倍率 +(0.25 + 今の【練気】× 0.08) (最大 +0.89)。 代わりに会心しなかった撃の与ダメージ −45%。</summary>
     public class PinpointEye : IPassiveSkillEffect
     {
         public string SkillId => ItemIds.CritPinpoint;
@@ -298,16 +298,14 @@ namespace ItemSystem.PassiveSkills.Effects
 
     // ===================== 分岐 A〈練気の維持〉9 品 =====================
 
-    /// <summary>余韻の鈴: 前のターンに出した会心 1 回につき、 このターンの会心率 +10%・ブロック +4 (上限なし・answer9: 旧 2 回目から +12%・+3)。</summary>
+    /// <summary>余韻の鈴: 前のターンに出した会心 1 回につき、 このターンの会心率 +10%・ブロック +4。</summary>
     public class LingeringBell : IPassiveSkillEffect, IRelicDisplay
     {
         public const string Id = "余韻の鈴";
         public string SkillId => Id;
         public const float RatePer = 0.10f;
         public const int BlockPer = 4, MinLastCrits = 1;
-        /// <summary>前のターンの会心のうち数える回数 (2 回目から)。</summary>
         public static int StacksNow(CombatContext ctx) => ctx == null ? 0 : System.Math.Max(0, Crit.LastTurnCount(ctx) - (MinLastCrits - 1));
-        /// <summary>このターンに足す会心率・ブロック (配線の前に分かる・BOT の見積もりも読む)。</summary>
         public static float RateNow(CombatContext ctx) => RatePer * StacksNow(ctx);
         public static int BlockNow(CombatContext ctx) => BlockPer * StacksNow(ctx);
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(StacksNow(ctx));
@@ -321,7 +319,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>見切りの目印 (仮名・2026-11-23 新): 同じターンに攻撃の端子を 2 枚以上発動したとき、 2 撃目以降の撃の会心率 +14% (【練気】3 以上なら +20%・answer9: 旧 +12% / 4 以上 +16%)。</summary>
+    /// <summary>見切りの目印: 同じターンに攻撃の端子を 2 枚以上発動したとき、 2 撃目以降の撃の会心率 +14% (【練気】3 以上なら +20%)。</summary>
     public class ReadMark : IPassiveSkillEffect
     {
         public string SkillId => ItemIds.CritReadMark;
@@ -336,7 +334,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>研ぎ師の見立て書 (2026-11-26 HP回復撤廃・堅守維持): 会心を出すたび、 そのターンのブロック +2。 同じターンに 2 回以上会心を出したら、 さらにブロック +6 (1 ターン 1 回)。</summary>
+    /// <summary>研ぎ師の見立て書: 会心を出すたび、 そのターンのブロック +2。 同じターンに 2 回以上会心を出したら、 さらにブロック +6 (1 ターン 1 回)。</summary>
     public class WhetAppraisal : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "研ぎ師の見立て書";
@@ -356,42 +354,46 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>斬り重ねの鞘 (2026-11-26 安定化調整): 会心を出すたび、 会心倍率 +0.08 が積もる (最大 8 層 = +0.64)。 ターン開始時、 積もった分の 1/2 を失う (前のターンに会心が 3 回以上出ていたか、 【練気】4 以上なら失わない)。</summary>
+    /// <summary>斬り重ねの鞘 (2026-11-26 ターン終了蓄積化): 会心を出したターン終了時、 会心倍率 +0.08・防御 +1 が 1 層蓄積する (最大 6 層)。
+    /// 会心を出さなかった次のターン開始時に蓄積の半分 (切り上げ) を失うが、 【練気】5 以上なら失わない。</summary>
     public class LayeredScabbard : IPassiveSkillEffect, IRelicDisplay
     {
         public const string Id = "斬り重ねの鞘";
         public string SkillId => Id;
         public const float MulPer = 0.08f;
-        public const int KeepAt = 3, KeepRenki = 4, MaxStacks = 8;
+        public const int DefPer = 1, MaxStacks = 6, KeepRenki = 5;
         private const string Key = "crit.scabbard";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Rw.Count(ctx, Key));
         public static float MulNow(CombatContext ctx) => MulPer * System.Math.Min(MaxStacks, Rw.Count(ctx, Key));
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalDamage, PassiveSkillTrigger.OnTurnStart, PassiveSkillTrigger.OnCriticalCheck };
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart, PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnTurnEnd, PassiveSkillTrigger.OnCriticalCheck };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            int n = Rw.Count(ctx, Key);
+            int n = System.Math.Min(MaxStacks, Rw.Count(ctx, Key));
             switch (t)
             {
-                case PassiveSkillTrigger.OnCriticalDamage:
-                    if (n < MaxStacks) ctx.accumulatedValues[Key] = n + 1;
-                    break;
                 case PassiveSkillTrigger.OnTurnStart:
-                    bool keep = (Crit.Count(ctx, Crit.LastKey) == ctx.currentTurn - 1 && Crit.Count(ctx, Crit.TurnNKey) >= KeepAt)   // 前のターンの会心の数 (このターンはまだ数えていない)
-                             || Crit.Renki(ctx) >= KeepRenki;
-                    if (!keep) ctx.accumulatedValues[Key] = n - (n + 1) / 2;   // 1/2 を失う (端数は切り上げて減らす)
+                    if (ctx.currentTurn > 1 && Crit.Count(ctx, Crit.LastKey) != ctx.currentTurn - 1 && Crit.Renki(ctx) < KeepRenki && n > 0)
+                        ctx.accumulatedValues[Key] = n - (n + 1) / 2;
                     break;
-                default: ctx.criticalMultiplier += MulPer * System.Math.Min(MaxStacks, n); break;
+                case PassiveSkillTrigger.OnPostRoll:
+                    if (n > 0) ctx.playerDefense += DefPer * n;
+                    break;
+                case PassiveSkillTrigger.OnTurnEnd:
+                    if (Crit.ThisTurn(ctx) > 0 && n < MaxStacks) ctx.accumulatedValues[Key] = n + 1;
+                    break;
+                default:
+                    if (n > 0) ctx.criticalMultiplier += MulPer * n;
+                    break;
             }
         }
     }
 
-    /// <summary>重ね斬りの型 (2026-11-26 安定攻防シフト): 同じターンに会心が 2 撃続いたとき、 3 撃目以降の撃は会心率 +25%・会心倍率 +0.30・その撃が会心したらブロック +8。</summary>
+    /// <summary>重ね斬りの型 (2026-11-26 練気比例化): 同じターンに会心が 2 撃続いたとき、 3 撃目以降の撃は会心率 +25%・会心倍率 +(今の【練気】× 0.03)・その撃が会心したらブロック +6。</summary>
     public class LayeredCutForm : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "重ね斬りの型";
-        public const float BonusRate = 0.25f, BonusMul = 0.30f;
-        public const int Block = 8;
-        /// <summary>[perTurn 相当] 続いた会心の数 / その数を数えたターンの番号 (ターンが変わったら 0 から)。</summary>
+        public const float BonusRate = 0.25f, MulPerRenki = 0.03f;
+        public const int Block = 6;
         private const string StreakKey = "crit.layeredCut.streak", TurnKey = "crit.layeredCut.turn";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(Streak(ctx) >= 2);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalCheck, PassiveSkillTrigger.OnPostDealDamage };
@@ -400,7 +402,7 @@ namespace ItemSystem.PassiveSkills.Effects
             if (!ctx.IsRealHit) return;
             if (t == PassiveSkillTrigger.OnCriticalCheck)
             {
-                if (Streak(ctx) >= 2) { ctx.critRatePctAdd += BonusRate; ctx.criticalMultiplier += BonusMul; }   // 会心率・会心倍率は撃ごとに戻るので、 この撃だけに乗る
+                if (Streak(ctx) >= 2) { ctx.critRatePctAdd += BonusRate; ctx.criticalMultiplier += MulPerRenki * Crit.Renki(ctx); }
                 return;
             }
             bool crit = ctx.isCritical && ctx.finalDamage > 0;
@@ -413,11 +415,11 @@ namespace ItemSystem.PassiveSkills.Effects
             => Rw.Count(ctx, TurnKey) == ctx.currentTurn ? Rw.Count(ctx, StreakKey) : 0;
     }
 
-    /// <summary>連なる閃き (2026-11-26 安定攻防シフト): 前のターンに会心を 1 回以上出していて、 このターンも会心を出したとき、 ブロック +6 (1 ターン 1 回)・その会心の撃とこのターンの後の撃の最終与ダメージ +12% (【練気】4 以上なら +20%)。</summary>
+    /// <summary>連なる閃き (2026-11-26 練気比例化): 前のターンに会心を 1 回以上出していて、 このターンも会心を出したとき、 ブロック +6 (1 ターン 1 回)・その会心の撃と以降の撃の最終与ダメージ +(今の【練気】× 2)% (最大 +36%)。</summary>
     public class ChainedFlash : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "連なる閃き";
-        public const int FinalPct = 12, FinalPctHigh = 20, Block = 6, Need = 1, HighRenki = 4;
+        public const int PctPerRenki = 2, MaxPct = 36, Block = 6, Need = 1;
         private const string BlockTurnKey = "crit.chainedFlash.blk";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(Crit.LastTurnCount(ctx) >= Need && Crit.ThisTurn(ctx) > 0);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage, PassiveSkillTrigger.OnCriticalDamage };
@@ -427,11 +429,12 @@ namespace ItemSystem.PassiveSkills.Effects
             int n = Crit.ThisTurn(ctx);
             if (t == PassiveSkillTrigger.OnCriticalDamage && n == 1 && Rw.OncePerTurn(ctx, BlockTurnKey))
                 ctx.itemBlockBonus += Block;
-            if (t == PassiveSkillTrigger.OnPreDealDamage ? n > 0 : n == 1) ctx.hitFinalDamagePct += Crit.Renki(ctx) >= HighRenki ? FinalPctHigh : FinalPct;
+            if (t == PassiveSkillTrigger.OnPreDealDamage ? n > 0 : n == 1)
+                ctx.hitFinalDamagePct += System.Math.Min(MaxPct, Crit.Renki(ctx) * PctPerRenki);
         }
     }
 
-    /// <summary>白刃の鏡砥 (2026-11-26 安定攻防シフト): 会心した撃は、 今の【練気】1 ごとに会心倍率 +0.04 (最大 +0.40)。 同じターンの 2 回目以降の会心を出すたび、 そのターンのブロック +6。</summary>
+    /// <summary>白刃の鏡砥: 会心した撃は、 今の【練気】1 ごとに会心倍率 +0.04。 同じターンの 2 回目以降の会心を出すたび、 そのターンのブロック +6。</summary>
     public class WhiteBladeMirror : IPassiveSkillEffect
     {
         public string SkillId => ItemIds.CritWhiteBlade;
@@ -446,13 +449,13 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>寸鉄【規則】(2026-11-26 安定化: 超過変換 1.5 倍): 超過会心率の会心倍率への変換が 1.5 倍 (超過 1% ごとに +0.0225・CritCore.ExcessMul)。 【練気】3 以上の撃が会心したとき、 敵の防御を完全に無視する。</summary>
+    /// <summary>寸鉄【規則】(2026-11-26 練気上限解放化): 【練気】の上限 +6 (12 → 18)。 【練気】4 以上の撃が会心したとき、 敵の防御を完全に無視する。</summary>
     public class Suntetsu : IPassiveSkillEffect
     {
         public string SkillId => ItemIds.CritSuntetsu;
-        public const int IgnoreRenki = 3;
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.critExcessDouble = true;
+        public const int CapAdd = 6, IgnoreRenki = 4;
+        public PassiveSkillTrigger[] Triggers => System.Array.Empty<PassiveSkillTrigger>();
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx) { }
     }
 
     /// <summary>千里眼の水晶 (2026-11-26 安定機関化): 会心を 1 ターンに 2 回以上出したか、 【練気】4 以上で会心したとき (1 ターン 1 回)、 次のターンの手札 +1 枚・会心率 +35%・ブロック +8。</summary>
@@ -538,14 +541,13 @@ namespace ItemSystem.PassiveSkills.Effects
     public class NickAppraisal : IPassiveSkillEffect
     {
         public string SkillId => ItemIds.CritNick;
-        public const int NotchPct = 35, NotchPctPerRenki = 10, Pen = 12;
+        public const int Gauge = 2, Pen = 12;   // 2026-11-26: 目盛りへの削り (35 + 練気 × 10)% → 混乱 +2 (撃ごと)
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalDamage, PassiveSkillTrigger.OnPostDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (t == PassiveSkillTrigger.OnCriticalDamage) { if (Crit.FocusCrit(ctx)) ctx.hitArmorPen += Pen; return; }   // 防御の計算はこの後
             if (!Psn.Hit(ctx) || !Crit.FocusCrit(ctx)) return;
-            int add = ctx.finalDamage * (NotchPct + NotchPctPerRenki * ctx.hitFocusSpentRenki) / 100;
-            if (add > 0) CombatManager.Instance?.RaiseBossNextNotch(add);
+            CombatManager.Instance?.AddBossGauge(Gauge);
         }
     }
 

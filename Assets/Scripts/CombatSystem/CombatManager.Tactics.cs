@@ -16,6 +16,9 @@ namespace CombatSystem
         /// <summary>〈目盛り削りのノミ〉: 敵に <paramref name="dmg"/> のダメージ。 敵の HP を減らす口 (<see cref="HpLossDiag.Lose"/>) を通すので、 最終与ダメージ倍率・怠惰・ダウンの ×1.5 は
         /// 主攻撃以外と同じに掛かる (敵の防御は掛からない)。 目盛りは<b>通常攻撃として</b>割る (<see cref="NoteBossDownMainHit"/>・ひびの入った目盛りもダウン)。
         /// 戻り値 = 使えたか (敵が倒れていれば使えない)。</summary>
+        /// <summary>〈目盛り削りのノミ〉の混乱 +N (2026-11-26・仮置き)。</summary>
+        public const int ChiselGauge = 10;
+
         public bool TacticChisel(CombatContext ctx, int dmg)
         {
             if (!isCombatActive || ctx == null || enemyHP <= 0 || dmg <= 0) return false;
@@ -24,8 +27,8 @@ namespace CombatSystem
             int dealt = before - enemyHP;
             ctx.enemyCurrentHP = enemyHP;
             EnemyHpLedger.CtxOverwritten();   // [計装]
-            NoteBossDownMainHit(dealt, ctx.currentTurn);
-            if (Debug.unityLogger.logEnabled) Debug.Log($"[目盛り削りのノミ] 敵に {dealt} (通常攻撃として目盛りを見る) → 敵HP {enemyHP}");
+            if (enemyHP > 0) AddBossGauge(ChiselGauge);   // 2026-11-26: 目盛り → 混乱ゲージ
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[目盛り削りのノミ] 敵に {dealt}・混乱 +{ChiselGauge} → 敵HP {enemyHP}");
             return true;
         }
 

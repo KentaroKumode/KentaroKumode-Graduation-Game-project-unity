@@ -23,7 +23,7 @@
     ///
     /// <para><b>【起爆】</b>: 敵の毒を 1/3 (切り上げ・2026-11-22 neon 収束: 旧 半分) 消費し、 max(消費量 × 倍率 (既定 ×4), floor(消費量 × 敵の最大 HP × 0.25%)) の軽減不可ダメージ (防御も無視)。
     /// 最大 HP の項は 2026-11-22 neon 収束 (HP の大きいボスで起爆が細る分を補う)。
-    /// 起爆したとき、 ボスの次の目盛りをその起爆のダメージの <see cref="DetonateNotchPct"/>% ぶん上げる (今の HP の 1 下まで・ひびは割らない・2026-11-25 作者の決定 / neon answer_gauge)。
+    /// 起爆したとき、 ボスの次の目盛りをその起爆のダメージの 起爆のダメージの割合ぶん (2026-11-26 に混乱 +<see cref="DetonateGauge"/> へ)上げる (今の HP の 1 下まで・ひびは割らない・2026-11-25 作者の決定 / neon answer_gauge)。
     /// 起爆は品が起こす (〈蓋付きの毒指輪〉〈劇毒の火薬庫〉)。 ダメージの式はここだけにあり、 本体 (PoisonEffects の Psn.Detonate) と BOT の見積もり (AutoRunner の ItemSight) が同じ関数を呼ぶ。</para>
     /// <para>このファイルは UnityEngine に依存しない。</para>
     /// </summary>
@@ -44,7 +44,7 @@
         /// <summary>〈骨溶かしの黒油〉: ダウン中の毒のダメージ・起爆の倍率。</summary>
         public const int OilDownMul = 2;
         /// <summary>【起爆】でボスの次の目盛りを上げる割合 (起爆のダメージの %) / 〈骨溶かしの黒油〉: ボスをダウンさせたとき敵に与える毒 (2026-11-25 neon answer_gauge)。</summary>
-        public const int DetonateNotchPct = 35, OilDownPoison = 8;
+        public const int DetonateGauge = 3, OilDownPoison = 8;   // 2026-11-26: 起爆のダメージの 35% の目盛り → 混乱 +3
         /// <summary>〈瘴気の外套〉: 受けるダメージ −35% の毒 / ターンの終わりの消費しない起爆 (威力 50%) の毒。</summary>
         public const int MantleNeed = 15, MantleCutPct = 35, MantleEchoNeed = 25, MantleEchoPct = 50;
         /// <summary>〈毒溜まりの主〉: ターン開始の毒のダメージが 2 回になる毒。</summary>

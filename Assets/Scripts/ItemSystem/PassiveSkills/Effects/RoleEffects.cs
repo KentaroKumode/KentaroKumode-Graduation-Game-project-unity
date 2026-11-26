@@ -1,4 +1,4 @@
-using CombatSystem;
+﻿using CombatSystem;
 using GameLoop;
 using ItemSystem.PassiveSkills.Keywords;
 
@@ -34,13 +34,12 @@ namespace ItemSystem.PassiveSkills.Effects
     public class ChippedEyeReading : IPassiveSkillEffect
     {
         public string SkillId => ItemIds.RoleChipped;
-        public const int NotchPct = 25;
+        public const int Gauge = 1;   // 2026-11-26: 目盛りへの削り 25% → 混乱 +1 (撃ごと)
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (!Psn.Hit(ctx) || !RoleFx.FaceRoleThisTurn(ctx, TerminalCards.ChippedFaces)) return;
-            int add = ctx.finalDamage * NotchPct / 100;
-            if (add > 0) CombatManager.Instance?.RaiseBossNextNotch(add);
+            CombatManager.Instance?.AddBossGauge(Gauge);
         }
     }
 

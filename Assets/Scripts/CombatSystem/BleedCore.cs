@@ -1,4 +1,4 @@
-namespace CombatSystem
+﻿namespace CombatSystem
 {
     /// <summary>出血の軸の品のうち、 端子の解決 (<see cref="TerminalCards.Resolve"/> の 5f) の中で効く物と、 本体の撃の輪・BOT の見積もりが読む物 (2026-11-21・full-item-rework-ledger §④)。
     /// 戦闘の始めに所持品から <see cref="TerminalBattleState.bleedItems"/> へ入れる (CombatManager.BeginTerminalDeck・<see cref="BleedCore.ItemsOf"/>)。</summary>
@@ -45,7 +45,7 @@ namespace CombatSystem
         /// <summary>〈血桜〉: 要る出血・1 撃で使う出血・消費前の出血 1 につき +%・上限 %。</summary>
         public const int SakuraNeed = 12, SakuraSpend = 2, SakuraPctPer = 2, SakuraMaxPct = 120;
         /// <summary>〈紅の搾り具〉: 要る出血・使った出血 1 につきのダメージ。 使う量は 1/3 (切り上げ)。</summary>
-        public const int PressNeed = 15, PressMul = 8;
+        public const int PressNeed = 15, PressMul = 8, PressGauge = 3;
         /// <summary>〈涸れぬ血晶〉: 与える出血が倍になる出血 (2026-11-22 neon 収束: 5 → 10 → final5: 14)。</summary>
         public const int CrystalNeed = 14;
         /// <summary>〈血の楔〉: 全部の撃の最終与ダメ +% になる出血・その %。</summary>

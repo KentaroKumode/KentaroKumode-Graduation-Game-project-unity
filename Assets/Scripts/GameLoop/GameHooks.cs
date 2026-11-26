@@ -146,9 +146,11 @@ namespace GameLoop
         /// AutoRunner.bossDown が毎ランの始めに入れ、 ラン終了で false へ戻す。</summary>
         public static bool BossDownDisabled;
         /// <summary>[測定 2026-11-14] ダウンが敵の周期 (大技・構え・予兆) を取り消す条件 (<see cref="CombatSystem.BossDown.CancelsCycle"/>)。
-        /// 既定 ChargeOrHeavy = チャージのターンか山場のターンに重なった時だけ (作者の決定)。 Always = どのダウンでも周期を頭に戻す (旧い規則)。
+        /// 既定 Instant (2026-11-26・作者の決定・§23-36) = 通常攻撃で割った瞬間に効く (山場のターンに割れば山場をキャンセルして次は大ダウン・小技のターンはよろめき・チャージは無効)。
+        /// Timed = ダウンの種類を来たターンで決める (チャージで割れば大ダウン・チャージ前は無効・他はよろめき・<see cref="CombatSystem.BossDown.Classify"/>)。
+        /// ChargeOrHeavy = チャージのターンか山場のターンに重なった時だけ取り消す (2026-11-14〜11-26)。 Always = どのダウンでも周期を頭に戻す (旧い規則)。
         /// AutoRunner.downCancelRule が毎ランの始めに入れ、 ラン終了で既定へ戻す。</summary>
-        public static CombatSystem.DownCancelRule DownCancel = CombatSystem.DownCancelRule.ChargeOrHeavy;
+        public static CombatSystem.DownCancelRule DownCancel = CombatSystem.DownCancelRule.Instant;
         /// <summary>[測定 2026-11-14] 目盛りの割れ方 (<see cref="CombatSystem.DownBreakRule"/>)。 既定 MainAttackOnly = 通常攻撃 (主攻撃) が当たった時だけ割れる (作者の決定)・
         /// 通常攻撃以外で下回った目盛りはひびが入り、 猶予 (<see cref="DownCrackGrace"/>) の後にひとりでに割れる。 AnyDamage = 旧い判定 (ターンの終わりの HP で割る)。
         /// AutoRunner.downBreakRule が毎ランの始めに入れ、 ラン終了で既定へ戻す。</summary>
@@ -221,7 +223,7 @@ namespace GameLoop
             TerminalKillBonusNeedsAttack = false;
             HandCarry = CombatSystem.HandCarryMode.Pick;
             BossDownDisabled = false;
-            DownCancel = CombatSystem.DownCancelRule.ChargeOrHeavy;
+            DownCancel = CombatSystem.DownCancelRule.Instant;
             DownBreak = CombatSystem.DownBreakRule.MainAttackOnly;
             DownCrackGrace = CombatSystem.BossDown.CrackGraceTurns;
             DownCrackWeak = true;

@@ -116,6 +116,11 @@ namespace CombatSystem
         public bool enemyDownWeak;
         /// <summary>後に続くダウンの先頭が弱いか (次のターンのダウンの種類)。</summary>
         public bool downPendingHeadWeak;
+        /// <summary>[2026-11-26] 次のターンに来るダウンの種類 (<see cref="DownKind"/> の値・−1 = 来ない)。 溜めで無効になる分も Resisted として出す。</summary>
+        public int downNextKind;
+        /// <summary>[2026-11-26] このターンに通常攻撃で目盛りを割ったら、 次のターンのダウンの種類 (<see cref="DownKind"/> の値・−1 = 割れる目盛りが無い / もう次のダウンが待っている)。
+        /// 配線の前に「今割ると…」を出すための完全情報。</summary>
+        public int downBreakNowKind;
         /// <summary>目盛りごとのひびの入ったターン (−1 = ひびなし・本体の状態を読むだけ・書き換えない)。 null = 目盛りなし。</summary>
         public int[] downCrackTurns;
         /// <summary>まだ割っていない一番上の目盛りのひびが、 ひとりでに割れるターン (そのターンの終わり・−1 = ひびなし)。</summary>
@@ -126,5 +131,8 @@ namespace CombatSystem
         public float[] downNotches;
         /// <summary>割った目盛りの数 (<see cref="downNotches"/> の先頭から)。</summary>
         public int downBroken;
+        /// <summary>[2026-11-26] 混乱ゲージ: 今の混乱値 / 満タンの量 (0 = ゲージを持たない敵) / 満ちた後に最大値に掛ける増え方。</summary>
+        public int downGauge, downGaugeMax;
+        public float downGaugeGrowth;
     }
 }

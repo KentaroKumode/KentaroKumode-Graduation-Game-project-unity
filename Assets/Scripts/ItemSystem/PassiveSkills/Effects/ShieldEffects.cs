@@ -1,4 +1,4 @@
-using CombatSystem;
+﻿using CombatSystem;
 using ItemSystem.PassiveSkills.Keywords;
 
 namespace ItemSystem.PassiveSkills.Effects
@@ -359,7 +359,7 @@ namespace ItemSystem.PassiveSkills.Effects
     {
         public const string Id = "落城の礎石";
         public string SkillId => Id;
-        public const int Need = 12, FinalPct = 80, NotchPermillePerShield = 5, NotchPermilleMax = 100;   // 2026-11-22 neon 収束: 失うシールド 20 → 12・final6: +60% → +80%
+        public const int Need = 12, FinalPct = 80, GaugePerShield = 5, GaugeMaxPerTurn = 4;   // 2026-11-26: 目盛り → 失ったシールド 5 につき混乱 +1 (1 ターン 4 まで)   // 2026-11-22 neon 収束: 失うシールド 20 → 12・final6: +60% → +80%
         /// <summary>このターンに失ったシールド (Psn.TurnN) / 上乗せが働くターン / その攻撃 +N。</summary>
         private const string LostKey = "shd.castle.lost", TurnKey = "shd.castle.turn", AtkKey = "shd.castle.atk";
         public static bool Primed(CombatContext ctx) => ctx != null && ctx.currentTurn > 0 && Shd.Count(ctx, TurnKey) == ctx.currentTurn;
@@ -392,8 +392,8 @@ namespace ItemSystem.PassiveSkills.Effects
                     int had = Psn.TurnN(ctx, LostKey);
                     Psn.AddTurnN(ctx, LostKey, lost);
                     // 1 ターンの合計で最大 HP の 10% まで: 今までの分と足した後の分の差だけ上げる
-                    int pm = System.Math.Min(NotchPermilleMax, (had + lost) * NotchPermillePerShield) - System.Math.Min(NotchPermilleMax, had * NotchPermillePerShield);
-                    if (pm > 0) CombatManager.Instance?.RaiseBossNextNotch((int)((long)ctx.enemyMaxHP * pm / 1000));
+                    int gn = System.Math.Min(GaugeMaxPerTurn, (had + lost) / GaugePerShield) - System.Math.Min(GaugeMaxPerTurn, had / GaugePerShield);
+                    if (gn > 0) CombatManager.Instance?.AddBossGauge(gn);
                     return;
                 }
             }

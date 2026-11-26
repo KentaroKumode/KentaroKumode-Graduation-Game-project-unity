@@ -1,4 +1,4 @@
-using CombatSystem;
+﻿using CombatSystem;
 using ItemSystem.PassiveSkills.Keywords;
 
 namespace ItemSystem.PassiveSkills.Effects
@@ -72,8 +72,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public static void Notch(CombatContext ctx, int pct)
         {
             if (!Psn.Hit(ctx) || pct <= 0) return;
-            int add = ctx.finalDamage * pct / 100;
-            if (add > 0) CombatManager.Instance?.RaiseBossNextNotch(add);
+            CombatManager.Instance?.AddBossGauge(pct);
         }
 
         public static void GainShield(CombatContext ctx, int amount, string label) => Rw.Shield(ctx, amount, label);
@@ -87,7 +86,7 @@ namespace ItemSystem.PassiveSkills.Effects
     public class Fervor : IPassiveSkillEffect
     {
         public static readonly string[] Ids = { "猛りI", "猛りII", "猛りIII" };
-        public static readonly int[] Caps = { 5, 9, 14 }, NotchPct = { 15, 25, 40 };
+        public static readonly int[] Caps = { 5, 9, 14 }, NotchPct = { 1, 1, 2 };   // 2026-11-26: 目盛りへの削り % → 混乱 +N (撃ごと)
         private readonly int _lv;
         public Fervor(int lv) { _lv = lv; }
         public string SkillId => Ids[_lv];
@@ -147,18 +146,18 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) { if (Fam.NoBlock(ctx)) Fam.Final(ctx, Pct); }
     }
 
-    /// <summary>血令 (2026-11-26 狂戦士化強化): 敵の攻撃で失った HP の 80% を「血」として溜める (ボスのダウンのたび +15)。
-    /// 次に攻撃したターン、 血を全部解放して全部の撃の攻撃 +血。 解放した血が 18 以上なら、 そのターンの全攻撃の最終与ダメージ +(解放した血 × 2)% (最大 +90%)。
-    /// さらに解放した血の 1/4 (切り捨て) が戦闘終了まで永続の基礎攻撃力 (最大 +20) として積み上がり、 攻撃が通ったら使った血の 1/2 だけ HP を回復する。</summary>
+    /// <summary>血令 (2026-11-26 狂戦士化・微調整): 敵の攻撃で失った HP の 70% を「血」として溜める (ボスのダウンのたび +12)。
+    /// 次に攻撃したターン、 血を全部解放して全部の撃の攻撃 +血。 解放した血が 20 以上なら、 そのターンの全攻撃の最終与ダメージ +(解放した血 × 1.5)% (切り捨て・最大 +60%)。
+    /// さらに解放した血の 1/5 (切り捨て) が戦闘終了まで永続の基礎攻撃力 (最大 +10) として積み上がり、 攻撃が通ったら使った血の 1/3 だけ HP を回復する。</summary>
     public class BloodEdict : IPassiveSkillEffect
     {
         /// <summary>[persistent・戦闘開始で 0] 溜まっている血・永続攻撃力 / [perTurn] このターンの攻撃に使った血。</summary>
         public const string BloodKey = "bloodEdictBlood", SpentKey = "bloodEdictSpent", PermAtkKey = "bloodEdictPermAtk", HealTurnKey = "bloodEdictHealTurn";
-        public const int StorePct = 80, DownBlood = 15, HealDiv = 2;
-        public const int BurstNeed = 18, BurstPctPerBlood = 2, BurstMaxPct = 90;
-        public const int PermDiv = 4, PermMax = 20;
+        public const int StorePct = 70, DownBlood = 12, HealDiv = 3;
+        public const int BurstNeed = 20, BurstMaxPct = 60;
+        public const int PermDiv = 5, PermMax = 10;
         public string SkillId => "血令";
-        public static int BurstPctFor(int blood) => blood >= BurstNeed ? System.Math.Min(BurstMaxPct, blood * BurstPctPerBlood) : 0;
+        public static int BurstPctFor(int blood) => blood >= BurstNeed ? System.Math.Min(BurstMaxPct, blood * 3 / 2) : 0;
         public static int BurstForecast(CombatContext ctx) => ctx == null ? 0 : BurstPctFor((int)ctx.GetAccumulated(BloodKey));
         public PassiveSkillTrigger[] Triggers => new[]
         {
@@ -410,7 +409,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public static readonly string[] Ids = { "シールドバッシュI", "シールドバッシュII" };
         public static readonly int[] RatePct = { 90, 150 };
         public static readonly bool[] SpendAll = { false, true };
-        public const int NotchPct = 30;
+        public const int NotchPct = 1;   // 2026-11-26: 目盛りへの削り 30% → 混乱 +1 (撃ごと)
         public const string TurnKey = "shield.bashTurn";
         private readonly int _lv;
         public ShieldBash(int lv) { _lv = lv; }
@@ -453,7 +452,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 削りは敵の HP を直接減らす (〈天与の才〉の踏みとどまりは通す)。</summary>
     public class Daybreak : IPassiveSkillEffect
     {
-        public const int PerUnit = 10, PctPerUnit = 5, JustPctPerUnit = 8, JustNotchPct = 50;
+        public const int PerUnit = 10, PctPerUnit = 5, JustPctPerUnit = 8, JustGauge = 3;   // 2026-11-26: 目盛り → 混乱 +3
         /// <summary>このターンに 1 体目へ入れた削り。 2 体戦で 2 体目へ同じ量を写すために CombatManager が読む (読んだら消す)。</summary>
         public const string DealtKey = "daybreakDealt";
         public string SkillId => "黎明";
@@ -471,7 +470,7 @@ namespace ItemSystem.PassiveSkills.Effects
             int after = DivineTalent.ClampToThreshold(ctx, System.Math.Max(0, before - dmg), ctx.enemyMaxHP);
             ctx.enemyCurrentHP = after;
             if (before > after) ctx.accumulatedValues[DealtKey] = before - after;
-            if (just && before > after) CombatManager.Instance?.RaiseBossNextNotch((before - after) * JustNotchPct / 100);
+            if (just && before > after) CombatManager.Instance?.AddBossGauge(JustGauge);
             Rw.Log($"[黎明] 無傷で受け切った{(just ? " (ジャスト防御)" : "")}: 軽減前 {pre} → {units}×{(just ? JustPctPerUnit : PctPerUnit)}% = {dmg} (敵HP {before} → {after})");
         }
     }
@@ -485,9 +484,10 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 式は <see cref="CombatRules.GaryoPct"/> (2026-11-22・旧: 装備ダイスの最大の目だけ)。</summary>
     public class GaryoTensei : IPassiveSkillEffect
     {
-        public const int FinalPct = 200, RollMaxPct = 100, NotchPct = 50;   // final5: 150 / 60 → 200 / 100 (会心倍率 2.0 → 1.6 の巻き添えを戻す)
+        public const int FinalPct = 200, RollMaxPct = 100, NotchPct = 3;   // 2026-11-26: 目盛りへの削り 50% → 混乱 +3   // final5: 150 / 60 → 200 / 100 (会心倍率 2.0 → 1.6 の巻き添えを戻す)
         public const string TurnKey = "ryusen.garyoTurn", BrokeKey = "ryusen.garyoBroke";
-        public string SkillId => "画竜点睛";
+        public const string Id = "画竜点睛";
+        public string SkillId => Id;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage, PassiveSkillTrigger.OnPostDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -503,8 +503,7 @@ namespace ItemSystem.PassiveSkills.Effects
                 return;
             }
             if ((int)ctx.GetAccumulated(TurnKey) != ctx.currentTurn || !Psn.Hit(ctx) || !Rw.OncePerTurn(ctx, BrokeKey)) return;
-            int add = ctx.finalDamage * NotchPct / 100;
-            if (add > 0) CombatManager.Instance?.RaiseBossNextNotch(add);
+            CombatManager.Instance?.AddBossGauge(NotchPct);
         }
 
         /// <summary>このターン振った目の最大 (振っていなければ 0)。</summary>

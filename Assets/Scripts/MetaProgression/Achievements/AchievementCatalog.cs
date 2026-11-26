@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using C = MetaProgression.Achievements.AchievementCategory;
 
 namespace MetaProgression.Achievements
@@ -144,7 +144,7 @@ namespace MetaProgression.Achievements
             D(BossNoHpDamage, C.CombatSkill, 4, "傷一つなく", "2層以降のボスを、HPを1も減らさずに倒す"),
             D(BossOneTurn, C.CombatSkill, 5, "一擲", "2層以降のボスを、1ターンで倒す"),
             D(DownCancel, C.CombatSkill, 2, "出鼻をくじく", "ボスのダウンで、大技を取り消す"),
-            D(DownDouble, C.CombatSkill, 3, "二枚抜き", "1回の攻撃で、ボスの目盛りを2つ割る"),
+            D(DownDouble, C.CombatSkill, 3, "二枚抜き", "1回の戦闘で、ボスの混乱を2回満たす"),
             D(Escalation4, C.CombatSkill, 3, "長丁場", "敵の攻撃の激化が4段階（最大）まで上がった戦闘に勝つ"),
             D(BerserkWin, C.CombatSkill, 4, "根比べ", "狂暴化したボスに勝つ"),
             D(Crit100, C.CombatSkill, 3, "芯を食う", $"会心の一撃で、{CritGoal}以上のダメージを与える"),

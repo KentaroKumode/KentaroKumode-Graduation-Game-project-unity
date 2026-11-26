@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Globalization;
 using System.Reflection;
 using UnityEngine;
@@ -553,6 +553,12 @@ namespace AutoTest.ParallelSweep
                 "handCarry", "handKeepPolicy", "EffectiveHandKeepPolicy", "bossDown", "depth3Heavy",
                 // 2026-11-14 (#141): ボスのダウンの狙い方 (None = 既定・今まで / Aim = 大技が 2 ターン後なら待つ手も比べる)。 残す印の Planned は上の handKeepPolicy
                 "downAimPolicy", "downAimGainShare",
+                // 2026-11-26: BOT が「割る時でダウンの種類が決まる」規則を知っているか (True = 既定 / False = 旧い規則のつもりで見積もる・本体の規則は変えない)
+                "downTimingAware",
+                // 2026-11-26: 振り直しを大事なターン (大ダウン・今割れば大技が止まる) に集める (True = 既定 / False = 今までの振り直し)
+                "downRerollPlan",
+                // 2026-11-26: 混乱ゲージの温存のための攻撃 0 本の待ち (True = 既定・⑯)・支度の得の割合 (0.5 = 既定)
+                "downGaugeNoAttackHold", "downGaugeReadyShare",
                 // 2026-11-14: ダウンが大技を取り消す条件 (ChargeOrHeavy = 既定 / Always = 旧い規則)・大技のチャージは攻撃しない (True = 既定)・大技の倍率の上書き (id:小技:大技)
                 "downCancelRule", "heavyChargeNoAttack", "enemyHeavySpec",
                 // 2026-11-14: 目盛りの割れ方 (MainAttackOnly = 既定・通常攻撃だけ / AnyDamage = 旧い判定)・ひびの猶予 (1 = 既定・0 = すぐ・−1 = ひびでは割れない)・よろめきは弱い (True = 既定)

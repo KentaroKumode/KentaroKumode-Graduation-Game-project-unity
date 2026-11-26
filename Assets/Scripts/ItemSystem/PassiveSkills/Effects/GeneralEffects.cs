@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using GameLoop;
 using ItemSystem.PassiveSkills.Keywords;
 
@@ -193,7 +193,7 @@ namespace ItemSystem.PassiveSkills.Effects
             if (t == PassiveSkillTrigger.OnPostRoll) { if (Shd.LastTurn(ctx, Key)) ctx.AddPlayerAttackOrDiceBonus(Atk); return; }
             if (!Rw.OncePerTurn(ctx, Key)) return;
             Rw.DrawNext(Draw);
-            Rw.Log($"[崩しの一手] 目盛りを割った → 次のターン 手札 +{Draw}・全撃 +{Atk}");
+            Rw.Log($"[崩しの一手] 混乱が満ちた → 次のターン 手札 +{Draw}・全撃 +{Atk}");
         }
     }
 

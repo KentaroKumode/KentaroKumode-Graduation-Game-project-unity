@@ -24,6 +24,7 @@ namespace CombatSystem
             "JudgmentFlames",        // 審判官〈審判の炎〉
             "AshRegrowth",           // 灰燼の王〈灰の再生〉
             "RelicScholar",          // ヴェスカ〈遺物学者〉
+            "RecurrentTruth",        // ヴェスカ〈回帰性真理〉(2026-11-26: ダウン中は外れる)
         };
 
         /// <summary>このパッシブが「ダウン中は発動しない」を名乗っているか。</summary>

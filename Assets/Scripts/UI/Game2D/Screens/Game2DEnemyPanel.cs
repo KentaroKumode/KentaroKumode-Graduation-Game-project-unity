@@ -1,4 +1,4 @@
-using CombatSystem;
+﻿using CombatSystem;
 using GameLoop;
 using UI.Game2D.Battle;
 using UnityEngine;
@@ -112,21 +112,21 @@ namespace UI.Game2D
                 if (s.heavyIn == 0) plan.Add("このターンは大技" + (s.burst > 0 ? " (烈炎の分 " + s.burst + " は軽減無視)" : "")); else if (s.charging) plan.Add("このターンはチャージ (攻撃しない・次のターンが大技)"); else if (s.heavyIn > 0) plan.Add("大技まで " + s.heavyIn + " ターン");
                 // ボスのダウン (2026-11-13): ダウン中・後に続くダウン・次の目盛りまでの残り。 大技の取り消しはチャージか大技のターンに重なった時だけ (2026-11-14)
                 if (s.down) plan.Add((s.downWeak ? "このターンはよろめき (攻撃しない" : "このターンはダウン (攻撃しない")
-                                     + (CombatSystem.BossDown.TakenMulNow ? "・受けるダメージ ×" + (CombatSystem.BossDown.TakenMulCard + CombatSystem.BossDown.TakenBonusPctNow * 0.01f).ToString("0.0#") : "")
+                                     + (CombatSystem.BossDown.TakenMulNow ? "・受けるダメージ ×" + CombatSystem.BossDown.MulNow.ToString("0.0#") : "")
                                      + (e.heavyPeriod > 0 && cm.Down.heavyCanceledNow ? "・大技は取り消し" : "") + ")");
-                if (s.downPending > 0) plan.Add("ダウンはあと " + s.downPending + " ターン続く" + (s.downNextWeak ? " (次はよろめき)" : ""));
-                // ひび (2026-11-14): 通常攻撃以外で下回った目盛り。 通常攻撃が当たれば割れる・猶予が切れるとひとりでに割れる (受けるダメージ ×1.5 は付かない)
-                if (s.crackBreakTurn >= 0) plan.Add(s.crackBreakTurn <= s.turn ? "亀裂の入った目盛りはこのターンの終わりにひとりでに割れる" : "亀裂の入った目盛りは " + (s.crackBreakTurn - s.turn + 1) + " ターン後の終わりにひとりでに割れる");
-                if (s.downNotchHp >= 0) plan.Add("次の目盛りまで " + System.Math.Max(0, cm.EnemyHP - s.downNotchHp));
+                if (s.downPending > 0) plan.Add(s.downNextKind == (int)CombatSystem.DownKind.Resisted ? "次のダウンは溜めで無効 (溜め中は怯まない)"
+                                              : s.downNextKind == (int)CombatSystem.DownKind.Stagger ? "次のターンはよろめき" : "次のターンはダウン");
+                if (s.downGaugeMax > 0 && !s.down && s.downBreakNowKind >= 0)
+                    plan.Add(s.downBreakNowKind == (int)CombatSystem.DownKind.Big ? (s.heavyIn == 0 ? "今満たすと大技が止まり、 次のターンはダウン" : "今満たすとこのターンの攻撃が止まり、 次のターンはダウン")
+                             : s.downBreakNowKind == (int)CombatSystem.DownKind.Stagger ? "今満たすとこのターンの攻撃が止まる (よろめき)" : "溜め中は怯まない (今満たしても止まらず、 混乱は 0 に戻る)");
                 if (plan.Count > 0) sb.Append(string.Join("・", plan)).Append('\n');
-                if (s.downNotches != null)
+                // 混乱ゲージ (2026-11-26・旧: HP の目盛り)
+                if (s.downGaugeMax > 0)
                 {
-                    var ns = new System.Collections.Generic.List<string>();
-                    for (int i = 0; i < s.downNotches.Length; i++)
-                        ns.Add(Mathf.RoundToInt(s.downNotches[i] * 100f) + "%" + (i < s.downBroken ? " (割った)"
-                               : s.downCracks != null && i < s.downCracks.Length && s.downCracks[i] >= 0 ? " (亀裂)" : ""));
-                    sb.Append("ダウンの目盛り: ").Append(string.Join("・", ns)).Append('\n');
-                    sb.Append("目盛りを割れるのは通常攻撃だけ。 通常攻撃以外で下回ると亀裂が入り、 しばらくするとひとりでに割れてよろめく (攻撃しないが、 受けるダメージは増えない)。 目盛り前進の効果でも、 目盛りは今の HP より上には来ない。").Append('\n');
+                    sb.Append("混乱 ").Append(s.downGauge).Append('/').Append(s.downGaugeMax).Append(" (満ちるたびに満タンが +").Append(Mathf.RoundToInt(cm.Down.gaugeGrowth * 100f)).Append("%)").Append('\n');
+                    sb.Append("攻撃のカードに挿したダイスの目 (出目 +N などは足さない) が混乱に溜まる。 満ちた瞬間に効き、 混乱は 0 に戻る。").Append('\n');
+                    if (e.heavyPeriod > 0 || s.guardIn >= 0)
+                        sb.Append("大技を持つ敵は、 大技のターンに満たすとその場で大技が止まり、 次のターンはダウンする。 チャージのターンは怯まない (満たしても止まらない)。 ほかのターンに満たすと、 そのターンの攻撃だけ止まる (よろめき)。 ダウン中は混乱が溜まらない。").Append('\n');
                 }
             }
             int poison = ctx != null ? ctx.EnemyPoison : 0, bleed = ctx != null ? ctx.enemyBleedStacks : 0;
@@ -138,7 +138,7 @@ namespace UI.Game2D
                 foreach (var ps in e.passiveSkills)
                     if (ps != null && !string.IsNullOrEmpty(ps.skillName))
                         d.Items.Add(new ModalItem { name = "〈" + ps.skillName + "〉", desc = CombatSystem.BossParams.Describe(e.id, ps.description) });   // 数字の印 ({JudgmentDice} ほか) を今の値で埋める
-            // 博士の「止まらない時計」(2026-11-13): 預かったランのヴェスカの各段に付く不利な効果 (目盛りは上の「ダウンの目盛り」の行に足されて出る)
+            // 博士の「止まらない時計」(2026-11-13): 預かったランのヴェスカの各段に付く不利な効果 (混乱は半分から始まる)
             if (cm.VescaClockActive) d.Items.Add(new ModalItem { name = "〈" + GameLoop.VescaClock.Name + "〉", desc = GameLoop.VescaClock.Description });
             if (d.Items.Count == 0) d.Items.Add(new ModalItem { name = "パッシブなし", desc = "この敵は特別な力を持たない。", disabled = true });
             if (d.Items.Count > 3) d.cols = 2;      // 多い敵は 2 列 (窓の高さに収める)

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -784,6 +784,7 @@ namespace CombatSystem
             // 既存の品が読む「特殊に挿した個数」(MutualKeys.SpecialDiceCount) = 補助の端子に挿した個数
             int specialCount = term.supportDice;
             ApplyTerminalOutcome(ctx, term, ref enemyAtkValue);
+            NoteBossGaugeWired(ctx, term, playerDice);   // 混乱ゲージ (2026-11-26): 攻撃に挿した止まった面の数字。 満ちたら撃と敵の攻撃より前に効く
             RaiseTerminalEvents(ctx, term);   // 端子の出来事 (使い捨て・切り直し・残した端子・補助・2026-11-20)。 OnWired の前 (〈灰払いの箒〉の「次の撃」がこのターンの撃になる)
             int _diagAtkRaw = attackSum;
             // 端子調律メタバフ: **接続したダイス 1 本あたり** +N (2026-07-28 に「合計 +N」から変更)。 ブロックの分は FinalBlockSum の中
@@ -1194,10 +1195,12 @@ namespace CombatSystem
                     EnemyHpLedger.Land("処刑(短剣)", left, left);
                     if (Debug.unityLogger.logEnabled) Debug.Log($"[処刑] 敵 HP {left}/{ctx.enemyMaxHP} → 倒す");
                 }
-                int broke = NoteBossDownMainHit(hitDmg, ctx.currentTurn);   // ボスのダウン (2026-11-14): 目盛りを割れるのは通常攻撃だけ (固定ダメの枠より前の HP で判定)
-                // 端子〈崩し斬り〉(2026-11-20): この撃 (撃 h = 攻撃の端子 h 枚目) で目盛りを割ったら、 最大 HP の 5% の軽減不可 (預かり・ターンの最後に通る。 通常攻撃ではないので次の目盛りは割らない)
-                if (broke > 0 && h < term.attackHitIds.Count && TerminalCards.BaseOf(term.attackHitIds[h]) == TerminalIds.Crush && currentEnemy != null)
+                NoteBossDownMainHit(hitDmg, ctx.currentTurn);   // 旧: 目盛り (2026-11-26 に混乱ゲージへ・目盛りが無いので何もしない)
+                // 端子〈崩し斬り〉(2026-11-26〜): このターンにボスの混乱が満ちていたら、 この撃で最大 HP の 5% の軽減不可 (1 ターン 1 回・預かり・ターンの最後に通る)
+                if (hitDmg > 0 && _gaugeFullTurn == ctx.currentTurn && _crushTurn != ctx.currentTurn
+                    && h < term.attackHitIds.Count && TerminalCards.BaseOf(term.attackHitIds[h]) == TerminalIds.Crush && currentEnemy != null)
                 {
+                    _crushTurn = ctx.currentTurn;
                     int pct = TerminalCards.Get(term.attackHitIds[h])?.upgraded == true ? TerminalCards.CrushPctUp : TerminalCards.CrushPct;
                     int extra = currentEnemy.maxHP * pct / 100;
                     ItemSystem.PassiveSkills.Keywords.Kw.DamageEnemy(ctx, extra);
@@ -1349,7 +1352,8 @@ namespace CombatSystem
             bool enemyStunnedThisTurn =
                 ctx.currentBuffs.TryGetValue(YachtRoleEffects.EnemyStunKey, out float stunFlag) && stunFlag > 0f;
             // ボスのダウン (2026-11-13): 行動不能と同じ枝 (攻撃しない・仕込み刃と古い手紙はこのターン限りで失効)
-            bool downThisTurn = _down.downNow;
+            MarkBossGaugeLate();   // 混乱ゲージ (2026-11-26): ここから後に足される混乱は次のターンの頭へ
+            bool downThisTurn = _down.downNow || _down.interruptNow;   // 割った瞬間にこのターンの行動をキャンセルした (2026-11-26・Instant) も同じ枝
             if (enemyHP > 0 && !enemyStunnedThisTurn && !downThisTurn && currentEnemy != null && Escalation.IsHeavyTurn(currentEnemy, ctx.currentTurn))
                 BossDownDiag.NoteHeavyTaken();   // [計装] 大技を受けた
             // 〈封じ・揃〉(端子の行動不能も) で大技のターンに行動しなかった = 大技を取り消した (2026-11-21・OnHeavyCanceled・ダウンのターンはダウンの側で鳴らす)
@@ -1366,7 +1370,7 @@ namespace CombatSystem
             bool chargeThisTurn = !downThisTurn && currentEnemy != null && (Escalation.IsChargeNoAttack(currentEnemy, ctx.currentTurn) || TenyoHeavy.NoAttackAt(currentEnemy, ctx.currentTurn));      // 天与の盾・指輪も攻撃しない (2026-11-15)
             if (enemyHP > 0 && (enemyStunnedThisTurn || downThisTurn || chargeThisTurn))
             {
-                if (Debug.unityLogger.logEnabled) Debug.Log(downThisTurn ? "[ダウン] 敵は行動不能 (攻撃しない)" : enemyStunnedThisTurn ? $"[役] 封じ・揃: 敵は行動不能 (予告されていた攻撃 {enemyAtkValue} は不発)"
+                if (Debug.unityLogger.logEnabled) Debug.Log(downThisTurn ? (_down.interruptNow && !_down.downNow ? "[ダウン] 目盛りを割った: このターンの行動はキャンセル (攻撃しない)" : "[ダウン] 敵は行動不能 (攻撃しない)") : enemyStunnedThisTurn ? $"[役] 封じ・揃: 敵は行動不能 (予告されていた攻撃 {enemyAtkValue} は不発)"
                         : "[大技] チャージ: 敵は攻撃しない (次のターンが大技)");
                 ctx.daggerArmed = false;   // 仕込み刃はこのターン限り ── 攻撃が来なくても失効
                 ctx.accumulatedValues.Remove(GameLoop.Consumables.OldLetterGuardKey);   // 古い手紙も同じ

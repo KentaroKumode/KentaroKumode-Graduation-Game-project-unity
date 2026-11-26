@@ -1,4 +1,4 @@
-namespace CombatSystem
+﻿namespace CombatSystem
 {
     /// <summary>臨界の軸の品のうち、 爆発の式・端子の解決 (<see cref="TerminalCards.Resolve"/> の 5g)・BOT と画面の見込みが読む物 (2026-11-21・full-item-rework-ledger §⑤)。
     /// 戦闘の始めに所持品から <see cref="TerminalBattleState.heatItems"/> へ入れる (CombatManager.BeginTerminalDeck・<see cref="ItemsOf"/>)。</summary>
@@ -38,7 +38,7 @@ namespace CombatSystem
         // 閾値 30 → 36 (2026-11-22 段 3 の較正 4・臨界の腕が寄せなしの約 2 倍 / ターンの終わりの攻撃の合計が毎ターン溜まる)
         // → 32 (2026-11-22 neon 収束: ターンの終わりの臨界を攻撃の合計から「攻撃に挿した出目の合計の半分」へ下げたのと合わせて)
         /// <summary>爆発でボスの次の目盛りを上げる割合 (爆発の入ったダメージの %・2026-11-25 neon answer_gauge・旧: ひびを入れる)。</summary>
-        public const int BurstNotchPct = 40;
+        public const int BurstGauge = 2;   // 2026-11-26: 爆発のダメージの 40% の目盛り → 混乱 +2
         public const int Threshold = 30, ThresholdFloor = 12, BurstBase = 25, DefensePenPct = 50;   // 爆発の基礎 30 → 24 (final6) → 26 (answer9) → 25 (answer12)
         public const int SuperAtPct = 150, SuperMulPct = 185, KilnSuperMulPct = 260;   // 超臨界 ×1.5 → ×1.65 (answer9) → ×1.85 (answer15)・雷管 +4 → +5・柱折り ×2.5 → ×3.0 (answer15)・暴れ窯 ×2.0 → ×2.5 (2026-11-22 final4) → ×2.0 (final5) → ×2.25 (final6) → ×2.60 (answer12)
         public const int StoneTwo = 8, StoneAll = 16, BreastHeat = 4, BreastBlock = 2, PokerPerDie = 6, SpannerPerHit = 3, WhetPerHit = 2;   // 過熱石 +6/+12 → +8/+16・スパナ +2 → +4・荒砥 +1 → +2 (final4)・スパナ +4 → +3 (final6)

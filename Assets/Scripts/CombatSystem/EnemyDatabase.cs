@@ -103,6 +103,18 @@ namespace CombatSystem
         /// 深さ 3 のボスの大技 (<see cref="BossParams.Depth3Heavy"/>・データではなく定数で足す) には効かない。 読み方は <see cref="HeavyCycle.ParseSpec"/>。</summary>
         public static string HeavyOverrideSpec = "";
 
+        /// <summary>[測定 2026-11-26] 深さ 3 のボスの大技 (<see cref="BossParams.Depth3Heavy"/>・定数で足す) の倍率の上書き。 <see cref="HeavyOverrideSpec"/> に<b>その id を名指しした</b>項目があれば、 その小技・大技の倍率を返す
+        /// ("*" は今までどおり json の大技を持つ敵だけ・周期の指定は使わない)。 無ければ false。</summary>
+        public static bool Depth3HeavyOverride(string id, out float light, out float heavy)
+        {
+            light = heavy = 0f;
+            if (string.IsNullOrEmpty(HeavyOverrideSpec) || string.IsNullOrEmpty(id)) return false;
+            bool hit = false;
+            foreach (var sp in HeavyCycle.ParseSpec(HeavyOverrideSpec))
+                if (sp.id == id) { light = sp.light; heavy = sp.heavy; hit = true; }
+            return hit;
+        }
+
         private static void ApplyHeavySpec()
         {
             if (string.IsNullOrEmpty(HeavyOverrideSpec)) return;

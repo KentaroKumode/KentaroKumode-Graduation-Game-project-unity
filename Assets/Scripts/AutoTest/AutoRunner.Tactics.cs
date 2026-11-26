@@ -171,9 +171,27 @@ namespace AutoTest
         /// 何もしなくても次がダウンではなく、 今ターンの最良の挿し方の主攻撃では割れない時。 割れ方は本体と同じ規則 (<see cref="DownForecast"/> → BossDown.ForecastTurn)。</summary>
         private bool ChiselBreaksIntoHeavy(int[] rolls, MutualTurnTelegraph tele, EnemyData enemy)
         {
-            if (enemy.heavyPeriod <= 0 || !BossDown.IsChargeOrClimax(Escalation.TurnsToHeavy(enemy, tele.turn + 1))) return false;
+            if (enemy.heavyPeriod <= 0) return false;
+            // 割る時を選ぶ規則 (2026-11-26): 次のターンが大ダウンになる時だけ (= 今がチャージ)。 BOT が規則を知らない腕は旧い条件のまま
+            if (BotDownRule == DownCancelRule.Instant)
+            {
+                // 割った瞬間に効く規則 (2026-11-26): 今が大技のターンなら、 鑿で割ればその場で大技が止まる
+                if (Escalation.TurnsToHeavy(enemy, tele.turn) != 0) return false;
+            }
+            else if (BotDownRule == DownCancelRule.Timed
+                ? CombatManager.DownKindAt(enemy, tele.turn + 1, Escalation.HeavyHpRatio, false, false, BotDownRule) != DownKind.Big || Escalation.TurnsToHeavy(enemy, tele.turn + 1) != 0
+                : !BossDown.IsChargeOrClimax(Escalation.TurnsToHeavy(enemy, tele.turn + 1))) return false;
             var ev = PrepareDeckEval(rolls, tele);
             var st = ev.st;
+            if (st.downGaugeMax > 0)
+            {
+                // [2026-11-26] 混乱ゲージ: 大技のターンに、 鑿の分で満ちて、 選ぶ配線だけでは満ちない時に使う
+                if (st.enemyDown || st.downGauge + CombatManager.ChiselGauge < st.downGaugeMax) return false;
+                var wg = ChooseDeckWiring(rolls, tele, out _, out _);
+                if (wg == null) return true;
+                EvalDeckWiring(in ev, rolls, wg, out var og, out _, out _);
+                return st.downGauge + og.gaugePips < st.downGaugeMax;
+            }
             if (st.downNotches == null || DownForecast(in st, st.enemyHp, 0, 0).nextDown) return false;
             int chisel = BossDown.ApplyTaken(Consumables.ChiselDamage, DownTakesMul(st.enemyDown, st.enemyDownWeak));
             if (chisel >= st.enemyHp) return true;      // 鑿で倒せる

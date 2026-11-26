@@ -1,4 +1,4 @@
-using CombatSystem;
+﻿using CombatSystem;
 using GameLoop;
 using ItemSystem.PassiveSkills.Keywords;
 
@@ -30,15 +30,14 @@ namespace ItemSystem.PassiveSkills.Effects
     public class PrimedSwitchboard : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => ItemIds.DeckSwitchboard;
-        public const int NotchPct = 20;
+        public const int Gauge = 1;   // 2026-11-26: 目盛りへの削り 20% → 混乱 +1 (撃ごと)
         public static bool Active() => (CombatManager.Instance?.LastTerminalOutcome?.firedNonBasic ?? 0) >= TerminalCards.SwitchboardNeed;
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(Active());
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (!Psn.Hit(ctx) || !Active()) return;
-            int add = ctx.finalDamage * NotchPct / 100;
-            if (add > 0) CombatManager.Instance?.RaiseBossNextNotch(add);
+            CombatManager.Instance?.AddBossGauge(Gauge);
         }
     }
 }

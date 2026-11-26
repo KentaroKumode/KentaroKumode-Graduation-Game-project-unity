@@ -180,10 +180,80 @@ static class T
             Check(s2.NoteTurnEnd(0, 1000) == 0, "倒れたターンは数えない");
             Check(BossDown.NextTurnIsDown(n, 1000, 0, 0, 750) && !BossDown.NextTurnIsDown(n, 1000, 0, 0, 751) && BossDown.NextTurnIsDown(n, 1000, 1, 1, 740),
                   "次のターンがダウンかの判定 (BOT と本体の共通の関数)");
-            Check(BossDown.ApplyTaken(10, true) == 15 && BossDown.ApplyTaken(7, true) == 10 && BossDown.ApplyTaken(7, false) == 7 && BossDown.ApplyTaken(0, true) == 0,
-                  "受けるダメージ ×1.5 (切り捨て)");
+            Check(BossDown.ApplyTaken(10, true) == 20 && BossDown.ApplyTaken(7, true) == 14 && BossDown.ApplyTaken(7, false) == 7 && BossDown.ApplyTaken(0, true) == 0,
+                  "受けるダメージ ×2.0 (切り捨て・2026-11-26 に 1.5 から)");
             var s3 = new BossDownState(); s3.Reset(null);
             Check(!s3.Enabled && s3.NoteTurnEnd(1, 1000) == 0 && !s3.BeginTurn(), "目盛りの無い敵はダウンしない");
+        }
+
+        // ---- 4c. 割る時を選ぶ規則 (2026-11-26・DownCancelRule.Timed・BossDown.Classify) ----
+        {
+            var T = DownCancelRule.Timed;
+            // 引数は「山場まで何ターンか」(大技・構え・予兆・−1 = 持たない)
+            Check(BossDown.Classify(T, false, false, 0, -1, -1) == DownKind.Big, "山場のターンに来た通常攻撃の分 = 大ダウン");
+            Check(BossDown.Classify(T, true, false, 0, -1, -1) == DownKind.Resisted, "山場のターンに来たひびの分 = 無効");
+            Check(BossDown.Classify(T, false, false, 1, -1, -1) == DownKind.Resisted && BossDown.Classify(T, true, false, 1, -1, -1) == DownKind.Resisted,
+                  "チャージのターンに来た分 = 溜め中は怯まない (無効)");
+            Check(BossDown.Classify(T, false, false, 2, -1, -1) == DownKind.Stagger && BossDown.Classify(T, true, false, 3, -1, -1) == DownKind.Stagger,
+                  "小技のターンに来た分 = よろめき (通常攻撃でもひびでも)");
+            Check(BossDown.Classify(T, false, false, -1, -1, -1) == DownKind.Big && BossDown.Classify(T, true, false, -1, -1, -1) == DownKind.Stagger,
+                  "周期を持たない敵は今までどおり (ダウン・ひびはよろめき)");
+            Check(BossDown.Classify(T, false, true, 2, -1, -1) == DownKind.Big, "延長の分は大ダウンのまま");
+            Check(BossDown.Classify(T, false, false, 3, 0, -1) == DownKind.Big && BossDown.Classify(T, false, false, 3, 1, -1) == DownKind.Resisted,
+                  "構えの周期も同じ数え方");
+            Check(BossDown.Classify(DownCancelRule.ChargeOrHeavy, false, false, 1, -1, -1) == DownKind.Big
+                  && BossDown.Classify(DownCancelRule.ChargeOrHeavy, true, false, 0, -1, -1) == DownKind.Stagger, "旧い規則は種類がひびかどうかだけ");
+            Check(BossDown.CancelsCycle(T, 0, -1, -1) && !BossDown.CancelsCycle(T, 1, -1, -1) && !BossDown.CancelsCycle(T, 2, -1, -1),
+                  "新しい規則で周期を頭に戻すのは山場のターンだけ");
+
+            // まとめて割る: 1 ターンだけ・数を持つ
+            var n = new[] { 0.75f, 0.5f, 0.25f };
+            var m = new BossDownState(); m.Reset(n, merge: true);
+            Check(m.NoteMainHit(200, 1000, 50, 5, out _, out _) == 3 && m.pending == 1 && m.BeginTurn() && m.countNow == 3 && !m.BeginTurn(),
+                  "まとめて 3 つ割ってもダウンは 1 ターン (数は 3)");
+            var m2 = new BossDownState(); m2.Reset(n, merge: true);
+            m2.NoteMainHit(740, 1000, 50, 5, out _, out _);
+            m2.NoteTurnEndCracks(490, 1000, 5, 0, true, out _);   // 同じターンのひび (猶予 0 = すぐ割れる)
+            Check(m2.pending == 1 && m2.BeginTurn() && m2.countNow == 2 && !m2.downWeakNow, "同じターンの通常攻撃とひびは 1 つのダウン (通常攻撃の分があれば弱くない)");
+            var m3 = new BossDownState(); m3.Reset(n, merge: true);
+            m3.NoteMainHit(740, 1000, 50, 5, out _, out _); m3.BeginTurn();
+            m3.NoteMainHit(490, 1000, 50, 6, out _, out _);
+            Check(m3.pending == 1 && m3.BeginTurn() && m3.countNow == 1, "別のターンに割った分は別のダウン");
+            var old = new BossDownState(); old.Reset(n);
+            Check(old.NoteMainHit(200, 1000, 50, 5, out _, out _) == 3 && old.pending == 3, "まとめない (旧い規則) は割った数だけターンが続く");
+
+            // 倍率: 1 つ ×1.5・2 つ ×2.0 (切り捨て)
+            BossDown.ExtraNotchesNow = 0; BossDown.TakenBonusPctNow = 0;
+            bool one = BossDown.ApplyTaken(10, true) == 20;
+            BossDown.ExtraNotchesNow = 1; bool two = BossDown.ApplyTaken(10, true) == 25;
+            BossDown.ExtraNotchesNow = 2; bool three = BossDown.ApplyTaken(10, true) == 30 && BossDown.ApplyTaken(10, false) == 10;
+            BossDown.ExtraNotchesNow = 0;
+            Check(one && two && three, "まとめて割った分の倍率 (×2.0 から +0.5 ずつ・よろめきには付かない)");
+
+            // 延長 (〈柱折りの発破筒〉) は延長の印つきで前に入る
+            var x = new BossDownState(); x.Reset(n, merge: true); x.ResetBuffs();
+            x.NoteMainHit(740, 1000, 50, 5, out _, out _); x.ExtendNext(); x.BeginTurn();
+            x.TakeBuffs(out _, out _, out bool ext);
+            Check(ext && x.pending == 1 && x.PendingHeadExt, "延長の分は印つきで次に入る");
+        }
+
+        // ---- 4d. 割った瞬間に効く規則 (2026-11-26・DownCancelRule.Instant・GAME.md §23-36) ----
+        {
+            Check(BossDown.ClassifyInstant(0, -1, -1) == DownKind.Big, "大技のターンに割る = 大技を止めて次のターンは大ダウン");
+            Check(BossDown.ClassifyInstant(1, -1, -1) == DownKind.Resisted, "チャージのターンに割る = 溜め中は怯まない");
+            Check(BossDown.ClassifyInstant(2, -1, -1) == DownKind.Stagger && BossDown.ClassifyInstant(4, -1, -1) == DownKind.Stagger, "小技のターンに割る = よろめき (このターンの行動だけ)");
+            Check(BossDown.ClassifyInstant(-1, -1, -1) == DownKind.Big, "周期を持たない敵は大ダウン");
+            Check(BossDown.IsTimedFamily(DownCancelRule.Instant) && BossDown.Classify(DownCancelRule.Instant, true, false, 0, -1, -1) == DownKind.Resisted
+                  && BossDown.Classify(DownCancelRule.Instant, true, false, 1, -1, -1) == DownKind.Resisted && BossDown.Classify(DownCancelRule.Instant, true, false, 2, -1, -1) == DownKind.Stagger,
+                  "ひびは次のターンによろめき (大技・チャージのターンなら無効)");
+            var n = new[] { 0.75f, 0.5f, 0.25f };
+            var a = new BossDownState(); a.Reset(n, merge: true);
+            int d = a.BreakByMainHit(400, 1000, 50, 5, out _, out _);
+            a.PushBig(d, true);
+            Check(d == 2 && a.pending == 1 && a.resetCycleNext && a.BeginTurn() && a.extNow && a.countNow == 2 && !a.interruptNow,
+                  "大技を止めたら次のターンに大ダウン (まとめて 2 つ・周期を戻す印・行動キャンセルの印は次のターンで消える)");
+            var b = new BossDownState(); b.Reset(n, merge: true);
+            Check(b.BreakByMainHit(700, 1000, 50, 5, out _, out _) == 1 && b.pending == 0, "割っただけでは待ちに積まない (よろめき・無効は次のターンに何も残さない)");
         }
 
         // ---- 4b. 博士の「止まらない時計」(2026-11-13): ヴェスカの各段に目盛り 0.80 を 1 つ足す ----

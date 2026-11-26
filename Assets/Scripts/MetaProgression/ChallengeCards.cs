@@ -84,7 +84,7 @@ namespace MetaProgression
             K(EnemyHp, false, Family.Durability, null, T(20, 45, 75));                      // 厚い皮: 敵の最大 HP +N%
             K(Steel, false, Family.Durability, null, T(1, 1, null), T(0, 35, null));        // 鋼の皮膚: 致命傷を HP1 で耐える / v2 = ボスの最大 HP +N%
             K(Regen, false, Family.Durability, null, T(null, 4, 8));                        // 再生: 敵が毎ターン最大 HP の N% を回復
-            K(Ukemi, false, Family.Durability, null, T(null, 1.25f, 1.10f), T(null, 10, 30)); // 受身: ダウン中の被ダメ倍率 / v2 = 目盛りの間隔 +N%
+            K(Ukemi, false, Family.Durability, null, T(null, 1.65f, 1.45f), T(null, 10, 30)); // 受身: ダウン中の被ダメ倍率 (2026-11-26: 基本が ×1.5 → ×2.0 になったので 1.25 / 1.10 を同じ比で 1.65 / 1.45 へ) / v2 = 目盛りの間隔 +N%
             K(Deadline, false, Family.Hand, null, T(1, 2, 3), T(0, 0, 1));                  // 刻限: 段の到達を N ターン早める / v2 = 1 ならボス戦は毎ターン進む
             K(HeavyDice, false, Family.Hand, null, T(1, 3, 5));                             // 重い賽: 振り直しの充電の費用 +N (無料は除く)
             K(Clog, false, Family.Hand, null, T(1, 1, 2), T(1, 3, 3));                      // 目詰まり: 各戦闘の最初の v2 ターン、 手札の端子 N 枚が止まる

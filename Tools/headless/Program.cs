@@ -21,6 +21,8 @@ namespace DiceBoundHeadless
             int ir = Array.IndexOf(args, "--itt-recompute");
             if (ir >= 0 && ir + 2 < args.Length)
             {
+                RegisterAssets();
+                var _ = ItemSystem.ItemDatabase.Instance;
                 AutoTest.GrantItt.Variant = ir + 3 < args.Length ? args[ir + 3] : "";
                 bool ok = AutoTest.GrantItt.Recompute(args[ir + 1], args[ir + 2]) && AutoTest.GrantItt.RecomputeSurvival(args[ir + 1], args[ir + 2]);
                 Console.WriteLine((ok ? "OK " : "NG ") + AutoTest.GrantItt.SurvivalSummary);

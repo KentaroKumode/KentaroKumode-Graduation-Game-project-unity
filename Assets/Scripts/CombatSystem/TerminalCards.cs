@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace CombatSystem
@@ -599,7 +599,7 @@ namespace CombatSystem
             // 役の軸の端子 (2026-11-21)
             [TerminalIds.DiceTable] = "充電 +出目。次のターンの最初の振り直しの充電の費用 −min(" + DiceTableCapUp + ", この戦闘で役が成立した回数)。",
             [TerminalIds.RoleDrop] = "出目を攻撃に。このターン役が成立していれば、攻撃 +この戦闘で役が成立した回数 ×" + RoleDropPerUp + " (ゾロ目・連なりなら 2 倍)。",
-            [TerminalIds.Crush] = "出目 +" + UpPip + " を攻撃に。この撃でボスの目盛りを割ったら、敵に最大 HP の " + CrushPctUp + "% の軽減不可ダメージ。",
+            [TerminalIds.Crush] = "出目 +" + UpPip + " を攻撃に。このターンにボスの混乱が満ちていたら、敵に最大 HP の " + CrushPctUp + "% の軽減不可ダメージ。",
         };
 
         /// <summary>基の端子の定義を写して、 強化した端子を作る (名前・説明文と、 表で変える条件・払う充電だけ変える)。</summary>
@@ -774,7 +774,7 @@ namespace CombatSystem
                 Cap(Perm(D(TerminalIds.Gear, S, "出目は挿せない。場にあれば、毎ターン最初に発動した基本以外のカード (場の左から) の挿した目 1 つにつき +" + GearPip + "。一度引くとこの戦闘中ずっと場に残る。")), 0),
                 Rare(Once(D(TerminalIds.Bell, S, "この戦闘の残りの間、山札を切り直すたび、次のターンにカードを 1 枚多く引く。"))),
                 D(TerminalIds.Mikiri, B, "出目をブロックに。敵が大技を予告したターンなら 2 倍。", TerminalCond.AtMost3),
-                D(TerminalIds.Crush, A, "出目を攻撃に。この撃でボスの目盛りを割ったら、敵に最大 HP の " + CrushPct + "% の軽減不可ダメージ。", TerminalCond.AtLeast5),
+                D(TerminalIds.Crush, A, "出目を攻撃に。このターンにボスの混乱が満ちていたら、敵に最大 HP の " + CrushPct + "% の軽減不可ダメージ。", TerminalCond.AtLeast5),
                 // ── 役の軸の端子 (2026-11-21・段 1-f・item-overhaul-spec §8-1 / §12-4) ──
                 //   〈賽振り台〉: 配線は振り直しの後なので、 安くするのは次のターンの最初の振り直し (§12-4)
                 D(TerminalIds.DiceTable, C, "充電 +出目。次のターンの最初の振り直しの充電の費用 −min(" + DiceTableCap + ", この戦闘で役が成立した回数)。", TerminalCond.None, ItemSystem.PassiveSkills.AxisRules.Role),

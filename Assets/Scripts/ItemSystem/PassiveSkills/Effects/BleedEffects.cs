@@ -1,4 +1,4 @@
-using CombatSystem;
+﻿using CombatSystem;
 using ItemSystem.PassiveSkills.Keywords;
 
 namespace ItemSystem.PassiveSkills.Effects
@@ -101,15 +101,15 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 敵の出血が 15 以上の間、 攻撃が当たるたび、 ボスの次の目盛りがその撃のダメージの 20% だけ上がる (目盛りへの削り +20%・CombatManager.RaiseBossNextNotch)。</summary>
     public class ArmorStitchNeedle : IPassiveSkillEffect, IRelicDisplay
     {
-        public string SkillId => "鎧縫いの針";
-        public const int Need = 15, NotchPct = 20;
+        public const string Id = "鎧縫いの針";
+        public string SkillId => Id;
+        public const int Need = 15, Gauge = 1;   // 2026-11-26: 目盛りへの削り 20% → 混乱 +1 (撃ごと)
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.enemyBleedStacks >= Need);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (!Psn.Hit(ctx) || ctx.enemyBleedStacks < Need) return;
-            int add = ctx.finalDamage * NotchPct / 100;
-            if (add > 0) CombatManager.Instance?.RaiseBossNextNotch(add);
+            CombatManager.Instance?.AddBossGauge(Gauge);
         }
     }
 
@@ -239,7 +239,7 @@ namespace ItemSystem.PassiveSkills.Effects
             int used = Kw.ConsumeBleed(ctx, BleedCore.PressSpend(b));
             if (used <= 0) return;
             Kw.DamageEnemy(ctx, used * BleedCore.PressMul);
-            CombatManager.Instance?.RaiseBossNextNotch(used * BleedCore.PressMul);
+            CombatManager.Instance?.AddBossGauge(BleedCore.PressGauge);   // 2026-11-26: 目盛り → 混乱 +3
             Rw.Log($"[紅の搾り具] 出血 {b} → {ctx.enemyBleedStacks} (使う {used}) → {used * BleedCore.PressMul} の軽減不可");
         }
     }

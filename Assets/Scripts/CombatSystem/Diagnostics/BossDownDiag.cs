@@ -48,7 +48,9 @@ namespace CombatSystem
             public const int CrackThenMain = 19, CrackWaitSum = 20, CracksMade = 21, CracksHealedRetired = 22;   // 22 = 回復で消えたひび (廃止・2026-11-14 にひびは回復で消えなくなった)
             // 旧い判定 (AnyDamage) の時: ターンの終わりに割れた数 / そのうち主攻撃だけでは割れていなかった数 (主攻撃以外で割れた)
             public const int AnyBreaks = 23, AnyNonMainBreaks = 24;
-            public const int Length = 25;
+            // 割る時を選ぶ規則 (2026-11-26): 溜めで無効になったダウン
+            public const int Resisted = 25;
+            public const int Length = 26;
         }
 
         /// <summary>ダウンのターン。 <paramref name="turnsToHeavy"/> = 起点を動かす前の周期で数えた「大技まで何ターンか」(0 = 大技・1 = チャージ・2 以上 = 小技・−1 = 大技なし)。</summary>
@@ -63,6 +65,9 @@ namespace CombatSystem
             else _cur[4]++;
             if (hasHeavy && turnsToHeavy >= 0) _cur[turnsToHeavy == 0 ? Slot.DownAtHeavy : turnsToHeavy == 1 ? Slot.DownAtCharge : Slot.DownAtLight]++;
         }
+
+        /// <summary>[計装 2026-11-26] 溜めで無効になったダウン (チャージのターンに来た・山場に来たひびの分)。 目盛りは消える。</summary>
+        public static void NoteResisted() { if (_cur != null) _cur[Slot.Resisted]++; }
 
         /// <summary>[診断 2026-11-14] 大技を持つボスの、 ダウンでないターンの敵の行動と、 そのターンに受けた HP の減り (防御・シールドの後・業火の烈炎の分も含む)。
         /// <paramref name="kind"/> = 0 大技 / 1 チャージ (攻撃しない) / 2 小技 / それ以外は数えない。</summary>
@@ -136,6 +141,9 @@ namespace CombatSystem
                       .Append($"割れ方 通常攻撃 {a[Slot.MainBroken]} (そのダウンで大技を消した {a[Slot.MainDownCanceled]})・ひび {a[Slot.CrackBroken]} (大技を消した {a[Slot.CrackDownCanceled]})")
                       .Append($" / 通常攻撃以外で下回った (ひび) {a[Slot.CracksMade]}")
                       .Append($"・ひびの後に通常攻撃で割った {a[Slot.CrackThenMain]} (平均 {(a[Slot.CrackThenMain] > 0 ? (double)a[Slot.CrackWaitSum] / a[Slot.CrackThenMain] : 0):0.00} ターン後)");
+                if (a[Slot.Resisted] > 0)
+                    sb.Append(System.Environment.NewLine).Append("    ")
+                      .Append($"溜めで無効 (チャージのターンに来た・山場に来たひびの分・2026-11-26) {a[Slot.Resisted]} (1 戦 {(double)a[Slot.Resisted] / a[0]:0.00})");
                 if (a[Slot.AnyBreaks] > 0)
                     sb.Append(System.Environment.NewLine).Append("    ")
                       .Append($"割れ方 (旧い判定 AnyDamage) 割れた {a[Slot.AnyBreaks]}・うち主攻撃の直後には割れておらず通常攻撃以外で割れた {a[Slot.AnyNonMainBreaks]}")

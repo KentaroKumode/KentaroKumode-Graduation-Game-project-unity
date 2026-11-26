@@ -155,6 +155,7 @@ namespace AutoTest.ParallelSweep
                 CombatSystem.TerminalDiag.Reset();
                 TerminalPolicyDiag.Reset();
                 CombatSystem.BossDownDiag.Reset();
+                AutoTest.AutoRunner.ResetInstantDownDiag();   // [診断 2026-11-26] 大ダウンの取り逃し
                 CombatSystem.HeavyHitDiag.Reset();   // [計装 2026-11-14] 大技の被ダメ
                 GameLoop.NavDiag.Reset();
                 CombatSystem.SkillDiag.Reset();
@@ -502,6 +503,13 @@ namespace AutoTest.ParallelSweep
                         if (dsVesca.TryGetValue(dsn[i], out var vRow)) Array.Copy(vRow, 0, response.dmgSrcVesca, i * W, W);
                     }
                 }
+                // [診断 2026-11-26] 大ダウンの取り逃し: 応答の隣に生の数と読める行を置く (応答の形は変えない)
+                try
+                {
+                    File.WriteAllText(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(_job.responsePath)) ?? ".", "inst_down_diag.txt"),
+                        AutoTest.AutoRunner.InstantDownDiagRaw() + "\n" + AutoTest.AutoRunner.InstantDownDiagLine() + "\n");
+                }
+                catch (Exception) { }
                 WriteAtomic(_job.responsePath, JsonUtility.ToJson(response, false));
                 WriteProgress(response.valid, response.completedNormally ? "completed" : "failed");
             }

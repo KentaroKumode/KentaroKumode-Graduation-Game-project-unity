@@ -45,7 +45,7 @@ namespace CombatSystem
             BladeAtk = V(MetaProgression.ChallengeCards.Blade);
             PursuitHand = V(MetaProgression.ChallengeCards.Pursuit); PursuitAtk = V2(MetaProgression.ChallengeCards.Pursuit);
             RebootCostCut = V2(MetaProgression.ChallengeCards.Charge);
-            BossDown.TakenMulCard = MetaProgression.MetaDebuffApplicator.GetDownTakenMul();
+            BossDown.TakenMulCard = BossDown.DownTakenMulOverride > 0f ? BossDown.DownTakenMulOverride : MetaProgression.MetaDebuffApplicator.GetDownTakenMul();
         }
 
         /// <summary>【再起動】【オーバークロック】の充電 (〈予備電源〉III の −N・最低 1)。</summary>

@@ -23,6 +23,13 @@ namespace CombatSystem
     /// ひとりでに割れた目盛りのダウンは<b>弱い</b>: 敵は攻撃しないが、 受けるダメージ ×<see cref="TakenMul"/> は付かない (口 downCrackWeak)。
     /// 口 downBreakRule = AnyDamage で旧い判定 (ターンの終わりの HP で割る・ひびなし・全部 ダウン)。</para>
     ///
+    /// <para><b>割る時を選ぶ規則 (2026-11-26・作者の決定・<see cref="DownCancelRule.Timed"/>・既定)</b>: 周期の山場 (大技・構え・予兆) を持つ敵では、
+    /// ダウンの種類を<b>ダウンが来るターン</b>で決める (<see cref="Classify"/>)。 山場のターン = <b>大ダウン</b> (攻撃しない・山場を取り消して周期を頭へ・受けるダメージ ×倍率) /
+    /// チャージのターン (山場の 1 ターン前) = <b>溜めで無効</b> (溜め中は怯まない・敵はそのまま溜める・目盛りは消える) / それ以外 = <b>よろめき</b> (攻撃しない・倍率なし・周期はそのまま)。
+    /// つまり大ダウンを取るには、 チャージのターンに通常攻撃で割る。 ひびで割れた分は常によろめき (山場のターンに来たら無効)。
+    /// 1 ターンに目盛りを 2 つ以上割っても、 ダウンは 1 ターンだけで、 倍率が 1 つにつき +<see cref="MultiNotchStep"/>。 周期を持たない敵は今までどおり (ダウン ×倍率・ひびはよろめき)。
+    /// 旧い規則 (ChargeOrHeavy・Always) は測定の口に残す (種類はひびかどうかだけ・割った数だけターンが続く)。</para>
+    ///
     /// <para>本体 (<c>CombatManager</c>) と BOT (<c>AutoRunner</c> の効用・先読み) が<b>同じ関数</b>を呼ぶ。 式を 2 か所に書かない。
     /// このファイルは UnityEngine に依存しない (Unity なしの検算 <c>Tools/rules_check</c> がそのままコンパイルする)。
     /// 小数の定数は const の float で持つ (実行時の割り算に置き換えない)。</para>
@@ -30,9 +37,13 @@ namespace CombatSystem
     public static class BossDown
     {
         /// <summary>ダウン中に受けるダメージの倍率 (ダウンだけ・ひびで割れたよろめきには付かない)。</summary>
-        public const float TakenMul = 1.5f;
-        /// <summary>今の戦闘のダウンの倍率 (既定 <see cref="TakenMul"/>・挑戦カード〈受身〉で 1.35 / 1.20)。 戦闘の始めに <see cref="CardRules.Load"/> が入れる。</summary>
+        public const float TakenMul = 2.0f;   // 2026-11-26 に 1.5 → 2.0 (作者の決定・割った瞬間に効く規則と一緒に・大ダウンを狙う価値を上げる)
+        /// <summary>今の戦闘のダウンの倍率 (既定 <see cref="TakenMul"/>・挑戦カード〈受身〉で 1.65 / 1.45)。 戦闘の始めに <see cref="CardRules.Load"/> が入れる。</summary>
         public static float TakenMulCard = TakenMul;
+        /// <summary>[測定 2026-11-26] 大ダウン倍率の上書き (0 以下 = 既定のまま)。</summary>
+        public static float DownTakenMulOverride = 0f;
+        /// <summary>[測定 2026-11-26] Timed のよろめきを行動不能にしない (大ダウンだけ行動不能・既定 false)。</summary>
+        public static bool DownStaggerNoStun = false;
 
         /// <summary>ひびの猶予の既定 (ターン数・2026-11-14)。 ひびが入ったターンから数えてこのターン数の後のターンの終わりに割れる
         /// (0 = ひびが入ったターンの終わりにすぐ割れる・1 = 次のターンの終わり)。 負 = ひびでは割れない。 測定の口 downCrackGrace。</summary>
@@ -89,12 +100,24 @@ namespace CombatSystem
         /// <summary>受けるダメージにダウンの倍率を掛ける (<paramref name="down"/> = このターンはダウン・切り捨て)。
         /// 〈英雄の意志〉〈黒錫のライデン瓶〉で強めたダウン (2026-11-25) は倍率 +<see cref="TakenBonusPctNow"/>%。</summary>
         public static int ApplyTaken(int dmg, bool down)
-            => !down || dmg <= 0 ? dmg : TakenBonusPctNow > 0 ? (int)(dmg * (TakenMulCard + TakenBonusPctNow * 0.01f)) : (int)(dmg * TakenMulCard);
+            => !down || dmg <= 0 ? dmg : TakenBonusPctNow > 0 || ExtraNotchesNow > 0 ? (int)(dmg * MulNow) : (int)(dmg * TakenMulCard);
+
+        /// <summary>今のダウンの倍率 (基本 + まとめて割った目盛りの分 + 強めた分)。 画面の「被ダメ×」もこれを読む。</summary>
+        public static float MulNow => TakenMulCard + MultiNotchStep * ExtraNotchesNow + TakenBonusPctNow * 0.01f;
+
+        /// <summary>混乱ゲージが満ちた後の最大値 (四捨五入・必ず 1 以上増える)。 本体と BOT の見込みが同じ関数を呼ぶ。</summary>
+        public static int GrownMax(int max, float growth) => Math.Max(max + 1, (int)Math.Round(max * (1.0 + growth)));
+
+        /// <summary>1 ターンに目盛りをまとめて割った時、 2 つ目から 1 つにつき足す倍率 (2026-11-26・作者の決定・大ダウンだけ)。</summary>
+        public const float MultiNotchStep = 0.5f;
+
+        /// <summary>このダウンでまとめて割った目盛りの、 1 つ目より多い数 (0 = 1 つだけ)。 CombatManager がターンの頭に入れ、 次のターンの頭・戦闘の始めと終わりに 0 へ戻す。</summary>
+        public static int ExtraNotchesNow;
 
         /// <summary>このダウンの倍率の上乗せ (% ・0 = なし・2026-11-25)。 次のダウンを強める品 (<see cref="BossDownState.bonusPct"/>) が、 そのダウンの間だけ立てる。 CombatManager がターンの頭に入れ、 戦闘の始めと終わりに 0 へ戻す。</summary>
         public static int TakenBonusPctNow;
 
-        /// <summary>次のダウンの倍率の上乗せの上限 (% ・×1.5 → ×2.5 まで・2026-11-25 neon answer_gauge)。</summary>
+        /// <summary>次のダウンの倍率の上乗せの上限 (% ・+100% まで = ×2.0 → ×3.0・2026-11-25 neon answer_gauge)。</summary>
         public const int TakenBonusMaxPct = 100;
         /// <summary>次のダウンを 1 ターン延ばせる回数 (1 戦闘につき・〈柱折りの発破筒〉・2026-11-25)。</summary>
         public const int ExtendMaxPerFight = 2;
@@ -107,7 +130,7 @@ namespace CombatSystem
         /// 敵の HP を減らす口 (<c>HpLossDiag.Lose</c>・主攻撃の <c>ApplyWinDamageModifiers</c>・品の直接の削り) が <see cref="ApplyTakenNow"/> で読む。</summary>
         public static bool TakenMulNow;
 
-        /// <summary>このターンが ×1.5 を持つダウンなら ×<see cref="TakenMul"/> (と上乗せ)。</summary>
+        /// <summary>このターンが倍率を持つダウンなら ×<see cref="TakenMul"/> (と上乗せ)。</summary>
         public static int ApplyTakenNow(int dmg) => ApplyTaken(dmg, TakenMulNow);
 
         // ---- 割れ方の見込み (本体の BossDownState と同じ規則を、 状態を書き換えずに 1 ターン分だけ進める・BOT が読む) ----
@@ -180,10 +203,52 @@ namespace CombatSystem
         /// 起点は 1 つ (<see cref="Escalation.HeavyCycleOffset"/>) なので、 取り消すと、 敵が持つ周期は全部そろって頭に戻る。
         /// 本体 (<c>CombatManager.BeginBossDownTurn</c>) と BOT の見積もり (<c>AutoRunner</c>) が同じ関数を呼ぶ。</summary>
         public static bool CancelsCycle(DownCancelRule rule, int turnsToHeavy, int turnsToGuard, int turnsToOmen)
-            => rule == DownCancelRule.Always || IsChargeOrClimax(turnsToHeavy) || IsChargeOrClimax(turnsToGuard) || IsChargeOrClimax(turnsToOmen);
+            => IsTimedFamily(rule) ? IsClimax(turnsToHeavy, turnsToGuard, turnsToOmen)
+             : rule == DownCancelRule.Always || IsChargeOrClimax(turnsToHeavy) || IsChargeOrClimax(turnsToGuard) || IsChargeOrClimax(turnsToOmen);
 
         /// <summary>「山場まで何ターンか」が、 山場のターン (0) か、 その 1 ターン前のチャージ (1) か。</summary>
         public static bool IsChargeOrClimax(int turnsTo) => turnsTo == 0 || turnsTo == 1;
+
+        /// <summary>割る時で種類が決まる規則か (<see cref="DownCancelRule.Timed"/> / <see cref="DownCancelRule.Instant"/>)。 待ちのダウン (ひび・延長) の種類の決め方は 2 つで同じ。</summary>
+        public static bool IsTimedFamily(DownCancelRule rule) => rule == DownCancelRule.Timed || rule == DownCancelRule.Instant;
+
+        /// <summary>[2026-11-26・<see cref="DownCancelRule.Instant"/>] このターンに通常攻撃で目盛りを割ったら、 その場で何が起きるか。 引数は「山場まで何ターンか」(このターン)。
+        /// 山場のターン (と周期を持たない敵) = <see cref="DownKind.Big"/> (このターンの行動をキャンセル・山場を取り消し・次のターンは大ダウン) /
+        /// チャージのターン = <see cref="DownKind.Resisted"/> (溜め中は怯まない・目盛りは消える) / それ以外 = <see cref="DownKind.Stagger"/> (このターンの行動をキャンセル・次のターンは普段どおり)。</summary>
+        public static DownKind ClassifyInstant(int h, int g, int o)
+        {
+            if (h < 0 && g < 0 && o < 0) return DownKind.Big;
+            if (IsClimax(h, g, o)) return DownKind.Big;
+            if (h == 1 || g == 1 || o == 1) return DownKind.Resisted;
+            return DownKind.Stagger;
+        }
+
+        /// <summary>どれかの周期の山場のターン (0) か。</summary>
+        public static bool IsClimax(int h, int g, int o) => h == 0 || g == 0 || o == 0;
+
+        /// <summary>ダウンが来たターンの、 ダウンの種類 (2026-11-26・<see cref="DownCancelRule.Timed"/>)。 引数は <see cref="CancelsCycle"/> と同じ「山場まで何ターンか」(−1 = その周期を持たない)。
+        /// <paramref name="weak"/> = ひびで割れた分 / <paramref name="extension"/> = 〈柱折りの発破筒〉で延ばした分 (前のダウンの続き = 大ダウンのまま)。
+        /// 旧い規則 (ChargeOrHeavy・Always) では種類はひびかどうかだけ (無効は無い)。 本体のターンの頭と BOT の見込みが同じ関数を呼ぶ。</summary>
+        public static DownKind Classify(DownCancelRule rule, bool weak, bool extension, int h, int g, int o)
+        {
+            if (!IsTimedFamily(rule)) return weak ? DownKind.Stagger : DownKind.Big;
+            if (extension) return DownKind.Big;
+            if (h < 0 && g < 0 && o < 0) return weak ? DownKind.Stagger : DownKind.Big;   // 周期を持たない敵は今までどおり
+            if (IsClimax(h, g, o)) return weak ? DownKind.Resisted : DownKind.Big;      // 山場: 通常攻撃で割った分だけが止める
+            if (h == 1 || g == 1 || o == 1) return DownKind.Resisted;                   // チャージ: 溜め中は怯まない
+            return DownKind.Stagger;                                                     // 小技のターン: よろめき (倍率なし・周期はそのまま)
+        }
+    }
+
+    /// <summary>ダウンの種類 (<see cref="BossDown.Classify"/>・2026-11-26)。</summary>
+    public enum DownKind
+    {
+        /// <summary>大ダウン: 攻撃しない・受けるダメージ ×倍率・山場のターンなら山場を取り消して周期を頭へ。</summary>
+        Big = 0,
+        /// <summary>よろめき: 攻撃しない・倍率なし (〈骨溶かしの黒油〉は ×1.5)・周期はそのまま。</summary>
+        Stagger = 1,
+        /// <summary>無効: 溜め中 (チャージのターン) は怯まない・山場に来たひびの分。 敵は普段どおり行動し、 目盛りは消える。</summary>
+        Resisted = 2,
     }
 
     /// <summary>ダウンが敵の周期を取り消す条件 (<see cref="BossDown.CancelsCycle"/>・測定の口 <c>GameHooks.DownCancel</c> / <c>AutoRunner.downCancelRule</c>)。</summary>
@@ -193,6 +258,13 @@ namespace CombatSystem
         ChargeOrHeavy = 0,
         /// <summary>旧い規則 (2026-11-13〜11-14): どのダウンでも周期を頭に戻す。</summary>
         Always = 1,
+        /// <summary>既定 (2026-11-26〜・作者の決定): ダウンの種類を来たターンで決める (<see cref="BossDown.Classify"/>)。 山場のターンの大ダウンだけが周期を頭に戻す。
+        /// まとめて割っても 1 ターン (倍率が増える)。</summary>
+        Timed = 2,
+        /// <summary>既定 (2026-11-26〜・作者の決定・GAME.md §23-36): 通常攻撃で割った瞬間に効く (<see cref="BossDown.ClassifyInstant"/>)。 山場のターンに割ると、 その場で山場をキャンセルし、
+        /// 次のターンは大ダウン。 小技のターンに割ると、 その場でこのターンの行動をキャンセル (よろめき・次のターンは普段どおり)。 チャージのターンは怯まない (無効)。
+        /// 大ダウンのターンに割ると、 そのターンの割った後のダメージの倍率が上がる。 ひびは次のターンによろめき (山場・チャージに来たら無効)。</summary>
+        Instant = 3,
     }
 
     /// <summary>目盛りの割れ方 (<see cref="BossDown.ForecastTurn"/>・測定の口 <c>GameHooks.DownBreak</c> / <c>AutoRunner.downBreakRule</c>)。</summary>
@@ -224,13 +296,54 @@ namespace CombatSystem
         /// <summary>このターンのダウンが大技を取り消した (<see cref="BossDown.CancelsCycle"/> が真で、 敵が大技を持つ)。 CombatManager が立てる・画面が読む。</summary>
         public bool heavyCanceledNow;
 
-        public bool Enabled => notches != null && notches.Length > 0;
+        /// <summary>[2026-11-26] まだ来ていないダウンごとの、 まとめて割った目盛りの数 / 延長の分か (長さは <see cref="pending"/> と同じ)。</summary>
+        public readonly System.Collections.Generic.List<int> pendingCount = new System.Collections.Generic.List<int>();
+        public readonly System.Collections.Generic.List<bool> pendingExt = new System.Collections.Generic.List<bool>();
+        /// <summary>[2026-11-26] このターンのダウンでまとめて割った目盛りの数 / 延長の分か / 溜めで無効になった (敵は普段どおり行動する)。 CombatManager が無効を立てる。</summary>
+        public int countNow;
+        public bool extNow, resistedNow;
+        /// <summary>[2026-11-26・Instant] このターン、 通常攻撃で割った瞬間に敵の行動をキャンセルした (敵の攻撃の枝を通らない)。 次のターンの頭で戻す。</summary>
+        public bool interruptNow;
+        /// <summary>[2026-11-26・Instant] 次に来る大ダウンのターンの頭で、 周期を頭に戻す (山場をキャンセルした時に立てる)。</summary>
+        public bool resetCycleNext;
+        /// <summary>[2026-11-26] 同じターンに割った目盛りを 1 つのダウンにまとめる (<see cref="DownCancelRule.Timed"/>)。 false = 旧い規則 (割った数だけターンが続く)。</summary>
+        public bool mergeNotches;
+        private int _lastPushTurn = int.MinValue;
 
-        /// <summary>戦闘の始め・形態の交代: 目盛りを入れ直し、 割った数と待ちを 0 に。</summary>
-        public void Reset(float[] n)
+        // ---- 混乱ゲージ (2026-11-26・作者の決定・GAME.md §6-15・目盛りを置き換えた) ----
+        //  攻撃の端子に挿したダイスの「止まった面の数字」(出目 +N などの補正は入れない) で溜まる。 満ちた瞬間に Instant と同じ効き方。
+        //  満ちたら 0 に戻り、 最大値が ×(1 + 係数) で増える (係数は敵ごと・BossParams.DownGauge)。 ダウン中のターンは溜まらない。
+        /// <summary>今の混乱値 / 満タンの量 (0 = ゲージを持たない敵) / 満ちるたびに最大値に掛ける増え方 (0.25 = +25%)。</summary>
+        public int gauge, gaugeMax;
+        public float gaugeGrowth;
+
+        public bool Enabled => gaugeMax > 0;
+
+        /// <summary>戦闘の始め・形態の交代: ゲージを入れ直す (<paramref name="max"/> ≤ 0 = ゲージを持たない)。 目盛りの状態も空にする。</summary>
+        public void ResetGauge(int max, float growth, int start)
+        {
+            Reset(null);
+            gaugeMax = Math.Max(0, max); gaugeGrowth = Math.Max(0f, growth);
+            gauge = gaugeMax > 0 ? Math.Min(gaugeMax - 1, Math.Max(0, start)) : 0;
+        }
+
+        /// <summary>混乱値を <paramref name="n"/> 足す。 満ちたら 0 に戻して最大値を増やし、 true (呼ぶ側がダウンを起こす)。</summary>
+        public bool AddGauge(int n)
+        {
+            if (!Enabled || n <= 0) return false;
+            gauge += n;
+            if (gauge < gaugeMax) return false;
+            gauge = 0;
+            gaugeMax = BossDown.GrownMax(gaugeMax, gaugeGrowth);
+            return true;
+        }
+
+        /// <summary>戦闘の始め・形態の交代: 目盛りを入れ直し、 割った数と待ちを 0 に。 <paramref name="merge"/> = 同じターンに割った目盛りを 1 つのダウンにまとめる。</summary>
+        public void Reset(float[] n, bool merge = false)
         {
             notches = n != null && n.Length > 0 ? n : null; broken = 0; pending = 0; downNow = false; downWeakNow = false; heavyCanceledNow = false;
-            pendingWeak.Clear();
+            pendingWeak.Clear(); pendingCount.Clear(); pendingExt.Clear();
+            countNow = 0; extNow = false; resistedNow = false; mergeNotches = merge; _lastPushTurn = int.MinValue; interruptNow = false; resetCycleNext = false;
             crackTurn = notches != null ? new int[notches.Length] : null;
             if (crackTurn != null) for (int i = 0; i < crackTurn.Length; i++) crackTurn[i] = -1;
         }
@@ -241,18 +354,64 @@ namespace CombatSystem
         /// <summary>ターンの頭: 待ちがあればこのターンをダウンにして 1 つ使う。 戻り値 = このターンはダウンか。</summary>
         public bool BeginTurn()
         {
-            heavyCanceledNow = false;
+            heavyCanceledNow = false; resistedNow = false; interruptNow = false;
             downNow = pending > 0;
-            downWeakNow = false;
+            downWeakNow = false; countNow = 0; extNow = false;
             if (downNow)
             {
                 pending--;
                 if (pendingWeak.Count > 0) { downWeakNow = pendingWeak[0]; pendingWeak.RemoveAt(0); }
+                countNow = 1;
+                if (pendingCount.Count > 0) { countNow = pendingCount[0]; pendingCount.RemoveAt(0); }
+                if (pendingExt.Count > 0) { extNow = pendingExt[0]; pendingExt.RemoveAt(0); }
             }
             return downNow;
         }
 
-        private void Push(int d, bool weak) { for (int i = 0; i < d; i++) pendingWeak.Add(weak); pending += d; }
+        /// <summary>[2026-11-26・Instant] 通常攻撃が当たった直後の HP で、 まだ割っていない目盛りを割る (待ちには積まない・何が起きるかは呼ぶ側が決める)。 戻り値 = 割った数。</summary>
+        public int BreakByMainHit(int hp, int maxHp, int mainDmg, int turn, out int crackedBroken, out int crackWaitSum)
+        {
+            crackedBroken = 0; crackWaitSum = 0;
+            if (!Enabled || hp <= 0 || mainDmg <= 0) return 0;
+            int nb = BossDown.BrokenCount(notches, maxHp, hp, broken);
+            for (int i = broken; i < nb; i++)
+                if (crackTurn[i] >= 0) { crackedBroken++; crackWaitSum += Math.Max(0, turn - crackTurn[i]); crackTurn[i] = -1; }
+            int d = nb - broken; broken = nb;
+            return d;
+        }
+
+        /// <summary>[2026-11-26・Instant] 次のターンの大ダウンを積む (<paramref name="count"/> = まとめて割った数・倍率に使う)。 延長と同じ「大ダウン確定」の印で入れる。</summary>
+        public void PushBig(int count, bool resetCycle)
+        {
+            if (count <= 0) return;
+            pendingWeak.Add(false); pendingCount.Add(count); pendingExt.Add(true); pending++;
+            if (resetCycle) resetCycleNext = true;
+        }
+
+        /// <summary>残っているダウンの先頭が延長の分か (BOT・予告が読む)。</summary>
+        public bool PendingHeadExt => pendingExt.Count > 0 && pendingExt[0];
+
+        /// <summary>割った目盛り <paramref name="d"/> 個を待ちに積む。 まとめる時 (<see cref="mergeNotches"/>) は 1 つのダウンにし、 同じターン (<paramref name="turn"/>) に積んだ物と合わせる
+        /// (通常攻撃で割った分があれば、 ひびの分と合わせても弱くない)。 まとめない時は d ターン (旧い規則)。</summary>
+        private void Push(int d, bool weak, int turn)
+        {
+            if (d <= 0) return;
+            if (mergeNotches)
+            {
+                int last = pendingCount.Count - 1;
+                if (last >= 0 && turn != int.MinValue && _lastPushTurn == turn && !pendingExt[last])
+                {
+                    pendingCount[last] += d;
+                    pendingWeak[last] = pendingWeak[last] && weak;
+                    return;
+                }
+                pendingWeak.Add(weak); pendingCount.Add(d); pendingExt.Add(false); pending++;
+                _lastPushTurn = turn;
+                return;
+            }
+            for (int i = 0; i < d; i++) { pendingWeak.Add(weak); pendingCount.Add(1); pendingExt.Add(false); }
+            pending += d;
+        }
 
         /// <summary>[旧い判定 AnyDamage] ターンの終わり: HP から新しく割った目盛りを数え、 その数だけダウンを待ちに積む (全部 満額)。 戻り値 = 新しく割った数。 倒れた (HP ≤ 0) なら数えない。</summary>
         public int NoteTurnEnd(int hp, int maxHp)
@@ -260,7 +419,7 @@ namespace CombatSystem
             if (!Enabled || hp <= 0) return 0;
             int nb = BossDown.BrokenCount(notches, maxHp, hp, broken);
             int d = nb - broken;
-            broken = nb; Push(d, false);
+            broken = nb; Push(d, false, int.MinValue);
             return d;
         }
 
@@ -275,7 +434,7 @@ namespace CombatSystem
             for (int i = broken; i < nb; i++)
                 if (crackTurn[i] >= 0) { crackedBroken++; crackWaitSum += Math.Max(0, turn - crackTurn[i]); crackTurn[i] = -1; }
             int d = nb - broken;
-            broken = nb; Push(d, false);
+            broken = nb; Push(d, false, turn);
             return d;
         }
 
@@ -286,7 +445,7 @@ namespace CombatSystem
         public int NoteTurnEndCracks(int hp, int maxHp, int turn, int grace, bool crackWeak, out int newCracks)
         {
             newCracks = 0;
-            if (!Enabled || hp <= 0) return 0;
+            if (notches == null || hp <= 0) return 0;
             // 一度入ったひびは、 回復で目盛りの上へ戻っても消さない (2026-11-14・作者の決定)
             for (int i = broken; i < notches.Length; i++)
                 if (hp <= BossDown.NotchHp(maxHp, notches[i]) && crackTurn[i] < 0) { crackTurn[i] = turn; newCracks++; }
@@ -294,7 +453,7 @@ namespace CombatSystem
             if (grace >= 0)
                 while (broken < notches.Length && crackTurn[broken] >= 0 && turn - crackTurn[broken] >= grace)
                 {
-                    Push(1, crackWeak);
+                    Push(1, crackWeak, turn);
                     crackTurn[broken] = -1; broken++; d++;
                 }
             return d;
@@ -304,7 +463,7 @@ namespace CombatSystem
         /// 並びは書き換えず作り直す (<c>BossParams</c> の表を共有しているため)。 戻り値 = 上がった後の目盛りの HP (動かなければ −1)。</summary>
         public int RaiseNext(int maxHp, int hpCap, int add)
         {
-            if (!Enabled || add <= 0 || maxHp <= 0 || broken >= notches.Length) return -1;
+            if (notches == null || add <= 0 || maxHp <= 0 || broken >= notches.Length) return -1;
             int cur = BossDown.NotchHp(maxHp, notches[broken]);
             int to = Math.Min(hpCap, cur + add);
             if (to <= cur) return -1;
@@ -357,7 +516,7 @@ namespace CombatSystem
             _buffsTaken = true;
             bonusNowPct = bonusPct; shield = shieldOnDown; charge = chargeOnDown;
             bonusPct = 0; shieldOnDown = 0; chargeOnDown = 0;
-            if (extendNext) { extendNext = false; extendsUsed++; pending++; pendingWeak.Insert(0, false); extended = true; }
+            if (extendNext) { extendNext = false; extendsUsed++; pending++; pendingWeak.Insert(0, false); pendingCount.Insert(0, 1); pendingExt.Insert(0, true); extended = true; }
             return bonusNowPct > 0 || shield > 0 || charge > 0 || extended;
         }
 

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using CombatSystem;
 using GameLoop;
 using UnityEngine;
@@ -427,11 +427,20 @@ namespace UI.Game2D
             }
             // 前触れ (次のターン)・ダウン中の倍率・ひび・目盛りまで・不安定 (旧画面の予告の枠の下の行)
             var parts = new List<string>(3); bool hot = false;
-            if (s.downPending > 0) { parts.Add(s.downNextWeak ? "次 よろめき" : "次 ダウン"); hot = true; }
-            else if (s.guardIn == 1 && s.heavyIn == 1) { parts.Add("次 構え・大技"); hot = true; }
-            else if (s.heavyIn == 1) { parts.Add("次 大技"); hot = true; }
-            else if (s.guardIn == 1) parts.Add("次 構え");
-            if (s.down && (!s.downWeak || BossDown.TakenMulNow)) { parts.Add("被ダメ×" + (BossDown.TakenMulCard + BossDown.TakenBonusPctNow * 0.01f).ToString("0.0#")); hot = true; }
+            // 割る時を選ぶ規則 (2026-11-26): 次に来るダウンの種類・溜め (怯まない)・今割れば山場が止まる
+            string stop = s.downBreakNowKind == (int)CombatSystem.DownKind.Big && s.HasDown ? " 今満たせば止まる" : "";
+            bool instant = GameLoop.GameHooks.DownCancel == CombatSystem.DownCancelRule.Instant;   // 割った瞬間に効く規則 (2026-11-26・§23-36)
+            if (instant && s.HasDown && s.downPending == 0 && s.heavyIn == 0 && s.downBreakNowKind == (int)CombatSystem.DownKind.Big) { parts.Add("大技 今満たせば止まる"); hot = true; }
+            else if (instant && s.HasDown && s.downPending == 0 && s.downBreakNowKind == (int)CombatSystem.DownKind.Resisted) { parts.Add("次 大技  溜め中 怯まない"); hot = true; }
+            else if (instant && s.downPending == 0 && s.heavyIn == 1) { parts.Add("次 大技"); hot = true; }
+            else if (s.downPending > 0) { parts.Add(s.downNextKind == (int)CombatSystem.DownKind.Resisted ? "次 溜めで無効" : s.downNextKind == (int)CombatSystem.DownKind.Stagger || (s.downNextKind < 0 && s.downNextWeak) ? "次 よろめき" : "次 ダウン"); hot = true; }
+            else if (s.guardIn == 1 && s.heavyIn == 1) { parts.Add("次 構え・大技" + stop); hot = true; }
+            else if (s.heavyIn == 1) { parts.Add("次 大技" + stop); hot = true; }
+            else if (s.guardIn == 1) parts.Add("次 構え" + stop);
+            else if (s.HasDown && s.downBreakNowKind == (int)CombatSystem.DownKind.Resisted) { parts.Add("次 溜め 怯まない"); hot = true; }
+            else if (s.HasDown && s.heavyIn >= 2) parts.Add("大技まで " + s.heavyIn);   // [2026-11-26] 先を読めるよう周期を出す
+            if (s.downGaugeMax > 0 && !s.down) parts.Insert(0, "混乱 " + s.downGauge + "/" + s.downGaugeMax);   // [2026-11-26] 混乱ゲージ
+            if (s.down && (!s.downWeak || BossDown.TakenMulNow)) { parts.Add("被ダメ×" + BossDown.MulNow.ToString("0.0#")); hot = true; }
             else if (s.crackBreakTurn >= 0) { parts.Add(s.crackBreakTurn <= s.turn ? "亀裂 このターンで割れる" : "亀裂 あと" + (s.crackBreakTurn - s.turn + 1) + "ターン"); hot = true; }
             else if (s.downNotchHp >= 0 && s.downCracks != null && s.downBroken < s.downCracks.Length && s.downCracks[s.downBroken] >= 0) { parts.Add("亀裂 通常攻撃で割れる"); hot = true; }
             if (parts.Count > 0)
@@ -918,7 +927,9 @@ namespace UI.Game2D
             l.Add("攻撃 " + s.eatk + (s.burst > 0 ? " + 烈炎 " + s.burst : "") + "  防御 " + s.edef);
             l.Add("HP " + (_fx != null ? _fx.EnemyHp + "/" + _fx.EnemyMax : "-"));
             l.Add("ターン " + s.turn + "  激化 " + s.Stage + (s.NextStageIn >= 0 ? " (次まで " + s.NextStageIn + ")" : " (最大)"));
-            if (s.downNotchHp >= 0 && _fx != null) l.Add("目盛りまで " + Mathf.Max(0, _fx.EnemyHp - s.downNotchHp));
+            if (s.downGaugeMax > 0) l.Add("混乱 " + s.downGauge + "/" + s.downGaugeMax + " (満ちるまで " + Mathf.Max(0, s.downGaugeMax - s.downGauge) + ")"
+                + (s.downBreakNowKind == (int)CombatSystem.DownKind.Big ? " 今満たすと ダウン" : s.downBreakNowKind == (int)CombatSystem.DownKind.Stagger ? " 今満たすと よろめき"
+                   : s.downBreakNowKind == (int)CombatSystem.DownKind.Resisted ? " 今満たすと 溜めで無効" : ""));
             int inst = GameManager.Instance != null ? GameManager.Instance.InstabilityFromEscalationThisCombat : 0;
             if (inst > 0) l.Add("不安定 +" + inst);
             return l;

@@ -1,4 +1,4 @@
-using CombatSystem;
+﻿using CombatSystem;
 using ItemSystem.PassiveSkills.Keywords;
 
 namespace ItemSystem.PassiveSkills.Effects
@@ -172,8 +172,9 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 過充電かどうかは配線の後 (OnWired・このターンの充電の獲得の後) で見る。</summary>
     public class CatfishSpine : IPassiveSkillEffect, IRelicDisplay
     {
-        public string SkillId => "雷鯰の棘";
-        public const int Pen = 8, NotchPct = 20;
+        public const string Id = "雷鯰の棘";
+        public string SkillId => Id;
+        public const int Pen = 8, Gauge = 1;   // 2026-11-26: 目盛りへの削り 20% → 混乱 +1 (撃ごと)
         private const string Key = "chg.catfish";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.IsOvercharged());
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired, PassiveSkillTrigger.OnPostDealDamage };
@@ -187,8 +188,7 @@ namespace ItemSystem.PassiveSkills.Effects
                 return;
             }
             if (Chg.TurnN(ctx, Key) <= 0 || !Rw.PlayerHit(ctx) || !Chg.RealHit(ctx)) return;
-            int add = ctx.finalDamage * NotchPct / 100;
-            if (add > 0) CombatManager.Instance?.RaiseBossNextNotch(add);
+            CombatManager.Instance?.AddBossGauge(Gauge);
         }
     }
 
@@ -251,13 +251,14 @@ namespace ItemSystem.PassiveSkills.Effects
     /// <summary>避雷の杭: 1 ターンに充電を 8 以上消費したとき、 ボスの次の目盛りを最大 HP の 5% ぶん上げ (2026-11-25 neon answer_gauge・旧: +5)、 ブロック +6 (1 ターン 1 回)。</summary>
     public class LightningStake : IPassiveSkillEffect
     {
-        public string SkillId => "避雷の杭";
-        public const int Need = 8, NotchMaxHpPct = 5, Block = 6;
+        public const string Id = "避雷の杭";
+        public string SkillId => Id;
+        public const int Need = 8, Gauge = 3, Block = 6;   // 2026-11-26: 目盛り 最大 HP 5% → 混乱 +3
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnChargeSpend };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (Chg.SpentTurn(ctx) < Need || !Rw.OncePerTurn(ctx, "chg.stake")) return;
-            CombatManager.Instance?.RaiseBossNextNotch((int)((long)ctx.enemyMaxHP * NotchMaxHpPct / 100));
+            CombatManager.Instance?.AddBossGauge(Gauge);
             Chg.Block(ctx, Block, SkillId);
         }
     }

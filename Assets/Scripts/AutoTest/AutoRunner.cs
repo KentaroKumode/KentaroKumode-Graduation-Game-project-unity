@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
@@ -290,9 +290,10 @@ namespace AutoTest
         /// 本体の GameHooks.BossDownDisabled へ流す (目盛りが無ければ BOT の見積もりも自然にダウンを見ない)。</summary>
         public bool bossDown = true;
         /// <summary>[測定 2026-11-14] ダウンが敵の周期 (大技・構え・予兆) を取り消す条件 (CombatSystem.BossDown.CancelsCycle)。
-        /// 既定 ChargeOrHeavy = ダウンがチャージのターンか山場のターンに重なった時だけ (作者の決定)。 Always = どのダウンでも周期を頭に戻す (旧い規則 = 2e76c46 の main)。
+        /// 既定 Timed (2026-11-26・作者の決定) = ダウンの種類を来たターンで決める (BossDown.Classify)。 ChargeOrHeavy = チャージか山場のターンに重なった時だけ取り消す (2026-11-14〜11-26)。
+        /// Always = どのダウンでも周期を頭に戻す (旧い規則 = 2e76c46 の main)。
         /// 本体の GameHooks.DownCancel へ流す。 BOT の待つ得 (downAimPolicy=Aim) も同じ口で式を切り替える。</summary>
-        public CombatSystem.DownCancelRule downCancelRule = CombatSystem.DownCancelRule.ChargeOrHeavy;
+        public CombatSystem.DownCancelRule downCancelRule = CombatSystem.DownCancelRule.Instant;
         /// <summary>[測定 2026-11-14] 目盛りの割れ方 (CombatSystem.DownBreakRule)。 既定 MainAttackOnly = 通常攻撃 (主攻撃) が当たった時だけ割れる (作者の決定)・
         /// 通常攻撃以外で下回った目盛りはひびが入り、 猶予 (downCrackGrace) の後にひとりでに割れる。 AnyDamage = 旧い判定 (ターンの終わりの HP で割る・ひびなし)。
         /// 本体の GameHooks.DownBreak へ流す。 BOT の見込み (BossDown.ForecastTurn) も同じ口で切り替わる。</summary>
@@ -913,16 +914,19 @@ namespace AutoTest
                  + $"/ 手札 {(handCarry == CombatSystem.HandCarryMode.Pick ? "印を付けた端子だけ残す (Pick)" : handCarry == CombatSystem.HandCarryMode.All ? "挿さなかった端子は全部残る (All)" : "毎ターン捨てる (Off・旧い規則)")}"
                  + $"{(handCarry == CombatSystem.HandCarryMode.Pick ? " 残す方策 " + EffectiveHandKeepPolicy + " (handKeepPolicy=" + handKeepPolicy + ")" : "")} "
                  + $"/ ボスのダウン {(bossDown ? "あり" : "なし (旧い作り)")} "
-                 + $"/ ダウンの大技の取り消し {(downCancelRule == CombatSystem.DownCancelRule.Always ? "どのダウンでも周期を頭に戻す (旧い規則)" : "チャージか大技のターンに重なった時だけ")} (downCancelRule={downCancelRule}) "
+                 + $"/ ダウンの大技の取り消し {(downCancelRule == CombatSystem.DownCancelRule.Always ? "どのダウンでも周期を頭に戻す (旧い規則)" : downCancelRule == CombatSystem.DownCancelRule.Instant ? "割った瞬間に効く (大技のターンに割れば大技を止めて次は大ダウン・小技のターンはよろめき・チャージは無効)" : downCancelRule == CombatSystem.DownCancelRule.Timed ? "割る時で種類が決まる (チャージで割れば大ダウン・チャージ前は無効・他はよろめき)" : "チャージか大技のターンに重なった時だけ (旧い規則)")} (downCancelRule={downCancelRule}) "
                  + $"/ 目盛りの割れ方 {(downBreakRule == CombatSystem.DownBreakRule.AnyDamage ? "ターンの終わりの HP で割る (旧い判定・ひびなし)" : "通常攻撃だけ・それ以外で下回るとひび → " + (downCrackGrace < 0 ? "ひびでは割れない" : downCrackGrace == 0 ? "そのターンの終わりに割れる" : downCrackGrace + " ターン後のターンの終わりに割れる") + (downCrackWeak ? "・よろめきは被ダメ ×1.5 なし" : "・よろめきも被ダメ ×1.5"))} (downBreakRule={downBreakRule}・downCrackGrace={downCrackGrace}・downCrackWeak={downCrackWeak}) "
                  + $"/ 大技のチャージ {(heavyChargeNoAttack ? "攻撃しない" : "小技の倍率で攻撃する (旧い作り)")} (heavyChargeNoAttack={heavyChargeNoAttack}) "
                  + $"/ 大技の倍率と周期 {HeavySpecEffectiveText()} (enemyHeavySpec='{enemyHeavySpec}') "
                  + $"/ 灰燼の王 {(ashKingHeavy ? "大技〈業火〉(攻撃 ×大技 + 烈炎 × 業火の倍率・チャージは攻撃しない)" : "旧い形 (予兆のターンに攻撃 +N)")} (ashKingHeavy={ashKingHeavy}) "
                  + $"/ 烈炎の毎ターンの削り {(blazeTickEachTurn ? "あり (旧い形)" : "なし")} (blazeTickEachTurn={blazeTickEachTurn}) "
                  + $"/ 烈炎の積もり方 {(blazeStackRule == CombatSystem.BlazeStackRule.Guard2 ? "出目 2 個以上を防御に挿したターン +1 (旧い条件)" : "主攻撃をシールドで " + BossParamSpec.Effective(BossParamOverrides, GameLoop.BossIds.Layer6Ash, CombatSystem.BossParam.BlazePerShield).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + " 受けるごとに +1")} (blazeStackRule={blazeStackRule}) "
+                 + $"/ ダウンの規則を BOT が知る {(downTimingAware ? "知る" : "知らない (旧い規則のつもり)")} (downTimingAware={downTimingAware}) "
+                 + $"/ 振り直しを大事なターンに集める {(downRerollPlan && downTimingAware ? "ON" : "OFF")} (downRerollPlan={downRerollPlan}) "
+                 + $"/ 混乱の温存のための攻撃 0 本の待ち {(downGaugeNoAttackHold && downTimingAware && EffectiveWiringSkill == WiringSkill.Super ? "ON" : "OFF")} (downGaugeNoAttackHold={downGaugeNoAttackHold}・downGaugeReadyShare={downGaugeReadyShare:0.##}) "
                  + $"/ ダウンの狙い {(downAimPolicy == DownAimPolicy.Aim ? (downCancelRule == CombatSystem.DownCancelRule.Always ? "大技が 2 ターン後なら待って大技に重ねる手も比べる" : "待つとダウンがチャージか大技に重なるなら待つ手も比べる") : "割れる時に割る (今まで)")} (downAimPolicy={downAimPolicy}・待つ得の割引 {(downAimGainShare >= 0f ? downAimGainShare.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) : "帳簿と同じ " + v3.ledgerFutureShare.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture))} (downAimGainShare={downAimGainShare.ToString(System.Globalization.CultureInfo.InvariantCulture)})) "
                  + $"/ 深さ 3 のボスの大技 {(depth3Heavy ? "あり" : "なし (旧い作り)")} "
-                 + $"/ 博士の時計 {(vescaClockHeld ? "ランの最初から預かる (ヴェスカの各段に目盛り +" + CombatSystem.BossParams.VescaClockNotch.ToString("0.00") + ")" : "預からない (イベントで選んだ時だけ)")} (vescaClockHeld={vescaClockHeld}) "
+                 + $"/ 博士の時計 {(vescaClockHeld ? "ランの最初から預かる (ヴェスカの各段の混乱が " + CombatSystem.BossParams.VescaClockGaugeStart.ToString("0.00") + " から)" : "預からない (イベントで選んだ時だけ)")} (vescaClockHeld={vescaClockHeld}) "
                  + $"/ 攻撃なしの手の主攻撃 (旧の式) {(v3.oldNoAttackBaseDmg ? "素火力を数える (旧い挙動)" : "0")} "
                  + AshKingEffectiveText()
                  + $"/ 縄張りの宝 {territoryTreasure} (BOT のしきい値 {territoryTreasureHpMargin:0.##}) / 縄張りを避ける遠回り {(navTerritoryDetour < 0 ? "使わない" : "+" + navTerritoryDetour + "歩まで")}"
@@ -932,6 +936,7 @@ namespace AutoTest
                  + (NoAttackChoiceLine().Length > 0 ? System.Environment.NewLine + NoAttackChoiceLine() : "")
                  + (DownAimLine().Length > 0 ? System.Environment.NewLine + DownAimLine() : "")                 // [#141]
                  + (DownBreakDiagLine().Length > 0 ? System.Environment.NewLine + DownBreakDiagLine() : "")     // [診断 2026-11-14] 目盛りの割り時
+                 + (InstantDownDiagLine().Length > 0 ? System.Environment.NewLine + InstantDownDiagLine() : "") // [診断 2026-11-26] 大ダウンの取り逃し
                  + (HandKeepPlanLine().Length > 0 ? System.Environment.NewLine + HandKeepPlanLine() : "")       // [#141]
                  + (TacticUsesLine().Length > 0 ? System.Environment.NewLine + TacticUsesLine() : "");          // [2026-11-21] 戦術消耗品
         }
@@ -1180,6 +1185,10 @@ namespace AutoTest
         public string enemyAttackSpec = "";
         /// <summary>較正スイープ専用: 敵の最大 HP の上書き ("id:hp,...")。 EnemyDatabase.HpOverrideSpec。</summary>
         public string enemyHpSpec = "";
+        /// <summary>[測定 2026-11-26] 大ダウン倍率の上書き (0 以下 = 既定 1.5)。</summary>
+        public float downTakenMulOverride = 0f;
+        /// <summary>[測定 2026-11-26] Timed のよろめきを行動不能にしない (既定 false)。</summary>
+        public bool downStaggerNoStun = false;
         /// <summary>[測定 2026-11-14] ボスの機構の値 (<see cref="CombatSystem.BossParam"/>) の差し替え。 <c>"id:名前:値,…"</c> 形式
         /// (例 <c>"boss_layer6:JudgmentDice:12,boss_layer6:FuryAttack:5,boss_layer6:RegrowthRate:0.03"</c>)。 値は実数値 (倍率ではない)。
         /// 空 (既定) = 口を開けない (<see cref="CombatSystem.BossParams.Overrides"/> は null のまま = 本番と同じ)。
@@ -1897,6 +1906,8 @@ namespace AutoTest
             if (saberWaltzShopBias >= 0f)
                 ItemSystem.Shop.ShopManager.SaberWaltzShopBias = saberWaltzShopBias;
             // 敵ステータスの上書きは **DB の読み直し**なので、 ラン開始より前にここで 1 回だけ。
+            CombatSystem.BossDown.DownTakenMulOverride = downTakenMulOverride;
+            CombatSystem.BossDown.DownStaggerNoStun = downStaggerNoStun;
             CombatSystem.EnemyDatabase.ReloadWithOverrides(enemyAttackSpec, enemyAttackMul, enemyHpSpec, enemyHpMul, enemyHeavySpec);   // [測定 2026-11-14] 大技の倍率の上書きも
             MetaProgression.MetaBuffApplicator.EliteUpgradePctOverride = eliteUpgradePctOverride;
             if (flatAttackMul  >= 0f)

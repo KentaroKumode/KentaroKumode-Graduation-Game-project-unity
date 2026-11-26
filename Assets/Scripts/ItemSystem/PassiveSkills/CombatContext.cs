@@ -402,19 +402,22 @@ namespace ItemSystem.PassiveSkills
         /// 会心倍率が実際に乗る 1 箇所 (PassiveSkillManager の isCritical 分岐) で引く。</para></summary>
         public float enemyCritMultReduction = 0f;
 
+        /// <summary>現在実効の会心倍率減算量。ダウン中は〈回帰性真理〉が外れるため 0。</summary>
+        public float EffectiveEnemyCritMultReduction => CombatSystem.BossDown.ActiveNow ? 0f : enemyCritMultReduction;
 
-        /// <summary>敵の処刑 (HP 閾値による即死) が通るか。 〈回帰性真理〉持ちには通らない。</summary>
+
+        /// <summary>敵の処刑 (HP 閾値による即死) が通るか。 〈回帰性真理〉持ちには通らない（ダウン中は外れる）。</summary>
         public bool CanExecuteEnemy()
         {
-            if (!enemyRecurrentTruth) return true;
+            if (!enemyRecurrentTruth || CombatSystem.BossDown.ActiveNow) return true;
             UnityEngine.Debug.Log("[回帰性真理] 処刑を無効化");
             return false;
         }
 
-        /// <summary>敵の最大 HP を変更する。 〈回帰性真理〉持ちは増減とも拒否する。</summary>
+        /// <summary>敵の最大 HP を変更する。 〈回帰性真理〉持ちは増減とも拒否する（ダウン中は外れる）。</summary>
         public void SetEnemyMaxHP(int value)
         {
-            if (enemyRecurrentTruth)
+            if (enemyRecurrentTruth && !CombatSystem.BossDown.ActiveNow)
             {
                 if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[回帰性真理] 最大HP変更 ({enemyMaxHP}→{value}) を拒否");
                 return;
@@ -945,7 +948,7 @@ namespace ItemSystem.PassiveSkills
                     CombatSystem.HpLossDiag.Add("毒段:T" + System.Math.Min(currentTurn, 8), stacks);
                     CombatSystem.HpLossDiag.Add("毒段n:T" + System.Math.Min(currentTurn, 8), 1);
                     // 〈骨溶かしの黒油〉: このターンがダウン (待っているダウンがある = ターンの頭でダウンになる) なら ×2
-                    if (poisonDownDouble && (CombatSystem.CombatManager.Instance?.Down?.pending ?? 0) > 0) dmg *= CombatSystem.PoisonCore.OilDownMul;
+                    if (poisonDownDouble && (CombatSystem.CombatManager.Instance?.PendingDownLandsAt(currentTurn) ?? false)) dmg *= CombatSystem.PoisonCore.OilDownMul;   // 溜めで無効になるダウンは数えない (2026-11-26)
                 }
                 //   〈毒溜まりの主〉: 毒 20 以上なら 2 回 (2 回目の後には減らない ── 減るのは下の 1 回だけ)。 出来事は 1 回目だけ「減る前の毒のダメージ」(〈瘴気溜まりの壺〉)
                 int ticks = isPoison && poisonDoubleTick && stacks >= CombatSystem.PoisonCore.PoolNeed ? 2 : 1;

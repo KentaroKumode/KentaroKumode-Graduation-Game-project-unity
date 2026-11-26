@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 namespace CombatSystem
@@ -235,52 +235,39 @@ namespace CombatSystem
         public static bool IsValidSignature(int[] faces)
             => faces != null && faces.Length == SignatureFaceCount;
 
-        // ===== ダウンの目盛り (2026-11-13・GAME.md §6-15・規則は BossDown.cs) =====
-        //  HP が目盛り以下になったターンの次のターン、 ボスはダウンする (攻撃しない・受けるダメージ ×1.5・溜めた大技は取り消し)。
-        //  値は最大 HP の割合 (大きい順)。 **隠し倍率ではなく実数値**。 数・位置は敵ごとに違う (数値は仮置き・未測定)。
-        //  既にある「HP で切り替わる仕掛け」と同じ位置に重ねない: 灰燼の王 50% (段の切り替え)・ヴェスカ天与 66% / 33% (〈天与の才〉の踏みとどまり)。
-        //  対象は見せる層の第 2 層 (内部の深さ 3) 以降のボスだけ。 序層のトレジャーゴブリン (boss_layer1)・ファーム層の古い宝箱 (boss_layer0) には置かない。
+        // ===== 混乱ゲージ (2026-11-26・作者の決定・GAME.md §6-15・規則は BossDown.cs) =====
+        //  旧: HP の目盛り (2026-11-13〜11-26・§24)。 目盛りは 1 回の攻撃が粗く (平均 241 越え) 割る時を合わせられなかった (docs/portfolio_metrics_20261126.md ⑭)。
+        //  攻撃の端子に挿したダイスの止まった面の数字で溜まり、 満ちた瞬間に Instant と同じ効き方。 満ちたら 0 に戻り、 最大値が ×(1 + 増え方)。
+        //  満タンの基本 = 大技の周期 × 9 (1 周期に 1 回、 全部攻撃すれば満たせる見当・作者の委任・数値は仮置き)。 **隠し倍率ではなく実数値**。
+        //  対象は見せる層の第 2 層 (内部の深さ 3) 以降のボスだけ。
 
-        private static readonly Dictionary<string, float[]> _downNotches = new Dictionary<string, float[]>
+        /// <summary>id のボスの混乱ゲージ (満タンの基本・増え方)。 持たない敵・測定の口 (<see cref="GameLoop.GameHooks.BossDownDisabled"/>) は (0, 0)。</summary>
+        public static (int max, float growth) DownGauge(string id)
         {
-            // 深さ 3 (HP 750・2026-11-22 Phase 4 較正: 旧 505): 戦闘は 5〜8 ターン。 大技 (周期 3) を 1〜2 回消せる数
-            { GameLoop.BossIds.Layer3Goblin, new[] { 0.70f, 0.35f } },   // 〈号令〉で毎ターン攻撃が乗る → 早めの目盛りで、 前のめりに割る価値を作る
-            { GameLoop.BossIds.Layer3Marsh,  new[] { 0.60f } },          // 長引くほど毒が深い敵 → 目盛り 1 つ (割り時を 1 度だけ選ぶ・長引かせる理由を作らない)
-            { GameLoop.BossIds.Layer3Mirror, new[] { 0.75f, 0.40f } },   // 浅い一撃を返す鏡 → 溜めて一気に割る遊びと〈鏡映の応答〉(大きく殴れ) の向きが揃う
-            // 深さ 5 (審判官 HP 1835 (2026-11-18 案 B で一度 1150 にし、 同日 作者の指示「審判官は戻していい」で 1835 へ戻した)・シュヴァリエ HP 1150 (案 B のまま)): 10 ターン前後
-            { GameLoop.BossIds.Layer5Judgment, new[] { 0.75f, 0.50f, 0.25f } },   // 毎ターンの〈審判の炎〉に耐える長丁場 → 目盛り 3 つ
-            { GameLoop.BossIds.Layer5Hidden,   new[] { 0.65f, 0.30f } },          // 形態の循環で間合いが変わる → 少なめ
-            // 深さ 6 (HP 2200・2026-11-18〜 案 B・旧 3800・目盛りの位置は 1945 の時のまま): 50% は段の切り替え (再生が止まり予兆が速まる) なので避ける
-            { GameLoop.BossIds.Layer6Ash, new[] { 0.80f, 0.30f } },
-            // 深さ 7 ヴェスカ: 4 段で段ごとに HP が別 → 段ごとに 1 つ。 天与 (p4) は 66% / 33% が〈天与の才〉なので 50%
-            { GameLoop.BossIds.VescaP1,    new[] { 0.60f } },
-            { GameLoop.BossIds.VescaP2,    new[] { 0.50f } },
-            { GameLoop.BossIds.VescaP3,    new[] { 0.40f } },
-            { GameLoop.BossIds.VescaFinal, new[] { 0.50f } },
+            if (GameLoop.GameHooks.BossDownDisabled || string.IsNullOrEmpty(id)) return (0, 0f);
+            return _downGauge.TryGetValue(id, out var g) ? g : (0, 0f);
+        }
+
+        private static readonly Dictionary<string, (int, float)> _downGauge = new Dictionary<string, (int, float)>
+        {
+            // 深さ 3 (周期 3・5〜8 ターン): 1〜2 回
+            { GameLoop.BossIds.Layer3Goblin, (27, 0.30f) },
+            { GameLoop.BossIds.Layer3Marsh,  (27, 0.60f) },   // 長引くほど毒が深い敵 → 2 回目は遠い (長引かせる理由を作らない)
+            { GameLoop.BossIds.Layer3Mirror, (27, 0.30f) },
+            // 深さ 5 (周期 5・10 ターン前後)
+            { GameLoop.BossIds.Layer5Judgment, (45, 0.25f) },
+            { GameLoop.BossIds.Layer5Hidden,   (45, 0.35f) },
+            // 深さ 6 (〈業火〉は HP で周期 4 → 3・名目の 4 で決める)
+            { GameLoop.BossIds.Layer6Ash, (36, 0.25f) },
+            // 深さ 7 ヴェスカ: 段ごとに 0 から (p1・p2 は大技なし)
+            { GameLoop.BossIds.VescaP1,    (30, 0.40f) },
+            { GameLoop.BossIds.VescaP2,    (30, 0.40f) },
+            { GameLoop.BossIds.VescaP3,    (45, 0.40f) },
+            { GameLoop.BossIds.VescaFinal, (45, 0.40f) },
         };
 
-        /// <summary>id のボスのダウンの目盛り (最大 HP の割合・大きい順)。 目盛りの無い敵・測定の口
-        /// (<see cref="GameLoop.GameHooks.BossDownDisabled"/>) で止めた時は null。 返す配列を書き換えないこと。</summary>
-        public static float[] DownNotches(string id)
-        {
-            if (GameLoop.GameHooks.BossDownDisabled || string.IsNullOrEmpty(id)) return null;
-            return _downNotches.TryGetValue(id, out var n) ? n : null;
-        }
-
-        /// <summary>博士の「止まらない時計」(2026-11-13・<see cref="GameLoop.VescaClock"/>) を預かっている時、 ヴェスカの 4 つの段それぞれに足す目盛り
-        /// (最大 HP の割合・全段とも同じ)。 **隠し倍率ではなく実数値の目盛りを 1 つ足す**。 上の段ごとの目盛り (p1 60%・p2 50%・p3 40%・最終 50%) とも、
-        /// 〈天与の才〉の踏みとどまり (66%・33%) とも重ならない位置。 数値は仮置き・未測定 (docs/GAME.md §23)。</summary>
-        public const float VescaClockNotch = 0.80f;
-
-        /// <summary>戦闘 (ヴェスカは段) の始めに入れる目盛りの並び。 <paramref name="vescaClock"/> = このランで時計を預かっている
-        /// (<see cref="GameLoop.VescaClock.Held"/>) なら、 ヴェスカの段に <see cref="VescaClockNotch"/> を 1 つ足す。 ダウンを止めた測定の口
-        /// (<see cref="GameLoop.GameHooks.BossDownDisabled"/>) の時は、 時計があっても何も足さない (null のまま)。
-        /// 呼ぶ所は <c>CombatManager.ResetBossDown</c> の 1 か所だけ ── 画面の目盛り・次の目盛りまでの残り・BOT の見積もりは、 戦闘が持つこの並びを読む。</summary>
-        public static float[] DownNotches(string id, bool vescaClock)
-        {
-            var n = DownNotches(id);
-            return vescaClock && GameLoop.BossIds.VescaStageOf(id) > 0 ? BossDown.WithExtraNotch(n, VescaClockNotch) : n;
-        }
+        /// <summary>博士の「止まらない時計」(<see cref="GameLoop.VescaClock"/>) を預かっている時、 ヴェスカの各段の混乱値の始まり (満タンに対する割合・旧: 目盛り 80% を 1 つ足す)。 数値は仮置き。</summary>
+        public const float VescaClockGaugeStart = 0.50f;
 
         // ===== 深さ 3 のボスの大技の周期 (2026-11-13・仮置き) =====
         //  深さ 5 以降と同じ形 (EnemyData.heavyPeriod / heavyMul / heavyLightMul・式は Escalation.HeavyFactor) を、 軽めの値で足す。
@@ -336,7 +323,12 @@ namespace CombatSystem
             bool addHeavy = Depth3Heavy(e.id) && e.heavyPeriod <= 0;   // 深さ 3 のボスの大技 (2026-11-13・測定の口で止められる)
             if (!changeHp && !changeDice && !addHeavy) return e;
             var cc = e.Clone();
-            if (addHeavy) { cc.heavyPeriod = Depth3HeavyPeriod; cc.heavyMul = Depth3HeavyMul; cc.heavyLightMul = Depth3HeavyLightMul; }
+            if (addHeavy)
+            {
+                cc.heavyPeriod = Depth3HeavyPeriod; cc.heavyMul = Depth3HeavyMul; cc.heavyLightMul = Depth3HeavyLightMul;
+                // [測定 2026-11-26] enemyHeavySpec で id を名指しした時だけ倍率を上書き ("*" では触らない)
+                if (EnemyDatabase.Depth3HeavyOverride(e.id, out float ovL, out float ovH)) { cc.heavyLightMul = ovL; cc.heavyMul = ovH; }
+            }
             if (changeHp) cc.maxHP = Mathf.Max(1, hpOv);
             if (changeDice)
             {

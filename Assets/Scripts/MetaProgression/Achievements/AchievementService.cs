@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using CombatSystem;
 using GameLoop;
@@ -207,7 +207,7 @@ namespace MetaProgression.Achievements
         /// <summary>ボスのダウンが大技 (チャージか大技のターン) に重なって取り消した (CombatManager.Down)。</summary>
         public static void NoteBossDownCanceledHeavy() { if (Ready) Unlock(Cat.DownCancel); }
 
-        /// <summary>主攻撃 1 回で目盛りを <paramref name="broken"/> 個割った (CombatManager.Down)。</summary>
+        /// <summary>この戦闘でボスの混乱を満たした回数 <paramref name="broken"/> (CombatManager.Down・2026-11-26 〜 旧: 主攻撃 1 回で割った目盛りの数)。</summary>
         public static void NoteBossDownBroken(int broken) { if (Ready && broken >= 2) Unlock(Cat.DownDouble); }
 
         public static void NoteHealRequested(int amount)

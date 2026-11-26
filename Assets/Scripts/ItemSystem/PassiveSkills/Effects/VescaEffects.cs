@@ -427,7 +427,8 @@ namespace ItemSystem.PassiveSkills.Effects
         /// あわせて「回避に成功した次のターンは回避できない」を追加した (enemyDodgeCooldown)。
         /// 連続回避で削りが完全に止まる局面を無くし、 回避を「たまに刺さる保険」に留める。</summary>
         public const float PerWin = 0.02f;
-        public const float Cap = 0.40f;
+        /// <summary>2026-11-26: 混乱（ダウン）でリセット可能にする代わりに上限を 40% → 100% へ引き上げ。</summary>
+        public const float Cap = 1.00f;
 
         public string SkillId => "AnalyticComputation";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRollLose };

@@ -1128,11 +1128,14 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 2026-11-14〜 (大技〈業火〉の形): 業火のターンと、 その 1 ターン前のチャージのターンは回復なし (作者の決定)。 旧い形 (ashKingHeavy=False) は予兆ターンだけ。</summary>
     public class AshRegrowth : IPassiveSkillEffect
     {
+        public const string SuppressedUntilTurnKey = "ash_regrowth_suppressed_until";
+        public const int StaggerSuppressTurns = 2;
         public string SkillId => "AshRegrowth";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
             if (ctx.playerMaxHP <= 0) return;
+            if (ctx.accumulatedValues.TryGetValue(SuppressedUntilTurnKey, out var supUntil) && ctx.currentTurn <= (int)supUntil) return;
 
             float r = (float)ctx.playerCurrentHP / ctx.playerMaxHP;
             if (r <= 0.5f) return; // Phase2: 再生停止

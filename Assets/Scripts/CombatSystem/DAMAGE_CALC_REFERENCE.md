@@ -172,7 +172,8 @@ outgoingDamageMultiplier += メタ% + 遺物% + 研磨剤1.5 + consDmgMultPct/10
                                      この枠を通らない経路: 盾〈黎明〉の削り (WeaponFamilyEffects.Daybreak が ctx.enemyCurrentHP を直接減らす・ボスのダウンも乗らない)・
                                      処刑 (〈百人切りの鉈〉〈賞金首狩り〉・短剣〈処刑〉= HP を 0 にする)。
                                      武器の撃ごとの +% (§3-B2: 一対一・捨て身・処刑・鎧砕き・不滅の刃・画竜点睛) は hitFinalDamagePct へ足す (足し合わせて 1 回掛ける)。 2 体目は 1 体目の減った量を写すので削られた後の値が入る
-× 1.5 (切り捨て)                    ← ボスのダウン【2026-11-13】: ボスがダウンしているターンだけ (よろめきは除く・BossDown.ApplyTakenNow・既定 BossDown.TakenMul・今の戦闘の値 BossDown.TakenMulCard)。
+× 2.0 (切り捨て)                    ← ボスのダウン【2026-11-13・2026-11-26 に ×1.5 → ×2.0】: ボスがダウンしているターンだけ (よろめきは除く・BossDown.ApplyTakenNow・既定 BossDown.TakenMul・今の戦闘の値 BossDown.TakenMulCard・
+                                     まとめて割った大ダウンは 1 つにつき +0.5【2026-11-26】= BossDown.MulNow)。
                                      【2026-11-22】挑戦カード〈受身〉で ×1.35 (II) / ×1.20 (III) (戦闘の始めに CardRules.Load が入れる・本体と BOT が同じ ApplyTaken)。
                                      ひびで割れたよろめき (2026-11-14) では掛けない (BossDown.TakenMulNow = false)。 〈骨溶かしの黒油〉を持つ戦闘 (ctx.poisonDownDouble) はよろめきにも掛ける (2026-11-25)。
                                      【2026-11-25】強めたダウン: 倍率 + BossDown.TakenBonusPctNow / 100 (〈英雄の意志〉〈黒錫のライデン瓶〉が +50 ずつ・上限 +100・そのダウンが続く間だけ・BossDownState.TakeBuffs)。
@@ -1173,7 +1174,21 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
            「反撃固定」として同じ分がもう一度敵 HP に入っていた (毒・〈二度目の打金〉・〈急所〉・蒼白の槍騎士の倍率まで二重)。
            敵攻撃側で返るのは、 これ以降に足された分 (被弾で発動する反撃・反射) だけ。
 
-ボスのダウン (2026-11-13・規則の正本 BossDown.cs・目盛りの値は BossParams.DownNotches)
+ボスの混乱ゲージ (2026-11-26・作者の決定・規則の正本 BossDown.cs の BossDownState.AddGauge・値は BossParams.DownGauge)
+         **これが今の規則。 下の「ボスのダウン (目盛り)」の割れ方・ひび・目盛りの前進は 2026-11-26 に廃止 (GAME.md §24)。 ダウンの種類と効き方 (Instant) はそのまま。**
+         溜まる量: 配線を反映した直後 (ApplyTerminalOutcome の後・撃と敵の攻撃より前・CombatManager.NoteBossGaugeWired)、
+           攻撃の種類の端子に挿して発動したダイスの「止まった面の数字」の和 (CombatManager.GaugePips・equippedDiceFaces[playerDiceFaceIdx])。
+           出目 +N・鋳造・〈号令の剣〉・怠惰の引き算・〈剛腕〉・端子の倍率・基礎攻撃は入らない。 振り直した後の面で数える。
+         品の混乱 +N (固定値・CombatManager.AddBossGauge): 〈猛り〉撃ごと +1/+1/+2・〈シールドバッシュ〉撃ごと +1・〈黎明〉ジャスト防御 +3・〈画竜点睛〉+3 (1 ターン 1 回)・
+           〈雷鯰の棘〉〈鎧縫いの針〉〈仕込みの切替器〉〈欠け目の見立て〉撃ごと +1・〈刃こぼれの見立て〉集中会心の撃 +2・〈避雷の杭〉〈紅の搾り具〉+3 (1 ターン 1 回)・
+           〈落城の礎石〉失ったシールド 5 につき +1 (1 ターン 4 まで)・【起爆】+3・臨界の爆発 +2・〈目盛り削りのノミ〉+10。
+         満ちた瞬間 (gauge ≥ gaugeMax): gauge = 0・gaugeMax = BossDown.GrownMax(gaugeMax, 増え方) = max(gaugeMax + 1, round(gaugeMax × (1 + 増え方)))。
+           効き方は ApplyInstantBreak (下の Instant と同じ: 山場のターン = 行動をキャンセルし次のターンは大ダウン ×2.0 / チャージ = 無効 / 小技 = よろめき)。
+         敵の行動の後 (MarkBossGaugeLate より後) に足された分は預かり (_gaugeCarry)、 次のターンの頭 (BeginBossDownTurn・ダウンの判定の直後) で最初に AddBossGauge へ入れる。 大ダウンのターンは明けるまで預かったまま。
+         大ダウンのターンは溜まらない (AddBossGauge が捨てる)。 挑戦カード〈受身〉III = 満タンの量 +N% (旧: 目盛りの間隔)。 博士の時計 = ヴェスカの各段を満タンの 50% から。
+         端子〈崩し斬り〉: このターンに混乱が満ちていたら、 攻撃の撃で最大 HP の 5% の軽減不可 (1 ターン 1 回)。
+
+ボスのダウン (目盛り・2026-11-13〜11-26・廃止・規則の正本 BossDown.cs・目盛りの値は旧 BossParams.DownNotches)
          割れ方 (2026-11-14・作者の決定・口 downBreakRule・既定 MainAttackOnly):
            ・通常攻撃 (主攻撃) が 1 以上のダメージで当たった直後 (HpLossDiag.Lose(…, "通常攻撃") の直後・固定ダメの枠より前・CombatManager.NoteBossDownMainHit) の
              敵の HP ≤ floor(最大 HP × 目盛り) の、 まだ割っていない目盛りを全部割る (ダウン)。 回避・吸収で 0・撃破 (HP 0) では割らない。
@@ -1184,12 +1199,26 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
              上げるだけでは割れない) か「次のダウンを強める」(BuffNextBossDown / ExtendNextBossDown) だけ。 〈目盛り削りのノミ〉は通常攻撃として割る (NoteBossDownMainHit)。
            ・BOT の見込みは同じ規則の BossDown.ForecastTurn (本体の進め方との一致は Tools/rules_check の 14)。
            ・口 downBreakRule=AnyDamage = 旧い判定: ターンの終わりの敵の HP ≤ floor(最大 HP × 目盛り) になった目盛りの数だけ、 次のターンからダウンを待たせる (全部 ダウン)。
-         割った目盛りの数だけ、 次のターンからダウンが続く (1 ターンで 2 つ割れば 2 ターン・ダウン中に次を割ればもう 1 ターン。 上限なし)。 ヴェスカは段ごとに目盛りを入れ直す (待ちは持ち越さない)。
+         **割った瞬間に効く規則 (2026-11-26・作者の決定・既定 DownCancelRule.Instant・BossDown.ClassifyInstant・GAME.md §23-36)**:
+           ・通常攻撃で割った瞬間 (主攻撃の直後・敵の攻撃より前・CombatManager.ApplyInstantBreak): このターンの周期の位置で決める。
+             山場のターン (と周期を持たない敵) = このターンの行動をキャンセル (BossDownState.interruptNow = 敵の攻撃の枝を通らない) + 山場を取り消し + 次のターンは大ダウン
+             (BossDownState.PushBig・まとめて割った数を倍率に使う・周期は大ダウンのターンの頭で頭へ) / チャージのターン = 無効 (目盛りは消える) /
+             小技のターン = このターンの行動をキャンセル (よろめき・倍率なし・次のターンは普段どおり) / 大ダウンのターン = そのターンの割った後のダメージの倍率 +0.5 × 割った数
+             (BossDown.ExtraNotchesNow・割った一撃には掛けない・次のターンは普段どおり)。 〈連撃〉〈多頭攻撃〉の 2 回目も止まる (同じ枝)・2 体戦の 2 体目は止まらない。
+           ・ひびは下の Timed と同じ (次のターンによろめき・山場とチャージは無効)。
+         **割る時を選ぶ規則 (2026-11-26・作者の決定・口 DownCancelRule.Timed・BossDown.Classify)**: 同じターンに割った目盛りは 1 つのダウン (BossDownState.mergeNotches)。
+         ダウンの種類は、 ダウンが来たターン (割った次のターン) の周期の位置で決める (大技・構え・〈業火の予兆〉の「山場まで何ターンか」):
+           ・山場のターン (0) = 大ダウン (通常攻撃で割った分だけ・ひびの分は無効) / チャージのターン (1) = 無効 (溜め中は怯まない・敵は普段どおり行動・目盛りは消える) /
+             それ以外 = よろめき (攻撃しない・倍率なし) / 周期を持たない敵 = 今までどおり (ダウン・ひびはよろめき) / 〈柱折りの発破筒〉の延長の分 = 大ダウン。
+           ・つまり大ダウンを取るには、 チャージのターンに通常攻撃で割る。 予告は「次 溜め 怯まない」「次 大技 今割れば止まる」・目盛りの欄に「今割ると …」(MutualTurnTelegraph.downBreakNowKind / downNextKind)。
+           ・まとめて割った大ダウンの倍率 = TakenMulCard + 0.5 × (割った数 − 1) + 強めた分 (BossDown.MulNow・MultiNotchStep = 0.5・ExtraNotchesNow)。 よろめきには付かない。
+         旧い規則 (口 downCancelRule = ChargeOrHeavy / Always): 割った目盛りの数だけ、 次のターンからダウンが続く (1 ターンで 2 つ割れば 2 ターン・ダウン中に次を割ればもう 1 ターン。 上限なし)。
+         ヴェスカは段ごとに目盛りを入れ直す (待ちは持ち越さない)。
          博士の「止まらない時計」を秘宝として持っているラン (GameLoop.VescaClock.Held = ownedPassiveItems・2026-11-13) は、 ヴェスカの 4 つの段それぞれの目盛りに
          BossParams.VescaClockNotch (0.80) を 1 つ足す (BossParams.DownNotches(id, true)・大きい順に入れる)。 bossDown=False では足さない。
          ダウンのターン (ターンの頭・敵が振る前に立つ):
            ・敵の攻撃 (予告値) = 0 ・〈連撃〉の 2 回目も 0。 敵の出目は振る (乱数の消費は変えない)。 攻撃の枝は〈封じ・揃〉と同じ (下の「敵攻撃」)
-           ・受けるダメージ ×1.5 (切り捨て・BossDown.ApplyTaken・よろめきは除く = BossDown.TakenMulNow・強めたダウンは上乗せ)。 掛ける口は 4 つで、 大罪:怠惰と同じ所:
+           ・受けるダメージ ×2.0 (2026-11-26 に ×1.5 から・切り捨て・BossDown.ApplyTaken・よろめきは除く = BossDown.TakenMulNow・まとめて割った分と強めたダウンは上乗せ = BossDown.MulNow)。 掛ける口は 4 つで、 大罪:怠惰と同じ所:
                主攻撃 = ApplyWinDamageModifiers の怠惰の直後 (CombatManager.Damage.cs)
                主攻撃以外 = HpLossDiag.Lose (channel ≠ "通常攻撃") ── 固定ダメの枠 (毒の tick・臨界の爆発・品が預けた分など)・出血・役〈極〉・反射・仕込み刃・反撃固定・品の直接 (攻撃後)
                〈逆締めの止血帯〉(ターン終了・ctx の HP を直接減らす) = AllPassiveSkillEffects.Wringing
@@ -1197,7 +1226,8 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
            ・敵のパッシブ・エスカレーション・敵の回復は普段どおり動く (止まるのは攻撃だけ)。 例外は「ダウン中は発動しない」を名乗ったパッシブ
              (BossDownPassives の一覧・PassiveSkillManager.FireEnemyTrigger の入口で鳴らさない・2026-11-20〜 毒の侵蝕 / 鏡映の応答 / 審判の炎 / 灰の再生 / 遺物学者。
              毒の侵蝕はダウンに入った時に毒stack −2 (0 未満にしない)・遺物学者はダウンのターンの頭に前のターンの vescaShieldReflectRate / vescaShieldAbsorbedThisTurn / vescaDrawnRelics を消す)。
-           ・大技 (2026-11-14・作者の決定): ダウンのターンが大技のチャージのターン (大技まで 1) か大技のターン (大技まで 0) に重なった時だけ、 その大技は取り消し、
+           ・大技 (2026-11-26〜・既定 Timed): 山場のターンの大ダウンだけが、 その山場を取り消して周期を次のターンから頭に戻す (よろめきは周期に触らない・チャージのターンは無効)。
+           ・大技 (旧い規則 ChargeOrHeavy・2026-11-14〜11-26): ダウンのターンが大技のチャージのターン (大技まで 1) か大技のターン (大技まで 0) に重なった時だけ、 その大技は取り消し、
              周期は次のターンから頭に戻す (Escalation.HeavyCycleOffset = このターン)。 それ以外 (小技のターン) のダウンは、 そのターンの攻撃を潰すだけで周期は進み続ける。
              判定は起点を動かす前の周期で BossDown.CancelsCycle (CombatManager.DownCancelsCycleAt)。 構え・〈業火の予兆〉も同じ (山場か、 その 1 ターン前)。
              起点は 1 つなので、 どれかで取り消すと全部の周期が頭に戻る。 測定の口 downCancelRule=Always で旧い規則 (どのダウンでも頭に戻す)。

@@ -580,6 +580,18 @@ namespace AutoTest
             /// <summary>[2026-11-14] 次のターンがダウンになった時、 ダウンが明けたターン (2 ターン後) の敵の攻撃の見込み (本体と同じ取り消しの規則で周期を数える)。
             /// 旧い規則は <see cref="downNextAtk"/> と同じ (今までの見込みのまま)。</summary>
             public int downAfterAtk;
+            /// <summary>[2026-11-26] 今割ると次のターンのダウンは溜めで無効 (目盛りが消えるだけ)。 このとき <see cref="downEraseAtk"/> は負 = 大技を止める機会を捨てる損。</summary>
+            public bool downNextResisted;
+            /// <summary>[2026-11-26・Instant] 割った瞬間に効く規則で見積もる / このターンに割ったら何が起きるか (DownKind の値) /
+            /// チャージのターンに割ると捨てる、 次の大技の見込み / 小技のターンに割ると捨てる、 近い大技を止める得 (大技 − 今の小技)。</summary>
+            public bool downInstant;
+            public int downBreakKindNow, downHeavyNextAtk, downHoldCost;
+            /// <summary>[2026-11-26] 混乱ゲージ (目盛りの代わり): 今の値 / 満タン (0 = ゲージなし) / 満ちた後の増え方 / 大技までのターン (このターン・−1 = 大技なし) /
+            /// 大技のターンに満たして止めた時の大技の見込み (支度の価値の元) / 1 ターンに攻撃へ挿せる止まった面の和の見込み (全部攻撃)。</summary>
+            public int downGauge, downGaugeMax, downToHeavy, downHeavyAtk;
+            public float downGaugeGrowth, downGaugePerTurn;
+            /// <summary>[2026-11-26] 今割ると次のターンは小技 (よろめき) だが、 1〜2 ターン後にチャージ→大技が控えている時の大技攻撃力の見込み (温存罰の元)。</summary>
+            public int downStaggerOppAtk;
             // ---- 大技のチャージ (2026-11-14・敵は攻撃しない) ----
             /// <summary>このターンは大技のチャージ (予告の攻撃は 0)。 口 heavyChargeNoAttack=False (旧い作り) では立たない。</summary>
             public bool charging;
@@ -602,6 +614,35 @@ namespace AutoTest
         /// <summary>[ボスのダウン] 目盛りを割って次のターンをダウンにする価値の割合 (次のターンの敵の攻撃 × これ を今の HP で見る・仮・未測定)。
         /// 〈石化の瞳〉(DeckStunShare) と同じ形: 半分にするのは、 割らなくてもブロックで一部は受けられるから。</summary>
         private const float DownNextTurnShare = 0.5f;
+        /// <summary>[2026-11-26] 混乱ゲージの支度 (大技のターンに満たせる位置に残す) の得の割合 (大ダウンの得の見込みに掛ける・確実ではないので半分)。 測定の口 downGaugeReadyShare。</summary>
+        [UnityEngine.Tooltip("混乱ゲージの支度の得の割合 (2026-11-26)")] public float downGaugeReadyShare = 0.5f;
+        private float DownGaugeReadyShare => downGaugeReadyShare;
+
+        /// <summary>[測定 2026-11-26] BOT が「割る時でダウンの種類が決まる」規則 (<see cref="CombatSystem.DownCancelRule.Timed"/>) を知っているか。 既定 true。
+        /// false = 知らない (旧い規則 ChargeOrHeavy のつもりで目盛りの価値を見積もる・どのダウンも大ダウンだと思う)。 本体の規則は変えない。
+        /// 知る腕と知らない腕の差 = 割る時を読む価値 (戦闘の読みの深さ)。</summary>
+        public bool downTimingAware = true;
+
+        /// <summary>[2026-11-26] 割った瞬間に効く規則 (Instant) で、 振り直しを大事なターンに集める (既定 true・downTimingAware が false なら効かない)。
+        /// 大ダウンのターンと「今割れば大技が止まる」大技のターンは、 振り直した後の最良の手の期待値で振るかを決め (充電の予備も使う・そのターン 2 回まで)、
+        /// その 1〜2 ターン前は振り直し 1 回分の充電を残す。 false = 今までの振り直し (平均を下回る手を 1 回)。</summary>
+        public bool downRerollPlan = true;
+
+        /// <summary>[測定 2026-11-26] Timed で次がチャージ (溜めで無効) の時の罰の係数 (-1 = 既定 DownNextTurnShare=0.5)。</summary>
+        public float downResistShare = -1f;
+
+        /// <summary>[測定 2026-11-26] Timed で次が小技 (よろめき) かつ 1〜2 ターン後にチャージ→大技が控える時の温存罰の係数 (0 = 既定・罰なし)。</summary>
+        public float downStaggerPenaltyShare = 0f;
+
+        /// <summary>[測定 2026-11-26] 目盛り温存対象ターンに限り、 攻撃 0 本 (aCount==0) の -10000 禁止を解除して待機を選べるようにするか (既定 false)。</summary>
+        public bool downAllowNoAttackHold = false;
+        /// <summary>[測定 2026-11-26] 混乱ゲージを大技のターンまで温存するためなら、 攻撃 0 本で待つ手を許す (大技の 1〜2 ターン前・満タンまで 1 ターンに入れられる量以内の時だけ)。
+        /// 既定 true (2026-11-26・作者の決定・⑯ で 3 層 +1.54 pp)。 false = 今まで (攻撃 0 本は死ぬ時だけ)。 規則を知る腕 (downTimingAware) でだけ効く。</summary>
+        [UnityEngine.Tooltip("混乱ゲージの温存のための攻撃 0 本の待ちを許す (2026-11-26)")] public bool downGaugeNoAttackHold = true;
+
+        /// <summary>BOT が見積もりに使うダウンの規則 (<see cref="downTimingAware"/> が false なら、 本体が Timed でも ChargeOrHeavy のつもりで読む)。</summary>
+        private CombatSystem.DownCancelRule BotDownRule
+            => !downTimingAware && CombatSystem.BossDown.IsTimedFamily(GameLoop.GameHooks.DownCancel) ? CombatSystem.DownCancelRule.ChargeOrHeavy : GameLoop.GameHooks.DownCancel;
 
         /// <summary>[V3 readOutgoingMult] 配線時点で分かる範囲で、 本体と同じ順に主攻撃 (ヴェスカの防御の前) の期待値を出す。
         /// 会心は確率で 2 通りを混ぜる。 配線の後で積まれる分 (OnWired・OnPreDealDamage・OnCriticalCheck・追撃・役の追撃・敵の軽減パッシブ・脆弱) は入らない。</summary>
@@ -678,12 +719,14 @@ namespace AutoTest
                     if (s.nick) focusPen += ItemSystem.PassiveSkills.Effects.NickAppraisal.Pen;   // answer9: 集中会心の撃は防御 12 無視
                 }
             }
-            //   【練気】の基礎の効果 (answer9 案 A・本体 PassiveSkillManager): 会心の秘宝を持てば、 会心した撃の会心倍率 +0.06 × (練気 + 1) (集中会心は使う前)
-            if (s.critRelics > 0) { mulAdd += CombatSystem.CritCore.RenkiMulPer * (s.renki + 1); mulPlain += CombatSystem.CritCore.RenkiMulPer * (s.renki + 1); }
-            //   〈白刃の鏡砥〉: 会心した撃は今の【練気】(この会心の +1・集中なら使った後) × 0.06
-            if (s.whiteBlade) { mulAdd += ItemSystem.PassiveSkills.Effects.WhiteBladeMirror.MulPerRenki * (s.renki + 1 - spent); mulPlain += ItemSystem.PassiveSkills.Effects.WhiteBladeMirror.MulPerRenki * (s.renki + 1); }
+            //   【練気】の基礎の効果 (全ビルド共通 +0.06 × 練気)
+            int capR = CombatSystem.CritCore.RenkiCap + (s.critDouble ? ItemSystem.PassiveSkills.Effects.Suntetsu.CapAdd : 0);
+            int nextR = System.Math.Min(capR, s.renki + 1);
+            if (s.critRelics > 0) { mulAdd += CombatSystem.CritCore.RenkiMulPer * nextR; mulPlain += CombatSystem.CritCore.RenkiMulPer * nextR; }
+            //   〈白刃の鏡砥〉: 会心した撃は今の【練気】(この会心の +1・集中なら使った後) × 0.04
+            if (s.whiteBlade) { mulAdd += ItemSystem.PassiveSkills.Effects.WhiteBladeMirror.MulPerRenki * (nextR - spent); mulPlain += ItemSystem.PassiveSkills.Effects.WhiteBladeMirror.MulPerRenki * nextR; }
             bool focusNoDef = focus && s.heaven;                                                                   // 〈白濁の義眼〉: 集中会心は防御を全部無視
-            bool suntetsuNoDef = s.critDouble && s.renki + 1 >= ItemSystem.PassiveSkills.Effects.Suntetsu.IgnoreRenki;   // 〈寸鉄〉: 練気 3 以上の会心は防御を全部無視
+            bool suntetsuNoDef = s.critDouble && nextR >= ItemSystem.PassiveSkills.Effects.Suntetsu.IgnoreRenki;   // 〈寸鉄〉: 練気 4 以上の会心は防御を全部無視
             float critMulEff = CombatSystem.CritCore.EffectiveMul(s.critMulBase + mulAdd, s.critRed, add, s.critDouble, focus);
             float sniperMul = CombatSystem.CritCore.EffectiveMul(s.critMulBase + mulPlain + CombatSystem.CritCore.SniperMulAdd(spent), s.critRed, addPlain, s.critDouble);
             float ironOut = s.ironClub ? System.Math.Min(1f, add) : 0f;
@@ -767,7 +810,7 @@ namespace AutoTest
             add = System.Math.Max(0f, add + itemRate);
             st.critAdd = add;
             st.critMulBase = ctx.criticalMultiplier + itemMul;
-            st.critRed = ctx.enemyCritMultReduction;
+            st.critRed = ctx.EffectiveEnemyCritMultReduction;
             st.critDouble = ctx.critExcessDouble || (run != null && run.OwnsPassive(ItemIds.CritSuntetsu));
             st.ironClub = ctx.critToDamage || (run != null && run.OwnsPassive(ItemIds.CritIronClub));
             bool bladeDance = ItemSystem.PassiveSkills.Effects.BladeDance.Held(run);   // 〈無銘の剣舞譜〉: 全部の撃が会心確定・防御無視・もう 1 回 (本体 CombatManager.Turn の撃の輪)
@@ -827,6 +870,32 @@ namespace AutoTest
             if (rem <= 0) return taken;
             rem = System.Math.Min(System.Math.Max(rem, s.enemyMaxHpNow), rem + System.Math.Max(0, enemyHeal));
             float dF = System.Math.Max(1f, s.dFull);
+            if (v3.ledgerContinuous && s.enemyLifesteal <= 0)
+            {
+                float remTurns = rem / dF;
+                int full = (int)remTurns;
+                float frac = remTurns - full;
+                float baseAtk = FutureEnemyAtk(in s);
+                float futureC = 0f;
+                int capFull = System.Math.Min(full, HorizonCapTurns);
+                for (int j = 1; j <= capFull; j++)
+                {
+                    float g = s.atkGrowth != null ? s.atkGrowth[System.Math.Min(j + 1, HorizonCapTurns)] : 1f;
+                    futureC += baseAtk * g;
+                }
+                if (full >= HorizonCapTurns)
+                {
+                    float gCap = s.atkGrowth != null ? s.atkGrowth[HorizonCapTurns] : 1f;
+                    futureC += ((full - HorizonCapTurns) + frac) * baseAtk * gCap;
+                }
+                else if (frac > 0f)
+                {
+                    float gNext = s.atkGrowth != null ? s.atkGrowth[System.Math.Min(full + 2, HorizonCapTurns)] : 1f;
+                    futureC += frac * baseAtk * gNext;
+                }
+                futureC += nextTurnExtra;
+                return taken + v3.ledgerFutureShare * futureC;
+            }
             int n;
             if (s.enemyLifesteal <= 0)
                 n = System.Math.Min(HorizonCapTurns, UnityEngine.Mathf.CeilToInt(rem / dF));
@@ -886,6 +955,7 @@ namespace AutoTest
         {
             public int effDmg;      // 敵 HP を減らす量の見積もり (撃破判定に使う値と同じ)
             public int mainDmg;     // [2026-11-14] そのうち主攻撃 (目盛りを割れる分・黎明の削りを除く)
+            public int gaugePips;   // [2026-11-26] 混乱ゲージに入る量
             public int taken;       // 自 HP の減少の見積もり
             public int block;
             public int aCount, bCount;
@@ -913,6 +983,8 @@ namespace AutoTest
             /// <summary>充電の価値の単位 (旧い配線 = 充電に挿したダイスの本数。 山札 = 実際に増える充電 ÷ <c>DeckChargePipsPerDie</c>)。</summary>
             public float chargeUnits;
             public int aSum, blockRaw, chargeRaw, maxBlockDie;
+            /// <summary>[2026-11-26] 混乱ゲージに入る量 (攻撃に挿した止まった面の和・本体と同じ CombatManager.GaugePips)。</summary>
+            public int gaugePips;
             /// <summary>効用へそのまま足す分 (山札の先の得の見積もり)。</summary>
             public float specFlat;
             // ---- 端子の山札の結果 (旧い配線では「なし」) ----
@@ -1079,6 +1151,12 @@ namespace AutoTest
             }
 
             int mainEff = aCount > 0 ? System.Math.Max(0, effDmg) : 0;   // [2026-11-14] 目盛りを割れる主攻撃の見込み (黎明の削りは入れない)
+            // [2026-11-26・Instant] この主攻撃で目盛りが割れたら、 その場でこのターンの敵の行動が止まる (溜め中は怯まない)。 本体と同じ規則 (BossDown.ClassifyInstant)
+            //   [2026-11-26] 混乱ゲージ: 配線の時点で満ちる (撃の前・与ダメに依らない)。 撃破する手は数えない
+            bool instBreak = s.downInstant && !s.enemyDown && s.downGaugeMax > 0 ? effDmg < enemyHp && s.downGauge + ws.gaugePips >= s.downGaugeMax
+                           : s.downInstant && s.downNotches != null && !s.enemyDown && mainEff > 0 && mainEff < enemyHp
+                             && DownForecast(in s, enemyHp, mainEff, mainEff).fullAdded > 0;
+            if (instBreak && s.downBreakKindNow != (int)CombatSystem.DownKind.Resisted) enemyAtk = 0;
             if (ws.extraDmg > 0) { effDmg = System.Math.Max(0, effDmg) + ws.extraDmg; noAtkDmg += ws.extraDmg; }   // 品の軽減不可ダメージ (主攻撃ではない)
             int block = blockRaw;
             // 〈貫きの錐〉: 敵攻撃値 1 につきブロックを 2 削る (予告済み)。
@@ -1190,10 +1268,42 @@ namespace AutoTest
             //   段取り (溜めのターンに合わせて割る) は 2 ターン先読み (deckLookahead) の役目 ── ここでは次のターンの 1 回分だけ。
             //   [2026-11-14] 割れるかは本体と同じ規則 (BossDown.ForecastTurn・口 downBreakRule)。 新しい判定 = 主攻撃 (mainEff) だけで割れる・通常攻撃以外の削り (downChip) はひび。
             //   旧い判定 (AnyDamage) は今までどおり 与ダメの見込み (effDmg) の後の HP で数える (NextTurnIsDown と同じ)。
-            if (s.downNotches != null && effDmg < enemyHp
+            if (instBreak)
+            {
+                // 割った瞬間に効く規則: このターンの攻撃は上で 0 にした。 大技を止めたら次のターンは大ダウン (次の攻撃も来ない)・
+                //   チャージや小技で割ると、 近い大技を止める機会を捨てる
+                float w = s.ledger ? 1f : wDef;
+                var kNow = (CombatSystem.DownKind)s.downBreakKindNow;
+                if (kNow == CombatSystem.DownKind.Big)
+                {
+                    u += DownNextTurnShare * System.Math.Max(0, s.downNextAtk) * w;
+                    // 大ダウンのターンは与ダメ ×倍率 (2026-11-26・×2.0): 増える与ダメ ≒ (倍率 − 1) ターン分 → その分だけ戦闘が縮み、 先で受ける攻撃が減る (帳簿と同じ物差し・先の割合を掛ける)
+                    if (s.ledger) u += (CombatSystem.BossDown.TakenMulCard - 1f) * FutureEnemyAtk(in s) * v3.ledgerFutureShare;
+                }
+                else if (kNow == CombatSystem.DownKind.Resisted) u -= DownNextTurnShare * s.downHeavyNextAtk * w;
+                else if (s.downHoldCost > 0) u -= DownNextTurnShare * s.downHoldCost * w;
+            }
+            else if (s.downInstant && s.downGaugeMax > 0 && !s.enemyDown && s.downToHeavy >= 1 && s.downHeavyAtk > 0 && effDmg < enemyHp)
+            {
+                // [2026-11-26] 混乱ゲージの支度: 満たさずに、 大技のターンに満たせる位置へ寄せた手に、 大技を止める得の見込みを足す (残りが 0 より大きく、 大技までのターン × 1 ターンに入れられる量以内)
+                int rest = s.downGaugeMax - (s.downGauge + ws.gaugePips);
+                if (rest > 0 && rest <= s.downToHeavy * s.downGaugePerTurn)
+                    u += DownNextTurnShare * DownGaugeReadyShare * s.downHeavyAtk * (s.ledger ? 1f : wDef);
+            }
+            else if (!s.downInstant && s.downNotches != null && effDmg < enemyHp
                 && DownForecast(in s, enemyHp, mainEff, effDmg).nextDown
                 && !DownForecast(in s, enemyHp, 0, 0).nextDown)
-                u += DownNextTurnShare * System.Math.Max(0, s.downEraseAtk) * (s.ledger ? 1f : wDef);   // 旧い規則では downEraseAtk = downNextAtk (今までと同じ)
+            {
+                float w = s.ledger ? 1f : wDef;
+                if (s.downNextResisted)
+                    u += (downResistShare >= 0f ? downResistShare : DownNextTurnShare) * s.downEraseAtk * w;
+                else
+                {
+                    u += DownNextTurnShare * System.Math.Max(0, s.downEraseAtk) * w;
+                    if (downStaggerPenaltyShare > 0f && s.downStaggerOppAtk > 0)
+                        u -= downStaggerPenaltyShare * s.downStaggerOppAtk * w;
+                }
+            }
 
             // ===== 短期決戦の概念 (2026-08-04) =====
             //   従来の効用は **1 ターンぶんの収支しか見ていなかった**。 撃破ボーナスも
@@ -1278,9 +1388,14 @@ namespace AutoTest
                 // 「ブロックの最大目を 1 本だけ攻撃へ回す」場合の被弾と比較する。
                 int takenIfAttackOne = System.Math.Max(0, enemyAtk - (block - maxBlockDie));
                 bool onlySurvivesByNotAttacking = (takenIfAttackOne >= myHpEff) && (taken < myHpEff);
-                if (!onlySurvivesByNotAttacking) u -= 10000f;
+                bool holdNotchAllowed = downAllowNoAttackHold && s.downNotches != null
+                    && (s.downNextResisted || (downStaggerPenaltyShare > 0f && s.downStaggerOppAtk > 0))
+                    && !DownForecast(in s, enemyHp, 0, 0).nextDown;
+                bool holdGaugeAllowed = downGaugeNoAttackHold && EffectiveWiringSkill == WiringSkill.Super && s.downInstant && s.downGaugeMax > 0 && !s.enemyDown
+                    && (s.downToHeavy == 1 || s.downToHeavy == 2) && s.downGaugeMax - s.downGauge <= s.downGaugePerTurn;
+                if (!onlySurvivesByNotAttacking && !holdNotchAllowed && !holdGaugeAllowed) u -= 10000f;
             }
-            outcome = new OptimalTurnOutcome { effDmg = effDmg, mainDmg = mainEff, taken = taken, block = block, aCount = aCount, bCount = bCount, bashUsed = bashUsed, justGuard = jgNow,
+            outcome = new OptimalTurnOutcome { effDmg = effDmg, mainDmg = mainEff, gaugePips = ws.gaugePips, taken = taken, block = block, aCount = aCount, bCount = bCount, bashUsed = bashUsed, justGuard = jgNow,
                                                freeBlock = fbCovers, killsNow = fbKills, dmgOld = dmgOld, dmgNew = dmgNew, rawNew = rawNew,
                                                dmgUsed = aCount > 0 ? dmgUsed : 0, enemyHeal = enemyHeal, balancePlus = balancePlus, blazeGain = blazeGain };
             return u;
@@ -1415,12 +1530,12 @@ namespace AutoTest
         /// (<see cref="CombatSystem.CombatManager.DownCancelsCycleAt"/>)、 攻撃は本体の式 (<see cref="ExpectedEnemyAttackAt"/>)。
         /// 取り消す時の T+2 は、 周期の起点を T+1 に置いた時の値 (起点を一時的に置き換えて本体の式を通し、 戻す・乱数は引かない)。</summary>
         private static void DownSequenceAfterNextTurn(EnemyData enemy, ItemSystem.PassiveSkills.CombatContext ctx, in CombatSystem.MutualTurnTelegraph tele,
-                                                      int s1, float bossHpRatio, out int erase, out int after)
+                                                      int s1, float bossHpRatio, CombatSystem.DownCancelRule rule, out int erase, out int after)
         {
             int t1 = tele.turn + 1;
             erase = s1;
             after = ExpectedEnemyAttackAt(enemy, ctx, in tele, t1 + 1, 0);
-            if (enemy == null || !CombatSystem.CombatManager.DownCancelsCycleAt(enemy, t1, bossHpRatio)) return;
+            if (enemy == null || !CombatSystem.CombatManager.DownCancelsCycleAt(enemy, t1, bossHpRatio, rule)) return;
             // チャージのターンのダウン: 次の大技 s(T+2) が並びから抜け、 後ろが 1 ターン遅れる (DownKeepRules.HoldGainChargeOrHeavy と同じ考え・遅れた分は周期の平均で置く)
             if (enemy.heavyPeriod > 0 && CombatSystem.Escalation.IsChargeTurn(enemy, t1))
             {
@@ -1466,17 +1581,66 @@ namespace AutoTest
             {
                 // 新しい判定 (2026-11-14): 主攻撃だけで割れる・通常攻撃以外の削りはひび (猶予の後によろめき)。 本体と同じ規則 (BossDown.ForecastTurn)
                 var f = DownForecast(in st, st.enemyHp, o.mainDmg, System.Math.Min(o.effDmg, st.enemyHp) - o.enemyHeal, wantCracks: true);
-                bool nd = f.nextDown;
+                bool landed = f.nextDown;   // 次のターンの頭で待ちのダウンが 1 つ使われる
+                bool nd = landed, weakNext = f.nextWeak;
                 int added = f.fullAdded + f.crackAdded;
                 ns.downBroken = f.brokenAfter;
                 ns.downCrackTurns = f.cracksAfter;
                 ns.downTurn = st.downTurn + 1;
-                ns.enemyDown = nd; ns.enemyDownWeak = nd && f.nextWeak;
-                ns.downPendingNow = System.Math.Max(0, st.downPendingNow + added - (nd ? 1 : 0));
+                var botRule = BotDownRule;
+                if (botRule == CombatSystem.DownCancelRule.Timed)
+                {
+                    // [2026-11-26] まとめて割っても 1 つのダウン。 種類は来るターンで決まる (本体と同じ関数)・溜めで無効なら敵は普段どおり
+                    if (added > 0) added = 1;
+                    if (landed)
+                    {
+                        var kind = CombatSystem.CombatManager.DownKindAt(CombatSystem.CombatManager.Instance?.CurrentEnemy, ns.downTurn,
+                                                                         (float)System.Math.Max(0, ns.enemyHp) / System.Math.Max(1, st.downMaxHp), f.nextWeak, false, botRule);
+                        if (kind == CombatSystem.DownKind.Resisted) nd = false;
+                        else weakNext = kind == CombatSystem.DownKind.Stagger;
+                    }
+                }
+                else if (botRule == CombatSystem.DownCancelRule.Instant)
+                {
+                    // [2026-11-26] 割った瞬間に効く規則: 通常攻撃で割った分は、 大技を止めた時だけ次のターンが大ダウン (それ以外はこのターンで済んでいる)。 ひびは次のターンによろめき (山場・チャージなら無効)
+                    var enemyI = CombatSystem.CombatManager.Instance?.CurrentEnemy;
+                    float ratioI = (float)System.Math.Max(0, ns.enemyHp) / System.Math.Max(1, st.downMaxHp);
+                    bool bigNow = st.downInstant && !st.enemyDown && f.fullAdded > 0 && st.downBreakKindNow == (int)CombatSystem.DownKind.Big;
+                    bool crack = f.crackAdded > 0;
+                    added = bigNow || crack ? 1 : 0;
+                    landed = st.downPendingNow > 0 || added > 0;
+                    nd = landed; weakNext = !bigNow && st.downPendingNow == 0 && crack;
+                    if (nd && weakNext
+                        && CombatSystem.CombatManager.DownKindAt(enemyI, ns.downTurn, ratioI, true, false, botRule) == CombatSystem.DownKind.Resisted) nd = false;
+                    if (enemyI != null) ns.downBreakKindNow = (int)CombatSystem.CombatManager.InstantBreakKindAt(enemyI, ns.downTurn, ratioI);
+                }
+                ns.enemyDown = nd; ns.enemyDownWeak = nd && weakNext;
+                ns.downPendingNow = System.Math.Max(0, st.downPendingNow + added - (landed ? 1 : 0));
                 // 次のターンの後に残るダウンの先頭の種類 (近似: 今残っている物が先・今のターンに割れた物は 通常攻撃 → ひび の順)
                 ns.downPendingHeadWeak = ns.downPendingNow > 0
                     && (st.downPendingNow > 1 ? st.downPendingHeadWeak
                         : (st.downPendingNow == 1 ? f.fullAdded == 0 : f.fullAdded <= 1) && f.crackAdded > 0 && GameLoop.GameHooks.DownCrackWeak);
+                ns.downNextAtk = nd ? st.downAfterAtk : st.downNextAtk;
+                if (nd) { ns.enemyAtk = 0; ns.tele.enemyAttackValue = 0; ns.atkGrowth = null; }
+            }
+            else if (st.downGaugeMax > 0)
+            {
+                // [2026-11-26] 混乱ゲージ: 配線の時点で満ちる。 大技のターンに満たした時だけ次のターンが大ダウン (よろめき・無効はこのターンで済む)。 大ダウンのターンは溜まらない
+                var enemyG = CombatSystem.CombatManager.Instance?.CurrentEnemy;
+                bool full = !st.enemyDown && o.effDmg < st.enemyHp && st.downGauge + o.gaugePips >= st.downGaugeMax;
+                bool bigNow = full && st.downInstant && st.downBreakKindNow == (int)CombatSystem.DownKind.Big;
+                ns.downGauge = st.enemyDown ? st.downGauge : full ? 0 : st.downGauge + o.gaugePips;
+                ns.downGaugeMax = full ? CombatSystem.BossDown.GrownMax(st.downGaugeMax, st.downGaugeGrowth) : st.downGaugeMax;
+                ns.downTurn = st.downTurn + 1;
+                bool nd = bigNow || st.downPendingNow > 0;
+                ns.downPendingNow = 0;
+                ns.enemyDown = nd; ns.enemyDownWeak = false;
+                if (enemyG != null)
+                {
+                    float ratioG = (float)System.Math.Max(0, ns.enemyHp) / System.Math.Max(1, st.downMaxHp);
+                    ns.downBreakKindNow = (int)CombatSystem.CombatManager.InstantBreakKindAt(enemyG, ns.downTurn, ratioG);
+                    ns.downToHeavy = CombatSystem.Escalation.TurnsToHeavy(enemyG, ns.downTurn);
+                }
                 ns.downNextAtk = nd ? st.downAfterAtk : st.downNextAtk;
                 if (nd) { ns.enemyAtk = 0; ns.tele.enemyAttackValue = 0; ns.atkGrowth = null; }
             }
@@ -1685,8 +1849,17 @@ namespace AutoTest
             };
             // ボスのダウン (2026-11-13): 予告で開示された目盛りとダウン。 次のターンの攻撃は公開規則の見込み (大技の周期は本体と同じ起点 Escalation.HeavyCycleOffset)
             st.enemyDown = tele.enemyDown;
-            if (tele.downNotches != null && cm?.CurrentEnemy != null && ctxRoles != null)
+            if ((tele.downNotches != null || tele.downGaugeMax > 0) && cm?.CurrentEnemy != null && ctxRoles != null)
             {
+                // [2026-11-26] 混乱ゲージ: 今の値と満タン・大技までのターン・大技の見込み・1 ターンに入れられる量 (止まった面の平均 × 個数)
+                st.downGauge = tele.downGauge; st.downGaugeMax = tele.downGaugeMax; st.downGaugeGrowth = tele.downGaugeGrowth;
+                st.downToHeavy = CombatSystem.Escalation.TurnsToHeavy(cm.CurrentEnemy, tele.turn);
+                st.downHeavyAtk = st.downToHeavy > 0 ? ExpectedEnemyAttackAt(cm.CurrentEnemy, ctxRoles, in tele, tele.turn + st.downToHeavy, 0) : 0;
+                {
+                    var fcs = ctxRoles.equippedDiceFaces; float mf = 3.5f;
+                    if (fcs != null && fcs.Length > 0) { float sf = 0f; foreach (int f in fcs) sf += f; mf = sf / fcs.Length; }
+                    st.downGaugePerTurn = mf * k;
+                }
                 st.downNotches = tele.downNotches; st.downBroken = tele.downBroken; st.downPendingNow = tele.downPending;
                 st.enemyDownWeak = tele.enemyDownWeak; st.downPendingHeadWeak = tele.downPendingHeadWeak;
                 st.downCrackTurns = tele.downCrackTurns; st.downTurn = tele.turn;
@@ -1694,9 +1867,57 @@ namespace AutoTest
                 st.downMaxHp = System.Math.Max(1, cm.CurrentEnemy.maxHP);
                 st.downNextAtk = ExpectedEnemyAttackAt(cm.CurrentEnemy, ctxRoles, in tele, tele.turn + 1, 0);
                 st.downEraseAtk = st.downNextAtk; st.downAfterAtk = st.downNextAtk;
-                if (GameLoop.GameHooks.DownCancel != CombatSystem.DownCancelRule.Always)
-                    DownSequenceAfterNextTurn(cm.CurrentEnemy, ctxRoles, in tele, st.downNextAtk, (float)cm.EnemyHP / st.downMaxHp,
-                                              out st.downEraseAtk, out st.downAfterAtk);
+                var botRule = BotDownRule;
+                float hpRatio = (float)cm.EnemyHP / st.downMaxHp;
+                if (botRule == CombatSystem.DownCancelRule.Instant)
+                {
+                    // [2026-11-26] 割った瞬間に効く規則: このターンに割ったら何が起きるか (本体と同じ関数) と、 割って捨てる機会の見込み
+                    st.downInstant = true;
+                    var kNow = CombatSystem.CombatManager.InstantBreakKindAt(cm.CurrentEnemy, tele.turn, hpRatio);
+                    st.downBreakKindNow = (int)kNow;
+                    if (kNow == CombatSystem.DownKind.Resisted)
+                        st.downHeavyNextAtk = ExpectedEnemyAttackAt(cm.CurrentEnemy, ctxRoles, in tele, tele.turn + 1, 0);
+                    else if (kNow == CombatSystem.DownKind.Stagger)
+                    {
+                        int toH = CombatSystem.Escalation.TurnsToHeavy(cm.CurrentEnemy, tele.turn);
+                        if (toH >= 2 && toH <= 3)
+                            st.downHoldCost = System.Math.Max(0, ExpectedEnemyAttackAt(cm.CurrentEnemy, ctxRoles, in tele, tele.turn + toH, 0) - st.enemyAtk);
+                    }
+                }
+                var nextKind = botRule == CombatSystem.DownCancelRule.Timed
+                    ? CombatSystem.CombatManager.DownKindAt(cm.CurrentEnemy, tele.turn + 1, hpRatio, false, false, botRule)
+                    : CombatSystem.DownKind.Big;
+                if (botRule == CombatSystem.DownCancelRule.Timed
+                    && (nextKind == CombatSystem.DownKind.Resisted || (CombatSystem.BossDown.DownStaggerNoStun && nextKind == CombatSystem.DownKind.Stagger)))
+                {
+                    // [2026-11-26] 今割ると次のターンで無効・目盛りが消える: 次の山場を止める機会を捨てる損
+                    st.downNextResisted = true;
+                    int oppTurn = tele.turn + 2;
+                    for (int dt = 2; dt <= 5; dt++)
+                    {
+                        if (CombatSystem.CombatManager.DownKindAt(cm.CurrentEnemy, tele.turn + dt, hpRatio, false, false, botRule) == CombatSystem.DownKind.Big)
+                        { oppTurn = tele.turn + dt; break; }
+                    }
+                    st.downEraseAtk = -ExpectedEnemyAttackAt(cm.CurrentEnemy, ctxRoles, in tele, oppTurn, 0);
+                }
+                else
+                {
+                    if (botRule != CombatSystem.DownCancelRule.Always)
+                        DownSequenceAfterNextTurn(cm.CurrentEnemy, ctxRoles, in tele, st.downNextAtk, hpRatio, botRule,
+                                                  out st.downEraseAtk, out st.downAfterAtk);
+                    if (botRule == CombatSystem.DownCancelRule.Timed && downStaggerPenaltyShare > 0f
+                        && CombatSystem.CombatManager.DownKindAt(cm.CurrentEnemy, tele.turn + 1, hpRatio, false, false, botRule) == CombatSystem.DownKind.Stagger)
+                    {
+                        for (int dt = 3; dt <= 4; dt++)
+                        {
+                            if (CombatSystem.CombatManager.DownKindAt(cm.CurrentEnemy, tele.turn + dt, hpRatio, false, false, botRule) == CombatSystem.DownKind.Big)
+                            {
+                                st.downStaggerOppAtk = ExpectedEnemyAttackAt(cm.CurrentEnemy, ctxRoles, in tele, tele.turn + dt, 0);
+                                break;
+                            }
+                        }
+                    }
+                }
             }
             // 〈烈炎〉の積もる量 (2026-11-14): 主攻撃をシールドで N 受けるごとに +1。 N は本体と同じ値
             if (cm?.CurrentEnemy != null && tele.blazePenalizesBlock)
@@ -1849,7 +2070,12 @@ namespace AutoTest
             if (ctx == null) return null;
             bool heavyNow = v3.superDefense && IsHeavyAttack(dice, tele.enemyAttackValue + tele.secondaryAttackValue,
                                                              System.Math.Max(1, CombatManager.Instance?.PlayerMaxHP ?? 1));
-            if (ctx.rerollsThisTurn >= (heavyNow ? RerollMaxPerTurn + 1 : RerollMaxPerTurn)) return null;
+            // [2026-11-26] 大事なターン (大ダウン・今割れば大技が止まる大技のターン) と、 その手前 (振り直しを温存する)
+            bool planDown = downRerollPlan && downTimingAware && GameLoop.GameHooks.DownCancel == CombatSystem.DownCancelRule.Instant && (tele.downNotches != null || tele.downGaugeMax > 0);
+            bool keyTurn = planDown && ((tele.enemyDown && !tele.enemyDownWeak)
+                                        || (tele.turnsToHeavy == 0 && tele.downBreakNowKind == (int)CombatSystem.DownKind.Big));
+            bool saveTurn = planDown && !keyTurn && (tele.downNextNotchHp >= 0 || tele.downGaugeMax > 0) && (tele.turnsToHeavy == 1 || tele.turnsToHeavy == 2);
+            if (ctx.rerollsThisTurn >= (heavyNow || keyTurn ? RerollMaxPerTurn + 1 : RerollMaxPerTurn)) return null;
 
             int k = dice.Length;
             var faces = ctx.equippedDiceFaces;
@@ -1886,6 +2112,19 @@ namespace AutoTest
                 return ev - ChargeUtilityPerUnit * scarcity * costE > cur ? RerollPickForDie(dice, all) : null;
             }
 
+            // [2026-11-26] 大事なターン: 振り直した後の最良の手の期待値で決める (効用に「割れば大技が止まる」「大ダウンで ×2」が入っているので、 振り直して割り切る得も数える)
+            if (keyTurn)
+            {
+                int costK = CombatSystem.CombatManager.RerollCostNow(ctx, all.Count, attempt);
+                if (ctx.GetCharge() < costK) return null;
+                var faceValsK = (faces != null && faces.Length > 0) ? faces : new[] { 1, 2, 3, 4, 5, 6 };
+                float curK = BestUtilityOf(dice, tele);
+                float evK = ExpectedBestUtilityAfterReroll(k, faceValsK, tele);
+                const float ChargeUtilityK = 1.2f;   // E1 と同じ充電 1 の効用 (上限に近いほど安い)
+                float scarcityK = 1f - UnityEngine.Mathf.Clamp01(ctx.GetCharge() / (float)CombatSystem.CombatManager.ChargeMax);
+                return evK - ChargeUtilityK * scarcityK * costK > curK ? RerollPickForDie(dice, all) : null;
+            }
+
             // S2: 大きい攻撃の予告なら、 止めきれない手は平均近くでも振り直し、 充電の予備も使う
             if (heavyNow && rerollSum < tele.enemyAttackValue && rerollSum < meanFace * all.Count * 1.15f)
             {
@@ -1897,7 +2136,9 @@ namespace AutoTest
             if (rerollSum >= meanFace * all.Count + RoleRerollPips(ctx, faces, k, tele)) return null;
 
             int cost = CombatSystem.CombatManager.RerollCostNow(ctx, all.Count, attempt);
-            if (ctx.GetCharge() - RerollChargeReserve < cost) return null;
+            // [2026-11-26] 大事なターンの手前は、 振り直し 1 回分 (次の回目の費用) の充電を残す
+            int reserve = RerollChargeReserve + (saveTurn ? CombatSystem.CombatManager.RerollCostNow(ctx, all.Count, attempt + 1) : 0);
+            if (ctx.GetCharge() - reserve < cost) return null;
             return RerollPickForDie(dice, all);
         }
 

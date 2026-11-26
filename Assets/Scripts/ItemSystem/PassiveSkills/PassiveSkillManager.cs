@@ -695,7 +695,7 @@ namespace ItemSystem.PassiveSkills
                 //   その後の加算 (メタ精密 r10 還元・物資系) に押し流される。
                 //   下限 1.0 ── 会心が通常攻撃より弱くなるのは倒錯するため。
                 //   超過会心率 (100% を超えた分・1% ごとに +0.01・〈寸鉄〉で 2 倍) も、 ここで乗せる (CritCore.EffectiveMul・BOT と画面も同じ関数)
-                float effCritMul = CombatSystem.CritCore.EffectiveMul(context.criticalMultiplier, context.enemyCritMultReduction, context.lastCritAddPct,
+                float effCritMul = CombatSystem.CritCore.EffectiveMul(context.criticalMultiplier, context.EffectiveEnemyCritMultReduction, context.lastCritAddPct,
                     context.critExcessDouble, context.hitIsFocused);
                 if (!attackerIsEnemy && context.lastCritAddPct > (context.hitIsFocused ? CombatSystem.CritCore.FocusMaxRate : 1f)) CombatSystem.CombatManager.CritOverflowFired++;   // [計装] 超過会心率が倍率になった会心
                 totalDamage = (int)(totalDamage * effCritMul);

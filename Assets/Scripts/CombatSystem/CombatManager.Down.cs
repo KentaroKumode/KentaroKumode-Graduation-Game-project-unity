@@ -1,4 +1,4 @@
-using ItemSystem.PassiveSkills;
+﻿using ItemSystem.PassiveSkills;
 using UnityEngine;
 
 namespace CombatSystem
@@ -16,17 +16,24 @@ namespace CombatSystem
         public bool VescaClockActive { get; private set; }
 
         /// <summary>戦闘の始め・形態の交代: 敵の目盛りを入れ直す (目盛りの無い敵・測定の口で止めた時は無し)。
-        /// **目盛りの並びを作るのはここ** (時計の目盛りもここで足す・戦闘中に動かすのは <see cref="RaiseBossNextNotch"/> だけ)。 画面・BOT は <see cref="Down"/> の並びを読む。</summary>
+        /// **目盛りの並びを作るのはここ** (時計の目盛りもここで足す・2026-11-26 に混乱ゲージへ・戦闘中に動かすのは <see cref="AddBossGauge"/> だけ)。 画面・BOT は <see cref="Down"/> の並びを読む。</summary>
         private void ResetBossDown(EnemyData enemy, bool newCombat)
         {
             bool clock = GameLoop.VescaClock.Held(GameLoop.GameManager.Instance?.Run);
-            _down.Reset(BossDown.WidenNotches(BossParams.DownNotches(enemy?.id, clock), (int)MetaProgression.MetaDebuffApplicator.GetDownNotchSpacingPct()));   // 挑戦カード〈受身〉III: 目盛りの間隔 +N%
-            VescaClockActive = clock && _down.Enabled && GameLoop.BossIds.VescaStageOf(enemy?.id) > 0;   // ダウンを止めた測定の口では効かない
+            // 混乱ゲージ (2026-11-26): 挑戦カード〈受身〉III は満タンの量 +N% (旧: 目盛りの間隔 +N%)・博士の時計はヴェスカの各段を半分から
+            var (gMax, gGrow) = BossParams.DownGauge(enemy?.id);
+            int spacing = (int)MetaProgression.MetaDebuffApplicator.GetDownNotchSpacingPct();
+            if (gMax > 0 && spacing > 0) gMax = (int)System.Math.Round(gMax * (100 + spacing) / 100.0);
+            bool vesca = GameLoop.BossIds.VescaStageOf(enemy?.id) > 0;
+            _down.ResetGauge(gMax, gGrow, clock && vesca ? (int)(gMax * BossParams.VescaClockGaugeStart) : 0);
+            VescaClockActive = clock && _down.Enabled && vesca;   // ダウンを止めた測定の口では効かない
+            _gaugeFullTurn = _crushTurn = -99; _gaugeLate = false; _gaugeCarry = 0;
+            if (newCombat) _gaugeFullsFight = 0;
             // 戦闘の始めの地の文 (最初の段だけ 1 回)。 戦闘の画面に文の欄が無いので戦闘ログの行として出す (2026-11-13)。 ヴェスカの台詞は置かない (作者の決定)
             if (VescaClockActive && newCombat && enemy?.id == GameLoop.BossIds.VescaP1)
                 if (Debug.unityLogger.logEnabled) Debug.Log("[戦闘] " + GameLoop.VescaClock.BattleLine);
-            if (VescaClockActive) Debug.Log($"[ダウン] 〈{GameLoop.VescaClock.Name}〉: {enemy?.displayName} の目盛りに {BossParams.VescaClockNotch * 100f:0}% を足した");
-            BossDown.ActiveNow = false; BossDown.TakenMulNow = false; BossDown.TakenBonusPctNow = 0;
+            if (VescaClockActive) Debug.Log($"[ダウン] 〈{GameLoop.VescaClock.Name}〉: {enemy?.displayName} の混乱は {_down.gauge}/{_down.gaugeMax} から");
+            BossDown.ActiveNow = false; BossDown.TakenMulNow = false; BossDown.TakenBonusPctNow = 0; BossDown.ExtraNotchesNow = 0;
             if (newCombat) _down.ResetBuffs();   // 次のダウンを強める分は段の交代では消さない (2026-11-25)
             if (newCombat) { Escalation.HeavyCycleOffset = 0; Escalation.StageOffset = 0; Escalation.HeavyHpRatio = 1f; TenyoHeavy.Reset(); }
             BossDownDiag.BeginFight(enemy?.id, _down.Enabled);
@@ -38,14 +45,37 @@ namespace CombatSystem
         /// 今の起点 (<see cref="Escalation.HeavyCycleOffset"/>) で数える ── 本体はダウンのターンの頭に起点を動かす前に呼び、 BOT は先のターンの見込みに呼ぶ (同じ関数・写しを持たない)。
         /// <paramref name="bossHpRatio"/> = ボスの HP の割合 (〈業火の予兆〉の周期が HP 50% で変わる)。 規則は口 <see cref="GameLoop.GameHooks.DownCancel"/>。</summary>
         public static bool DownCancelsCycleAt(EnemyData e, int turn, float bossHpRatio)
+            => DownCancelsCycleAt(e, turn, bossHpRatio, GameLoop.GameHooks.DownCancel);
+
+        /// <summary><see cref="DownCancelsCycleAt(EnemyData,int,float)"/> の規則を指定する版 (BOT が「規則を知らない」腕で旧い規則の見込みを作る・2026-11-26)。</summary>
+        public static bool DownCancelsCycleAt(EnemyData e, int turn, float bossHpRatio, DownCancelRule rule)
         {
             if (e == null) return false;
-            int omen = -1;
+            TurnsToClimaxAt(e, turn, bossHpRatio, out int h, out int g, out int o);
+            return BossDown.CancelsCycle(rule, h, g, o);
+        }
+
+        /// <summary>ターン <paramref name="turn"/> の、 周期ごとの「山場まで何ターンか」(大技・構え・〈業火の予兆〉・−1 = その周期を持たない)。 今の起点 (<see cref="Escalation.HeavyCycleOffset"/>) で数える。</summary>
+        public static void TurnsToClimaxAt(EnemyData e, int turn, float bossHpRatio, out int heavy, out int guard, out int omen)
+        {
+            heavy = guard = omen = -1;
+            if (e == null) return;
             if (e.passiveSkills != null)
                 foreach (var ps in e.passiveSkills)
                     if (ps != null && ps.internalName == ItemSystem.PassiveSkills.Effects.EmberOmen.Id)
                     { omen = ItemSystem.PassiveSkills.Effects.EmberOmenTiming.TurnsToOmen(turn, bossHpRatio); break; }
-            return BossDown.CancelsCycle(GameLoop.GameHooks.DownCancel, Escalation.TurnsToHeavy(e, turn), Escalation.TurnsToGuard(e, turn), omen);
+            heavy = Escalation.TurnsToHeavy(e, turn); guard = Escalation.TurnsToGuard(e, turn);
+        }
+
+        /// <summary>ターン <paramref name="turn"/> にダウンが来たら、 その種類 (<see cref="BossDown.Classify"/>・2026-11-26)。 本体のターンの頭・予告・BOT の見込みが同じ関数を呼ぶ。
+        /// <paramref name="rule"/> を省くと本体の規則 (<see cref="GameLoop.GameHooks.DownCancel"/>)。</summary>
+        public static DownKind DownKindAt(EnemyData e, int turn, float bossHpRatio, bool weak, bool extension = false)
+            => DownKindAt(e, turn, bossHpRatio, weak, extension, GameLoop.GameHooks.DownCancel);
+
+        public static DownKind DownKindAt(EnemyData e, int turn, float bossHpRatio, bool weak, bool extension, DownCancelRule rule)
+        {
+            TurnsToClimaxAt(e, turn, bossHpRatio, out int h, out int g, out int o);
+            return BossDown.Classify(rule, weak, extension, h, g, o);
         }
 
         /// <summary>ターンの頭 (ターン番号を進めた後・敵が振る前): 待っているダウンがあれば、 このターンをダウンにする。
@@ -59,7 +89,10 @@ namespace CombatSystem
         private void BeginBossDownTurn(CombatContext ctx)
         {
             bool was = BossDown.ActiveNow;
+            _gaugeLate = false;
             BeginBossDownTurnCore(ctx);
+            // 預かった混乱 (前のターンに敵が動いた後で足された分) を、 このターンの頭で最初に入れる。 大ダウンのターンは溜まらないので、 明けるまで預かったまま
+            if (_gaugeCarry > 0 && !(_down.downNow && !_down.downWeakNow)) { int c = _gaugeCarry; _gaugeCarry = 0; AddBossGauge(c); }
             // 「ダウン中は発動しない」パッシブの後始末 (2026-11-20・BossDownPassives): 毒沼の主はダウンに入った時に毒 −2、 ヴェスカは前のターンの遺物を消す
             if (BossDown.ActiveNow)
             {
@@ -76,9 +109,15 @@ namespace CombatSystem
         /// ターン開始のトリガーはダウンを立てる前に鳴るので、 待っているダウンがあれば (このターンはダウン = 予告を出さない) false。</summary>
         public bool EnemyHeavyOrChargeNow(int turn)
         {
-            if (currentEnemy == null || enemyHP <= 0 || (_down.Enabled && _down.pending > 0)) return false;
+            if (currentEnemy == null || enemyHP <= 0 || PendingDownLandsAt(turn)) return false;
             return Escalation.IsHeavyTurn(currentEnemy, turn) || Escalation.IsChargeTurn(currentEnemy, turn);
         }
+
+        /// <summary>ターンの頭より前に読む所 (ターン開始のトリガー・ターン頭の毒): 待っているダウンがあり、 ターン <paramref name="turn"/> にそれが来るか
+        /// (溜めで無効になる分は来ない = 敵は普段どおり・2026-11-26)。</summary>
+        public bool PendingDownLandsAt(int turn)
+            => currentEnemy != null && enemyHP > 0 && _down.Enabled && _down.pending > 0
+               && DownKindAt(currentEnemy, turn, Escalation.HeavyHpRatio, _down.PendingHeadWeak, _down.PendingHeadExt) != DownKind.Resisted;
 
         /// <summary>このターン敵がダウン中か (〈抜き打ちの作法〉が撃の中で読む)。</summary>
         public bool EnemyDownNow => currentEnemy != null && enemyHP > 0 && _down.downNow;
@@ -94,14 +133,67 @@ namespace CombatSystem
         /// <summary>次に割る目盛りを <paramref name="add"/> (HP) だけ上げる (臨界の爆発・【劇症】・〈雷鯰の棘〉〈避雷の杭〉ほか)。 今の HP より上へは行かない
         /// (今の HP の 1 下まで ── 上げるだけでは割れもひびも入らない・割るには通常攻撃が要る)。 品が預けてまだ入っていない敵へのダメージ (Kw.DamageEnemy) は今の HP から引いて数える。
         /// 目盛りの無い敵では何もしない。 ターンの解決中は CombatManager の手元の HP、 それ以外は ctx の HP の低い方を今の HP とみなす。</summary>
-        public void RaiseBossNextNotch(int add)
+        public void AddBossGauge(int add)
         {
             if (!_down.Enabled || currentEnemy == null || enemyHP <= 0 || add <= 0) return;
-            var ctx = PassiveSkillManager.Instance?.Context;
-            int hpNow = ctx != null ? System.Math.Min(enemyHP, ctx.enemyCurrentHP) - (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.PendingEnemyDamageKey) : enemyHP;
-            int before = _down.NextNotchHp(currentEnemy.maxHP);
-            int to = _down.RaiseNext(currentEnemy.maxHP, hpNow - 1, add);
-            if (to >= 0) Debug.Log($"[{CombatContext.CurrentSkillId}] 次の目盛り {before} → {to} (+{add}・HP {hpNow})");
+            // 敵が行動した後に足された分 (〈黎明〉〈落城の礎石〉ほか) は預かり、 次のターンの頭で最初に入れる (2026-11-26・作者の決定: 満ちるのは常に敵が動く前)
+            if (_gaugeLate) { _gaugeCarry += add; if (Debug.unityLogger.logEnabled) Debug.Log($"[混乱] 敵が動いた後の +{add} は次のターンの頭へ (預かり {_gaugeCarry})"); return; }
+            if (_down.downNow && !_down.downWeakNow) return;   // 大ダウンのターンは溜まらない (連続でダウンさせない)
+            int before = _down.gauge;
+            bool full = _down.AddGauge(add);
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[{(string.IsNullOrEmpty(CombatContext.CurrentSkillId) ? "配線" : CombatContext.CurrentSkillId)}] 混乱 {before} +{add}" + (full ? " → 満ちた" : $" → {_down.gauge}/{_down.gaugeMax}"));
+            if (full) OnBossGaugeFull(PassiveSkillManager.Instance?.Context?.currentTurn ?? 0);
+        }
+
+        /// <summary>混乱ゲージに入る量 = 攻撃の端子に挿して発動したダイスの、 止まった面の数字の和 (出目 +N・鋳造・怠惰・端子の倍率は入れない)。
+        /// <paramref name="native"/> = ダイスごとの止まった面の数字 (<see cref="NativeDice"/>)。 本体と BOT の見積もりが同じ関数を呼ぶ。</summary>
+        public static int GaugePips(TerminalOutcome o, int[] native)
+        {
+            if (o?.kindOfDie == null || o.slotOfDie == null || native == null) return 0;
+            int s = 0;
+            for (int i = 0; i < native.Length && i < o.kindOfDie.Length && i < o.slotOfDie.Length; i++)
+                if (o.kindOfDie[i] == DiceTerminal.Attack && o.slotOfDie[i] >= 0 && o.fired.Contains(o.slotOfDie[i])) s += native[i];
+            return s;
+        }
+
+        /// <summary>ダイスごとの止まった面の数字 (<see cref="CombatContext.equippedDiceFaces"/>[<see cref="CombatContext.playerDiceFaceIdx"/>])。
+        /// <paramref name="rolls"/> が今の出目 (ctx.playerDice) と違う (BOT が仮の目で試す) か、 面配列を使わない素のロールなら、 その目をそのまま使う。</summary>
+        public static int[] NativeDice(CombatContext ctx, int[] rolls)
+        {
+            if (rolls == null) return null;
+            var r = (int[])rolls.Clone();
+            var faces = ctx?.equippedDiceFaces; var idx = ctx?.playerDiceFaceIdx; var cur = ctx?.playerDice;
+            if (faces == null || idx == null || cur == null || cur.Length != rolls.Length) return r;
+            for (int i = 0; i < r.Length; i++) if (cur[i] != rolls[i]) return (int[])rolls.Clone();
+            for (int i = 0; i < r.Length && i < idx.Length; i++) if (idx[i] >= 0 && idx[i] < faces.Length) r[i] = faces[idx[i]];
+            return r;
+        }
+
+        /// <summary>配線を反映した直後 (撃と敵の攻撃より前): 攻撃に挿した止まった面の数字を混乱ゲージに足す。</summary>
+        private void NoteBossGaugeWired(CombatContext ctx, TerminalOutcome o, int[] playerDice)
+        {
+            if (!_down.Enabled || ctx == null || o == null) return;
+            int pips = GaugePips(o, NativeDice(ctx, playerDice));
+            if (pips > 0) AddBossGauge(pips);
+        }
+
+        /// <summary>混乱ゲージが満ちた瞬間: Instant と同じ効き方 (山場のターン = 行動をキャンセルして次のターンは大ダウン / チャージ = 無効 / 小技 = よろめき)。</summary>
+        /// <summary>混乱が満ちたターン (〈崩し斬り〉が読む) / 〈崩し斬り〉が効いたターン (1 ターン 1 回)。</summary>
+        private int _gaugeFullTurn = -99, _crushTurn = -99, _gaugeFullsFight;
+        /// <summary>このターンは敵が行動した後 (足された混乱は預かる) / 預かった混乱 (次のターンの頭で入れる)。</summary>
+        private bool _gaugeLate;
+        private int _gaugeCarry;
+
+        /// <summary>敵の行動の直前に呼ぶ: これより後に足される混乱は次のターンの頭へ。</summary>
+        private void MarkBossGaugeLate() => _gaugeLate = true;
+
+        private void OnBossGaugeFull(int turn)
+        {
+            _gaugeFullTurn = turn;
+            MetaProgression.Achievements.AchievementService.NoteBossDownBroken(++_gaugeFullsFight);   // 実績〈二枚抜き〉(1 戦闘で 2 回満たす)
+            ApplyInstantBreak(1, turn);
+            RaiseBossEvent(PassiveSkillManager.Instance?.Context, PassiveSkillTrigger.OnBossDown, 1, false);
+            BossDownDiag.NoteMainBreak(1, 0, 0);
         }
 
         /// <summary>次のダウン (よろめきは数えない) の受けるダメージの倍率 +<paramref name="pct"/>% (上限 +100%)・そのダウンの開始時にシールド / 充電 (〈英雄の意志〉〈黒錫のライデン瓶〉・2026-11-25)。 目盛りの無い敵では何もしない。</summary>
@@ -126,9 +218,25 @@ namespace CombatSystem
             // 灰燼の王の〈業火〉の周期は HP 50% で 4 → 3 ターン (2026-11-14)。 このターンの周期の数え方に使う HP の割合をターンの頭に決める (取り消しの判定より前)
             Escalation.HeavyHpRatio = currentEnemy != null ? enemyHP / (float)System.Math.Max(1, EnemyMaxHP) : 1f;
             FightEndDiag.NoteTurnHead(ctx?.currentTurn ?? 0, playerHP, Escalation.HeavyHpRatio);   // [計装 2026-11-18] 読むだけ
-            BossDown.ActiveNow = false; BossDown.TakenMulNow = false; BossDown.TakenBonusPctNow = 0;
+            BossDown.ActiveNow = false; BossDown.TakenMulNow = false; BossDown.TakenBonusPctNow = 0; BossDown.ExtraNotchesNow = 0;
             if (!_down.Enabled || ctx == null) { _down.downNow = false; _down.downWeakNow = false; return; }
             bool downTurn = _down.BeginTurn();
+            // ダウンの種類 (2026-11-26・BossDown.Classify): 来たターンで決める。 溜めで無効なら、 このターンは普段どおり (目盛りは消える)。
+            //   旧い規則 (ChargeOrHeavy・Always) では種類はひびかどうかだけ (今までと同じ)
+            bool timed = BossDown.IsTimedFamily(GameLoop.GameHooks.DownCancel);
+            bool instant = GameLoop.GameHooks.DownCancel == DownCancelRule.Instant;
+            DownKind kind = DownKind.Big;
+            if (downTurn)
+            {
+                kind = DownKindAt(currentEnemy, ctx.currentTurn, Escalation.HeavyHpRatio, _down.downWeakNow, _down.extNow);
+                if (kind == DownKind.Resisted || (BossDown.DownStaggerNoStun && kind == DownKind.Stagger))
+                {
+                    _down.downNow = false; _down.downWeakNow = false; _down.resistedNow = true; downTurn = false;
+                    BossDownDiag.NoteResisted();
+                    if (Debug.unityLogger.logEnabled) Debug.Log($"[ダウン] T{ctx.currentTurn} {currentEnemy?.displayName}: 大ダウン以外では怯まない ── ダウンは無効 (目盛りは消えた)");
+                }
+                else _down.downWeakNow = kind == DownKind.Stagger;
+            }
             // 次のダウンを強める分 (2026-11-25): よろめきでないダウンの最初のターンに使う (延長はこのダウンを 1 ターン足す)
             if (_down.TakeBuffs(out int buffShield, out int buffCharge, out bool extended))
             {
@@ -142,18 +250,26 @@ namespace CombatSystem
             bool always = GameLoop.GameHooks.DownCancel == DownCancelRule.Always;
             // 起点を動かす前に見る。 計装の「取り消した」: 新しい規則 = 大技のチャージか大技のターンに重なった / 旧い規則 (Always) = 今までどおり大技のターンだけ数える
             int toHeavyAtDown = hadHeavy ? Escalation.TurnsToHeavy(currentEnemy, ctx.currentTurn) : -1;   // [診断] ダウンのターンの周期の位置 (起点を動かす前)
+            // 周期を頭に戻すのは: 新しい規則 = 山場のターンの大ダウンだけ (よろめきは周期に触らない) / 旧い規則 = 今までどおり
+            // 割った瞬間に効く規則 (Instant): 山場は割ったターンにもうキャンセルしてある。 大ダウンのターンの頭で周期を頭に戻すだけ (印は割った時に立てた)
+            bool resetCycle = instant ? kind == DownKind.Big && _down.extNow && _down.resetCycleNext
+                            : (!timed || kind == DownKind.Big) && DownCancelsCycleAt(currentEnemy, ctx.currentTurn, Escalation.HeavyHpRatio);
+            if (instant && resetCycle) _down.resetCycleNext = false;
             bool canceled = hadHeavy && (always ? Escalation.IsHeavyTurn(currentEnemy, ctx.currentTurn)
-                                                : BossDown.IsChargeOrClimax(toHeavyAtDown));
-            if (DownCancelsCycleAt(currentEnemy, ctx.currentTurn, Escalation.HeavyHpRatio))
+                                       : instant ? false
+                                       : timed ? resetCycle && toHeavyAtDown == 0
+                                               : BossDown.IsChargeOrClimax(toHeavyAtDown));
+            if (resetCycle)
                 Escalation.HeavyCycleOffset = ctx.currentTurn;
             _down.heavyCanceledNow = hadHeavy && (always || canceled);
             if (canceled) RaiseBossEvent(ctx, PassiveSkillTrigger.OnHeavyCanceled, 1, false);   // 大技を取り消した (2026-11-21・〈構え崩しの鉄杭〉)
             if (canceled) MetaProgression.Achievements.AchievementService.NoteBossDownCanceledHeavy();   // 実績〈出鼻をくじく〉   // 画面の「大技は取り消し」(旧い規則はどのダウンでも大技が先へ延びる)
             BossDown.ActiveNow = true;
-            BossDown.TakenMulNow = !_down.downWeakNow || ctx.poisonDownDouble;   // ひびで割れたよろめき (2026-11-14) は受けるダメージ ×1.5 なし (〈骨溶かしの黒油〉はよろめきにも ×1.5・2026-11-25)
+            BossDown.TakenMulNow = !_down.downWeakNow || ctx.poisonDownDouble;   // よろめき (ひび・2026-11-14 / 小技のターン・2026-11-26) は受けるダメージ ×1.5 なし (〈骨溶かしの黒油〉はよろめきにも ×1.5・2026-11-25)
             BossDown.TakenBonusPctNow = _down.bonusNowPct;
-            BossDownDiag.NoteDown(hadHeavy, canceled, toHeavyAtDown, _down.downWeakNow);
-            if (Debug.unityLogger.logEnabled) Debug.Log($"[ダウン] T{ctx.currentTurn} {currentEnemy?.displayName}: 行動不能" + (!BossDown.TakenMulNow ? "・よろめき (受けるダメージは普段どおり)" : $"{(_down.downWeakNow ? "・よろめき" : "")}・受けるダメージ ×{BossDown.TakenMulCard + BossDown.TakenBonusPctNow * 0.01f:0.00}")
+            BossDown.ExtraNotchesNow = !_down.downWeakNow ? System.Math.Max(0, _down.countNow - 1) : 0;   // まとめて割った分の倍率 (大ダウンだけ・2026-11-26)
+            if (!instant || _down.downWeakNow) BossDownDiag.NoteDown(hadHeavy, canceled, toHeavyAtDown, _down.downWeakNow);   // Instant の大ダウンは割った時に数えた
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[ダウン] T{ctx.currentTurn} {currentEnemy?.displayName}: 行動不能" + (!BossDown.TakenMulNow ? "・よろめき (受けるダメージは普段どおり)" : $"{(_down.downWeakNow ? "・よろめき" : "")}・受けるダメージ ×{BossDown.MulNow:0.00}")
                     + (canceled ? "・大技は取り消し (周期は頭から)" : hadHeavy ? (always ? "・(大技は溜まっていない)" : "・大技の周期はそのまま進む") : "")
                     + (_down.pending > 0 ? $" (あと {_down.pending} ターン続く)" : ""));
         }
@@ -172,6 +288,14 @@ namespace CombatSystem
             t.downNotches = _down.notches;
             t.downBroken = _down.broken;
             t.downNextNotchHp = currentEnemy != null ? _down.NextNotchHp(currentEnemy.maxHP) : -1;
+            // 次のターンに来るダウンの種類 / 今割ったら次のターンのダウンの種類 (2026-11-26・完全情報)
+            t.downNextKind = _down.Enabled && currentEnemy != null && _down.pending > 0
+                ? (int)DownKindAt(currentEnemy, t.turn + 1, Escalation.HeavyHpRatio, _down.PendingHeadWeak, _down.PendingHeadExt) : -1;
+            t.downGauge = _down.gauge; t.downGaugeMax = _down.gaugeMax; t.downGaugeGrowth = _down.gaugeGrowth;   // 混乱ゲージ (2026-11-26)
+            t.downBreakNowKind = !_down.Enabled || currentEnemy == null ? -1
+                : GameLoop.GameHooks.DownCancel == DownCancelRule.Instant
+                    ? (_down.downNow && !_down.downWeakNow ? -1 : (int)InstantBreakKindAt(currentEnemy, t.turn, Escalation.HeavyHpRatio))   // 割った瞬間に効く (大ダウン中は倍率が上がるだけ)
+                : _down.pending == 0 ? (int)DownKindAt(currentEnemy, t.turn + 1, Escalation.HeavyHpRatio, false) : -1;
             if (_down.downNow) { t.enemyAttackValue = 0; t.secondaryAttackValue = 0; }
             // 大技のチャージ (2026-11-14): 攻撃しない。 攻撃値は Escalation.HeavyFactor が 0 にしてある (予告も BOT の見込みも同じ関数)。 ここは画面の印だけ
             t.enemyCharging = !_down.downNow && Escalation.IsChargeNoAttack(currentEnemy, t.turn);
@@ -196,14 +320,102 @@ namespace CombatSystem
                 _downMainWouldBreak = BossDown.BrokenCount(_down.notches, currentEnemy.maxHP, enemyHP, _down.broken) - _down.broken;
                 return 0;
             }
-            int d = _down.NoteMainHit(enemyHP, currentEnemy.maxHP, mainDmg, turn, out int crackedBroken, out int waitSum);
+            bool instantRule = GameLoop.GameHooks.DownCancel == DownCancelRule.Instant;
+            int crackedBroken, waitSum;
+            int d = instantRule ? _down.BreakByMainHit(enemyHP, currentEnemy.maxHP, mainDmg, turn, out crackedBroken, out waitSum)
+                                : _down.NoteMainHit(enemyHP, currentEnemy.maxHP, mainDmg, turn, out crackedBroken, out waitSum);
             if (d <= 0) return 0;
+            if (instantRule) ApplyInstantBreak(d, turn);
             MetaProgression.Achievements.AchievementService.NoteBossDownBroken(d);   // 実績〈二枚抜き〉(1 回の攻撃で 2 つ)
             RaiseBossEvent(PassiveSkillManager.Instance?.Context, PassiveSkillTrigger.OnBossDown, d, false);   // 通常攻撃で割った (2026-11-21)
             BossDownDiag.NoteMainBreak(d, crackedBroken, waitSum);
             if (Debug.unityLogger.logEnabled) Debug.Log($"[ダウン] 通常攻撃で目盛りを {d} つ割った (HP {enemyHP}/{currentEnemy.maxHP}"
                     + (crackedBroken > 0 ? $"・うちひびの入った目盛り {crackedBroken}" : "") + $") → 次のターンからダウン {_down.pending} ターン");
             return d;
+        }
+
+        /// <summary>[2026-11-26・Instant・GAME.md §23-36] 通常攻撃で目盛りを <paramref name="d"/> 個割った瞬間の処理 (主攻撃の直後・敵の攻撃より前)。
+        /// 大ダウンのターン = そのターンの割った後のダメージの倍率を上げる (次のターンは普段どおり) /
+        /// 山場のターン (と周期を持たない敵) = このターンの行動をキャンセルし、 次のターンは大ダウン (周期は大ダウンのターンの頭で頭へ) /
+        /// チャージのターン = 溜め中は怯まない (無効・目盛りは消える) / 小技のターン = このターンの行動をキャンセル (よろめき・次のターンは普段どおり)。
+        /// 1 ターンに 2 回の攻撃: 〈連撃〉〈多頭攻撃〉は両方止まる (同じ枝)・2 体戦は割った敵 (1 体目) だけ止まる。</summary>
+        private void ApplyInstantBreak(int d, int turn)
+        {
+            var ctx = PassiveSkillManager.Instance?.Context;
+            if (_down.downNow && !_down.downWeakNow)
+            {
+                BossDown.ExtraNotchesNow += d;
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[ダウン] 大ダウン中に目盛りを {d} つ割った: このターンの残りの受けるダメージ ×{BossDown.MulNow:0.00}");
+                return;
+            }
+            TurnsToClimaxAt(currentEnemy, turn, Escalation.HeavyHpRatio, out int h, out int g, out int o);
+            var kind = BossDown.ClassifyInstant(h, g, o);
+            bool hadHeavy = currentEnemy.heavyPeriod > 0;
+            if (kind == DownKind.Resisted)
+            {
+                BossDownDiag.NoteResisted();
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[ダウン] T{turn} {currentEnemy.displayName}: 溜め中は怯まない ── 目盛り {d} つは無効 (消えた)");
+                return;
+            }
+            _down.interruptNow = true;
+            bool canceled = kind == DownKind.Big && hadHeavy && h == 0;
+            BossDownDiag.NoteDown(hadHeavy, canceled, hadHeavy ? h : -1, kind == DownKind.Stagger);
+            if (kind == DownKind.Big)
+            {
+                _down.heavyCanceledNow = canceled;
+                _down.PushBig(d, BossDown.IsClimax(h, g, o));
+                ApplyConfusionBossHooks(ctx, currentEnemy, turn, isBig: true);
+                if (canceled) RaiseBossEvent(ctx, PassiveSkillTrigger.OnHeavyCanceled, 1, false);
+                if (canceled) MetaProgression.Achievements.AchievementService.NoteBossDownCanceledHeavy();
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[ダウン] T{turn} {currentEnemy.displayName}: 割った瞬間にこのターンの行動をキャンセル" + (canceled ? " (大技を止めた)" : "") + $" → 次のターンは大ダウン (目盛り {d} つ)");
+            }
+            else
+            {
+                ApplyConfusionBossHooks(ctx, currentEnemy, turn, isBig: false);
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[ダウン] T{turn} {currentEnemy.displayName}: よろめき ── 割った瞬間にこのターンの行動をキャンセル (次のターンは普段どおり)");
+            }
+        }
+
+        /// <summary>[2026-11-26] ボス固有の混乱効果:
+        /// 1. ヴェスカ〈解析演算〉: 混乱（大ダウン・よろめき問わず）で回避率を 0% にリセット。
+        /// 2. 灰燼の王〈烈炎〉: 大ダウンで烈炎スタックを 0 にリセット。
+        /// 3. 灰燼の王〈灰の再生〉: 混乱（よろめき含む）で 2 ターン再生停止。</summary>
+        private static void ApplyConfusionBossHooks(CombatContext ctx, EnemyData enemy, int turn, bool isBig)
+        {
+            if (ctx == null || enemy == null) return;
+            if (ctx.enemyDodgeChance > 0f)
+            {
+                float prev = ctx.enemyDodgeChance;
+                ctx.enemyDodgeChance = 0f;
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[ダウン] 混乱により〈解析演算〉の回避率 {prev:P0} → 0% にリセット");
+            }
+            if (isBig && HasBlazeBurst(enemy) && BlazeStacks(ctx) > 0)
+            {
+                int prev = BlazeStacks(ctx);
+                ctx.accumulatedValues[ItemSystem.PassiveSkills.Effects.BlazeBrand.StackKey] = 0f;
+                if (Debug.unityLogger.logEnabled) Debug.Log($"[ダウン] 大ダウンにより〈烈炎〉 {prev} → 0 にリセット");
+            }
+            if (enemy.passiveSkills != null)
+            {
+                foreach (var ps in enemy.passiveSkills)
+                {
+                    if (ps != null && ps.internalName == "AshRegrowth")
+                    {
+                        int until = turn + ItemSystem.PassiveSkills.Effects.AshRegrowth.StaggerSuppressTurns;
+                        ctx.accumulatedValues.TryGetValue(ItemSystem.PassiveSkills.Effects.AshRegrowth.SuppressedUntilTurnKey, out var cur);
+                        if (until > (int)cur) ctx.accumulatedValues[ItemSystem.PassiveSkills.Effects.AshRegrowth.SuppressedUntilTurnKey] = until;
+                        if (Debug.unityLogger.logEnabled) Debug.Log($"[ダウン] 混乱により〈灰の再生〉を T{until} まで停止");
+                        break;
+                    }
+                }
+            }
+        }
+
+        /// <summary>[2026-11-26・Instant] このターンに通常攻撃で割ったら何が起きるか (予告・BOT が読む)。</summary>
+        public static DownKind InstantBreakKindAt(EnemyData e, int turn, float bossHpRatio)
+        {
+            TurnsToClimaxAt(e, turn, bossHpRatio, out int h, out int g, out int o);
+            return BossDown.ClassifyInstant(h, g, o);
         }
 
         /// <summary>ターンの終わり (ターン終了時の削りを拾った後): 旧い判定 (AnyDamage) = 新しく割った目盛りを数え、 その数だけ次のターンからダウンを待たせる。
@@ -246,7 +458,7 @@ namespace CombatSystem
         /// <summary>戦闘の終わり: ダウンの倍率を戻す。</summary>
         private void EndBossDown()
         {
-            BossDown.ActiveNow = false; BossDown.TakenMulNow = false; BossDown.TakenBonusPctNow = 0;
+            BossDown.ActiveNow = false; BossDown.TakenMulNow = false; BossDown.TakenBonusPctNow = 0; BossDown.ExtraNotchesNow = 0;
             _down.downNow = false; _down.downWeakNow = false;
             Escalation.HeavyCycleOffset = 0;
             Escalation.StageOffset = 0;

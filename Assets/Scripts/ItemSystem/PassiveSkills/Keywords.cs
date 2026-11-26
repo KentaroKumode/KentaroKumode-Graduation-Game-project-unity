@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace ItemSystem.PassiveSkills.Keywords
 {
@@ -167,7 +167,7 @@ namespace ItemSystem.PassiveSkills.Keywords
                 {
                     cm.LandBurst(ctx, b.landed);
                     // 爆発はボスの次の目盛りを、 その爆発のダメージの 40% ぶん上げる (今の HP の 1 下まで・ひびは入れない・2026-11-25 作者の決定 / neon answer_gauge)
-                    cm.RaiseBossNextNotch(b.landed * CombatSystem.HeatCore.BurstNotchPct / 100);
+                    cm.AddBossGauge(CombatSystem.HeatCore.BurstGauge);   // 2026-11-26: 目盛り → 混乱 +2
                     // 〈柱折りの発破筒〉: 超臨界の爆発で、 次のダウンを 1 ターン延ばす (1 戦闘 2 回まで)
                     if (b.super && CombatSystem.HeatCore.Has(s.items, CombatSystem.HeatItems.Pillar)) cm.ExtendNextBossDown("柱折りの発破筒");
                 }
