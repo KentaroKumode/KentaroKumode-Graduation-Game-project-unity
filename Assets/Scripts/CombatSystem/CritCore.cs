@@ -56,12 +56,12 @@ namespace CombatSystem
 
         // ---- 【集中】(2026-11-23) ----
 
-        /// <summary>集中の品の数の入口 / 集中の会心率の下限・上限 (2026-11-26 パチンコ化: 最大 80%) / 基礎の賭け金・最低賭け金下限 (25%)。</summary>
+        /// <summary>集中の品の数の入口 / 集中の会心率の下限・上限 (2026-11-27: 最大 85%) / 基礎の賭け金 (20%)・最低賭け金下限 (15%)。</summary>
         public const int FocusNeedCount = 3;
-        public const float FocusMinRate = 0.01f, FocusMaxRate = 0.80f, FocusBaseCost = 0.25f, FocusMinWager = 0.25f;
-        /// <summary>【集中】が外れた時のペナルティ (2026-11-26 パチンコ化): その撃の与ダメ 70% (−30%)・そのターンの被ダメージ +25%。</summary>
+        public const float FocusMinRate = 0.01f, FocusMaxRate = 0.85f, FocusBaseCost = 0.20f, FocusMinWager = 0.15f;
+        /// <summary>【集中】が外れた時のペナルティ: その撃の与ダメ 70% (−30%)。 被ダメージ増加は 2026-11-27 に撤廃 (0f)。</summary>
         public const int FocusMissKeepPct = 70;
-        public const float FocusMissTakenBonus = 0.25f;
+        public const float FocusMissTakenBonus = 0f;
         public const string FocusMissVulnTurnKey = "crit.focusMissTurn";
         /// <summary>集中の品の賭け金 (レア度ごと: BRONZE 0・SILVER 0・GOLD 18%・LEGENDARY 24%・answer10)。</summary>
         public const float FocusCostB = 0f, FocusCostS = 0f, FocusCostG = 0.18f, FocusCostL = 0.24f;

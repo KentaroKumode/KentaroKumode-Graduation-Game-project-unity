@@ -82,8 +82,8 @@ namespace MetaProgression
         public const int ChargeCapBonus = 10, ChargeOpening = 10;
         /// <summary>臨界: 戦闘の終わりのメーターを次の戦闘へ持ち越す割合。</summary>
         public const float RinkaiCarryoverRatio = 0.5f;
-        /// <summary>毒: 1 ターンに最初の 1 回だけ、 毒の付与に足すスタック (CombatContext.AddStatus)。</summary>
-        public const int PoisonApplyBonus = 5;
+        /// <summary>毒: 1 ターンに最初の 1 回だけ、 毒の付与に足すスタック (CombatContext.AddStatus・2026-11-27: 3 → 4)。</summary>
+        public const int PoisonApplyBonus = 4;
         /// <summary>出血: 出血がこれ以上の敵の攻撃値 −<see cref="BleedWeakenAmount"/>。</summary>
         public const int BleedWeakenThreshold = 3, BleedWeakenAmount = 4;
         /// <summary>シールド: ターン開始の減衰で残るシールド +N ポイント。</summary>

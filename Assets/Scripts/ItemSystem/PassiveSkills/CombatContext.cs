@@ -487,7 +487,7 @@ namespace ItemSystem.PassiveSkills
 
         public int EnemyDealUnmitigable(int dmg, DeathCause? cause)
         {
-            if (dmg <= 0) return 0;
+            if (dmg <= 0 || CombatSystem.LethalParry.InvincibleThisTurn) return 0;
             dbgChipRaw += dmg;
 
             if (ShieldAbsorbsUnmitigable && consShield > 0)

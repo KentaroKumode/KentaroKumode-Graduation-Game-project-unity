@@ -1,4 +1,4 @@
-﻿using ItemSystem.PassiveSkills;
+using ItemSystem.PassiveSkills;
 using UnityEngine;
 
 namespace CombatSystem
@@ -34,6 +34,7 @@ namespace CombatSystem
                 if (Debug.unityLogger.logEnabled) Debug.Log("[戦闘] " + GameLoop.VescaClock.BattleLine);
             if (VescaClockActive) Debug.Log($"[ダウン] 〈{GameLoop.VescaClock.Name}〉: {enemy?.displayName} の混乱は {_down.gauge}/{_down.gaugeMax} から");
             BossDown.ActiveNow = false; BossDown.TakenMulNow = false; BossDown.TakenBonusPctNow = 0; BossDown.ExtraNotchesNow = 0;
+            if (newCombat) LethalParry.ResetCombat();
             if (newCombat) _down.ResetBuffs();   // 次のダウンを強める分は段の交代では消さない (2026-11-25)
             if (newCombat) { Escalation.HeavyCycleOffset = 0; Escalation.StageOffset = 0; Escalation.HeavyHpRatio = 1f; TenyoHeavy.Reset(); }
             BossDownDiag.BeginFight(enemy?.id, _down.Enabled);
@@ -459,6 +460,7 @@ namespace CombatSystem
         private void EndBossDown()
         {
             BossDown.ActiveNow = false; BossDown.TakenMulNow = false; BossDown.TakenBonusPctNow = 0; BossDown.ExtraNotchesNow = 0;
+            LethalParry.ResetCombat();
             _down.downNow = false; _down.downWeakNow = false;
             Escalation.HeavyCycleOffset = 0;
             Escalation.StageOffset = 0;

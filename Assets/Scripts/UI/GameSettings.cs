@@ -11,7 +11,7 @@ namespace UI
     /// </summary>
     public static class GameSettings
     {
-        public enum Key { Master, Bgm, Se, Bright, Scan, Curve, Chroma, Vignette, Noise, LineGap, CharGap, Bloom }
+        public enum Key { Master, Bgm, Se, Bright, Scan, Curve, Chroma, Vignette, Noise, LineGap, CharGap, Bloom, Parry }
 
         public struct Def
         {
@@ -36,6 +36,7 @@ namespace UI
             new Def { pref = "Settings.charGap",  name = "字間",       min = 0, max = MaxCharGap, def = 0, desc = "字と字の間に足す。 0 が標準。" },
             // 2026-11-17 (作者の依頼): ブルーム (にじみ) の強さ。 液晶の _Bloom と _Halo に掛ける (周りの明るさでの抑え方は変えない・Game2DSettingsApply)
             new Def { pref = "Settings.bloom",    name = "ブルーム",   min = 0, max = 100, def = 50,  desc = "明るい所から光がにじむ強さ。 50 が標準・0 で切。" },
+            new Def { pref = "Settings.parry",    name = "パリィ",     min = 0, max = 1,   def = 1,   desc = "致死攻撃の回避。1=手動タイミング入力 / 0=オート(確率)。" },
         };
 
         private static int[] _v;
@@ -79,5 +80,7 @@ namespace UI
         public static float Brightness => 0.5f + Get(Key.Bright) / 100f;
         /// <summary>液晶の効果の倍率 (50 → 1・100 → 2・0 → 0)。</summary>
         public static float FxScale(Key k) => Get(k) / 50f;
+        /// <summary>手動パリィ ON/OFF（1=手動 / 0=オート）。</summary>
+        public static bool ManualParry => Get(Key.Parry) != 0;
     }
 }

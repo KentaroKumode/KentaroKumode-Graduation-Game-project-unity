@@ -29,6 +29,12 @@ namespace GameLoop
         /// BOT の <c>ExecuteTurn</c> と画面の「人が操作するターン」がぶつからないように。</summary>
         public static bool BotDriving;
 
+        /// <summary>[2026-11-26] 致死パリィ有効フラグ（既定 true・測定の口で OFF 比較可）。</summary>
+        public static bool LethalParryEnabled = true;
+
+        /// <summary>[2026-11-26] 手動パリィ設定（true = 手動リング入力 / false = オートパリィ P(N)=N^3/(N^3+8^3)）。GameSettings から同期。</summary>
+        public static bool ManualParrySetting = true;
+
         /// <summary>[測定] メタ進行 (<c>MetaProgressManager</c>) を PlayerPrefs へ保存しない・PlayerPrefs から読まない (2026-11-12・#119)。
         /// 並列ワーカー (-batchmode の Player) が起動時に立てる。 PlayerPrefs は全ワーカーで共有されるので、
         /// 前の測定が書いた挑戦の難易度などが次の測定のワーカーへ持ち込まれ、 バッチ開始時に読む学習の帯がワーカーごとに割れていた。
@@ -233,6 +239,7 @@ namespace GameLoop
             Depth3HeavyDisabled = false;
             VescaClockHeldAtStart = false;
             AshKingBeatenEver = null;
+            LethalParryEnabled = true;
         }
     }
 }

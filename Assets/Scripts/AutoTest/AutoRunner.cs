@@ -244,6 +244,8 @@ namespace AutoTest
         /// <b>既定 3</b> (2026-11-18・作者の承認): 控えの 5 腕の同じシードの比較で、 第 4 層の死亡率 34.6 → 31.1% (z −7.8)・クリア 19.5 → 20.0% と、 いちばん効いた控え方だった
         /// (Captures/experience_storm_d/work/cmp_arms.md)。 1 にすると 2026-11-18 までと同じ。 BOT の値付けのつまみ (ゲームの数値ではない)。 乱数は引かない。</summary>
         public float navD6HpWeightMul = 3f;
+        /// <summary>[実験 2026-11-27] Super の航行スノーボール評価関数 (0 = 既定OFF / >0 = 序盤のアイテム・戦闘・エリート・強化のスノーボール価値を重み付け)。</summary>
+        public float navSnowball = 0f;
         /// <summary>[測定の口・2026-11-18] 最初に持つ賽を指定する (ADR-0015 の賽 20 種の確かめ)。 空 = 製品と同じ (角の取れた賽)。
         /// ゲームの数値ではない・乱数は引かない。 v3_queue の腕で <c>forceStartDie=逆巻きの賽</c> のように渡す。</summary>
         public string forceStartDie = "";
@@ -289,6 +291,8 @@ namespace AutoTest
         /// <summary>[測定 2026-11-13] ボスのダウン (HP の目盛り・CombatSystem.BossDown)。 既定 true = 新しい規則。 false = 目盛りを置かない旧い作り。
         /// 本体の GameHooks.BossDownDisabled へ流す (目盛りが無ければ BOT の見積もりも自然にダウンを見ない)。</summary>
         public bool bossDown = true;
+        /// <summary>[2026-11-26] 致死パリィ有効フラグ（既定 true・BOT ではオートパリィ P(N)=N^3/(N^3+8^3) で判定）。</summary>
+        public bool lethalParryEnabled = true;
         /// <summary>[測定 2026-11-14] ダウンが敵の周期 (大技・構え・予兆) を取り消す条件 (CombatSystem.BossDown.CancelsCycle)。
         /// 既定 Timed (2026-11-26・作者の決定) = ダウンの種類を来たターンで決める (BossDown.Classify)。 ChargeOrHeavy = チャージか山場のターンに重なった時だけ取り消す (2026-11-14〜11-26)。
         /// Always = どのダウンでも周期を頭に戻す (旧い規則 = 2e76c46 の main)。
@@ -932,6 +936,7 @@ namespace AutoTest
                  + $"/ 縄張りの宝 {territoryTreasure} (BOT のしきい値 {territoryTreasureHpMargin:0.##}) / 縄張りを避ける遠回り {(navTerritoryDetour < 0 ? "使わない" : "+" + navTerritoryDetour + "歩まで")}"
                  + (DeckLookaheadDiagLine().Length > 0 ? System.Environment.NewLine + DeckLookaheadDiagLine() : "")
                  + (CombatSystem.BossDownDiag.Line().Length > 0 ? System.Environment.NewLine + CombatSystem.BossDownDiag.Line() : "")
+                 + (CombatSystem.LethalParryDiag.Line().Length > 0 ? System.Environment.NewLine + CombatSystem.LethalParryDiag.Line() : "")
                  + (CombatSystem.HeavyHitDiag.Line().Length > 0 ? System.Environment.NewLine + CombatSystem.HeavyHitDiag.Line() : "")   // [計装 2026-11-14] 大技の被ダメ
                  + (NoAttackChoiceLine().Length > 0 ? System.Environment.NewLine + NoAttackChoiceLine() : "")
                  + (DownAimLine().Length > 0 ? System.Environment.NewLine + DownAimLine() : "")                 // [#141]

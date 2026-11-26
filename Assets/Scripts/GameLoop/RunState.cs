@@ -342,6 +342,8 @@ namespace GameLoop
         /// (割合を掛けた整数部が増えるたびに 1 ずつ減らす)。 減少量そのものを積むのではなく
         /// 蓄積量を持つのは、 割合が Tier で変わっても一貫した換算にするため。</summary>
         public int lingeringWoundDamageAccum;
+        /// <summary>[2026-11-26] このランでの致死パリィ成功回数（成功するたびに猶予 12→4→2→1f へ縮小、〈決死〉+(20%×回数)）。</summary>
+        public int lethalParrySuccessCount;
         /// <summary>T4-C〈凶運〉ラン開始時に封印された役のビットマスク (index = RoleKind)。
         /// **ラン中ずっと固定**。 どの役が死ぬかでそのランの組み立てが変わるので、
         /// 戦闘ごとに引き直さない (引き直すと「運が悪い戦闘」の集合になり、 判断が生まれない)。</summary>
@@ -556,6 +558,7 @@ namespace GameLoop
             baseMaxHPAtRunStart = 0;
             lingeringWoundLost = 0;
             lingeringWoundDamageAccum = 0;
+            lethalParrySuccessCount = 0;
             sealedRoleMask = 0;
             challengeDifficulty = 0;
             if (challengePicks == null) challengePicks = new List<string>(); else challengePicks.Clear();

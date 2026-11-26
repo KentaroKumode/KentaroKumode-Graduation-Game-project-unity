@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Globalization;
 using System.Reflection;
 using UnityEngine;
@@ -512,7 +512,7 @@ namespace AutoTest.ParallelSweep
                 "rerollStopRule", "rerollShelfValue", "rerollPriorWeight",
                 "phase3BeforeReroll", "rerollCurveFirst", "rerollCurveStep",
                 // 計測でイベントを切っているか (2026-11-05)。 クリア率の意味が変わるので必ず印字する。
-                "suppressEvents", "suppressConvictionChain", "freeNavScout", "navLearnedDanger", "measureNoExplore",
+                "suppressEvents", "suppressConvictionChain", "freeNavScout", "navLearnedDanger", "navSnowball", "measureNoExplore",
                 // 2026-11-10: 配線が与ダメの倍率を読むか (−1 = 技量に従う) と実効値・軸に寄せる方策・配布の有無 (配布は使わない前提を確かめる)
                 "v3.readOutgoingMult", "ReadOutgoingMultEffective", "buyAxisFocus", "buyAxisFocusBonus", "buyBranchFocus", "botBanItemIds",
                 "axisPackageAxis", "axisPackageCount", "v3.hpLedger", "predTrace",
@@ -558,7 +558,7 @@ namespace AutoTest.ParallelSweep
                 // 2026-11-26: 振り直しを大事なターン (大ダウン・今割れば大技が止まる) に集める (True = 既定 / False = 今までの振り直し)
                 "downRerollPlan",
                 // 2026-11-26: 混乱ゲージの温存のための攻撃 0 本の待ち (True = 既定・⑯)・支度の得の割合 (0.5 = 既定)
-                "downGaugeNoAttackHold", "downGaugeReadyShare",
+                "downGaugeNoAttackHold", "downGaugeReadyShare", "lethalParryEnabled",
                 // 2026-11-14: ダウンが大技を取り消す条件 (ChargeOrHeavy = 既定 / Always = 旧い規則)・大技のチャージは攻撃しない (True = 既定)・大技の倍率の上書き (id:小技:大技)
                 "downCancelRule", "heavyChargeNoAttack", "enemyHeavySpec",
                 // 2026-11-14: 目盛りの割れ方 (MainAttackOnly = 既定・通常攻撃だけ / AnyDamage = 旧い判定)・ひびの猶予 (1 = 既定・0 = すぐ・−1 = ひびでは割れない)・よろめきは弱い (True = 既定)

@@ -1,4 +1,4 @@
-﻿using CombatSystem;
+using CombatSystem;
 using ItemSystem.PassiveSkills.Keywords;
 
 namespace ItemSystem.PassiveSkills.Effects
@@ -83,11 +83,11 @@ namespace ItemSystem.PassiveSkills.Effects
             => Chg.Block(ctx, Block * Chg.NewSteps(ctx, "chg.cuirass", Every, MaxPerTurn), SkillId);
     }
 
-    /// <summary>十五年目の計測器: 充電が上限に達したターン、 次の攻撃の撃の基礎攻撃 +6 (攻撃 +N は撃ごと・1 ターン 1 回)。</summary>
+    /// <summary>十五年目の計測器: 充電が上限に達したターン、 次の攻撃の撃の基礎攻撃 +8 (攻撃 +N は撃ごと・1 ターン 1 回)。</summary>
     public class OldGauge : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "十五年目の計測器";
-        public const int Atk = 6;
+        public const int Atk = 8;
         private const string Key = "chg.gauge";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(Rw.Count(ctx, Key) > 0);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnChargeGain, PassiveSkillTrigger.OnOvercharge, PassiveSkillTrigger.OnWired };
@@ -208,11 +208,11 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>蓄電の小手: このターン充電を 5 消費するたび、 このターンの全攻撃の撃の基礎攻撃 +3 (累積・攻撃 +N は撃ごと)。</summary>
+    /// <summary>蓄電の小手: このターン充電を 5 消費するたび、 このターンの全攻撃の撃の基礎攻撃 +4 (累積・攻撃 +N は撃ごと)。</summary>
     public class StorageGauntlet : IPassiveSkillEffect
     {
         public string SkillId => "蓄電の小手";
-        public const int Every = 5, Atk = 3;
+        public const int Every = 5, Atk = 4;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnChargeSpend };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -221,11 +221,11 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>引き直しの撃鉄: 振り直すたび、 このターンの次の 1 撃の基礎攻撃 +5 (そのターン累積・最初の 1 撃へ・ctx.firstHitAttackBonus)。</summary>
+    /// <summary>引き直しの撃鉄: 振り直すたび、 このターンの次の 1 撃の基礎攻撃 +7 (そのターン累積・最初の 1 撃へ・ctx.firstHitAttackBonus)。</summary>
     public class RerollHammer : IPassiveSkillEffect
     {
         public string SkillId => "引き直しの撃鉄";
-        public const int AtkPerReroll = 5;
+        public const int AtkPerReroll = 7;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {

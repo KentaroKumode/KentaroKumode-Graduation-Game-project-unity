@@ -1,4 +1,4 @@
-﻿namespace CombatSystem
+namespace CombatSystem
 {
     /// <summary>毒の軸の品のうち、 端子の解決 (<see cref="TerminalCards.Resolve"/> の 5d) の中で効く物と、 起爆の式に効く物 (2026-11-21・full-item-rework-ledger §②)。
     /// 戦闘の始めに所持品から <see cref="TerminalBattleState.poisonItems"/> へ入れる (CombatManager.BeginTerminalDeck・<see cref="PoisonCore.ItemsOf"/>)。</summary>
@@ -35,8 +35,10 @@
         public const int DetonateMaxHpBp = 25, MagazineMaxHpBp = 32;
         /// <summary>起爆で消費する毒の割合の分母 (毒 ÷ これ・切り上げ・2026-11-22 neon 収束: 2 → 3)。</summary>
         public const int SpendDiv = 3;
-        /// <summary>〈蓋付きの毒指輪〉: 起爆に要る敵の毒 (2026-11-26: 24 → 20) / 開幕暗殺ターン数 / その間の付与毒 +N・劇症ダメージ +%。</summary>
-        public const int RingNeed = 20, RingAssassinTurns = 5, RingBonusPoison = 2, RingEarlyPct = 50;
+        /// <summary>〈蓋付きの毒指輪〉: 起爆に要る敵の毒 (2026-11-27: 26) / 発動に要る毒秘宝数 (6・他軸侵入封じ) / 開幕暗殺ターン数 / その間の付与毒 +N・劇症ダメージ +% (25)。</summary>
+        public const int RingNeed = 26, RingMinPoisonRelics = 6, RingAssassinTurns = 5, RingBonusPoison = 2, RingEarlyPct = 25;
+        /// <summary>起爆の最大 HP 割合項を 100% 発揮するのに要る毒秘宝数 (他軸つまみ食い封じ・2026-11-27)。</summary>
+        public const int DetonateMaxHpFullRelics = 5;
         /// <summary>〈劇毒の火薬庫〉: 1 ターンに与えた毒の合計がこれ以上、かつ敵の毒が <see cref="MagazineMinPoison"/> 以上なら、ターンの終わりに起爆 (2026-11-26 下限追加)。</summary>
         public const int MagazineGiven = 8, MagazineMinPoison = 18;
         /// <summary>〈遅効の毒刃〉: この戦闘で起爆した回数 1 回につき、 起爆のダメージ +% (最大 +150%・2026-11-26 上限追加) / 劇症後の即死ライン倍率 (毒 × 2、ボスは半分 = × 1)。</summary>
@@ -62,12 +64,14 @@
 
         /// <summary>起爆 1 回のダメージ (消費量 <paramref name="spent"/>・この戦闘でここまでに起爆した回数 <paramref name="before"/>・ダウン中 <paramref name="down"/>・
         /// 敵の最大 HP <paramref name="enemyMaxHp"/> (ctx.enemyMaxHP・ヴェスカは段ごとの最大 HP)・威力 <paramref name="powerPct"/>%・ターン <paramref name="turn"/>)。 切り捨て。</summary>
-        public static int Damage(int spent, PoisonItems f, int before, bool down, int enemyMaxHp, int powerPct = 100, int turn = 99)
+        public static int Damage(int spent, PoisonItems f, int before, bool down, int enemyMaxHp, int powerPct = 100, int turn = 99, int poisonRelics = DetonateMaxHpFullRelics)
         {
             if (spent <= 0) return 0;
             bool mag = (f & PoisonItems.Magazine) != 0;
-            long d = System.Math.Max((long)spent * (mag ? MagazineMul : DetonateMul),
-                                     (long)spent * System.Math.Max(0, enemyMaxHp) * (mag ? MagazineMaxHpBp : DetonateMaxHpBp) / 10000);
+            long flat = (long)spent * (mag ? MagazineMul : DetonateMul);
+            int relScale = System.Math.Min(DetonateMaxHpFullRelics, System.Math.Max(0, poisonRelics));
+            long maxHpTerm = (long)spent * System.Math.Max(0, enemyMaxHp) * (mag ? MagazineMaxHpBp : DetonateMaxHpBp) * relScale / (10000L * DetonateMaxHpFullRelics);
+            long d = System.Math.Max(flat, maxHpTerm);
             if (CardRules.DetonateMulTenths > 0) d += (long)spent * CardRules.DetonateMulTenths / 10;   // 挑戦カード〈毒仕込み〉: 倍率 +0.5 / +1.0 / +1.5 (切り捨て・最大 HP の項との大きい方に足す)
             if ((f & PoisonItems.Ring) != 0 && turn >= 1 && turn <= RingAssassinTurns) d = d * (100 + RingEarlyPct) / 100;   // 〈蓋付きの毒指輪〉: 1〜5 ターン目 +50%
             if ((f & PoisonItems.SlowBlade) != 0 && before > 0) d = d * (100 + System.Math.Min(SlowBladeMaxPct, SlowBladePctPerDetonate * before)) / 100;

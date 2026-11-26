@@ -434,12 +434,21 @@ namespace AutoTest
             if (n == null) return 0f;
             float wHp = MacroHpPer10[layer] * 10f * (layer == D6Layer ? navD6HpWeightMul : 1f);   // [測定 2026-11-18] 第 4 層の HP の重みの口 (既定 1)
             float wItem = MacroItem[layer];
+            float snow = navSnowball;
+            float snowMul = 1f;
+            if (snow > 0f)
+            {
+                int remFloors = Mathf.Max(0, 4 - layer);
+                snowMul = 1f + 0.18f * remFloors * snow;
+                wItem *= snowMul;
+                if (layer <= 2 && s.hp >= 0.55f) wHp *= Mathf.Clamp(1f - 0.30f * snow, 0.45f, 1f);
+            }
             float wGold = wItem / MacroPrice[layer] * MacroGoldDiscount;
 
             if (!n.revealed)
             {
                 // 種別が見えていない点: 通常の戦闘相当として見積もる
-                return MacroFight(in fl, wHp, wGold, 0f, ref s) * MacroUnknownWeight + VaneWin(run, wGold, MacroUnknownWeight, ref s);
+                return MacroFight(in fl, wHp, wGold, snow > 0f ? 0.12f * wItem * snow : 0f, ref s) * MacroUnknownWeight + VaneWin(run, wGold, MacroUnknownWeight, ref s);
             }
             switch (n.EffectiveType)
             {
@@ -448,17 +457,20 @@ namespace AutoTest
                     // 〈徒労〉(2026-11-14): 報酬が止まっていれば報酬のゴールドの見込みを 0 にする (被ダメ・死の見込みは残す = 正味で損)
                     bool noReward = s.toil > 0;
                     if (noReward) s.toil = ToilNavRule.AfterNormalWin(s.toil, GameHooks.ToilMode);
-                    return MacroFight(in fl, wHp, wGold, 0f, ref s, noReward, 'N') + VaneWin(run, wGold, 1f, ref s);
+                    float bSnow = (!noReward && snow > 0f) ? 0.18f * wItem * snow : 0f;
+                    return MacroFight(in fl, wHp, wGold, bSnow, ref s, noReward, 'N') + VaneWin(run, wGold, 1f, ref s);
                 }
                 case TileType.EliteBattle:
                 {
-                    return MacroFight(in fl, wHp, wGold, CombatRewards.EliteDropRate * wItem, ref s, false, 'E') + VaneWin(run, wGold, 1f, ref s);
+                    float eSnow = snow > 0f ? 0.25f * wItem * snow : 0f;
+                    return MacroFight(in fl, wHp, wGold, CombatRewards.EliteDropRate * wItem + eSnow, ref s, false, 'E') + VaneWin(run, wGold, 1f, ref s);
                 }
                 case TileType.Rest:
                 {
                     float healed = Mathf.Min(0.3f, 1f - s.hp);
                     s.hp += healed;
-                    return wHp * healed + 0.02f;   // 満タンなら強化に使う
+                    float upgSnow = (snow > 0f && s.hp >= 0.80f && run != null && run.weaponMaterials >= 1) ? 0.25f * wItem * snow : 0f;
+                    return wHp * healed + 0.02f + upgSnow;   // 満タンなら強化に使う
                 }
                 case TileType.Shop:
                 {

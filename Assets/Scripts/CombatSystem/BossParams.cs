@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace CombatSystem
@@ -89,7 +89,7 @@ namespace CombatSystem
                 case BossParam.FuryAttack:        return new ParamSpec( 3f, 0f, 20f);
                 case BossParam.BlazeBurstPerStack: return new ParamSpec( 5f, 0f, 20f);
                 case BossParam.BlazePerShield:    return new ParamSpec(10f, 1f, 100f);   // 2026-11-14: 烈炎はシールドで受けた量で積もる (作者の決定)
-                case BossParam.RegrowthRate:      return new ParamSpec(0.02f, 0f, 0.10f);
+                case BossParam.RegrowthRate:      return new ParamSpec(0.06f, 0f, 0.10f);   // 2026-11-26: 灰燼の王 HP=10000・Atk=25・混乱で2T停止に合わせて 2% → 6%
                 case BossParam.TenyoShieldPct:    return new ParamSpec(20f, 0f, 100f);   // 2026-11-15 天与の盾 (仮)
                 case BossParam.TenyoSwordBite:    return new ParamSpec( 6f, 0f, 50f);    // 2026-11-15 天与の剣 (仮・〈灼〉の 2 倍)
                 default:                          return new ParamSpec( 1f, 0f,  1f);

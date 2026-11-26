@@ -1,4 +1,4 @@
-﻿using CombatSystem;
+using CombatSystem;
 using ItemSystem.PassiveSkills.Keywords;
 
 namespace ItemSystem.PassiveSkills.Effects
@@ -30,7 +30,7 @@ namespace ItemSystem.PassiveSkills.Effects
             ctx.enemyStatusStacks["poison"] = remPoison;
             int before = Count(ctx, DetonateCountKey);
             var flags = PoisonCore.ItemsOf(Rw.Run);
-            int dmg = PoisonCore.Damage(spent, flags, before, BossDown.ActiveNow, ctx.enemyMaxHP, 100, ctx.currentTurn);
+            int dmg = PoisonCore.Damage(spent, flags, before, BossDown.ActiveNow, ctx.enemyMaxHP, 100, ctx.currentTurn, ctx.AxisDepth(AxisRules.Poison));
             ctx.accumulatedValues[DetonateCountKey] = before + 1;
             ctx.accumulatedValues[DetonatedTurnKey] = ctx.currentTurn;
             CombatManager.DetonateFired++;
@@ -252,7 +252,8 @@ namespace ItemSystem.PassiveSkills.Effects
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnPostDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (t == PassiveSkillTrigger.OnBattleStart) { ctx.poisonRingEarly = true; return; }
+            if (t == PassiveSkillTrigger.OnBattleStart) { if (ctx.AxisDepth(AxisRules.Poison) >= PoisonCore.RingMinPoisonRelics) ctx.poisonRingEarly = true; return; }
+            if (ctx.AxisDepth(AxisRules.Poison) < PoisonCore.RingMinPoisonRelics) return;
             if (!Psn.Hit(ctx) || ctx.EnemyPoison < PoisonCore.RingNeed || !Rw.OncePerTurn(ctx, TurnKey)) return;
             Psn.Detonate(ctx, SkillId);
         }
@@ -348,7 +349,7 @@ namespace ItemSystem.PassiveSkills.Effects
         {
             int p = ctx.EnemyPoison;
             if (p < PoisonCore.MantleEchoNeed) return;
-            int dmg = PoisonCore.Damage(PoisonCore.Spend(p), PoisonCore.ItemsOf(Rw.Run), Psn.Count(ctx, Psn.DetonateCountKey), BossDown.ActiveNow, ctx.enemyMaxHP, PoisonCore.MantleEchoPct);
+            int dmg = PoisonCore.Damage(PoisonCore.Spend(p), PoisonCore.ItemsOf(Rw.Run), Psn.Count(ctx, Psn.DetonateCountKey), BossDown.ActiveNow, ctx.enemyMaxHP, PoisonCore.MantleEchoPct, 99, ctx.AxisDepth(AxisRules.Poison));
             Kw.DamageEnemy(ctx, dmg);
             Rw.Log($"[瘴気の外套] 毒 {p} → 消費せずに起爆の 50% ({dmg})");
         }

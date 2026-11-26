@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace CombatSystem
@@ -29,6 +29,7 @@ namespace CombatSystem
         Odd,            // 奇数
         SameElsewhere,  // 同じ目が他の端子に挿さっている
         PairSame,       // 同じ目 2 個を挿す (capacity 2・2 個そろって初めて発動)
+        AtLeast4,       // 4 以上 (2026-11-26 〈激昂〉)
     }
 
     /// <summary>山札の軸の品のうち、 端子の解決・山札の出し入れを変える品 (2026-11-21・full-item-rework-ledger §⑦)。
@@ -435,13 +436,13 @@ namespace CombatSystem
         public const int DetectorMul = 2, RectifierMul = 2;
         public const int IgniterAttack = 7, FuseBlock = 8, GroundCutPct = 60, BreakerCutPct = 75, ReliefCutPct = 90;
         public const int DischargeCost = 3, DischargeMul = 3, BreakerCost = 6, DeathwishMul = 3, RelayPerFired = 8, OscPerStreak = 5;
-        public const int CapacitorNeed = 12, CapacitorAttack = 40, ArresterNeed = 8, FoundryNeed = 10, CoolantNeed = 12;
+        public const int CapacitorNeed = 9, CapacitorAttack = 50, ArresterNeed = 6, FoundryNeed = 7, CoolantNeed = 8;
         /// <summary>〈打ち直し〉で出目が増えるのは 1 ターンにこの回数まで (2026-11-21・作者の決定)。 溜まりの余りは次のターンへ持ち越す。
         /// 旧: 届いた回数だけ増えたので、 増えた出目がさらに溜まりを速めて複利で膨らんだ (ラン #1012542 で出目 2,600 万)。 今は 1 ターンに +1 の直線。</summary>
         public const int FoundryMaxPerTurn = 1;
-        public const float AmplifierPerPip = 0.16f, ResonatorMul = 1.5f, VacuumCritMult = 2.0f;
+        public const float AmplifierPerPip = 0.20f, ResonatorMul = 1.8f, VacuumCritMult = 2.0f;
         public const int CounterEvery = 10; public const float CounterPct = 0.10f;
-        public const int TwinShotMul = 3, DetonatorMul = 3, FirstAidMul = 1, HealMul = 1, BatteryBonus = 2, InsulatorBonus = 4;
+        public const int TwinShotMul = 3, DetonatorMul = 3, FirstAidMul = 1, HealMul = 1, BatteryBonus = 4, InsulatorBonus = 4;
         /// <summary>〈火葬の剣〉: 挿した出目の合計に掛けて攻撃に足す倍率 (2026-11-14・作者の決定)。</summary>
         public const int BurnOutMul = 2;
         public const int HarvesterMaxHp = 2, WhetGain = 1, LootGold = 5;
@@ -468,8 +469,8 @@ namespace CombatSystem
         //   千刃・諸刃の剣・号令の剣・力溜め・受け流し・剥ぎ取り・火葬の剣は据え置き。 腕から元の値へ戻す口は GameHooks.Terminal* (AutoRunner.terminal*)。
         // 2026-11-14: 〈応急箱〉の「使うとランの山札から抜ける」を取り下げた (作者の決定:「使い捨ては全部『その戦闘で山札に戻らない』でいい」)。
         //   使い捨ての決まりは disposable だけ。 旧い決まりへ戻す測定の口は GameHooks.TerminalFirstAidLeavesRunDeck (AutoRunner.terminalFirstAidLeavesRunDeck)。
-        /// <summary>〈千刃〉: この戦闘で使うたび、 以後のこの端子の攻撃 +N。 / 〈先読み〉: 次のターンに多く引く枚数。</summary>
-        public const int MainsPerUse = 1, SwitchboardDraw = 2;
+        /// <summary>〈千刃〉: この戦闘で使うたび、 以後のこの端子の攻撃 +N (2026-11-26: 常設ナシ・+1 → +2)。 / 〈先読み〉: 次のターンに多く引く枚数。</summary>
+        public const int MainsPerUse = 2, SwitchboardDraw = 2;
 
         // ===== 山札の軸の品の数値 (2026-11-21・full-item-rework-ledger §⑦・未測定) =====
         /// <summary>〈焼き入れの挟み〉使い捨て 1 枚につき各撃 +N / 〈留め金の栞〉各撃 +N / 〈備えの鐘〉ブロック・1 ターンの回数 / 〈空回りの錘〉多く引く上限 /
@@ -518,10 +519,10 @@ namespace CombatSystem
         /// <summary>基本 (攻撃・防御・充電)・〈後の先〉〈攻防一体〉のブロック: 出目 +1。 / 〈無形の構え〉〈有効活用〉のブロック: 出目 +2。</summary>
         public const int UpPip = 1, UpPipBlock2 = 2;
         public const int DetectorBonusUp = 2, DischargeCostUp = 2, RelayPerFiredUp = 10, OscPerStreakUp = 7, TwinPairBonusUp = 3;
-        public const int FuseBlockUp = 10, InsulatorBonusUp = 5, BreakerCostUp = 5, RectifierBonusUp = 2, BatteryBonusUp = 3, HealShieldUp = 2;
-        public const int CapacitorNeedUp = 10, ArresterNeedUp = 7, SwitchboardDrawUp = 3;
+        public const int FuseBlockUp = 10, InsulatorBonusUp = 5, BreakerCostUp = 5, RectifierBonusUp = 2, BatteryBonusUp = 6, HealShieldUp = 2;
+        public const int CapacitorNeedUp = 7, ArresterNeedUp = 5, SwitchboardDrawUp = 3;
         public const float VacuumCritMultUp = 2.5f;
-        public const int CoolantNeedUp = 10, CounterEveryUp = 8, TwinShotMulUp = 4, HarvesterMaxHpUp = 3, WhetLowHpAttackUp = 4, LootGoldUp = 7, StripperChoicesUp = 2;
+        public const int CoolantNeedUp = 6, CounterEveryUp = 8, TwinShotMulUp = 4, HarvesterMaxHpUp = 3, WhetLowHpAttackUp = 4, LootGoldUp = 7, StripperChoicesUp = 2;
         public const int MisterBonusUp = 2, PoisonScaleAttackUp = 4, StokerBonusUp = 3, AfterHeatPerBurstUp = 3, LeakBonusUp = 2, PatchBonusUp = 2;
         public const int DetonatorMulUp = 4, FirstAidBonusUp = 2, PiercerMulUp = 2, ReliefShieldUp = 4, FullChargeCapUp = 5, BurnOutMulUp = 3;
 
@@ -554,11 +555,11 @@ namespace CombatSystem
             [TerminalIds.Battery] = "充電 +出目 +" + BatteryBonusUp + "。",
             [TerminalIds.Heal] = (HealMul == 1 ? "HP +出目。" : "HP +出目 ×" + HealMul + "。") + "シールド +" + HealShieldUp + "。",
             [TerminalIds.Capacitor] = "出目を溜める。" + CapacitorNeedUp + " で次の攻撃 +" + CapacitorAttack + "。",
-            [TerminalIds.Arrester] = "出目を溜める。" + ArresterNeedUp + " でそのターンの被ダメージ半分。",
-            [TerminalIds.Transformer] = "攻撃のカードを挿した出目を 2 倍。このカードに挿した出目も攻撃に足す。",
-            [TerminalIds.Switchboard] = "次のターン、カードを " + SwitchboardDrawUp + " 枚多く引く。",
-            [TerminalIds.VacuumTube] = "このターンの会心倍率 +" + VacuumCritMultUp.ToString("0.0") + "。",
-            [TerminalIds.Coolant] = "出目を溜める。" + CoolantNeedUp + " ごとにエスカレーションの段階を 1 つ戻す。",
+            [TerminalIds.Arrester] = "出目の半分 (切り上げ) をブロックに。出目を溜める。" + ArresterNeedUp + " でそのターンの被ダメージ半分。",
+            [TerminalIds.Transformer] = "攻撃のカードを挿した出目を 2 倍。このカードに挿した出目 +" + UpPipBlock2 + " も攻撃に足す。",
+            [TerminalIds.Switchboard] = "出目 +" + UpPipBlock2 + " をブロックに。次のターン、カードを " + SwitchboardDrawUp + " 枚多く引く。",
+            [TerminalIds.VacuumTube] = "このターンの攻撃は必ず会心し、会心倍率 +" + VacuumCritMultUp.ToString("0.0") + "。",
+            [TerminalIds.Coolant] = "出目の半分 (切り上げ) をブロックに。出目を溜める。" + CoolantNeedUp + " ごとにエスカレーションの段階を 1 つ戻す。",
             [TerminalIds.Counter] = "出目を攻撃に。基本以外の発動が累計 " + CounterEveryUp + " 回になるごとに、この戦闘中の与ダメージ +" + (int)(CounterPct * 100) + "%。",
             [TerminalIds.Preheater] = "出目 +" + UpPipBlock2 + " をブロックに。次のターン、カードの条件を無視する。",
             [TerminalIds.TwinShot] = "同じ目 2 個で、出目の合計 ×" + TwinShotMulUp + " を攻撃に。",
@@ -587,14 +588,14 @@ namespace CombatSystem
             [TerminalIds.FirstAid] = "この戦闘で HP を失った後だけ発動。HP +出目" + (FirstAidMul == 1 ? "" : " ×" + FirstAidMul) + " +" + FirstAidBonusUp + "。最大 HP を超えた分はシールドになる。",
             [TerminalIds.FullCharge] = "この戦闘中、充電の上限 +" + FullChargeCapUp + "。充電を上限まで満たす。",
             [TerminalIds.CoolShot] = "エスカレーションの段階を 1 つ戻す。出目をブロックに。",
-            [TerminalIds.Copier] = "挿さずに空けた手札のカードを 1 枚、この戦闘中だけ複製して、次のターンの手札に加える。出目を充電に。空けたカードが無ければ発動しない。",
+            [TerminalIds.Copier] = "挿さずに空けた手札のカードを 1 枚、この戦闘中だけ複製して、次のターンの手札に加える。出目 +" + UpPipBlock2 + " を充電に。空けたカードが無ければ発動しない。",
             [TerminalIds.BurnOut] = "出目 ×" + BurnOutMulUp + " を攻撃に。挿さずに空けた手札のカードを 1 枚、この戦闘から外す。空けたカードが無ければ発動しない。",
             // 采配と共通の端子 (2026-11-20)。 使い捨ては回数・枚数を増やさない (段 1-b の方針・terminal_upgrades_draft.md)
             [TerminalIds.BurnSlash] = "この戦闘で使い捨てを使った後だけ発動 (前のターンまで)。出目 ×" + BurnSlashMulUp + " を攻撃に。これまでにこの戦闘で使い捨てを使った回数 ×" + BurnSlashPerUp + " を攻撃に足す。",
-            [TerminalIds.Reload] = "このターンに使った他の使い捨てを 1 枚 (場の右から)、次のターンの手札に戻す。出目を充電に。",
+            [TerminalIds.Reload] = "このターンに使った他の使い捨てを 1 枚 (場の右から)、次のターンの手札に戻す。出目 +" + UpPipBlock2 + " を充電に。",
             [TerminalIds.OneCut] = "出目 ×" + OneCutMulUp + " を攻撃に。この撃は敵の防御を無視。挿した攻撃のカードがこれ 1 枚だけのターンにだけ発動する。",
             [TerminalIds.Gear] = "出目は挿せない。場にあれば、毎ターン最初に発動した基本以外のカード (場の左から) の挿した目 1 つにつき +" + GearPipUp + "。一度引くとこの戦闘中ずっと場に残る。",
-            [TerminalIds.Bell] = "この戦闘の残りの間、山札を切り直すたび、次のターンにカードを 1 枚多く引く。出目を充電に。",
+            [TerminalIds.Bell] = "この戦闘の残りの間、山札を切り直すたび、次のターンにカードを 1 枚多く引く。出目 +" + UpPipBlock2 + " を充電に。",
             [TerminalIds.Mikiri] = "出目をブロックに。敵が大技を予告したターンなら 2 倍。",
             // 役の軸の端子 (2026-11-21)
             [TerminalIds.DiceTable] = "充電 +出目。次のターンの最初の振り直しの充電の費用 −min(" + DiceTableCapUp + ", この戦闘で役が成立した回数)。",
@@ -646,6 +647,7 @@ namespace CombatSystem
             {
                 case TerminalCond.AtMost3: return "3以下";
                 case TerminalCond.AtMost4: return "4以下";
+                case TerminalCond.AtLeast4: return "4以上";
                 case TerminalCond.AtLeast5: return "5以上";
                 case TerminalCond.AtLeast6: return "6以上";
                 case TerminalCond.Even: return "偶数";
@@ -686,7 +688,7 @@ namespace CombatSystem
             const TerminalKind A = TerminalKind.Attack, B = TerminalKind.Block, C = TerminalKind.Charge, S = TerminalKind.Support;
             string ax = ItemSystem.PassiveSkills.AxisRules.Crit, ab = ItemSystem.PassiveSkills.AxisRules.Bleed, ap = ItemSystem.PassiveSkills.AxisRules.Poison,
                    ah = ItemSystem.PassiveSkills.AxisRules.Heat, ac = ItemSystem.PassiveSkills.AxisRules.Charge, asx = ItemSystem.PassiveSkills.AxisRules.Shield;
-            var perm = D(TerminalIds.Mains, A, "出目を攻撃に。この戦闘で使うたび、以後のこのカードの攻撃 +" + MainsPerUse + "。一度引くとこの戦闘中ずっと場に残る。"); perm.permanent = true;
+            var perm = D(TerminalIds.Mains, A, "出目を攻撃に。この戦闘で使うたび、以後のこのカードの攻撃 +" + MainsPerUse + "。");
             return new List<TerminalDef>
             {
                 // ── 基本 ──
@@ -713,15 +715,15 @@ namespace CombatSystem
                 D(TerminalIds.Battery, C, "充電 +出目 +" + BatteryBonus + "。"),
                 D(TerminalIds.Heal, S, (HealMul == 1 ? "HP +出目。" : "HP +出目 ×" + HealMul + "。"), TerminalCond.AtMost3),
                 D(TerminalIds.Capacitor, S, "出目を溜める。" + CapacitorNeed + " で次の攻撃 +" + CapacitorAttack + "。"),
-                D(TerminalIds.Arrester, S, "出目を溜める。" + ArresterNeed + " でそのターンの被ダメージ半分。"),
-                D(TerminalIds.Transformer, S, "攻撃のカードを挿した出目を 2 倍。"),
-                D(TerminalIds.Switchboard, S, "次のターン、カードを " + SwitchboardDraw + " 枚多く引く。"),
+                D(TerminalIds.Arrester, S, "出目の半分 (切り上げ) をブロックに。出目を溜める。" + ArresterNeed + " でそのターンの被ダメージ半分。"),
+                D(TerminalIds.Transformer, S, "攻撃のカードを挿した出目を 2 倍。このカードに挿した出目も攻撃に足す。"),
+                D(TerminalIds.Switchboard, S, "出目をブロックに。次のターン、カードを " + SwitchboardDraw + " 枚多く引く。"),
                 // ── レア ──
-                Rare(D(TerminalIds.Amplifier, S, "出目 1 につき与ダメージ +" + (int)(AmplifierPerPip * 100) + "% (別枠)。", TerminalCond.AtLeast5)),
-                Rare(D(TerminalIds.VacuumTube, S, "このターンの会心倍率 +" + VacuumCritMult.ToString("0.0") + "。", TerminalCond.AtLeast6)),
+                Rare(D(TerminalIds.Amplifier, S, "出目 1 につき与ダメージ +" + (int)(AmplifierPerPip * 100) + "% (別枠)。", TerminalCond.AtLeast4)),
+                Rare(D(TerminalIds.VacuumTube, S, "このターンの攻撃は必ず会心し、会心倍率 +" + VacuumCritMult.ToString("0.0") + "。", TerminalCond.AtLeast5)),
                 Rare(D(TerminalIds.Resonator, S, "このターンの与ダメージ ×" + ResonatorMul.ToString("0.0") + " (別枠)。", TerminalCond.SameElsewhere)),
                 Rare(D(TerminalIds.Foundry, S, "出目を溜める。" + FoundryNeed + " ごとにこの戦闘中の全部の出目 +1 (1 ターンに " + FoundryMaxPerTurn + " 回まで・余りは持ち越す。このターンは、まだ効果の出ていないカードの出目から)。")),
-                Rare(D(TerminalIds.Coolant, S, "出目を溜める。" + CoolantNeed + " ごとにエスカレーションの段階を 1 つ戻す。")),
+                Rare(D(TerminalIds.Coolant, S, "出目の半分 (切り上げ) をブロックに。出目を溜める。" + CoolantNeed + " ごとにエスカレーションの段階を 1 つ戻す。")),
                 Rare(D(TerminalIds.Counter, A, "出目を攻撃に。基本以外の発動が累計 " + CounterEvery + " 回になるごとに、この戦闘中の与ダメージ +" + (int)(CounterPct * 100) + "%。")),
                 Rare(D(TerminalIds.Preheater, B, "出目をブロックに。次のターン、カードの条件を無視する。")),
                 Rare(perm),
@@ -731,7 +733,7 @@ namespace CombatSystem
                 Rare(D(TerminalIds.LootBox, A, "出目を攻撃に。このターンに敵を倒すとゴールド +" + LootGold + "。")),
                 // 〈剥ぎ取り〉: 2026-11-13 に補助から攻撃へ (ユーザーの決定)。 補助のままでは挿しても攻撃にならず、 レアの 3 択でほかに負け続けた (GAME.md §24)
                 Rare(D(TerminalIds.Stripper, A, "出目を攻撃に。このターンに敵を倒すと、戦闘後のカードの選択肢が " + StripperChoices + " つ増える。")),
-                Rare(D(TerminalIds.Doubler, S, "このターン、他のカードの効果を 2 回発動させる。", TerminalCond.AtLeast6)),
+                Rare(D(TerminalIds.Doubler, S, "出目を充電に。このターン、他のカードの効果を 2 回発動させる。", TerminalCond.AtLeast5)),
                 // 〈有効活用〉: 手札の持ち越し (2026-11-13・HandCarry) で「空けた端子を 1 枚残す」は役目を失ったので、
                 //   「捨て札から選んだ 1 枚を、 次のターンの手札に戻す」に作り替えた (ユーザーの決定)。 出目をブロックに入れるのは残す
                 //   (ADR-0014 の値付けの規則 2: 準備役は挿した出目を素の端子と同じに入れたうえで効果を足す)。
@@ -761,18 +763,18 @@ namespace CombatSystem
                 Sit(RunOnce(D(TerminalIds.FirstAid, S, "この戦闘で HP を失った後だけ発動。HP +出目" + (FirstAidMul == 1 ? "" : " ×" + FirstAidMul) + "。", TerminalCond.AtMost3)), "被弾後"),
                 Once(D(TerminalIds.FullCharge, C, "充電を上限まで満たす。")),
                 Once(D(TerminalIds.CoolShot, S, "エスカレーションの段階を 1 つ戻す。")),
-                Once(D(TerminalIds.Copier, S, "挿さずに空けた手札のカードを 1 枚、この戦闘中だけ複製して、次のターンの手札に加える。空けたカードが無ければ発動しない。")),
+                Once(D(TerminalIds.Copier, S, "挿さずに空けた手札のカードを 1 枚、この戦闘中だけ複製して、次のターンの手札に加える。出目を充電に。空けたカードが無ければ発動しない。")),
                 // 〈火葬の剣〉: 2026-11-14 に作り直し (作者の決定)。 旧: 補助で「空けた端子を 1 枚この戦闘から外す」だけ (測定で発動 1.7%・GAME.md §24)。
                 //   外す端子が無いターン (候補 0) は挿しても不発 (Resolve の 4.)・使い捨ても消費しない
                 Once(D(TerminalIds.BurnOut, A, "出目 ×" + BurnOutMul + " を攻撃に。挿さずに空けた手札のカードを 1 枚、この戦闘から外す。空けたカードが無ければ発動しない。")),
                 // ── 采配と共通の端子 (2026-11-20・段 1-e・item-overhaul-spec §8 / §12-4) ──
                 Sit(Once(D(TerminalIds.BurnSlash, A, "この戦闘で使い捨てを使った後だけ発動 (前のターンまで)。出目 ×" + BurnSlashMul + " を攻撃に。これまでにこの戦闘で使い捨てを使った回数 ×" + BurnSlashPer + " を攻撃に足す。", TerminalCond.None, ItemSystem.PassiveSkills.AxisRules.Deck)), "使い捨て後"),
                 //   〈緊急再装填〉: 自分は戻せない (他の〈緊急再装填〉は戻せる・作者 2026-11-20「戻し合っても意味がない」)。 戻す 1 枚は場の右から (Resolve の 5b)
-                Once(D(TerminalIds.Reload, S, "このターンに使った他の使い捨てを 1 枚 (場の右から)、次のターンの手札に戻す。", TerminalCond.AtLeast5)),
+                Once(D(TerminalIds.Reload, S, "このターンに使った他の使い捨てを 1 枚 (場の右から)、次のターンの手札に戻す。出目を充電に。", TerminalCond.AtLeast5)),
                 Once(D(TerminalIds.OneCut, A, "出目 ×" + OneCutMul + " を攻撃に。この撃は敵の防御を無視。挿した攻撃のカードがこれ 1 枚だけのターンにだけ発動する。")),
                 //   〈歯車の軸〉: 挿せない常設 (capacity 0)。 場にあれば効く (Resolve の 5.)。 2 枚あれば 2 枚分
                 Cap(Perm(D(TerminalIds.Gear, S, "出目は挿せない。場にあれば、毎ターン最初に発動した基本以外のカード (場の左から) の挿した目 1 つにつき +" + GearPip + "。一度引くとこの戦闘中ずっと場に残る。")), 0),
-                Rare(Once(D(TerminalIds.Bell, S, "この戦闘の残りの間、山札を切り直すたび、次のターンにカードを 1 枚多く引く。"))),
+                Rare(Once(D(TerminalIds.Bell, S, "この戦闘の残りの間、山札を切り直すたび、次のターンにカードを 1 枚多く引く。出目を充電に。"))),
                 D(TerminalIds.Mikiri, B, "出目をブロックに。敵が大技を予告したターンなら 2 倍。", TerminalCond.AtMost3),
                 D(TerminalIds.Crush, A, "出目を攻撃に。このターンにボスの混乱が満ちていたら、敵に最大 HP の " + CrushPct + "% の軽減不可ダメージ。", TerminalCond.AtLeast5),
                 // ── 役の軸の端子 (2026-11-21・段 1-f・item-overhaul-spec §8-1 / §12-4) ──
@@ -852,6 +854,7 @@ namespace CombatSystem
             {
                 case TerminalCond.AtMost3: return v <= 3;
                 case TerminalCond.AtMost4: return v <= 4;
+                case TerminalCond.AtLeast4: return v >= 4;
                 case TerminalCond.AtLeast5: return v >= 5;
                 case TerminalCond.AtLeast6: return v >= 6;
                 case TerminalCond.Even: return (v & 1) == 0;
@@ -1505,19 +1508,19 @@ namespace CombatSystem
                 case TerminalIds.Battery: o.chargeAdd += sum + (up ? BatteryBonusUp : BatteryBonus); break;
                 case TerminalIds.Heal: o.heal += sum * HealMulNow; if (up) o.shield += HealShieldUp; break;
                 case TerminalIds.Capacitor: st.storedAttack += CapacitorAttack * Gauge(st, name, sum, GaugeNeed(name)); break;
-                case TerminalIds.Arrester: if (Gauge(st, name, sum, GaugeNeed(name)) > 0) o.takenMul *= 0.5f; break;
-                case TerminalIds.Transformer: if (up) o.attackAdd += sum; break;      // 2 倍は 5. の頭 (pipMul)。 〈剛腕＋〉は挿した出目も攻撃に足す
-                case TerminalIds.Switchboard: st.extraDrawNext += up ? SwitchboardDrawUp : SwitchboardDraw; break;
+                case TerminalIds.Arrester: o.blockAdd += (sum + 1) / 2; if (Gauge(st, name, sum, GaugeNeed(name)) > 0) o.takenMul *= 0.5f; break;
+                case TerminalIds.Transformer: o.attackAdd += sum + p2; break;      // 2 倍は 5. の頭 (pipMul)。 2026-11-26: 素から挿した出目も攻撃に足す (強化は +2)
+                case TerminalIds.Switchboard: o.blockAdd += sum + p2; st.extraDrawNext += up ? SwitchboardDrawUp : SwitchboardDraw; break;
                 // レア
                 case TerminalIds.Amplifier: o.damageMul *= 1f + AmplifierPerPip * sum; break;
-                case TerminalIds.VacuumTube: o.critMultAdd += up ? VacuumCritMultUp : VacuumCritMult; break;
+                case TerminalIds.VacuumTube: o.forceCrit = true; o.critMultAdd += up ? VacuumCritMultUp : VacuumCritMult; break;
                 case TerminalIds.Resonator: o.damageMul *= ResonatorMul; break;
                 case TerminalIds.Foundry:      // 1 ターンに FoundryMaxPerTurn 回まで (何枚・〈残響〉で何回走っても合わせて・余りは溜まりに残る)
                 {
                     int got = Gauge(st, name, sum, GaugeNeed(name), FoundryMaxPerTurn - st.foundryFiredTurn);
                     st.foundryFiredTurn += got; st.foundryBonus += got; break;
                 }
-                case TerminalIds.Coolant: o.retreatStage += Gauge(st, name, sum, GaugeNeed(name)); break;      // 1 ターンに 2 回届けば 2 段 (2026-11-20〜)
+                case TerminalIds.Coolant: o.blockAdd += (sum + 1) / 2; o.retreatStage += Gauge(st, name, sum, GaugeNeed(name)); break;      // 1 ターンに 2 回届けば 2 段 (2026-11-20〜)
                 case TerminalIds.Clock: o.escalationDelay += sum; break;      // 時計の賽 (ADR-0015)
                 case TerminalIds.Preheater: o.blockAdd += sum + p2; st.ignoreCondNext = true; break;
                 case TerminalIds.Mains: o.attackAdd += sum + MainsPerUse * st.mainsUses; st.mainsUses++; break;
@@ -1527,7 +1530,7 @@ namespace CombatSystem
                     // 〈処刑の刃＋〉: 敵の HP が半分以下 (端子を解く時の HP) なら攻撃 +4
                     if (up && env.enemyMaxHp > 0 && env.enemyHp * 2 <= env.enemyMaxHp) o.attackAdd += WhetLowHpAttackUp;
                     break;
-                // 残響 (5. の頭で見る) は、 ここでは何もしない
+                case TerminalIds.Doubler: o.chargeAdd += sum; break;      // 倍化本体は 5. の頭で見る (2026-11-26: 素の出目を充電に)
                 case TerminalIds.Retainer: o.blockAdd += sum + p2; if (!HandCarry) o.retainTarget = empty(slot); else o.recall = true; break;   // 持ち越しの規則では捨て札から 1 枚戻す (対象は RecallPick)
                 case TerminalIds.StopSignal: o.enemyStunNext = true; if (up) o.blockAdd += sum; break;
                 case TerminalIds.Fork: o.attackAdd += sum; o.blockAdd += sum + p1; break;
@@ -1559,13 +1562,13 @@ namespace CombatSystem
                 case TerminalIds.FirstAid: { int h = sum * FirstAidMul + (up ? FirstAidBonusUp : 0); o.heal += h; if (up) o.overhealToShield += h; break; }
                 case TerminalIds.FullCharge: o.chargeFill = true; if (up) o.chargeCapAdd += FullChargeCapUp; break;
                 case TerminalIds.CoolShot: o.retreatStage++; if (up) o.blockAdd += sum; break;
-                case TerminalIds.Copier: o.copyTarget = empty(slot); if (up) o.chargeAdd += sum; break;
+                case TerminalIds.Copier: o.copyTarget = empty(slot); o.chargeAdd += sum + p2; break;
                 case TerminalIds.BurnOut: o.attackAdd += sum * (up ? BurnOutMulUp : BurnOutMul); o.burnTarget = empty(slot); break;   // 候補は 4. で確かめ済み (無ければ不発)
                 // 采配と共通の端子 (2026-11-20)
                 case TerminalIds.BurnSlash: o.attackAdd += sum * (up ? BurnSlashMulUp : BurnSlashMul) + st.disposedTotal * (up ? BurnSlashPerUp : BurnSlashPer); break;   // 回数はこのターンより前の分 (1 以上でないと発動しない・4.)
-                case TerminalIds.Reload: if (up) o.chargeAdd += sum; break;      // 戻す 1 枚は 5b
+                case TerminalIds.Reload: o.chargeAdd += sum + p2; break;      // 戻す 1 枚は 5b
                 case TerminalIds.OneCut: o.attackAdd += sum * (up ? OneCutMulUp : OneCutMul); o.ignoreDefense = true; break;      // 攻撃の端子は 1 枚だけ (4.) なので撃は 1 つ
-                case TerminalIds.Bell: st.bells++; if (up) o.chargeAdd += sum; break;
+                case TerminalIds.Bell: st.bells++; o.chargeAdd += sum + p2; break;
                 case TerminalIds.Mikiri: o.blockAdd += sum * (env.heavyTurn ? 2 : 1); break;      // 強化は条件 (4 以下) だけ
                 case TerminalIds.Crush: o.attackAdd += sum + p1; break;      // 目盛りを割った時の追加は本体の撃の輪 (attackHitIds)
                 // 役の軸の端子 (2026-11-21)。 立つ役は Resolve の 5. の頭で決めた o.roleNow (ResolveRoles と同じ判定)

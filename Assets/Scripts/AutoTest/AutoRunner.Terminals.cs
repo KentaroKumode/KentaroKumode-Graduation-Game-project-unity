@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using GameLoop;
@@ -92,8 +92,13 @@ namespace AutoTest
             if (o.firedNonBasic >= TerminalCards.SwitchboardNeed && Has(ids, GameLoop.ItemIds.DeckSwitchboard)) perHit += ItemSystem.PassiveSkills.Effects.PrimedSwitchboard.Gauge;
             if (Has(ids, GameLoop.ItemIds.RoleChipped) && ItemSystem.PassiveSkills.Effects.RoleFx.FaceRoleThisTurn(ctx, TerminalCards.ChippedFaces)) perHit += ItemSystem.PassiveSkills.Effects.ChippedEyeReading.Gauge;
             if (hits == 1 && s.focusCount >= CritCore.FocusNeedCount && Has(ids, GameLoop.ItemIds.CritNick)) once += ItemSystem.PassiveSkills.Effects.NickAppraisal.Gauge;
-            if (hits == 1 && Has(ids, ItemSystem.PassiveSkills.Effects.GaryoTensei.Id)
-                && CombatRules.GaryoPct(ws.atkFaceMax, ws.rolledMax, s.dieMaxFace) >= ItemSystem.PassiveSkills.Effects.GaryoTensei.FinalPct) once += ItemSystem.PassiveSkills.Effects.GaryoTensei.NotchPct;
+            if (hits == 1 && s.focusCount >= CritCore.FocusNeedCount && Has(ids, GameLoop.ItemIds.CritHeaven)) once += ItemSystem.PassiveSkills.Effects.HeavenEyeGuard.Gauge;
+            if (hits == 1 && Has(ids, ItemSystem.PassiveSkills.Effects.GaryoTensei.Id))
+            {
+                int gp = CombatRules.GaryoPct(ws.atkFaceMax, ws.rolledMax, s.dieMaxFace);
+                if (gp >= ItemSystem.PassiveSkills.Effects.GaryoTensei.FinalPct) once += ItemSystem.PassiveSkills.Effects.GaryoTensei.NotchPct;
+                else if (gp > 0) once += ItemSystem.PassiveSkills.Effects.GaryoTensei.RollMaxNotchPct;
+            }
             if (ctx.enemyBleedStacks >= BleedCore.PressNeed && Has(ids, GameLoop.ItemIds.BleedPress)) once += BleedCore.PressGauge;
             if ((int)ctx.GetAccumulated(ItemSystem.PassiveSkills.CombatContext.ChargeSpentThisTurnKey) + o.chargeSpend >= ItemSystem.PassiveSkills.Effects.LightningStake.Need
                 && Has(ids, ItemSystem.PassiveSkills.Effects.LightningStake.Id)) once += ItemSystem.PassiveSkills.Effects.LightningStake.Gauge;
@@ -170,12 +175,16 @@ namespace AutoTest
             }
             // 〈無害灯〉: 敵の直接攻撃で失う HP を無効 (1 ターン 1 回・使う臨界と返すダメージは見ない)
             if (sg.lamp) ws.takenMul = 0f;
-            // 〈蓋付きの毒指輪〉の【起爆】(毒の BOT の規則・2026-11-26): 配線の後の毒が 20 以上で攻撃の撃があれば、 起爆のダメージを軽減不可の分に足す
+            // 〈蓋付きの毒指輪〉の【起爆】(毒の BOT の規則・2026-11-27): 毒秘宝6以上＆配線の後の毒が 26 以上で攻撃の撃があれば、 起爆のダメージを軽減不可の分に足す
             if (sg.ring && o.attackHits.Count > 0)
             {
-                int ringAdd = o.poison > 0 && sg.turn <= PoisonCore.RingAssassinTurns ? PoisonCore.RingBonusPoison : 0;
-                int pz = env.enemyPoison + o.poison + ringAdd;
-                if (pz >= PoisonCore.RingNeed) ws.extraDmg += PoisonCore.Damage(PoisonCore.Spend(pz), sg.poisonItems, sg.detonates, s.enemyDown, sg.enemyMaxHp, 100, sg.turn);
+                int pRel = ItemSystem.PassiveSkills.AxisRules.Count(GameManager.Instance?.Run, ItemSystem.PassiveSkills.AxisRules.Poison);
+                if (pRel >= PoisonCore.RingMinPoisonRelics)
+                {
+                    int ringAdd = o.poison > 0 && sg.turn <= PoisonCore.RingAssassinTurns ? PoisonCore.RingBonusPoison : 0;
+                    int pz = env.enemyPoison + o.poison + ringAdd;
+                    if (pz >= PoisonCore.RingNeed) ws.extraDmg += PoisonCore.Damage(PoisonCore.Spend(pz), sg.poisonItems, sg.detonates, s.enemyDown, sg.enemyMaxHp, 100, sg.turn, pRel);
+                }
             }
             // 〈灼線鞭〉〈焦げ導線〉〈溜め撃ちの誘導コイル〉(2026-11-26 再起動連動強化)
             if ((sg.chargeItems & ChargeItems.Whip) != 0 && o.attackHits.Count > 0 && o.rebooted.Count > 0)

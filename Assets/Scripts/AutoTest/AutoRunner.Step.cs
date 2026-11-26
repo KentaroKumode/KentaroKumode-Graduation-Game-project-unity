@@ -79,6 +79,7 @@ namespace AutoTest
             GameLoop.GameHooks.TerminalKillBonusNeedsAttack = terminalKillNeedsAttack;   // [測定 2026-11-13・#117]
             GameLoop.GameHooks.HandCarry = handCarry;                           // [測定 2026-11-13] 手札の持ち越し
             GameLoop.GameHooks.BossDownDisabled = !bossDown;                             // [測定 2026-11-13] ボスのダウン
+            GameLoop.GameHooks.LethalParryEnabled = lethalParryEnabled;                  // [2026-11-26] 致死パリィ
             GameLoop.GameHooks.DownCancel = downCancelRule;                              // [測定 2026-11-14] ダウンが周期を取り消す条件
             GameLoop.GameHooks.DownBreak = downBreakRule;                                // [測定 2026-11-14] 目盛りの割れ方 (通常攻撃だけ / 旧い判定)
             GameLoop.GameHooks.DownCrackGrace = downCrackGrace;                          // [測定 2026-11-14] ひびの猶予

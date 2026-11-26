@@ -1,4 +1,4 @@
-﻿using CombatSystem;
+using CombatSystem;
 using ItemSystem.PassiveSkills.Keywords;
 
 namespace ItemSystem.PassiveSkills.Effects
@@ -484,8 +484,8 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 式は <see cref="CombatRules.GaryoPct"/> (2026-11-22・旧: 装備ダイスの最大の目だけ)。</summary>
     public class GaryoTensei : IPassiveSkillEffect
     {
-        public const int FinalPct = 200, RollMaxPct = 100, NotchPct = 3;   // 2026-11-26: 目盛りへの削り 50% → 混乱 +3   // final5: 150 / 60 → 200 / 100 (会心倍率 2.0 → 1.6 の巻き添えを戻す)
-        public const string TurnKey = "ryusen.garyoTurn", BrokeKey = "ryusen.garyoBroke";
+        public const int FinalPct = 300, RollMaxPct = 150, NotchPct = 5, RollMaxNotchPct = 2;   // 2026-11-27: 一刀両断個性特化 (+150%/+300%, 混乱 +2/+5)
+        public const string TurnKey = "ryusen.garyoTurn", GaugeKey = "ryusen.garyoGauge", BrokeKey = "ryusen.garyoBroke";
         public const string Id = "画竜点睛";
         public string SkillId => Id;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage, PassiveSkillTrigger.OnPostDealDamage };
@@ -497,13 +497,15 @@ namespace ItemSystem.PassiveSkills.Effects
                 int pct = CombatRules.GaryoPct(ctx.hitFaceMax, RolledMax(ctx), MaxFace(ctx));
                 if (pct <= 0) return;
                 ctx.hitFinalDamagePct += pct;   // 確定会心は 2026-11-23 に撤去 (〈竜閃〉は武器の会心率 100%)
-                if (pct >= FinalPct) ctx.accumulatedValues[TurnKey] = ctx.currentTurn;      // 目盛りを上げるのは装備ダイスの最大の目の時だけ
+                ctx.accumulatedValues[TurnKey] = ctx.currentTurn;
+                ctx.accumulatedValues[GaugeKey] = pct >= FinalPct ? NotchPct : RollMaxNotchPct;
                 CombatManager.WeaponGaryoFired++;
                 Rw.Log($"[画竜点睛] 目 {ctx.hitFaceMax} (振った最大 {RolledMax(ctx)}・ダイスの最大 {MaxFace(ctx)}) → 最終与ダメージ +{pct}%");
                 return;
             }
             if ((int)ctx.GetAccumulated(TurnKey) != ctx.currentTurn || !Psn.Hit(ctx) || !Rw.OncePerTurn(ctx, BrokeKey)) return;
-            CombatManager.Instance?.AddBossGauge(NotchPct);
+            int g = (int)ctx.GetAccumulated(GaugeKey);
+            if (g > 0) CombatManager.Instance?.AddBossGauge(g);
         }
 
         /// <summary>このターン振った目の最大 (振っていなければ 0)。</summary>
@@ -530,7 +532,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 攻撃の端子を 2 枚以上発動したターンは武器の攻撃力が 0 になる (〈画竜点睛〉は 1 枚の時だけ働く)。</summary>
     public class MugaMushin : IPassiveSkillEffect
     {
-        public const int RatePct = 150, BlockPerDie = 3;
+        public const int RatePct = 200, BlockPerDie = 5;   // 2026-11-27: 一刀両断個性特化 (150%→200%, +3→+5)
         public string SkillId => "無我無心";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)

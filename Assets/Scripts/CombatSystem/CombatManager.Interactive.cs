@@ -10,6 +10,8 @@ namespace CombatSystem
         Reroll,
         /// <summary>配線 (出目 → 場の端子)。 <see cref="CombatManager.AnswerWiringSlots"/> で答える。</summary>
         Wiring,
+        /// <summary>[2026-11-26] 致死パリィのタイミング判定。 <see cref="CombatManager.AnswerLethalParry"/> で答える。</summary>
+        LethalParry,
     }
 
     /// <summary>人が操作するターンの「止まっている所」。 画面はこれを読んで出目・予告を出し、 答えを CombatManager へ返す。
@@ -48,12 +50,27 @@ namespace CombatSystem
         internal bool overclock;
         /// <summary>撃の順 (2026-11-25): 出目ごとの挿した順 (<see cref="WiringPlan.plugRank"/> と同じ)。 null = 場の順。</summary>
         internal int[] plugRank;
+        /// <summary>[2026-11-26] 致死パリィ: 猶予フレーム数 (60fps換算) / 猶予秒数 / これまでのラン内成功回数 / 判定結果。</summary>
+        public int parryWindowFrames;
+        public float parryWindowSeconds;
+        public int parrySuccessCountSoFar;
+        internal bool parrySucceeded;
 
         internal void Set(TurnPauseKind k, int[] dice, int[] faceIdx, MutualTurnTelegraph t)
         {
             kind = k; playerDice = dice; playerFaceIdx = faceIdx; tele = t;
             rerollCost = 0; reroll = false; rerollKeep = -1; slots = null; targets = null; keep = null; board = null; terminalEnv = default; terminalState = null;
             reboot = ChargeCore.RebootNone; overclock = false; plugRank = null;
+            parryWindowFrames = 0; parryWindowSeconds = 0f; parrySuccessCountSoFar = 0; parrySucceeded = false;
+        }
+
+        internal void SetLethalParry(int windowFrames, float windowSeconds, int successCountSoFar)
+        {
+            kind = TurnPauseKind.LethalParry;
+            parryWindowFrames = windowFrames;
+            parryWindowSeconds = windowSeconds;
+            parrySuccessCountSoFar = successCountSoFar;
+            parrySucceeded = false;
         }
     }
 
@@ -109,6 +126,14 @@ namespace CombatSystem
         {
             if (_activeTurn == null || _pause.kind != TurnPauseKind.Wiring) return;
             _pause.slots = slots; _pause.targets = targets; _pause.keep = keep; _pause.reboot = reboot; _pause.overclock = overclock; _pause.plugRank = plugRank;
+            Advance();
+        }
+
+        /// <summary>[2026-11-26] 致死パリィの判定結果 (成功=true / 失敗=false) を返してターンを進める。</summary>
+        public void AnswerLethalParry(bool succeeded)
+        {
+            if (_activeTurn == null || _pause.kind != TurnPauseKind.LethalParry) return;
+            _pause.parrySucceeded = succeeded;
             Advance();
         }
 

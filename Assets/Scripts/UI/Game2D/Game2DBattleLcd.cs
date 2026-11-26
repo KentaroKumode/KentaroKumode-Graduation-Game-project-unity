@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using CombatSystem;
 using GameLoop;
 using UnityEngine;
@@ -440,6 +440,12 @@ namespace UI.Game2D
             else if (s.HasDown && s.downBreakNowKind == (int)CombatSystem.DownKind.Resisted) { parts.Add("次 溜め 怯まない"); hot = true; }
             else if (s.HasDown && s.heavyIn >= 2) parts.Add("大技まで " + s.heavyIn);   // [2026-11-26] 先を読めるよう周期を出す
             if (s.downGaugeMax > 0 && !s.down) parts.Insert(0, "混乱 " + s.downGauge + "/" + s.downGaugeMax);   // [2026-11-26] 混乱ゲージ
+            if (LethalParry.DesperateCountNow > 0) { parts.Add("決死+" + LethalParry.DesperateBonusPctNow + "%"); hot = true; }
+            else if (GameLoop.GameHooks.LethalParryEnabled)
+            {
+                int pSucc = GameLoop.GameManager.Instance?.Run?.lethalParrySuccessCount ?? 0;
+                parts.Add(GameLoop.GameHooks.ManualParrySetting ? ("パリィ" + LethalParry.WindowFramesFor(pSucc) + "f") : ("オート" + Mathf.RoundToInt(LethalParry.AutoParryChance(pSucc) * 100f) + "%"));
+            }
             if (s.down && (!s.downWeak || BossDown.TakenMulNow)) { parts.Add("被ダメ×" + BossDown.MulNow.ToString("0.0#")); hot = true; }
             else if (s.crackBreakTurn >= 0) { parts.Add(s.crackBreakTurn <= s.turn ? "亀裂 このターンで割れる" : "亀裂 あと" + (s.crackBreakTurn - s.turn + 1) + "ターン"); hot = true; }
             else if (s.downNotchHp >= 0 && s.downCracks != null && s.downBroken < s.downCracks.Length && s.downCracks[s.downBroken] >= 0) { parts.Add("亀裂 通常攻撃で割れる"); hot = true; }

@@ -1,4 +1,4 @@
-﻿using CombatSystem;
+using CombatSystem;
 using GameLoop;
 using ItemSystem.PassiveSkills.Keywords;
 
@@ -499,25 +499,39 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>初太刀の黒鞘【集中】(賭け金 0・2026-11-26 パチンコ化: ブロック撤廃 → 次弾装填): 集中会心のとき、 次のターンの最初の 1 撃の基礎攻撃 +(6 ＋ 使った【練気】× 3)・会心率 +25%。</summary>
+    /// <summary>初太刀の黒鞘【集中】(賭け金 0・2026-11-27 パチンコ防御＆外し保険): 集中会心のとき、 このターンのブロック +6、 次のターンの最初の 1 撃の基礎攻撃 +(6 ＋ 使った【練気】× 3)・会心率 +25%。
+    /// 集中が外れたときも、 次のターンの最初の 1 撃の会心率 +15% (保険)。</summary>
     public class FirstStrokePin : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => ItemIds.CritFirstStroke;
-        public const int AtkBase = 6, AtkPerRenki = 3;
-        public const float NextRate = 0.25f;
-        /// <summary>[persistent] 会心率・攻撃が乗るターンの番号と攻撃加算量。</summary>
-        public const string Key = "crit.firstStroke.turn", AtkKey = "crit.firstStroke.atk";
+        public const int AtkBase = 6, AtkPerRenki = 3, CritBlock = 6;
+        public const float NextRate = 0.25f, MissNextRate = 0.15f;
+        /// <summary>[persistent] 会心率・攻撃が乗るターンの番号と攻撃加算量・会心率加算量。</summary>
+        public const string Key = "crit.firstStroke.turn", AtkKey = "crit.firstStroke.atk", RateKey = "crit.firstStroke.rate";
         public static bool Primed(CombatContext ctx) => ctx != null && ctx.currentTurn > 0 && Rw.Count(ctx, Key) == ctx.currentTurn;
         public static int AtkNow(CombatContext ctx) => Primed(ctx) ? Rw.Count(ctx, AtkKey) : 0;
+        public static float RateNow(CombatContext ctx) => Primed(ctx) ? ctx.GetAccumulated(RateKey) : 0f;
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(Primed(ctx));
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnCriticalCheck, PassiveSkillTrigger.OnCriticalDamage };
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnCriticalCheck, PassiveSkillTrigger.OnCriticalDamage, PassiveSkillTrigger.OnPostDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (t == PassiveSkillTrigger.OnPostRoll) { int a = AtkNow(ctx); if (a > 0) ctx.firstHitAttackBonus += a; return; }
-            if (t == PassiveSkillTrigger.OnCriticalCheck) { if (ctx.IsRealHit && ctx.hitIndex == 0 && Primed(ctx)) ctx.critRatePctAdd += NextRate; return; }
-            if (!Crit.FocusCrit(ctx)) return;
-            ctx.accumulatedValues[Key] = ctx.currentTurn + 1;
-            ctx.accumulatedValues[AtkKey] = AtkBase + AtkPerRenki * ctx.hitFocusSpentRenki;
+            if (t == PassiveSkillTrigger.OnCriticalCheck) { if (ctx.IsRealHit && ctx.hitIndex == 0 && Primed(ctx)) ctx.critRatePctAdd += RateNow(ctx); return; }
+            if (t == PassiveSkillTrigger.OnCriticalDamage)
+            {
+                if (!Crit.FocusCrit(ctx)) return;
+                ctx.itemBlockBonus += CritBlock;
+                ctx.accumulatedValues[Key] = ctx.currentTurn + 1;
+                ctx.accumulatedValues[AtkKey] = AtkBase + AtkPerRenki * ctx.hitFocusSpentRenki;
+                ctx.accumulatedValues[RateKey] = NextRate;
+                return;
+            }
+            if (ctx.IsRealHit && ctx.hitIsFocused && !ctx.isCritical)
+            {
+                ctx.accumulatedValues[Key] = ctx.currentTurn + 1;
+                ctx.accumulatedValues[AtkKey] = 0;
+                ctx.accumulatedValues[RateKey] = MissNextRate;
+            }
         }
     }
 
@@ -541,7 +555,7 @@ namespace ItemSystem.PassiveSkills.Effects
     public class NickAppraisal : IPassiveSkillEffect
     {
         public string SkillId => ItemIds.CritNick;
-        public const int Gauge = 2, Pen = 12;   // 2026-11-26: 目盛りへの削り (35 + 練気 × 10)% → 混乱 +2 (撃ごと)
+        public const int Gauge = 4, Pen = 12;   // 2026-11-27: 会心B大技対策 混乱 +2 → +4
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalDamage, PassiveSkillTrigger.OnPostDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -551,17 +565,24 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>渾身の鉄兜【集中】(賭け金 0・2026-11-26 パチンコ化: ブロック撤廃 → 最終与ダメ全振り): 集中会心の撃の最終与ダメージ +(75 ＋ 使った【練気】× 25)%。</summary>
+    /// <summary>渾身の鉄兜【集中】(賭け金 0・2026-11-27 パチンコ防御＆外し保険): 集中会心の撃の最終与ダメージ +(75 ＋ 使った【練気】× 25)%、 さらにシールド +(10 ＋ 使った【練気】× 3)。
+    /// 集中が外れたときも、 そのターンのブロック +8 (保険)。</summary>
     public class HeftyPommel : IPassiveSkillEffect
     {
         public string SkillId => ItemIds.CritPommel;
-        public const int FinalPct = 75, FinalPctPerRenki = 25;
+        public const int FinalPct = 75, FinalPctPerRenki = 25, CritShield = 10, CritShieldPerRenki = 3, MissBlock = 8;
         public static int FinalPctFor(int spent) => FinalPct + FinalPctPerRenki * spent;
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalDamage };
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalDamage, PassiveSkillTrigger.OnPostDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (!Crit.FocusCrit(ctx)) return;
-            ctx.hitFinalDamagePct += FinalPctFor(ctx.hitFocusSpentRenki);   // 最終与ダメージ倍率はこの後 (ApplyWinDamageModifiers)
+            if (t == PassiveSkillTrigger.OnCriticalDamage)
+            {
+                if (!Crit.FocusCrit(ctx)) return;
+                ctx.hitFinalDamagePct += FinalPctFor(ctx.hitFocusSpentRenki);   // 最終与ダメージ倍率はこの後 (ApplyWinDamageModifiers)
+                Rw.Shield(ctx, CritShield + CritShieldPerRenki * ctx.hitFocusSpentRenki, SkillId);
+                return;
+            }
+            if (ctx.IsRealHit && ctx.hitIsFocused && !ctx.isCritical) ctx.itemBlockBonus += MissBlock;
         }
     }
 
@@ -608,11 +629,16 @@ namespace ItemSystem.PassiveSkills.Effects
     public class HeavenEyeGuard : IPassiveSkillEffect
     {
         public string SkillId => ItemIds.CritHeaven;
-        public const float PctPerMul = 0.07f, PctPerRenki = 0.04f;
+        public const float PctPerMul = 0.09f, PctPerRenki = 0.05f;
+        public const int Gauge = 2;
         /// <summary>[persistent] この品を持っている (CombatManager が読む)。</summary>
         public const string HeldKey = "crit.tengan.held";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.accumulatedValues[HeldKey] = 1;
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnPostDealDamage };
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
+        {
+            if (t == PassiveSkillTrigger.OnBattleStart) { ctx.accumulatedValues[HeldKey] = 1; return; }
+            if (Psn.Hit(ctx) && Crit.FocusCrit(ctx)) CombatManager.Instance?.AddBossGauge(Gauge);
+        }
 
         public static bool Held(CombatContext ctx) => ctx != null && ctx.GetAccumulated(HeldKey) > 0f;
 

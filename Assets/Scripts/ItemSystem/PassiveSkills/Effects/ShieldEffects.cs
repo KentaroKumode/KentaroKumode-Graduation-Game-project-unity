@@ -1,4 +1,4 @@
-﻿using CombatSystem;
+using CombatSystem;
 using ItemSystem.PassiveSkills.Keywords;
 
 namespace ItemSystem.PassiveSkills.Effects
@@ -40,22 +40,24 @@ namespace ItemSystem.PassiveSkills.Effects
 
     // ── B: 起点 ── (〈肩当て〉〈当て布の籠手〉〈鋲の胸当て〉は端子の解決の中だけ・ShieldCore の旗)
 
-    /// <summary>鏡返しの小盾: シールドまたはブロックで敵の攻撃を防いだとき、 防いだ量の 60% を敵へ返す (【ジャスト防御】なら 100%)。
+    /// <summary>鏡返しの小盾: シールドまたはブロックで敵の攻撃を防いだとき、 防いだ量の 80% (【ジャスト防御】なら 130%) × (1 + 現在シールド ÷ 25) の軽減不可ダメージを敵へ返す (2026-11-27 後半反射スケール)。
     /// 防いだ量 = min(敵の攻撃, ブロック) + 敵の攻撃をシールドが吸った量。 ターンの終わりに軽減不可ダメージで返す (切り捨て)。</summary>
     public class MirrorBuckler : IPassiveSkillEffect
     {
         public const string Id = "鏡返しの小盾";
         public string SkillId => Id;
-        public const int Pct = 60, JustPct = 100;
+        public const int Pct = 80, JustPct = 130, ShieldScaleDiv = 25;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (!Psn.EnemyAttacked(ctx)) return;
             int defended = System.Math.Min(Rw.Count(ctx, MutualKeys.EnemyAtk), ctx.blockSumThisTurn) + ctx.shieldAbsorbedAttackThisTurn;
-            int dmg = defended * (Shd.JustGuardNow(ctx) ? JustPct : Pct) / 100;
+            int basePct = Shd.JustGuardNow(ctx) ? JustPct : Pct;
+            float scale = 1f + System.Math.Max(0, ctx.consShield) / (float)ShieldScaleDiv;
+            int dmg = (int)(defended * basePct / 100f * scale);
             if (dmg <= 0) return;
             Kw.DamageEnemy(ctx, dmg);
-            Rw.Log($"[鏡返しの小盾] 防いだ {defended} → {dmg} を返す{(Shd.JustGuardNow(ctx) ? " (ジャスト防御)" : "")}");
+            Rw.Log($"[鏡返しの小盾] 防いだ {defended} (盾{ctx.consShield}・×{scale:F2}) → {dmg} を返す{(Shd.JustGuardNow(ctx) ? " (ジャスト防御)" : "")}");
         }
     }
 
@@ -140,16 +142,29 @@ namespace ItemSystem.PassiveSkills.Effects
             => ctx.shieldKeepBonusPct = Shd.JustGuardNow(ctx) || Psn.Shutout(ctx) ? KeepBonus : 0;   // 次のターンの頭の減衰 (BeginNewTurn) が読む
     }
 
-    /// <summary>割れ盾の仕返し: シールドが割られて 0 になったとき、 割られる直前のシールド量の軽減不可ダメージを敵へ返し、 次のターンの与ダメージ +35% (与ダメ % の池)。</summary>
+    /// <summary>割れ盾の仕返し: シールドで敵の攻撃を吸収するたび、 吸収した量の 100% の軽減不可ダメージを敵へ返す (2026-11-27 反射強化)。
+    /// さらにシールドが割られて 0 になったとき、 割られる直前のシールド量の軽減不可ダメージを敵へ返し、 次のターンの与ダメージ +35% (与ダメ % の池)。</summary>
     public class BrokenShieldGrudge : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "割れ盾の仕返し";
         public const float Pct = 0.35f;
         private const string Key = "shd.grudge";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(Shd.LastTurn(ctx, Key));
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnShieldBreak, PassiveSkillTrigger.OnPostRoll };
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnShieldAbsorb, PassiveSkillTrigger.OnShieldBreak, PassiveSkillTrigger.OnPostRoll };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
+            if (t == PassiveSkillTrigger.OnShieldAbsorb)
+            {
+                int abs = Kw.EventAmount(ctx);
+                if (abs > 0)
+                {
+                    float scale = 1f + System.Math.Max(0, ctx.consShield + abs) / 20f;
+                    int dmg = (int)(abs * scale);
+                    Kw.DamageEnemy(ctx, dmg);
+                    Rw.Log($"[割れ盾の仕返し] シールド吸収 {abs} (×{scale:F2}) → {dmg} を返す");
+                }
+                return;
+            }
             if (t == PassiveSkillTrigger.OnShieldBreak)
             {
                 int before = Kw.EventAmount(ctx);
@@ -210,21 +225,22 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>重装兵の隠し刃: 【ジャスト防御】を成立させたとき、 敵の予告攻撃の 150% の軽減不可ダメージ (防御も無視) を返す (answer14: 旧 100%)。
+    /// <summary>重装兵の隠し刃: 【ジャスト防御】を成立させたとき、 敵の予告攻撃の 220% の軽減不可ダメージ (防御も無視) を返す (2026-11-27: 旧 150%)。
     /// さらにボスのダウン中はシールドがターン開始時に減衰しない (ctx.shieldKeepOnBossDown・BeginNewTurn)。</summary>
     public class KnightsTrump : IPassiveSkillEffect, IRelicDisplay
     {
         public const string Id = "重装兵の隠し刃";
         public string SkillId => Id;
-        public const int ReturnPct = 150;
+        public const int ReturnPct = 220;
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(BossDown.ActiveNow);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnJustGuard };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (t == PassiveSkillTrigger.OnBattleStart) { ctx.shieldKeepOnBossDown = true; return; }
-            int e = Kw.EventAmount(ctx) * ReturnPct / 100;
+            float mul = 1f + System.Math.Max(0, ctx.finalDamagePct) / 100f;
+            int e = (int)(Kw.EventAmount(ctx) * ReturnPct / 100f * mul);
             Kw.DamageEnemy(ctx, e);
-            Rw.Log($"[重装兵の隠し刃] ジャスト防御 → 予告の {ReturnPct}% {e} を返す");
+            Rw.Log($"[重装兵の隠し刃] ジャスト防御 → 予告の {ReturnPct}% × {mul:F2} = {e} を返す");
         }
     }
 
@@ -311,16 +327,30 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>二拍目の心臓: 戦闘中初めて HP が 50% 以下になった瞬間、 最大 HP の 30% (切り上げ) のシールドを得て、 以後この戦闘のシールドの獲得量 ×1.5 (ctx.shieldGainPct += 50・1 戦闘 1 回)。</summary>
+    /// <summary>二拍目の心臓: 戦闘中初めて HP が 50% 以下になった瞬間、 最大 HP の 30% (切り上げ) のシールドを得て、 以後この戦闘のシールドの獲得量 ×1.5 (ctx.shieldGainPct += 50・1 戦闘 1 回)。
+    /// さらに発動後、 シールドで敵の攻撃を吸収するたび、 吸収した量の 100% の軽減不可ダメージを敵へ返す (2026-11-27 反射追加)。</summary>
     public class SecondBeatHeart : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "二拍目の心臓";
         public const int ShieldPct = 30, GainPct = 50;
         private const string Once = "shd.secondBeat";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Once(Shd.Count(ctx, Once) > 0, true);
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostReceiveDamage };
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostReceiveDamage, PassiveSkillTrigger.OnShieldAbsorb };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
+            if (t == PassiveSkillTrigger.OnShieldAbsorb)
+            {
+                if (Shd.Count(ctx, Once) <= 0) return;
+                int abs = Kw.EventAmount(ctx);
+                if (abs > 0)
+                {
+                    float scale = 1f + System.Math.Max(0, ctx.consShield + abs) / 15f;
+                    int dmg = (int)(abs * scale);
+                    Kw.DamageEnemy(ctx, dmg);
+                    Rw.Log($"[二拍目の心臓] シールド吸収 {abs} (×{scale:F2}) → {dmg} を返す");
+                }
+                return;
+            }
             if (ctx.playerMaxHP <= 0 || ctx.playerCurrentHP <= 0) return;
             if (ctx.playerCurrentHP * 100 > ctx.playerMaxHP * 50) return;
             if (!Rw.OncePerBattle(ctx, Once)) return;

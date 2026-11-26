@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -406,6 +406,7 @@ namespace CombatSystem
             // ここからターンの最後の HP 同期までは、 品が入れる敵へのダメージを預かる (Kw.DamageEnemy)。
             if (ctx != null) ctx.accumulatedValues[ItemSystem.PassiveSkills.Keywords.Kw.ResolvingKey] = 1;
             psm.BeginTurn();
+            LethalParry.BeginTurn(GameLoop.GameManager.Instance?.Run?.lethalParrySuccessCount ?? 0);
             GameLoop.Consumables.ApplyRapierRelease(ctx);   // 〈シュヴァリエのレイピア〉を解いた次のターン: 攻撃は会心確定 (BeginNewTurn が戻した後に立てる)
             BeginBossDownTurn(ctx);   // ボスのダウン (2026-11-13): 待っているダウンがあれば、 このターンは行動不能・受けるダメージ ×1.5 (ターン番号を進めた後・敵が振る前)
             DrawTerminalHand(ctx);   // 端子の山札 (ADR-0014): 5 枚引く (振り直しの判断より前 ── 手札を見て振り直すか決められる)
@@ -1428,6 +1429,7 @@ namespace CombatSystem
                 // attackerIsEnemy: true ＝ 会心判定を飛ばす。 これが無いと敵の攻撃が
                 //   **プレイヤーの**会心率で会心し、 **プレイヤーの** criticalMultiplier で
                 //   増幅される (§6-10 敵会心の全廃は enemies.json の分子 0 だけでは担保できない)。
+                int savedShieldPrimary = ctx.consShield;
                 var (takenDmg, counterFixed, _) =
                     psm.ProcessDamage(lossBase, 0, 0f, attackerIsEnemy: true, fireEnemyDealTriggers: true);
                 takenDmg = ApplyLossDamageModifiers(takenDmg, floorMod, ctx, Math.Min(enemyAtkValue, blockSum));
@@ -1468,65 +1470,101 @@ namespace CombatSystem
                 { int cap = MetaProgression.MetaBuffApplicator.GetArmorHitCap(playerMaxHP); if (cap > 0 && takenDmg > cap) takenDmg = cap; }
                 takenDmg = ItemSystem.PassiveSkills.Effects.HarmlessLamp.Apply(ctx, takenDmg);   // 〈無害灯〉【規則】: 臨界で被ダメージを半減 (1 ターン 1 回)
                 if (guardless) takenDmg = enemyAtkValue;   // 〈狂暴化〉: 防御・ブロック・シールド・軽減を通さず HP へ
-                playerHP = Math.Max(0, playerHP - takenDmg);
-                takenApplied = takenDmg;
-                diagHitMain = takenDmg;   // [計装] 大技の被ダメ: 主攻撃の分 (防御・シールドの後)
-                GuardDiag.NoteCut7F(enemyAtkRaw, enemyAtkBeforeDefense, enemyAtkValue, blockSum, lossBase, takenDmg);   // [計装 2026-11-11]
-                // 〈長引く負傷〉: ラン中の累計被ダメを積む。 **最大HP の減少はここからは行わない** ──
-                //   戦闘中に最大HP を削ると、 予告に無い形でその場の生死が変わる。 精算は戦闘終了時。
-                if (takenDmg > 0)
+
+                // [2026-11-26] 致死パリィ: 敵の攻撃パケット（主攻撃＋付随固定＋業火烈炎）で HP<=0 になる瞬間に発動（痛覚遮断剤より先）
                 {
-                    var lwAccRun = GameLoop.GameManager.Instance?.Run;
-                    if (lwAccRun != null) lwAccRun.lingeringWoundDamageAccum += takenDmg;
+                    int estBlazeRaw = BlazeBurstAt(currentEnemy, ctx.currentTurn, BlazeStacks(ctx));
+                    int estBlazeNet = estBlazeRaw > 0 && CombatContext.ShieldAbsorbsUnmitigable && ctx.consShield > 0
+                        ? Math.Max(0, estBlazeRaw - ctx.consShield) : estBlazeRaw;
+                    int estTotalLethal = takenDmg + Math.Max(0, ctx.fixedDamageToPlayer) + estBlazeNet;
+                    if (GameLoop.GameHooks.LethalParryEnabled && !LethalParry.InvincibleThisTurn && estTotalLethal >= playerHP && playerHP > 0)
+                    {
+                        var parryRun = GameLoop.GameManager.Instance?.Run;
+                        int parrySucc = parryRun != null ? parryRun.lethalParrySuccessCount : 0;
+                        bool parryOk;
+                        if (_interactiveTurn && GameLoop.GameHooks.ManualParrySetting && !Application.isBatchMode)
+                        {
+                            _pause.SetLethalParry(LethalParry.WindowFramesFor(parrySucc), LethalParry.WindowSecondsFor(parrySucc), parrySucc);
+                            yield return _pause;
+                            parryOk = _pause.parrySucceeded;
+                        }
+                        else
+                        {
+                            parryOk = GameLoop.GameRng.Chance(LethalParry.AutoParryChance(parrySucc), "combat.parry", RngIdx(4));
+                        }
+                        if (parryOk)
+                        {
+                            if (parryRun != null) parryRun.lethalParrySuccessCount = parrySucc + 1;
+                            LethalParry.OnParrySucceeded(parrySucc + 1);
+                            ctx.consShield = savedShieldPrimary;
+                            takenDmg = 0; takenApplied = 0; diagHitMain = 0; diagBurst = 0;
+                            if (Debug.unityLogger.logEnabled) Debug.Log($"[致死パリィ] 成功 ({parrySucc + 1}回目・猶予{LethalParry.WindowFramesFor(parrySucc)}f) → このターン完全無敵・次ターン〈決死〉+{LethalParry.DesperateBonusPct(parrySucc + 1)}%");
+                        }
+                        else
+                        {
+                            LethalParry.OnParryFailed(parrySucc);
+                        }
+                    }
                 }
 
-                ctx.playerDamageThisTurn += takenDmg;
-                ctx.AddPlayerDamageSource(ctx.lastDamageCause, takenDmg);
-                if (ctx.fixedDamageToPlayer > 0)
+                if (!LethalParry.InvincibleThisTurn)
                 {
-                    int fixedTaken = ctx.fixedDamageToPlayer;
-                    playerHP = Math.Max(0, playerHP - fixedTaken);
-                    takenApplied += fixedTaken;
-                    ctx.playerDamageThisTurn += fixedTaken;
-                    ctx.AddPlayerDamageSource(ctx.lastDamageCause, fixedTaken);
+                    playerHP = Math.Max(0, playerHP - takenDmg);
+                    takenApplied = takenDmg;
+                    diagHitMain = takenDmg;   // [計装] 大技の被ダメ: 主攻撃の分 (防御・シールドの後)
+                    GuardDiag.NoteCut7F(enemyAtkRaw, enemyAtkBeforeDefense, enemyAtkValue, blockSum, lossBase, takenDmg);   // [計装 2026-11-11]
+                    // 〈長引く負傷〉: ラン中の累計被ダメを積む。 **最大HP の減少はここからは行わない** ──
+                    //   戦闘中に最大HP を削ると、 予告に無い形でその場の生死が変わる。 精算は戦闘終了時。
+                    if (takenDmg > 0)
+                    {
+                        var lwAccRun = GameLoop.GameManager.Instance?.Run;
+                        if (lwAccRun != null) lwAccRun.lingeringWoundDamageAccum += takenDmg;
+                    }
+
+                    ctx.playerDamageThisTurn += takenDmg;
+                    ctx.AddPlayerDamageSource(ctx.lastDamageCause, takenDmg);
+                    if (ctx.fixedDamageToPlayer > 0)
+                    {
+                        int fixedTaken = ctx.fixedDamageToPlayer;
+                        playerHP = Math.Max(0, playerHP - fixedTaken);
+                        takenApplied += fixedTaken;
+                        ctx.playerDamageThisTurn += fixedTaken;
+                        ctx.AddPlayerDamageSource(ctx.lastDamageCause, fixedTaken);
+                    }
+
+                    // 灰燼の王の大技〈業火〉(2026-11-14): 烈炎の数 × BlazeBurstPerStack を軽減無視で入れ、 烈炎を 0 に (業火のターンだけ・旧い形では大技が無いので何もしない)
+                    diagBlazeStacks = BlazeStacks(ctx);   // [計装] 撃つ前の烈炎の数 (読むだけ)
+                    diagBurst = ApplyBlazeBurst(ctx);
+                    takenApplied += diagBurst;
+
+                    // 痛覚遮断剤 (狂戦士) post-clamp (旧法と同一)
+                    if (ctx.painkillerArmedThisTurn && playerHP <= 0)
+                    {
+                        Debug.Log("[痛覚遮断剤] post-clamp: HP=1 復帰");
+                        playerHP = 1;
+                        ctx.playerCurrentHP = 1;
+                    }
+
+                    // [計測] 7層でこのターンにプレイヤーが落ちたなら、 出ていた遺物を致死側へ計上する。
+                    if (playerHP <= 0 && !string.IsNullOrEmpty(ctx.bossId)
+                        && ctx.bossId.StartsWith(GameLoop.BossIds.Layer7Prefix))
+                        BossDmgDiag.V7Death(ctx.vescaDrawnRelics);
+
+                    ctx.playerCurrentHP = playerHP;
+                    ApplyVescaOnHitEffects(ctx, takenApplied);
+
+                    // 反撃固定ダメ (Counter/Riposte 等)
+                    if (counterFixed > 0)
+                        HpLossDiag.Lose(ref enemyHP, counterFixed, "反撃固定");
+
+                    ctx.playerCurrentHP = playerHP;
+                    ctx.playerMaxHP = playerMaxHP;
+                    ctx.enemyCurrentHP = enemyHP;
+                    EnemyHpLedger.CtxOverwritten();   // [計装]
+                    ctx.finalDamage = takenDmg;
+                    psm.FireEnemyTrigger(PassiveSkillTrigger.OnPostDealDamage);
+                    SyncHPFromContext(ctx);
                 }
-
-                // 灰燼の王の大技〈業火〉(2026-11-14): 烈炎の数 × BlazeBurstPerStack を軽減無視で入れ、 烈炎を 0 に (業火のターンだけ・旧い形では大技が無いので何もしない)
-                diagBlazeStacks = BlazeStacks(ctx);   // [計装] 撃つ前の烈炎の数 (読むだけ)
-                diagBurst = ApplyBlazeBurst(ctx);
-                takenApplied += diagBurst;
-
-                // 痛覚遮断剤 (狂戦士) post-clamp (旧法と同一)
-                if (ctx.painkillerArmedThisTurn && playerHP <= 0)
-                {
-                    Debug.Log("[痛覚遮断剤] post-clamp: HP=1 復帰");
-                    playerHP = 1;
-                    ctx.playerCurrentHP = 1;
-                }
-
-                // [計測] 7層でこのターンにプレイヤーが落ちたなら、 出ていた遺物を致死側へ計上する。
-                if (playerHP <= 0 && !string.IsNullOrEmpty(ctx.bossId)
-                    && ctx.bossId.StartsWith(GameLoop.BossIds.Layer7Prefix))
-                    BossDmgDiag.V7Death(ctx.vescaDrawnRelics);
-
-                ctx.playerCurrentHP = playerHP;
-                ApplyVescaOnHitEffects(ctx, takenApplied);
-
-                // 反撃固定ダメ (Counter/Riposte 等)
-                if (counterFixed > 0)
-                    HpLossDiag.Lose(ref enemyHP, counterFixed, "反撃固定");
-
-                // 敵の「ダメージを与えた時」(〈吸血〉)。 2026-11-11 #104:
-                //   ctx の HP を CombatManager の値へ揃えてから鳴らし (上の反撃固定・仕込み刃は enemyHP だけを減らしている)、
-                //   鳴らした後に ctx の HP を拾う ── 旧実装は ctx にだけ書いた回復が、 このターンの後ろの ctx.enemyCurrentHP = enemyHP で消えていた。
-                //   finalDamage (敵視点で「与えた量」) は、 この攻撃で実際に通った主攻撃のダメージ (ブロック・シールド・軽減の後) にする。
-                ctx.playerCurrentHP = playerHP;
-                ctx.playerMaxHP = playerMaxHP;
-                ctx.enemyCurrentHP = enemyHP;
-                EnemyHpLedger.CtxOverwritten();   // [計装]
-                ctx.finalDamage = takenDmg;
-                psm.FireEnemyTrigger(PassiveSkillTrigger.OnPostDealDamage);
-                SyncHPFromContext(ctx);
             }
             // **旧: else で OnPostReceiveDamage を焚いていた (2026-09-09 撤去)。**
             //   この else は「敵が死んでいて攻撃しなかった」枝で、 被弾の通知には使えない
@@ -1567,7 +1605,7 @@ namespace CombatSystem
                 // --- (b) 2 体目の攻撃 = 独立した 2 つ目のパケット ---
                 //   **ブロックは各パケットから全額引く (倍率なし)。** 1 本のプールを分配すると
                 //   防御配線が成立しなくなるため、 2 回引く形を採る (2026-08-28 決定)。
-                if ((twinOnly || secondaryHP > 0) && playerHP > 0 && !enemyStunnedThisTurn)
+                if ((twinOnly || secondaryHP > 0) && playerHP > 0 && !enemyStunnedThisTurn && !LethalParry.InvincibleThisTurn)
                 {
                     secondaryAttacked = true;
                     // 予告で開示済みの値をそのまま使う (ここで振り直さない)。
@@ -1575,6 +1613,7 @@ namespace CombatSystem
                     int secLossBase = Math.Max(0, secAtkValue - blockSum);
 
                     ctx.playerWonRoll = false; ctx.playerLostRoll = true;
+                    int savedShieldSec = ctx.consShield;
                     var (secTaken, _, _) =
                         psm.ProcessDamage(secLossBase, 0, 0, attackerIsEnemy: true);
                     secTaken = ApplyLossDamageModifiers(secTaken, floorMod, ctx, Math.Min(secAtkValue, blockSum));
@@ -1588,7 +1627,36 @@ namespace CombatSystem
                     { int cap = MetaProgression.MetaBuffApplicator.GetArmorHitCap(playerMaxHP); if (cap > 0 && secTaken > cap) secTaken = cap; }   // 〈装甲〉r10〈不動〉
                     secTaken = ItemSystem.PassiveSkills.Effects.HarmlessLamp.Apply(ctx, secTaken);   // 〈無害灯〉 (1 体目で使っていれば何もしない)
 
-                    if (secTaken > 0)
+                    if (GameLoop.GameHooks.LethalParryEnabled && !LethalParry.InvincibleThisTurn && secTaken >= playerHP && playerHP > 0)
+                    {
+                        var parryRun = GameLoop.GameManager.Instance?.Run;
+                        int parrySucc = parryRun != null ? parryRun.lethalParrySuccessCount : 0;
+                        bool parryOk;
+                        if (_interactiveTurn && GameLoop.GameHooks.ManualParrySetting && !Application.isBatchMode)
+                        {
+                            _pause.SetLethalParry(LethalParry.WindowFramesFor(parrySucc), LethalParry.WindowSecondsFor(parrySucc), parrySucc);
+                            yield return _pause;
+                            parryOk = _pause.parrySucceeded;
+                        }
+                        else
+                        {
+                            parryOk = GameLoop.GameRng.Chance(LethalParry.AutoParryChance(parrySucc), "combat.parry", RngIdx(4));
+                        }
+                        if (parryOk)
+                        {
+                            if (parryRun != null) parryRun.lethalParrySuccessCount = parrySucc + 1;
+                            LethalParry.OnParrySucceeded(parrySucc + 1);
+                            ctx.consShield = savedShieldSec;
+                            secTaken = 0;
+                            if (Debug.unityLogger.logEnabled) Debug.Log($"[致死パリィ] 成功(2撃目・{parrySucc + 1}回目) → このターン完全無敵・次ターン〈決死〉+{LethalParry.DesperateBonusPct(parrySucc + 1)}%");
+                        }
+                        else
+                        {
+                            LethalParry.OnParryFailed(parrySucc);
+                        }
+                    }
+
+                    if (secTaken > 0 && !LethalParry.InvincibleThisTurn)
                     {
                         playerHP = Math.Max(0, playerHP - secTaken);
                         takenApplied += secTaken;
@@ -1607,7 +1675,7 @@ namespace CombatSystem
                 (primaryAttacked ? enemyAtkBeforeDefense : 0) + (secondaryAttacked ? secondaryAtkBeforeDefense : 0);
             ctx.accumulatedValues[ItemSystem.PassiveSkills.Effects.MutualKeys.HpLossFromEnemy] = takenApplied;
             // 【ジャスト防御】(2026-11-21・ShieldCore): 1 体目の攻撃 E > 0・敵の攻撃で HP を 1 も失っていない・E ≤ ブロック + シールド ≤ E + 許容幅
-            if (takenApplied <= 0 && _deck != null && ShieldCore.IsJustGuard(jgAttack, jgGuard, ShieldCore.Width(_deck.state.shieldItems)))
+            if (!LethalParry.InvincibleThisTurn && takenApplied <= 0 && _deck != null && ShieldCore.IsJustGuard(jgAttack, jgGuard, ShieldCore.Width(_deck.state.shieldItems)))
             {
                 ItemSystem.PassiveSkills.Effects.Shd.NoteJustGuard(ctx, jgAttack, jgGuard);
                 // 挑戦カード〈見切り〉: ジャスト防御の時、 敵へ防御無視の反撃 N (固定ダメージ・最終与ダメ倍率とダウンの倍率は HP を減らす口が掛ける)

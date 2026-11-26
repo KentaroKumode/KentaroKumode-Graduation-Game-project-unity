@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using CombatSystem;
 using GameLoop;
 using UnityEngine;
@@ -98,7 +98,18 @@ namespace UI.Game2D.Battle
         private void Touch() { version++; }
 
         /// <summary>液晶の中に描く新しい戦闘の画面 (<see cref="Game2DBattleLcd"/>・2026-11-16) を同じ GameObject に付ける (シーンには保存しない)。</summary>
-        private void Awake() { if (GetComponent<Game2DBattleLcd>() == null) gameObject.AddComponent<Game2DBattleLcd>(); }
+        private void Awake()
+        {
+            if (GetComponent<Game2DBattleLcd>() == null) gameObject.AddComponent<Game2DBattleLcd>();
+            if (GetComponent<Game2DParryOverlay>() == null) gameObject.AddComponent<Game2DParryOverlay>();
+        }
+
+        /// <summary>[2026-11-26] 致死パリィオーバーレイが AnswerLethalParry を返した後に呼ばれる。</summary>
+        public void OnLethalParryResolved(CombatManager cm)
+        {
+            if (cm != null && !cm.IsAwaitingDecision) Resolve(cm);
+            Touch();
+        }
 
         private void OnEnable()
         {

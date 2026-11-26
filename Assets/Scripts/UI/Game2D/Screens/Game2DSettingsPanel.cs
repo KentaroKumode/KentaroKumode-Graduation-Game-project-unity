@@ -17,7 +17,7 @@ namespace UI.Game2D
 
         private static readonly GameSettings.Key[] ScreenKeys = { GameSettings.Key.Bright, GameSettings.Key.Scan, GameSettings.Key.Curve, GameSettings.Key.Chroma, GameSettings.Key.Vignette, GameSettings.Key.Noise,
                                                                   GameSettings.Key.Bloom, GameSettings.Key.LineGap, GameSettings.Key.CharGap };      // ブルーム (2026-11-17)・行間・字間 (2026-11-16)
-        private static readonly GameSettings.Key[] SoundKeys = { GameSettings.Key.Master, GameSettings.Key.Bgm, GameSettings.Key.Se };
+        private static readonly GameSettings.Key[] SoundKeys = { GameSettings.Key.Master, GameSettings.Key.Bgm, GameSettings.Key.Se, GameSettings.Key.Parry };
 
         private static Game2DSettingsPanel _inst;
         private ScreenDef _def;
@@ -31,7 +31,7 @@ namespace UI.Game2D
             if (m != null && m.GetComponent<Game2DSettingsPanel>() == null) m.gameObject.AddComponent<Game2DSettingsPanel>().modal = m;
         }
 
-        private void Awake() { _inst = this; }
+        private void Awake() { _inst = this; GameHooks.ManualParrySetting = GameSettings.ManualParry; }
         private void OnDestroy() { if (_inst == this) _inst = null; }
 
         /// <summary>この画面が窓を使っているか。</summary>
@@ -94,6 +94,7 @@ namespace UI.Game2D
         {
             var keys = Keys; if (row < 0 || row >= keys.Length) return;
             GameSettings.Set(keys[row], GameSettings.Get(keys[row]) + delta);
+            GameHooks.ManualParrySetting = GameSettings.ManualParry;
             Game2DSfx.Play("ui_click");
             Rebuild();
         }
@@ -103,6 +104,7 @@ namespace UI.Game2D
         private static string Effect(GameSettings.Key k)
         {
             int v = GameSettings.Get(k);
+            if (k == GameSettings.Key.Parry) return v != 0 ? "手動" : "オート";
             if (k == GameSettings.Key.Master || k == GameSettings.Key.Bgm || k == GameSettings.Key.Se) return v >= 100 ? "最大" : "";
             if (k == GameSettings.Key.Bright) return v == 50 ? "標準" : "標準の ×" + GameSettings.Brightness.ToString("0.00");
             if (k == GameSettings.Key.LineGap || k == GameSettings.Key.CharGap) return v == GameSettings.Defs[(int)k].def ? "標準" : "+" + v + " dot";      // 標準 = 既定の値 (行間は 1・2026-11-17)
