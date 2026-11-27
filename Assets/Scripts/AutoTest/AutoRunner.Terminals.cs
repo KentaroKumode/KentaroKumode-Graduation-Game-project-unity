@@ -189,6 +189,7 @@ namespace AutoTest
                 {
                     int sp = PoisonCore.Spend(pz);
                     ws.extraDmg += PoisonCore.Damage(sp, sg.poisonItems, detN, s.enemyDown, sg.enemyMaxHp, 100, sg.turn, pRel);
+                    ws.takenMul *= (100 + ItemSystem.PassiveSkills.Effects.PoisonMagazine.TakenBonusPct) / 100f;
                     pz -= sp;
                     detN++;
                 }
@@ -196,6 +197,7 @@ namespace AutoTest
                 {
                     int sp = PoisonCore.Spend(pz);
                     ws.extraDmg += PoisonCore.Damage(sp, sg.poisonItems, detN, s.enemyDown, sg.enemyMaxHp, 100, sg.turn, pRel);
+                    ws.takenMul *= (100 + ItemSystem.PassiveSkills.Effects.HollowPoisonRing.TakenBonusPct) / 100f;
                 }
             }
             // 〈灼線鞭〉〈焦げ導線〉〈溜め撃ちの誘導コイル〉(2026-11-26 再起動連動強化)

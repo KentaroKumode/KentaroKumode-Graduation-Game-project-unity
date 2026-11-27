@@ -242,17 +242,25 @@ namespace ItemSystem.PassiveSkills.Effects
 
     // ── G: 分岐 A〈蝕み〉/ 分岐 B〈起爆〉 ──
 
-    /// <summary>蓋付きの毒指輪 (分岐 B・2026-11-27 開幕暗殺特化): 戦闘開始から 5 ターン目まで敵へ与える毒 +2・【起爆】ダメージ +25%。 1〜5 ターン目に敵の毒が 26 以上 (<see cref="PoisonCore.RingNeed"/>) で攻撃が当たったとき、 自動で【起爆】(1 ターン 1 回)。</summary>
+    /// <summary>蓋付きの毒指輪 (分岐 B・2026-11-27 開幕暗殺＆代償): 戦闘開始から 5 ターン目まで敵へ与える毒 +2・【起爆】ダメージ +25%。 1〜5 ターン目に敵の毒が 26 以上 (<see cref="PoisonCore.RingNeed"/>) で攻撃が当たったとき、 自動で【起爆】(1 ターン 1 回)。
+    /// 代償: この品で起爆したターン、 自分が受ける直接ダメージ +20%。</summary>
     public class HollowPoisonRing : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "蓋付きの毒指輪";
+        public const int TakenBonusPct = 20;
         /// <summary>[persistent] 起爆したターン (Rw.OncePerTurn・BOT の見積もりも読む)。</summary>
         public const string TurnKey = "psn.ring";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.On(ctx.currentTurn <= PoisonCore.RingAssassinTurns && ctx.EnemyPoison >= PoisonCore.RingNeed);
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnPostDealDamage };
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnPostDealDamage, PassiveSkillTrigger.OnPreReceiveDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (t == PassiveSkillTrigger.OnBattleStart) { ctx.poisonRingEarly = true; return; }
+            if (t == PassiveSkillTrigger.OnPreReceiveDamage)
+            {
+                if (!ctx.playerWonRoll && ctx.finalDamage > 0 && Psn.Count(ctx, TurnKey) == ctx.currentTurn)
+                    ctx.finalDamage = (int)((long)ctx.finalDamage * (100 + TakenBonusPct) / 100);
+                return;
+            }
             if (ctx.currentTurn > PoisonCore.RingAssassinTurns || !Psn.Hit(ctx) || ctx.EnemyPoison < PoisonCore.RingNeed || !Rw.OncePerTurn(ctx, TurnKey)) return;
             Psn.Detonate(ctx, SkillId);
         }
@@ -307,16 +315,24 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.playerArmorPen += ctx.EnemyPoison / Every;
     }
 
-    /// <summary>劇毒の火薬庫 (分岐 B・2026-11-27 即時起爆化): 【起爆】の倍率が ×4 → ×5 (PoisonCore の旗)。 1 ターンに敵へ毒を合計 8 以上与え、かつ敵の毒が 18 以上になったとき、 即座に自動で【起爆】(1 ターン 1 回)。</summary>
+    /// <summary>劇毒の火薬庫 (分岐 B・2026-11-27 即時起爆＆代償): 【起爆】の倍率が ×4 → ×5 (PoisonCore の旗)。 1 ターンに敵へ毒を合計 8 以上与え、かつ敵の毒が 18 以上になったとき、 即座に自動で【起爆】(1 ターン 1 回)。
+    /// 代償: この品で起爆したターン、 自分が受ける直接ダメージ +25%。</summary>
     public class PoisonMagazine : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "劇毒の火薬庫";
+        public const int TakenBonusPct = 25;
         /// <summary>[ターンごと] このターンに与えた毒 / 起爆したターン (BOT の見積もりも読む)。</summary>
         public const string GivenKey = "psn.magazine.given", TurnKey = "psn.magazine";
         public RelicView View(CombatContext ctx, RelicEnv env) => RelicView.Count(Psn.TurnN(ctx, GivenKey));
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPoisonGain };
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPoisonGain, PassiveSkillTrigger.OnPreReceiveDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
+            if (t == PassiveSkillTrigger.OnPreReceiveDamage)
+            {
+                if (!ctx.playerWonRoll && ctx.finalDamage > 0 && Psn.Count(ctx, TurnKey) == ctx.currentTurn)
+                    ctx.finalDamage = (int)((long)ctx.finalDamage * (100 + TakenBonusPct) / 100);
+                return;
+            }
             Psn.AddTurnN(ctx, GivenKey, Kw.EventAmount(ctx));
             if (ctx.currentTurn >= 1 && Psn.TurnN(ctx, GivenKey) >= PoisonCore.MagazineGiven && ctx.EnemyPoison >= PoisonCore.MagazineMinPoison && Rw.OncePerTurn(ctx, TurnKey))
                 Psn.Detonate(ctx, SkillId);
