@@ -499,12 +499,12 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>初太刀の黒鞘【集中】(賭け金 0・2026-11-27 パチンコ防御＆外し保険): 集中会心のとき、 このターンのブロック +6、 次のターンの最初の 1 撃の基礎攻撃 +(6 ＋ 使った【練気】× 3)・会心率 +25%。
+    /// <summary>初太刀の黒鞘【集中】(賭け金 0・2026-11-27 外し保険のみ維持): 集中会心のとき、 次のターンの最初の 1 撃の基礎攻撃 +(6 ＋ 使った【練気】× 3)・会心率 +25%。
     /// 集中が外れたときも、 次のターンの最初の 1 撃の会心率 +15% (保険)。</summary>
     public class FirstStrokePin : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => ItemIds.CritFirstStroke;
-        public const int AtkBase = 6, AtkPerRenki = 3, CritBlock = 6;
+        public const int AtkBase = 6, AtkPerRenki = 3;
         public const float NextRate = 0.25f, MissNextRate = 0.15f;
         /// <summary>[persistent] 会心率・攻撃が乗るターンの番号と攻撃加算量・会心率加算量。</summary>
         public const string Key = "crit.firstStroke.turn", AtkKey = "crit.firstStroke.atk", RateKey = "crit.firstStroke.rate";
@@ -520,7 +520,6 @@ namespace ItemSystem.PassiveSkills.Effects
             if (t == PassiveSkillTrigger.OnCriticalDamage)
             {
                 if (!Crit.FocusCrit(ctx)) return;
-                ctx.itemBlockBonus += CritBlock;
                 ctx.accumulatedValues[Key] = ctx.currentTurn + 1;
                 ctx.accumulatedValues[AtkKey] = AtkBase + AtkPerRenki * ctx.hitFocusSpentRenki;
                 ctx.accumulatedValues[RateKey] = NextRate;
@@ -555,7 +554,7 @@ namespace ItemSystem.PassiveSkills.Effects
     public class NickAppraisal : IPassiveSkillEffect
     {
         public string SkillId => ItemIds.CritNick;
-        public const int Gauge = 4, Pen = 12;   // 2026-11-27: 会心B大技対策 混乱 +2 → +4
+        public const int Gauge = 3, Pen = 12;   // 2026-11-27: 会心Bハイリスク調整 混乱 +4 → +3
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalDamage, PassiveSkillTrigger.OnPostDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -565,12 +564,12 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>渾身の鉄兜【集中】(賭け金 0・2026-11-27 パチンコ防御＆外し保険): 集中会心の撃の最終与ダメージ +(75 ＋ 使った【練気】× 25)%、 さらにシールド +(4 ＋ 使った【練気】× 1)。
-    /// 集中が外れたときも、 そのターンのブロック +8 (保険)。</summary>
+    /// <summary>渾身の鉄兜【集中】(賭け金 0・2026-11-27 パチンコ純化): 集中会心の撃の最終与ダメージ +(75 ＋ 使った【練気】× 25)%。
+    /// 集中が外れたとき、 そのターンのブロック +4 (最小限の保険)。</summary>
     public class HeftyPommel : IPassiveSkillEffect
     {
         public string SkillId => ItemIds.CritPommel;
-        public const int FinalPct = 75, FinalPctPerRenki = 25, CritShield = 4, CritShieldPerRenki = 1, MissBlock = 8;
+        public const int FinalPct = 75, FinalPctPerRenki = 25, MissBlock = 4;
         public static int FinalPctFor(int spent) => FinalPct + FinalPctPerRenki * spent;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalDamage, PassiveSkillTrigger.OnPostDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
@@ -579,7 +578,6 @@ namespace ItemSystem.PassiveSkills.Effects
             {
                 if (!Crit.FocusCrit(ctx)) return;
                 ctx.hitFinalDamagePct += FinalPctFor(ctx.hitFocusSpentRenki);   // 最終与ダメージ倍率はこの後 (ApplyWinDamageModifiers)
-                Rw.Shield(ctx, CritShield + CritShieldPerRenki * ctx.hitFocusSpentRenki, SkillId);
                 return;
             }
             if (ctx.IsRealHit && ctx.hitIsFocused && !ctx.isCritical) ctx.itemBlockBonus += MissBlock;
