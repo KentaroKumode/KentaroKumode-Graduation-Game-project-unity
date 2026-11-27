@@ -157,6 +157,7 @@ namespace AutoTest.ParallelSweep
                 CombatSystem.BossDownDiag.Reset();
                 CombatSystem.LethalParryDiag.Reset();
                 AutoTest.AutoRunner.ResetInstantDownDiag();   // [診断 2026-11-26] 大ダウンの取り逃し
+                ItemSystem.PassiveSkills.PassiveSkillManager.EnemySkillFires.Clear();   // [計装 2026-11-27] 敵のパッシブが鳴った回数
                 CombatSystem.HeavyHitDiag.Reset();   // [計装 2026-11-14] 大技の被ダメ
                 GameLoop.NavDiag.Reset();
                 CombatSystem.SkillDiag.Reset();
@@ -509,6 +510,10 @@ namespace AutoTest.ParallelSweep
                 {
                     File.WriteAllText(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(_job.responsePath)) ?? ".", "inst_down_diag.txt"),
                         AutoTest.AutoRunner.InstantDownDiagRaw() + "\n" + AutoTest.AutoRunner.InstantDownDiagLine() + "\n");
+                    // [計装 2026-11-27] 敵のパッシブが鳴った回数 (視点の入れ替えの廃止の網羅の見張り・「品の id|トリガー<TAB>回数」・ワーカーをまたいで足す)
+                    var efs = new System.Text.StringBuilder();
+                    foreach (var kv in ItemSystem.PassiveSkills.PassiveSkillManager.EnemySkillFires) efs.Append(kv.Key).Append('\t').Append(kv.Value).Append('\n');
+                    File.WriteAllText(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(_job.responsePath)) ?? ".", "enemy_skill_fires.txt"), efs.ToString());
                 }
                 catch (Exception) { }
                 WriteAtomic(_job.responsePath, JsonUtility.ToJson(response, false));

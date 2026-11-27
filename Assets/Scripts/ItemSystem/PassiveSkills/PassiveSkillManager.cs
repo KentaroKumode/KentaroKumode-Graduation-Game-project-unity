@@ -306,6 +306,8 @@ namespace ItemSystem.PassiveSkills
                         skills[i].Execute(trigger, context);
                         CombatContext.CurrentSkillId = "";
                         triggeredEnemySkills.Add(skills[i].SkillId);
+                        string fk = skills[i].SkillId + "|" + trigger;   // [計装 2026-11-27] 入れ替えの廃止の網羅の見張り
+                        EnemySkillFires[fk] = EnemySkillFires.TryGetValue(fk, out long fc) ? fc + 1 : 1;
                     }
                     catch (System.Exception e)
                     {
@@ -322,6 +324,10 @@ namespace ItemSystem.PassiveSkills
         }
 
         private bool _perspectiveSwapped;
+
+        /// <summary>[計装 2026-11-27] 敵のパッシブが鳴った回数 (「品の id|トリガー」ごと・バッチ累計・結果を変えない)。
+        /// 視点の入れ替えの廃止 (docs/perspective-swap-removal-approval.md) で、 書き換えたクラスが検証の中で十分に通ったかを見る。</summary>
+        public static readonly Dictionary<string, long> EnemySkillFires = new Dictionary<string, long>();
 
         /// <summary>
         /// プレイヤー/敵の視点を入れ替える
