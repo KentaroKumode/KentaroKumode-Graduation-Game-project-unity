@@ -300,6 +300,9 @@ namespace ItemSystem.PassiveSkills
                 for (int i = 0; i < skills.Count; i++)
                 {
                     if (down && CombatSystem.BossDownPassives.SkipsDuringDown(skills[i].SkillId)) continue;
+                    // [移行中 2026-11-27] 書き換え済み (IExplicitPerspective) の物は入れ替えずに実行する
+                    bool explicitView = skills[i] is IExplicitPerspective;
+                    if (explicitView) SwapPerspective();
                     try
                     {
                         CombatContext.CurrentSkillId = skills[i].SkillId;
@@ -313,6 +316,10 @@ namespace ItemSystem.PassiveSkills
                     {
                         Debug.LogError($"[PassiveSkillManager] Error in enemy skill '{skills[i].SkillId}': {e.Message}");
                     }
+                    finally
+                    {
+                        if (explicitView) SwapPerspective();   // 次の (まだ書き換えていない) 物のために敵視点へ戻す
+                    }
                 }
             }
             finally
@@ -324,6 +331,10 @@ namespace ItemSystem.PassiveSkills
         }
 
         private bool _perspectiveSwapped;
+
+        /// <summary>[移行中 2026-11-27] いま敵視点に入れ替わっているか (<see cref="CombatContext.EnemyDealUnmitigable"/> が、 書き換え済みかどうかで書く欄を選ぶ)。
+        /// 入れ替えを消す時に一緒に消す。</summary>
+        public bool PerspectiveSwappedNow => _perspectiveSwapped;
 
         /// <summary>[計装 2026-11-27] 敵のパッシブが鳴った回数 (「品の id|トリガー」ごと・バッチ累計・結果を変えない)。
         /// 視点の入れ替えの廃止 (docs/perspective-swap-removal-approval.md) で、 書き換えたクラスが検証の中で十分に通ったかを見る。</summary>

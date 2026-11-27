@@ -500,11 +500,15 @@ namespace ItemSystem.PassiveSkills
             }
 
             dbgChipToHp += dmg;
-            enemyCurrentHP = System.Math.Max(0, enemyCurrentHP - dmg);
+            // [移行中 2026-11-27] 書き換え前の敵のパッシブ (敵視点に入れ替わっている) は enemyCurrentHP = プレイヤー。 書き換え済み (IExplicitPerspective) は名前どおり playerCurrentHP
+            bool swapped = PassiveSkillManager.Instance != null && ReferenceEquals(PassiveSkillManager.Instance.Context, this) && PassiveSkillManager.Instance.PerspectiveSwappedNow;
+            int hpAfter;
+            if (swapped) hpAfter = enemyCurrentHP = System.Math.Max(0, enemyCurrentHP - dmg);
+            else hpAfter = playerCurrentHP = System.Math.Max(0, playerCurrentHP - dmg);
             if (cause.HasValue)
             {
                 AddPlayerDamageSource(cause.Value, dmg);
-                if (enemyCurrentHP <= 0) lastDamageCause = cause.Value;
+                if (hpAfter <= 0) lastDamageCause = cause.Value;
             }
             return dmg;
         }
