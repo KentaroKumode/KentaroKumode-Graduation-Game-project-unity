@@ -25,7 +25,7 @@ updated: 2026-07-30
 | アイテム全カタログ | [items.json](../Assets/Data/InventorySystem/items.json) | 分類とルールのみ |
 | パッシブ全 166 種の効果 | `AllPassiveSkillEffects.cs` / `EnemyPassiveSkillEffects.cs` | 体系と機構のみ |
 | 敵ステータス | [enemies.json](../Assets/Resources/enemies.json) | 構造のみ |
-| 七つの大罪の ID・効果・フレーバー | [PermanentDebuffIds.cs](../Assets/Scripts/MetaProgression/PermanentDebuffIds.cs) | 位置づけのみ |
+| 七つの大罪の ID・効果 | [PermanentDebuffIds.cs](../Assets/Scripts/MetaProgression/PermanentDebuffIds.cs) | 位置づけのみ |
 | ID 定数 | [Ids.cs](../Assets/Scripts/GameLoop/Ids.cs) (`ItemIds` / `BossIds`) | 規約のみ |
 | イベント定義 | [event_list.txt](../Assets/Resources/Events/event_list.txt) | フォーマットのみ |
 | 筐体レイアウト実寸 | [docs/design/cabinet-layout.html](design/cabinet-layout.html) 他 | 設計思想のみ |
@@ -83,7 +83,7 @@ updated: 2026-07-30
 
 - 唯一の正本は実コード。
 - ダメージ計算の正本は `DAMAGE_CALC_REFERENCE.md`。
-- 七つの大罪フレーバーの正本は `PermanentDebuffIds.cs`。
+- 七つの大罪の正本は `PermanentDebuffIds.cs`。
 - アイテムカタログの正本は `items.json`。
 - `BALANCE_CHANGELOG_*` / `BALANCE_TIER_LIST_*` は BOT 自動生成＝改変しない。
 
@@ -3566,10 +3566,6 @@ Optimal は ITT を 3 段に丸め、Super は無段階で使う（§13-7）。I
   2026-11-27 のビルドでは BOT がレイピアを 9 割で取り、3 層クリアが 72.4% → 49.4% に落ちていた（作り直す前のシュヴァリエ）。
   さらに遮断の測定でも BOT はレイピアをただで持っていた。`GameManager.SuppressLayer5HiddenBoss`（AutoRunner の既定 true）は計測専用の口として残すが、
   `aimEnd2=False` の下ではレイピアを取らないので、遮断の有無で結果は変わらない。製品の挙動は変えていない。
-
-### 23-8. lore の残り
-
-- 七つの大罪のフレーバー（`PermanentDebuffIds.GetFlavorText`）を画面に出す所が無い。
 
 ### 23-9. 噂層の出荷
 
