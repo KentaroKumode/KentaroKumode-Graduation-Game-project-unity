@@ -684,21 +684,21 @@ namespace ItemSystem.PassiveSkills.Effects
     // ============================================================
 
     /// <summary>ゴブリン王 — 号令: 毎ターン、 攻撃 +N (N = BossParam.GoblinCall・基準 3)</summary>
-    public class GoblinKingsCall : IPassiveSkillEffect
+    public class GoblinKingsCall : IPassiveSkillEffect, IExplicitPerspective
     {
         public string SkillId => "GoblinKingsCall";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll };
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
             // 敵視点なので playerDiceTotal = ボス自身のダイス合計。 加算量は BossParams.GoblinCall (基準3)。
-            ctx.playerDiceTotal += UnityEngine.Mathf.Max(0, CombatSystem.BossParams.ParamInt(ctx.bossId, CombatSystem.BossParam.GoblinCall));
+            ctx.enemyDiceTotal += UnityEngine.Mathf.Max(0, CombatSystem.BossParams.ParamInt(ctx.bossId, CombatSystem.BossParam.GoblinCall));
         }
     }
 
     /// <summary>毒沼の主 — 毒の侵蝕: 毎ターン終了時に毒スタック+1（上限 BossParam.PoisonStackCap・基準4）、
     /// その後スタック分の固定ダメ（軽減無視）。長期戦ほど加速度的に蝕む。
     /// T1:1 T2:2 … T5:5 で頭打ち。累計はT5までで15＝速攻なら軽傷、長引けば致命。</summary>
-    public class MiasmaCorrosion : IPassiveSkillEffect
+    public class MiasmaCorrosion : IPassiveSkillEffect, IExplicitPerspective
     {
         public const string Id = "MiasmaCorrosion";
         public string SkillId => Id;
@@ -721,14 +721,14 @@ namespace ItemSystem.PassiveSkills.Effects
             int s = System.Math.Min(cap, (int)stack + 1);
             ctx.accumulatedValues[Key] = s;
             ctx.EnemyDealUnmitigable(s, DeathCause.Chip);   // 軽減は無視・シールドは肩代わりする
-            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[毒の侵蝕] 毒×{s} ダメ (上限{cap}, 軽減無視) → プレイヤー残HP={ctx.enemyCurrentHP}");
+            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[毒の侵蝕] 毒×{s} ダメ (上限{cap}, 軽減無視) → プレイヤー残HP={ctx.playerCurrentHP}");
         }
     }
 
     /// <summary>鏡の双子 — 鏡映の応答: 与ダメ (主攻撃+固定) が閾値 = max(12, ボス最大HP の 4%) 未満だったターン、
     /// 次ターン開始時に min(反射上限, 閾値 − 与ダメ) を軽減無視で返す (反射上限 = BossParam.MirrorReflectCap・基準 9)。
     /// 閾値以上の一撃は反射 0 ＝ 小突きを罰し、 重い一撃で鏡を割る。</summary>
-    public class MirrorTwinsResponse : IPassiveSkillEffect
+    public class MirrorTwinsResponse : IPassiveSkillEffect, IExplicitPerspective
     {
         /// <summary>計装: 被弾イベント数 / そのうち反射が成立した数 / 反射の合計ダメージ。
         /// **閾値を勘で置き直さないため**に置いている ── 5% 版は 1 度も発火せず、
@@ -796,16 +796,16 @@ namespace ItemSystem.PassiveSkills.Effects
                 //     7%  → 発火 70% / 被ダメ 65.6%HP
                 //   と両極に振れた。 **4% ＝ 発火 35〜40%** が狙い (被ダメ 45〜50%HP =
                 //   3層ボス 41.9 と 5層ボス 56.7 の間)。 次に動かすときも P30/P50 を見ること。
-                int Thr = UnityEngine.Mathf.Max(12, ctx.playerMaxHP * 4 / 100);
+                int Thr = UnityEngine.Mathf.Max(12, ctx.enemyMaxHP * 4 / 100);
                 // ボスの数値 (BossParams): 反射ダメ上限を直接調整 (低い=反射事故の緩和)。 基準9
                 int reflectCap = UnityEngine.Mathf.Max(0, CombatSystem.BossParams.ParamInt(ctx.bossId, CombatSystem.BossParam.MirrorReflectCap));
                 int dmg = ctx.finalDamage;
                 if (dmg > 0)
                 {
                     Hits++;
-                    if (ctx.playerMaxHP > 0)
+                    if (ctx.enemyMaxHP > 0)
                     {
-                        int bucket = (int)(100L * dmg / ctx.playerMaxHP);   // 敵視点: playerMaxHP = ボス最大HP
+                        int bucket = (int)(100L * dmg / ctx.enemyMaxHP);   // 敵視点: playerMaxHP = ボス最大HP
                         HitPctHist[UnityEngine.Mathf.Clamp(bucket, 0, HitPctHist.Length - 1)]++;
                     }
                 }
@@ -823,7 +823,7 @@ namespace ItemSystem.PassiveSkills.Effects
                 int dmg = (int)pending;
                 ctx.EnemyDealUnmitigable(dmg, DeathCause.Reflect);   // 軽減は無視・シールドは肩代わりする
                 ctx.accumulatedValues[Key] = 0f;
-                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[鏡映の応答] 反射 {dmg}ダメ → プレイヤー残HP={ctx.enemyCurrentHP}");
+                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[鏡映の応答] 反射 {dmg}ダメ → プレイヤー残HP={ctx.playerCurrentHP}");
             }
         }
     }
