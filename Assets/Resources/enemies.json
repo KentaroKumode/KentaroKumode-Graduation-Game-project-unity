@@ -1400,19 +1400,19 @@
     },
     {
       "id": "boss_layer5_hidden",
-      "defense": 3,
+      "defense": 5,
       "displayName": "シュヴァリエ・サン=ジョリオラ",
       "description": "資格ある者の前にだけ現れる、古き決闘術の幻影。透き通る細剣を胸元に掲げて礼をとり、足音ひとつ立てずに石畳の上を滑るように踏み込む。",
       "floor": 5,
-      "maxHP": 1891,
+      "maxHP": 3800,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 8,
       "passiveSkills": [
         {
           "internalName": "SaintGeorgesPhases",
-          "skillName": "形態転換／プリオリテ",
-          "description": "コントラタック（シールド+反撃）とオポジション（殴り合い+連勝報酬）を循環。形態2→1の帰還ごとにプリオリテ+1＝シールド初期 140−28×プリオリテ（最低28・開幕はプリオリテ1で112）／反撃+7。粘る者ほど無駄に身を削る",
+          "skillName": "決闘術／三本勝負",
+          "description": "【構え1:コントラタック】被ダメ−45%・攻撃ダイス1個ごとに軽減不可反撃（8+敵の一本×3）。完封・ジャスト防御・攻撃0個・ダウンで先手奪取→【構え2:オポジション】(2T・被ダメ+25%・敵攻撃+14)。【三本勝負】構え2で1Tに最大HP25%以上削り・大技ジャスト防御・ダウンで〈一本〉、3本先取で決闘勝利。逆に1Tで最大HP10%以上被弾か構え1反撃被弾で敵に〈一本〉（攻撃+8・貫通+4、最大3）",
           "flavorText": "構えを変えるたびに一礼が入る。省いてくれてもいいのだが。"
         },
         {
@@ -1422,9 +1422,9 @@
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         }
       ],
-      "baseAttack": 16,
+      "baseAttack": 22,
       "attackRollMin": 2,
-      "attackRollMax": 3,
+      "attackRollMax": 4,
       "heavyPeriod": 5,
       "heavyMul": 3.5,
       "heavyLightMul": 0.8

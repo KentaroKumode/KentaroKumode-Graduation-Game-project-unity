@@ -1328,37 +1328,61 @@ namespace ItemSystem.PassiveSkills.Effects
     /// ctx の HP に書かれる。 CombatManager.Turn.cs が収支トリガーの直前に ctx の HP を CombatManager の値へ揃え、 直後に
     /// SyncHPFromContext で拾うようにしたので、 HP の増減が残る。 旧実装は直後の FinishTurnCommon の書き戻しで消えていた
     /// (シールドの肩代わり分・シールドへの 25・形態の遷移だけが残っていた)。</para></summary>
+    /// <summary>
+    /// 5層隠しボス「シュヴァリエ・サン=ジョリオラ」フルリワーク（2026-11-27）。
+    /// 決闘術の二構え〈プリオリテ（攻撃権）の奪い合い〉×〈三本勝負（トゥッシュ）〉。
+    ///
+    /// <para><b>構え 1〈コントラタック〉(シュヴァリエ先手・初期構え)</b>:
+    /// 敵の素攻撃は控えめ (−4) だが、受ける主攻撃ダメージ −45%、さらにプレイヤーが攻撃端子に挿したダイス 1 個につき
+    /// 軽減不可のカウンター (6 + 敵の一本×2) を返す。
+    /// 「敵の攻撃を完封／ジャスト防御」「攻撃端子 0 個で呼吸を外す」「ダウン」のいずれかで先手を奪い、次ターンから構え 2 へ。</para>
+    ///
+    /// <para><b>構え 2〈オポジション〉(プレイヤー先手・2 ターン持続)</b>:
+    /// 軽減とカウンターが消えて受ける主攻撃ダメージ +35% (+プレイヤーの一本×10%) になる代わり、
+    /// シュヴァリエも踏み込んで攻撃 +10。2 ターン終了で構え 1 へ戻る。</para>
+    ///
+    /// <para><b>三本勝負〈トゥッシュ〉</b>:
+    /// ・プレイヤーの一本（1T 最大 1 本）: (a) 構え 2 中に 1T で敵最大 HP の 25% 以上削る / (b) 大技をジャスト防御（or レイピア中完封） / (c) ダウン成立（1 ダウン 1 回）。
+    ///   3 本先取で残り HP に関わらず一礼して決闘勝利。
+    /// ・シュヴァリエの一本（最大 3 本）: プレイヤーが 1T に最大 HP の 15% 以上の直接ダメを受ける、または構え 1 で攻撃 2 個以上挿してカウンターで HP を失う。
+    ///   1 本につき敵攻撃 +6・防御貫通 +3。</para>
+    /// </summary>
     public class SaintGeorgesPhases : IPassiveSkillEffect
     {
         public string SkillId => "SaintGeorgesPhases";
         public PassiveSkillTrigger[] Triggers => new[] {
             PassiveSkillTrigger.OnBattleStart,
             PassiveSkillTrigger.OnTurnStart,
+            PassiveSkillTrigger.OnPostRoll,
             PassiveSkillTrigger.OnPreReceiveDamage,
-            PassiveSkillTrigger.OnRollLose,   // 敵視点: ボスが敗北 = プレイヤー勝利
-            PassiveSkillTrigger.OnRollWin,    // 敵視点: ボスが勝利 = プレイヤー敗北
             PassiveSkillTrigger.OnTurnEnd,
         };
 
-        // accumulatedValues キー（perspective 非依存・共有スカラ）
-        private const string KPhase           = "sg_phase";            // 1 or 2
-        private const string KShield          = "sg_shield";           // 形態1シールド残量
-        private const string KBossWins        = "sg_boss_wins";        // 形態2のボス累積勝利
-        private const string KPendingP1ToP2   = "sg_pending_p1_to_p2"; // シールド破壊→次T形態2
-        private const string KPendingP2ToP1   = "sg_pending_p2_to_p1"; // ボス3勝→次T形態1
-        private const string KP2RewardPending = "sg_p2_reward_pending"; // P2: 連勝予約
-        private const string KP2RewardActive  = "sg_p2_reward_active";  // P2: 当ターン報酬有効
-        private const string KP2ExtendPending = "sg_p2_extend_pending"; // P2: 帰還1T延長予約
-        private const string KPrioriteStacks  = "sg_priorite_stacks";   // プリオリテ累積（往復ペナルティ）
+        private const string KPhase           = "sg_phase";           // 1 = コントラタック / 2 = オポジション
+        private const string KP2Left          = "sg_p2_left";         // 構え 2 の残りターン
+        private const string KPlayerTouche    = "sg_player_touche";   // プレイヤーの一本 (0..3)
+        private const string KBossTouche      = "sg_boss_touche";     // シュヴァリエの一本 (0..3)
+        private const string KTurnStartHp     = "sg_turn_start_hp";   // ターン開始時のボス HP
+        private const string KLastDownToucheT = "sg_down_touche_t";   // ダウンで一本を取った直近ターン
 
-        /// <summary>いまの形態 (1 = コントラタック / 2 = オポジション / 0 = 戦闘の外)。 画面の演出 (構えの絵) が読むだけ・値は変えない (2026-11-14)。</summary>
+        /// <summary>いまの形態 (1 = コントラタック / 2 = オポジション / 0 = 戦闘の外)。 画面の演出 (構えの絵) が読むだけ・値は変えない。</summary>
         public static int PhaseOf(CombatContext ctx) => ctx != null ? (int)ctx.GetAccumulated(KPhase) : 0;
 
-        private const int BaseDiceCount   = 4; // 形態1で extraDice = −4 → 攻撃ロールを引く回数 max(0, 1 − 4) = 0 (EnemyData.RollAttack)
-        private const int BaseShield      = 140; // HP +40% に比例して上方修正
-        private const int MinShield       = 28; // プリオリテ削減後の下限 (20→28, +40%)
-        private const int PrioriteShieldDecPer = 28; // /stack でシールド初期量を減らす
-        private const int PrioriteCounterPer   = 7;  // /stack で反撃ダメ加算
+        public const int P1MitigatePct      = 45;   // 構え 1: 被ダメ −45%
+        public const int P1AtkCut           = 0;    // 構え 1: 素攻撃の軽減なし (基礎22でしっかり防御を要求)
+        public const int P1CounterPerDie    = 8;    // 構え 1: 攻撃ダイス 1 個あたりのカウンター基礎値
+        public const int P1CounterPerBossT  = 3;    // 構え 1: 敵の一本 1 つあたりのカウンター加算
+        public const int P2Duration         = 2;    // 構え 2: 持続ターン数
+        public const int P2VulnPct          = 25;   // 構え 2: 被ダメ +25%
+        public const int P2VulnPerPlayerT   = 10;   // 構え 2: プレイヤーの一本 1 つにつき被ダメ +10%
+        public const int P2AtkBonus         = 14;   // 構え 2: 踏み込みの突き (攻撃 +14)
+        public const int ToucheWinNeed      = 3;    // 3 本先取で決闘勝利
+        public const int ToucheBurstPct     = 25;   // 構え 2 中 1T に敵最大 HP の 25% 以上削りで一本
+        public const int BossToucheMax      = 3;
+        public const int BossToucheAtkPer   = 8;    // 敵の一本 1 つにつき攻撃 +8
+        public const int BossTouchePenPer   = 4;    // 敵の一本 1 つにつき防御貫通 +4
+        public const int BossToucheHitPct   = 10;   // プレイヤーが最大 HP の 10% 以上被弾で敵に一本
+        public const int PlayerToucheTensionAtk = 4; // プレイヤーの一本 1 つにつき敵も気迫で攻撃 +4
 
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
@@ -1366,174 +1390,163 @@ namespace ItemSystem.PassiveSkills.Effects
             {
                 case PassiveSkillTrigger.OnBattleStart:
                     ctx.accumulatedValues[KPhase] = 1;
-                    // 2026-05-31: プリオリテ初期+1 (BaseShield - PrioriteShieldDecPer = 140-28=112 で開始)
-                    ctx.accumulatedValues[KPrioriteStacks] = 1;
-                    int initShield = System.Math.Max(MinShield, BaseShield - PrioriteShieldDecPer);
-                    ctx.accumulatedValues[KShield] = initShield;
-                    if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[サン=ジョリオラ] 戦闘開始: コントラタック構え シールド{initShield} (プリオリテ初期+1)");
+                    ctx.accumulatedValues[KP2Left] = 0;
+                    ctx.accumulatedValues[KPlayerTouche] = 0;
+                    ctx.accumulatedValues[KBossTouche] = 0;
+                    ctx.accumulatedValues[KLastDownToucheT] = -10;
+                    if (UnityEngine.Debug.unityLogger.logEnabled)
+                        UnityEngine.Debug.Log("[サン=ジョリオラ] 決闘開始: 構え1〈コントラタック〉(三本勝負)");
                     break;
 
                 case PassiveSkillTrigger.OnTurnStart:
-                    ApplyPendingTransitions(ctx);
-                    int phaseStart = (int)ctx.GetAccumulated(KPhase);
-                    if (phaseStart == 1)
-                    {
-                        // 形態1: ボスはダイスを振らない (0d0)
-                        ctx.accumulatedValues["extraDice"] = -BaseDiceCount;
-                    }
-                    else
-                    {
-                        // 形態2: 報酬予約→有効化、ボスダイス合計+4
-                        if (ctx.GetAccumulated(KP2RewardPending) > 0)
-                        {
-                            ctx.accumulatedValues[KP2RewardActive] = 1;
-                            ctx.accumulatedValues[KP2RewardPending] = 0;
-                            ctx.enemyDiceTotalBonus += 4;
-                            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log("[サン=ジョリオラ・オポジション] 報酬ターン突入: ボスダイス合計+4");
-                        }
-                    }
+                    ctx.accumulatedValues[KTurnStartHp] = ctx.enemyCurrentHP;
                     break;
+
+                case PassiveSkillTrigger.OnPostRoll:
+                {
+                    int phase = (int)ctx.GetAccumulated(KPhase);
+                    int pT = (int)ctx.GetAccumulated(KPlayerTouche);
+                    int bT = (int)ctx.GetAccumulated(KBossTouche);
+                    int delta = bT * BossToucheAtkPer + pT * PlayerToucheTensionAtk + (phase == 2 ? P2AtkBonus : -P1AtkCut);
+                    ctx.enemyDiceTotal = System.Math.Max(0, ctx.enemyDiceTotal + delta);
+                    break;
+                }
 
                 case PassiveSkillTrigger.OnPreReceiveDamage:
                 {
-                    // 形態1のみシールド経由
-                    if ((int)ctx.GetAccumulated(KPhase) != 1) break;
-                    if (ctx.finalDamage <= 0) break;
-
-                    float shield = ctx.GetAccumulated(KShield);
-                    if (shield <= 0)
+                    if (ctx.finalDamage <= 0 || CombatSystem.BossDown.ActiveNow) break;
+                    int phase = (int)ctx.GetAccumulated(KPhase);
+                    if (phase == 1)
                     {
-                        // シールド既に0 → このターンは無敵
-                        ctx.finalDamage = 0;
-                        UnityEngine.Debug.Log("[サン=ジョリオラ] シールド0(無敵): ダメージ無効");
-                        break;
+                        ctx.finalDamage = System.Math.Max(1, (int)((long)ctx.finalDamage * (100 - P1MitigatePct) / 100));
                     }
-
-                    int absorbed = System.Math.Min((int)shield, ctx.finalDamage);
-                    shield -= absorbed;
-                    ctx.finalDamage -= absorbed;
-                    ctx.accumulatedValues[KShield] = shield;
-
-                    if (shield <= 0)
+                    else if (phase == 2)
                     {
-                        // シールド破壊ターン: 残ダメを全て無効化、次T形態2へ
-                        ctx.finalDamage = 0;
-                        ctx.accumulatedValues[KPendingP1ToP2] = 1;
-                        if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[サン=ジョリオラ] シールド破壊! 吸収{absorbed} + 超過分は無敵で無効化 / 次T 形態2");
-                    }
-                    else
-                    {
-                        if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[サン=ジョリオラ] シールド吸収{absorbed} → 残{shield}");
-                    }
-                    break;
-                }
-
-                case PassiveSkillTrigger.OnRollLose:
-                {
-                    // 敵視点: ボスがロール敗北 = プレイヤーがロール勝利
-                    int phaseLose = (int)ctx.GetAccumulated(KPhase);
-                    if (phaseLose == 1)
-                    {
-                        // 反撃: プレイヤー自身の出目の合計 + プリオリテ×PrioriteCounterPer(7) を不可避ダメで返す
-                        // 敵視点では ctx.enemyDiceTotal = プレイヤー実ダイス合計、ctx.enemyCurrentHP = プレイヤー実HP
-                        int playerTotal = ctx.playerDiceTotal;
-                        int stacks = (int)ctx.GetAccumulated(KPrioriteStacks);
-                        int counter = playerTotal + stacks * PrioriteCounterPer;
-                        if (counter > 0)
-                        {
-                            ctx.EnemyDealUnmitigable(counter, null);   // 軽減は無視・シールドは肩代わりする
-                            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[サン=ジョリオラ・コントラタック] 反撃{counter} (素{playerTotal}+プリオリテ{stacks}×{PrioriteCounterPer}, 不可避) → プレイヤーHP={ctx.playerCurrentHP}");
-                        }
-                        // シールドへ +25 確定ダメ
-                        float s = ctx.GetAccumulated(KShield);
-                        if (s > 0)
-                        {
-                            float newS = System.Math.Max(0, s - 25);
-                            ctx.accumulatedValues[KShield] = newS;
-                            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[サン=ジョリオラ・コントラタック] +25確定ダメ シールド{s}→{newS}");
-                            if (newS <= 0)
-                                ctx.accumulatedValues[KPendingP1ToP2] = 1;
-                        }
-                    }
-                    else // 形態2
-                    {
-                        // 当ターン報酬有効中なら +15 ダメ
-                        if (ctx.GetAccumulated(KP2RewardActive) > 0)
-                        {
-                            // 敵視点: ctx.playerCurrentHP = ボス自身のHP
-                            ctx.enemyCurrentHP = System.Math.Max(0, ctx.enemyCurrentHP - 15);
-                            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[サン=ジョリオラ・連勝報酬] +15ダメ → ボスHP={ctx.enemyCurrentHP}");
-                        }
-                        // 次ターン分の報酬予約
-                        ctx.accumulatedValues[KP2RewardPending] = 1;
-                        // 形態1帰還を1T遅延する予約
-                        ctx.accumulatedValues[KP2ExtendPending] = 1;
-                    }
-                    break;
-                }
-
-                case PassiveSkillTrigger.OnRollWin:
-                {
-                    // 敵視点: ボスがロール勝利
-                    if ((int)ctx.GetAccumulated(KPhase) != 2) break;
-                    int wins = (int)ctx.GetAccumulated(KBossWins) + 1;
-                    ctx.accumulatedValues[KBossWins] = wins;
-                    if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[サン=ジョリオラ・オポジション] ボス勝利 累計{wins}/3");
-                    if (wins >= 3)
-                    {
-                        if (ctx.GetAccumulated(KP2ExtendPending) > 0)
-                        {
-                            // 延長: 形態2を1T継続させ、勝利カウントを2に戻す
-                            ctx.accumulatedValues[KBossWins] = 2;
-                            ctx.accumulatedValues[KP2ExtendPending] = 0;
-                            UnityEngine.Debug.Log("[サン=ジョリオラ] 連勝報酬完了まで形態2延長 (勝利数2へ戻す)");
-                        }
-                        else
-                        {
-                            ctx.accumulatedValues[KPendingP2ToP1] = 1;
-                            UnityEngine.Debug.Log("[サン=ジョリオラ] 次T 形態1帰還を予約 → シールド再展開");
-                        }
+                        int pT = (int)ctx.GetAccumulated(KPlayerTouche);
+                        int vuln = P2VulnPct + pT * P2VulnPerPlayerT;
+                        ctx.finalDamage = (int)((long)ctx.finalDamage * (100 + vuln) / 100);
                     }
                     break;
                 }
 
                 case PassiveSkillTrigger.OnTurnEnd:
-                    // 報酬ターン終了処理: +4 ボーナス除去、active クリア
-                    if (ctx.GetAccumulated(KP2RewardActive) > 0)
+                {
+                    if (ctx.enemyCurrentHP <= 0 || ctx.playerCurrentHP <= 0) break;
+
+                    int phase = (int)ctx.GetAccumulated(KPhase);
+                    int pT = (int)ctx.GetAccumulated(KPlayerTouche);
+                    int bT = (int)ctx.GetAccumulated(KBossTouche);
+                    bool down = CombatSystem.BossDown.ActiveNow;
+                    int atkDice = (int)ctx.GetAccumulated(MutualKeys.AttackDiceCount);
+                    int hpLoss = (int)ctx.GetAccumulated(MutualKeys.HpLossFromEnemy);
+                    bool enemyAttacked = (int)ctx.GetAccumulated(MutualKeys.EnemyAtkPreDefense) > 0;
+                    bool shutout = enemyAttacked && hpLoss <= 0;
+                    bool justGuard = Shd.JustGuardNow(ctx);
+                    bool contreOn = ctx.GetAccumulated("player_contre") > 0f;
+
+                    // 1. 構え 1 のカウンター（ダウン中は発動しない）
+                    int counterHpLoss = 0;
+                    if (phase == 1 && !down && atkDice > 0)
                     {
-                        ctx.accumulatedValues[KP2RewardActive] = 0;
-                        ctx.enemyDiceTotalBonus = System.Math.Max(0, ctx.enemyDiceTotalBonus - 4);
+                        int counterDmg = atkDice * (P1CounterPerDie + bT * P1CounterPerBossT);
+                        counterHpLoss = ctx.EnemyDealUnmitigable(counterDmg, DeathCause.Reflect);
+                        if (UnityEngine.Debug.unityLogger.logEnabled)
+                            UnityEngine.Debug.Log($"[サン=ジョリオラ・コントラタック] 先手反撃 {counterDmg} (攻撃ダイス{atkDice}・敵一本{bT}) → 実被弾{counterHpLoss}");
+                    }
+
+                    if (ctx.playerCurrentHP <= 0) break;
+
+                    // 2. プレイヤーの〈一本（トゥッシュ）〉判定（1 ターン最大 1 本）
+                    bool gotPlayerTouche = false;
+                    string toucheReason = null;
+                    int startHp = (int)ctx.GetAccumulated(KTurnStartHp);
+                    int dealtThisTurn = System.Math.Max(0, startHp - ctx.enemyCurrentHP);
+                    int burstNeed = System.Math.Max(1, ctx.enemyMaxHP * ToucheBurstPct / 100);
+
+                    if (phase == 2 && dealtThisTurn >= burstNeed)
+                    {
+                        gotPlayerTouche = true;
+                        toucheReason = $"踏み込みの一撃 ({dealtThisTurn} ≥ {burstNeed})";
+                    }
+                    else
+                    {
+                        var curE = CombatSystem.CombatManager.Instance?.CurrentEnemy;
+                        bool isHeavy = curE != null && !down && CombatSystem.Escalation.IsHeavyTurn(curE, ctx.currentTurn);
+                        if (isHeavy && (justGuard || (shutout && contreOn)))
+                        {
+                            gotPlayerTouche = true;
+                            toucheReason = justGuard ? "大技のジャスト見切り" : "大技のコントラタック完封";
+                        }
+                        else if (down && ctx.currentTurn - (int)ctx.GetAccumulated(KLastDownToucheT) >= 2)
+                        {
+                            gotPlayerTouche = true;
+                            ctx.accumulatedValues[KLastDownToucheT] = ctx.currentTurn;
+                            toucheReason = "体勢崩し (ダウン)";
+                        }
+                    }
+
+                    if (gotPlayerTouche)
+                    {
+                        pT++;
+                        ctx.accumulatedValues[KPlayerTouche] = pT;
+                        if (UnityEngine.Debug.unityLogger.logEnabled)
+                            UnityEngine.Debug.Log($"[サン=ジョリオラ・トゥッシュ!] プレイヤー 一本 {pT}/{ToucheWinNeed} ({toucheReason})");
+
+                        if (pT >= ToucheWinNeed)
+                        {
+                            int left = ctx.enemyCurrentHP;
+                            ctx.enemyCurrentHP = 0;
+                            CombatSystem.HpLossDiag.Add("経路:決闘勝利(三本先取)", left);
+                            CombatSystem.EnemyHpLedger.Land("決闘勝利(三本先取)", left, left);
+                            if (UnityEngine.Debug.unityLogger.logEnabled)
+                                UnityEngine.Debug.Log($"[サン=ジョリオラ] 三本先取! 剣聖が一礼して剣を納めた (残HP {left} → 0)");
+                            break;
+                        }
+                    }
+
+                    // 3. シュヴァリエの〈一本（優位）〉判定（ダウン中は取らない・最大 3 本）
+                    if (!down && bT < BossToucheMax)
+                    {
+                        int hitNeed = System.Math.Max(1, ctx.playerMaxHP * BossToucheHitPct / 100);
+                        bool gotBossTouche = hpLoss >= hitNeed || (phase == 1 && atkDice >= 2 && counterHpLoss > 0);
+                        if (gotBossTouche)
+                        {
+                            bT++;
+                            ctx.accumulatedValues[KBossTouche] = bT;
+                            ctx.enemyArmorPen += BossTouchePenPer;
+                            if (UnityEngine.Debug.unityLogger.logEnabled)
+                                UnityEngine.Debug.Log($"[サン=ジョリオラ・プリオリテ] 剣聖 一本 {bT}/{BossToucheMax} → 攻撃+{BossToucheAtkPer}・貫通+{BossTouchePenPer}");
+                        }
+                    }
+
+                    // 4. 構えの遷移
+                    if (phase == 1)
+                    {
+                        if (down || shutout || justGuard || atkDice == 0)
+                        {
+                            ctx.accumulatedValues[KPhase] = 2;
+                            ctx.accumulatedValues[KP2Left] = P2Duration;
+                            if (UnityEngine.Debug.unityLogger.logEnabled)
+                                UnityEngine.Debug.Log($"[サン=ジョリオラ] 先手奪取! 構え1→2〈オポジション〉({P2Duration}T)");
+                        }
+                    }
+                    else
+                    {
+                        int left = (int)ctx.GetAccumulated(KP2Left) - 1;
+                        if (left <= 0)
+                        {
+                            ctx.accumulatedValues[KPhase] = 1;
+                            ctx.accumulatedValues[KP2Left] = 0;
+                            if (UnityEngine.Debug.unityLogger.logEnabled)
+                                UnityEngine.Debug.Log("[サン=ジョリオラ] 体勢を立て直した: 構え2→1〈コントラタック〉");
+                        }
+                        else
+                        {
+                            ctx.accumulatedValues[KP2Left] = left;
+                        }
                     }
                     break;
-            }
-        }
-
-        private void ApplyPendingTransitions(CombatContext ctx)
-        {
-            if (ctx.GetAccumulated(KPendingP1ToP2) > 0)
-            {
-                ctx.accumulatedValues[KPhase] = 2;
-                ctx.accumulatedValues[KShield] = 0;
-                ctx.accumulatedValues[KBossWins] = 0;
-                ctx.accumulatedValues[KPendingP1ToP2] = 0;
-                UnityEngine.Debug.Log("[サン=ジョリオラ] 形態1→2 移行: オポジション(4d6) 開始");
-            }
-            if (ctx.GetAccumulated(KPendingP2ToP1) > 0)
-            {
-                // プリオリテ累積: 帰還の代償としてシールド −PrioriteShieldDecPer(28) (最低 MinShield)、反撃 +PrioriteCounterPer(7)
-                int newStacks = (int)ctx.GetAccumulated(KPrioriteStacks) + 1;
-                ctx.accumulatedValues[KPrioriteStacks] = newStacks;
-                int newShield = System.Math.Max(MinShield, BaseShield - newStacks * PrioriteShieldDecPer);
-
-                ctx.accumulatedValues[KPhase] = 1;
-                ctx.accumulatedValues[KShield] = newShield;
-                ctx.accumulatedValues[KBossWins] = 0;
-                ctx.accumulatedValues[KPendingP2ToP1] = 0;
-                // 報酬関連はクリア（形態跨ぎでは持ち越さない）
-                ctx.accumulatedValues[KP2RewardPending] = 0;
-                ctx.accumulatedValues[KP2RewardActive] = 0;
-                ctx.accumulatedValues[KP2ExtendPending] = 0;
-                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[サン=ジョリオラ] プリオリテ{newStacks} 主張! 形態2→1 移行: シールド{newShield} (反撃+{newStacks * PrioriteCounterPer})");
+                }
             }
         }
     }
