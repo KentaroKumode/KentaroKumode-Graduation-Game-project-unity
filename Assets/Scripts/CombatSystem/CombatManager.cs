@@ -205,7 +205,6 @@ namespace CombatSystem
         public void DamagePlayerDirect(int amount)
         {
             if (amount <= 0 || !isCombatActive) return;
-            amount = amount;
             playerHP = Math.Max(0, playerHP - amount);
             var ctx = PassiveSkillManager.Instance?.Context;
             if (ctx != null) ctx.playerCurrentHP = playerHP;

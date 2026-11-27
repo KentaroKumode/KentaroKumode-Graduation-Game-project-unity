@@ -1251,7 +1251,6 @@ namespace CombatSystem
                 int reflect = Mathf.RoundToInt(ctx.vescaShieldAbsorbedThisTurn * ctx.vescaShieldReflectRate);
                 if (reflect > 0)
                 {
-                    reflect = reflect;
                     playerHP = Math.Max(0, playerHP - reflect);
                     ctx.playerCurrentHP = playerHP;
                     if (Debug.unityLogger.logEnabled) Debug.Log($"[ヴェスカ] シールド反射 {ctx.vescaShieldAbsorbedThisTurn}×{ctx.vescaShieldReflectRate:F1} = {reflect} ダメージ");
@@ -1465,7 +1464,6 @@ namespace CombatSystem
                     ctx.accumulatedValues.Remove(GameLoop.Consumables.OldLetterGuardKey);
                 }
 
-                takenDmg = takenDmg;
                 // 整備パネル〈装甲〉r10〈不動〉: 1 回の攻撃で受けるダメージは最大 HP の 35% まで (2026-11-10)
                 { int cap = MetaProgression.MetaBuffApplicator.GetArmorHitCap(playerMaxHP); if (cap > 0 && takenDmg > cap) takenDmg = cap; }
                 takenDmg = ItemSystem.PassiveSkills.Effects.HarmlessLamp.Apply(ctx, takenDmg);   // 〈無害灯〉【規則】: 臨界で被ダメージを半減 (1 ターン 1 回)
@@ -1623,7 +1621,6 @@ namespace CombatSystem
                     //   〈守り〉の価値が 2 体戦でだけ半減してしまう。
                     secTaken = ApplyRoleGuard(ctx, secTaken, roleOutcome);
 
-                    secTaken = secTaken;
                     { int cap = MetaProgression.MetaBuffApplicator.GetArmorHitCap(playerMaxHP); if (cap > 0 && secTaken > cap) secTaken = cap; }   // 〈装甲〉r10〈不動〉
                     secTaken = ItemSystem.PassiveSkills.Effects.HarmlessLamp.Apply(ctx, secTaken);   // 〈無害灯〉 (1 体目で使っていれば何もしない)
 
