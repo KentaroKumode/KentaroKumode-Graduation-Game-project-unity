@@ -111,7 +111,7 @@ namespace UI.Lcd
                 // 0→0.5→1 で 0→1→0 に動くピーク強度
                 float intensity = Mathf.Sin(p * Mathf.PI);
                 DrawScanlines(intensity);
-                if (!fired && p >= 0.5f) { fired = true; try { onMidpoint?.Invoke(); } catch { } }
+                if (!fired && p >= 0.5f) { fired = true; try { onMidpoint?.Invoke(); } catch (System.Exception e) { Debug.LogException(e); } }   // 2026-11-27: 例外を黙って捨てない (遷移先の初期化の失敗を残す)
                 yield return null;
             }
             HideImmediate();
