@@ -251,7 +251,14 @@ namespace ItemSystem.PassiveSkills.Keywords
         {
             if (ctx == null || dmg <= 0) return;
             if (ctx.GetAccumulated(ResolvingKey) > 0) Add(ctx, PendingEnemyDamageKey, dmg);
-            else ctx.enemyCurrentHP = System.Math.Max(0, ctx.enemyCurrentHP - CombatSystem.BossDown.ApplyTakenNow(MetaProgression.MetaDebuffApplicator.ApplyOutgoingCut(ApplyFinalDamage(ctx, dmg))));   // 預けた分は HpLossDiag.Lose で掛かる (最終与ダメージ倍率・ボスのダウンの ×1.5 も)
+            else
+            {
+                // 預けた分は HpLossDiag.Lose で掛かる (最終与ダメージ倍率・ボスのダウンの ×1.5 も)
+                int before = ctx.enemyCurrentHP;
+                int after = System.Math.Max(0, before - CombatSystem.BossDown.ApplyTakenNow(MetaProgression.MetaDebuffApplicator.ApplyOutgoingCut(ApplyFinalDamage(ctx, dmg))));
+                // ヴェスカの踏みとどまり (2026-11-27・監査で見つけた漏れ): 解決中の口 (CombatManager) と同じく、 まだ通っていない閾値を跨がせない。 回復はさせない
+                ctx.enemyCurrentHP = System.Math.Min(before, Effects.DivineTalent.ClampToThreshold(ctx, after, ctx.enemyMaxHP));
+            }
         }
 
         /// <summary>最終与ダメージ倍率 (2026-11-20・GAME.md §23-32)。 すべての倍率の後・敵の軽減パッシブと防御の前に掛ける (切り捨て)。

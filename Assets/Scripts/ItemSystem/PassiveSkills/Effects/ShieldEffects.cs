@@ -1,4 +1,4 @@
-using CombatSystem;
+﻿using CombatSystem;
 using ItemSystem.PassiveSkills.Keywords;
 
 namespace ItemSystem.PassiveSkills.Effects
@@ -142,7 +142,7 @@ namespace ItemSystem.PassiveSkills.Effects
             => ctx.shieldKeepBonusPct = Shd.JustGuardNow(ctx) || Psn.Shutout(ctx) ? KeepBonus : 0;   // 次のターンの頭の減衰 (BeginNewTurn) が読む
     }
 
-    /// <summary>割れ盾の仕返し: シールドで敵の攻撃を吸収するたび、 吸収した量の 100% の軽減不可ダメージを敵へ返す (2026-11-27 反射強化)。
+    /// <summary>割れ盾の仕返し: シールドで敵のダメージを吸収するたび、 吸収した量の 100% の軽減不可ダメージを敵へ返す (2026-11-27 反射強化)。
     /// さらにシールドが割られて 0 になったとき、 割られる直前のシールド量の軽減不可ダメージを敵へ返し、 次のターンの与ダメージ +35% (与ダメ % の池)。</summary>
     public class BrokenShieldGrudge : IPassiveSkillEffect, IRelicDisplay
     {
@@ -327,7 +327,7 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>二拍目の心臓: 戦闘中初めて HP が 50% 以下になった瞬間、 最大 HP の 30% (切り上げ) のシールドを得て、 以後この戦闘のシールドの獲得量 ×1.5 (ctx.shieldGainPct += 50・1 戦闘 1 回)。
-    /// さらに発動後、 シールドで敵の攻撃を吸収するたび、 吸収した量の 100% の軽減不可ダメージを敵へ返す (2026-11-27 反射追加)。</summary>
+    /// さらに発動後、 シールドで敵のダメージを吸収するたび、 吸収した量の 100% の軽減不可ダメージを敵へ返す (2026-11-27 反射追加)。</summary>
     public class SecondBeatHeart : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => "二拍目の心臓";

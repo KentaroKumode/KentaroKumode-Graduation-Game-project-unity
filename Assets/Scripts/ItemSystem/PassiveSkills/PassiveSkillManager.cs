@@ -225,6 +225,7 @@ namespace ItemSystem.PassiveSkills
         public void BeginCombat(int playerMaxHP, int enemyMaxHP = 0, int playerDiceMax = 6, int enemyDiceMax = 6, int enemyThreat = 0)
         {
             context = new CombatContext(playerMaxHP, enemyMaxHP, enemyThreat);
+            _perspectiveSwapped = false;   // 2026-11-27: 前の戦闘が EndCombat を通らずに切られても、 入れ替えの印を持ち越さない (docs/perspective-swap-removal-approval.md の 3)
             // 〈一点読みの片眼〉の代価の印 (戦闘の情報を作った直後・品の OnBattleStart より前)
             Effects.PinpointEye.ApplyCost(context, GameLoop.GameManager.Instance?.Run);
 
@@ -290,29 +291,33 @@ namespace ItemSystem.PassiveSkills
 
             int ledgerHpBefore = context.enemyCurrentHP;   // [計装 2026-11-10] 敵自身の効果による敵 HP の増減
 
-            // 敵視点に反転
+            // 敵視点に反転 (2026-11-27: 往復を try/finally で囲む・ループの外で例外が出ても反転を残さない)
             SwapPerspective();
-
-            // ボスのダウン (2026-11-13): 「ダウン中は発動しない」を名乗ったパッシブだけを、 ダウンのターンに鳴らさない (一覧は BossDownPassives・いまは空)
-            bool down = CombatSystem.BossDown.ActiveNow;
-            for (int i = 0; i < skills.Count; i++)
+            try
             {
-                if (down && CombatSystem.BossDownPassives.SkipsDuringDown(skills[i].SkillId)) continue;
-                try
+                // ボスのダウン (2026-11-13): 「ダウン中は発動しない」を名乗ったパッシブだけを、 ダウンのターンに鳴らさない (一覧は BossDownPassives・いまは空)
+                bool down = CombatSystem.BossDown.ActiveNow;
+                for (int i = 0; i < skills.Count; i++)
                 {
-                    CombatContext.CurrentSkillId = skills[i].SkillId;
-                    skills[i].Execute(trigger, context);
-                    CombatContext.CurrentSkillId = "";
-                    triggeredEnemySkills.Add(skills[i].SkillId);
-                }
-                catch (System.Exception e)
-                {
-                    Debug.LogError($"[PassiveSkillManager] Error in enemy skill '{skills[i].SkillId}': {e.Message}");
+                    if (down && CombatSystem.BossDownPassives.SkipsDuringDown(skills[i].SkillId)) continue;
+                    try
+                    {
+                        CombatContext.CurrentSkillId = skills[i].SkillId;
+                        skills[i].Execute(trigger, context);
+                        CombatContext.CurrentSkillId = "";
+                        triggeredEnemySkills.Add(skills[i].SkillId);
+                    }
+                    catch (System.Exception e)
+                    {
+                        Debug.LogError($"[PassiveSkillManager] Error in enemy skill '{skills[i].SkillId}': {e.Message}");
+                    }
                 }
             }
-
-            // プレイヤー視点に戻す
-            SwapPerspective();
+            finally
+            {
+                // プレイヤー視点に戻す
+                SwapPerspective();
+            }
             CombatSystem.EnemyHpLedger.NoteEnemyTriggerDelta(context.enemyCurrentHP - ledgerHpBefore);
         }
 
