@@ -456,10 +456,7 @@ namespace ItemSystem.PassiveSkills
         /// <see cref="CombatManager.ApplyLossDamageModifiers"/> 内にあるシールド吸収を
         /// 経路ごと飛ばしていたため、 盾を厚く積む意味が「通常攻撃にだけある」状態になっていた。</para>
         ///
-        /// <para><b>敵視点でのみ呼ぶこと。</b> <c>PassiveSkillManager.SwapPerspective</c> は HP/ダイス/勝敗を
-        /// 入れ替えるが <see cref="consShield"/> は入れ替えない。 したがって敵スキルの中では
-        /// <c>enemyCurrentHP</c> = プレイヤーHP、 <c>consShield</c> = プレイヤーのシールドになり、
-        /// この組み合わせだけが正しい。 プレイヤー側スキルから呼ぶと自分の盾を削る。</para>
+        /// <para><b>敵のパッシブから呼ぶ。</b> プレイヤーの HP (<see cref="playerCurrentHP"/>) とプレイヤーのシールド (<see cref="consShield"/>) を減らす (2026-11-27〜 視点の入れ替えは廃止)。</para>
         ///
         /// <param name="cause">被ダメ内訳と死因タグへ計上する分類。 <c>null</c> なら計上しない
         ///   (従来から計上していなかったスキルの挙動を保つため)。</param>
@@ -500,11 +497,7 @@ namespace ItemSystem.PassiveSkills
             }
 
             dbgChipToHp += dmg;
-            // [移行中 2026-11-27] 書き換え前の敵のパッシブ (敵視点に入れ替わっている) は enemyCurrentHP = プレイヤー。 書き換え済み (IExplicitPerspective) は名前どおり playerCurrentHP
-            bool swapped = PassiveSkillManager.Instance != null && ReferenceEquals(PassiveSkillManager.Instance.Context, this) && PassiveSkillManager.Instance.PerspectiveSwappedNow;
-            int hpAfter;
-            if (swapped) hpAfter = enemyCurrentHP = System.Math.Max(0, enemyCurrentHP - dmg);
-            else hpAfter = playerCurrentHP = System.Math.Max(0, playerCurrentHP - dmg);
+            int hpAfter = playerCurrentHP = System.Math.Max(0, playerCurrentHP - dmg);
             if (cause.HasValue)
             {
                 AddPlayerDamageSource(cause.Value, dmg);

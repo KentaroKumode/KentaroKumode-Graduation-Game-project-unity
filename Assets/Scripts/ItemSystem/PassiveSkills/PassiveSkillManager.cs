@@ -225,7 +225,6 @@ namespace ItemSystem.PassiveSkills
         public void BeginCombat(int playerMaxHP, int enemyMaxHP = 0, int playerDiceMax = 6, int enemyDiceMax = 6, int enemyThreat = 0)
         {
             context = new CombatContext(playerMaxHP, enemyMaxHP, enemyThreat);
-            _perspectiveSwapped = false;   // 2026-11-27: 前の戦闘が EndCombat を通らずに切られても、 入れ替えの印を持ち越さない (docs/perspective-swap-removal-approval.md の 3)
             // 〈一点読みの片眼〉の代価の印 (戦闘の情報を作った直後・品の OnBattleStart より前)
             Effects.PinpointEye.ApplyCost(context, GameLoop.GameManager.Instance?.Run);
 
@@ -279,8 +278,7 @@ namespace ItemSystem.PassiveSkills
 
         /// <summary>
         /// 敵スキルのトリガー発火
-        /// 敵視点での実行: context の playerWonRoll/playerLostRoll を
-        /// 反転して実行し、元に戻す
+        /// 2026-11-27〜 視点は入れ替えない (欄は名前どおり)
         /// </summary>
         public void FireEnemyTrigger(PassiveSkillTrigger trigger)
         {
@@ -291,90 +289,33 @@ namespace ItemSystem.PassiveSkills
 
             int ledgerHpBefore = context.enemyCurrentHP;   // [計装 2026-11-10] 敵自身の効果による敵 HP の増減
 
-            // 敵視点に反転 (2026-11-27: 往復を try/finally で囲む・ループの外で例外が出ても反転を残さない)
-            SwapPerspective();
-            try
+            // 2026-11-27: 視点の入れ替え (SwapPerspective) は廃止。 敵のパッシブは欄を名前どおりの意味で読み書きする
+            //   (player* = プレイヤー・enemy* = 敵自身・docs/perspective-swap-removal-approval.md)
+            // ボスのダウン (2026-11-13): 「ダウン中は発動しない」を名乗ったパッシブだけを、 ダウンのターンに鳴らさない (一覧は BossDownPassives・いまは空)
+            bool down = CombatSystem.BossDown.ActiveNow;
+            for (int i = 0; i < skills.Count; i++)
             {
-                // ボスのダウン (2026-11-13): 「ダウン中は発動しない」を名乗ったパッシブだけを、 ダウンのターンに鳴らさない (一覧は BossDownPassives・いまは空)
-                bool down = CombatSystem.BossDown.ActiveNow;
-                for (int i = 0; i < skills.Count; i++)
+                if (down && CombatSystem.BossDownPassives.SkipsDuringDown(skills[i].SkillId)) continue;
+                try
                 {
-                    if (down && CombatSystem.BossDownPassives.SkipsDuringDown(skills[i].SkillId)) continue;
-                    // [移行中 2026-11-27] 書き換え済み (IExplicitPerspective) の物は入れ替えずに実行する
-                    bool explicitView = skills[i] is IExplicitPerspective;
-                    if (explicitView) SwapPerspective();
-                    try
-                    {
-                        CombatContext.CurrentSkillId = skills[i].SkillId;
-                        skills[i].Execute(trigger, context);
-                        CombatContext.CurrentSkillId = "";
-                        triggeredEnemySkills.Add(skills[i].SkillId);
-                        string fk = skills[i].SkillId + "|" + trigger;   // [計装 2026-11-27] 入れ替えの廃止の網羅の見張り
-                        EnemySkillFires[fk] = EnemySkillFires.TryGetValue(fk, out long fc) ? fc + 1 : 1;
-                    }
-                    catch (System.Exception e)
-                    {
-                        Debug.LogError($"[PassiveSkillManager] Error in enemy skill '{skills[i].SkillId}': {e.Message}");
-                    }
-                    finally
-                    {
-                        if (explicitView) SwapPerspective();   // 次の (まだ書き換えていない) 物のために敵視点へ戻す
-                    }
+                    CombatContext.CurrentSkillId = skills[i].SkillId;
+                    skills[i].Execute(trigger, context);
+                    CombatContext.CurrentSkillId = "";
+                    triggeredEnemySkills.Add(skills[i].SkillId);
+                    string fk = skills[i].SkillId + "|" + trigger;   // [計装 2026-11-27] 敵のパッシブが鳴った回数
+                    EnemySkillFires[fk] = EnemySkillFires.TryGetValue(fk, out long fc) ? fc + 1 : 1;
                 }
-            }
-            finally
-            {
-                // プレイヤー視点に戻す
-                SwapPerspective();
+                catch (System.Exception e)
+                {
+                    Debug.LogError($"[PassiveSkillManager] Error in enemy skill '{skills[i].SkillId}': {e.Message}");
+                }
             }
             CombatSystem.EnemyHpLedger.NoteEnemyTriggerDelta(context.enemyCurrentHP - ledgerHpBefore);
         }
 
-        private bool _perspectiveSwapped;
-
-        /// <summary>[移行中 2026-11-27] いま敵視点に入れ替わっているか (<see cref="CombatContext.EnemyDealUnmitigable"/> が、 書き換え済みかどうかで書く欄を選ぶ)。
-        /// 入れ替えを消す時に一緒に消す。</summary>
-        public bool PerspectiveSwappedNow => _perspectiveSwapped;
-
         /// <summary>[計装 2026-11-27] 敵のパッシブが鳴った回数 (「品の id|トリガー」ごと・バッチ累計・結果を変えない)。
         /// 視点の入れ替えの廃止 (docs/perspective-swap-removal-approval.md) で、 書き換えたクラスが検証の中で十分に通ったかを見る。</summary>
         public static readonly Dictionary<string, long> EnemySkillFires = new Dictionary<string, long>();
-
-        /// <summary>
-        /// プレイヤー/敵の視点を入れ替える
-        /// </summary>
-        private void SwapPerspective()
-        {
-            if (context == null) return;
-            _perspectiveSwapped = !_perspectiveSwapped;
-
-            // HP入れ替え
-            int tmpHP = context.playerCurrentHP;
-            int tmpMaxHP = context.playerMaxHP;
-            context.playerCurrentHP = context.enemyCurrentHP;
-            context.playerMaxHP = context.enemyMaxHP;
-            context.enemyCurrentHP = tmpHP;
-            context.enemyMaxHP = tmpMaxHP;
-
-            // ダイス入れ替え
-            var tmpDice = context.playerDice;
-            context.playerDice = context.enemyDice;
-            context.enemyDice = tmpDice;
-
-            int tmpTotal = context.playerDiceTotal;
-            context.playerDiceTotal = context.enemyDiceTotal;
-            context.enemyDiceTotal = tmpTotal;
-
-            // 固定ダメージ入れ替え
-            int tmpFixed = context.fixedDamageToEnemy;
-            context.fixedDamageToEnemy = context.fixedDamageToPlayer;
-            context.fixedDamageToPlayer = tmpFixed;
-
-            // 勝敗反転
-            bool tmpWon = context.playerWonRoll;
-            context.playerWonRoll = context.playerLostRoll;
-            context.playerLostRoll = tmpWon;
-        }
 
         /// <summary>
         /// 新しいターンを開始
@@ -399,7 +340,6 @@ namespace ItemSystem.PassiveSkills
         {
             FireTrigger(PassiveSkillTrigger.OnBattleEnd);
             ClearEnemySkills();
-            _perspectiveSwapped = false;
             context = null;
             Debug.Log("[PassiveSkillManager] Combat ended.");
         }
@@ -473,8 +413,6 @@ namespace ItemSystem.PassiveSkills
             _kwDepth++;
             if (_kwDepth > ChainMaxDepth) { ChainMaxDepth = _kwDepth; ChainDeepestPath = string.Join(" → ", _kwPath) + " → " + trigger + "(" + amount + ")"; }
             float prevAmount = context.GetAccumulated(Keywords.Kw.AmountKey);
-            bool wasSwapped = _perspectiveSwapped;
-            if (wasSwapped) SwapPerspective();
             try
             {
                 // 実行中にリストが増減しても壊れないよう写しを回す
@@ -503,7 +441,6 @@ namespace ItemSystem.PassiveSkills
             }
             finally
             {
-                if (wasSwapped) SwapPerspective();
                 context.accumulatedValues[Keywords.Kw.AmountKey] = prevAmount;
                 _kwDepth--;
             }

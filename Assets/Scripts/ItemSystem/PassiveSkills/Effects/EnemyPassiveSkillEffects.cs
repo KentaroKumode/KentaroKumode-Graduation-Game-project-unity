@@ -73,7 +73,7 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>不死者 — 毎ターン開始時、HP1回復</summary>
-    public class Undying : IPassiveSkillEffect, IExplicitPerspective
+    public class Undying : IPassiveSkillEffect
     {
         public string SkillId => "Undying";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
@@ -85,7 +85,7 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>疾駆 — 1 ターン目、 攻撃 +2 (敵視点の playerDiceTotal = 敵の攻撃値に入る出目の合計)</summary>
-    public class Sprint : IPassiveSkillEffect, IExplicitPerspective
+    public class Sprint : IPassiveSkillEffect
     {
         public string SkillId => "Sprint";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll };
@@ -106,7 +106,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// プレイヤーの攻撃の計算では鳴らないので、 プレイヤー側へは漏れない。 〈闇技〉(EliteDarkKnight) も同じ。</para>
     /// <para>旧実装は敵の攻撃の前 (playerWonRoll がプレイヤー攻撃用のまま) に鳴り、 条件が立っても直後の
     /// <c>ProcessDamage(lossBase, …)</c> が finalDamage を上書きしていた。</para></summary>
-    public class BruteForce : IPassiveSkillEffect, IExplicitPerspective
+    public class BruteForce : IPassiveSkillEffect
     {
         public string SkillId => "BruteForce";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
@@ -195,7 +195,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// CombatManager.Turn.cs が収支トリガーの後に ctx の HP を拾う (SyncHPFromContext)。 〈地獄の業火〉〈重甲〉の反射も同じ。</para>
     /// <para>旧実装は fixedDamageToEnemy (スワップ後の fixedDamageToPlayer) に積んでいたが、 その枠を読むのは敵攻撃の
     /// 解決中だけで、 読まれないまま次の BeginNewTurn で 0 に戻っていた。</para></summary>
-    public class TailStrike : IPassiveSkillEffect, IExplicitPerspective
+    public class TailStrike : IPassiveSkillEffect
     {
         public const int Damage = 1;
         public string SkillId => "TailStrike";
@@ -213,7 +213,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 敵視点の playerDiceTotal (= この敵の出目の合計 → Escalation.EnemyAttackValue) に足す。 予告にもそのまま出る。</para>
     /// <para>旧実装は共有バフ <c>nextTurnBuffs["diceBonus"]</c> に書いており、 次ターンの RecomputeDiceTotals が
     /// <b>プレイヤーの</b> playerDiceTotal に足していた (向きが逆)。</para></summary>
-    public class Rampage : IPassiveSkillEffect, IExplicitPerspective
+    public class Rampage : IPassiveSkillEffect
     {
         public const int Bonus = 3;
         /// <summary>nextTurnBuffs の専用キー (書くのはこのクラスだけ。 BOT の先読みが読む)。</summary>
@@ -239,7 +239,7 @@ namespace ItemSystem.PassiveSkills.Effects
 
     /// <summary>虚体 — 受ける攻撃のダメージを 50% 軽減 (主攻撃だけ。 固定ダメ・出血・毒には効かない)。
     /// 敵の OnPreReceiveDamage は CombatManager.Damage.cs の主攻撃の確定で鳴る。</summary>
-    public class Ethereal : IPassiveSkillEffect, IExplicitPerspective
+    public class Ethereal : IPassiveSkillEffect
     {
         public string SkillId => "Ethereal";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreReceiveDamage };
@@ -286,7 +286,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 専用キーで nextTurnBuffs に積み、 次ターンの敵の OnPreDealDamage (敵の攻撃の ProcessDamage の中) で読む。</para>
     /// <para>旧実装は共有バフ <c>nextTurnBuffs["damageBonus"]</c> に書いており、 次ターンの ProcessDamage が
     /// <b>プレイヤーの主攻撃にも</b>敵の攻撃 (2 経路) にも +3 していた (漏れ)。</para></summary>
-    public class CounterStance : IPassiveSkillEffect, IExplicitPerspective
+    public class CounterStance : IPassiveSkillEffect
     {
         public const int Bonus = 3;
         /// <summary>nextTurnBuffs の専用キー (書くのはこのクラスだけ。 BOT の先読みが読む)。</summary>
@@ -320,7 +320,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 旧実装の OnRollWin は「敵が与ダメするターン」の代わりとして使っていたもの (旧ロール勝負では勝った側だけがダメージを与えた)。</para>
     /// <para>旧実装は収支トリガー (ターン解決の後) で currentBuffs["damageBonus"] に書いており、 次の BeginNewTurn の
     /// currentBuffs.Clear() で捨てられていた。 書けていてもプレイヤーの主攻撃へ漏れるキーだった。</para></summary>
-    public class HoningDuel : IPassiveSkillEffect, IExplicitPerspective
+    public class HoningDuel : IPassiveSkillEffect
     {
         public string SkillId => "HoningDuel";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
@@ -339,7 +339,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// (スポーン時に倍率を掛ける精鋭化は 2026-09-20 に廃止・GAME.md §24)。
     /// 敵視点で playerDiceTotal = 敵の攻撃値に入る出目の合計。
     /// T1-2:+0 / T3-5:+1 / T6-8:+2 / T9-11:+3 …</summary>
-    public class EliteVigor : IPassiveSkillEffect, IExplicitPerspective
+    public class EliteVigor : IPassiveSkillEffect
     {
         public string SkillId => "EliteVigor";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnBattleStart };
@@ -367,7 +367,7 @@ namespace ItemSystem.PassiveSkills.Effects
 
     /// <summary>精鋭13番目の死 — 死の重圧: 13番目の宣告が灯ったターン中、
     /// 自ダイス合計+13（宣告フラグ decree13th_armed が立つターンのみ）。</summary>
-    public class EliteDecree13 : IPassiveSkillEffect, IExplicitPerspective
+    public class EliteDecree13 : IPassiveSkillEffect
     {
         public string SkillId => "EliteDecree13";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll };
@@ -383,7 +383,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 旧: 被弾時さらに −2 軽減。
     /// <para>反射 (2026-11-11 #104 で修正): 〈尾撃〉と同じく、 プレイヤーの収支プラスのターン (敵視点 OnRollLose・解決の後) に
     /// その場で <see cref="Reflect"/> の軽減無視ダメージ (シールドは肩代わりする)。 旧実装は fixedDamageToEnemy に積んで読まれずに消えていた。</para></summary>
-    public class EliteLizard : IPassiveSkillEffect, IExplicitPerspective
+    public class EliteLizard : IPassiveSkillEffect
     {
         public const int Defense = 4;
         public const int Reflect = 1;
@@ -399,7 +399,7 @@ namespace ItemSystem.PassiveSkills.Effects
 
     /// <summary>精鋭レイス — 霊体: 2ターンに1度（偶数ターン）「霊体状態」となり、
     /// すべての被ダメージを1に減少。霊体でないターンはダイス数+1。</summary>
-    public class EliteWraith : IPassiveSkillEffect, IExplicitPerspective
+    public class EliteWraith : IPassiveSkillEffect
     {
         public string SkillId => "EliteWraith";
         public PassiveSkillTrigger[] Triggers => new[] {
@@ -422,7 +422,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// <summary>精鋭ストーンゴーレム — 巌の意志: 毎ターン意志スタック+1。
     /// 撃破された瞬間、スタック分の確定ダメージをプレイヤーへ。
     /// （硬鱗との二重軽減・×2反撃が過剰だったため緩和。精鋭勝率を25%域へ）。</summary>
-    public class EliteGolem : IPassiveSkillEffect, IExplicitPerspective
+    public class EliteGolem : IPassiveSkillEffect
     {
         public string SkillId => "EliteGolem";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
@@ -443,7 +443,7 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>精鋭ミノタウロス — 際限なき暴走: 毎ターン 攻撃 +1 (敵視点の playerDiceTotal へ・既に強い→控えめ)</summary>
-    public class EliteMinotaur : IPassiveSkillEffect, IExplicitPerspective
+    public class EliteMinotaur : IPassiveSkillEffect
     {
         public string SkillId => "EliteMinotaur";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll };
@@ -452,7 +452,7 @@ namespace ItemSystem.PassiveSkills.Effects
 
     /// <summary>精鋭ダークナイト — 闇技: 勝利時、与ダメ+2（4Fへ降格に伴いナーフ）
     /// <para>2026-11-11 #104 で修正: 〈剛力〉と同じ (この敵の攻撃が通る計算の中で敵の OnPreDealDamage が鳴り、 ダメージ +2)。</para></summary>
-    public class EliteDarkKnight : IPassiveSkillEffect, IExplicitPerspective
+    public class EliteDarkKnight : IPassiveSkillEffect
     {
         public string SkillId => "EliteDarkKnight";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
@@ -481,7 +481,7 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>再生 — 毎ターン開始時、HP1回復</summary>
-    public class Regeneration : IPassiveSkillEffect, IExplicitPerspective
+    public class Regeneration : IPassiveSkillEffect
     {
         // キメラを 6F→4F に降格した際に +2→+1 へ控えめ化（現在唯一の利用元）。
         public string SkillId => "Regeneration";
@@ -510,7 +510,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// <summary>地獄の業火 — ロール勝利時、追加で2の固定ダメージ
     /// <para>2026-11-11 #104 で修正: 〈尾撃〉と同じ形で、 プレイヤーの収支マイナスのターン (敵視点 OnRollWin・解決の後) に
     /// その場で <see cref="Damage"/> の軽減無視ダメージ (シールドは肩代わりする)。 旧実装は fixedDamageToEnemy に積んで読まれずに消えていた。</para></summary>
-    public class Hellfire : IPassiveSkillEffect, IExplicitPerspective
+    public class Hellfire : IPassiveSkillEffect
     {
         public const int Damage = 2;
         public string SkillId => "Hellfire";
@@ -527,7 +527,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// ctx の HP を CombatManager の値へ揃え、 <c>ctx.finalDamage</c> に<b>この攻撃で実際に通った主攻撃のダメージ</b>
     /// (ブロック・シールド等の後) を入れてから鳴らし、 鳴らした後に ctx の HP を拾う (SyncHPFromContext)。</para>
     /// <para>旧実装は回復を ctx の HP にだけ書き、 同じターンのうちに <c>ctx.enemyCurrentHP = enemyHP</c> で上書きされて消えていた。</para></summary>
-    public class Lifesteal : IPassiveSkillEffect, IExplicitPerspective
+    public class Lifesteal : IPassiveSkillEffect
     {
         public string SkillId => "Lifesteal";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage };
@@ -560,7 +560,7 @@ namespace ItemSystem.PassiveSkills.Effects
 
     /// <summary>死の宣告 — 10ターン以内に倒さなければ、 11 ターン目に即死攻撃（999ダメージ）。
     /// 清算は敵攻撃の固定ダメ枠と、 FinishTurnCommon の「fixedDamageToPlayer ≥ 999 → HP 0」の 2 か所。</summary>
-    public class DeathSentence : IPassiveSkillEffect, IExplicitPerspective
+    public class DeathSentence : IPassiveSkillEffect
     {
         public string SkillId => "DeathSentence";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
@@ -684,7 +684,7 @@ namespace ItemSystem.PassiveSkills.Effects
     // ============================================================
 
     /// <summary>ゴブリン王 — 号令: 毎ターン、 攻撃 +N (N = BossParam.GoblinCall・基準 3)</summary>
-    public class GoblinKingsCall : IPassiveSkillEffect, IExplicitPerspective
+    public class GoblinKingsCall : IPassiveSkillEffect
     {
         public string SkillId => "GoblinKingsCall";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll };
@@ -698,7 +698,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// <summary>毒沼の主 — 毒の侵蝕: 毎ターン終了時に毒スタック+1（上限 BossParam.PoisonStackCap・基準4）、
     /// その後スタック分の固定ダメ（軽減無視）。長期戦ほど加速度的に蝕む。
     /// T1:1 T2:2 … T5:5 で頭打ち。累計はT5までで15＝速攻なら軽傷、長引けば致命。</summary>
-    public class MiasmaCorrosion : IPassiveSkillEffect, IExplicitPerspective
+    public class MiasmaCorrosion : IPassiveSkillEffect
     {
         public const string Id = "MiasmaCorrosion";
         public string SkillId => Id;
@@ -728,7 +728,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// <summary>鏡の双子 — 鏡映の応答: 与ダメ (主攻撃+固定) が閾値 = max(12, ボス最大HP の 4%) 未満だったターン、
     /// 次ターン開始時に min(反射上限, 閾値 − 与ダメ) を軽減無視で返す (反射上限 = BossParam.MirrorReflectCap・基準 9)。
     /// 閾値以上の一撃は反射 0 ＝ 小突きを罰し、 重い一撃で鏡を割る。</summary>
-    public class MirrorTwinsResponse : IPassiveSkillEffect, IExplicitPerspective
+    public class MirrorTwinsResponse : IPassiveSkillEffect
     {
         /// <summary>計装: 被弾イベント数 / そのうち反射が成立した数 / 反射の合計ダメージ。
         /// **閾値を勘で置き直さないため**に置いている ── 5% 版は 1 度も発火せず、
@@ -836,7 +836,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 累計 30 前後の**軽減不可**が確定し、 配線・ブロックで一切対処できないまま
     /// 5層勝率 45% / 主死因 Chip 98% の壁になっていた。 軽減不可の継続ダメは
     /// ADR-0009 の「被弾を効率よく受けるレース判断」(§6-2) を無効化するため、 総量を抑える。</summary>
-    public class JudgmentFlames : IPassiveSkillEffect, IExplicitPerspective
+    public class JudgmentFlames : IPassiveSkillEffect
     {
         public string SkillId => "JudgmentFlames";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
@@ -875,7 +875,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// スタックは戦闘通して保持 (accumulatedValues)。
     /// テレグラフ (MutualTurnTelegraph.blazeStacks / blazePenalizesBlock) で配線前に開示するので、
     /// 「知らないうちに焼かれる」にはならない。</summary>
-    public class BlazeBrand : IPassiveSkillEffect, IExplicitPerspective
+    public class BlazeBrand : IPassiveSkillEffect
     {
         /// <summary>パッシブの id (enemies.json の internalName)。 〈業火〉で烈炎を返す CombatManager も読む。</summary>
         public const string Id = "BlazeBrand";
@@ -958,7 +958,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 断罪ターンにボスがロール勝利すると、 ボス最終ダメージ ×8+8 の致命ダメ
     /// （軽減/シールド有効経路で適用）。 プレイヤーがロール勝利＝間一髪回避し、
     /// 鎧貫通の確定反撃18をボスへ。</summary>
-    public class JudgmentBlaze : IPassiveSkillEffect, IExplicitPerspective
+    public class JudgmentBlaze : IPassiveSkillEffect
     {
         public string SkillId => "JudgmentBlaze";
         public PassiveSkillTrigger[] Triggers => new[] {
@@ -1024,7 +1024,7 @@ namespace ItemSystem.PassiveSkills.Effects
 
     /// <summary>灰塵の鎧 — 被弾時、受けるダメージ-5。軽減後が10超なら10に丸める
     /// （通常打は「なんとか一撃」）。断罪ターンは鎧無効＝削りの本命窓。</summary>
-    public class AshArmor : IPassiveSkillEffect, IExplicitPerspective
+    public class AshArmor : IPassiveSkillEffect
     {
         public string SkillId => "AshArmor";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreReceiveDamage };
@@ -1077,7 +1077,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// enemyDiceTotalBonus へ積んだ量 (<see cref="KeyApplied"/>) との差だけを足し引きする (他のパッシブの寄与は消さない)。
     /// 旧実装は `+=` だけで戻す処理が無く、 予兆のたびに +8 が戦闘終了まで積み上がっていた。</para>
     /// 旧 JudgmentBlaze の即死一撃を「相互攻撃モデルで対応可能な予告火力」に転換。</summary>
-    public class EmberOmen : IPassiveSkillEffect, IExplicitPerspective
+    public class EmberOmen : IPassiveSkillEffect
     {
         /// <summary>前ターンに自分が enemyDiceTotalBonus へ積んだ量 (差分更新用)。 "ember_" 始まりなので形態の差し替えで消える。</summary>
         private const string KeyApplied = "ember_omen_applied";
@@ -1126,7 +1126,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// HP≤50% で回復完全停止 (Phase2: 「決着期」に突入 = プレイヤーの削り勝ちが可視化)。
     /// 予兆ターンは回復なし = 集中砲火で HP50% ラインを越える窓。
     /// 2026-11-14〜 (大技〈業火〉の形): 業火のターンと、 その 1 ターン前のチャージのターンは回復なし (作者の決定)。 旧い形 (ashKingHeavy=False) は予兆ターンだけ。</summary>
-    public class AshRegrowth : IPassiveSkillEffect, IExplicitPerspective
+    public class AshRegrowth : IPassiveSkillEffect
     {
         public const string SuppressedUntilTurnKey = "ash_regrowth_suppressed_until";
         public const int StaggerSuppressTurns = 2;
@@ -1162,7 +1162,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// EmberOmen (周期3Tに加速) + AshRegrowth (停止) と合わせて瞬発力勝負を強制。
     /// <para>2026-11-11 #104 で修正: 〈業火の予兆〉と同じ差分更新。 ターン頭の HP が 50% 以下のターンは +3、 50% を超えるターンは 0
     /// (回復して戻れば外れる)。 旧実装は HP≤50% のターンごとに `+=` して +3 が積み上がっていた。</para></summary>
-    public class EmberFury : IPassiveSkillEffect, IExplicitPerspective
+    public class EmberFury : IPassiveSkillEffect
     {
         /// <summary>前ターンに自分が enemyDiceTotalBonus へ積んだ量 (差分更新用)。 "ember_" 始まりなので形態の差し替えで消える。</summary>
         private const string KeyApplied = "ember_fury_applied";
@@ -1242,7 +1242,7 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>13番目の死神の宣告。即死級ではないが層を問わず事故率が固定で残る。</summary>
-    public class Decree13th : IPassiveSkillEffect, IExplicitPerspective
+    public class Decree13th : IPassiveSkillEffect
     {
         public string SkillId => "Decree13th";
         public PassiveSkillTrigger[] Triggers => new[]
@@ -1328,7 +1328,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// ctx の HP に書かれる。 CombatManager.Turn.cs が収支トリガーの直前に ctx の HP を CombatManager の値へ揃え、 直後に
     /// SyncHPFromContext で拾うようにしたので、 HP の増減が残る。 旧実装は直後の FinishTurnCommon の書き戻しで消えていた
     /// (シールドの肩代わり分・シールドへの 25・形態の遷移だけが残っていた)。</para></summary>
-    public class SaintGeorgesPhases : IPassiveSkillEffect, IExplicitPerspective
+    public class SaintGeorgesPhases : IPassiveSkillEffect
     {
         public string SkillId => "SaintGeorgesPhases";
         public PassiveSkillTrigger[] Triggers => new[] {

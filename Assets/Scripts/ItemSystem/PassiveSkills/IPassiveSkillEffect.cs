@@ -24,11 +24,6 @@ namespace ItemSystem.PassiveSkills
         void Execute(PassiveSkillTrigger trigger, CombatContext ctx);
     }
 
-    /// <summary>[2026-11-27・視点の入れ替えの廃止の移行中だけ] 敵のパッシブのうち、 欄を名前どおりの意味で読み書きするように書き換え済みの物の印。
-    /// <c>PassiveSkillManager.FireEnemyTrigger</c> は、 この印のある物を入れ替えずに実行する (docs/perspective-swap-removal-approval.md)。
-    /// 全部の敵のパッシブを書き換え終えたら、 入れ替えと一緒にこの印も消す。</summary>
-    public interface IExplicitPerspective { }
-
     /// <summary>ラン跨ぎで永続するインスタンス状態を持つスキル向け。
     /// GameManager.StartNewRun で各スキルの ResetRunState() が呼ばれる。</summary>
     public interface IRunResettable

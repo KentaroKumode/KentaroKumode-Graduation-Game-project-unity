@@ -261,11 +261,11 @@ fixedDamageToPlayer ≥ 999 → playerHP = 0（死の宣告）
 **被ダメを肩代わりするシールドは機能する**。
 
 適用の実体は `CombatContext.EnemyDealUnmitigable(dmg, cause)` ただ 1 箇所。
-敵パッシブはここを通し、`enemyCurrentHP` を直接引く書き方をしないこと。
+敵パッシブはここを通し、`playerCurrentHP` を直接引く書き方をしないこと。
 
-- **敵視点でのみ呼ぶ。** `PassiveSkillManager.SwapPerspective` は HP/ダイス/勝敗を入れ替えるが
-  `consShield` は入れ替えない。敵スキル内でだけ `enemyCurrentHP`=プレイヤーHP /
-  `consShield`=プレイヤーの盾 が揃う。プレイヤー側から呼ぶと自分の盾を削る。
+- **敵のパッシブから呼ぶ。** プレイヤーの HP (`playerCurrentHP`) とプレイヤーの盾 (`consShield`) を減らす。
+  2026-11-27 に視点の入れ替え (`SwapPerspective`) を廃止した。敵のパッシブも欄を名前どおりに読む
+  (`player*` = プレイヤー・`enemy*` = 敵自身・`docs/perspective-swap-removal-approval.md`)。
 - `cause` は被ダメ内訳と死因タグへの計上分類。`null` で計上しない。
 - 対照群スイッチ: `CombatContext.ShieldAbsorbsUnmitigable`（既定 true。false は計測専用）。
 

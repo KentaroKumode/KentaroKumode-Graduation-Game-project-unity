@@ -15,18 +15,7 @@ namespace ItemSystem.PassiveSkills.Effects
     ///     (DIVINE は 2026-08-16 に廃止 ── VescaRelicPool.CapForStage の doc を参照)
     /// </summary>
     /// <remarks>
-    /// **視点反転に注意。** これらは敵パッシブなので `PassiveSkillManager.FireEnemyTrigger` が
-    /// `SwapPerspective()` を掛けた状態で走る。 実行中の対応は:
-    ///
-    ///   ヴェスカ自身の HP  = `ctx.playerCurrentHP` / `ctx.playerMaxHP`
-    ///   プレイヤーの HP    = `ctx.enemyCurrentHP`  / `ctx.enemyMaxHP`
-    ///   ヴェスカが受ける固定ダメ = `ctx.fixedDamageToPlayer`
-    ///   プレイヤーへの固定ダメ   = `ctx.fixedDamageToEnemy`
-    ///   敵視点 OnRollWin = プレイヤーの収支マイナス / OnRollLose = プレイヤーの収支プラス
-    ///
-    /// 入れ替わるのは HP・ダイス・ダイス合計・固定ダメ・勝敗フラグの 5 組のみ。
-    /// `enemyBleedStacks` / `enemyStatusStacks` / `rinkaiMeter` / 充電 / `accumulatedValues` /
-    /// 本ファイルで足した vesca* フィールドは **反転しない**（名前どおりの意味のまま）。
+    /// 敵のパッシブは、 欄を名前どおりの意味で読み書きする (2026-11-27〜 視点の入れ替えは廃止): ヴェスカ自身の HP = `ctx.enemyCurrentHP` / `ctx.enemyMaxHP`・プレイヤーの HP = `ctx.playerCurrentHP` / `ctx.playerMaxHP`。
     /// </remarks>
     public sealed class VescaRelic
     {
@@ -228,7 +217,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// **形態変化直後の 1 ターン目は、その段で追加された等級から確定で選出する。**
     /// 引いた遺物の名前は予告 (<c>MutualTurnTelegraph.drawnRelics</c>) に載る。 ただし 2026-11-11 時点で
     /// 画面の側はこの欄を読んでいない (enemies.json の「予告に開示」はまだ表示されない)。</summary>
-    public class RelicScholar : IPassiveSkillEffect, IExplicitPerspective
+    public class RelicScholar : IPassiveSkillEffect
     {
         public const string Id = "RelicScholar";
         public string SkillId => Id;
@@ -460,7 +449,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// (ヴェスカ 2% / プレイヤー 2%) ため、 条件そのものが意味を失う。
     /// (守りへの罰は当時〈停滞する時間〉が担っていたが、 2026-11-12 #103 で〈停滞する時間〉は「引いた端子を確率で止める」に替わり、
     /// 配線を見る罰は無くなった。)</para></summary>
-    public class RiftHeldOpen : IPassiveSkillEffect, IExplicitPerspective
+    public class RiftHeldOpen : IPassiveSkillEffect
     {
         /// <summary>毎ターンヴェスカが失う「**最大** HP」の割合。</summary>
         public const float LossRate = 0.02f;
@@ -562,7 +551,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 予約方式: 敵パッシブ実行中は視点が反転しているため
     /// SwapEnemy を直接呼ばず `ctx.pendingEnemySwapId` に積み、 CombatManager が
     /// 敵トリガー完了後に処理する。</summary>
-    public class ContinuousExperiment : IPassiveSkillEffect, IExplicitPerspective
+    public class ContinuousExperiment : IPassiveSkillEffect
     {
         /// <summary>自段の HP が 0 になっていたら次段への差し替えを予約する。
         /// 敵視点 (swapped) なので <c>ctx.playerCurrentHP</c> がボス自身の HP。
@@ -602,7 +591,7 @@ namespace ItemSystem.PassiveSkills.Effects
     ///
     /// 踏みとどまりの側は `VescaRelicPool.HasDivineTalent()` で敵の passiveSkills を直接見る
     /// ── パッシブ同士の発火順に依存させないため。</summary>
-    public class DivineTalent : IPassiveSkillEffect, IExplicitPerspective
+    public class DivineTalent : IPassiveSkillEffect
     {
         /// <summary>この割合を **初めて割った** 次のターンに 2 枚引く。 降順で持つこと。
         ///
