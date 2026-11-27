@@ -76,30 +76,30 @@ namespace MetaProgression
 
         static ChallengeCards()
         {
-            // ── 表 (純デバフ) 16 種。 Tier II・III は 2026-11-23 に neon answer20 表 A の値へ (Tier I は仕様書 §2 のまま) ──
-            K(EnemyAtk, false, Family.Attack, null, T(null, null, 55));                     // 猛攻: 敵の攻撃 +N%
-            K(Heavy, false, Family.Attack, null, T(0.4f, 1.0f, 1.8f));                      // 致命的な一撃: 大技の倍率 +N
-            K(Twin, false, Family.Attack, null, T(null, 70, 120));                          // 連撃: 敵の攻撃が 2 回・2 回目は N%
-            K(Opener, false, Family.Attack, null, T(null, 130, 240));                       // 先手必殺: ボスの各形態の 1 ターン目 敵の攻撃 +N%
-            K(EnemyHp, false, Family.Durability, null, T(20, 45, 75));                      // 厚い皮: 敵の最大 HP +N%
-            K(Steel, false, Family.Durability, null, T(1, 1, null), T(0, 35, null));        // 鋼の皮膚: 致命傷を HP1 で耐える / v2 = ボスの最大 HP +N%
-            K(Regen, false, Family.Durability, null, T(null, 4, 8));                        // 再生: 敵が毎ターン最大 HP の N% を回復
-            K(Ukemi, false, Family.Durability, null, T(null, 1.65f, 1.45f), T(null, 10, 30)); // 受身: ダウン中の被ダメ倍率 (2026-11-26: 基本が ×1.5 → ×2.0 になったので 1.25 / 1.10 を同じ比で 1.65 / 1.45 へ) / v2 = 目盛りの間隔 +N%
-            K(Deadline, false, Family.Hand, null, T(1, 2, 3), T(0, 0, 1));                  // 刻限: 段の到達を N ターン早める / v2 = 1 ならボス戦は毎ターン進む
-            K(HeavyDice, false, Family.Hand, null, T(1, 3, 5));                             // 重い賽: 振り直しの充電の費用 +N (無料は除く)
-            K(Clog, false, Family.Hand, null, T(1, 1, 2), T(1, 3, 3));                      // 目詰まり: 各戦闘の最初の v2 ターン、 手札の端子 N 枚が止まる
-            K(Heal, false, Family.Hand, null, T(25, 55, 80));                               // 深い傷: 回復 −N% (層の入口の全回復も)
-            K(Price, false, Family.Economy, null, T(15, 40, 75));                           // 暴騰: 店の品物の値段 +N%
-            K(Money, false, Family.Economy, null, T(20, 50, null));                         // 通行料: 層を移るたび所持金の N% を失う
-            K(Lowball, false, Family.Economy, null, T(30, 60, null));                       // 買い叩き: 秘宝の見送り換金の額 −N%
-            K(Bag, false, Family.Economy, null, T(2, 2, 1), T(0, 3, 2));                    // 浅い鞄: 1 戦闘で使える消耗品 N 個まで / v2 = 持てる数 (0 = 制限なし)
+            // ── 表 (純デバフ) 16 種 (2026-11-27 挑戦レベル最終調整: 仕様書 §2 寄りへ微緩和し Lv9≈5% / Lv10≈2.5%・単調階段へ) ──
+            K(EnemyAtk, false, Family.Attack, null, T(null, null, 40));                     // 猛攻: 敵の攻撃 +N%
+            K(Heavy, false, Family.Attack, null, T(0.4f, 0.8f, 1.3f));                      // 致命的な一撃: 大技の倍率 +N
+            K(Twin, false, Family.Attack, null, T(null, 60, 100));                          // 連撃: 敵の攻撃が 2 回・2 回目は N%
+            K(Opener, false, Family.Attack, null, T(null, 100, 180));                       // 先手必殺: ボスの各形態の 1 ターン目 敵の攻撃 +N%
+            K(EnemyHp, false, Family.Durability, null, T(15, 35, 55));                      // 厚い皮: 敵の最大 HP +N%
+            K(Steel, false, Family.Durability, null, T(1, 1, null), T(0, 25, null));        // 鋼の皮膚: 致命傷を HP1 で耐える / v2 = ボスの最大 HP +N%
+            K(Regen, false, Family.Durability, null, T(null, 3, 5));                        // 再生: 敵が毎ターン最大 HP の N% を回復
+            K(Ukemi, false, Family.Durability, null, T(null, 1.65f, 1.45f), T(null, 10, 20)); // 受身: ダウン中の被ダメ倍率 / v2 = 目盛りの間隔 +N%
+            K(Deadline, false, Family.Hand, null, T(1, 2, 2), T(0, 0, 1));                  // 刻限: 段の到達を N ターン早める / v2 = 1 ならボス戦は毎ターン進む
+            K(HeavyDice, false, Family.Hand, null, T(1, 2, 4));                             // 重い賽: 振り直しの充電の費用 +N (無料は除く)
+            K(Clog, false, Family.Hand, null, T(1, 1, 2), T(1, 2, 2));                      // 目詰まり: 各戦闘の最初の v2 ターン、 手札の端子 N 枚が止まる
+            K(Heal, false, Family.Hand, null, T(20, 45, 65));                               // 深い傷: 回復 −N% (層の入口の全回復も)
+            K(Price, false, Family.Economy, null, T(15, 30, 50));                           // 暴騰: 店の品物の値段 +N%
+            K(Money, false, Family.Economy, null, T(20, 40, null));                         // 通行料: 層を移るたび所持金の N% を失う
+            K(Lowball, false, Family.Economy, null, T(30, 50, null));                       // 買い叩き: 秘宝の見送り換金の額 −N%
+            K(Bag, false, Family.Economy, null, T(2, 2, 1), T(0, 4, 3));                    // 浅い鞄: 1 戦闘で使える消耗品 N 個まで / v2 = 持てる数 (0 = 制限なし)
 
-            // ── 七つの大罪 (IV・仕様書 §4 の値のまま・未較正) ──
-            K(SinPride, false, Family.Hand, null, IV(80), IV(50));       // 傲慢 (2026-11-23: 60/25 → 80/50): 防御の端子に挿した出目 −N% / v2 = シールドの獲得 −N%
+            // ── 七つの大罪 (IV・2026-11-27 個別較正: 傲慢・憤怒・怠惰の端を揃える) ──
+            K(SinPride, false, Family.Hand, null, IV(80), IV(60));       // 傲慢: 防御の端子に挿した出目 −N% / v2 = シールドの獲得 −N%
             K(SinEnvy, false, Family.Attack, null, IV(80));              // 嫉妬: 残り HP の割合が敵より高い間、 敵の攻撃 +N%
-            K(SinGreed, false, Family.Economy, null, IV(1));             // 強欲: 受けた時、 所持金と消耗品をすべて失う + 5 層の店を使えない + 持っている秘宝 1 つにつき敵の攻撃 +N% (2026-11-23・answer20 で 2 → 1)
-            K(SinWrath, false, Family.Attack, null, IV(40), IV(120));    // 憤怒: ボスの各形態の 1 ターン目、 現在 HP −N% / v2 = そのターンの敵の攻撃 +N%
-            K(SinSloth, false, Family.Hand, null, IV(2), IV(2));         // 怠惰: 全部の出目 −N (下限 1) / v2 = 毎ターン、 手札の端子が止まる枚数 (2026-11-23・answer20 で 1 ターン目だけ → 毎ターン)
+            K(SinGreed, false, Family.Economy, null, IV(1));             // 強欲: 受けた時、 所持金と消耗品をすべて失う + 5 層の店を使えない + 持っている秘宝 1 つにつき敵の攻撃 +N%
+            K(SinWrath, false, Family.Attack, null, IV(35), IV(90));     // 憤怒: ボスの各形態の 1 ターン目、 現在 HP −N% / v2 = そのターンの敵の攻撃 +N%
+            K(SinSloth, false, Family.Hand, null, IV(2), IV(1));         // 怠惰: 全部の出目 −N (下限 1) / v2 = 毎ターン、 手札の端子が止まる枚数
             K(SinGluttony, false, Family.Durability, null, IV(100), IV(35));   // 暴食: 回復 −N% / v2 = 受けた時に最大 HP −N%
             K(SinLust, false, Family.Hand, null, IV(2));                 // 色欲: 1 ターンに挿せる出目は N 個まで + 秘宝の見送り換金ができない
 
@@ -133,15 +133,15 @@ namespace MetaProgression
         {
             new[] { 0, 0, 0, 0, 0 },
             new[] { 1, 0, 0, 0, 0 },
-            new[] { 1, 1, 0, 0, 0 },
-            new[] { 1, 1, 1, 1, 0 },      // Lv3 (2026-11-23・answer20: 旧 1, 1, 1, 0, 0)
-            new[] { 1, 1, 1, 1, 2 },      // Lv4 (2026-11-23・answer20: 旧 1, 1, 1, 2, 0)
-            new[] { 1, 1, 2, 2, 2 },
-            new[] { 1, 1, 2, 2, 3 },
-            new[] { 1, 1, 2, 3, 3 },      // Lv7 (2026-11-23・neon answer19: 旧 1, 2, 2, 3, 3)
-            new[] { 2, 2, 2, 3, 3 },
-            new[] { 2, 2, 3, 3, 3 },
-            new[] { 2, 2, 3, 3, SinTier },
+            new[] { 1, 1, 1, 0, 0 },      // Lv2 (2026-11-27: 旧 1,1,0,0,0 が Lv1 と差 0.3pp のみだったため 2→3 も I へ)
+            new[] { 1, 1, 1, 1, 1 },      // Lv3 (全5層 Tier I)
+            new[] { 1, 1, 1, 2, 2 },      // Lv4 (後半2層 Tier II)
+            new[] { 1, 1, 2, 2, 2 },      // Lv5
+            new[] { 1, 1, 2, 2, 3 },      // Lv6 (Tier III 解禁)
+            new[] { 1, 2, 2, 2, 3 },      // Lv7
+            new[] { 1, 2, 2, 3, 3 },      // Lv8
+            new[] { 2, 2, 3, 3, 3 },      // Lv9 (通常カード頂点)
+            new[] { 2, 2, 3, 3, SinTier },// Lv10 (4→5 に七つの大罪)
         };
 
         /// <summary>難易度 d の引き方: (場所, Tier) の並び。 各場所 1 回まで。</summary>
@@ -231,7 +231,7 @@ namespace MetaProgression
             bool hasLock = locked != null && locked.Count > 0;
             string main = hasLock && first ? MainLockedAxis(run) : null;
             var pool = new List<Card>(); var w = new List<int>();
-            void Collect(bool axisOnly)
+            void Collect(bool axisOnly, bool genericOnly)
             {
                 pool.Clear(); w.Clear();
                 foreach (var c in _all)
@@ -239,11 +239,13 @@ namespace MetaProgression
                     if (c.tier != tier || !c.isBuff || owned.Contains(c.kind) || c.kind == excludeKind) continue;
                     if (c.axis != null && hasLock && !locked.Contains(c.axis)) continue;   // 枠の外の軸 (死に札) は出さない
                     if (axisOnly && c.axis == null) continue;
+                    if (genericOnly && c.axis != null) continue;
                     pool.Add(c); w.Add(c.axis != null && c.axis == main ? 2 : 1);
                 }
             }
-            Collect(hasLock && first);
-            if (pool.Count == 0 && hasLock && first) Collect(false);   // 枠の軸のバフが尽きたら汎用へ
+            // 枠が空 (開始時・種火なし) の 1 枚目は汎用バフを保証し、開幕の死に札 2 択を防ぐ (2026-11-27)
+            Collect(hasLock && first, !hasLock && first);
+            if (pool.Count == 0 && first) Collect(false, false);   // 枯渇時は全候補へフォールバック
             if (pool.Count == 0) return null;
             int total = 0; foreach (int x in w) total += x;
             int r = GameRng.RangeAuto("challenge_card", 0, total);
