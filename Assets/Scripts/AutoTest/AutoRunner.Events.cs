@@ -77,6 +77,7 @@ namespace AutoTest
             if (def == null || def.choices == null || def.choices.Count == 0) return 0;
 
             var run = GameLoop.GameManager.Instance?.Run;
+            EventChoiceScorer.AimEnd2 = aimEnd2;   // ワーカーはラン開始の設定の行を通らないので、 選ぶ所で渡す
 
             // 7層を目指す方策では、6層の〈灰に埋もれた基地〉で〈真理〉を得る選択 (効果「真理を得る」= 手記の最後の頁を開く) を必ず選ぶ (2026-11-13)。
             //   はじめての版は選択肢が 1 つ (〈徒労〉) なのでそれ。 〈徒労〉を値付けに入れる判断は入れていない (通常の戦闘を避ける/こなすの判断も無い)。
@@ -140,6 +141,7 @@ namespace AutoTest
                 //   ここは数値を見ない近道なので、 ターンを使う選択肢を足した後は捕まる手を素通しで選んでしまう。
                 if (EventChoiceScorer.EndangersLife(def.choices[i], run)) continue;   // 二撃で死ぬ・致死
                 if (EventEncounter.WouldBeCaught(def.choices[i].TurnCost)) continue;
+                if (!aimEnd2 && EventChoiceScorer.GrantsRapier(def.choices[i])) continue;   // END2 を狙わない腕はレイピアを取らない
                 int s = ScoreFlagChoice(def.choices[i], run);
                 if (s > bestScore) { bestScore = s; bestIdx = i; }
             }

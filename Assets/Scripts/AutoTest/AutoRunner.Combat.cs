@@ -639,6 +639,7 @@ namespace AutoTest
         /// <summary>[測定 2026-11-26] 混乱ゲージを大技のターンまで温存するためなら、 攻撃 0 本で待つ手を許す (大技の 1〜2 ターン前・満タンまで 1 ターンに入れられる量以内の時だけ)。
         /// 既定 true (2026-11-26・作者の決定・⑯ で 3 層 +1.54 pp)。 false = 今まで (攻撃 0 本は死ぬ時だけ)。 規則を知る腕 (downTimingAware) でだけ効く。</summary>
         [UnityEngine.Tooltip("混乱ゲージの温存のための攻撃 0 本の待ちを許す (2026-11-26)")] public bool downGaugeNoAttackHold = true;
+        [UnityEngine.Tooltip("END2 を狙う: レイピアを必ず取る (false = 既定・取らない・2026-11-27)")] public bool aimEnd2 = false;
 
         /// <summary>BOT が見積もりに使うダウンの規則 (<see cref="downTimingAware"/> が false なら、 本体が Timed でも ChargeOrHeavy のつもりで読む)。</summary>
         private CombatSystem.DownCancelRule BotDownRule

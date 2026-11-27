@@ -559,6 +559,8 @@ namespace AutoTest.ParallelSweep
                 "downRerollPlan",
                 // 2026-11-26: 混乱ゲージの温存のための攻撃 0 本の待ち (True = 既定・⑯)・支度の得の割合 (0.5 = 既定)
                 "downGaugeNoAttackHold", "downGaugeReadyShare", "lethalParryEnabled",
+                // 2026-11-27: END2 を狙う (True = レイピアを必ず取る / False = 既定・取らない)
+                "aimEnd2",
                 // 2026-11-14: ダウンが大技を取り消す条件 (ChargeOrHeavy = 既定 / Always = 旧い規則)・大技のチャージは攻撃しない (True = 既定)・大技の倍率の上書き (id:小技:大技)
                 "downCancelRule", "heavyChargeNoAttack", "enemyHeavySpec",
                 // 2026-11-14: 目盛りの割れ方 (MainAttackOnly = 既定・通常攻撃だけ / AnyDamage = 旧い判定)・ひびの猶予 (1 = 既定・0 = すぐ・−1 = ひびでは割れない)・よろめきは弱い (True = 既定)

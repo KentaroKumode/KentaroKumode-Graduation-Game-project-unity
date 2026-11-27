@@ -20,7 +20,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public static int Count(CombatContext ctx, string key) => (int)ctx.GetAccumulated(key);
 
         /// <summary>【起爆】: 敵の毒を 1/3 (切り上げ) 消費し、 max(消費量 × 倍率, 消費量 × 敵の最大 HP × 0.25%) の軽減不可ダメージ (<see cref="PoisonCore.Damage"/>)。
-        /// ボスの次の目盛りを、 そのダメージの 35% ぶん上げる (<see cref="PoisonCore.DetonateGauge"/>・ひびは割らない・2026-11-25)。 戻り値 = ダメージ。</summary>
+        /// 混乱は入れない (2026-11-27 GAME.md §23-38: 撃の中で起きるかが決まり、 配線の時点で読めないため)。 戻り値 = ダメージ。</summary>
         public static int Detonate(CombatContext ctx, string label)
         {
             int p = ctx.EnemyPoison;
@@ -54,7 +54,6 @@ namespace ItemSystem.PassiveSkills.Effects
                     }
                 }
             }
-            CombatManager.Instance?.AddBossGauge(PoisonCore.DetonateGauge);   // 2026-11-26: 目盛り → 混乱 +3
             Rw.Log($"[{label}] 【起爆】 毒 {p} → {remPoison} (消費 {spent}) → {dmg} の軽減不可ダメージ (この戦闘 {before + 1} 回目)");
             Kw.Raise(ctx, PassiveSkillTrigger.OnPoisonDetonate, dmg);
             return dmg;

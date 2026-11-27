@@ -95,6 +95,15 @@ namespace AutoTest
         /// <summary>選べない選択肢 (払えないゴールド・物資・素材、 得になる効果が何ひとつ起きない など <see cref="EventChoice.UnavailableReason"/>)。 致死の拒否権より下に置く。
         /// 本体と同じ規則 (2026-11-13): 起きない効果が代償 (追跡者を呼ぶ・前線を近づける) だけの選択肢は選べる ── 起きない代償は下の値付けで 0 になる。</summary>
         public const float V_UNAVAILABLE = -10000f;
+        /// <summary>END2 (シュヴァリエ) を狙う腕か (2026-11-27 作者「END2 狙いじゃない限りは取らなくていい」)。 false (既定) なら〈シュヴァリエのレイピア〉を得る選択肢を選ばない ── 取ると 3 層のボスが替わる。</summary>
+        public static bool AimEnd2;
+        public static bool GrantsRapier(EventChoice c)
+        {
+            if (c?.effects == null) return false;
+            foreach (var e in c.effects)
+                if (e != null && (e.type == EventEffectType.GainPassiveItem || e.type == EventEffectType.GainSpecificItem) && e.param == GameLoop.ItemIds.ChevalierRapier) return true;
+            return false;
+        }
 
         /// <summary>〈観測所の写し〉の評価。 上乗せ (パッシブ×1+素材+8+金+60+全回復) は
         /// パッシブ 1 個 + 雑多 を足して 2026-11-05 の点で 18 前後だったが、
@@ -337,6 +346,7 @@ namespace AutoTest
                     // 具体ID指定があれば優先度で加算
                     if (!string.IsNullOrEmpty(e.param))
                     {
+                        if (e.param == GameLoop.ItemIds.ChevalierRapier) return AimEnd2 ? -V_UNAVAILABLE : V_UNAVAILABLE;
                         if (LearnedPriorityProvider.IsSRank(e.param)) return 1.7f * PassivePrice(run);
                         if (LearnedPriorityProvider.IsARank(e.param)) return 1.3f * PassivePrice(run);
                         return 1.1f * PassivePrice(run);   // 名前付き (ユニーク) は店に並ばない

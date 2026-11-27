@@ -927,6 +927,7 @@ namespace AutoTest
                  + $"/ 烈炎の積もり方 {(blazeStackRule == CombatSystem.BlazeStackRule.Guard2 ? "出目 2 個以上を防御に挿したターン +1 (旧い条件)" : "主攻撃をシールドで " + BossParamSpec.Effective(BossParamOverrides, GameLoop.BossIds.Layer6Ash, CombatSystem.BossParam.BlazePerShield).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + " 受けるごとに +1")} (blazeStackRule={blazeStackRule}) "
                  + $"/ ダウンの規則を BOT が知る {(downTimingAware ? "知る" : "知らない (旧い規則のつもり)")} (downTimingAware={downTimingAware}) "
                  + $"/ 振り直しを大事なターンに集める {(downRerollPlan && downTimingAware ? "ON" : "OFF")} (downRerollPlan={downRerollPlan}) "
+                 + $"/ END2 を狙う {(aimEnd2 ? "狙う (レイピアを必ず取る)" : "狙わない (レイピアを取らない)")} (aimEnd2={aimEnd2}) "
                  + $"/ 混乱の温存のための攻撃 0 本の待ち {(downGaugeNoAttackHold && downTimingAware && EffectiveWiringSkill == WiringSkill.Super ? "ON" : "OFF")} (downGaugeNoAttackHold={downGaugeNoAttackHold}・downGaugeReadyShare={downGaugeReadyShare:0.##}) "
                  + $"/ ダウンの狙い {(downAimPolicy == DownAimPolicy.Aim ? (downCancelRule == CombatSystem.DownCancelRule.Always ? "大技が 2 ターン後なら待って大技に重ねる手も比べる" : "待つとダウンがチャージか大技に重なるなら待つ手も比べる") : "割れる時に割る (今まで)")} (downAimPolicy={downAimPolicy}・待つ得の割引 {(downAimGainShare >= 0f ? downAimGainShare.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) : "帳簿と同じ " + v3.ledgerFutureShare.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture))} (downAimGainShare={downAimGainShare.ToString(System.Globalization.CultureInfo.InvariantCulture)})) "
                  + $"/ 深さ 3 のボスの大技 {(depth3Heavy ? "あり" : "なし (旧い作り)")} "
@@ -1785,6 +1786,7 @@ namespace AutoTest
             // 5層裏ボス遮断。 各スイープのコルーチンはこの後で自分の値へ書き戻すので、
             //   ここは「素の Run N runs も既定で遮断される」ことだけを担保する。
             GameLoop.GameManager.SuppressLayer5HiddenBoss = suppressLayer5HiddenBoss;
+            EventChoiceScorer.AimEnd2 = aimEnd2;
             GameLoop.GameManager.SuppressEvents = suppressEvents;
             GameLoop.GameManager.SuppressConvictionChain = suppressConvictionChain;
             if (suppressEvents) Debug.Log("[AutoRunner] **計測**: イベントマスを素通り (確信の資格は無償で付与)");

@@ -76,7 +76,7 @@ namespace AutoTest
             => Mathf.Clamp(Mathf.CeilToInt(s.enemyHp / DeckPerTurnDamage(in s, k)), 1, DeckTurnsCap);
 
         /// <summary>[2026-11-26] この挿し方で品が足す混乱の見込み (撃ごとの品 × 攻撃の撃の数・1 ターン 1 回の品)。 条件は本体の品と同じ物を読む。
-        /// shortcut: 【起爆】(+3)・臨界の爆発 (+2) は撃の中で起きるかが決まるので数えない。 起爆・爆発の軸で溢れが目立ったら足す。</summary>
+        /// 【起爆】・臨界の爆発は 2026-11-27 に混乱を入れなくなった (GAME.md §23-38) ので、 これで本体の品の混乱を全部数える。</summary>
         private static int ItemGaugeEstimate(in OptimalTurnState s, TerminalOutcome o, in WiredSums ws, ItemSystem.PassiveSkills.CombatContext ctx)
         {
             var ids = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.ActivePlayerSkillIds;
