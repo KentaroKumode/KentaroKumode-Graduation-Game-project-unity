@@ -484,12 +484,12 @@ namespace ItemSystem.PassiveSkills.Effects
 
     // ===================== 分岐 B〈集中〉9 品 (賭け金は CritCore.FocusIds) =====================
 
-    /// <summary>一の矢【集中】(賭け金 0・2026-11-27 防御分散): 集中会心の撃の会心倍率 +(0.90 ＋ 使った【練気】× 0.25) (5 以上の目を挿していれば さらに +0.50)・このターンのブロック +3。</summary>
+    /// <summary>一の矢【集中】(賭け金 0・2026-11-27 防御分散): 集中会心の撃の会心倍率 +(0.90 ＋ 使った【練気】× 0.25) (5 以上の目を挿していれば さらに +0.50)・このターンのブロック +2。</summary>
     public class FirstArrow : IPassiveSkillEffect
     {
         public string SkillId => ItemIds.CritFirstArrow;
         public const float Mul = 0.90f, MulPerRenki = 0.25f, FaceMul = 0.50f;
-        public const int MinFace = 5, CritBlock = 3;
+        public const int MinFace = 5, CritBlock = 2;
         public static float MulFor(int spent, int face) => Mul + MulPerRenki * spent + (face >= MinFace ? FaceMul : 0f);
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
@@ -500,12 +500,12 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>初太刀の黒鞘【集中】(賭け金 0・2026-11-27 防御分散): 集中会心のとき、 このターンのブロック +3・次のターンの最初の 1 撃の基礎攻撃 +(6 ＋ 使った【練気】× 3)・会心率 +25%。
+    /// <summary>初太刀の黒鞘【集中】(賭け金 0・2026-11-27 防御分散): 集中会心のとき、 このターンのブロック +2・次のターンの最初の 1 撃の基礎攻撃 +(6 ＋ 使った【練気】× 3)・会心率 +25%。
     /// 集中が外れたときも、 次のターンの最初の 1 撃の会心率 +15% (保険)。</summary>
     public class FirstStrokePin : IPassiveSkillEffect, IRelicDisplay
     {
         public string SkillId => ItemIds.CritFirstStroke;
-        public const int AtkBase = 6, AtkPerRenki = 3, CritBlock = 3;
+        public const int AtkBase = 6, AtkPerRenki = 3, CritBlock = 2;
         public const float NextRate = 0.25f, MissNextRate = 0.15f;
         /// <summary>[persistent] 会心率・攻撃が乗るターンの番号と攻撃加算量・会心率加算量。</summary>
         public const string Key = "crit.firstStroke.turn", AtkKey = "crit.firstStroke.atk", RateKey = "crit.firstStroke.rate";
@@ -536,11 +536,11 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>細目の覗き筒【集中】(賭け金 0・2026-11-27 防御分散): 集中会心の撃は敵の防御を (15 ＋ 使った【練気】× 5) 無視し、 会心倍率 +0.35・このターンのブロック +3。</summary>
+    /// <summary>細目の覗き筒【集中】(賭け金 0・2026-11-27 防御分散): 集中会心の撃は敵の防御を (15 ＋ 使った【練気】× 5) 無視し、 会心倍率 +0.35・このターンのブロック +2。</summary>
     public class NarrowSpyglass : IPassiveSkillEffect
     {
         public string SkillId => ItemIds.CritNarrow;
-        public const int Pen = 15, PenPerRenki = 5, CritBlock = 3;
+        public const int Pen = 15, PenPerRenki = 5, CritBlock = 2;
         public const float Mul = 0.35f;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
@@ -567,12 +567,12 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>渾身の鉄兜【集中】(賭け金 0・2026-11-27 防御分散): 集中会心の撃の最終与ダメージ +(75 ＋ 使った【練気】× 25)%・このターンのブロック +3。
+    /// <summary>渾身の鉄兜【集中】(賭け金 0・2026-11-27 防御分散): 集中会心の撃の最終与ダメージ +(75 ＋ 使った【練気】× 25)%・このターンのブロック +2。
     /// 集中が外れたとき、 そのターンのブロック +4 (最小限の保険)。</summary>
     public class HeftyPommel : IPassiveSkillEffect
     {
         public string SkillId => ItemIds.CritPommel;
-        public const int FinalPct = 75, FinalPctPerRenki = 25, CritBlock = 3, MissBlock = 4;
+        public const int FinalPct = 75, FinalPctPerRenki = 25, CritBlock = 2, MissBlock = 4;
         public static int FinalPctFor(int spent) => FinalPct + FinalPctPerRenki * spent;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalDamage, PassiveSkillTrigger.OnPostDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
