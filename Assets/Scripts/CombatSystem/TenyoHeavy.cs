@@ -73,9 +73,9 @@ namespace CombatSystem
                 {
                     case Gift.Shield:
                     {
-                        int add = (int)System.Math.Round(ctx.playerMaxHP * BossParams.Param(e.id, BossParam.TenyoShieldPct) / 100f);
+                        int add = (int)System.Math.Round(ctx.enemyMaxHP * BossParams.Param(e.id, BossParam.TenyoShieldPct) / 100f);
                         ctx.vescaShield += add;
-                        if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[天与の盾] T{turn} シールド +{add} (最大 HP {ctx.playerMaxHP} の {BossParams.Param(e.id, BossParam.TenyoShieldPct)}%) → {ctx.vescaShield}");
+                        if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[天与の盾] T{turn} シールド +{add} (最大 HP {ctx.enemyMaxHP} の {BossParams.Param(e.id, BossParam.TenyoShieldPct)}%) → {ctx.vescaShield}");
                         break;
                     }
                     case Gift.Sword:

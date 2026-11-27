@@ -228,7 +228,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// **形態変化直後の 1 ターン目は、その段で追加された等級から確定で選出する。**
     /// 引いた遺物の名前は予告 (<c>MutualTurnTelegraph.drawnRelics</c>) に載る。 ただし 2026-11-11 時点で
     /// 画面の側はこの欄を読んでいない (enemies.json の「予告に開示」はまだ表示されない)。</summary>
-    public class RelicScholar : IPassiveSkillEffect
+    public class RelicScholar : IPassiveSkillEffect, IExplicitPerspective
     {
         public const string Id = "RelicScholar";
         public string SkillId => Id;
@@ -460,7 +460,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// (ヴェスカ 2% / プレイヤー 2%) ため、 条件そのものが意味を失う。
     /// (守りへの罰は当時〈停滞する時間〉が担っていたが、 2026-11-12 #103 で〈停滞する時間〉は「引いた端子を確率で止める」に替わり、
     /// 配線を見る罰は無くなった。)</para></summary>
-    public class RiftHeldOpen : IPassiveSkillEffect
+    public class RiftHeldOpen : IPassiveSkillEffect, IExplicitPerspective
     {
         /// <summary>毎ターンヴェスカが失う「**最大** HP」の割合。</summary>
         public const float LossRate = 0.02f;
@@ -476,21 +476,21 @@ namespace ItemSystem.PassiveSkills.Effects
 
             // 視点反転中: player* = ヴェスカ / enemy* = プレイヤー。
             // --- ヴェスカ側 (自壊) ---
-            if (ctx.playerCurrentHP > 0 && ctx.playerMaxHP > 0)
+            if (ctx.enemyCurrentHP > 0 && ctx.enemyMaxHP > 0)
             {
-                int loss = UnityEngine.Mathf.CeilToInt(ctx.playerMaxHP * LossRate);
-                ctx.playerCurrentHP = System.Math.Max(0, ctx.playerCurrentHP - loss);
-                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[裂け目] ヴェスカ -{loss} (最大HPの{LossRate:P0}) → {ctx.playerCurrentHP}/{ctx.playerMaxHP}");
+                int loss = UnityEngine.Mathf.CeilToInt(ctx.enemyMaxHP * LossRate);
+                ctx.enemyCurrentHP = System.Math.Max(0, ctx.enemyCurrentHP - loss);
+                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[裂け目] ヴェスカ -{loss} (最大HPの{LossRate:P0}) → {ctx.enemyCurrentHP}/{ctx.enemyMaxHP}");
             }
 
             // --- プレイヤー側 ---
             // **軽減は無視・シールドは肩代わりする** (2026-08-15 の規約: ③-C)。
-            if (ctx.enemyCurrentHP > 0 && ctx.enemyMaxHP > 0)
+            if (ctx.playerCurrentHP > 0 && ctx.playerMaxHP > 0)
             {
-                int loss = UnityEngine.Mathf.CeilToInt(ctx.enemyMaxHP * PlayerLossRate);
+                int loss = UnityEngine.Mathf.CeilToInt(ctx.playerMaxHP * PlayerLossRate);
                 int dealt = ctx.EnemyDealUnmitigable(loss, DeathCause.Rift);
                 if (dealt > 0)
-                    if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[裂け目] プレイヤー -{dealt} (最大HPの{PlayerLossRate:P0}) → {ctx.enemyCurrentHP}/{ctx.enemyMaxHP}");
+                    if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[裂け目] プレイヤー -{dealt} (最大HPの{PlayerLossRate:P0}) → {ctx.playerCurrentHP}/{ctx.playerMaxHP}");
             }
         }
     }
@@ -562,14 +562,14 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 予約方式: 敵パッシブ実行中は視点が反転しているため
     /// SwapEnemy を直接呼ばず `ctx.pendingEnemySwapId` に積み、 CombatManager が
     /// 敵トリガー完了後に処理する。</summary>
-    public class ContinuousExperiment : IPassiveSkillEffect
+    public class ContinuousExperiment : IPassiveSkillEffect, IExplicitPerspective
     {
         /// <summary>自段の HP が 0 になっていたら次段への差し替えを予約する。
         /// 敵視点 (swapped) なので <c>ctx.playerCurrentHP</c> がボス自身の HP。
         /// 2026-08-24: 旧 AwakenedChainHelper から移設 (覚者連戦の削除に伴い唯一の利用者になったため)。</summary>
         private static void ReserveSwap(CombatContext ctx, string nextId, string logLabel)
         {
-            if (ctx.playerCurrentHP > 0) return;
+            if (ctx.enemyCurrentHP > 0) return;
             if (!string.IsNullOrEmpty(ctx.pendingEnemySwapId)) return; // 既に予約済み
             ctx.pendingEnemySwapId = nextId;
             ctx.pendingEnemySwapLabel = logLabel;
@@ -602,7 +602,7 @@ namespace ItemSystem.PassiveSkills.Effects
     ///
     /// 踏みとどまりの側は `VescaRelicPool.HasDivineTalent()` で敵の passiveSkills を直接見る
     /// ── パッシブ同士の発火順に依存させないため。</summary>
-    public class DivineTalent : IPassiveSkillEffect
+    public class DivineTalent : IPassiveSkillEffect, IExplicitPerspective
     {
         /// <summary>この割合を **初めて割った** 次のターンに 2 枚引く。 降順で持つこと。
         ///
@@ -660,9 +660,9 @@ namespace ItemSystem.PassiveSkills.Effects
 
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
-            if (ctx == null || ctx.playerMaxHP <= 0) return;
+            if (ctx == null || ctx.enemyMaxHP <= 0) return;
             // 視点反転中: ヴェスカ自身の HP は player* 側。
-            int hp = ctx.playerCurrentHP, maxHP = ctx.playerMaxHP;
+            int hp = ctx.enemyCurrentHP, maxHP = ctx.enemyMaxHP;
             // 一度に複数の閾値をまたいだ場合も、 発火は 1 回・記録はまとめて進める。
             // (踏みとどまりが効いていれば 1 段ずつしか進まないが、 役の確定キルなど
             //  clamp を通らない経路があるので多段通過は残しておく。)
