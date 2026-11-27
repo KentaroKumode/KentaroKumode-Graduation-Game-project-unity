@@ -836,7 +836,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 累計 30 前後の**軽減不可**が確定し、 配線・ブロックで一切対処できないまま
     /// 5層勝率 45% / 主死因 Chip 98% の壁になっていた。 軽減不可の継続ダメは
     /// ADR-0009 の「被弾を効率よく受けるレース判断」(§6-2) を無効化するため、 総量を抑える。</summary>
-    public class JudgmentFlames : IPassiveSkillEffect
+    public class JudgmentFlames : IPassiveSkillEffect, IExplicitPerspective
     {
         public string SkillId => "JudgmentFlames";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
@@ -854,7 +854,7 @@ namespace ItemSystem.PassiveSkills.Effects
             int turnTerm = UnityEngine.Mathf.CeilToInt(System.Math.Max(1, ctx.currentTurn) / 3f);
             int dmg = System.Math.Min(cap, 1 + turnTerm + sin);
             ctx.EnemyDealUnmitigable(dmg, DeathCause.Chip);   // 軽減は無視・シールドは肩代わりする
-            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[審判の炎] {dmg}ダメ (1+経過T{ctx.currentTurn}+罪{sin}, 上限{cap}, 軽減無視) → プレイヤー残HP={ctx.enemyCurrentHP}");
+            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[審判の炎] {dmg}ダメ (1+経過T{ctx.currentTurn}+罪{sin}, 上限{cap}, 軽減無視) → プレイヤー残HP={ctx.playerCurrentHP}");
         }
     }
 
@@ -875,7 +875,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// スタックは戦闘通して保持 (accumulatedValues)。
     /// テレグラフ (MutualTurnTelegraph.blazeStacks / blazePenalizesBlock) で配線前に開示するので、
     /// 「知らないうちに焼かれる」にはならない。</summary>
-    public class BlazeBrand : IPassiveSkillEffect
+    public class BlazeBrand : IPassiveSkillEffect, IExplicitPerspective
     {
         /// <summary>パッシブの id (enemies.json の internalName)。 〈業火〉で烈炎を返す CombatManager も読む。</summary>
         public const string Id = "BlazeBrand";
@@ -907,7 +907,7 @@ namespace ItemSystem.PassiveSkills.Effects
                 if (dmg > 0)
                 {
                     ctx.EnemyDealUnmitigable(dmg, DeathCause.Chip);   // 軽減は無視・シールドは肩代わりする
-                    if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[烈炎] ×{dmg} ダメ (軽減無視) → プレイヤー残HP={ctx.enemyCurrentHP}");
+                    if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[烈炎] ×{dmg} ダメ (軽減無視) → プレイヤー残HP={ctx.playerCurrentHP}");
                 }
             }
             else if (trigger == PassiveSkillTrigger.OnTurnEnd)
@@ -943,8 +943,8 @@ namespace ItemSystem.PassiveSkills.Effects
     {
         public static int Period(CombatContext ctx)
         {
-            if (ctx.playerMaxHP <= 0) return 3;
-            float r = (float)ctx.playerCurrentHP / ctx.playerMaxHP;
+            if (ctx.enemyMaxHP <= 0) return 3;
+            float r = (float)ctx.enemyCurrentHP / ctx.enemyMaxHP;
             return r <= 0.30f ? 1 : (r <= 0.60f ? 2 : 3);
         }
         public static bool IsJudgment(CombatContext ctx)
@@ -958,7 +958,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 断罪ターンにボスがロール勝利すると、 ボス最終ダメージ ×8+8 の致命ダメ
     /// （軽減/シールド有効経路で適用）。 プレイヤーがロール勝利＝間一髪回避し、
     /// 鎧貫通の確定反撃18をボスへ。</summary>
-    public class JudgmentBlaze : IPassiveSkillEffect
+    public class JudgmentBlaze : IPassiveSkillEffect, IExplicitPerspective
     {
         public string SkillId => "JudgmentBlaze";
         public PassiveSkillTrigger[] Triggers => new[] {
@@ -990,7 +990,7 @@ namespace ItemSystem.PassiveSkills.Effects
                     // 敵視点: playerWonRoll = ボスがロール勝利 = プレイヤー敗北。
                     // 断罪Tに発動 → 係数は 1回目=4、 以降+2ずつ (2回目=6、 3回目=8、 4回目=10...)。
                     // ctx.finalDamage = base × coef + coef （軽減/シールド有効経路）。
-                    if (ctx.playerWonRoll && EmberKing.IsJudgment(ctx))
+                    if (ctx.playerLostRoll && EmberKing.IsJudgment(ctx))
                     {
                         int n = (int)ctx.GetAccumulated("judg_counter");
                         if (n < 1) n = 1;
@@ -1013,9 +1013,9 @@ namespace ItemSystem.PassiveSkills.Effects
                     if (ctx.accumulatedValues.TryGetValue(CtrKey, out var c) && c > 0f)
                     {
                         int dmg = (int)c;
-                        ctx.playerCurrentHP = System.Math.Max(0, ctx.playerCurrentHP - dmg);
+                        ctx.enemyCurrentHP = System.Math.Max(0, ctx.enemyCurrentHP - dmg);
                         ctx.accumulatedValues[CtrKey] = 0f;
-                        if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[業火の断罪] 間一髪回避→反撃 {dmg} → 灰燼残HP={ctx.playerCurrentHP}");
+                        if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[業火の断罪] 間一髪回避→反撃 {dmg} → 灰燼残HP={ctx.enemyCurrentHP}");
                     }
                     break;
             }
@@ -1024,7 +1024,7 @@ namespace ItemSystem.PassiveSkills.Effects
 
     /// <summary>灰塵の鎧 — 被弾時、受けるダメージ-5。軽減後が10超なら10に丸める
     /// （通常打は「なんとか一撃」）。断罪ターンは鎧無効＝削りの本命窓。</summary>
-    public class AshArmor : IPassiveSkillEffect
+    public class AshArmor : IPassiveSkillEffect, IExplicitPerspective
     {
         public string SkillId => "AshArmor";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreReceiveDamage };
@@ -1033,7 +1033,7 @@ namespace ItemSystem.PassiveSkills.Effects
             // 断罪ターンは鎧無効（ロール勝利の差分ダメが素通り＝削りの本命）
             if (EmberKing.IsJudgment(ctx)) return;
 
-            if (ctx.playerLostRoll && ctx.finalDamage > 0)
+            if (ctx.playerWonRoll && ctx.finalDamage > 0)
             {
                 // ボスの数値 (BossParams): 灰塵の鎧の軽減量を直接調整 (低い=タンク性弱化=ジリ貧緩和)。 基準-9
                 int reduction = CombatSystem.BossParams.ParamInt(ctx.bossId, CombatSystem.BossParam.RegenReduction);
@@ -1077,7 +1077,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// enemyDiceTotalBonus へ積んだ量 (<see cref="KeyApplied"/>) との差だけを足し引きする (他のパッシブの寄与は消さない)。
     /// 旧実装は `+=` だけで戻す処理が無く、 予兆のたびに +8 が戦闘終了まで積み上がっていた。</para>
     /// 旧 JudgmentBlaze の即死一撃を「相互攻撃モデルで対応可能な予告火力」に転換。</summary>
-    public class EmberOmen : IPassiveSkillEffect
+    public class EmberOmen : IPassiveSkillEffect, IExplicitPerspective
     {
         /// <summary>前ターンに自分が enemyDiceTotalBonus へ積んだ量 (差分更新用)。 "ember_" 始まりなので形態の差し替えで消える。</summary>
         private const string KeyApplied = "ember_omen_applied";
@@ -1088,7 +1088,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
             int bonus = CombatSystem.BossParams.ParamInt(ctx.bossId, CombatSystem.BossParam.JudgmentDice);
-            float hpRatio = ctx.playerMaxHP > 0 ? (float)ctx.playerCurrentHP / ctx.playerMaxHP : 1f;
+            float hpRatio = ctx.enemyMaxHP > 0 ? (float)ctx.enemyCurrentHP / ctx.enemyMaxHP : 1f;
             // [計装] 発火したかではなく、 **何を計算したか**をそのまま残す。
             CombatSystem.BossCombatTrace.NoteEvent("omen",
                 $"turn={ctx.currentTurn} bossId='{ctx.bossId}' bonus={bonus}"
@@ -1126,7 +1126,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// HP≤50% で回復完全停止 (Phase2: 「決着期」に突入 = プレイヤーの削り勝ちが可視化)。
     /// 予兆ターンは回復なし = 集中砲火で HP50% ラインを越える窓。
     /// 2026-11-14〜 (大技〈業火〉の形): 業火のターンと、 その 1 ターン前のチャージのターンは回復なし (作者の決定)。 旧い形 (ashKingHeavy=False) は予兆ターンだけ。</summary>
-    public class AshRegrowth : IPassiveSkillEffect
+    public class AshRegrowth : IPassiveSkillEffect, IExplicitPerspective
     {
         public const string SuppressedUntilTurnKey = "ash_regrowth_suppressed_until";
         public const int StaggerSuppressTurns = 2;
@@ -1134,10 +1134,10 @@ namespace ItemSystem.PassiveSkills.Effects
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
-            if (ctx.playerMaxHP <= 0) return;
+            if (ctx.enemyMaxHP <= 0) return;
             if (ctx.accumulatedValues.TryGetValue(SuppressedUntilTurnKey, out var supUntil) && ctx.currentTurn <= (int)supUntil) return;
 
-            float r = (float)ctx.playerCurrentHP / ctx.playerMaxHP;
+            float r = (float)ctx.enemyCurrentHP / ctx.enemyMaxHP;
             if (r <= 0.5f) return; // Phase2: 再生停止
 
             if (EmberOmenTiming.IsOmen(ctx.currentTurn, r)) return; // 予兆T (= 業火のターン) は回復なし
@@ -1147,12 +1147,12 @@ namespace ItemSystem.PassiveSkills.Effects
             // 割合は BossParam.RegrowthRate (基準 0.02f = 2%・2026-11-14 に直書き 0.02f から移し、 同日 0.03 へ・2026-11-18 に 0.02 へ戻した (案 B)・測定の口で差し替えられる)
             float rate = CombatSystem.BossParams.Param(ctx.bossId, CombatSystem.BossParam.RegrowthRate);
             int heal = ctx.ReduceEnemyHeal(System.Math.Max(1,
-                UnityEngine.Mathf.FloorToInt(ctx.playerMaxHP * rate)));
-            int after = System.Math.Min(ctx.playerMaxHP, ctx.playerCurrentHP + heal);
-            if (after > ctx.playerCurrentHP)
+                UnityEngine.Mathf.FloorToInt(ctx.enemyMaxHP * rate)));
+            int after = System.Math.Min(ctx.enemyMaxHP, ctx.enemyCurrentHP + heal);
+            if (after > ctx.enemyCurrentHP)
             {
-                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[灰の再生] Phase1 +{after - ctx.playerCurrentHP} ({ctx.playerCurrentHP}→{after})");
-                ctx.playerCurrentHP = after;
+                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[灰の再生] Phase1 +{after - ctx.enemyCurrentHP} ({ctx.enemyCurrentHP}→{after})");
+                ctx.enemyCurrentHP = after;
             }
         }
     }
@@ -1162,7 +1162,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// EmberOmen (周期3Tに加速) + AshRegrowth (停止) と合わせて瞬発力勝負を強制。
     /// <para>2026-11-11 #104 で修正: 〈業火の予兆〉と同じ差分更新。 ターン頭の HP が 50% 以下のターンは +3、 50% を超えるターンは 0
     /// (回復して戻れば外れる)。 旧実装は HP≤50% のターンごとに `+=` して +3 が積み上がっていた。</para></summary>
-    public class EmberFury : IPassiveSkillEffect
+    public class EmberFury : IPassiveSkillEffect, IExplicitPerspective
     {
         /// <summary>前ターンに自分が enemyDiceTotalBonus へ積んだ量 (差分更新用)。 "ember_" 始まりなので形態の差し替えで消える。</summary>
         private const string KeyApplied = "ember_fury_applied";
@@ -1170,13 +1170,13 @@ namespace ItemSystem.PassiveSkills.Effects
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
-            if (ctx.playerMaxHP <= 0) return;
-            float r = (float)ctx.playerCurrentHP / ctx.playerMaxHP;
+            if (ctx.enemyMaxHP <= 0) return;
+            float r = (float)ctx.enemyCurrentHP / ctx.enemyMaxHP;
             bool phase2 = r <= 0.5f;   // Phase1 (HP>50%) は 0
             int bonus = CombatSystem.BossParams.ParamInt(ctx.bossId, CombatSystem.BossParam.FuryAttack);
             EmberBonus.SetApplied(ctx, KeyApplied, phase2 ? bonus : 0);
             if (phase2)
-                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[憤怒の残滓] Phase2 このターンの攻撃 +{bonus} (HP {ctx.playerCurrentHP}/{ctx.playerMaxHP})");
+                if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[憤怒の残滓] Phase2 このターンの攻撃 +{bonus} (HP {ctx.enemyCurrentHP}/{ctx.enemyMaxHP})");
         }
     }
 
@@ -1242,7 +1242,7 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>13番目の死神の宣告。即死級ではないが層を問わず事故率が固定で残る。</summary>
-    public class Decree13th : IPassiveSkillEffect
+    public class Decree13th : IPassiveSkillEffect, IExplicitPerspective
     {
         public string SkillId => "Decree13th";
         public PassiveSkillTrigger[] Triggers => new[]
@@ -1279,14 +1279,14 @@ namespace ItemSystem.PassiveSkills.Effects
                 if (!ctx.currentBuffs.TryGetValue(FlagKey, out float armed) || armed <= 0f) return;
 
                 // 敵視点のため playerCurrentHP = 13番目の死本体のHP
-                if (ctx.playerCurrentHP <= 0)
+                if (ctx.enemyCurrentHP <= 0)
                 {
                     UnityEngine.Debug.Log("[Decree13th] 死神は既に倒れた。回避成功");
                     ctx.currentBuffs.Remove(FlagKey);
                     return;
                 }
 
-                int total = ctx.playerDiceTotal + ctx.enemyDiceTotal;
+                int total = ctx.enemyDiceTotal + ctx.playerDiceTotal;
                 // **プレイヤー側の ctx.criticalMultiplier を読んではいけない** (2026-08-08 修正)。
                 //   敵パッシブの文脈では player/enemy の HP は入れ替わるが、
                 //   criticalMultiplier は入れ替わらない単一フィールド ＝ プレイヤーの値。
@@ -1300,7 +1300,7 @@ namespace ItemSystem.PassiveSkills.Effects
                 // 軽減フックは全バイパスするが、 シールドは肩代わりとして機能する (2026-08-15)
                 ctx.EnemyDealUnmitigable(dmg, null);   // 計上は従来どおり無し
                 if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log(
-                    $"[Decree13th] 成就: ({ctx.playerDiceTotal}+{ctx.enemyDiceTotal})×{DecreeMultiplier:F1} = {dmg} ダメ → プレイヤー残HP={ctx.enemyCurrentHP}");
+                    $"[Decree13th] 成就: ({ctx.enemyDiceTotal}+{ctx.playerDiceTotal})×{DecreeMultiplier:F1} = {dmg} ダメ → プレイヤー残HP={ctx.playerCurrentHP}");
 
                 ctx.currentBuffs.Remove(FlagKey);
             }
@@ -1328,7 +1328,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// ctx の HP に書かれる。 CombatManager.Turn.cs が収支トリガーの直前に ctx の HP を CombatManager の値へ揃え、 直後に
     /// SyncHPFromContext で拾うようにしたので、 HP の増減が残る。 旧実装は直後の FinishTurnCommon の書き戻しで消えていた
     /// (シールドの肩代わり分・シールドへの 25・形態の遷移だけが残っていた)。</para></summary>
-    public class SaintGeorgesPhases : IPassiveSkillEffect
+    public class SaintGeorgesPhases : IPassiveSkillEffect, IExplicitPerspective
     {
         public string SkillId => "SaintGeorgesPhases";
         public PassiveSkillTrigger[] Triggers => new[] {
@@ -1436,13 +1436,13 @@ namespace ItemSystem.PassiveSkills.Effects
                     {
                         // 反撃: プレイヤー自身の出目の合計 + プリオリテ×PrioriteCounterPer(7) を不可避ダメで返す
                         // 敵視点では ctx.enemyDiceTotal = プレイヤー実ダイス合計、ctx.enemyCurrentHP = プレイヤー実HP
-                        int playerTotal = ctx.enemyDiceTotal;
+                        int playerTotal = ctx.playerDiceTotal;
                         int stacks = (int)ctx.GetAccumulated(KPrioriteStacks);
                         int counter = playerTotal + stacks * PrioriteCounterPer;
                         if (counter > 0)
                         {
                             ctx.EnemyDealUnmitigable(counter, null);   // 軽減は無視・シールドは肩代わりする
-                            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[サン=ジョリオラ・コントラタック] 反撃{counter} (素{playerTotal}+プリオリテ{stacks}×{PrioriteCounterPer}, 不可避) → プレイヤーHP={ctx.enemyCurrentHP}");
+                            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[サン=ジョリオラ・コントラタック] 反撃{counter} (素{playerTotal}+プリオリテ{stacks}×{PrioriteCounterPer}, 不可避) → プレイヤーHP={ctx.playerCurrentHP}");
                         }
                         // シールドへ +25 確定ダメ
                         float s = ctx.GetAccumulated(KShield);
@@ -1461,8 +1461,8 @@ namespace ItemSystem.PassiveSkills.Effects
                         if (ctx.GetAccumulated(KP2RewardActive) > 0)
                         {
                             // 敵視点: ctx.playerCurrentHP = ボス自身のHP
-                            ctx.playerCurrentHP = System.Math.Max(0, ctx.playerCurrentHP - 15);
-                            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[サン=ジョリオラ・連勝報酬] +15ダメ → ボスHP={ctx.playerCurrentHP}");
+                            ctx.enemyCurrentHP = System.Math.Max(0, ctx.enemyCurrentHP - 15);
+                            if (UnityEngine.Debug.unityLogger.logEnabled) UnityEngine.Debug.Log($"[サン=ジョリオラ・連勝報酬] +15ダメ → ボスHP={ctx.enemyCurrentHP}");
                         }
                         // 次ターン分の報酬予約
                         ctx.accumulatedValues[KP2RewardPending] = 1;
