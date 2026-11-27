@@ -12,7 +12,7 @@ My project — Unity 3D ローグライク（ボードゲーム調・ダイス�
 ## Documentation
 
 - **入口: [docs/GAME.md](docs/GAME.md)** — 統合仕様書（設計・ロジック・仕様の正本）
-  - §23 が未決事項・残作業。**GAME.md は今の仕様の詳細で、変更ログではない**（経緯は git）
+  - §15 が未決事項・残作業。**GAME.md は今の仕様の詳細で、変更ログではない**（経緯は git）
 - [docs/design-rejects.md](docs/design-rejects.md) — **設計アイデアの棄却記録**（実装前に落とした案と理由）。
   新しいアイデアを出す前に読む
 - **[docs/experience-goal.md](docs/experience-goal.md) — 体験の大目標**（2026-11-17・作者の宣言）。「俺ツエーの回」と「引きの悪さを知識で乗り切る回」の両方を持つ。
@@ -37,12 +37,12 @@ My project — Unity 3D ローグライク（ボードゲーム調・ダイス�
 
 - ピクセル要素（PPU=32）の状態表現に `transform.localScale` 倍率を使わない（色/明度/別スプライト）。
 - ボスの数値は隠し倍率禁止・実数値を直接調整（正本は [BossParams.cs](Assets/Scripts/CombatSystem/BossParams.cs)。
-  [docs/GAME.md](docs/GAME.md) §13-3）。
-- 戦闘は **ADR-0009 相互攻撃モデル**（GAME.md §6）だけ。旧ロール勝負の経路は削除済み。
-- 呼び名: **ランの中の持ち物は「秘宝」、ラン外の成長は「整備盤」と「パネル」**（2026-11-12〜・遺物は 2026-11-23 に撤去して整備盤へ統合・GAME.md §15-1）。
+  [docs/GAME.md](docs/GAME.md) §8）。
+- 戦闘は **ADR-0009 相互攻撃モデル**（GAME.md §3）だけ。旧ロール勝負の経路は削除済み。
+- 呼び名: **ランの中の持ち物は「秘宝」、ラン外の成長は「整備盤」と「パネル」**（2026-11-12〜・遺物は 2026-11-23 に撤去して整備盤へ統合・GAME.md §9-1）。
   画面の文で持ち物を「パッシブ」「遺物」と呼ばない。敵の常時効果は「パッシブ」のまま。
-  識別子（`passive*`）・`event_list.txt` の効果の書式は変えない（GAME.md §2-7）。
-- 用語: 「ダイス合計+N」は**禁止語彙**。攻撃+N / 出目+N / 端子配線合計+N を使う（GAME.md §2-7）。
+  識別子（`passive*`）・`event_list.txt` の効果の書式は変えない（GAME.md §0-4）。
+- 用語: 「ダイス合計+N」は**禁止語彙**。攻撃+N / 出目+N / 端子配線合計+N を使う（GAME.md §0-4）。
 - シングルトンは `_shuttingDown` + `[RuntimeInitializeOnLoadMethod]` パターンを守る。
 - **フォントの指定は [GameFont.cs](Assets/Scripts/UI/GameFont.cs) の 1 か所だけ**（2026-11-04〜）。画面ごとにフォントの欄を持たせない ──
   TMP の字は `GameFont.Apply`、液晶のドット字は `Game2DJpFont`（`Tools/bake_jpfont.py` が GameFont.cs の指定を読んで焼く）。
