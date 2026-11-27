@@ -122,7 +122,7 @@ namespace ItemSystem.PassiveSkills
         /// 立った役は <see cref="CombatContext.firedRolesThisTurn"/> の最後。 〈曇りの合わせ鏡〉の重ねた効果・〈宿命の音叉〉のもう 1 回では鳴らない (役が立ったのではない)。
         /// ここで足す攻撃 +N (ctx.mutualAttackBonus) は撃ごとに乗る。</summary>
         OnRoleFired,
-        /// <summary>ボスの目盛りを割ってダウンが決まった (量 = 割った目盛りの数)。 通常攻撃で割った (主攻撃・〈目盛り削りのノミ〉) か、 ひびの猶予が切れて割れたかは
+        /// <summary>ボスの目盛りを割ってダウンが決まった (量 = 割った目盛りの数)。 通常攻撃で割った (主攻撃・〈瞬光ランタン〉) か、 ひびの猶予が切れて割れたかは
         /// <see cref="Keywords.Kw.BossDownCrackKey"/> (1 = ひび) で分ける。 通常攻撃の割れは撃の輪の中、 ひびの割れはターンの終わりに鳴る。</summary>
         OnBossDown,
         /// <summary>敵の大技を取り消した (量 = 1): ダウンがチャージか大技のターンに重なった (ターンの頭・CombatManager.BeginBossDownTurnCore) か、

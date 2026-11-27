@@ -13,22 +13,22 @@ namespace CombatSystem
         /// <summary>〈鎧割りの酸瓶〉をこの戦闘で使った数 (ctx.accumulatedValues)。 ヴェスカの形態の交代 (防御を入れ直す) の後にも同じだけ引く。</summary>
         public const string TacticAcidKey = "tactic.acid";
 
-        /// <summary>〈目盛り削りのノミ〉: 敵に <paramref name="dmg"/> のダメージ。 敵の HP を減らす口 (<see cref="HpLossDiag.Lose"/>) を通すので、 最終与ダメージ倍率・怠惰・ダウンの ×1.5 は
+        /// <summary>〈瞬光ランタン〉: 敵に <paramref name="dmg"/> のダメージ。 敵の HP を減らす口 (<see cref="HpLossDiag.Lose"/>) を通すので、 最終与ダメージ倍率・怠惰・ダウンの ×1.5 は
         /// 主攻撃以外と同じに掛かる (敵の防御は掛からない)。 目盛りは<b>通常攻撃として</b>割る (<see cref="NoteBossDownMainHit"/>・ひびの入った目盛りもダウン)。
         /// 戻り値 = 使えたか (敵が倒れていれば使えない)。</summary>
-        /// <summary>〈目盛り削りのノミ〉の混乱 +N (2026-11-26・仮置き)。</summary>
+        /// <summary>〈瞬光ランタン〉の混乱 +N (2026-11-26・仮置き)。</summary>
         public const int ChiselGauge = 10;
 
         public bool TacticChisel(CombatContext ctx, int dmg)
         {
             if (!isCombatActive || ctx == null || enemyHP <= 0 || dmg <= 0) return false;
             int before = enemyHP;
-            HpLossDiag.Lose(ref enemyHP, dmg, "目盛り削りのノミ");
+            HpLossDiag.Lose(ref enemyHP, dmg, "瞬光ランタン");
             int dealt = before - enemyHP;
             ctx.enemyCurrentHP = enemyHP;
             EnemyHpLedger.CtxOverwritten();   // [計装]
             if (enemyHP > 0) AddBossGauge(ChiselGauge);   // 2026-11-26: 目盛り → 混乱ゲージ
-            if (Debug.unityLogger.logEnabled) Debug.Log($"[目盛り削りのノミ] 敵に {dealt}・混乱 +{ChiselGauge} → 敵HP {enemyHP}");
+            if (Debug.unityLogger.logEnabled) Debug.Log($"[瞬光ランタン] 敵に {dealt}・混乱 +{ChiselGauge} → 敵HP {enemyHP}");
             return true;
         }
 

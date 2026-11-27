@@ -13,7 +13,7 @@ namespace AutoTest
     /// (TerminalBattleState の ignoreCond / doubleAll・針の印・手札の引き直し) で組み、 今ターンの最良の効用 (<see cref="BestDeckUtilityOver"/>・
     /// 配線と同じ列挙と HP の帳簿) を使わない場合と比べる。 差が「取っておく値」(<see cref="TacticKeepValue"/>) より大きい物のうち、 差が一番大きい 1 つだけ使う (1 ターン 1 つ)。</para>
     /// <para><b>規則の 4 つ</b>: 鎧割りの酸瓶 (戦闘の頭・エリートかボス・敵の防御 6 以上)・反転の砂 (ボス戦・エスカレーションの段 2 以上)・
-    /// 複製の水銀 (ボス戦の頭・手札で素の点が一番高い端子)・目盛り削りのノミ (ボス戦・鑿の削りだけで目盛りが割れ、 そのダウンが大技のチャージか大技のターンに重なり、
+    /// 複製の水銀 (ボス戦の頭・手札で素の点が一番高い端子)・瞬光ランタン (ボス戦・鑿の削りだけで目盛りが割れ、 そのダウンが大技のチャージか大技のターンに重なり、
     /// 今ターンの最良の挿し方では割れない時)。</para>
     /// <para>乱数: 風替わりの羽根の引き直しの見込みは専用の乱数 (盤面から決まる種) で引く。 GameRng は引かない。</para>
     /// </summary>
@@ -167,7 +167,7 @@ namespace AutoTest
             return (float)(acc / TacticSwapSamples);
         }
 
-        /// <summary>目盛り削りのノミの規則: 鑿の削り (通常攻撃として目盛りを見る) だけで目盛りが割れ、 次のターン (ダウンのターン) が大技のチャージか大技のターンで、
+        /// <summary>瞬光ランタンの規則: 鑿の削り (通常攻撃として目盛りを見る) だけで目盛りが割れ、 次のターン (ダウンのターン) が大技のチャージか大技のターンで、
         /// 何もしなくても次がダウンではなく、 今ターンの最良の挿し方の主攻撃では割れない時。 割れ方は本体と同じ規則 (<see cref="DownForecast"/> → BossDown.ForecastTurn)。</summary>
         private bool ChiselBreaksIntoHeavy(int[] rolls, MutualTurnTelegraph tele, EnemyData enemy)
         {

@@ -186,7 +186,7 @@ namespace GameLoop
         //   店の消費の 3 枠目に 1 種 (ShopManager・乱数キー "shop.consTactic")。 戦闘中だけ使える。
         public const string ConsTacticFamily = "tactic";
         public const string TacticSwap = "風替わりの羽根", TacticOil = "無銘の潤滑油", TacticAcid = "鎧割りの酸瓶", TacticNeedle = "急所突きの針",
-            TacticChisel = "目盛り削りのノミ", TacticSand = "反転の砂", TacticOrb = "倍化の共鳴玉", TacticMercury = "複製の水銀";
+            TacticChisel = "瞬光ランタン", TacticSand = "反転の砂", TacticOrb = "倍化の共鳴玉", TacticMercury = "複製の水銀";
 
         // === 消耗品の連動品 (帯革・小瓶 = GeneralEffects.cs / 見本箱 = GoldEffects.cs) ===
         public const string LinkPouch = "帯革の薬嚢", LinkBottomless = "二度点きの燐寸", LinkSampleBox = "行商人の見本箱";

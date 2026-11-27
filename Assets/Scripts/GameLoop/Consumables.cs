@@ -300,7 +300,7 @@ namespace GameLoop
 
         /// <summary>〈鎧割りの酸瓶〉: 敵の防御から引く量 (この戦闘中・下限 0)。</summary>
         public const int AcidDefenseCut = 12;
-        /// <summary>〈目盛り削りのノミ〉: 敵へのダメージ。</summary>
+        /// <summary>〈瞬光ランタン〉: 敵へのダメージ。</summary>
         public const int ChiselDamage = 15;
         /// <summary>〈痛覚遮断剤〉: 発動したターンの攻撃の最終与ダメージ +N% (油・膏薬と同じ最終与ダメージの枠・2026-11-25 作者の決定・旧 +10 固定)。</summary>
         public const int PainkillerFinalPct = 50;

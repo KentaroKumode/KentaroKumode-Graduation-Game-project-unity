@@ -248,7 +248,7 @@ fixedDamageToPlayer ≥ 999 → playerHP = 0（死の宣告）
 |---|---|
 | 急所突きの針 | `accumulatedValues["tactic.needle"]` を立てる。 ADR-0016 の撃のループで、 攻撃のある最初の撃に `forceCritThisHit = true`・`playerArmorPen += DefenseFormula.IgnoreAll`（その撃の ApplyWinDamageModifiers の後に戻す）。 攻撃しないターンは持ち越す |
 | 鎧割りの酸瓶 | `enemyDefense = max(0, enemyDefense − 12)`（`Consumables.AcidDefenseCut`）。 ヴェスカの形態の交代では `ReapplyTacticAcid` が使った数 × 12 を引き直す |
-| 目盛り削りのノミ | 敵に 15（`ChiselDamage`）を `HpLossDiag.Lose(…, "目盛り削りのノミ")` で入れる（主攻撃以外と同じに 最終与ダメージ倍率・怠惰・ダウンの ×1.5 が掛かる・敵の防御は掛からない）。 その後 `NoteBossDownMainHit` を通す ＝ 目盛りは通常攻撃として割れる（ひびの入った目盛りも、 よろめきではなくダウン） |
+| 瞬光ランタン | 敵に 15（`ChiselDamage`）を `HpLossDiag.Lose(…, "瞬光ランタン")` で入れる（主攻撃以外と同じに 最終与ダメージ倍率・怠惰・ダウンの ×1.5 が掛かる・敵の防御は掛からない）。 その後 `NoteBossDownMainHit` を通す ＝ 目盛りは通常攻撃として割れる（ひびの入った目盛りも、 よろめきではなくダウン） |
 | 倍化の共鳴玉 | `TerminalBattleState.doubleAll = true`（このターン・BeginTurn で戻す）。 `TerminalCards.Resolve` の 5. で〈残響〉と同じ倍化 |
 | 無銘の潤滑油 | `TerminalBattleState.ignoreCond = true`（このターン・〈無形の構え〉と同じ旗） |
 | 切り捨ての半券（秘宝） | OnConsumableUse: そのターン 1 回 `AddOutgoingPct(0.25)`（与ダメ % の池・最終与ダメージ倍率ではない） |
@@ -653,7 +653,7 @@ s = `SwordDanceSet.SoloScale`（2026-11-20）: 持っている[剣の舞]（昇�
 | OnKeptTerminalUse | 残す印で前のターンから残した端子を発動したとき (`RaiseTerminalEvents`・名前で数える) | 挿した出目の合計 (最低 1) |
 | OnSupportTerminalUse | 補助の端子 (基本の〈時計〉を除く) を発動したとき (`RaiseTerminalEvents`・〈残響〉で 2 回働いても 1 回) | 挿した出目の合計 (最低 1) |
 | OnRoleFired | 役が立ったとき (2026-11-21・`CombatManager.ResolveRoles`・配線の解決の後・OnWired の前・〈曇りの合わせ鏡〉の重ねた効果・〈宿命の音叉〉のもう 1 回では鳴らない) | 強さ (2 個そろい 1 / ゾロ目・連なり 2) |
-| OnBossDown | ボスの目盛りを割ってダウンが決まったとき (2026-11-21)。 通常攻撃 = `NoteBossDownMainHit` (撃の輪の中・〈目盛り削りのノミ〉も)・旧い判定 AnyDamage のターンの終わり / ひび = `NoteBossDownTurnEnd`。 `Kw.BossDownCrackKey` (1 = ひび) で分ける | 割った目盛りの数 |
+| OnBossDown | ボスの目盛りを割ってダウンが決まったとき (2026-11-21)。 通常攻撃 = `NoteBossDownMainHit` (撃の輪の中・〈瞬光ランタン〉も)・旧い判定 AnyDamage のターンの終わり / ひび = `NoteBossDownTurnEnd`。 `Kw.BossDownCrackKey` (1 = ひび) で分ける | 割った目盛りの数 |
 | OnHeavyCanceled | 大技を取り消したとき (2026-11-21): ダウンがチャージか大技のターンに重なった (`BeginBossDownTurnCore`・ターンの頭) / 大技のターンに〈封じ・揃〉か端子の行動不能で敵が行動しなかった (敵の攻撃の解決) | 1 |
 | OnChargeGain / OnOvercharge | CombatContext.AddCharge | 増えた分 / 上限で捨てた分 (〈雷壷〉は上限が無く、 ターン終了時に上限超過の 1/4 を失う・2026-11-21 Phase 4 較正: 旧 1/2) |
 | OnChargeSpend | CombatContext.ConsumeCharge (リロールも通る) | 使った分 |
@@ -1181,7 +1181,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
            出目 +N・鋳造・〈号令の剣〉・怠惰の引き算・〈剛腕〉・端子の倍率・基礎攻撃は入らない。 振り直した後の面で数える。
          品の混乱 +N (固定値・CombatManager.AddBossGauge): 〈猛り〉撃ごと +1/+1/+2・〈シールドバッシュ〉撃ごと +1・〈黎明〉ジャスト防御 +3・〈画竜点睛〉+3 (1 ターン 1 回)・
            〈雷鯰の棘〉〈鎧縫いの針〉〈仕込みの切替器〉〈欠け目の見立て〉撃ごと +1・〈刃こぼれの見立て〉集中会心の撃 +2・〈避雷の杭〉〈紅の搾り具〉+3 (1 ターン 1 回)・
-           〈落城の礎石〉失ったシールド 5 につき +1 (1 ターン 4 まで)・【起爆】+3・臨界の爆発 +2・〈目盛り削りのノミ〉+10。
+           〈落城の礎石〉失ったシールド 5 につき +1 (1 ターン 4 まで)・【起爆】+3・臨界の爆発 +2・〈瞬光ランタン〉+10。
          満ちた瞬間 (gauge ≥ gaugeMax): gauge = 0・gaugeMax = BossDown.GrownMax(gaugeMax, 増え方) = max(gaugeMax + 1, round(gaugeMax × (1 + 増え方)))。
            効き方は ApplyInstantBreak (下の Instant と同じ: 山場のターン = 行動をキャンセルし次のターンは大ダウン ×2.0 / チャージ = 無効 / 小技 = よろめき)。
          敵の行動の後 (MarkBossGaugeLate より後) に足された分は預かり (_gaugeCarry)、 次のターンの頭 (BeginBossDownTurn・ダウンの判定の直後) で最初に AddBossGauge へ入れる。 大ダウンのターンは明けるまで預かったまま。
@@ -1196,7 +1196,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
              ひびが入ったターン c から、 c + 猶予 (BossDown.CrackGraceTurns = 1・口 downCrackGrace・負 = ひびでは割れない) のターンの終わりに、 上から順にひとりでに割れる
              (よろめき = 攻撃しないが ×1.5 なし・口 downCrackWeak=False で ×1.5 あり)。 1 ターンに両方割れたら、 通常攻撃の分が先・ひびの分が後 (BossDownState.pendingWeak)。
            ・HP に関係なく目盛りを割る・ひびを入れる品と規則は無い (2026-11-25 作者の決定・neon answer_gauge)。 品は「次の目盛りを上げる」(CombatManager.RaiseBossNextNotch・今の HP − 預けたダメージ − 1 まで =
-             上げるだけでは割れない) か「次のダウンを強める」(BuffNextBossDown / ExtendNextBossDown) だけ。 〈目盛り削りのノミ〉は通常攻撃として割る (NoteBossDownMainHit)。
+             上げるだけでは割れない) か「次のダウンを強める」(BuffNextBossDown / ExtendNextBossDown) だけ。 〈瞬光ランタン〉は通常攻撃として割る (NoteBossDownMainHit)。
            ・BOT の見込みは同じ規則の BossDown.ForecastTurn (本体の進め方との一致は Tools/rules_check の 14)。
            ・口 downBreakRule=AnyDamage = 旧い判定: ターンの終わりの敵の HP ≤ floor(最大 HP × 目盛り) になった目盛りの数だけ、 次のターンからダウンを待たせる (全部 ダウン)。
          **割った瞬間に効く規則 (2026-11-26・作者の決定・既定 DownCancelRule.Instant・BossDown.ClassifyInstant・GAME.md §23-36)**:
